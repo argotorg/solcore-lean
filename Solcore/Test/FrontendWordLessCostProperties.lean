@@ -1,4 +1,4 @@
-import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent exact paths for the existing ordered less-than Core expansion.

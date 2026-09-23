@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.FileRecoveryProperties
-import Solcore.Syntax.Parser.TriviaProperties
+import Solcore.Syntax.Parser.Trivia
 
 /-! Source-validity contracts for complete-file item accumulation. -/
 

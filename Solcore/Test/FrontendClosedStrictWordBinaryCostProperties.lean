@@ -1,5 +1,5 @@
 import Solcore.Frontend.StrictWordBinary
-import Solcore.Frontend.LocalExpressionCostExecutionProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /- Independent source cost for fourteen strict Word meanings. The two child
 costs and all three stores are supplied separately; no closed runner, typing,

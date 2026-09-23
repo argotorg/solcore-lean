@@ -1,5 +1,4 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageReadWriteProperties
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageReadProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
 
 /-! Compile-only regressions for proven-present total read/write coherence. -/
 

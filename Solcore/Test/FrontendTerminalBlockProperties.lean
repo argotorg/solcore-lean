@@ -1,8 +1,4 @@
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeStoreProperties
-import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
-import Solcore.Frontend.TypedLetReturnTreeRunnerTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnTreeLookupProperties
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Frontend.TypedLetReturnBody
 
 /-! Original terminal wrappers have no hidden binder or machine transition.

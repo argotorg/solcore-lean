@@ -1,8 +1,7 @@
-import Solcore.Frontend.ExpectedLambdaLetBodyTyping
+import Solcore.Frontend.Expected
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
-import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! An original lambda-let calls the old captured function, while the tail calls

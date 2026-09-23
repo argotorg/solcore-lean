@@ -1,5 +1,5 @@
-import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.Expected
+import Solcore.Frontend.LocalExpressionTyping
 
 /- Symbolic Bool body and direct/saved call data images.
 Saved IDs inherit LocalTypeInputs NoDup; duplicate spellings/foreign owners remain possible.

@@ -1,4 +1,4 @@
-import Solcore.Frontend.ExpectedDataLambdaApplicationOwnerProperties
+import Solcore.Frontend.Expected
 
 /- Old, renamed, and Core paths are concrete before either owner/data-lambda
 bridge is consumed.  The fixture deliberately has no runtime typing premise. -/

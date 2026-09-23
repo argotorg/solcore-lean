@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDelta
 import Solcore.Test.Adr0148CheckedAccountCreationFixture
 
 /-! External consumers and actual checked creation-preparation regressions. -/

@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeCoreDeclarationExactnessProperties
-import Solcore.Syntax.Parser.ImplDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Impl
 
 /-! Unconditional executable exactness for implementation declarations. -/
 

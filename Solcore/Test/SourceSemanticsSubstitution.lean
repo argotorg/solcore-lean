@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.TraitSubstitutionProperties
-import Solcore.SourceSemantics.GraphSubstitutionProperties
+import Solcore.SourceSemantics.Graph
 
 /-!
 Focused public checks for rigid substitution through implementation matching,

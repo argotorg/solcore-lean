@@ -1,6 +1,4 @@
-import Solcore.Frontend.RecursiveLocalComputationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationEvaluationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent original syntax, arbitrary static types and unchecked actual

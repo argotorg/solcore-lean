@@ -1,6 +1,4 @@
-import Solcore.Frontend.TerminalReturnTreeExecutionProperties
-import Solcore.Frontend.TerminalReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TerminalReturnTreeProperties
+import Solcore.Frontend.TerminalReturnTree
 
 /-! Recursive selected paths retain actual values, stores and pending frames.
 Identity alignment is separate from value typing; no tree runner is introduced. -/

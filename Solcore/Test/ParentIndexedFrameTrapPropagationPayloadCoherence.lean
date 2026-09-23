@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayloadCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayload
 import Solcore.ContractRuntime.ParentIndexedFrameContinuationConstruction
 
 /-! Compile regressions for parent-indexed trap payload coherence. -/

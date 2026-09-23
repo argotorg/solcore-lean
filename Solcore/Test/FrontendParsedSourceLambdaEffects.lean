@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceLambdaEvaluationProperties
+import Solcore.Frontend.SourceLambdaEvaluation
 import Solcore.Frontend.LocalReference
 import Solcore.Resolved.LocalScope
 import Solcore.Syntax.Parser.Term

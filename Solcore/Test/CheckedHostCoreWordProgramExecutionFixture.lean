@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.CheckedHostCoreWordProgramExecutionProperties
+import Solcore.ContractRuntime.CheckedHostCoreWordProgram
 import Solcore.Test.ParentIndexedSelectedExecutionFixture
 
 /-! Shared direct-execution fixtures for checked Word return tests. -/

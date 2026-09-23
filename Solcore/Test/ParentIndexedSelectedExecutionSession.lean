@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedSelectedExecutionSessionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecution
 import Solcore.Test.ParentIndexedSelectedExecutionFixture
 
 /-! Executable regressions for proof-refined selected execution sessions. -/

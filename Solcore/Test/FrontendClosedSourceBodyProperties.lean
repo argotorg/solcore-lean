@@ -1,4 +1,4 @@
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /-! Heterogeneous original tuples and all nine body rules have independent
 closed derivations. Lookup witnesses, not evaluator callbacks, supply actual

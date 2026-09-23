@@ -1,7 +1,7 @@
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionCompilationOwnerProperties
-import Solcore.Frontend.LocalInputsTypeErasureRenamingProperties
-import Solcore.Frontend.RuntimeParametersOwnerProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeParameters
 
 /-! Type-only owner changes preserve complete compilation observations even
 when the declared nominal parameter has no runtime argument inhabitant. -/

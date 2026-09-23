@@ -1,5 +1,5 @@
 import Solcore.ContractRuntime.ContractWordCallInput
-import Solcore.ContractRuntime.TransactionHostStorageHandlerProperties
+import Solcore.ContractRuntime.TransactionHostStorage
 
 /-! Focused executable checks for transaction-aware log handling. -/
 

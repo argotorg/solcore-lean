@@ -1,4 +1,4 @@
-import Solcore.Frontend.BoundedCalleeLambdaDepthDecisionProperties
+import Solcore.Frontend.BoundedCalleeLambdaDepth
 
 /- A finite chain returns the same full saved identity datum passed by caller x.
 Original creation/calls and direct runner recursion precede bounded-callee laws.

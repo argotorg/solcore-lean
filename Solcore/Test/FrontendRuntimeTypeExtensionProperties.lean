@@ -1,6 +1,4 @@
-import Solcore.Frontend.RuntimeFunctionTypeExtensionProperties
-import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Preserve actual input bundles, not merely their static projections.
 Original annotations, independent provenance and manual paths fix expectations. -/

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
-import Solcore.Frontend.ReturnBodyFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.ReturnBody
 
 /-! Complete source parsing connects monomorphic Word equality to Bool results,
 ordered pending frames, conservative budgets, and genuine one-step resumption. -/

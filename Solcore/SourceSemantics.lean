@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.Instantiation
 import Solcore.SourceSemantics.Substitution
 import Solcore.SourceSemantics.SubstitutionCorrespondence
-import Solcore.SourceSemantics.GraphSubstitutionProperties
+import Solcore.SourceSemantics.Graph
 import Solcore.SourceSemantics.Traits
 import Solcore.SourceSemantics.Typing
 import Solcore.SourceSemantics.Requirements
@@ -15,7 +15,6 @@ import Solcore.SourceSemantics.Operators
 import Solcore.SourceSemantics.Calls
 import Solcore.SourceSemantics.Patterns
 import Solcore.SourceSemantics.Places
-import Solcore.SourceSemantics.Graph
 import Solcore.SourceSemantics.Ownership
 import Solcore.SourceSemantics.Control
 import Solcore.SourceSemantics.Static

@@ -1,7 +1,6 @@
-import Solcore.Frontend.ClosedSourceDataExpression
-import Solcore.Frontend.ClosedSourceEvaluation
-import Solcore.Frontend.LocalExpressionEvaluationRules
-import Solcore.Frontend.RuntimeValueProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalExpressionEvaluation
+import Solcore.Frontend.RuntimeValue
 
 /- Independent shape/image/alignment counterexamples, not failures inferred from a budget. -/
 set_option autoImplicit false

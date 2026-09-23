@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationContinuationContextCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitialization
 
 /-! Compile-only regressions for initialization continuation-context coherence. -/
 

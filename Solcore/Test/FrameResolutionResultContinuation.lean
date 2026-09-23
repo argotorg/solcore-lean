@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameResolutionResultContinuation
+import Solcore.ContractRuntime.FrameResolutionResult
 
 /-! Executable branch and payload tests for frame resolution continuation. -/
 

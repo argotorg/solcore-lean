@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionProperties
-import Solcore.ContractRuntime.HostStorageDriverProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution
+import Solcore.ContractRuntime.HostStorageDriver
 
 /-! End-to-end regressions for strict optional big-endian input-word reads. -/
 

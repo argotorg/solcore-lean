@@ -1,13 +1,8 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.TypeNameProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
-import Solcore.Frontend.ComputationReturnTreeRuntimeSafetyProperties
-import Solcore.Frontend.ComputationBindingScopeProperties
-import Solcore.Frontend.ComputationReturnTreeRuntimeCheckpointProperties
+import Solcore.Frontend.TypeName
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.Computation
 import Solcore.Core.FuelResumptionProperties
 /-! Original mixed bodies, sparse caller rows, independently counted source rules
 and literal Core scripts connect actual effects to same-world runtime safety. -/

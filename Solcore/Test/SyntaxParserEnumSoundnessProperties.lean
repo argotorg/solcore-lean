@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.EnumDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Enum
 
 /-! External consumers for algebraic-enum grammar soundness. -/
 

@@ -1,7 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
+import Solcore.Frontend.TypedLetReturnTree
 
 /-! Completely parsed original blocks, independent raw certificates and separate
 Core/value/cost expectations. Direct evaluation neither checks nor changes entry policy. -/

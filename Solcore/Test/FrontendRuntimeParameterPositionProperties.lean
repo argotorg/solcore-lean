@@ -1,4 +1,4 @@
-import Solcore.Frontend.RuntimeFunctionParameterReturnProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! ADR-0171: actual paired lookups justify reversed positions. Equal argument
 types do not identify values, and saturated subtraction is not a bounds proof. -/

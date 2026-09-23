@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.ImportProperties
-import Solcore.Syntax.Parser.ModulePathSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! Success soundness of diagnostic-free canonical plain imports. -/
 

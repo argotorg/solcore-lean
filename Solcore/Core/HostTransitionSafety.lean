@@ -1,5 +1,5 @@
 import Solcore.Core.HostCoreTransitionSafety
-import Solcore.Core.HostMachineProperties
+import Solcore.Core.HostMachine
 
 /-! Type preservation at the executable Core/host boundary. -/
 

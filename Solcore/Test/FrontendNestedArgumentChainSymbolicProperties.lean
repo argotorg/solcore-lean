@@ -1,4 +1,4 @@
-import Solcore.Frontend.BoundedInputsLambdaDepthDecisionProperties
+import Solcore.Frontend.BoundedInputsLambdaDepth
 
 /- Independent original identity calls and direct runner recursion precede the
 two supplied-input laws. Nested arguments are call syntax outside the data gate.

@@ -1,4 +1,4 @@
-import Solcore.Abi.StaticWordContract
+import Solcore.Abi.StaticWord
 import Solcore.ContractRuntime.WorldStateDelta
 
 /-! Explicit ABI/world fixture for the first Static Word vertical execution. -/

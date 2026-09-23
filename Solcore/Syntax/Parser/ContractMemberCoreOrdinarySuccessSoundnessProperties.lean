@@ -3,10 +3,10 @@ import Solcore.Syntax.Parser.ConstructorDeclarationOrdinarySuccessSoundnessPrope
 import Solcore.Syntax.Parser.ContractFieldOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.ContractMemberCoreSoundnessProperties
 import Solcore.Syntax.Parser.CoreTermPublicOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.EnumDeclarationOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.FallbackDeclarationOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.TypeAliasDeclarationOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! Broad ordinary-success reflection for attribute-free contract members. -/
 

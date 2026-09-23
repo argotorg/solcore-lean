@@ -1,9 +1,9 @@
 import Solcore.Core.Check
-import Solcore.Core.HostMachineProperties
+import Solcore.Core.HostMachine
 import Solcore.Core.HostRunner
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
-import Solcore.ContractRuntime.CheckedHostCoreProgramProperties
+import Solcore.ContractRuntime.CheckedHostCoreProgram
 
 /-! Focused admission and runtime regressions for the Core host boundary. -/
 

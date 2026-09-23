@@ -1,4 +1,4 @@
-import Solcore.Frontend.RuntimeValueOwnerProperties
+import Solcore.Frontend.RuntimeValue
 
 /- Handwritten nested values exercise literal Core code, tags, locations and
 duplicate rows. Direct structural calculations precede the representation laws. -/

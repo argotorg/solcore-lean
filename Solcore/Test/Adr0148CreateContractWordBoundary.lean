@@ -1,7 +1,7 @@
 import Solcore.Core.HostProgress
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
-import Solcore.ContractRuntime.ContractCallFailureProperties
+import Solcore.ContractRuntime.ContractCallFailure
 import Solcore.ContractRuntime.ContractWordCallInput
 import Solcore.ContractRuntime.HostStorageHandler
 

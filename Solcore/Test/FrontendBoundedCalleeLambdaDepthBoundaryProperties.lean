@@ -1,4 +1,4 @@
-import Solcore.Frontend.BoundedCalleeLambdaDepthDecisionProperties
+import Solcore.Frontend.BoundedCalleeLambdaDepth
 
 /- An independently successful inner identity call returns the actual outer
 source closure. Original outer-call exclusions precede finite-depth decisions;

@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativePublicSourceFileOutcomeProperties
 import Solcore.Syntax.Parser.CompleteOutputProperties
-import Solcore.Syntax.Parser.NestingOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Nesting
 import Solcore.Syntax.Parser.SourceFileOrdinaryOutcomeSoundnessProperties
 
 /-! Broad syntax outcomes at both public canonical parser boundaries. -/

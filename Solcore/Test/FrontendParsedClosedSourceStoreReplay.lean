@@ -1,7 +1,4 @@
-import Solcore.Frontend.ClosedSourceStoreProperties
-import Solcore.Frontend.ClosedSourceEvaluatorStoreProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Literal runtime values and saved lexical fields survive store replacement.

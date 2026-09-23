@@ -1,4 +1,4 @@
-import Solcore.Frontend.ExpectedLambdaArgumentApplication
+import Solcore.Frontend.Expected
 
 /-!
 This standalone singleton-call adapter accepts an immediate conditional

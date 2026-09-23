@@ -1,6 +1,6 @@
-import Solcore.ContractRuntime.AccountCodeProperties
+import Solcore.ContractRuntime.Account
 import Solcore.ContractRuntime.TopLevelExecution
-import Solcore.ContractRuntime.WorldStateProperties
+import Solcore.ContractRuntime.WorldState
 
 /-! Read-only checked program observing every direct top-level address/input role. -/
 

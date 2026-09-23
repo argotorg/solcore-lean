@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateCodeWriteProperties
+import Solcore.ContractRuntime.WorldStateCode
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! External and executable checks for checked-code replacement. -/

@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameResolutionResultTrapReasonMap
+import Solcore.ContractRuntime.FrameResolutionResult
 
 /-! Definition-only tests for total-resolution trap-reason mapping. -/
 

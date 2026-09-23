@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameContinuationContextContinueTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameContinuationContext
 
 /-! Compile-only regressions for continuation-result invariance. -/
 

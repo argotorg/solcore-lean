@@ -1,4 +1,4 @@
-import Solcore.Syntax.YulStatementValidity
+import Solcore.Syntax.Yul
 
 /-! External consumers for recursive inline-Yul statement validity. -/
 

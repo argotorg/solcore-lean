@@ -1,8 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalComputationReturnTreeTypingProperties
-import Solcore.Frontend.LocalComputationReturnTreeCostProperties
-import Solcore.Frontend.LocalComputationReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeApplicationFunctionFactorizationProperties
+import Solcore.Frontend.LocalComputation
+import Solcore.Frontend.RuntimeApplicationFunction
 import Solcore.Core.FuelResumptionProperties
 /-! Original functions supply parameters, not a new whole-function endpoint.
 Source certificates and explicit Core transition scripts have separate fixed expectations. -/

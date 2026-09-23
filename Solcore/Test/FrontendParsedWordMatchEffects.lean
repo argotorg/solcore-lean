@@ -1,16 +1,11 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.ComputationFunctionFactorizationProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
-import Solcore.Frontend.RuntimeComputationFunctionFactorizationProperties
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.RuntimeComputationFunction
 import Solcore.Frontend.RuntimeArgumentConstruction
 import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.ComputationFunctionRuntimeSafetyProperties
 import Solcore.Core.FuelResumptionProperties
 /-! Original literal cases, preparation and source costs are independent of the
 literal Core walker. Allocation exposes repeated scrutinees and selected effects. -/

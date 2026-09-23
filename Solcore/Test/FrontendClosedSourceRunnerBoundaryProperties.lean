@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 set_option autoImplicit false
 namespace Tests.ClosedSourceRunnerBoundaries

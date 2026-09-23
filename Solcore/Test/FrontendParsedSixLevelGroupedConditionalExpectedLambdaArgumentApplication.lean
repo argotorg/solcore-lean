@@ -1,5 +1,5 @@
 import Solcore.Frontend.SixLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithFiveLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 set_option autoImplicit false

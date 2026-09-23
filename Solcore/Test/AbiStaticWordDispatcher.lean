@@ -1,7 +1,6 @@
-import Solcore.Abi.StaticWordCodec
-import Solcore.Abi.StaticWordDispatcher
+import Solcore.Abi.StaticWord
 import Solcore.ContractRuntime.HostStorageDriver
-import Solcore.ContractRuntime.WorldStateProperties
+import Solcore.ContractRuntime.WorldState
 
 /-! Compile-time and runtime consumers for checked Static Word dispatchers. -/
 

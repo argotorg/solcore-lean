@@ -1,7 +1,6 @@
-import Solcore.Frontend.LocalInputsProperties
-import Solcore.Frontend.LocalInputsExecutionProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.LocalExpressionEvaluationProperties
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.LocalExpressionEvaluation
 
 /-! Shared typed inputs keep identity order synchronized. Fresh identity
 allocation does not prevent deliberate first-match spelling shadowing. -/

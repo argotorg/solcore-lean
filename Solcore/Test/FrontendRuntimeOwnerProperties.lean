@@ -1,8 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
-import Solcore.Frontend.LocalInputsRenamingProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Owner changes relabel identities, not positional Core or runtime values.
 Independent entry witnesses retain every header and parameter restriction. -/

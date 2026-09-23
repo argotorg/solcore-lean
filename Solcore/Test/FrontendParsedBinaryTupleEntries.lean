@@ -1,7 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Complete declarations use named aliases and one structural return annotation,
 not multiple returns. Raw source and fixed Core certificates are separate. -/

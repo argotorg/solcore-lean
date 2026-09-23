@@ -1,8 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalFunctionApplicationProperties
-import Solcore.Frontend.RuntimeFunctionEntryProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original whole declarations still fail the old entry profile. Their root

@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceLambdaEvaluationProperties
+import Solcore.Frontend.SourceLambdaEvaluation
 
 /-! Deliberately small callback models isolate raw success from body availability
 and from each independent determinism premise. They are not a closed evaluator. -/

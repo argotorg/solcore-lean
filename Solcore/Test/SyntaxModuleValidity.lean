@@ -1,4 +1,4 @@
-import Solcore.Syntax.ModuleValidity
+import Solcore.Syntax.Module
 
 /-! External consumers for canonical module declaration validity. -/
 

@@ -1,8 +1,7 @@
-import Solcore.Frontend.ComputationFunctionOwnerProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original f,x parameters bind in written order before arbitrary repeated

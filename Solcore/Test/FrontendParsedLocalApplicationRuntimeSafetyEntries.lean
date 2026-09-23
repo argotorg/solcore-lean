@@ -1,10 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalFunctionApplicationRuntimeSafetyProperties
-import Solcore.Frontend.LocalFunctionApplicationRuntimeStateProperties
-import Solcore.Frontend.RuntimeFunctionEntryProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.LocalInputsProperties
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Core.FuelResumptionProperties
 
 /-! The original parameter binding is checked against an actual runtime world.

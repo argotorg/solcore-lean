@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.TopLevelExecutionResumption
+import Solcore.ContractRuntime.TopLevelExecution
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! Executable end-to-end regressions for ADR-0145 top-level finalization. -/

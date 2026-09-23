@@ -1,5 +1,5 @@
 import Solcore.Frontend.SourceRuntimeDeepProperties
-import Solcore.Frontend.SourceRuntimeLinkingSafetyProperties
+import Solcore.Frontend.SourceRuntimeLinking
 
 /-! Deep graph preservation at the checked and linked entry boundaries. -/
 

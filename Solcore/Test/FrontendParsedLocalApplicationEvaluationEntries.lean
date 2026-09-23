@@ -1,9 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalFunctionApplicationExecutionProperties
-import Solcore.Frontend.RuntimeFunctionEntryProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.LocalInputsProperties
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original whole declarations retain their entry rejection. Independent

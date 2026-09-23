@@ -1,4 +1,4 @@
-import Solcore.Frontend.ComputationReturnTreeProperties
+import Solcore.Frontend.Computation
 
 /-! Source-only protection is independent of branch execution or child checking.
 Bare if scopes differ from explicit blocks and match arms in the pinned resolver. -/

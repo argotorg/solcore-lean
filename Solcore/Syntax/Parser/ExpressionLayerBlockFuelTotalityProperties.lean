@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.ExpressionLayerFuelContractProperties
-import Solcore.Syntax.Parser.Expression.AtomCoreTotalityProperties
+import Solcore.Syntax.Parser.Expression.Atom
 import Solcore.Syntax.Parser.Expression.LambdaTotalityProperties
 import Solcore.Syntax.Parser.Expression.PostfixTailFuelTotalityProperties
 

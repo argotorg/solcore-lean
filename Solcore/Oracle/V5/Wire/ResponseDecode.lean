@@ -3,7 +3,7 @@ import Solcore.Oracle.V5.Wire.ObservationDecode
 import Solcore.Oracle.V5.Wire.Protocol
 import Solcore.Oracle.V5.Wire.RequestShape
 import Solcore.Oracle.V5.Wire.ResponseEncode
-import Solcore.Oracle.V5.Wire.ScenarioDiagnosticDecode
+import Solcore.Oracle.V5.Wire.ScenarioDiagnostic
 
 /-! Strict query-indexed decoding for complete Oracle v5 responses. -/
 

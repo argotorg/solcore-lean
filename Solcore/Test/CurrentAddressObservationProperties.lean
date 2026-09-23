@@ -1,6 +1,6 @@
-import Solcore.ContractRuntime.CheckedHostCoreProgramProperties
-import Solcore.ContractRuntime.HostStorageDriverProperties
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationSelectedExecutionResumptionProperties
+import Solcore.ContractRuntime.CheckedHostCoreProgram
+import Solcore.ContractRuntime.HostStorageDriver
+import Solcore.ContractRuntime.ParentIndexedSelectedExecution
 
 /-! Compile-only consumers for run-fixed current-address proof contracts. -/
 

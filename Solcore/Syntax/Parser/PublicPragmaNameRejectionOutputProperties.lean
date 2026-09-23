@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.LexedValidationOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.LexedValidation
 import Solcore.Syntax.Parser.PragmaNameRejectionTraceProperties
 import Solcore.Syntax.Parser.PublicSourceFileExecutionWitnessProperties
 import Solcore.Syntax.Parser.SourceFileBoundaryStopTraceProperties

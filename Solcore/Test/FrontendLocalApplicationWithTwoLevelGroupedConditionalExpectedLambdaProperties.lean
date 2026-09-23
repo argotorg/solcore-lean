@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithTwoLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Machine
 import Solcore.Core.Correspondence
 

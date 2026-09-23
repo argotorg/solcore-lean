@@ -1,5 +1,5 @@
 import Solcore.Core.ContractCallWordResultProperties
-import Solcore.ContractRuntime.ContractCallFailureProperties
+import Solcore.ContractRuntime.ContractCallFailure
 import Solcore.ContractRuntime.ContractWordCallInput
 import Solcore.ContractRuntime.HostStorageHandler
 

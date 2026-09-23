@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceOwnerCoreBodyProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Actual parser, checker/lowering, raw evaluators and Core machine all run before

@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteIsolationProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
 
 /-! Compile-only regressions for proven-present total-write isolation. -/
 

@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.AccountNonceIncrementProperties
+import Solcore.ContractRuntime.Account
 import Solcore.ContractRuntime.CreationAddressPolicy
 
 /-! External compile and executable checks for creation foundation APIs. -/

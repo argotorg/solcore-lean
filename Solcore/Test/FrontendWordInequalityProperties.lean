@@ -1,10 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.LocalInputsCostInvariance
-import Solcore.Frontend.LocalInputsRenamingProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Frontend.LocalExpressionResumptionProperties
 
 /-! Independent Word-only inequality returns Bool while preserving strict operand

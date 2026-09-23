@@ -1,4 +1,4 @@
-import Solcore.Frontend.ClosedSourceOwnerCoreBodyProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Core.DirectWordComparisons
 
 /- Independent checker, exact-ID, Core, and old/mapped raw paths precede the bridge.

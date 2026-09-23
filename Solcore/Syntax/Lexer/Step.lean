@@ -1,4 +1,4 @@
-import Solcore.Syntax.Lexer.StateOrder
+import Solcore.Syntax.Lexer.State
 import Solcore.Syntax.Lexer.ScanProperties
 
 set_option autoImplicit false

@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ModulePathTotalityProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! External consumers for module-path totality. -/
 

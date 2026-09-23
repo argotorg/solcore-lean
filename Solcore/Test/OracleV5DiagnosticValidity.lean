@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.DiagnosticExecutionValidity
+import Solcore.Oracle.V5.Diagnostic
 
 /-! Semantic regressions for the sealed Oracle v5 diagnostic catalog. -/
 

@@ -1,7 +1,5 @@
-import Solcore.Frontend.ClosedSourceShortCircuitProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalExpressionCostExecutionProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Syntax.Parser.Term
 
 /-! Parsed IO consumers. Closed raw-store depth and independently costed

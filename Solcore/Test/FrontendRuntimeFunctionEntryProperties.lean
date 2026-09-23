@@ -1,7 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
-import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! ADR-0170: independent entry preparation checks the complete declared
 contract and retains exact Core. Returning a value is not a source call. -/

@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.BalanceTransferProperties
+import Solcore.ContractRuntime.BalanceTransfer
 
 /-! External compile consumers for every public balance-transfer theorem. -/
 set_option autoImplicit false

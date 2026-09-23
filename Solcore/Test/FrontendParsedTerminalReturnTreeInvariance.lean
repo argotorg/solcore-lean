@@ -1,13 +1,9 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TerminalReturnTreeRenamingProperties
-import Solcore.Frontend.TerminalReturnTreeStoreProperties
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
-import Solcore.Frontend.TerminalReturnTreeResumptionProperties
+import Solcore.Frontend.TerminalReturnTree
 import Solcore.Frontend.TerminalReturnBody
-import Solcore.Frontend.RuntimeFunctionCompilation
-import Solcore.Frontend.RuntimeFunctionEntry
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Frontend.LocalOwnerRenaming
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Resolved.LocalScope
 
 /-! Identity changes preserve complete results; store changes preserve their
 observations, with distinct actual checkpoints resumed independently. Raw

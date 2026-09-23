@@ -1,7 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.ReturnBodyResumptionProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.ReturnBody
 
 /-! Independent source costs and actual machine frames witness exact suffix
 execution. Resuming is not reinitializing or discarding a pending continuation. -/

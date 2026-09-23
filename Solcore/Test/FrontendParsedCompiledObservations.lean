@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionObservationProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Independently parsed declarations share observations through their actual
 ordered type contexts and exact Core trees, not their names or eventual values.

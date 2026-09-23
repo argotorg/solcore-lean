@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
-import Solcore.Frontend.ReturnBodyFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.ReturnBody
 
 /-! Fully parsed unsigned greater-than-or-equal negates two ordered Core lets.
 Both operands retain their original identities. Checkpoints, environments, and

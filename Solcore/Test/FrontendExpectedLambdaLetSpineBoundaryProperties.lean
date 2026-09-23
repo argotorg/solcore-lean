@@ -1,5 +1,4 @@
-import Solcore.Frontend.ExpectedLambdaLetBodyTyping
-import Solcore.Frontend.ExpectedLambdaLetSpineTyping
+import Solcore.Frontend.Expected
 
 /-! Artificial exact children distinguish maximal source dispatch from semantic
 fallback. Their deliberately mislabeled Core outputs carry no Core-typing claim. -/

@@ -1,7 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.TypedLetReturnTreeRawOwnerProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
-import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
+import Solcore.Frontend.TypedLetReturnTree
 
 /-! Original complete blocks and independent raw certificates on arbitrary caller
 rows. Owner collapse changes lookup; allocator noncommutation alone says less. -/

@@ -1,5 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionDelegationProperties
-import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionResumptionProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecution
 
 /-! Compile-only consumers for ADR-0144 provenance and resumption laws. -/
 

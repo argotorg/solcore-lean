@@ -1,9 +1,9 @@
 import Solcore.Syntax.Parser.Contract
 import Solcore.Syntax.Parser.DeclarationCanonicalProperties
 import Solcore.Syntax.Parser.DeriveCarrierProperties
-import Solcore.Syntax.Parser.EnumProperties
+import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.TypeRecursiveProperties
-import Solcore.Syntax.Parser.TypeAliasProperties
+import Solcore.Syntax.Parser.TypeAlias
 import Solcore.Syntax.ContractDeclarationValidity
 
 /-! Contracts for canonical contract declaration parsing. -/

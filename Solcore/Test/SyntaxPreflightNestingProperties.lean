@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.NestingOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Nesting
 
 /-! External consumers for nesting-diagnostic provenance. -/
 

@@ -1,9 +1,6 @@
-import Solcore.Frontend.RuntimeComputationFunctionProperties
-import Solcore.Frontend.RuntimeComputationFunctionFactorizationProperties
-import Solcore.Frontend.LocalComputationReturnTreeCostProperties
-import Solcore.Frontend.LocalComputationReturnTreeTypingProperties
-import Solcore.Frontend.LocalComputationReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeApplicationFunctionCompilation
+import Solcore.Frontend.RuntimeComputationFunction
+import Solcore.Frontend.LocalComputation
+import Solcore.Frontend.RuntimeApplicationFunction
 import Solcore.Core.FuelResumptionProperties
 import Solcore.Core.Safety
 

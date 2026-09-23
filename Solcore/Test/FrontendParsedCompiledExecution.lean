@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
+import Solcore.Frontend.RuntimeFunction
 
 /-! A cached result from complete source compilation determines full runtime
 states for many actual argument lists, including exact guard rejection. -/

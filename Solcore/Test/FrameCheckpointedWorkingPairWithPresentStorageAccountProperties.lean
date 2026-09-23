@@ -1,6 +1,5 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountProperties
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressProperties
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressStorageReadProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddress
 
 /-! Compile-only regressions for selected working Account refinement laws. -/
 

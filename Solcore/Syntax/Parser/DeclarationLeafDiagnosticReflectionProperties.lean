@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.FunctionParameterDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.SignatureLeafDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.TypeAliasRecoveryDiagnosticProperties
+import Solcore.Syntax.Parser.Signature
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! Backward diagnostic reflection for alias and enum declaration leaves. -/
 

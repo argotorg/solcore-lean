@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalComputationReturnTreeCostProperties
-import Solcore.Frontend.RuntimeComputationFunctionFactorizationProperties
-import Solcore.Frontend.RuntimeApplicationFunctionFactorizationProperties
+import Solcore.Frontend.LocalComputation
+import Solcore.Frontend.RuntimeComputationFunction
+import Solcore.Frontend.RuntimeApplicationFunction
 import Solcore.Core.FuelResumptionProperties
 /-! Original declarations and actual records precede source certificates and independent fixed Core transition scripts. -/
 set_option autoImplicit false

@@ -1,4 +1,4 @@
-import Solcore.Frontend.ClosedSourceDataDepthDecisionProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Test.FrontendClosedStrictWordBinarySymbolicProperties
 
 /- Independent original witnesses precede every new bounded-search law.

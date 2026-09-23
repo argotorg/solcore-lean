@@ -1,4 +1,4 @@
-import Solcore.Frontend.SelfApplicationCallNonreturnProperties
+import Solcore.Frontend.SelfApplication
 
 /- Original creations and successful input references precede non-return laws.
 Typed parameters remain inert syntax; no typing or live host/cell claim is made. -/

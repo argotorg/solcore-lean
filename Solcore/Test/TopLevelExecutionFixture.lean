@@ -1,6 +1,6 @@
-import Solcore.ContractRuntime.AccountCodeProperties
+import Solcore.ContractRuntime.Account
 import Solcore.ContractRuntime.TopLevelExecution
-import Solcore.ContractRuntime.WorldStateProperties
+import Solcore.ContractRuntime.WorldState
 
 /-! Checked program and explicit-state fixture for ADR-0145 top-level execution. -/
 

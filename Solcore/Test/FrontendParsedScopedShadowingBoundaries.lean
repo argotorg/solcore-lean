@@ -1,12 +1,10 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Test.FrontendComputationScopeBoundaryProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.WordMatchProperties
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.WordMatch
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original parsed branches distinguish scope guards from selected raw paths. -/

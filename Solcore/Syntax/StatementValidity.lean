@@ -1,6 +1,6 @@
 import Solcore.Syntax.ExpressionValidity
 import Solcore.Syntax.PatternValidity
-import Solcore.Syntax.YulStatementValidity
+import Solcore.Syntax.Yul
 
 /-! Recursive source-validity contracts for canonical Core statements. -/
 

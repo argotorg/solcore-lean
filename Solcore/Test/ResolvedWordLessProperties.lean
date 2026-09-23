@@ -1,8 +1,7 @@
-import Solcore.Resolved.RenamingProperties
-import Solcore.Resolved.ScopeExtensionProperties
-import Solcore.Resolved.ScopeExtensionReflectionProperties
+import Solcore.Resolved.Renaming
+import Solcore.Resolved.Scope
 import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Frontend.WordLessLocalRightCostProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Independent consumers use only the two original named operands. Positional
 Core bindings introduce no LocalIds, even with duplicate identities, nested

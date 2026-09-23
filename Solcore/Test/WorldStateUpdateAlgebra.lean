@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateUpdateAlgebraProperties
+import Solcore.ContractRuntime.WorldState
 
 /-! Compile-time and executable regressions for WorldState update algebra. -/
 

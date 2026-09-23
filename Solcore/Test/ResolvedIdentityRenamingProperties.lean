@@ -1,4 +1,4 @@
-import Solcore.Resolved.RenamingProperties
+import Solcore.Resolved.Renaming
 
 /-! Compile-time identity-renaming consumers. Injective index shifts preserve
 meaning, while a constant map captures an outer reference under an inner let. -/

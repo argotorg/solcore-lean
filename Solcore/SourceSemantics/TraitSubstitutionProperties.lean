@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.SubstitutionProperties
-import Solcore.SourceSemantics.GraphSubstitutionProperties
+import Solcore.SourceSemantics.Graph
 
 /-!
 Rigid-parameter substitution preserves declarative trait evidence.

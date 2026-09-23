@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceStrictWordBinaryProperties
+import Solcore.Frontend.ClosedSource
 
 /- Independent child witnesses precede semantic rejection of every whole endpoint.
 Both strict operands are required, including beside zero; mixed rows remain unrestricted. -/

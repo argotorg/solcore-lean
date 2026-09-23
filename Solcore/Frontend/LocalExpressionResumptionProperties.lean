@@ -1,5 +1,5 @@
 import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.LocalExpressionCostExecutionProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! A source cost determines the exact remaining path after genuine Core fuel
 exhaustion. Whole checking is preserved at the executable local-input boundary. -/

@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceDataBodyDepthDecisionProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original conditional and ordered-choice witnesses precede depth contracts.
 Mixed captures and complete stores remain arbitrary; no uniqueness or typing

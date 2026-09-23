@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalFunctionApplicationRuntimeSafetyProperties
-import Solcore.Frontend.LocalFunctionApplicationRuntimeStateProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original parsed children, independent actual world/store witnesses, and

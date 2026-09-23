@@ -1,5 +1,5 @@
 import Solcore.Resolved.Expr
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Resolved.LocalScope
 
 set_option autoImplicit false
 

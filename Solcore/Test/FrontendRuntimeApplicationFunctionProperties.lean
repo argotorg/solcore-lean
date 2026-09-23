@@ -1,6 +1,6 @@
-import Solcore.Frontend.RuntimeApplicationFunctionFactorizationProperties
-import Solcore.Frontend.LocalApplicationReturnBodyRunnerProperties
-import Solcore.Frontend.LocalInputsApplicationRuntimeProperties
+import Solcore.Frontend.RuntimeApplicationFunction
+import Solcore.Frontend.LocalApplication
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Original three-parameter declarations retain independent static and actual
 provenance. Swapping equally typed arguments changes values, not acceptance. -/

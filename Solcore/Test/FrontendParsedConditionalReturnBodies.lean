@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ConditionalReturnBodyFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
+import Solcore.Frontend.ConditionalReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! A fully parsed terminal statement conditional uses its separate body API
 and the integrated runtime entry. Actual typed parameters and returned

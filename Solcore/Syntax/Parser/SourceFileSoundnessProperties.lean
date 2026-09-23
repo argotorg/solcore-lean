@@ -50,8 +50,12 @@ theorem sourceFile_success_sound
         next.declarativeRemainder := by
   unfold sourceFile at result
   cases itemsResult : parseItems (input.remainingCount + 1) [] input with
-  | invariant error => simp [itemsResult] at result
-  | reject failure rejected => simp [itemsResult] at result
+  | invariant error =>
+      rw [itemsResult] at result
+      cases result
+  | reject failure rejected =>
+      rw [itemsResult] at result
+      cases result
   | ok rawItems afterItems =>
       simp only [itemsResult] at result
       cases result

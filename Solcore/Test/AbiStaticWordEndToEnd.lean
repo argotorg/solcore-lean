@@ -1,5 +1,5 @@
 import Solcore.Test.AbiStaticWordEndToEndFixture
-import Solcore.ContractRuntime.BalancedTopLevelExecutionProperties
+import Solcore.ContractRuntime.BalancedTopLevelExecution
 
 /-! Executable vertical checks for Static Word ABI routing and finalization. -/
 

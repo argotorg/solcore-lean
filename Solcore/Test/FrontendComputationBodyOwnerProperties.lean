@@ -1,7 +1,6 @@
-import Solcore.Frontend.ComputationReturnTreeOwnerProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original repeated typed/inferred lets, discard, scope barrier, conditional

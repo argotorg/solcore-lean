@@ -1,7 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Original many-element annotations keep exact right-associated types and existing steps.
 Independent annotation/raw-body evidence and fixed Core paths determine all expectations. -/

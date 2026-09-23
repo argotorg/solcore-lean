@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressStorageWriteCoherenceProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddress
 
 /-! Compile-only regressions for retained-address write values coherence. -/
 

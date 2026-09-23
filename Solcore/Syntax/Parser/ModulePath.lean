@@ -1,5 +1,13 @@
 import Solcore.Syntax.Parser.Name
-import Solcore.Syntax.ModuleValidity
+import Solcore.Syntax.Module
+import Solcore.Syntax.DeclarativeModulePathOutcomeGrammar
+import Solcore.Syntax.Parser.CoreTypeQualifiedNameRejectionSoundnessProperties
+import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
+import Solcore.Syntax.Parser.QualifiedNameSoundnessProperties
+import Solcore.Syntax.DeclarativeModulePathExactnessProperties
+import Solcore.Syntax.DeclarativeModulePathOutcomeProperties
+import Solcore.Syntax.Parser.InvariantFreeProperties
+import Solcore.Syntax.Parser.QualifiedNameTotalityProperties
 
 set_option autoImplicit false
 
@@ -240,5 +248,258 @@ theorem modulePath_cursorMonotoneOnSuccess (context : ParseContext) :
     Parser.CursorMonotoneOnSuccess (modulePath context) := by
   intro input path next result
   exact Nat.le_of_lt (modulePath_cursor_lt_onSuccess context result)
+
+end Solcore.Syntax.Parser
+
+/-!
+## Consolidated module: `Solcore.Syntax.Parser.ModulePathOrdinaryRejectionSoundnessProperties`
+-/
+
+/-! Exact executable rejection reflection for module paths. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser
+
+/-- Every executable module-path rejection comes from the qualified name in
+the prioritized local or exact-marker external-package branch. -/
+theorem modulePath_reject_ordinaryOutcome_sound (context : ParseContext)
+    {input rejected : State} {failure : Failure}
+    (result : modulePath context input = .reject failure rejected) :
+    DeclarativeGrammar.ModulePathRejects input.declarativeRemainder
+      rejected.declarativeRemainder := by
+  unfold modulePath at result
+  by_cases markerPresent : isSymbol input .at = true
+  · rcases symbol_eq_ok_of_isSymbol_eq_true .at context markerPresent with
+      ⟨marker, markerResult⟩
+    simp only [markerPresent, if_true, markerResult] at result
+    cases nameResult : qualifiedName context .topLevel
+        { input with cursor := input.cursor + 1 } with
+    | invariant error => simp [nameResult] at result
+    | ok name output => simp [nameResult] at result
+    | reject nameFailure nameRejected =>
+        simp only [nameResult] at result
+        cases result
+        exact .externalRejected marker.span
+          (symbol_success_exactTokenParses .at context markerResult)
+          (qualifiedName_reject_type_sound context .topLevel nameResult)
+  · have markerAbsent : isSymbol input .at = false :=
+      Bool.eq_false_iff.mpr markerPresent
+    simp only [markerAbsent, Bool.false_eq_true, if_false] at result
+    cases nameResult : qualifiedName context .topLevel input with
+    | invariant error => simp [nameResult] at result
+    | ok name output => simp [nameResult] at result
+    | reject nameFailure nameRejected =>
+        simp only [nameResult] at result
+        cases result
+        exact .localRejected
+          (symbolAbsentAt_of_isSymbol_eq_false .at markerAbsent)
+          (qualifiedName_reject_type_sound context .topLevel nameResult)
+
+end Solcore.Syntax.Parser
+
+/-!
+## Consolidated module: `Solcore.Syntax.Parser.ModulePathSoundnessProperties`
+-/
+
+/-! Success soundness of canonical module-path parsing. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser
+
+/-- Every successful module-path parse follows the independent token grammar. -/
+theorem modulePath_success_sound (context : ParseContext)
+    {input next : State} {path : ModulePath}
+    (result : modulePath context input = .ok path next) :
+    DeclarativeGrammar.ModulePathParses input.declarativeRemainder path
+      next.declarativeRemainder := by
+  unfold modulePath at result
+  split at result
+  · cases markerResult : symbol .at context input with
+    | invariant error => simp [markerResult] at result
+    | reject failure rejected => simp [markerResult] at result
+    | ok marker afterMarker =>
+        have markerSound := symbol_ok_tokenAt .at context markerResult
+        simp only [markerResult] at result
+        cases nameResult : qualifiedName context .topLevel afterMarker with
+        | invariant error => simp [nameResult] at result
+        | reject failure rejected => simp [nameResult] at result
+        | ok name final =>
+            have nameSound := qualifiedName_success_sound context .topLevel
+              nameResult
+            simp only [nameResult] at result
+            cases result
+            apply DeclarativeGrammar.ModulePathParses.externalPackage
+              marker.span markerSound.1
+            simpa only [markerSound.2, State.declarativeRemainder,
+              State.tokens, State.window, State.cursor] using nameSound
+  · cases nameResult : qualifiedName context .topLevel input with
+    | invariant error => simp [nameResult] at result
+    | reject failure rejected => simp [nameResult] at result
+    | ok name final =>
+        have nameSound := qualifiedName_success_sound context .topLevel
+          nameResult
+        simp only [nameResult] at result
+        cases result
+        exact DeclarativeGrammar.ModulePathParses.local nameSound
+
+/-- Success soundness composes with the established source-provenance contract. -/
+theorem modulePath_success_sound_and_validFor (context : ParseContext)
+    {input next : State} {path : ModulePath} (inputValid : input.ValidFor)
+    (result : modulePath context input = .ok path next) :
+    DeclarativeGrammar.ModulePathParses input.declarativeRemainder path
+        next.declarativeRemainder ∧
+      path.ValidFor input.file := by
+  refine ⟨modulePath_success_sound context result, ?_⟩
+  have valid := modulePath_validFor context input inputValid
+  rw [result] at valid
+  exact valid.1
+
+end Solcore.Syntax.Parser
+
+/-!
+## Consolidated module: `Solcore.Syntax.Parser.ModulePathOrdinarySuccessSoundnessProperties`
+-/
+
+/-! Broad ordinary-success soundness for module paths. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser
+
+/-- Every executable module-path success follows the existing exact ordinary
+grammar without a diagnostic-free premise. -/
+theorem modulePath_success_ordinaryOutcome_sound (context : ParseContext)
+    {input output : State} {path : ModulePath}
+    (result : modulePath context input = .ok path output) :
+    DeclarativeGrammar.ModulePathOrdinaryParses input.declarativeRemainder
+      path output.declarativeRemainder :=
+  modulePath_success_sound context result
+
+end Solcore.Syntax.Parser
+
+/-!
+## Consolidated module: `Solcore.Syntax.Parser.ModulePathOrdinaryOutcomeSoundnessProperties`
+-/
+
+/-! Complete executable broad ordinary outcomes for module paths. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser
+
+/-- Package module-path success and exact prioritized rejection. -/
+theorem modulePath_ordinaryOutcome_sound (context : ParseContext) :
+    (∀ {input output : State} {path : ModulePath},
+      modulePath context input = .ok path output →
+        DeclarativeGrammar.ModulePathOrdinaryParses
+          input.declarativeRemainder path output.declarativeRemainder) ∧
+    (∀ {input rejected : State} {failure : Failure},
+      modulePath context input = .reject failure rejected →
+        DeclarativeGrammar.ModulePathRejects
+          input.declarativeRemainder rejected.declarativeRemainder) :=
+  ⟨modulePath_success_ordinaryOutcome_sound context,
+    modulePath_reject_ordinaryOutcome_sound context⟩
+
+/-- Re-export deterministic and exclusive module-path outcomes. -/
+theorem modulePath_ordinaryOutcomeSpec :
+    DeclarativeGrammar.DeterministicOutcomeSpec
+      DeclarativeGrammar.ModulePathOrdinaryParses
+      DeclarativeGrammar.ModulePathRejects :=
+  DeclarativeGrammar.modulePathDeterministicOutcomeSpec
+
+
+/-- Exact values and endpoints for the independent modulePath grammar. -/
+theorem modulePath_exactOutcomeSpec  :
+    DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      DeclarativeGrammar.ModulePathOrdinaryParses DeclarativeGrammar.ModulePathRejects :=
+  DeclarativeGrammar.modulePathExactOutcomeSpec
+
+/-- Executable successes agree on their complete value and remainder. -/
+theorem modulePath_success_result_unique (context : ParseContext)
+    {input leftOutput rightOutput : State} {left right : ModulePath}
+    (leftResult : modulePath context input = .ok left leftOutput)
+    (rightResult : modulePath context input = .ok right rightOutput) :
+    left = right ∧
+      leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (modulePath_exactOutcomeSpec ).successResultUnique
+    (modulePath_success_ordinaryOutcome_sound context leftResult)
+    (modulePath_success_ordinaryOutcome_sound context rightResult)
+
+/-- Executable rejections agree on their complete declarative endpoint. -/
+theorem modulePath_reject_output_unique (context : ParseContext)
+    {input leftOutput rightOutput : State} {leftFailure rightFailure : Failure}
+    (leftResult : modulePath context input = .reject leftFailure leftOutput)
+    (rightResult : modulePath context input = .reject rightFailure rightOutput) :
+    leftOutput.declarativeRemainder = rightOutput.declarativeRemainder :=
+  (modulePath_exactOutcomeSpec ).rejectOutputUnique
+    (modulePath_reject_ordinaryOutcome_sound context leftResult)
+    (modulePath_reject_ordinaryOutcome_sound context rightResult)
+
+end Solcore.Syntax.Parser
+
+/-!
+## Consolidated module: `Solcore.Syntax.Parser.ModulePathTotalityProperties`
+-/
+
+/-! Totality laws for module-path parsing. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser
+
+/-- Module paths always produce an ordinary success or rejection reply. -/
+theorem modulePath_ordinary (context : ParseContext) :
+    Parser.Ordinary (modulePath context) := by
+  intro input
+  unfold modulePath
+  split
+  · cases markerResult : symbol .at context input with
+    | invariant error =>
+        exact False.elim
+          (symbol_ne_invariant .at context input error markerResult)
+    | reject failure rejected =>
+        exact Or.inr ⟨failure, rejected, rfl⟩
+    | ok marker afterMarker =>
+        dsimp only
+        cases nameResult : qualifiedName context .topLevel afterMarker with
+        | invariant error =>
+            exact False.elim
+              (qualifiedName_ne_invariant context .topLevel afterMarker error
+                nameResult)
+        | reject failure rejected =>
+            exact Or.inr ⟨failure, rejected, rfl⟩
+        | ok name next =>
+            exact Or.inl ⟨_, next, rfl⟩
+  · cases nameResult : qualifiedName context .topLevel input with
+    | invariant error =>
+        exact False.elim
+          (qualifiedName_ne_invariant context .topLevel input error nameResult)
+    | reject failure rejected =>
+        exact Or.inr ⟨failure, rejected, rfl⟩
+    | ok name next =>
+        exact Or.inl ⟨_, next, rfl⟩
+
+/-- Module paths cannot expose an internal parser invariant. -/
+theorem modulePath_ne_invariant (context : ParseContext) (input : State)
+    (error : ParserInvariantError) :
+    modulePath context input ≠ .invariant error :=
+  (modulePath_ordinary context).ne_invariant input error
+
+/-- Module paths are invariant-free on the canonical valid-input domain. -/
+theorem modulePath_invariantFreeOnValid (context : ParseContext) :
+    Parser.InvariantFreeOnValid (modulePath context) :=
+  (modulePath_ordinary context).invariantFreeOnValid
+
+/-- Module paths satisfy the generic strict element-parser contract. -/
+theorem modulePath_elementTotalityContract (context : ParseContext) :
+    ElementTotalityContract (modulePath context) := {
+  validFor := (modulePath_validFor context).mono (fun _ _ _ => trivial)
+  preservesTokenWindow := modulePath_preservesTokenWindow context
+  cursorLtOnSuccess := modulePath_cursor_lt_onSuccess context
+  invariantFree := fun input _ error =>
+    modulePath_ne_invariant context input error
+}
 
 end Solcore.Syntax.Parser

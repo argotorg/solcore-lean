@@ -1,13 +1,6 @@
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationEmbeddingProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
-import Solcore.Frontend.RecursiveComputationReturnTreeEmbeddingProperties
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.RecursiveComputationReturnTree
+import Solcore.Frontend.Computation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Fixed short-circuit source retains arbitrary actual RHS values and captures.

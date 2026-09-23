@@ -1,4 +1,4 @@
-import Solcore.Frontend.RuntimeValueProperties
+import Solcore.Frontend.RuntimeValue
 
 /-! These are representation tests, not value typing or operational semantics.
 Every old payload, code body, tag, capture and raw store slot is retained literally;

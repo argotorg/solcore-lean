@@ -1,5 +1,5 @@
 import Solcore.Frontend.ConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithTwoLevelGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Frontend.ThreeOrMoreGroupedExpectedLambdaArgumentApplication
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term

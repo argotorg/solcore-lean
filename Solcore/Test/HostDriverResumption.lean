@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.HostDriverResumptionProperties
+import Solcore.ContractRuntime.HostDriver
 
 /-! Executable regressions for exact generic-driver fuel resumption. -/
 

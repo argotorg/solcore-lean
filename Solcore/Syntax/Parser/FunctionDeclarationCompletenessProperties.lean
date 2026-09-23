@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ContractEntryDeclarationTotalityProperties
+import Solcore.Syntax.Parser.ContractEntry
 import Solcore.Syntax.Parser.CoreFunctionDeclarationExactnessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationTotalityProperties
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties

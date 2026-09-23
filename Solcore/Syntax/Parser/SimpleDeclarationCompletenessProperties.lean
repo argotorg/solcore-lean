@@ -1,10 +1,7 @@
-import Solcore.Syntax.Parser.EnumDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.EnumDeclarationTotalityProperties
+import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
-import Solcore.Syntax.Parser.TraitDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.TraitDeclarationTotalityProperties
-import Solcore.Syntax.Parser.TypeAliasDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.TypeAliasTotalityProperties
+import Solcore.Syntax.Parser.Trait
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! Complete syntax-only correspondence for type aliases, enums, and traits.
 The supplied enum derive attribute is fixed but needs no provenance premise. -/

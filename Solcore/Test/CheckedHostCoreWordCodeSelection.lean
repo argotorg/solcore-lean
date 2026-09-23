@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateWordCodeSelectionProperties
+import Solcore.ContractRuntime.WorldStateWordCodeSelection
 
 /-! Executable regressions for branch-complete selected Word-code classification. -/
 

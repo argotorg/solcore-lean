@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.OneLevelNestedExecutionResumptionProperties
+import Solcore.ContractRuntime.OneLevelNestedExecution
 import Solcore.Test.OneLevelNestedExecutionFixture
 
 /-! Actual checked-Core fixtures for depth-one value-bearing calls. -/

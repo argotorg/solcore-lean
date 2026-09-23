@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithFiveLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Machine
 import Solcore.Core.Correspondence
 /-! Independent symbolic consumer for the ADR-0334-first ADR-0333 wrapper. -/

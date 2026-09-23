@@ -1,5 +1,4 @@
-import Solcore.Syntax.Parser.TraitDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
+import Solcore.Syntax.Parser.Trait
 
 /-! External consumers for diagnostic-free trait grammar soundness. -/
 

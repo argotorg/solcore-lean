@@ -5,7 +5,7 @@ import Solcore.Syntax.Parser.CorePatternDotConstructorOrdinaryOutcomeSoundnessPr
 import Solcore.Syntax.Parser.CorePatternParenthesizedOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternPublicOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CorePatternQualifiedOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.PatternProperties
+import Solcore.Syntax.Parser.Pattern
 
 /-! One-call executable outcomes for a complete Core pattern step. -/
 

@@ -1,7 +1,4 @@
-import Solcore.Frontend.TypedLetReturnBodyExecutionProperties
-import Solcore.Frontend.TypedLetReturnBodyEvaluationProperties
-import Solcore.Frontend.TypedLetReturnBodyEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnBodyProperties
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Independent let paths use actual values and count even unused initializers.
 Static typing, positional alignment and pending-continuation safety are separate. -/

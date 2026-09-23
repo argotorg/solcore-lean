@@ -1,5 +1,5 @@
 import Solcore.Test.FrontendExpectedWordStrictDataImageProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 /- Saved typed identities are unique, but their opaque Core payloads need not
 inhabit the declared types. Raw caller rows deliberately retain duplicate IDs.

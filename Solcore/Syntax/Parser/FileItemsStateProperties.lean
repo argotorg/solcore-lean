@@ -152,8 +152,12 @@ theorem sourceFile_cursorMonotoneOnSuccess
   intro input parsedFile next parsed
   unfold sourceFile at parsed
   cases itemsResult : parseItems (input.remainingCount + 1) [] input with
-  | invariant error => simp [itemsResult] at parsed
-  | reject failure rejected => simp [itemsResult] at parsed
+  | invariant error =>
+      rw [itemsResult] at parsed
+      cases parsed
+  | reject failure rejected =>
+      rw [itemsResult] at parsed
+      cases parsed
   | ok items final =>
       simp only [itemsResult] at parsed
       have monotone : input.cursor ≤ final.cursor :=

@@ -1,10 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Complete declarations retain independently specified Core and original
 parameters. Selected source certificates fix values and costs before executing

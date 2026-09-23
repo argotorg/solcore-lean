@@ -1,6 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Core.Safety
 
 /-! Independent finite let/if trees retain lexical scopes and exact Core.

@@ -1,5 +1,4 @@
-import Solcore.Frontend.LocalInputsExtensionProperties
-import Solcore.Frontend.LocalInputsRenamingProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.UnaryPrimitives
 
 /-! ADR-0161: fixed Word complement is distinct from Boolean negation.

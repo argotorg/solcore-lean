@@ -1,12 +1,7 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.TerminalReturnTreeEmbeddingProperties
-import Solcore.Frontend.TerminalReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TerminalReturnTree
+import Solcore.Frontend.TerminalReturnBody
 
 /-! Independent terminal-entry contracts use actual arguments, unequal selected
 costs and real suspended environments. Static compilation invents no values. -/

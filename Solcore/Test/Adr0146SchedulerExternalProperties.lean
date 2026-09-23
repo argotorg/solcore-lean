@@ -1,5 +1,4 @@
-import Solcore.ContractRuntime.OneLevelNestedExecutionProperties
-import Solcore.ContractRuntime.OneLevelNestedExecutionReachabilityProperties
+import Solcore.ContractRuntime.OneLevelNestedExecution
 
 /-! External compile consumers for the public ADR-0146 scheduler laws. -/
 

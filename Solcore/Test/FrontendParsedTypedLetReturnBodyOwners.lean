@@ -1,10 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnBodyRunnerOwnerProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeFunctionCompilation
-import Solcore.Frontend.RuntimeFunctionEntry
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 
 /-! Owner-only allocation changes actual IDs, not the parsed source, original
 scope positions or full fixed-store checkpoints. Nominal cases remain value-free. -/

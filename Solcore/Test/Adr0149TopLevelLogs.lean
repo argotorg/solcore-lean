@@ -1,6 +1,6 @@
 import Solcore.Test.Adr0149TopLevelLogsFixture
 import Solcore.Core.HostRunner
-import Solcore.ContractRuntime.HostDriverResumption
+import Solcore.ContractRuntime.HostDriver
 import Solcore.ContractRuntime.HostStorageDriver
 
 /-! Executable root commit/rollback and resumption tests for ADR-0149 logs. -/

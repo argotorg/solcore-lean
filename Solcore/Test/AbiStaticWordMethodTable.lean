@@ -1,4 +1,4 @@
-import Solcore.Abi.StaticWordMethodTable
+import Solcore.Abi.StaticWord
 
 /-! Consumers for deterministic Static Word method-table validation. -/
 

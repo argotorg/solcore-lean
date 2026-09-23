@@ -1,7 +1,7 @@
-import Solcore.Frontend.ExpectedUnaryLambdaHeader
+import Solcore.Frontend.Expected
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.RecursiveLocalComputationProperties
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RecursiveLocalComputation
 
 /-! Original symbolic headers retain every supplied range and outer row. Header
 meaning precedes executable checking and requires no runtime inhabitants. The

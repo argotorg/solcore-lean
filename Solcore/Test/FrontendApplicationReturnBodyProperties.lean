@@ -1,5 +1,5 @@
-import Solcore.Frontend.LocalApplicationReturnBodyRunnerProperties
-import Solcore.Frontend.LocalInputsApplicationRuntimeProperties
+import Solcore.Frontend.LocalApplication
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Frontend.ReturnBody
 
 /-! The original singleton return contributes no machine action. Static

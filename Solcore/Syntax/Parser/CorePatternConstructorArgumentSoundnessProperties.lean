@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeCorePatternConstructorGrammar
 import Solcore.Syntax.Parser.CoreLiteralSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingNonemptyDiagnosticFreeSoundnessProperties
-import Solcore.Syntax.Parser.PatternProperties
+import Solcore.Syntax.Parser.Pattern
 
 /-!
 Diagnostic reflection and exact token soundness for constructor-pattern names

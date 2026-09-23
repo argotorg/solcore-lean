@@ -1,7 +1,6 @@
-import Solcore.Frontend.ExpectedDataLambdaInvocationOwnerProperties
-import Solcore.Frontend.ExpectedComputationLambdaOwnerProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.Expected
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Syntax.Parser.Term
 
 /- Parsed old/mapped creation, caller prefixes, complete raw calls and the Core

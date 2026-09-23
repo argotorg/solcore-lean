@@ -1,7 +1,5 @@
-import Solcore.Frontend.TerminalReturnBodyRenamingProperties
-import Solcore.Frontend.TerminalReturnBodyStoreProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
+import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! Identity transport preserves whole suspended states, whereas store replay
 preserves observations carrying their own stores. Merging IDs is explicitly

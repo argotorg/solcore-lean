@@ -1,7 +1,7 @@
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
-import Solcore.ContractRuntime.ParentIndexedFrameContinuationContextProperties
-import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayloadProperties
-import Solcore.ContractRuntime.FrameResolutionResultContinuation
+import Solcore.ContractRuntime.ParentIndexedFrameInitialization
+import Solcore.ContractRuntime.ParentIndexedFrameContinuationContext
+import Solcore.ContractRuntime.ParentIndexedFrameTrapPropagationPayload
+import Solcore.ContractRuntime.FrameResolutionResult
 
 /-! Compile-only consumers of parent-indexed selected execution continuation. -/
 

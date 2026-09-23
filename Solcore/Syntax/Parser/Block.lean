@@ -3,7 +3,7 @@ import Solcore.Syntax.DeclarativeCoreBlockTailTraceGrammar
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
 import Solcore.Syntax.Parser.DiagnosticReflectionProperties
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.Parser.State
 import Solcore.Syntax.CollectionValidity
 import Solcore.Syntax.ExpressionValidity
 

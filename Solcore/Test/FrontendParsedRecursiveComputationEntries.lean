@@ -1,13 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationEmbeddingProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
-import Solcore.Frontend.RuntimeComputationFunctionFactorizationProperties
-import Solcore.Frontend.RuntimeApplicationFunctionEntry
-import Solcore.Frontend.RuntimeApplicationFunctionCompilation
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.RuntimeComputationFunction
+import Solcore.Frontend.RuntimeApplicationFunction
 import Solcore.Core.FuelResumptionProperties
 /-! Original declaration records feed a separate recursive expression profile.
 No recursive whole entry is introduced; fixed Core paths are independent scripts. -/

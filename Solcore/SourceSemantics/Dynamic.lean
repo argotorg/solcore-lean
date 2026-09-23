@@ -8,14 +8,11 @@ import Solcore.SourceSemantics.Dynamic.Place
 import Solcore.SourceSemantics.Dynamic.Evidence
 import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.Dynamic.Fault
-import Solcore.SourceSemantics.Dynamic.ControlProperties
-import Solcore.SourceSemantics.Dynamic.StaticControlProperties
+import Solcore.SourceSemantics.Dynamic.Control
 import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
-import Solcore.SourceSemantics.Dynamic.ControlTypingProperties
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.Dynamic.Program
-import Solcore.SourceSemantics.Dynamic.ProgramPreservation
 
 /-!
 # Declarative source dynamics

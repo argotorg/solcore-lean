@@ -1,8 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalApplicationReturnBodyRunnerProperties
-import Solcore.Frontend.LocalFunctionApplicationExactInsertionProperties
+import Solcore.Frontend.LocalApplication
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.RuntimeApplicationFunctionFactorizationProperties
+import Solcore.Frontend.RuntimeApplicationFunction
 
 /-! Original whole-entry records are retained; only the Core caller gains a slot.
 Independent actual paths fix costs and effects before insertion is used. -/

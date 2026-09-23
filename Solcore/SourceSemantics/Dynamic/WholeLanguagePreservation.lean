@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.Dynamic.Preservation
-import Solcore.SourceSemantics.Dynamic.ControlTypingProperties
+import Solcore.SourceSemantics.Dynamic.Control
 
 /-!
 # Constructive whole-language preservation

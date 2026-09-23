@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.CheckedCoreProgramProperties
+import Solcore.ContractRuntime.CheckedCoreProgram
 
 /-! Admission, stateful execution, and safety regressions for checked code. -/
 

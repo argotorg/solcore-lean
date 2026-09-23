@@ -1,4 +1,4 @@
-import Solcore.Frontend.RuntimeValueProperties
+import Solcore.Frontend.RuntimeValue
 
 /-! Structural nonprojectability tests. These witnesses describe finite value
 subterms, never reachable heap contents, source admission or execution. -/

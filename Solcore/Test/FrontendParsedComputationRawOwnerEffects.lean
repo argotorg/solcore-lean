@@ -1,13 +1,7 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.ComputationReturnTreeRawOwnerProperties
-import Solcore.Frontend.ComputationReturnTreeOwnerProperties
-import Solcore.Frontend.RecursiveLocalComputationEvaluationRenamingProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
 import Solcore.Core.FuelResumptionProperties
 /-! Original allocation/write/read and literal-to-grouped-wildcard selection have
 independent raw and cost witnesses before owner transport or Core observations. -/

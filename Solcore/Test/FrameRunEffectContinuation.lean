@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameRunEffectResolution
+import Solcore.ContractRuntime.FrameRun
 
 /-! Executable tests for resolved synchronized frame continuations. -/
 

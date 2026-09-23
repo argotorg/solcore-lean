@@ -1,5 +1,5 @@
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.LocalExpressionEvaluationProperties
+import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.LocalExpressionEvaluation
 import Solcore.Frontend.LocalExpressionSafetyProperties
 import Solcore.Core.Correspondence
 

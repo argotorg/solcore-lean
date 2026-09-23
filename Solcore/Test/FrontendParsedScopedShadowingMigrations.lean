@@ -1,15 +1,9 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ComputationFunctionFactorizationProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
-import Solcore.Frontend.RuntimeComputationFunctionCompilation
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.RuntimeComputationFunction
 import Solcore.Core.FuelResumptionProperties
 
 /-! Three exact old rejections become positives without replacing their original

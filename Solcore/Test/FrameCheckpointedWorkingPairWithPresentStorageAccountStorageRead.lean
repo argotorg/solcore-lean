@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageRead
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
 
 /-! Runtime regressions for total reads from a present selected working Account. -/
 

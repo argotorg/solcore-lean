@@ -1,6 +1,6 @@
-import Solcore.ContractRuntime.FrameResolutionResultContinuationProperties
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionViewProperties
+import Solcore.ContractRuntime.FrameResolutionResult
+import Solcore.ContractRuntime.ParentIndexedFrameInitialization
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionView
 
 /-! Compile-only consumers of the parent-indexed resolution view. -/
 

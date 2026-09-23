@@ -1,5 +1,5 @@
 import Solcore.Frontend.TwoLevelGroupedExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Eval
 /-! Independent symbolic consumer for the exact two-group expected-lambda adapter. -/
 set_option autoImplicit false

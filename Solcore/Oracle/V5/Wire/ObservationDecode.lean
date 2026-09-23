@@ -1,5 +1,4 @@
-import Solcore.Oracle.V5.ObservationCodec
-import Solcore.Oracle.V5.ObservationValidity
+import Solcore.Oracle.V5.Observation
 import Solcore.Oracle.V5.Wire.Scalar
 
 /-! Strict JSON decoding for total Oracle v5 execution observations. -/

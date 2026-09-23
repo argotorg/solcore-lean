@@ -1,10 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationEmbeddingProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.ExactFuelProperties
 import Solcore.Core.FuelResumptionProperties
 /-! Original ternaries carry independent static/raw certificates. Literal Core,

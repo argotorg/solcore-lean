@@ -1,5 +1,5 @@
 import Solcore.Frontend.ConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithTwoLevelGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Frontend.ThreeOrMoreGroupedExpectedLambdaArgumentApplication
 import Solcore.Core.Eval
 /-! Independent symbolic consumer for conditional expected-lambda arguments. -/

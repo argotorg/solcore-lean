@@ -1,6 +1,6 @@
 import Solcore.Test.SyntaxCanonicalDelimitedTrailingTraceExamples
 import Solcore.Syntax.Parser.DelimitedTrailingRejectionTraceCorrespondenceProperties
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! After a comma, a non-closing token invokes the checked-name child. Without
 a comma, the same token reports the ordered delimiter pair instead. Both paths

@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.ExecutionEnvironmentProperties
-import Solcore.ContractRuntime.OneLevelNestedExecutionResumptionProperties
+import Solcore.ContractRuntime.ExecutionEnvironment
+import Solcore.ContractRuntime.OneLevelNestedExecution
 import Solcore.Test.Adr0148CreationEndToEndFixture
 import Solcore.Test.OneLevelNestedExecutionFixture
 

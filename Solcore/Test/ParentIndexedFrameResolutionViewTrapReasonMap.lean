@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.FrameResolutionResultContinueTrapReasonMapProperties
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionViewTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameResolutionResult
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionView
 
 /-! Compile-only consumers of resolution-view reason-mapping naturality. -/
 

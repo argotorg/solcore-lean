@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeSelectiveImportOutcomeGrammar
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
 import Solcore.Syntax.Parser.HidingClauseOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 import Solcore.Syntax.Parser.SelectedImportsOrdinarySuccessSoundnessProperties
 
 /-! Broad ordinary-success reflection for selective import payloads. -/

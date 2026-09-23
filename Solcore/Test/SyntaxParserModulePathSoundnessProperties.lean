@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ModulePathOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! External consumers for canonical module-path success soundness. -/
 

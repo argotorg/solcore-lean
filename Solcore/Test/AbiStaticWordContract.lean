@@ -1,4 +1,4 @@
-import Solcore.Abi.StaticWordContract
+import Solcore.Abi.StaticWord
 
 /-! Admission and balanced-entry consumers for Static Word ABI contracts. -/
 

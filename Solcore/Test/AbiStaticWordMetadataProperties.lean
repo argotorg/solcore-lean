@@ -1,4 +1,4 @@
-import Solcore.Abi.StaticWordMetadataProperties
+import Solcore.Abi.StaticWord
 
 /-! External compile consumers for Static Word ABI metadata proof contracts. -/
 

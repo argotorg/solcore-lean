@@ -1,4 +1,4 @@
-import Solcore.Frontend.StructuralTypeTableProperties
+import Solcore.Frontend.StructuralType
 import Solcore.Core.Safety
 
 /-! Original unary annotations have independently constructed meanings. Return-list

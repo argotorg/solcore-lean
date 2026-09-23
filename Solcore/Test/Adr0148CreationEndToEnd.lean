@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.OneLevelNestedExecutionProperties
-import Solcore.ContractRuntime.WorldStateDeltaProperties
+import Solcore.ContractRuntime.OneLevelNestedExecution
+import Solcore.ContractRuntime.WorldStateDelta
 import Solcore.Test.Adr0148CreationEndToEndFixture
 
 /-! Executable checked-program regressions for the ADR-0148 lifecycle. -/

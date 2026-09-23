@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
-import Solcore.ContractRuntime.HostStorageHandlerProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuation
+import Solcore.ContractRuntime.HostStorageHandler
 
 /-! Compile-time use of the public storage-driver proof interface. -/
 

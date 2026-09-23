@@ -1,14 +1,10 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RuntimeArgumentConstruction
 import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.ComputationFunctionRuntimeSafetyProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 /-! Raw values, original preparation and literal Core paths are retained through
 structural construction and the separate, opt-in same-world validation boundary. -/

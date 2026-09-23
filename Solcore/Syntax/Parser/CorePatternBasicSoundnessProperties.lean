@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeCorePatternBasicGrammar
 import Solcore.Syntax.Parser.CorePatternBasicDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
-import Solcore.Syntax.Parser.PatternProperties
+import Solcore.Syntax.Parser.Pattern
 
 /-!
 Exact diagnostic-free soundness for basic Core pattern leaves and

@@ -1,9 +1,6 @@
 import Solcore.Syntax.Parser.Signature
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties
-import Solcore.Frontend.RuntimeParametersPositionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsOwnerProperties
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeParameters
 
 /-! Complete original parameter lists have independent structural/declaration/binding
 certificates. Expected rows and actual values are separate; products are never flattened. -/

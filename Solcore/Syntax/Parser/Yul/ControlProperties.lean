@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Yul.Control
-import Solcore.Syntax.YulStatementValidity
+import Solcore.Syntax.Yul
 
 /-! Compositional contracts for canonical inline-Yul control statements. -/
 

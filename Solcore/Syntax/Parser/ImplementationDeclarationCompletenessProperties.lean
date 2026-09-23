@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreImplDeclarationExactnessProperties
-import Solcore.Syntax.Parser.ImplDeclarationTotalityProperties
+import Solcore.Syntax.Parser.Impl
 import Solcore.Syntax.Parser.OrdinaryOutcomeCompletenessProperties
 
 /-! Complete ordinary grammar correspondence for implementation declarations. -/

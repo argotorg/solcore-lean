@@ -1,8 +1,5 @@
-import Solcore.Frontend.RuntimeParameterDeclarationReferenceProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsOwnerProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
-import Solcore.Frontend.RuntimeFunctionParameterReturnProperties
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 
 /-! Structural annotations keep each original parameter and supplied value whole.
 Independent constructor evidence fixes static and runtime bundles before checking. -/

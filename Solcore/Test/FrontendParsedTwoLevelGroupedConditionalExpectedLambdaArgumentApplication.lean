@@ -1,5 +1,5 @@
 import Solcore.Frontend.TwoLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithOneLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 /-! Independent parsed consumer for exactly two grouped conditional application arguments. -/

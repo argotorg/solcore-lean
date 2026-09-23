@@ -1,4 +1,4 @@
-import Solcore.Frontend.ExpectedLambdaArgumentApplication
+import Solcore.Frontend.Expected
 
 /-!
 One opt-in adapter passes a locally inferred parameter type through exactly two

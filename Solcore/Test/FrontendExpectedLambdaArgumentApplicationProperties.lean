@@ -1,4 +1,4 @@
-import Solcore.Frontend.ExpectedLambdaArgumentApplication
+import Solcore.Frontend.Expected
 import Solcore.Core.Eval
 
 /-! Independent symbolic consumers for expected-type lambda arguments. -/

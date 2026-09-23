@@ -1,10 +1,6 @@
-import Solcore.Frontend.ComputationReturnTreeRuntimeSafetyProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! A fixed original mixed body has independent source and literal Core paths.

@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedSelectedExecutionSessionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecution
 
 /-! Compile-only consumers for certified selected-session proof contracts. -/
 

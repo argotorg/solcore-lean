@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalExpressionEvaluatorExecutionProperties
+import Solcore.Frontend.LocalExpressionEvaluator
 import Solcore.Frontend.LocalExpressionResumptionProperties
 import Solcore.Frontend.LocalExpressionFuelBound
 import Solcore.Frontend.TypeName

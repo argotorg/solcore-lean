@@ -1,6 +1,6 @@
-import Solcore.Frontend.ExpectedComputationLambdaTyping
+import Solcore.Frontend.Expected
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
+import Solcore.Frontend.RecursiveLocalComputation
 
 /-! True recursive source typing constructs the original mixed lambda before
 any Core witness or checker result is requested. Arbitrary outer rows, expected

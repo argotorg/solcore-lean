@@ -1,8 +1,7 @@
 import Solcore.Frontend.LocalExpressionLookupProperties
-import Solcore.Frontend.TypedLetReturnTreeLookupProperties
-import Solcore.Frontend.TypedLetReturnTreeRunnerProperties
-import Solcore.Frontend.LocalNameRenaming
-import Solcore.Resolved.RenamingProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.LocalName
+import Solcore.Resolved.Renaming
 
 /-! Composed lookup, not hidden identities or positional machine layouts, is
 the raw observation. All concrete results begin with independent source paths. -/

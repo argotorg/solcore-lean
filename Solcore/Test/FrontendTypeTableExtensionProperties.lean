@@ -1,7 +1,4 @@
-import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
-import Solcore.Frontend.RuntimeFunctionParameterCompilationProperties
-import Solcore.Frontend.RuntimeFunctionConditionalParameterCompilationProperties
-import Solcore.Frontend.RuntimeFunctionObservationProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Existing meanings retain exact static compilation. One-way extension may
 enable unknown annotations; duplicate membership does not license shadowing. -/

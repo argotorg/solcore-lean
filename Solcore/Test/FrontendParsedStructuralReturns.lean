@@ -1,7 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Complete entries consume original structural return annotations. Independent
 annotation/raw-body evidence and fixed Core transition scripts fix all expectations. -/

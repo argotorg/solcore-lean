@@ -1,11 +1,6 @@
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Symbolic original syntax. Static types do not assert a shared runtime world

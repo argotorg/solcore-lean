@@ -1,5 +1,4 @@
-import Solcore.ContractRuntime.TopLevelExecutionProperties
-import Solcore.ContractRuntime.TopLevelExecutionResumptionProperties
+import Solcore.ContractRuntime.TopLevelExecution
 
 /-! External compile consumers for ADR-0145 finalization and resumption laws. -/
 

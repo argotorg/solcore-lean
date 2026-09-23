@@ -1,4 +1,4 @@
-import Solcore.Resolved.ScopeExtensionReflectionProperties
+import Solcore.Resolved.Scope
 
 /-! Fresh insertion reflects already-scoped evaluations, including references
 under an existing binder with the inserted ID. Freshness alone is insufficient. -/

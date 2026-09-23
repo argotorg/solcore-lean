@@ -1,5 +1,5 @@
 import Solcore.Syntax.DeclarativeGrammar
-import Solcore.Syntax.TriviaAttachment
+import Solcore.Syntax.Trivia
 
 /-! Parser-independent grammar for complete comment-attached syntax files. -/
 

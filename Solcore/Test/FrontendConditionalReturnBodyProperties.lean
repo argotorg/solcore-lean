@@ -1,8 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.ConditionalReturnBodyExecutionProperties
-import Solcore.Frontend.ConditionalReturnBodyFuelBoundProperties
-import Solcore.Frontend.ConditionalReturnBodyResumptionProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.ConditionalReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! Independent terminal conditional bodies retain both checked return arms,
 but execute only the selected arm. Actual values and stores are not replaced

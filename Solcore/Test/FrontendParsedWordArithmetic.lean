@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
-import Solcore.Frontend.LocalInputsExecution
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Fully parsed subtraction and multiplication retain ordered syntax/Core,
 modular results, strict checking, and exact pending-frame fuel boundaries. -/

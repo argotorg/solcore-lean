@@ -1,6 +1,5 @@
-import Solcore.Resolved.RenamingProperties
-import Solcore.Resolved.ScopeExtensionProperties
-import Solcore.Resolved.ScopeExtensionReflectionProperties
+import Solcore.Resolved.Renaming
+import Solcore.Resolved.Scope
 import Solcore.Core.LocalFragment
 import Solcore.Core.FuelResumptionProperties
 

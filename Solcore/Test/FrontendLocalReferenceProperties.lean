@@ -1,6 +1,4 @@
 import Solcore.Frontend.LocalReference
-import Solcore.Frontend.LocalReferenceElaborationProperties
-import Solcore.Frontend.LocalReferenceEvaluation
 import Solcore.Resolved.ExecutionProperties
 
 /-! Canonical-AST consumers for the narrow local-reference adapter. Names are

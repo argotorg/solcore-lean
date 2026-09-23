@@ -1,5 +1,4 @@
-import Solcore.Frontend.LocalInputsRenamingProperties
-import Solcore.Frontend.LocalInputsExecutionProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Simultaneous identity relabeling leaves spellings, positional Core, values,
 and complete machine results unchanged. Injectivity and allocation boundaries

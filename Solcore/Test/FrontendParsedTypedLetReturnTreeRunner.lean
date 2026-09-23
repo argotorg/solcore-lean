@@ -1,11 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeRunnerEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeFunctionEntry
-import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 
 /-! Actual parsed parameters and independent source scripts meet the new body
 runner. All checkpoints come from real execution; expectations are not inferred

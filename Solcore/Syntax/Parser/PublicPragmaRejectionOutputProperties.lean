@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.LexedValidationOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.LexedValidation
 import Solcore.Syntax.Parser.ParseDiagnosticCascadeProperties
 import Solcore.Syntax.Parser.PragmaDeclarationRejectionTraceCompletenessProperties
 import Solcore.Syntax.Parser.PragmaKeywordExecutionProperties

@@ -1,8 +1,7 @@
-import Solcore.Frontend.ComputationReturnTreeRuntimeCheckpointProperties
-import Solcore.Frontend.ComputationReturnTreeRuntimeWorldProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! One original body is fixed while actual typed closure bodies allocate or

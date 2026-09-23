@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceDataBodyDepthDecisionProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Actual parsed bodies retain independent whole AST/ranges and original raw

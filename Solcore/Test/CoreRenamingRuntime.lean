@@ -1,4 +1,4 @@
-import Solcore.Core.RenamingInsertion
+import Solcore.Core.Renaming
 
 /-! Dynamic regressions for evaluation under Core environment renaming. -/
 

@@ -1,6 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionObservationProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Core.ModularArithmetic
 
 /-! Independent compilation removes names, aliases, owners, ranges, and groups

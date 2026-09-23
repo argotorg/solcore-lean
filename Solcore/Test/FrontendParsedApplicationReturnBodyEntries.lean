@@ -1,10 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalApplicationReturnBodyRunnerProperties
-import Solcore.Frontend.LocalInputsApplicationRuntimeProperties
-import Solcore.Frontend.LocalInputsExecution
-import Solcore.Frontend.RuntimeFunctionEntryProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
+import Solcore.Frontend.LocalApplication
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.RuntimeParameterDeclarations
 
 /-! Original parameter-only records feed the separate return-call profile.
 Independent children, actual body paths and costs precede all executable checks. -/

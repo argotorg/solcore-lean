@@ -1,5 +1,5 @@
-import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.Expected
+import Solcore.Frontend.LocalExpressionTyping
 /- Independent Bool short-circuit body and direct/saved call data images.
 Saved IDs inherit LocalTypeInputs NoDup; duplicate spellings/foreign owners remain possible.
 Caller rows below are arbitrary mixed lists, including duplicate IDs. Runtime q is untyped. -/

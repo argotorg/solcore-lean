@@ -3,7 +3,7 @@ import Solcore.Syntax.Parser.CoreExpressionAtomCoreOrdinaryOutcomeSoundnessPrope
 import Solcore.Syntax.Parser.CoreExpressionAtomPublicOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionLayerOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.CoreExpressionPostfixOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 import Solcore.Syntax.Parser.ParameterProperties
 
 /-!

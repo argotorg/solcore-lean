@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateStorageReadWriteProperties
+import Solcore.ContractRuntime.WorldStateStorageRead
 
 /-! Compile-only regressions for stage-preserving storage read/write laws. -/
 

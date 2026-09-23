@@ -1,5 +1,4 @@
-import Solcore.Frontend.ComputationReturnTreeRuntimeWorldProperties
-import Solcore.Frontend.ComputationReturnTreeRuntimeCheckpointProperties
+import Solcore.Frontend.Computation
 
 /-! A genuine checkpoint is essential, and independently typed endpoint stores
 do not compensate for an untyped pending write. No source-ID law is needed. -/

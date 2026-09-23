@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.OneLevelNestedValueCallProperties
+import Solcore.ContractRuntime.OneLevelNestedExecution
 
 /-! External compile consumers for nested value-call scheduler laws. -/
 

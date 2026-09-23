@@ -4,7 +4,7 @@ import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.NamespaceImportOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.PlainImportOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.SelectiveImportOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Parser.WildcardImportOrdinarySuccessSoundnessProperties
 
 /-! Broad ordinary-success reflection for complete import declarations. -/

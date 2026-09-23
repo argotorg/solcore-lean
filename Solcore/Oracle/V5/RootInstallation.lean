@@ -1,6 +1,6 @@
 import Solcore.Oracle.V5.PackageResolvers
 import Solcore.Oracle.V5.WorldMaterialization
-import Solcore.ContractRuntime.CheckedCoreContractExtensionality
+import Solcore.ContractRuntime.CheckedCoreContract
 
 /-! Exact root-contract installation at the Oracle v5 execution boundary. -/
 

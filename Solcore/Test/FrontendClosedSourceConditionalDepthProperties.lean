@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceConditionalProperties
-import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original conditionals retain independent marker ranges at every depth.
 The constructor proof and full runner calculation are independent inductions. -/

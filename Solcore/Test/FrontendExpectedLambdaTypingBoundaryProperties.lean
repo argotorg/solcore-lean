@@ -1,6 +1,5 @@
-import Solcore.Frontend.ExpectedComputationLambdaTyping
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
+import Solcore.Frontend.Expected
+import Solcore.Frontend.RecursiveLocalComputation
 
 /-! Source typing precedes Core existence. Artificial child models distinguish
 existence from determinism and show why each correspondence premise matters.

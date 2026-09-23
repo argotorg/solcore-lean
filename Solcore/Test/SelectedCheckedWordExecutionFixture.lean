@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.SelectedCheckedWordExecutionResumptionProperties
+import Solcore.ContractRuntime.SelectedCheckedWordExecution
 import Solcore.Test.CheckedHostCoreWordProgramExecutionFixture
 
 /-! Shared absent, non-Word, and measured Word selected-execution fixtures. -/

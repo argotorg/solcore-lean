@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalFunctionApplicationProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Frontend.ReturnBody
 import Solcore.Core.LocalFragment
 import Solcore.Core.FuelResumptionProperties

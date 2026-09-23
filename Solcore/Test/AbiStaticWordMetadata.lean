@@ -1,4 +1,4 @@
-import Solcore.Abi.StaticWordMetadata
+import Solcore.Abi.StaticWord
 
 /-! External consumers for Static Word ABI names, metadata, and selectors. -/
 

@@ -1,7 +1,7 @@
 import Solcore.Syntax.DeclarativeNamespaceImportOutcomeGrammar
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! Broad ordinary-success reflection for namespace-import payloads. -/
 

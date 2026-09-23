@@ -4,8 +4,7 @@ import Solcore.Syntax.Parser.HidingClauseOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.HidingClauseOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.ImportTerminatorOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 import Solcore.Syntax.Parser.SelectedImportsOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.SelectedImportsOrdinarySuccessSoundnessProperties
 

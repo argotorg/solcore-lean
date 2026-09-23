@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Import
-import Solcore.Syntax.Parser.ModulePathTotalityProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! Totality laws for import terminators and the two basic import forms. -/
 

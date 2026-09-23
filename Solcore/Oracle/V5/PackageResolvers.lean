@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.ContractAdmissionProperties
+import Solcore.Oracle.V5.ContractAdmission
 
 /-! Thin resolver adapters from an admitted package to Oracle runtime layers. -/
 

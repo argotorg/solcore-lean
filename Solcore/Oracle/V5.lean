@@ -5,7 +5,7 @@ import Solcore.Oracle.V5.Capabilities
 import Solcore.Oracle.V5.Handler
 import Solcore.Oracle.V5.Wire.Encode
 import Solcore.Oracle.V5.Wire.Decode
-import Solcore.Oracle.V5.Wire.ProtocolErrorDecode
+import Solcore.Oracle.V5.Wire.Protocol
 import Solcore.Oracle.V5.Wire.ResponseDecode
 import Solcore.Oracle.V5.Wire.ResponseEncode
 

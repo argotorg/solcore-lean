@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Syntax.Parser.PatternProperties
+import Solcore.Syntax.Parser.Pattern
 
 /-! Fuel-inductive contracts for the public canonical pattern parser. -/
 

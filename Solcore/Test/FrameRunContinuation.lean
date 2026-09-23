@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameRunContinuation
+import Solcore.ContractRuntime.FrameRun
 
 /-! Executable tests for caller-owned frame continuation. -/
 

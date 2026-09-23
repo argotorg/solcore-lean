@@ -1,9 +1,8 @@
-import Solcore.Frontend.ComputationFunctionTypeExtensionProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.LocalExpressionCostStepComposition
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original symbolic headers, parameter binding and same-name lets have independent

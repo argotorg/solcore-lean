@@ -1,5 +1,5 @@
-import Solcore.Frontend.ClosedSourceOwnerCoreExpressionProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalExpressionTyping
 
 /- A successful data-expression check supplies the original resolution and
 lowering stages. Owner transport exposes those stages on both sides while the

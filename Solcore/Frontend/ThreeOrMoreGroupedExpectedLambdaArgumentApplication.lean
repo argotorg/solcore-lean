@@ -1,4 +1,4 @@
-import Solcore.Frontend.ExpectedLambdaArgumentApplication
+import Solcore.Frontend.Expected
 
 /-!
 This module recognizes a finite source-group spine around a direct computation

@@ -1,8 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionParameterCompilationProperties
-import Solcore.Frontend.RuntimeFunctionConditionalParameterCompilationProperties
-import Solcore.Frontend.RuntimeFunctionCompilationOwnerProperties
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 
 /-! Exact parameter-return compilation is value-free, but never header-free,
 whole-parameter-free, or replaceable by a merely equally typed Core tree. -/

@@ -1,11 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ExpectedComputationLambda
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.ComputationFunctionEntry
-import Solcore.Frontend.ComputationFunctionCompilation
-import Solcore.Frontend.WordLessCostStepComposition
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.Expected
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.Computation
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.ExactFuelProperties
 import Solcore.Core.FuelResumptionProperties
 

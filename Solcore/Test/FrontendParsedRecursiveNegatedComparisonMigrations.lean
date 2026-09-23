@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.RecursiveLocalComputationProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.LocalComputation
 
 /-! Two original rejection fixtures retain the exact Binary caller and source file.

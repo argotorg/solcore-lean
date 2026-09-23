@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.CheckedAccountCreationProperties
+import Solcore.ContractRuntime.CheckedAccountCreation
 
 /-! Actual checked initializer and explicit worlds for creation preparation. -/
 

@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceShortCircuitProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 
 /- Semantic negative consumers. A successful non-Bool left witness
 excludes every whole-expression endpoint before soundness is used for all depths.

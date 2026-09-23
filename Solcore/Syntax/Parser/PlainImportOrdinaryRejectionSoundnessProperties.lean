@@ -1,7 +1,6 @@
 import Solcore.Syntax.DeclarativePlainImportOutcomeGrammar
 import Solcore.Syntax.Parser.ImportTerminatorOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! Exact executable rejection reflection for plain import payloads. -/
 

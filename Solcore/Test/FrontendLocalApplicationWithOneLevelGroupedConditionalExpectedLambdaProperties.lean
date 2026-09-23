@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithOneLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Machine
 
 /-! Independent symbolic consumer for grouped-conditional-first local applications. -/

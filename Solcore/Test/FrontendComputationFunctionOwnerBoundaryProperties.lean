@@ -1,6 +1,6 @@
-import Solcore.Frontend.ComputationFunctionOwnerProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.RecursiveLocalComputationProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Covariance is an equation, not child-checker correctness. The graph below

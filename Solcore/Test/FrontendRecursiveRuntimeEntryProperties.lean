@@ -1,11 +1,7 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.TerminalReturnTree
 
 /-! Value-free recursive compilation and actual-argument execution are distinct
 contracts. Original parameter order, exact Core and genuine states are retained. -/

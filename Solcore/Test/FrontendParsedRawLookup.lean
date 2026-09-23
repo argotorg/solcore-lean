@@ -1,7 +1,6 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.TypedLetReturnTreeLookupProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
-import Solcore.Frontend.LocalNameRenaming
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.LocalName
 import Solcore.Resolved.Renaming
 
 /-! Composed lookup agrees on every spelling, independently of IDs and layouts.

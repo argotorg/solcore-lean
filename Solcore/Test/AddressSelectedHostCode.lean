@@ -1,6 +1,6 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecutionProperties
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWrite
-import Solcore.ContractRuntime.HostStorageDriverFuelProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeExecution
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
+import Solcore.ContractRuntime.HostStorageDriver
 
 /-! End-to-end regressions for address-selected handled host execution. -/
 

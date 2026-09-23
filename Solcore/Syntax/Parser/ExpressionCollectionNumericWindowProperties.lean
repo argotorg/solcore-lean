@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DelimitedNumericWindowProperties
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Raw collection atoms retain the numeric endIndex of both ordinary
 outcomes under only the same child law. Their children may change file,

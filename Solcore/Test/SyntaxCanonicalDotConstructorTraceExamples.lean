@@ -1,6 +1,6 @@
 import Solcore.Test.SyntaxDotConstructorSuccessTraceProperties
 import Solcore.Test.SyntaxDotConstructorRejectionTraceProperties
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Canonical source-to-dot-constructor traces reuse the independently proved
 consumer outcomes. The rejection carrier matches its existing explicit fixture.

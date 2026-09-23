@@ -1,8 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
-import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
-import Solcore.Frontend.RuntimeFunctionCompiledExecutionProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 
 /-! Independently compiled entries execute the actual supplied typed values.
 Full machine states, ordered arguments, whole contracts, and cost boundaries

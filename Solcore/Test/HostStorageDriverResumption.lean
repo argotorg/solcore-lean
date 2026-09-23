@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.HostStorageDriverFuelProperties
+import Solcore.ContractRuntime.HostStorageDriver
 
 /-! Storage-specialized executable regressions for handled fuel resumption. -/
 

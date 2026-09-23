@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Contract
-import Solcore.Syntax.Parser.EnumDeclSoundnessProperties
+import Solcore.Syntax.Parser.Enum
 
 /-! Declarative transformation performed when a contract enum gains `derive`. -/
 

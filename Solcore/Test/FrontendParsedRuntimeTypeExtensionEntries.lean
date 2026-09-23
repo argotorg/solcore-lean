@@ -1,10 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionTypeExtensionProperties
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
-import Solcore.Frontend.RuntimeFunctionStaticProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnTree
 
 /-! The original complete declaration and actual arguments remain fixed while only
 first-match type meanings change. Exact records, paths and saved states are retained. -/

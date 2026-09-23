@@ -1,7 +1,7 @@
-import Solcore.Frontend.RuntimeValueOwner
+import Solcore.Frontend.RuntimeValue
 import Solcore.Resolved.FreshIdentity
-import Solcore.Resolved.LocalScopeProperties
-import Solcore.Frontend.RuntimeWordMatchSelection
+import Solcore.Resolved.LocalScope
+import Solcore.Frontend.RuntimeWordMatch
 
 /- First-match rows are transported without uniqueness or runtime typing.
 Injective owner maps preserve key distinctions and the exact fresh binder index. -/

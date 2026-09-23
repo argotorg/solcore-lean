@@ -1,6 +1,6 @@
-import Solcore.Frontend.ExpectedLambdaLetBodyTyping
+import Solcore.Frontend.Expected
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
+import Solcore.Frontend.RecursiveLocalComputation
 
 /-! Original source typing precedes elaboration and checking. The leading new f
 captures the old f in its initializer scope; only the original tail sees new f.

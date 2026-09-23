@@ -1,4 +1,4 @@
-import Solcore.Frontend.ExpectedLambdaArgumentApplication
+import Solcore.Frontend.Expected
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 

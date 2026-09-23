@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameContinuationContextResolveTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameResolutionResult
 
 /-! Compile-only regressions for resolution naturality. -/
 

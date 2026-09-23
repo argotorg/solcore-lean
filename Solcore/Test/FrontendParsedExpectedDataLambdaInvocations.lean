@@ -1,12 +1,8 @@
-import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
-import Solcore.Frontend.ClosedSourceDataBodyProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalExpressionCostCorrespondence
-import Solcore.Frontend.LocalExpressionEvaluatorProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.WordLessCostStepComposition
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.Expected
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.LocalExpressionEvaluator
+import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Syntax.Parser.Term
 /- Original source/Core paths precede execution. Actual returned closure and
 caller prefix stores remain data; image existentials are used only inside Prop. -/

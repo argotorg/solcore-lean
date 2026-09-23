@@ -3,7 +3,7 @@ import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedListRejectionSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptySoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-!
 Exact executable rejection bridges for maximal Core postfix expressions.

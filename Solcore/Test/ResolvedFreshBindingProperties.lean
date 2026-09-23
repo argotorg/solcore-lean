@@ -1,6 +1,5 @@
 import Solcore.Resolved.FreshIdentity
-import Solcore.Resolved.ScopeExtensionProperties
-import Solcore.Resolved.ScopeExtensionEvaluationProperties
+import Solcore.Resolved.Scope
 
 /-! Fresh allocation is local to the caller's scope. Extension must preserve
 both free outer references and existing inner binders, even when they share the new ID. -/

@@ -1,8 +1,7 @@
-import Solcore.Frontend.ExpectedComputationLambda
+import Solcore.Frontend.Expected
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
-import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent original lambdas retain arbitrary outer rows and repeated

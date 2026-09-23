@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalFunctionApplicationExecutionProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 import Solcore.Core.Safety
 

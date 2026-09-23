@@ -1,11 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnBodyExecutionProperties
-import Solcore.Frontend.TypedLetReturnBodyEvaluationProperties
-import Solcore.Frontend.TypedLetReturnBodyEvaluationEmbeddingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.LocalInputsProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.RuntimeFunctionEntry
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeFunction
 
 /-! Actual parsed initializers certify their old-scope values before adding
 bindings. Fixture scripts construct source paths, never derive expectations

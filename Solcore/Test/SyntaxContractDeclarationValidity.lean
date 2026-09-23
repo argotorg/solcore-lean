@@ -1,5 +1,5 @@
 import Solcore.Syntax.ContractDeclarationValidity
-import Solcore.Syntax.Parser.ContractEntryProperties
+import Solcore.Syntax.Parser.ContractEntry
 
 /-! External consumers for canonical contract declaration validity. -/
 

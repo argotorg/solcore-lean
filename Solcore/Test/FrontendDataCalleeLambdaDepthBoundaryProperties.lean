@@ -1,4 +1,4 @@
-import Solcore.Frontend.DataCalleeLambdaDepthDecisionProperties
+import Solcore.Frontend.DataCalleeLambdaDepth
 
 /- Independent original selection and whole-call exclusion precede new depth laws.
 An unselected good closure is not a fallback for a selected bad body, and a saved

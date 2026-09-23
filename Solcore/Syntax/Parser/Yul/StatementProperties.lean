@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Yul.Statement
 import Solcore.Syntax.Parser.Yul.ControlSwitchProperties
 import Solcore.Syntax.Parser.Yul.ExpressionProperties
-import Solcore.Syntax.YulStatementValidity
+import Solcore.Syntax.Yul
 
 /-! Compositional contracts for canonical inline-Yul leaf statements. -/
 

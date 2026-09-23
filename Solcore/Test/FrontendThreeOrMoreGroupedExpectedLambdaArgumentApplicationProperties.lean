@@ -1,5 +1,5 @@
 import Solcore.Frontend.ThreeOrMoreGroupedExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithTwoLevelGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Eval
 /-! Independent symbolic consumer for the finite three-or-more group adapter. -/
 set_option autoImplicit false

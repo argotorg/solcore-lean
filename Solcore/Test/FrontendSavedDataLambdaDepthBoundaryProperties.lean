@@ -1,4 +1,4 @@
-import Solcore.Frontend.SavedDataLambdaDepthDecisionProperties
+import Solcore.Frontend.SavedDataLambdaDepth
 
 /- Original lexical failures are proved before using saved-body depth decisions.
 Caller values do not fill absent saved captures, nor do saved values evaluate

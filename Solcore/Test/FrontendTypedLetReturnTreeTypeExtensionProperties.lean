@@ -1,7 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeRunnerTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.TypedLetReturnBodyProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Independent recursive provenance distinguishes meaning extension from row
 membership. Fixed actual inputs retain every result and their real checkpoints. -/

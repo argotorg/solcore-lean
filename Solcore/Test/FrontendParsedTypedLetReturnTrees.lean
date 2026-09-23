@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 
 /-! Completely parsed alternating let/if trees are checked against independent
 open Core. Siblings reuse their original scope and may reuse a fresh identity.

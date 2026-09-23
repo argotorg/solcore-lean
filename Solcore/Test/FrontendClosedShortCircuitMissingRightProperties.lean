@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceShortCircuitProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original-syntax consumers. Missing lookup is excluded before any
 whole-expression argument. Successful skipped witnesses precede iff conversion;

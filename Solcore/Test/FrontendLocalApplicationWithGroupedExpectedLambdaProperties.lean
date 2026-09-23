@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Eval
 /-! Independent symbolic consumer for the group-first local-application entry. -/
 set_option autoImplicit false

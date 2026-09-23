@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Dynamic.ProgramPreservation
+import Solcore.SourceSemantics.Dynamic.Program
 
 /-!
 Focused construction tests for whole-program declarative admission.

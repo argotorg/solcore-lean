@@ -1,6 +1,8 @@
-import Solcore.Abi.StaticWordContract
+import Solcore.Abi.StaticWord
 import Solcore.Core.Wire.V3.Host
 import Solcore.Oracle.V5.Input
+import Solcore.Oracle.V5.CheckDiagnostic
+import Solcore.ContractRuntime.RuntimeScalars.TextProperties
 
 /-! Deterministic admission of Oracle v5 contract definitions. -/
 
@@ -408,3 +410,312 @@ def admit
 end ContractAdmission
 
 end Solcore.Oracle.V5
+
+/-!
+## Consolidated module: `Solcore.Oracle.V5.ContractAdmissionDiagnostic`
+-/
+
+/-! Canonical Oracle v5 diagnostics for contract-package admission. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Oracle.V5.ContractAdmissionDiagnostic
+
+open Solcore.Core.Wire
+
+private def diagnostic
+    (code : String)
+    (path : List String)
+    (arguments : Lean.Json) : Diagnostic := {
+  code
+  phase := .contractAdmission
+  path
+  arguments
+}
+
+private def encodeCoreType
+    (type : Solcore.Core.Ty) : Except InternalError Lean.Json :=
+  match V3.Ty.ofCore? type with
+  | some wire => .ok (V3.encodeType wire)
+  | none => .error .coreWireProjectionFailed
+
+private def selectorText (selector : Solcore.Abi.V1.Selector) : String :=
+  ((Solcore.ContractRuntime.encodeBytesText selector.encode).drop 2).toString
+
+private def programPrefix : ContractProgramSite → List String
+  | .checkedCore contract => ["contracts", contract.value, "program"]
+  | .staticMethod contract methodName =>
+      ["contracts", contract.value, "methods", methodName, "implementation"]
+
+/-- Project every closed admission failure into its exact diagnostic shape. -/
+def ofError :
+    ContractAdmissionError → Except InternalError Diagnostic
+  | .invalidContractId actual => .ok <| diagnostic
+      "oracle.v5.contract.invalid-id"
+      ["contracts", actual, "id"]
+      (.mkObj [("actual", actual)])
+  | .duplicateContractId id => .ok <| diagnostic
+      "oracle.v5.contract.duplicate-id"
+      ["contracts", id.value, "id"]
+      (.mkObj [("id", id.value)])
+  | .coreCheckFailed site error =>
+      CheckDiagnostic.ofError .contractAdmission (programPrefix site) error
+  | .unsupportedEntryResultType contract actual => do
+      .ok <| diagnostic
+        "oracle.v5.contract.unsupported-entry-result-type"
+        ["contracts", contract.value, "program", "resultType"]
+        (.mkObj [("actual", ← encodeCoreType actual)])
+  | .invalidMethodName contract actual => .ok <| diagnostic
+      "oracle.v5.method.invalid-name"
+      ["contracts", contract.value, "methods", actual, "name"]
+      (.mkObj [("actual", actual)])
+  | .methodDataDefinitionsNonempty contract methodName count => .ok <|
+      diagnostic
+        "oracle.v5.method.nonempty-data-definitions"
+        ["contracts", contract.value, "methods", methodName,
+          "implementation", "dataDefinitions"]
+        (.mkObj [("count", Lean.toJson count)])
+  | .methodResultTypeMismatch contract methodName actual => do
+      .ok <| diagnostic
+        "oracle.v5.method.result-type-mismatch"
+        ["contracts", contract.value, "methods", methodName,
+          "implementation", "resultType"]
+        (.mkObj [("actual", ← encodeCoreType actual)])
+  | .emptyMethodTable contract => .ok <| diagnostic
+      "oracle.v5.abi.empty-method-table"
+      ["contracts", contract.value, "methods"]
+      (.mkObj [])
+  | .duplicateSignature contract firstMethod secondMethod signature =>
+      .ok <| diagnostic
+        "oracle.v5.abi.duplicate-signature"
+        ["contracts", contract.value, "methods"]
+        (.mkObj [
+          ("signature", signature),
+          ("firstMethod", firstMethod),
+          ("secondMethod", secondMethod)
+        ])
+  | .selectorCollision contract firstSignature secondSignature selector =>
+      .ok <| diagnostic
+        "oracle.v5.abi.selector-collision"
+        ["contracts", contract.value, "methods"]
+        (.mkObj [
+          ("selector", selectorText selector),
+          ("firstSignature", firstSignature),
+          ("secondSignature", secondSignature)
+        ])
+  | .duplicateCode firstId secondId => .ok <| diagnostic
+      "oracle.v5.contract.duplicate-code"
+      ["contracts", secondId.value]
+      (.mkObj [
+        ("firstId", firstId.value),
+        ("secondId", secondId.value)
+      ])
+
+end Solcore.Oracle.V5.ContractAdmissionDiagnostic
+
+/-!
+## Consolidated module: `Solcore.Oracle.V5.ContractAdmissionProperties`
+-/
+
+/-! Exact uniqueness and lookup laws for admitted Oracle v5 packages. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Oracle.V5.ContractAdmission
+
+/-- Identifier scan success is exactly pairwise identifier uniqueness. -/
+theorem firstDuplicateEntryId?_eq_none_iff (entries : List AdmittedEntry) :
+    firstDuplicateEntryId? entries = none ↔
+      entries.Pairwise fun left right => left.id ≠ right.id := by
+  induction entries with
+  | nil => simp [firstDuplicateEntryId?]
+  | cons first rest inductionHypothesis =>
+      cases found : rest.find? (fun later => decide (later.id = first.id)) with
+      | none =>
+          have headDistinct : ∀ later ∈ rest, first.id ≠ later.id := by
+            intro later member equal
+            have rejected := (List.find?_eq_none.mp found) later member
+            exact rejected (by simp [equal])
+          rw [firstDuplicateEntryId?, found, inductionHypothesis,
+            List.pairwise_cons]
+          exact ⟨fun tail => ⟨headDistinct, tail⟩, fun all => all.2⟩
+      | some later =>
+          have laterMember : later ∈ rest :=
+            List.mem_of_find?_eq_some found
+          have equal : later.id = first.id := by
+            simpa using List.find?_some found
+          simp only [firstDuplicateEntryId?, found, reduceCtorEq,
+            false_iff, List.pairwise_cons]
+          intro pairwise
+          exact pairwise.1 later laterMember equal.symm
+
+/-- Program scan success is exactly pairwise checked-Program uniqueness. -/
+theorem firstDuplicateProgram?_eq_none_iff (entries : List AdmittedEntry) :
+    firstDuplicateProgram? entries = none ↔
+      entries.Pairwise fun left right => left.program ≠ right.program := by
+  induction entries with
+  | nil => simp [firstDuplicateProgram?]
+  | cons first rest inductionHypothesis =>
+      cases found : rest.find? (fun later =>
+          decide (later.program = first.program)) with
+      | none =>
+          have headDistinct : ∀ later ∈ rest,
+              first.program ≠ later.program := by
+            intro later member equal
+            have rejected := (List.find?_eq_none.mp found) later member
+            exact rejected (by simp [equal])
+          rw [firstDuplicateProgram?, found, inductionHypothesis,
+            List.pairwise_cons]
+          exact ⟨fun tail => ⟨headDistinct, tail⟩, fun all => all.2⟩
+      | some later =>
+          have laterMember : later ∈ rest :=
+            List.mem_of_find?_eq_some found
+          have equal : later.program = first.program := by
+            simpa using List.find?_some found
+          simp only [firstDuplicateProgram?, found, reduceCtorEq,
+            false_iff, List.pairwise_cons]
+          intro pairwise
+          exact pairwise.1 later laterMember equal.symm
+
+namespace ContractPackage
+
+/-- Every sealed package has pairwise distinct validated identifiers. -/
+theorem identifiersPairwise (package : ContractPackage) :
+    package.entries.Pairwise fun left right => left.id ≠ right.id :=
+  (firstDuplicateEntryId?_eq_none_iff package.entries).mp
+    package.identifiersUnique
+
+/-- Every sealed package has one canonical ID for each checked Program. -/
+theorem programsPairwise (package : ContractPackage) :
+    package.entries.Pairwise fun left right =>
+      left.program ≠ right.program :=
+  (firstDuplicateProgram?_eq_none_iff package.entries).mp
+    package.programsUnique
+
+private theorem findId?_of_mem
+    {entries : List AdmittedEntry}
+    (unique : entries.Pairwise fun left right => left.id ≠ right.id)
+    {entry : AdmittedEntry}
+    (member : entry ∈ entries) :
+    entries.find? (fun candidate => decide (candidate.id = entry.id)) =
+      some entry := by
+  induction entries with
+  | nil => simp at member
+  | cons first rest inductionHypothesis =>
+      rw [List.pairwise_cons] at unique
+      have memberCases : entry = first ∨ entry ∈ rest := by
+        simpa using member
+      rcases memberCases with equal | member
+      · simp [equal]
+      · have different : first.id ≠ entry.id :=
+          unique.1 entry member
+        rw [List.find?_cons]
+        simp [different, inductionHypothesis unique.2 member]
+
+private theorem findProgram?_of_mem
+    {entries : List AdmittedEntry}
+    (unique : entries.Pairwise fun left right =>
+      left.program ≠ right.program)
+    {entry : AdmittedEntry}
+    (member : entry ∈ entries) :
+    entries.find? (fun candidate =>
+      decide (candidate.program = entry.program)) = some entry := by
+  induction entries with
+  | nil => simp at member
+  | cons first rest inductionHypothesis =>
+      rw [List.pairwise_cons] at unique
+      have memberCases : entry = first ∨ entry ∈ rest := by
+        simpa using member
+      rcases memberCases with equal | member
+      · simp [equal]
+      · have different : first.program ≠ entry.program :=
+          unique.1 entry member
+        rw [List.find?_cons]
+        simp [different, inductionHypothesis unique.2 member]
+
+/-- Lookup is complete for every entry carried by the finite package. -/
+@[simp] theorem lookupEntry?_of_mem
+    (package : ContractPackage)
+    {entry : AdmittedEntry}
+    (member : entry ∈ package.entries) :
+    package.lookupEntry? entry.id = some entry := by
+  exact findId?_of_mem package.identifiersPairwise member
+
+/-- Runnable lookup returns the exact checked contract of every package entry. -/
+@[simp] theorem lookup?_of_mem
+    (package : ContractPackage)
+    {entry : AdmittedEntry}
+    (member : entry ∈ package.entries) :
+    package.lookup? entry.id = some entry.contract := by
+  simp [lookup?, lookupEntry?_of_mem package member]
+
+/-- Raw validated-ID lookup has the same exact completeness law. -/
+@[simp] theorem lookupRaw?_of_mem
+    (package : ContractPackage)
+    {entry : AdmittedEntry}
+    (member : entry ∈ package.entries) :
+    package.lookupRaw? entry.id.value = some entry.contract := by
+  simp [lookupRaw?, lookup?_of_mem package member]
+
+/-- Program reverse lookup returns the unique package identifier. -/
+@[simp] theorem idByProgram?_of_mem
+    (package : ContractPackage)
+    {entry : AdmittedEntry}
+    (member : entry ∈ package.entries) :
+    package.idByProgram? entry.program = some entry.id := by
+  simp [idByProgram?, findProgram?_of_mem package.programsPairwise member]
+
+/-- Checked-code reverse lookup returns the unique package identifier. -/
+@[simp] theorem idByCode?_of_mem
+    (package : ContractPackage)
+    {entry : AdmittedEntry}
+    (member : entry ∈ package.entries) :
+    package.idByCode? entry.contract.code = some entry.id := by
+  exact idByProgram?_of_mem package member
+
+/-- A successful forward lookup always round-trips through checked code. -/
+theorem idByCode?_of_lookupEntry?_eq_some
+    {package : ContractPackage}
+    {id : ContractId}
+    {entry : AdmittedEntry}
+    (found : package.lookupEntry? id = some entry) :
+    package.idByCode? entry.contract.code = some id := by
+  rw [idByCode?_of_mem package
+    (mem_of_lookupEntry?_eq_some found),
+    id_eq_of_lookupEntry?_eq_some found]
+
+/-- Runnable lookup always round-trips through the canonical checked-code ID. -/
+theorem idByCode?_of_lookup?_eq_some
+    {package : ContractPackage}
+    {id : ContractId}
+    {contract : Solcore.ContractRuntime.CheckedCoreContract}
+    (found : package.lookup? id = some contract) :
+    package.idByCode? contract.code = some id := by
+  unfold lookup? at found
+  rcases Option.map_eq_some_iff.mp found with
+    ⟨entry, entryFound, contractEq⟩
+  subst contract
+  exact idByCode?_of_lookupEntry?_eq_some entryFound
+
+/-- Forward and reverse package resolution identify the same exact Program. -/
+theorem program_eq_of_idByProgram?_and_lookupEntry?
+    {package : ContractPackage}
+    {program : Solcore.Core.Program}
+    {id : ContractId}
+    {entry : AdmittedEntry}
+    (reverse : package.idByProgram? program = some id)
+    (forward : package.lookupEntry? id = some entry) :
+    program = entry.program := by
+  rcases program_eq_of_idByProgram?_eq_some reverse with
+    ⟨candidate, candidateMember, candidateId, candidateProgram⟩
+  have candidateLookup :=
+    lookupEntry?_of_mem package candidateMember
+  rw [candidateId] at candidateLookup
+  have sameEntry : candidate = entry :=
+    Option.some.inj (candidateLookup.symm.trans forward)
+  subst entry
+  exact candidateProgram.symm
+
+end ContractPackage
+
+end Solcore.Oracle.V5.ContractAdmission

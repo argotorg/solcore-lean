@@ -1,5 +1,5 @@
 import Solcore.Frontend.FiveLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithFourLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Machine
 import Solcore.Core.Correspondence
 /-! Independent symbolic consumer for the exact five-whole-group conditional adapter. -/

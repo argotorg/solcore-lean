@@ -1,5 +1,4 @@
-import Solcore.Frontend.RuntimeParameterDeclarationReferenceProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsOwnerProperties
+import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Frontend.TerminalReturnBody
 
 /-! Annotation-only rows fix source positions without supplied values. Sparse

@@ -1,5 +1,5 @@
 import Solcore.ContractRuntime.BalanceTransfer
-import Solcore.ContractRuntime.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDelta
 
 /-! External consumers and runtime checks for balance delta observations. -/
 

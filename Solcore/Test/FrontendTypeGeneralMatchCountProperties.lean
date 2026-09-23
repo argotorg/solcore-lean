@@ -1,12 +1,6 @@
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.Computation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Symbolic original groups and all wildcard rows retain their source spans.

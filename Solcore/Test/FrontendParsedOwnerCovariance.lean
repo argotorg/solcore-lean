@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceEvaluatorOwnerProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Independent parsed originals and direct old runs precede finite covariance.

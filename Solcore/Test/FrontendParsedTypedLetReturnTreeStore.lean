@@ -1,10 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnTreeStoreProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeFunctionEntry
-import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 
 /-! Store replay on actual parsed recursive bodies keeps inputs and source paths
 fixed. Independent source certificates precede execution; full checkpoints are

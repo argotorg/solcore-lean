@@ -1,4 +1,4 @@
-import Solcore.Frontend.StructuralTypeTableProperties
+import Solcore.Frontend.StructuralType
 import Solcore.Core.Safety
 
 /-! Independent original-syntax meanings, not interpreter-generated expectations.

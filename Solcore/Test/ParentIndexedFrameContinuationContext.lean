@@ -1,5 +1,5 @@
 import Solcore.ContractRuntime.ParentIndexedFrameContinuationContext
-import Solcore.ContractRuntime.FrameTraceExtension
+import Solcore.ContractRuntime.FrameTrace
 
 /-! Definition-only tests for parent-indexed frame continuation contexts. -/
 

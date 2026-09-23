@@ -1,8 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalApplicationReturnBodyRunnerProperties
-import Solcore.Frontend.LocalInputsApplicationRuntimeProperties
-import Solcore.Frontend.LocalInputsExecution
-import Solcore.Frontend.RuntimeApplicationFunctionFactorizationProperties
+import Solcore.Frontend.LocalApplication
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeApplicationFunction
 
 /-! Original whole declarations and supplied values precede the new entry checks.
 Independent body paths fix the expected costs, stores and exact Core. -/

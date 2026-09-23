@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddressStorageRead
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithStorageAddress
 
 /-! Runtime regressions for address-bound working storage reads. -/
 

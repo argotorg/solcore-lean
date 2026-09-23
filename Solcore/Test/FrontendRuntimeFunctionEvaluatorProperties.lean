@@ -1,6 +1,4 @@
-import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Original declarations and actual arguments, independently justified before
 the direct triple is reflected back into the established machine contracts. -/

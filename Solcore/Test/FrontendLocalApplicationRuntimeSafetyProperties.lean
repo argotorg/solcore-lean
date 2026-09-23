@@ -1,5 +1,4 @@
-import Solcore.Frontend.LocalFunctionApplicationRuntimeSafetyProperties
-import Solcore.Frontend.LocalFunctionApplicationRuntimeStateProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Actual values, worlds and stores are independent evidence, not inferred

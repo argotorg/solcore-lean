@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CoreExpressionAtomRecoveryOrdinarySoundnessProperties
-import Solcore.Syntax.Parser.Expression.AtomRecoveryTotalityProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Complete ordinary outcome for the standalone Core atom recovery parser. -/
 

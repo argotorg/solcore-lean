@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalFunctionApplicationProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.Safety
 
 /-! Original single-argument calls have independent child resolution, lowering

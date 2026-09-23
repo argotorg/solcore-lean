@@ -1,4 +1,4 @@
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Boundary consumers for the callback-free syntax fragment.
 Successful store invariance is not termination or a fault classifier. -/

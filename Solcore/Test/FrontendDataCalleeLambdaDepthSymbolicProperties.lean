@@ -1,4 +1,4 @@
-import Solcore.Frontend.DataCalleeLambdaDepthDecisionProperties
+import Solcore.Frontend.DataCalleeLambdaDepth
 
 /- Independent original selection is built before every new depth law. Caller
 argument rows, saved fresh-body rows, creation store and invocation store remain

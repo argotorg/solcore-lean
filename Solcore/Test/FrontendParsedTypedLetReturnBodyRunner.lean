@@ -1,10 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
-import Solcore.Frontend.TypedLetReturnBodyRunnerEmbeddingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeFunctionCompilation
-import Solcore.Frontend.RuntimeFunctionEntry
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 
 /-! Independent parsed source certificates meet the actual checked runner.
 Every checkpoint is obtained by running its predecessor; no state, actual

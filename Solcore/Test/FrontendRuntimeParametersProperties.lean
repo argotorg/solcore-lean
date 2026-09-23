@@ -1,6 +1,5 @@
-import Solcore.Frontend.RuntimeParametersProperties
-import Solcore.Frontend.RuntimeParametersLayout
-import Solcore.Frontend.LocalInputsExecutionProperties
+import Solcore.Frontend.RuntimeParameters
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! ADR-0168: independent ordered parameter binding supplies the existing
 checked input endpoint. Structural argument typing is not store allocation. -/

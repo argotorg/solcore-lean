@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.TopLevelExecutionContextProperties
+import Solcore.ContractRuntime.TopLevelExecution
 
 /-! External compile consumers for prepared root checkpoint projections. -/
 

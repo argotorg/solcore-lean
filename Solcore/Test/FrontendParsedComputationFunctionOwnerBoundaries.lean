@@ -1,8 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ComputationFunctionOwnerProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationRenamingProperties
+import Solcore.Frontend.RecursiveLocalComputation
 
 /-! Original parsed preparation failures remain absent under owner transport.
 Selected raw body success does not repair a header, parameter list or branch. -/

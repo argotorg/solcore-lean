@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDelta
 import Solcore.Test.Adr0147NestedValueExecutionFixture
 
 /-! Runtime and compile-time regressions for checked nested value calls. -/

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionCompilationOwnerProperties
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Frontend.TerminalReturnTree
 
 /-! Compilation owner laws are consumed without constructing runtime arguments.

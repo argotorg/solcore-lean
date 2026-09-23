@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.FrameContinuationContextResolutionContinuationCoherenceProperties
-import Solcore.ContractRuntime.FrameContinuationContextContinueTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameResolutionResult
+import Solcore.ContractRuntime.FrameContinuationContext
 
 /-! Compile-only regressions for branch/byte erasure coherence. -/
 

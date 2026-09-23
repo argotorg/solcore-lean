@@ -1,10 +1,7 @@
-import Solcore.Frontend.ClosedSourceDataBodyProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalExpressionCostErasureProperties
-import Solcore.Frontend.ComputationReturnTreeEvaluationProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.Computation
 import Solcore.Frontend.LocalExpressionTyping
-import Solcore.Frontend.LocalExpressionCostProperties
 import Solcore.Syntax.Parser.Term
 /- Original arms, pattern proofs and two body derivations precede search.
 The selected body is read from the AST; image witnesses are eliminated only in Prop. -/

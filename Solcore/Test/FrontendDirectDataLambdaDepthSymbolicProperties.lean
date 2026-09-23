@@ -1,4 +1,4 @@
-import Solcore.Frontend.DirectDataLambdaDepthDecisionProperties
+import Solcore.Frontend.DirectDataLambdaDepth
 
 /- Original direct-call witnesses and exact runner recursions are independent
 of the new depth laws. Annotations are syntax only; all mixed rows and stores

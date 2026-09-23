@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationStorageAddressProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitialization
 
 /-! Compile-only regressions for storage-address initialization wiring. -/
 

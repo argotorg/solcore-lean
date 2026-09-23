@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PatternConstructorFuelTotalityProperties
+import Solcore.Syntax.Parser.Pattern
 
 set_option autoImplicit false
 

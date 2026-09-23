@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.ContractBodyTotalityProperties
 import Solcore.Syntax.Parser.DeriveAttributeTotalityProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.TypeAliasTotalityProperties
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! Conditional totality for canonical contract-member dispatch. -/
 

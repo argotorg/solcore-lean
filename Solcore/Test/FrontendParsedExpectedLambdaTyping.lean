@@ -1,8 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ExpectedComputationLambdaTyping
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.ComputationFunctionCompilation
+import Solcore.Frontend.Expected
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.Computation
 
 /-! Original source typing is constructed before either existence theorem or
 checker is used. The body certificates contain no Core terms or positional indices. -/

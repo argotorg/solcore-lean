@@ -3,10 +3,10 @@ import Solcore.Syntax.Parser.DeclarationLeafDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.ExportDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.File
 import Solcore.Syntax.Parser.FunctionDeclSoundnessProperties
-import Solcore.Syntax.Parser.ImplDeclSoundnessProperties
+import Solcore.Syntax.Parser.Impl
 import Solcore.Syntax.Parser.ImportDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.PragmaDiagnosticReflectionProperties
-import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
+import Solcore.Syntax.Parser.Trait
 
 /-! Diagnostic-freedom reflection through attribute-free top-item dispatch. -/
 

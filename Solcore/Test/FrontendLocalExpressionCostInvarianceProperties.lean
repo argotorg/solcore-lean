@@ -1,5 +1,4 @@
-import Solcore.Frontend.LocalInputsCostInvariance
-import Solcore.Frontend.LocalInputsExtensionProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.BitwiseLogic
 
 /-! ADR-0166: exact source costs and fixed-fuel observations survive the stated

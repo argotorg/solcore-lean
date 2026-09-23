@@ -1,5 +1,5 @@
-import Solcore.Frontend.ExpectedDataLambdaApplicationOwnerProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.Expected
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- The parser must produce a literal call(lambda,args), not a grouped callee.

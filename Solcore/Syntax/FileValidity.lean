@@ -1,5 +1,5 @@
 import Solcore.Syntax.ContractDeclarationValidity
-import Solcore.Syntax.ModuleValidity
+import Solcore.Syntax.Module
 
 /-! Source-validity contracts for canonical top-level items and parsed files. -/
 

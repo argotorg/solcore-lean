@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitialization
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionFold
 
 /-! Compile-only consumers of parent-indexed resolution-fold laws. -/
 

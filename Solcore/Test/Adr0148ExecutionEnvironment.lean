@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.CheckedCreationTemplateRegistryProperties
-import Solcore.ContractRuntime.ExecutionEnvironmentProperties
+import Solcore.ContractRuntime.CheckedCreationTemplateRegistry
+import Solcore.ContractRuntime.ExecutionEnvironment
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! External and executable checks for the immutable creation environment. -/

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.DiagnosticTraceCompletenessFromSoundnessProperties
 import Solcore.Syntax.Parser.ExpressionNameRejectionTraceProperties
-import Solcore.Syntax.Parser.Expression.AtomLeafTotalityProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! The real Boolean-first checked-name leaf consumes all four generic APIs.
 Earlier diagnostics are arbitrary, including malformed spans. Countermodels

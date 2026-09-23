@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithSevenLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 set_option autoImplicit false

@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
+import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! The common body interface preserves both original runners at every fuel.
 Singleton and terminal-conditional profiles retain their own Core, costs and

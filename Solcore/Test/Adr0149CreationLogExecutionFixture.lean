@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.OneLevelNestedExecutionResumption
+import Solcore.ContractRuntime.OneLevelNestedExecution
 import Solcore.Test.Adr0148CreationEndToEndFixture
 
 /-! Checked creation programs with logs on both sides of the initializer. -/

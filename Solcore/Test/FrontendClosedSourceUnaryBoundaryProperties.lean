@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceUnaryProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original saved-scope calls and actual-shape boundaries for unary primitives. -/
 set_option autoImplicit false

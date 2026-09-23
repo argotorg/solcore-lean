@@ -1,5 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationSelectedExecutionResumptionProperties
-import Solcore.ContractRuntime.ParentIndexedSelectedExecutionFoldCoherenceProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecution
 
 /-! Compile-only consumers for branch-complete selected execution laws. -/
 

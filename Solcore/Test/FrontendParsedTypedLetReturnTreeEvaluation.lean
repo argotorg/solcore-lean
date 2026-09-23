@@ -1,12 +1,9 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnTreeExecutionProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluationProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.LocalInputsProperties
-import Solcore.Frontend.RuntimeFunctionEntry
-import Solcore.Frontend.RuntimeFunctionCompilation
-import Solcore.Frontend.TypedLetReturnBodyRunner
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Actual source-path scripts certify strict old-scope initializers and selected
 recursive arms. Independent expected Core, values and costs are not runner output.

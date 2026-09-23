@@ -1,11 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnTreeRunnerTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeFunctionEntry
-import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 /-! Independent original-syntax provenance meets semantic dictionary extension.
 Inputs are bound once under the original table. Whole rejection is preserved only
 mutually; a repaired unselected annotation need not change the raw selected path. -/

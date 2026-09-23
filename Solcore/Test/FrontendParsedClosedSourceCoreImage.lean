@@ -1,11 +1,7 @@
-import Solcore.Frontend.ClosedSourceDataExpressionProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalExpressionCostProperties
-import Solcore.Frontend.LocalExpressionCostErasureProperties
-import Solcore.Frontend.LocalExpressionEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalExpressionCostExecutionProperties
-import Solcore.Frontend.LocalExpressionResolutionProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.LocalExpressionEvaluator
+import Solcore.Frontend.LocalExpression
 import Solcore.Syntax.Parser.Term
 
 /- Original gate and two independent derivations precede semantic search.

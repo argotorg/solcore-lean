@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDelta
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! External consumers and executable creation-delta checks. -/

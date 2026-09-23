@@ -1,4 +1,4 @@
-import Solcore.Frontend.ComputationFunctionArgumentProperties
+import Solcore.Frontend.Computation
 import Solcore.Core.ExactFuelProperties
 
 /-! An explicitly artificial nondeterministic child tests generic proof premises.

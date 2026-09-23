@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionParameterCompilationProperties
-import Solcore.Frontend.RuntimeFunctionConditionalParameterCompilationProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Whole parsed entries consume all six positional compilation interfaces.
 Actual source lookups and shapes fix open Core without argument inhabitants;

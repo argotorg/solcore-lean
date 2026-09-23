@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Signature
 import Solcore.Syntax.Parser.Term
 import Solcore.Frontend.RuntimeParameters
-import Solcore.Frontend.LocalInputsExecution
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Completely parsed parameter lists feed the actual input builder, and the
 returned tables feed existing expression checking and execution. This does not

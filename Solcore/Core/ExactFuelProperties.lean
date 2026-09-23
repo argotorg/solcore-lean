@@ -1,4 +1,4 @@
-import Solcore.Core.MachineProperties
+import Solcore.Core.Machine
 
 /-! Exact fuel thresholds for a known terminating Core path. Length uniqueness
 is restricted to final states, never arbitrary intermediate endpoints. -/

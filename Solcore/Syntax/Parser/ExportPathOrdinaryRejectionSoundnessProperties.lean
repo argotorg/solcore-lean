@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeExportPathOutcomeGrammar
 import Solcore.Syntax.Parser.CoreIdentifierOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.ExportPathTotalityProperties
-import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.Parser.State
 
 /-! Exact executable rejection reflection for maximal export paths. -/
 

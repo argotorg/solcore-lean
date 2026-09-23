@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameContinuationContextTrapReasonMap
+import Solcore.ContractRuntime.FrameContinuationContext
 
 /-! Definition-only tests for continuation-context trap-reason mapping. -/
 

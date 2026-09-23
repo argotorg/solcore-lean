@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameRunEffectResolution
+import Solcore.ContractRuntime.FrameRun
 
 /-! Executable test for unresolved trap propagation through Option bind. -/
 

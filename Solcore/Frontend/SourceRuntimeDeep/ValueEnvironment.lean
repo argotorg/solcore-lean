@@ -1,6 +1,4 @@
-import Solcore.Frontend.SourceRuntimeProperties
-import Solcore.Frontend.SourceRuntimeStaticInversionProperties
-import Solcore.Frontend.SourceRuntimeStaticOperatorProperties
+import Solcore.Frontend.SourceRuntime
 
 /-! Deep typing bridges for graph values and lexical environments. -/
 

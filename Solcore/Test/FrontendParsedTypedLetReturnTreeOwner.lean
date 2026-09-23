@@ -1,11 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeFunctionEntry
-import Solcore.Frontend.RuntimeFunctionCompilation
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 
 /-! Original parsed syntax and separately supplied Core build independent
 provenance. Owner covariance retains actual values and full fixed-store states;

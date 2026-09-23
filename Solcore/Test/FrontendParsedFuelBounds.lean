@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ReturnBodyFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
+import Solcore.Frontend.ReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! A source-computed budget is shared by actual typed argument cases. The
 budget is sufficient, not exact; rejected sources still do not execute. -/

@@ -1,6 +1,6 @@
-import Solcore.ContractRuntime.AccountCodeProperties
-import Solcore.ContractRuntime.CheckedCoreProgramHostPromotion
-import Solcore.ContractRuntime.WorldStateCodeProperties
+import Solcore.ContractRuntime.Account
+import Solcore.ContractRuntime.CheckedCoreProgram
+import Solcore.ContractRuntime.WorldStateCode
 
 /-! Runtime and direct-law regressions for address-selected host code. -/
 

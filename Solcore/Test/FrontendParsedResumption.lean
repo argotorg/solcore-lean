@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
+import Solcore.Frontend.RuntimeFunction
 
 /-! Resume only genuine fuel-exhaustion states from fully parsed entries.
 Every control, continuation, captured value, and store remains observable. -/

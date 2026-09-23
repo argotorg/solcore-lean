@@ -1,5 +1,5 @@
-import Solcore.Syntax.Parser.TypeAliasProperties
-import Solcore.Syntax.Parser.EnumProperties
+import Solcore.Syntax.Parser.TypeAlias
+import Solcore.Syntax.Parser.Enum
 
 /-! External consumers for type and enum declaration validity. -/
 

@@ -183,7 +183,8 @@ private def taggedBroadPrepassExact : Bool :=
     ("kind", "future"), ("zzz", .null)
   ]
   let invalidProbe := .mkObj [
-    ("address", encodeAddress addressA), ("kind", "future"),
+    ("address", Solcore.Oracle.V5.Wire.encodeAddress addressA),
+    ("kind", "future"),
     ("zzz", .null)
   ]
   let missingProbeAddress := .mkObj [("kind", "future")]

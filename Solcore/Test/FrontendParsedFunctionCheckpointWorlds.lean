@@ -1,14 +1,11 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.ComputationFunctionRuntimeCheckpointProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.RuntimeArgumentConstruction
 import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
+import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Core.FuelResumptionProperties
 /-! Original preparation, literal source costs and separate Core paths precede
 function checkpoint safety. Actual aliased captures share one supplied world.

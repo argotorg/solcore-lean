@@ -1,4 +1,4 @@
-import Solcore.Frontend.ClosedSourceShortCircuitProperties
+import Solcore.Frontend.ClosedSource
 
 /- Exact-depth composition. The selected right operand starts from
 the actual left endpoint; skipped operands have no depth or execution premise. -/

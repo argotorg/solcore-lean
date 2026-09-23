@@ -1,7 +1,6 @@
-import Solcore.Frontend.ClosedSourceDataExpression
-import Solcore.Frontend.ClosedSourceEvaluation
+import Solcore.Frontend.ClosedSource
 import Solcore.Frontend.LocalExpression
-import Solcore.Frontend.LocalReferenceProperties
+import Solcore.Frontend.LocalReference
 
 set_option autoImplicit false
 namespace Tests.ClosedSourceShortCircuitDataBoundaries

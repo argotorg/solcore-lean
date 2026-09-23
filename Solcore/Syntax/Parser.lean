@@ -6,7 +6,7 @@ import Solcore.Syntax.Parser.Preflight
 import Solcore.Syntax.Parser.Validity
 import Solcore.Syntax.Parser.LiteralProperties
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.Parser.State
 import Solcore.Syntax.Parser.Yul.LeafProperties
 
 set_option autoImplicit false

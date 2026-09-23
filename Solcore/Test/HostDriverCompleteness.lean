@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.HostDriverCompletenessProperties
+import Solcore.ContractRuntime.HostDriver
 
 /-! Compile-time regressions for Core and generic-driver replay completeness. -/
 

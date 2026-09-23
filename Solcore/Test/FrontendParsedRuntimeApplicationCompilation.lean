@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeApplicationFunctionFactorizationProperties
-import Solcore.Frontend.LocalApplicationReturnBodyRunnerProperties
+import Solcore.Frontend.RuntimeApplicationFunction
+import Solcore.Frontend.LocalApplication
 
 /-! Value-free original declarations establish their own compilation evidence.
 Only the separate Unit/Word smoke supplies actual arguments; nominal types do not. -/

@@ -1,12 +1,9 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
-import Solcore.Frontend.TerminalReturnTreeResumptionProperties
-import Solcore.Frontend.TerminalReturnTreeRunnerEmbeddingProperties
-import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionCompilation
-import Solcore.Frontend.RuntimeFunctionEntry
-import Solcore.Frontend.LocalInputsProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.TerminalReturnTree
+import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Resolved.LocalScope
 
 /-! Actual checked recursive bodies retain their full machine states. Small
 fixture-supplied branch scripts independently certify the selected source cost;

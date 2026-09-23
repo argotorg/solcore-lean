@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDelta
 import Solcore.Test.OneLevelNestedExecutionFixture
 
 /-! Extended executable regressions for the depth-one nested scheduler. -/

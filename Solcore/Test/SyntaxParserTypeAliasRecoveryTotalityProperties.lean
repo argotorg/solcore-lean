@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.TypeAliasRecoveryTotalityProperties
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! External consumers for type-alias recovery totality. -/
 

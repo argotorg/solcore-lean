@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.EnumElementTotalityProperties
+import Solcore.Syntax.Parser.Enum
 
 set_option autoImplicit false
 

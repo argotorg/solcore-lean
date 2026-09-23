@@ -1,7 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Frontend.TypedLetReturnBody
 
 /-! Original optional annotations, independent source evidence and hand-composed

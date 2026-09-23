@@ -1,8 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ExpectedLambdaLetSpineTyping
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.ComputationFunctionCompilation
+import Solcore.Frontend.Expected
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.Computation
 
 /-! Every original prefix head is source-typed before elaboration/checking.
 At the first non-head, the complete original remainder is typed by the shared body.

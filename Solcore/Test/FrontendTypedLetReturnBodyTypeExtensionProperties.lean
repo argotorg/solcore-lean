@@ -1,6 +1,4 @@
-import Solcore.Frontend.TypedLetReturnBodyRunnerTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! First-match meaning extension keeps fixed inputs and exact source results.
 Repairing an unknown annotation is different from changing an existing meaning. -/

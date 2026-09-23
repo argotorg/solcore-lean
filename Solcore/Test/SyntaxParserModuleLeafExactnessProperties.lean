@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.SelectorNameOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 import Solcore.Syntax.Parser.ExportPathOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.ImportTerminatorOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FinishExportOrdinaryOutcomeSoundnessProperties

@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.DelimitedUnrestrictedFuelTotalityProperties
-import Solcore.Syntax.Parser.Expression.AtomLeafTotalityProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Dot constructors and arrays use the actual no-trailing list policy under
 the three-field unrestricted child contract. Only successful endIndex and

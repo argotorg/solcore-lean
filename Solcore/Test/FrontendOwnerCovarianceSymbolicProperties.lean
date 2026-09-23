@@ -1,7 +1,6 @@
-import Solcore.Frontend.ClosedSourceEvaluatorOwnerProperties
-import Solcore.Frontend.ClosedSourceEvaluation
-import Solcore.Frontend.LocalReferenceProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalReference
+import Solcore.Resolved.LocalScope
 
 /- Independent original constructors and direct depth equations precede covariance.
 Ordered rows, arbitrary opaque values and whole stores are never projected away.

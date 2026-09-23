@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.TraitProperties
+import Solcore.Syntax.Parser.Trait
 
 /-! External compile consumers for canonical trait parser contracts. -/
 

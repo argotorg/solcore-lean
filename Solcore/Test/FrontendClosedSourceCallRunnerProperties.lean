@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
+import Solcore.Frontend.ClosedSource
 
 /-! Original symbolic call towers are evaluated by closed constructors, not by
 assumed callbacks. Every capture, annotation and raw store remains literal.

@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithConditionalAndFiniteGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 /-! Independent parsed integration consumer for conditional-first finite-group dispatch. -/

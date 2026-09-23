@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalInputsExtensionProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! ADR-0159 consumers distinguish Boolean checking from selected-value raw
 evaluation, and fixed internal constants from caller-controlled spellings. -/

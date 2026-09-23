@@ -1,8 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeExecutionProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluationProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeProperties
-import Solcore.Frontend.TypedLetReturnBodyEvaluationProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TypedLetReturnBody
 import Solcore.Core.Safety
 
 /-! Independent selected paths distinguish raw scope, whole checking, actual

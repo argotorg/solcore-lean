@@ -1,4 +1,4 @@
-import Solcore.Frontend.ClosedSourceDataExpression
+import Solcore.Frontend.ClosedSource
 import Solcore.Test.FrontendClosedStrictWordBinaryNegativeProperties
 import Solcore.Frontend.LocalExpression
 

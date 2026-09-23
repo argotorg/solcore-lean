@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativePlainImportOutcomeGrammar
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! Broad ordinary-success reflection for plain import payloads. -/
 

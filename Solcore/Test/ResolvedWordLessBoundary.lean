@@ -1,6 +1,5 @@
-import Solcore.Resolved.RenamingProperties
-import Solcore.Resolved.ScopeExtensionProperties
-import Solcore.Resolved.ScopeExtensionReflectionProperties
+import Solcore.Resolved.Renaming
+import Solcore.Resolved.Scope
 
 /-! Raw ordered comparison evaluates only selected conditional branches. Whole
 scope and typing checks remain stricter, and positional Core temporaries cannot

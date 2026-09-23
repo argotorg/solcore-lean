@@ -1,5 +1,5 @@
 import Solcore.Core.Eval
-import Solcore.Core.RenamingSyntax
+import Solcore.Core.Renaming
 
 set_option autoImplicit false
 

@@ -1,7 +1,4 @@
-import Solcore.Frontend.ClosedSourceStoreProperties
-import Solcore.Frontend.ClosedSourceEvaluatorStoreProperties
-import Solcore.Frontend.ClosedSourceEvaluator
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Store contents cannot supply lexical captures or execute an opaque host value.
 Independent original exclusions and direct finite runs precede replay consumers. -/

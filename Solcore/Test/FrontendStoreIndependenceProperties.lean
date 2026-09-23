@@ -1,6 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 
 /-! Independent source derivations replay on arbitrary stores. Whole contracts,
 actual values, per-store results, and effectful Core remain separate boundaries. -/

@@ -1,9 +1,7 @@
-import Solcore.Frontend.ExpectedComputationLambda
+import Solcore.Frontend.Expected
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.Computation
 
 /-! Well-formed lambda components, an exact child checker and child Core typing
 are distinct premises. Original header/body evidence and arbitrary unused outer

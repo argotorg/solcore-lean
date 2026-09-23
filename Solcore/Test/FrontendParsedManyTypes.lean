@@ -1,9 +1,7 @@
 import Solcore.Syntax.Parser.Signature
-import Solcore.Frontend.StructuralTypeTableProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties
-import Solcore.Frontend.RuntimeParametersPositionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
+import Solcore.Frontend.StructuralType
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeParameters
 
 /-! Original flat lists retain every child and range. Independent structural and
 parameter certificates are compared with external ordered types and supplied values. -/

@@ -2,7 +2,7 @@ import Solcore.SourceSemantics.Dynamic.Value
 import Solcore.SourceSemantics.Literals
 import Solcore.SourceSemantics.Operators
 import Solcore.SourceSemantics.Coercions
-import Solcore.Frontend.WordLiteralProperties
+import Solcore.Frontend.WordLiteral
 
 /-!
 Declarative primitive operations for source evaluation.

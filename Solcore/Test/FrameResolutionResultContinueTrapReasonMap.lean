@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameResolutionResultContinueTrapReasonMapProperties
+import Solcore.ContractRuntime.FrameResolutionResult
 
 /-! Compile-only regressions for result-continuation reason-map invariance. -/
 

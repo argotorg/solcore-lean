@@ -1,6 +1,6 @@
-import Solcore.Frontend.ComputationReturnTreeRawOwnerProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationEvaluationRenamingProperties
+import Solcore.Frontend.RecursiveLocalComputation
 
 /-! These artificial child interfaces test the generic contract, not Core
 semantics. A cost interface need not erase into an uncosted interface, nor must

@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceShortCircuitProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Original AST witnesses precede every run. Actual full

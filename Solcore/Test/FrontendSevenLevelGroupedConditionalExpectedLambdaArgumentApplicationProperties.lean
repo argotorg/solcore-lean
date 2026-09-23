@@ -1,5 +1,5 @@
 import Solcore.Frontend.SevenLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithSixLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Machine
 import Solcore.Core.Correspondence
 /-! Independent symbolic consumer for the exact seven-whole-group conditional adapter. -/

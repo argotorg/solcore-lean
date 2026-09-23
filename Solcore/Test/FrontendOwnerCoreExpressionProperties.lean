@@ -1,5 +1,5 @@
-import Solcore.Frontend.ClosedSourceOwnerCoreExpressionProperties
-import Solcore.Frontend.LocalExpressionEvaluationRules
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalExpressionEvaluation
 
 /- The concrete old local/Core and mapped raw paths are built before the new
 owner/Core image theorem is consumed. No runtime validity premise is added. -/

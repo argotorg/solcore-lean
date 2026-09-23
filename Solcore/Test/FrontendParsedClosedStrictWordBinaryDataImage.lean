@@ -1,8 +1,6 @@
-import Solcore.Frontend.ClosedSourceDataExpressionProperties
-import Solcore.Frontend.ClosedSourceStrictWordBinaryProperties
-import Solcore.Frontend.StrictWordBinaryProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.LocalExpressionCostExecutionProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.StrictWordBinary
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Syntax.Parser.Term
 
 /- Fourteen parsed operators, five Word pairs and two stores use the same Core

@@ -1,7 +1,6 @@
 import Solcore.Syntax.Parser.Term
 import Solcore.Frontend.LocalExpressionTyping
-import Solcore.Frontend.LocalInputsExecution
-import Solcore.Frontend.LocalInputsRenaming
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Resolved.Eval
 import Solcore.Core.Machine
 

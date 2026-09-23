@@ -1,6 +1,6 @@
-import Solcore.Frontend.ComputationFunctionRuntimeCheckpointProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original identity functions expose the distinct actual-argument, store,

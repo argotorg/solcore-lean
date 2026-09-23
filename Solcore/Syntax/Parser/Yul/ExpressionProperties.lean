@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Yul.LeafProperties
-import Solcore.Syntax.YulValidity
+import Solcore.Syntax.Yul
 
 /-! Compositional carrier and cursor contracts for one inline-Yul expression layer. -/
 

@@ -1,6 +1,4 @@
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
-import Solcore.Frontend.TypedLetReturnBodyRunnerEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Independent let chains distinguish actual typed inputs, numerical bounds,
 whole acceptance and genuine suspended frames. No runtime value is fabricated. -/

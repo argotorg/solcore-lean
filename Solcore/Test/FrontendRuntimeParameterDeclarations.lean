@@ -1,6 +1,5 @@
 import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.RuntimeParametersLayout
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
+import Solcore.Frontend.RuntimeParameters
 
 /-! Type-only declarations require annotations, not runtime inhabitants.
 Actual supplied structural values are used only by the separate binding bridge. -/

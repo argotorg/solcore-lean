@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionExecutionFactorization
-import Solcore.Frontend.ReturnBodyFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.ReturnBody
 
 /-! Parsed Word inequality retains ordered equality beneath an observable
 negation frame. Five and six transitions are genuine, distinct checkpoints. -/

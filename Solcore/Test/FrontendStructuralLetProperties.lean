@@ -1,8 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnTreeOwnerProperties
-import Solcore.Frontend.TypedLetReturnTreeExecutionProperties
-import Solcore.Frontend.LocalInputsTypeErasure
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Independent structural annotations and lexical bodies fix the original Core.
 Static nominal inputs never manufacture the values needed for actual execution. -/

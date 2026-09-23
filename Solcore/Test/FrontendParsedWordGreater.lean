@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
-import Solcore.Frontend.LocalInputsExecution
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Complete source parsing connects unsigned Word comparison to exact Bool
 typing, ordered parameter positions, and checked machine states and costs. -/

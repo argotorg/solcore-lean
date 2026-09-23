@@ -1,9 +1,6 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Frontend.TypedLetReturnBody
-import Solcore.Frontend.LocalFragmentProperties
 import Solcore.Core.LocalFragment
 
 /-! Original strict statement prefixes, independent source evidence and manually

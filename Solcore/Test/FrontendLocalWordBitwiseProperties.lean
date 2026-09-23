@@ -1,5 +1,4 @@
-import Solcore.Frontend.LocalInputsExtensionProperties
-import Solcore.Frontend.LocalInputsRenamingProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.BitwiseLogic
 
 /-! ADR-0164: strict ordered Word operands, exact binary Core, and no mask-based

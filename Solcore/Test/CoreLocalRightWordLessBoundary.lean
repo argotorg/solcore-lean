@@ -1,5 +1,5 @@
 import Solcore.Core.LocalFragment
-import Solcore.Frontend.WordLessLocalRightCostProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! The left operand may allocate before a local right reference is evaluated.

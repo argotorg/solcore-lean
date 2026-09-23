@@ -1,6 +1,6 @@
 import Solcore.Syntax.CollectionValidity
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.Parser.State
 
 set_option autoImplicit false
 

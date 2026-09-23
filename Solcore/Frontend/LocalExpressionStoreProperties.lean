@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalExpressionCostProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! The current source fragment neither reads nor writes the store. Replaying
 an independent derivation preserves its value and cost on any replacement store.

@@ -1,6 +1,4 @@
-import Solcore.Frontend.TypedLetReturnBodyStoreProperties
-import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
-import Solcore.Frontend.TypedLetReturnBodyRunnerEmbeddingProperties
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Exact source replay does not identify stores or erase pending work.
 Core loads demonstrate why preservation alone cannot establish independence. -/

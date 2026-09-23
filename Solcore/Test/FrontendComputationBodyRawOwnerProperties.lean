@@ -1,8 +1,6 @@
-import Solcore.Frontend.ComputationReturnTreeRawOwnerProperties
-import Solcore.Frontend.ComputationBindingScopeProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationEvaluationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Symbolic original blocks, not parser outputs. Arbitrary raw rows stay raw:

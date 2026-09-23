@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeComputationFunctionFactorizationProperties
-import Solcore.Frontend.LocalComputationReturnTreeTypingProperties
-import Solcore.Frontend.RuntimeApplicationFunctionCompilation
+import Solcore.Frontend.RuntimeComputationFunction
+import Solcore.Frontend.LocalComputation
+import Solcore.Frontend.RuntimeApplicationFunction
 import Solcore.Core.ExactFuelProperties
 
 /-! Whole original declarations have independent annotation, parameter and body

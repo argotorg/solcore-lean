@@ -1,4 +1,4 @@
-import Solcore.Frontend.RuntimeValueProperties
+import Solcore.Frontend.RuntimeValue
 import Solcore.Syntax.Parser.Term
 
 set_option autoImplicit false

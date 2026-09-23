@@ -1,9 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TerminalReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TerminalReturnTree
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Frontend.TypedLetReturnBody
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTree
 
 /-! Recursive bodies are checked statically using actual parsed parameters.
 No values, tree execution or costs are assumed by recursive entry compilation.

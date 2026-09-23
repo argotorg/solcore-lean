@@ -1,11 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TerminalReturnTree
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Resolved.LocalScope
 
 /-! Compile actual recursive declarations once, then supply independent actual
 arguments. Source-selected cost scripts and exact compilation provenance meet

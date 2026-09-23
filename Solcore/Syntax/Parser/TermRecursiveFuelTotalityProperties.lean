@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.BlockFuelTotalityProperties
 import Solcore.Syntax.Parser.ExpressionLayerBlockFuelTotalityProperties
-import Solcore.Syntax.Parser.PatternLayerFuelTotalityProperties
+import Solcore.Syntax.Parser.Pattern
 import Solcore.Syntax.Parser.Statement.StatementLayerStrictProperties
 import Solcore.Syntax.Parser.TermRecursiveProperties
 

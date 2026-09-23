@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitialization
 
 /-! Compile-only regressions for parent-indexed frame initialization. -/
 

@@ -1,6 +1,5 @@
 import Solcore.Oracle.V5.Input
-import Solcore.ContractRuntime.AccountNonceProperties
-import Solcore.ContractRuntime.AccountStorageWriteSparsePreservationProperties
+import Solcore.ContractRuntime.Account
 import Solcore.ContractRuntime.WorldStateBalanceProperties
 import Solcore.ContractRuntime.WorldStateNonceProperties
 import Solcore.ContractRuntime.WorldState

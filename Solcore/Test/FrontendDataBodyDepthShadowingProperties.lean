@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceDataBodyDepthDecisionProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original fresh binding witnesses precede all bounded-search consequences.
 Repeated shadowing retains arbitrary mixed values and the entire actual store. -/

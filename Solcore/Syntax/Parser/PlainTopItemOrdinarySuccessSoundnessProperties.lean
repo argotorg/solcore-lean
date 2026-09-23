@@ -1,13 +1,13 @@
 import Solcore.Syntax.Parser.ContractDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.EnumDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.ExportDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.FunctionDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.ImplDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Impl
 import Solcore.Syntax.Parser.ImportDeclarationOrdinaryOutcomeSoundnessProperties
 import Solcore.Syntax.Parser.PlainTopItemOutcomePrimitiveProperties
 import Solcore.Syntax.Parser.PragmaDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.TraitDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.TypeAliasDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Trait
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! Broad executable success reflection for the plain top-item dispatcher. -/
 

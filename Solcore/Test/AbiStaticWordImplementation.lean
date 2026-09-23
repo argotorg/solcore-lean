@@ -1,4 +1,4 @@
-import Solcore.Abi.StaticWordImplementation
+import Solcore.Abi.StaticWord
 
 /-! Admission regressions for checked Static Word method implementations. -/
 

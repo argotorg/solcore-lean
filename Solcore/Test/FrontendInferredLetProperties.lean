@@ -1,8 +1,4 @@
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeStoreProperties
-import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
-import Solcore.Frontend.TypedLetReturnTreeLookupProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Frontend.TypedLetReturnBody
 
 /-! Original optional annotations, independent paths and exact old-scope

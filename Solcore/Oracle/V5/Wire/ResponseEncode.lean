@@ -1,5 +1,5 @@
 import Solcore.Oracle.V5.Capabilities
-import Solcore.Oracle.V5.ObservationCodec
+import Solcore.Oracle.V5.Observation
 import Solcore.Oracle.V5.ProtocolErrorValidity
 import Solcore.Oracle.V5.Wire.Encode
 

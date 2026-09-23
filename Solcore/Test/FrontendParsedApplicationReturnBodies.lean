@@ -1,11 +1,8 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalInputsApplicationRuntimeProperties
-import Solcore.Frontend.LocalApplicationReturnBody
-import Solcore.Frontend.LocalApplicationReturnBodyRunnerProperties
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.LocalApplication
 import Solcore.Frontend.ReturnBody
-import Solcore.Frontend.TypedLetReturnTreeRunner
-import Solcore.Frontend.LocalFunctionApplicationExecutionProperties
-import Solcore.Frontend.LocalInputsProperties
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original complete blocks and independent child/body witnesses retain the

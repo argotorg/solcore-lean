@@ -1,9 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionLocalFragmentProperties
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Core.LocalFragment
 import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorProperties
+import Solcore.Frontend.TypedLetReturnTree
 
 /-! Exact parsed entry provenance feeds structural insertion laws. Independent
 Core paths fix costs; transported suspended states need not be identical. -/

@@ -1,8 +1,7 @@
-import Solcore.Frontend.LocalExpressionResolutionProperties
+import Solcore.Frontend.LocalExpression
 import Solcore.Frontend.LocalExpressionTyping
-import Solcore.Frontend.LocalExpressionEvaluationProperties
-import Solcore.Frontend.LocalReferenceElaboration
-import Solcore.Frontend.LocalReferenceEvaluation
+import Solcore.Frontend.LocalExpressionEvaluation
+import Solcore.Frontend.LocalReference
 
 /-! The identifier/group adapter embeds exactly in the conditional adapter.
 Variable-shaped resolution characterizes the old fragment; evaluating a

@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceConditionalProperties
-import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
+import Solcore.Frontend.ClosedSource
 
 /- A conditional initializer saves every lexical row before a later payload let.
 Independent caller and saved lookups drive nested argument and body conditionals. -/

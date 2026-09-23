@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeCoreCollectionAtomGrammar
 import Solcore.Syntax.Parser.CoreExpressionCollectionAtomDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptyDiagnosticFreeSoundnessProperties
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-!
 Exact diagnostic-free soundness for parenthesized and array Core atoms.

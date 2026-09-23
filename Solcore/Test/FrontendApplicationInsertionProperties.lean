@@ -1,5 +1,4 @@
-import Solcore.Frontend.LocalFunctionApplicationExactInsertionProperties
-import Solcore.Frontend.LocalFunctionApplicationExecutionProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent actual paths separate caller insertion from closure captures.

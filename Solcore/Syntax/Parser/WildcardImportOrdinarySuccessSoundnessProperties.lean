@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeWildcardImportOutcomeGrammar
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
 import Solcore.Syntax.Parser.HidingClauseOrdinarySuccessSoundnessProperties
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! Broad ordinary-success reflection for wildcard import payloads. -/
 

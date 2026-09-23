@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.AccountCodeProperties
-import Solcore.ContractRuntime.TopLevelExecutionResumption
+import Solcore.ContractRuntime.Account
+import Solcore.ContractRuntime.TopLevelExecution
 
 /-! Checked root fixture for executable transaction-log finalization. -/
 

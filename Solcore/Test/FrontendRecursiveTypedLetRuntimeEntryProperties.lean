@@ -1,9 +1,5 @@
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Independent recursive source provenance and cost reach the existing entry.
 Only original parameters inhabit the records; sibling lets remain scope-local. -/

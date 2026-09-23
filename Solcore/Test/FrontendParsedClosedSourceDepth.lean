@@ -1,9 +1,5 @@
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
-import Solcore.Frontend.ClosedSourceConditionalProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.ClosedSourceEvaluatorThresholdProperties
 
 /- Independent original certificates precede search; actual returned closures and
 stores are reused under a different caller. None is not a runtime fault. -/

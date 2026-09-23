@@ -1,6 +1,6 @@
 import Solcore.Syntax.DeclarativeGrammar
 import Solcore.Syntax.Parser.PrimitiveCarrierProperties
-import Solcore.Syntax.Parser.StateCursorProperties
+import Solcore.Syntax.Parser.State
 
 /-! Primitive bridges from parser success to exact declarative tokens. -/
 

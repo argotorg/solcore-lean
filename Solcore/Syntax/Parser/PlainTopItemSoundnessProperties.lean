@@ -1,13 +1,13 @@
 import Solcore.Syntax.Parser.ContractDeclSoundnessProperties
-import Solcore.Syntax.Parser.EnumDeclSoundnessProperties
+import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.ExportDeclSoundnessProperties
 import Solcore.Syntax.Parser.File
 import Solcore.Syntax.Parser.FunctionDeclSoundnessProperties
-import Solcore.Syntax.Parser.ImplDeclSoundnessProperties
+import Solcore.Syntax.Parser.Impl
 import Solcore.Syntax.Parser.ImportDeclSoundnessProperties
 import Solcore.Syntax.Parser.PragmaSoundnessProperties
-import Solcore.Syntax.Parser.TraitDeclSoundnessProperties
-import Solcore.Syntax.Parser.TypeAliasSoundnessProperties
+import Solcore.Syntax.Parser.Trait
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! Parametric strict soundness for attribute-free top-item dispatch. -/
 

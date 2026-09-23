@@ -1,8 +1,7 @@
-import Solcore.Frontend.ExpectedLambdaLetSpineTyping
-import Solcore.Frontend.ExpectedLambdaLetBody
+import Solcore.Frontend.Expected
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Source-only typing is constructed before literal Core or checker evidence.

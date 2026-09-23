@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameRunResult
+import Solcore.ContractRuntime.FrameRun
 
 /-! Executable boundary tests for state-and-outcome frame results. -/
 

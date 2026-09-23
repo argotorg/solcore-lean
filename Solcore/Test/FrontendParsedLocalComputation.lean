@@ -1,8 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalComputationProperties
-import Solcore.Frontend.LocalComputationEvaluationProperties
-import Solcore.Frontend.LocalComputationExecutionProperties
-import Solcore.Frontend.LocalComputationInsertionProperties
+import Solcore.Frontend.LocalComputation
 
 /-! Original parsed children supply independent exact static and raw evidence.
 Manual Core paths, not checker outputs, fix each runtime value and cost. -/

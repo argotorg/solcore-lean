@@ -1,10 +1,8 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.TerminalReturnTreeExecutionProperties
-import Solcore.Frontend.TerminalReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TerminalReturnTreeProperties
-import Solcore.Frontend.LocalInputsProperties
+import Solcore.Frontend.TerminalReturnTree
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Frontend.RuntimeParameters
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Resolved.LocalScope
 
 /-! Fixture-supplied branch scripts certify actual parsed selected paths.
 This is not a tree runner: no branch search, execution API or fuel policy is

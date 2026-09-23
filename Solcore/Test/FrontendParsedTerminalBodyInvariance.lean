@@ -1,9 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TerminalReturnBodyRenamingProperties
-import Solcore.Frontend.TerminalReturnBodyStoreProperties
-import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
+import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! Parsed body identity changes preserve complete same-fuel machine results.
 Store replay preserves actual values and thresholds, not the store-bearing

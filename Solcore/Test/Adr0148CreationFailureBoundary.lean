@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.CheckedCreationPreflightFailureProperties
+import Solcore.ContractRuntime.CheckedCreationPreflight
 
 /-! External and executable checks for stable creation failure codes. -/
 

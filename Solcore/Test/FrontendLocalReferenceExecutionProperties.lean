@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalReferenceExecutionProperties
+import Solcore.Frontend.LocalReference
 
 /-! Checked canonical references preserve values only when context and runtime
 identity order agree. Equal positional types alone do not establish that alignment. -/

@@ -1,4 +1,4 @@
-import Solcore.Frontend.BoundedInputsLambdaDepthDecisionProperties
+import Solcore.Frontend.BoundedInputsLambdaDepth
 
 /- Both caller inputs succeed independently before a saved-body exclusion is
 constructed. These laws do not classify unsuccessful callee or argument runs. -/

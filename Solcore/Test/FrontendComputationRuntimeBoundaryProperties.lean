@@ -1,6 +1,6 @@
-import Solcore.Frontend.ComputationReturnTreeRuntimeCheckpointProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent original bodies separate positional checkpoint safety from

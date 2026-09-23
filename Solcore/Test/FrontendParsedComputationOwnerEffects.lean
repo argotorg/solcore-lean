@@ -1,12 +1,7 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.ComputationReturnTreeOwnerProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 /-! Original repeated-name lets retain old-input initializers and fresh indices
 under owner-only relabeling. Actual cells and captures are never mapped. -/

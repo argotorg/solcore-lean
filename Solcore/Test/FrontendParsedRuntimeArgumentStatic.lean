@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionEntry
+import Solcore.Frontend.RuntimeFunction
 
 /-! Equal typed-argument type lists preserve static preparation, including
 rejection. Actual runtime values, suspended states, and costs need not agree. -/

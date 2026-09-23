@@ -1,10 +1,8 @@
 import Solcore.Syntax.Parser.Signature
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsPositionProperties
-import Solcore.Frontend.RuntimeParametersPositionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeParameters
+import Solcore.Frontend.LocalExpressionTyping
 
 /-! Exact old static function-annotation rejections become independent declarations.
 Original files, owners, tables and source spelling stay fixed. Supplied Unit/Word

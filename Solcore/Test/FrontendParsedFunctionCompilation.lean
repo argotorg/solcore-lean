@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
-import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Full canonical declarations compile before any arguments are supplied.
 Matching actual arguments then use the unchanged checked runtime endpoint. -/

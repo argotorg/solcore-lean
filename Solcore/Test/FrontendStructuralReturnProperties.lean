@@ -1,8 +1,5 @@
-import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnBodyProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Independent structural return contracts meet the existing entry only through
 original parameter/body provenance. Static types do not supply runtime arguments. -/

@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.BalanceTransferInstallationProperties
+import Solcore.ContractRuntime.BalanceTransfer
 
 /-! External compile consumer for balance-transfer installation transport. -/
 

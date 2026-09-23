@@ -1,9 +1,7 @@
-import Solcore.Frontend.ClosedSourceStoreProperties
-import Solcore.Frontend.ClosedSourceEvaluatorStoreProperties
-import Solcore.Frontend.ClosedSourceEvaluator
-import Solcore.Frontend.LocalReferenceProperties
-import Solcore.Frontend.SourceLambdaEvaluationProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalReference
+import Solcore.Frontend.SourceLambdaEvaluation
+import Solcore.Resolved.LocalScope
 
 /- Independent original constructors and direct finite runners precede replay.
 Stores are replaced only at endpoints, never inside captured values. Arbitrary

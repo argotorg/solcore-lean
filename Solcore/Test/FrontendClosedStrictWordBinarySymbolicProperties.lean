@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceStrictWordBinaryProperties
-import Solcore.Frontend.ClosedSourceDataExpression
+import Solcore.Frontend.ClosedSource
 
 /- Fourteen original strict Word witnesses over arbitrary ordered mixed inputs.
 No typing, unique-row, whole-resolution or bounded-execution premise is used. -/

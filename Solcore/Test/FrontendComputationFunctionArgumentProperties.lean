@@ -1,9 +1,7 @@
-import Solcore.Frontend.ComputationFunctionArgumentProperties
-import Solcore.Frontend.ComputationFunctionProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent value-free compilation precedes every supplied actual argument.

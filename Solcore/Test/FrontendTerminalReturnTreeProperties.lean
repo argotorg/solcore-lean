@@ -1,7 +1,7 @@
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.TerminalReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.ConditionalReturnBodyEvaluation
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TerminalReturnTree
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.ConditionalReturnBody
 
 /-! Arbitrary-depth static trees retain every original branch and positional
 reference. The raw skip contrast below uses only the old conditional judgment. -/

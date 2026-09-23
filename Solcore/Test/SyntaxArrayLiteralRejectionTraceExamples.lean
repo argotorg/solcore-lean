@@ -1,5 +1,5 @@
 import Solcore.Test.SyntaxArrayLiteralTraceExamples
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Distinct array rejection routes with the actual identifier child. After
 a comma the child runs even at a closing bracket; without a comma the list

@@ -1,6 +1,5 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteIsolationProperties
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageWriteProjectionProperties
-import Solcore.ContractRuntime.HostStorageContextRebase
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
+import Solcore.ContractRuntime.HostStorageContext
 import Solcore.ContractRuntime.HostStorageHandler
 
 /-! Presence evidence retained while another selected Account is being handled. -/

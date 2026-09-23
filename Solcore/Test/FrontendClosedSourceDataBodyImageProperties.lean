@@ -1,10 +1,8 @@
-import Solcore.Frontend.ClosedSourceDataBodyProperties
-import Solcore.Frontend.ClosedSourceEvaluation
+import Solcore.Frontend.ClosedSource
 import Solcore.Frontend.LocalExpressionEvaluation
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.ComputationReturnTreeExecutionProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.LocalExpressionExecutionProperties
-import Solcore.Frontend.LocalFragmentProperties
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Core.LocalFragment
 
 /- Original repeated shadowing preserves the pre-binding value and complete raw store. -/

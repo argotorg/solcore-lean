@@ -1,7 +1,4 @@
-import Solcore.Frontend.ClosedSourceShortCircuitProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
+import Solcore.Frontend.ClosedSource
 
 /- A selected lambda captures
 the original saved rows; the actual returned closure and store are reused by a

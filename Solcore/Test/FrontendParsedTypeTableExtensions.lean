@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Caller dictionaries preserve exact parsed compilation only when their
 first-match meanings persist. Mutual preservation includes rejection; adding

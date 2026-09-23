@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.PatternLayerFuelTotalityProperties
+import Solcore.Syntax.Parser.Pattern
 import Solcore.Syntax.Parser.ExpressionProperties
 import Solcore.Syntax.Parser.TermPatternProperties
 

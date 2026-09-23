@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.OneLevelNestedExecutionResumption
+import Solcore.ContractRuntime.OneLevelNestedExecution
 
 /-! Executable root/child fixtures for rollback-scoped word logs. -/
 

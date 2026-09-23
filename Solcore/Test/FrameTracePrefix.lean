@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameTracePrefix
+import Solcore.ContractRuntime.FrameTrace
 
 /-! Definition-only compile regressions for concrete frame-trace prefixes. -/
 

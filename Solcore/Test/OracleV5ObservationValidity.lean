@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.ObservationValidity
+import Solcore.Oracle.V5.Observation
 
 /-! Focused regressions for sealed Oracle v5 rollback observations. -/
 

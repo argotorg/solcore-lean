@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.OneLevelNestedExecutionResumptionProperties
+import Solcore.ContractRuntime.OneLevelNestedExecution
 import Solcore.Test.Adr0148CreationEndToEndFixture
 
 /-! Shared-fuel and exact-resumption regressions for checked creation. -/

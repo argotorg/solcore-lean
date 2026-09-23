@@ -1,7 +1,4 @@
-import Solcore.Frontend.LocalExpressionCostProperties
-import Solcore.Frontend.LocalExpressionCostCorrespondence
-import Solcore.Frontend.LocalExpressionCostExecutionProperties
-import Solcore.Frontend.LocalInputsExecutionProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.BitwiseLogic
 
 /-! ADR-0165 consumers count Core transitions, not frontend computation time.

@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountProperties
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountStorageReadWriteProperties
+import Solcore.ContractRuntime.ParentIndexedFrameInitialization
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccount
 
 /-! Compile-only regressions for initialized present-storage refinement. -/
 

@@ -1,5 +1,5 @@
 import Solcore.Core.Primitive
-import Solcore.ContractRuntime.HostStorageInputDataProperties
+import Solcore.ContractRuntime.HostStorageInputData
 
 /-! Executable boundary tests for bounded run input bytes. -/
 

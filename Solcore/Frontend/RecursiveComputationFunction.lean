@@ -1,5 +1,4 @@
-import Solcore.Frontend.ComputationFunctionCompilation
-import Solcore.Frontend.ComputationFunctionEntry
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveLocalComputation
 
 /-! Concrete entry operations and independent provenance select the recursive

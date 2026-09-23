@@ -2,7 +2,7 @@ import Solcore.Syntax.DeclarativeCoreExpressionPostfixGrammar
 import Solcore.Syntax.Parser.CoreExpressionPostfixDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.DeclarativePrimitiveProperties
 import Solcore.Syntax.Parser.DelimitedNoTrailingAllowEmptyDiagnosticFreeSoundnessProperties
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-!
 Exact parser-independent soundness for maximal Core postfix parsing.

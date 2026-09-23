@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceStrictWordBinaryProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original saved closures can occur on either strict operand side. Caller
 arguments are read before the fresh saved-owner parameter shadows saved p.

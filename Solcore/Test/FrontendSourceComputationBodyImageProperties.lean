@@ -1,7 +1,7 @@
-import Solcore.Frontend.SourceComputationBodyEmbeddingProperties
+import Solcore.Frontend.SourceComputationBody
 import Solcore.Frontend.SourceLambdaEvaluation
-import Solcore.Frontend.LocalReferenceProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.LocalReference
+import Solcore.Resolved.LocalScope
 
 /-! Independent old/mixed reference callbacks establish the strong all-actual
 image contract by first-ID lookup inversion. They do not assume typed rows,

@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.WorldStateWordCodeSelectionProperties
+import Solcore.ContractRuntime.WorldStateWordCodeSelection
 
 /-! Compile-only consumers for branch-complete selected Word-code classification. -/
 

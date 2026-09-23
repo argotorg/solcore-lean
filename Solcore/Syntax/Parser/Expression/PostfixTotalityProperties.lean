@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Expression.AtomCoreTotalityProperties
+import Solcore.Syntax.Parser.Expression.Atom
 import Solcore.Syntax.Parser.Expression.PostfixTailFuelTotalityProperties
 
 /-! Fuel-aware totality for complete postfix expressions. -/

@@ -1,6 +1,5 @@
-import Solcore.Frontend.SelfApplicationCallNonreturnProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.SelfApplication
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Separate actual source occurrences create finite closures with literal saved fields.

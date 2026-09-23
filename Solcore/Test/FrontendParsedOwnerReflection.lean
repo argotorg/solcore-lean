@@ -1,7 +1,4 @@
-import Solcore.Frontend.ClosedSourceOwnerReflectionProperties
-import Solcore.Frontend.ClosedSourceOwnerBudgetProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 /- Actual mapped endpoints precede reflection; independent originals and adjacent runs identify full preimages and a shared cutoff. -/
 set_option autoImplicit false

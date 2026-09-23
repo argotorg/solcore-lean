@@ -1,9 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.LocalInputsCostInvariance
-import Solcore.Frontend.LocalInputsRenamingProperties
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
-import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Core.DirectWordComparisons
 
 /-! Independent unsigned comparison changes the result type, not operand order,

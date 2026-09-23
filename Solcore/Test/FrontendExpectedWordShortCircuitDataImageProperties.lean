@@ -1,7 +1,7 @@
-import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.LocalTypeInputsProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.Expected
+import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.LocalTypeInputs
+import Solcore.Resolved.LocalScope
 
 set_option autoImplicit false
 namespace Tests.ExpectedWordShortCircuitDataImages

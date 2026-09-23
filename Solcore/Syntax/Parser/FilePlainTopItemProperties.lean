@@ -1,11 +1,11 @@
 import Solcore.Syntax.Parser.DeclarationCanonicalProperties
-import Solcore.Syntax.Parser.EnumProperties
+import Solcore.Syntax.Parser.Enum
 import Solcore.Syntax.Parser.ExportProperties
 import Solcore.Syntax.Parser.FileTopItemProperties
 import Solcore.Syntax.Parser.ImportProperties
 import Solcore.Syntax.Parser.Pragma
-import Solcore.Syntax.Parser.TraitProperties
-import Solcore.Syntax.Parser.TypeAliasProperties
+import Solcore.Syntax.Parser.Trait
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! Compositional contracts for top-level declaration dispatch. -/
 

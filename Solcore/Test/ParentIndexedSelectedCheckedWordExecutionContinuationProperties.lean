@@ -1,5 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionCompatibilityProperties
-import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecutionContinuationResumptionProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedCheckedWordExecution
 
 /-! Compile-only consumers for ADR-0144 return and compatibility laws. -/
 

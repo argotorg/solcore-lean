@@ -1,5 +1,5 @@
 import Solcore.Core.HostProgress
-import Solcore.ContractRuntime.BalanceTransferCallFailureProperties
+import Solcore.ContractRuntime.BalanceTransfer
 import Solcore.ContractRuntime.HostStorageHandler
 import Solcore.ContractRuntime.NestedWordCall
 

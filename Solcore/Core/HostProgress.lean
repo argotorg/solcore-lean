@@ -1,4 +1,4 @@
-import Solcore.Core.HostMachineProperties
+import Solcore.Core.HostMachine
 import Solcore.Core.HostStateSafety
 
 /-! Progress and immediate fault freedom for the host-aware CEK machine. -/

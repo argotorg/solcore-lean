@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Term
 import Solcore.Frontend.WordLiteral
-import Solcore.Frontend.LocalInputsExecution
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Full-source literal regressions for numeric interpretation and checked execution.
 Parser acceptance, natural-number meaning, and strict Word range are distinct.

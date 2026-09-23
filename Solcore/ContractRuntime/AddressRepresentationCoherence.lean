@@ -1,5 +1,5 @@
 import Solcore.ContractRuntime.RuntimeScalars.TextProperties
-import Solcore.ContractRuntime.AddressBytesBEProperties
+import Solcore.ContractRuntime.AddressBytesBE
 
 /-! Private radix bridge for Address text and exact-byte coherence. -/
 

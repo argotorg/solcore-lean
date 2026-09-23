@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.OneLevelNestedCreationCompletion
+import Solcore.ContractRuntime.OneLevelNestedTransitionSystem
 import Solcore.Test.Adr0148CheckedCreationPreflightFixture
 import Solcore.Test.OneLevelNestedExecutionFixture
 

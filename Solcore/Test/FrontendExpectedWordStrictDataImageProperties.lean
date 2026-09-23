@@ -1,8 +1,6 @@
-import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
-import Solcore.Frontend.LocalExpressionCostCorrespondence
-import Solcore.Frontend.LocalExpressionCostErasureProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.Expected
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.LocalExpressionTyping
 set_option autoImplicit false
 namespace Tests.ExpectedWordStrictDataImages
 open Solcore Solcore.Frontend

@@ -1,15 +1,10 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.ComputationFunctionFactorizationProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.RuntimeArgumentConstruction
 import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.ComputationFunctionRuntimeSafetyProperties
-import Solcore.Frontend.ComputationReturnTreeRuntimeWorldProperties
 import Solcore.Core.FuelResumptionProperties
 /-! Original unary annotations supply no runtime closure. Independently supplied
 factory/writer values allocate, capture, write, and return a closure or a triple. -/

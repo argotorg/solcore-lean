@@ -1,7 +1,4 @@
-import Solcore.Frontend.ClosedSourceConditionalProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluatorCompletenessProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original conditional boundaries consume independent judgments and direct
 computations separately. No typing, failure classification or cost claim. -/

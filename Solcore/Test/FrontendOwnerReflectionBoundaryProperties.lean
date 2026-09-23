@@ -1,7 +1,5 @@
-import Solcore.Frontend.ClosedSourceOwnerReflectionProperties
-import Solcore.Frontend.ClosedSourceOwnerBudgetProperties
-import Solcore.Frontend.SelfApplicationCallNonreturnProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.SelfApplication
 
 /- Old failures and both independent original controls precede reflection.
 An observed mapped endpoint is arbitrary, not assumed to be in the image. -/

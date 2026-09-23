@@ -1,6 +1,5 @@
-import Solcore.Frontend.ClosedSourceEvaluation
-import Solcore.Frontend.ClosedSourceEvaluator
-import Solcore.Frontend.LocalExpressionCostExecutionProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Independent counts for the same nested original AST.
 Closed depth uses arbitrary RuntimeValue capture tails and whole raw stores.

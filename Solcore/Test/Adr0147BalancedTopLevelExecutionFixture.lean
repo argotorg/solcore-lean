@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.BalancedTopLevelExecutionProperties
+import Solcore.ContractRuntime.BalancedTopLevelExecution
 import Solcore.Test.TopLevelExecutionFixture
 
 /-! Actual checked-Core worlds for balance-aware top-level execution tests. -/

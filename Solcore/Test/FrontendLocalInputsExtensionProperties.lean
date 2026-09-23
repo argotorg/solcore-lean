@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalInputsExtensionProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Adding an unused spelling shifts positional Core references without
 changing existing identity-based meanings. Fresh IDs alone do not suffice. -/

@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithOneLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 /-! Parsed consumer for grouped-conditional-first local application dispatch. -/

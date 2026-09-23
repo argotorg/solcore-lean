@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.ObservationCodec
+import Solcore.Oracle.V5.Observation
 
 /-! Exact-wire regressions for canonical Oracle v5 execution observations. -/
 

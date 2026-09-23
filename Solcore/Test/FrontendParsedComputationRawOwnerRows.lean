@@ -1,8 +1,7 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.ComputationReturnTreeRawOwnerProperties
-import Solcore.Frontend.ComputationReturnTreeEvaluationProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationEvaluationRenamingProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.LocalTypeInputs
 
 /-! Raw names and actual rows are deliberately not aligned or repaired.

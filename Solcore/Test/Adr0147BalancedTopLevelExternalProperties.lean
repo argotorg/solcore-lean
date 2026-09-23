@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.BalancedTopLevelExecutionProperties
+import Solcore.ContractRuntime.BalancedTopLevelExecution
 
 /-! External compile consumers for balance-aware top-level execution laws. -/
 

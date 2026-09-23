@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameTraceExtension
+import Solcore.ContractRuntime.FrameTrace
 import Solcore.ContractRuntime.FrameContinuationContextWithTracePrefix
 
 /-! Definition-only tests for indexed incremental frame-trace extension. -/

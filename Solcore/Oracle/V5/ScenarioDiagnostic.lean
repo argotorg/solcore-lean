@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.ContractAdmissionDiagnostic
+import Solcore.Oracle.V5.ContractAdmission
 import Solcore.Oracle.V5.RootInstallation
 import Solcore.Oracle.V5.ScenarioPreparation
 import Solcore.ContractRuntime.RuntimeScalars.TextProperties

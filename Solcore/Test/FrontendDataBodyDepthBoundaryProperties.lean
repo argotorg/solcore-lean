@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceDataBodyDepthDecisionProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original constructor evidence and independent ordered selection come first.
 All lexical tails, mixed captures and actual stores remain unrestricted.

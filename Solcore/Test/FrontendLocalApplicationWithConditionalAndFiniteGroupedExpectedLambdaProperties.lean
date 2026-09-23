@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithConditionalAndFiniteGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Eval
 /-! Independent symbolic consumer for conditional-first finite-group dispatch. -/
 set_option autoImplicit false

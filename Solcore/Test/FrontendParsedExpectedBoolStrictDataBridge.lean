@@ -1,5 +1,5 @@
 import Solcore.Test.FrontendExpectedBoolStrictDataImageProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Core.ExactFuelProperties
 import Solcore.Syntax.Parser.Term
 

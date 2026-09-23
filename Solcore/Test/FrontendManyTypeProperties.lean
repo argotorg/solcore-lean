@@ -1,4 +1,4 @@
-import Solcore.Frontend.StructuralTypeTableProperties
+import Solcore.Frontend.StructuralType
 import Solcore.Core.Safety
 
 /-! Original finite type lists have an independent source-order meaning.

@@ -1,9 +1,7 @@
-import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalExpressionCostCorrespondence
-import Solcore.Frontend.LocalExpressionCostErasureProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.Expected
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Syntax.Parser.Term
 set_option autoImplicit false
 set_option maxHeartbeats 1600000

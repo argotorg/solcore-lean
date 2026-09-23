@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalExpressionEvaluatorExecutionProperties
+import Solcore.Frontend.LocalExpressionEvaluator
 
 /-! Original parsed expressions, independently specified values/Core/costs, and
 actual first-match inputs. Raw selected success is not whole-source acceptance. -/

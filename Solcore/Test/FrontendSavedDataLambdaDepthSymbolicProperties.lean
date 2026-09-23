@@ -1,4 +1,4 @@
-import Solcore.Frontend.SavedDataLambdaDepthDecisionProperties
+import Solcore.Frontend.SavedDataLambdaDepth
 
 /- Independent original creation, first pickup, caller argument and saved fresh
 body witnesses precede depth laws. Creation and invocation stores are separate.

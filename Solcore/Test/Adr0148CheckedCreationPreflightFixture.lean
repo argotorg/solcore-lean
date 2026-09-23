@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.CheckedCreationPreflightFailureProperties
+import Solcore.ContractRuntime.CheckedCreationPreflight
 
 /-! Explicit creation environment and checked contracts for preflight tests. -/
 

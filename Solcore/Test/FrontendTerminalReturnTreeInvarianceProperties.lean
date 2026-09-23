@@ -1,5 +1,4 @@
-import Solcore.Frontend.TerminalReturnTreeRenamingProperties
-import Solcore.Frontend.TerminalReturnTreeStoreProperties
+import Solcore.Frontend.TerminalReturnTree
 
 /-! Static relabeling needs no runtime inhabitants. Actual typed runners retain
 whole checkpoints under ID maps, but replacement stores remain distinct. -/

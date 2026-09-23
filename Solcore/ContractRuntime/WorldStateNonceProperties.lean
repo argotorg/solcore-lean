@@ -1,5 +1,5 @@
-import Solcore.ContractRuntime.AccountNonceProperties
-import Solcore.ContractRuntime.WorldStateProperties
+import Solcore.ContractRuntime.Account
+import Solcore.ContractRuntime.WorldState
 
 /-! Exact nonce lookup and account-preserving update laws. -/
 

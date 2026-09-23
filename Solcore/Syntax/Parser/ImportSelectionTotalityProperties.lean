@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.DelimitedNonemptyProperties
 import Solcore.Syntax.Parser.ImportProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.OperatorTotalityProperties
+import Solcore.Syntax.Parser.Operator
 
 /-! Totality for selected-import and hiding-clause parsing. -/
 

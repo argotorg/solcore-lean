@@ -1,6 +1,6 @@
 import Solcore.Test.SyntaxCanonicalParenthesizedTraceExamples
 import Solcore.Syntax.Parser.ParenthesizedRejectionTraceCorrespondenceProperties
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! Canonical closing failures after successful checked-name children. The
 bespoke parenthesized parser expects only right parenthesis at these points,

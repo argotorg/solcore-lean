@@ -1,4 +1,4 @@
-import Solcore.Frontend.SavedDataLambdaDepthDecisionProperties
+import Solcore.Frontend.SavedDataLambdaDepth
 import Solcore.Syntax.Parser.Term
 
 /- Actual saved creation fields feed first-match caller pickup. Original lookup,

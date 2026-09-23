@@ -1,11 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.TerminalReturnTree
 
 /-! Compile completely parsed prefixes once, then run actual arguments against
 independent Core, typed value and source-cost expectations. Prefix locals are

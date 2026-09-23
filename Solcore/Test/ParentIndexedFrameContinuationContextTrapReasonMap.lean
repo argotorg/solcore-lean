@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedFrameContinuationContextTrapReasonMap
+import Solcore.ContractRuntime.ParentIndexedFrameContinuationContext
 
 /-! Definition-only compile regressions for parent-indexed reason mapping. -/
 

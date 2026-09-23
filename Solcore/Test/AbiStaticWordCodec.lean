@@ -1,4 +1,4 @@
-import Solcore.Abi.StaticWordCodec
+import Solcore.Abi.StaticWord
 /-! External boundary consumers for the Static Word ABI byte codecs. -/
 set_option autoImplicit false
 namespace Tests

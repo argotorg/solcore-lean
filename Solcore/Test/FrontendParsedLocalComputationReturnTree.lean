@@ -1,8 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalComputationReturnTreeTypingProperties
-import Solcore.Frontend.LocalComputationReturnTreeCostProperties
-import Solcore.Frontend.LocalComputationReturnTreeEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeElaboration
+import Solcore.Frontend.LocalComputation
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Core.FuelResumptionProperties
 import Solcore.Frontend.RuntimeParameters
 /-! Original parsed function bodies are checked against an explicit sparse caller,

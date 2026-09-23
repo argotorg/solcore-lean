@@ -1,9 +1,8 @@
-import Solcore.Frontend.ComputationFunctionRuntimeCheckpointProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
-import Solcore.Frontend.WordLessCostStepComposition
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent original preparation with arbitrarily many typed/inferred shadows.

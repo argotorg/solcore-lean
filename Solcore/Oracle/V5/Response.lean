@@ -1,6 +1,6 @@
 import Lean.Data.Json
-import Solcore.Oracle.V5.DiagnosticExecutionValidity
-import Solcore.Oracle.V5.ObservationValidity
+import Solcore.Oracle.V5.Diagnostic
+import Solcore.Oracle.V5.Observation
 
 /-! Typed, query-indexed response values for Oracle v5. -/
 

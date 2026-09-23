@@ -1,8 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ExpectedLambdaLetBodyTyping
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationTypingProperties
-import Solcore.Frontend.ComputationFunctionCompilation
+import Solcore.Frontend.Expected
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.Computation
 
 /-! Original source typing precedes elaboration/checking. The lambda sees the
 pre-binder scope; its parameter and the tail binder reuse one fresh ID in disjoint scopes.

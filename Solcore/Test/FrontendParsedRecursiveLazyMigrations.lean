@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.RecursiveLocalComputationProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.LocalComputation
 
 /-! The three former recursive-lazy rejections retain their original source,

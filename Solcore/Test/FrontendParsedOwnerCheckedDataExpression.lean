@@ -1,6 +1,5 @@
 import Solcore.Frontend.CheckedDataExpressionOwnerProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 

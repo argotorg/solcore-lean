@@ -1,4 +1,4 @@
-import Solcore.Frontend.BoundedCalleeLambdaDepthDecisionProperties
+import Solcore.Frontend.BoundedCalleeLambdaDepth
 import Solcore.Syntax.Parser.Term
 
 /- Actual independent creations feed an inner call outside the data gate. Its

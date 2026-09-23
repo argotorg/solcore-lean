@@ -1,5 +1,5 @@
-import Solcore.Frontend.ClosedSourceStrictWordBinaryProperties
-import Solcore.Frontend.StrictWordBinaryProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.StrictWordBinary
 
 /- Exact search depth composes both actual Word children in their original order.
 This is a cutoff theorem at every budget, not a Core transition-cost equation. -/

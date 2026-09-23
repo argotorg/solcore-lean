@@ -1,9 +1,9 @@
-import Solcore.Frontend.LocalExpressionEvaluatorExecutionProperties
+import Solcore.Frontend.LocalExpressionEvaluator
 import Solcore.Frontend.LocalExpressionLookupProperties
 import Solcore.Frontend.LocalExpressionResumptionProperties
-import Solcore.Frontend.LocalExpressionFuelBoundProperties
+import Solcore.Frontend.LocalExpressionFuelBound
 import Solcore.Frontend.LocalExpressionStoreProperties
-import Solcore.Frontend.LocalExpressionRenamingSemantics
+import Solcore.Frontend.LocalExpressionRenaming
 import Solcore.Frontend.TypeName
 
 /-! Empty original tuples are constant Unit leaves. Independent constructors and

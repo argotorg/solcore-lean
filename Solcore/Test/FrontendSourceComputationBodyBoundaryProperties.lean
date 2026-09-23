@@ -1,7 +1,7 @@
-import Solcore.Frontend.SourceLambdaEvaluationProperties
-import Solcore.Frontend.RuntimeValueProperties
-import Solcore.Frontend.ComputationReturnTreeEvaluation
-import Solcore.Frontend.SourceComputationBodyEvaluationProperties
+import Solcore.Frontend.SourceLambdaEvaluation
+import Solcore.Frontend.RuntimeValue
+import Solcore.Frontend.Computation
+import Solcore.Frontend.SourceComputationBody
 
 /-! A real source-lambda callback can discard a non-Core intermediate value.
 These independent boundary witnesses do not define a closed expression evaluator. -/

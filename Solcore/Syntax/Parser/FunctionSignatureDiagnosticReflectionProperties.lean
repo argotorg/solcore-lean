@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.SignatureLeafDiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Signature
 
 /-! Diagnostic-free reflection for complete named-function signatures. -/
 

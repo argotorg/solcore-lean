@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithTwoLevelGroupedConditionalExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 /-! Parsed consumer for ADR-0329's two-level-grouped-conditional-first wrapper. -/

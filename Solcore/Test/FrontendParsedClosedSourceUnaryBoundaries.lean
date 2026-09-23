@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceUnaryProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Original operand certificates distinguish shape and lookup fixtures before closed runs. -/

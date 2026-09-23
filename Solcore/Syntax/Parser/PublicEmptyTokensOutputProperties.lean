@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.LexedValidationOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.LexedValidation
 import Solcore.Syntax.Parser.PublicSourceFileExecutionWitnessProperties
 
 /-! Complete normal-branch outputs for independently empty token carriers.

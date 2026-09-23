@@ -1,8 +1,7 @@
-import Solcore.Frontend.ExpectedComputationLambda
+import Solcore.Frontend.Expected
 import Solcore.Frontend.LocalExpressionTyping
-import Solcore.Frontend.ClosedSourceDataBody
-import Solcore.Frontend.ClosedSourceEvaluation
-import Solcore.Frontend.RuntimeValueProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.RuntimeValue
 
 /- Raw source calls can bypass unvisited syntax and produce non-Core intermediates. -/
 set_option autoImplicit false

@@ -1,4 +1,4 @@
-import Solcore.Frontend.WordLiteralProperties
+import Solcore.Frontend.WordLiteral
 import Solcore.Core.Primitive
 
 /-! ADR-0162 consumers: complete ASCII spellings have independent natural

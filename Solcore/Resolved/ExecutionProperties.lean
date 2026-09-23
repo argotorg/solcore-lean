@@ -1,5 +1,5 @@
-import Solcore.Resolved.TypingProperties
-import Solcore.Resolved.EvaluationProperties
+import Solcore.Resolved.Typing
+import Solcore.Resolved.Eval
 import Solcore.Core.Safety
 
 set_option autoImplicit false

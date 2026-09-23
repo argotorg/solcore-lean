@@ -1,5 +1,4 @@
-import Solcore.Syntax.Parser.ImplDeclSoundnessProperties
-import Solcore.Syntax.Parser.ImplDeclarationOrdinaryOutcomeSoundnessProperties
+import Solcore.Syntax.Parser.Impl
 
 /-! External consumers for strict and broad implementation soundness. -/
 

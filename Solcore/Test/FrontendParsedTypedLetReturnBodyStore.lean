@@ -1,10 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnBodyStoreProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeFunctionCompilation
-import Solcore.Frontend.RuntimeFunctionEntry
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 
 /-! Actual parsed prefixes replay at distinct stores without replacing their
 values, identities or source paths. Same control and frames do not identify

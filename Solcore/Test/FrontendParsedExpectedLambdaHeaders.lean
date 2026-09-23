@@ -1,9 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ExpectedUnaryLambdaHeader
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.ComputationFunctionCompilation
-import Solcore.Frontend.ComputationFunctionEntry
+import Solcore.Frontend.Expected
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.Computation
 
 /-! Original parsed headers are certified before the opt-in checker is used.
 Separate inner-body evidence never becomes lambda admission or a runtime closure. -/

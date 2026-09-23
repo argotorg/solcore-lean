@@ -1,6 +1,4 @@
-import Solcore.Frontend.TypedLetReturnTreeStoreProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeProperties
+import Solcore.Frontend.TypedLetReturnTree
 
 /-! Replay retains values and costs but not the store fields of full results.
 Pending loads delimit the claim; they are not part of the source body. -/

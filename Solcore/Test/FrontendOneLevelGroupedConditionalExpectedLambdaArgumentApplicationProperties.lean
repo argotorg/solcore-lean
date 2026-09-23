@@ -1,5 +1,5 @@
 import Solcore.Frontend.OneLevelGroupedConditionalExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithConditionalAndFiniteGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Machine
 
 /-! Independent symbolic consumer for one whole-group conditional adapter. -/

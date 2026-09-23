@@ -1,9 +1,7 @@
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
-import Solcore.Frontend.TerminalReturnTreeResumptionProperties
-import Solcore.Frontend.TerminalReturnTreeRunnerEmbeddingProperties
-import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TerminalReturnTree
+import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! Exact recursive fuel uses actual typed inputs and genuine suspended states.
 The generic untyped contrast does not fabricate a proof-carrying input row. -/

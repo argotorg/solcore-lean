@@ -1,8 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.TerminalReturnBodyExecutionProperties
-import Solcore.Frontend.TerminalReturnBodyFuelBoundProperties
-import Solcore.Frontend.TerminalReturnBodyResumptionProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! The nonrecursive union preserves each original profile's full observations.
 Independent fixtures retain actual inputs and do not turn conditional arms into

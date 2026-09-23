@@ -1,5 +1,4 @@
-import Solcore.Frontend.LocalInputsApplicationRuntimeProperties
-import Solcore.Frontend.LocalInputsExecution
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! One supplied record fixes all original projections. Independent source and
 actual-body evidence precedes wrapper observations; a static tag is not a world. -/

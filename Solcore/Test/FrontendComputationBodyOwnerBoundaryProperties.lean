@@ -1,7 +1,6 @@
-import Solcore.Frontend.ComputationReturnTreeOwnerProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
+import Solcore.Frontend.RecursiveLocalComputation
 
 /-! Sparse same-owner indices and arbitrarily large foreign indices are not
 interchangeable. Owner covariance preserves fresh allocation; arbitrary

@@ -1,5 +1,5 @@
-import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
+import Solcore.Frontend.Expected
+import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Core.Typing
 
 /- Checked lambda bodies do not type their actual arguments or enlarge the closed gate. -/

@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.HostStorageInputDataProperties
+import Solcore.ContractRuntime.HostStorageInputData
 
 /-! Exact fixed-width input derivation for the internal contract-word call. -/
 

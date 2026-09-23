@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypeNameProperties
+import Solcore.Frontend.TypeName
 
 /-! ADR-0167 consumers: an explicit ordered table interprets exact components.
 No spelling or source-range validity is required, and unsupported shapes remain

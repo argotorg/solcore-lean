@@ -1,4 +1,4 @@
-import Solcore.Frontend.ClosedSourceEvaluatorThresholdProperties
+import Solcore.Frontend.ClosedSource
 
 /- Original if, ordered literal misses and discard prefixes; comparisons are not depth. -/
 set_option autoImplicit false

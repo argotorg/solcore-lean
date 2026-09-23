@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.TriviaProperties
+import Solcore.Syntax.Parser.Trivia
 
 /-! External consumers for canonical comment-attachment validity. -/
 

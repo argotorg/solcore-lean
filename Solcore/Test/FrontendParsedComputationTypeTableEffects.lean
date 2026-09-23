@@ -1,13 +1,8 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.ComputationFunctionFactorizationProperties
-import Solcore.Frontend.ComputationFunctionTypeExtensionProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.RuntimeArgumentConstruction
 import Solcore.Frontend.RuntimeInputValidation
 import Solcore.Core.FuelResumptionProperties

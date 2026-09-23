@@ -5,8 +5,7 @@ import Solcore.Syntax.Parser.DelimitedRejectionPrimitiveProperties
 import Solcore.Syntax.Parser.Import
 import Solcore.Syntax.Parser.ImportTerminatorOrdinaryRejectionSoundnessProperties
 import Solcore.Syntax.Parser.ImportTerminatorOrdinarySuccessSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinaryRejectionSoundnessProperties
-import Solcore.Syntax.Parser.ModulePathOrdinarySuccessSoundnessProperties
+import Solcore.Syntax.Parser.ModulePath
 
 /-! Exact executable rejection reflection for namespace-import payloads. -/
 

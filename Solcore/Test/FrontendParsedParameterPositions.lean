@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeParameterDeclarationReferenceProperties
-import Solcore.Frontend.RuntimeFunctionCompilationOwnerProperties
+import Solcore.Frontend.RuntimeParameterDeclarations
+import Solcore.Frontend.RuntimeFunction
 
 /-! Actual parsed parameter lookups justify reversed Core indices without
 runtime arguments. Same-type positions, nominal types, owner composition and

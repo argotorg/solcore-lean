@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.RecursiveLocalComputationProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.LocalComputation
 
 /-! Six original tuple rejection fixtures retain their exact source, owner,

@@ -1,6 +1,6 @@
-import Solcore.Frontend.ClosedSourceDataExpressionProperties
-import Solcore.Frontend.LocalExpressionEvaluationProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalExpressionEvaluation
+import Solcore.Resolved.LocalScope
 
 set_option autoImplicit false
 namespace Tests.ClosedSourceShortCircuitDataImages

@@ -1,7 +1,6 @@
-import Solcore.Frontend.TypedLetReturnBodyProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Core.Safety
 
 /-! Independent, value-free let chains preserve original initializer scopes and

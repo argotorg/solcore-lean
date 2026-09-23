@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.StructuralTypeTableProperties
+import Solcore.Frontend.StructuralType
 
 /-! Complete original function annotations are certified independently of the
 structural interpreter. Source parameter arity is never inferred from a packed type. -/

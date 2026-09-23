@@ -1,7 +1,7 @@
-import Solcore.Frontend.ClosedSourceDataExpressionProperties
-import Solcore.Frontend.StrictWordBinaryProperties
-import Solcore.Frontend.LocalExpressionCostExecutionProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.StrictWordBinary
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Resolved.LocalScope
 
 /- Fourteen independent original paths precede the two data-image conversions.
 The left is grouped bitwise negation; mixed Core tails and stores stay opaque. -/

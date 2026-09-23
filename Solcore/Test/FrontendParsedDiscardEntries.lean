@@ -1,11 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionLocalFragmentProperties
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
+import Solcore.Frontend.RuntimeFunction
 import Solcore.Core.LocalFragment
 import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Frontend.TypedLetReturnBody
 
 /-! Original semicolon prefixes preserve source rows while hidden Core binders

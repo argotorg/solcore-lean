@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ImplProperties
+import Solcore.Syntax.Parser.Impl
 
 /-! External compile consumers for implementation parser state contracts. -/
 

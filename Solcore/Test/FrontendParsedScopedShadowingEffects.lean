@@ -1,15 +1,10 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.ComputationFunctionFactorizationProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Frontend.RuntimeArgumentConstruction
 import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.ComputationFunctionRuntimeSafetyProperties
-import Solcore.Frontend.ComputationReturnTreeRuntimeWorldProperties
 import Solcore.Core.FuelResumptionProperties
 /-! Old initializer x and fresh Word/Bool rows coexist; explicit blocks protect the outer scope. -/
 set_option autoImplicit false

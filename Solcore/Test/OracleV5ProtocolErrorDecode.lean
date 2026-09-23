@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.Wire.ProtocolErrorDecode
+import Solcore.Oracle.V5.Wire.Protocol
 
 /-! Focused strict-decoding tests for the Oracle v5 protocol-error partition. -/
 

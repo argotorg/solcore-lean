@@ -1,13 +1,11 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ComputationFunctionFactorizationProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RuntimeComputationFunctionFactorizationProperties
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.RuntimeComputationFunction
 import Solcore.Core.ExactFuelProperties
-import Solcore.Frontend.WordLessCostStepComposition
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.LocalFunctionApplication
 /-! Whole original declarations have independent annotation, parameter and body
 certificates. The nominal matrix supplies no values; three actual smokes run separately. -/
 set_option autoImplicit false

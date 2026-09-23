@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! External consumers for canonical Core expression-atom contracts. -/
 

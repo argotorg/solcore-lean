@@ -1,4 +1,4 @@
-import Solcore.Resolved.ScopeProperties
+import Solcore.Resolved.Scope
 import Solcore.Resolved.Eval
 
 /-! Concrete consumers separate local scope, type checking, and selected-branch

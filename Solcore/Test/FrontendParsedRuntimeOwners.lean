@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionEntry
-import Solcore.Frontend.LocalNameRenaming
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.LocalName
 
 /-! Caller-owned declaration identities change input IDs, not the prepared
 Core or runtime values. Compare complete parsed entries at identical fuel. -/

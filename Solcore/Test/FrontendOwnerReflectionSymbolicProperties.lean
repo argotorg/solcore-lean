@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceOwnerReflectionProperties
-import Solcore.Frontend.ClosedSourceOwnerBudgetProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 
 /- Independent originals and exact runner recursion precede reflection. Arbitrary
 mixed payloads, duplicate rows, annotations and stores require no runtime typing. -/

@@ -1,4 +1,4 @@
-import Solcore.Frontend.DataCalleeLambdaDepthDecisionProperties
+import Solcore.Frontend.DataCalleeLambdaDepth
 import Solcore.Syntax.Parser.Term
 
 /- Independent original callee selection is required, never inferred from a new

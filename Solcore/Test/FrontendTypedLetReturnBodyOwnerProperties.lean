@@ -1,5 +1,4 @@
-import Solcore.Frontend.TypedLetReturnBodyRunnerOwnerProperties
-import Solcore.Frontend.TypedLetReturnBodyResumptionProperties
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Owner-only covariance preserves fresh allocation and exact positional Core.
 Static nominal inputs and actual runtime values remain separate boundaries. -/

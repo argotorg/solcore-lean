@@ -1,6 +1,4 @@
-import Solcore.Frontend.LocalComputationReturnTreeTypingProperties
-import Solcore.Frontend.LocalComputationReturnTreeCostProperties
-import Solcore.Frontend.LocalComputationReturnTreeEmbeddingProperties
+import Solcore.Frontend.LocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original mixed statements, independently indexed Core, and manual paths.

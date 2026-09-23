@@ -1,8 +1,7 @@
-import Solcore.Frontend.ClosedSourceDataBody
-import Solcore.Frontend.ClosedSourceEvaluation
-import Solcore.Frontend.ComputationReturnTreeEvaluation
-import Solcore.Frontend.LocalExpressionEvaluationRules
-import Solcore.Frontend.RuntimeValueProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.Computation
+import Solcore.Frontend.LocalExpressionEvaluation
+import Solcore.Frontend.RuntimeValue
 
 /- Independent original rule/selector evidence; no image law or bounded runner is imported. -/
 set_option autoImplicit false

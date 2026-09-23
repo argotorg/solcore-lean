@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.Expression.AtomRecoveryTotalityProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 set_option autoImplicit false
 

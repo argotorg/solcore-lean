@@ -1,7 +1,7 @@
 import Solcore.Core.HostMachine
 import Solcore.ContractRuntime.CheckedCoreWordOutcome
 import Solcore.ContractRuntime.ContractWordCallInput
-import Solcore.ContractRuntime.TopLevelExecutionContext
+import Solcore.ContractRuntime.TopLevelExecution
 
 /-! Exact invocation and response derivation for one internal Word call. -/
 

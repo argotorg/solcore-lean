@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionStoreProperties
+import Solcore.Frontend.RuntimeFunction
 
 /-! Fully parsed restricted entries retain values and exact fuel boundaries
 across unrelated stores. Every concrete result still carries its own store;

@@ -1,7 +1,6 @@
 import Solcore.Core.Conversions
 import Solcore.Core.DirectWordComparisons
 import Solcore.Core.Renaming
-import Solcore.Core.RenamingInsertion
 import Solcore.Core.SignedComparison
 
 /-!

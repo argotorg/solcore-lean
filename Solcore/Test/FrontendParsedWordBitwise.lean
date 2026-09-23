@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalInputsExecution
-import Solcore.Frontend.LocalInputsRenaming
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Actual parsed-source execution for strict binary Word operators. Full AST
 checking is mandatory, and expected Core shapes retain precedence and order. -/

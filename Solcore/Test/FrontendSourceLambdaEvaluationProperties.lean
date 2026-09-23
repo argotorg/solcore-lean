@@ -1,6 +1,6 @@
-import Solcore.Frontend.SourceLambdaEvaluationProperties
-import Solcore.Frontend.LocalReferenceProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.SourceLambdaEvaluation
+import Solcore.Frontend.LocalReference
+import Solcore.Resolved.LocalScope
 
 /-! These independently supplied callbacks only read original local references and
 return through explicit blocks. They are not a closed source-language evaluator.

@@ -1,5 +1,4 @@
-import Solcore.Frontend.ClosedSourceDataDepthDecisionProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Two actual parsed trees exercise original right-associated many tails and a

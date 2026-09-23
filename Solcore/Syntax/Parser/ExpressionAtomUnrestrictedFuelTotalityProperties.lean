@@ -2,7 +2,7 @@ import Solcore.Syntax.Parser.ExpressionAtomTupleUnrestrictedFuelTotalityProperti
 import Solcore.Syntax.Parser.ExpressionAtomCollectionUnrestrictedFuelTotalityProperties
 import Solcore.Syntax.Parser.ExpressionAtomDispatchSelectionTraceProperties
 import Solcore.Syntax.Parser.LambdaExpressionTraceProperties
-import Solcore.Syntax.Parser.Expression.AtomRecoveryTotalityProperties
+import Solcore.Syntax.Parser.Expression.Atom
 
 /-! One atom layer is ordinary under an explicit remaining-count bound and
 the minimal three-field nested contract. Blocks need only ordinary execution.

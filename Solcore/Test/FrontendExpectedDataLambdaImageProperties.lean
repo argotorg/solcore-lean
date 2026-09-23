@@ -1,10 +1,8 @@
-import Solcore.Frontend.ExpectedComputationLambda
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.ClosedSourceDataBody
-import Solcore.Frontend.ClosedSourceEvaluation
+import Solcore.Frontend.Expected
+import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.ClosedSource
 import Solcore.Core.Eval
 import Solcore.Resolved.Eval
-import Solcore.Frontend.ExpectedDataLambdaApplicationProperties
 
 /- Arbitrarily nested original identity bodies retain spans, captures and raw payloads. -/
 set_option autoImplicit false

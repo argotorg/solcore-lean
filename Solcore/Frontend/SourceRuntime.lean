@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceRuntime.Checking
+import Solcore.Core.Safety
 
 /-! Runtime values and evaluation for the checked finite source call graph.
 
@@ -574,5 +575,673 @@ def RunResult.toCore? : RunResult → Option (Core.Value × Core.Store)
   | .outOfFuel _
   | .fault _ _ => none
 
+
+end Solcore.Frontend.SourceRuntime
+
+/-!
+## Consolidated module: `Solcore.Frontend.SourceRuntimeProperties`
+-/
+
+/-! Focused executable checks for the finite runtime call graph. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend.SourceRuntime
+
+/-- Deep typing for the Core-projectable part of `SourceRuntime.Value`.
+Unlike `Value.HasType`, this validates Core closure bodies and captured
+environments and relates cell references to one concrete store-typing world.
+Source-native closures and named globals are intentionally outside this
+boundary relation because `Value.toCore?` does not project them. -/
+def Value.RuntimeHasType
+    (world : Core.StoreTyping) (value : Value) (expected : Core.Ty)
+    (definitions : Core.DataEnvironment := []) : Prop :=
+  ∃ core,
+    value.toCore? = some core ∧
+    Core.RuntimeValueHasType world core expected definitions
+
+/-- Pointwise deep typing for an ordered source-runtime value list. -/
+def ValuesRuntimeHaveTypes
+    (world : Core.StoreTyping) (values : List Value) (types : List Core.Ty)
+    (definitions : Core.DataEnvironment := []) : Prop :=
+  ∃ coreValues,
+    values = coreValues.map Value.ofCore ∧
+    Core.RuntimeEnvironmentHasTypes world coreValues types definitions
+
+/-- Embedding a Core value and projecting it immediately is lossless. -/
+@[simp] theorem Value.toCore?_ofCore : (value : Core.Value) →
+    (Value.ofCore value).toCore? = some value
+  | .unit => rfl
+  | .bool _ => rfl
+  | .word _ => rfl
+  | .hostFunction _ => rfl
+  | .pair left right => by
+      simp [Value.ofCore, Value.toCore?, Value.toCore?_ofCore left,
+        Value.toCore?_ofCore right]
+  | .closure _ _ _ _ => rfl
+  | .inLeft _ payload => by
+      simp [Value.ofCore, Value.toCore?, Value.toCore?_ofCore payload]
+  | .inRight _ payload => by
+      simp [Value.ofCore, Value.toCore?, Value.toCore?_ofCore payload]
+  | .cellRef _ _ => rfl
+  | .constructed _ payload => by
+      simp [Value.ofCore, Value.toCore?, Value.toCore?_ofCore payload]
+
+/-- Any successful Core projection exposes the same shallow type tag on the
+source-runtime side. -/
+theorem Value.hasType_of_toCore?
+    (program : Program) : (value : Value) → (core : Core.Value) →
+    value.toCore? = some core → Value.HasType program value core.type
+  | .unit, core, projected => by
+      simp [Value.toCore?, Value.HasType] at projected ⊢
+      cases projected
+      rfl
+  | .bool value, core, projected => by
+      simp [Value.toCore?, Value.HasType] at projected ⊢
+      cases projected
+      rfl
+  | .word value, core, projected => by
+      simp [Value.toCore?, Value.HasType] at projected ⊢
+      cases projected
+      rfl
+  | .hostFunction function, core, projected => by
+      simp [Value.toCore?, Value.HasType] at projected ⊢
+      cases projected
+      rfl
+  | .pair left right, core, projected => by
+      cases leftProjection : left.toCore? with
+      | none => simp [Value.toCore?, leftProjection] at projected
+      | some coreLeft =>
+          cases rightProjection : right.toCore? with
+          | none =>
+              simp [Value.toCore?, leftProjection, rightProjection] at projected
+          | some coreRight =>
+              simp [Value.toCore?, leftProjection, rightProjection] at projected
+              cases projected
+              have leftTyping :=
+                Value.hasType_of_toCore? program left coreLeft leftProjection
+              have rightTyping :=
+                Value.hasType_of_toCore? program right coreRight rightProjection
+              exact Value.HasType.pair leftTyping rightTyping
+  | .closure _ _ _ _, core, projected => by
+      simp [Value.toCore?] at projected
+  | .global _, core, projected => by
+      simp [Value.toCore?] at projected
+  | .coreClosure _ _ _ _, core, projected => by
+      simp [Value.toCore?, Value.HasType] at projected ⊢
+      cases projected
+      rfl
+  | .inLeft rightType payload, core, projected => by
+      cases payloadProjection : payload.toCore? with
+      | none => simp [Value.toCore?, payloadProjection] at projected
+      | some corePayload =>
+          simp [Value.toCore?, payloadProjection] at projected
+          cases projected
+          have payloadTyping :=
+            Value.hasType_of_toCore? program payload corePayload
+              payloadProjection
+          exact Value.HasType.inLeft payloadTyping
+  | .inRight leftType payload, core, projected => by
+      cases payloadProjection : payload.toCore? with
+      | none => simp [Value.toCore?, payloadProjection] at projected
+      | some corePayload =>
+          simp [Value.toCore?, payloadProjection] at projected
+          cases projected
+          have payloadTyping :=
+            Value.hasType_of_toCore? program payload corePayload
+              payloadProjection
+          exact Value.HasType.inRight payloadTyping
+  | .cellRef _ _, core, projected => by
+      simp [Value.toCore?, Value.HasType] at projected ⊢
+      cases projected
+      rfl
+  | .constructed _ payload, core, projected => by
+      cases payloadProjection : payload.toCore? with
+      | none => simp [Value.toCore?, payloadProjection] at projected
+      | some corePayload =>
+          simp [Value.toCore?, payloadProjection] at projected
+          cases projected
+          rfl
+
+/-- Deep Core typing transports across the public Core-to-source embedding. -/
+theorem Value.runtimeHasType_ofCore
+    {world : Core.StoreTyping} {core : Core.Value} {expected : Core.Ty}
+    {definitions : Core.DataEnvironment}
+    (typing : Core.RuntimeValueHasType world core expected definitions) :
+    (Value.ofCore core).RuntimeHasType world expected definitions :=
+  ⟨core, Value.toCore?_ofCore core, typing⟩
+
+/-- The deep boundary relation always implies the public shallow tag
+relation. -/
+theorem Value.RuntimeHasType.hasType
+    {world : Core.StoreTyping} {value : Value} {expected : Core.Ty}
+    {definitions : Core.DataEnvironment}
+    (typing : value.RuntimeHasType world expected definitions)
+    (program : Program) :
+    Value.HasType program value expected := by
+  obtain ⟨core, projected, coreTyping⟩ := typing
+  have shallow := Value.hasType_of_toCore? program value core projected
+  simpa [coreTyping.type_eq] using shallow
+
+/-- Projecting a deeply typed boundary value recovers a deeply typed Core
+value, not merely a matching structural tag. -/
+theorem Value.RuntimeHasType.toCore
+    {world : Core.StoreTyping} {value : Value} {expected : Core.Ty}
+    {definitions : Core.DataEnvironment}
+    (typing : value.RuntimeHasType world expected definitions)
+    {core : Core.Value} (projected : value.toCore? = some core) :
+    Core.RuntimeValueHasType world core expected definitions := by
+  obtain ⟨typedCore, typedProjection, coreTyping⟩ := typing
+  rw [projected] at typedProjection
+  cases typedProjection
+  exact coreTyping
+
+/-- A deeply typed Core environment remains deeply typed, pointwise, after
+the runner's `Value.ofCore` input conversion. -/
+theorem ValuesRuntimeHaveTypes.ofCore
+    {world : Core.StoreTyping} {environment : Core.Environment}
+    {context : Core.Context} {definitions : Core.DataEnvironment}
+    (typing : Core.RuntimeEnvironmentHasTypes world environment context
+      definitions) :
+    ValuesRuntimeHaveTypes world (environment.map Value.ofCore) context
+      definitions := by
+  exact ⟨environment, rfl, typing⟩
+
+/-- Deep premises for calling one finite graph entry.  Static program validity
+is deliberately separate because `CheckedProgram` remains a forgeable public
+carrier; this structure records only the selected definition, Core input
+typing, and the store world they share. -/
+structure CheckedProgram.RuntimeInputsHaveType
+    (checked : CheckedProgram) (entry : Key)
+    (arguments : List Core.Value) (store : Core.Store)
+    (definition : Definition) (world : Core.StoreTyping)
+    (definitions : Core.DataEnvironment := []) : Prop where
+  found : checked.program.findDefinition? entry = some definition
+  argumentsTyping : Core.RuntimeEnvironmentHasTypes world arguments
+    definition.signature.parameterTypes definitions
+  storeTyping : Core.StoreHasTypes world store
+
+/-- The runner's input conversion preserves every deep Core input premise. -/
+theorem CheckedProgram.RuntimeInputsHaveType.convertedArguments
+    {checked : CheckedProgram} {entry : Key}
+    {arguments : List Core.Value} {store : Core.Store}
+    {definition : Definition} {world : Core.StoreTyping}
+    {definitions : Core.DataEnvironment}
+    (typing : checked.RuntimeInputsHaveType entry arguments store definition
+      world definitions) :
+    ValuesRuntimeHaveTypes world (arguments.map Value.ofCore)
+      definition.signature.parameterTypes definitions :=
+  ValuesRuntimeHaveTypes.ofCore typing.argumentsTyping
+
+/-- Deeply typed inputs necessarily pass the shallow entry gate.  Zero
+execution fuel is therefore reported as fuel exhaustion with the exact initial
+store, rather than as an argument fault. -/
+theorem CheckedProgram.RuntimeInputsHaveType.run_zero
+    {checked : CheckedProgram} {entry : Key}
+    {arguments : List Core.Value} {store : Core.Store}
+    {definition : Definition} {world : Core.StoreTyping}
+    {definitions : Core.DataEnvironment}
+    (typing : checked.RuntimeInputsHaveType entry arguments store definition
+      world definitions) :
+    checked.run 0 entry arguments store = .outOfFuel store :=
+  checked.run_zero_of_matching_types entry definition arguments store
+    typing.found typing.argumentsTyping.type_tags
+
+@[simp] theorem Program.findDefinition?_empty (key : Key) :
+    ({ definitions := [] : Program }).findDefinition? key = none := by
+  rfl
+
+@[simp] theorem Program.findSignature?_empty (key : Key) :
+    ({ definitions := [] : Program }).findSignature? key = none := by
+  rfl
+
+/-- Public signature-facing form of successful result-tag preservation. -/
+theorem CheckedProgram.run_done_has_signature_type
+    (checked : CheckedProgram) (fuel : Nat) (entry : Key)
+    (arguments : List Core.Value) (initialStore finalStore : Core.Store)
+    (value : Value) (signature : Signature)
+    (found : checked.entrySignature? entry = some signature)
+    (completed : checked.run fuel entry arguments initialStore =
+      .done value finalStore) :
+    Value.HasType checked.program value signature.resultType := by
+  obtain ⟨definition, _, definitionSignature, valueType⟩ :=
+    checked.run_done_hasType fuel entry arguments initialStore finalStore value
+      completed
+  rw [found] at definitionSignature
+  cases definitionSignature
+  exact valueType
+
+/-- First outer-run preservation bridge.  It retains the deeply typed input
+conversion and initial store invariant while adding the declared shallow type
+of a successful result.  Proving a typed *final* store requires the subsequent
+evaluator preservation theorem. -/
+theorem CheckedProgram.RuntimeInputsHaveType.run_done_boundary
+    {checked : CheckedProgram} {fuel : Nat} {entry : Key}
+    {arguments : List Core.Value} {initialStore finalStore : Core.Store}
+    {value : Value} {definitions : Core.DataEnvironment}
+    {definition : Definition} {world : Core.StoreTyping}
+    (typing : checked.RuntimeInputsHaveType entry arguments initialStore
+      definition world definitions)
+    (completed : checked.run fuel entry arguments initialStore =
+      .done value finalStore) :
+    ValuesRuntimeHaveTypes world (arguments.map Value.ofCore)
+        definition.signature.parameterTypes definitions ∧
+      Core.StoreHasTypes world initialStore ∧
+      Value.HasType checked.program value definition.resultType := by
+  have signatureFound : checked.entrySignature? entry =
+      some definition.signature := by
+    simp [CheckedProgram.entrySignature?, Program.findSignature?, typing.found]
+  exact ⟨typing.convertedArguments, typing.storeTyping,
+    checked.run_done_has_signature_type fuel entry arguments initialStore
+      finalStore value definition.signature signatureFound completed⟩
+
+private def testPath : Workspace.ModulePath :=
+  ⟨[⟨"Runtime", by decide⟩], by decide⟩
+
+private def declaration (index : Nat) : Resolved.DeclarationId :=
+  ⟨⟨.main, testPath⟩, index⟩
+
+private def key (index : Nat) : Key :=
+  ⟨declaration index, []⟩
+
+private def localId (owner binder : Nat) : Resolved.LocalId :=
+  ⟨declaration owner, binder⟩
+
+private def leftParameter : Parameter := (localId 0 0, .bool)
+private def rightParameter : Parameter := (localId 1 0, .bool)
+
+/-- A deliberately nonterminating mutual cycle.  Checking succeeds because all
+global signatures are collected before either body is inspected. -/
+private def cyclicProgram : Program := {
+  definitions := [
+    {
+      key := key 0
+      parameters := [leftParameter]
+      resultType := .bool
+      body := .apply (.global (key 1)) [.local leftParameter.1]
+    },
+    {
+      key := key 1
+      parameters := [rightParameter]
+      resultType := .bool
+      body := .apply (.global (key 0)) [.local rightParameter.1]
+    }
+  ]
+}
+
+example : cyclicProgram.check = .ok ⟨cyclicProgram⟩ := by
+  rfl
+
+example (store : Core.Store) :
+    (⟨cyclicProgram⟩ : CheckedProgram).run 12 (key 0) [.bool true] store =
+      .outOfFuel store := by
+  rfl
+
+private def captureParameter : Parameter := (localId 2 0, .bool)
+private def lambdaBinder : Resolved.LocalId := localId 2 1
+private def lambdaParameter : Parameter := (localId 2 2, .bool)
+
+/-- The lambda ignores its argument and returns a captured entry parameter. -/
+private def closureDefinition : Definition := {
+    key := key 2
+    parameters := [captureParameter]
+    resultType := .bool
+    body := .letE lambdaBinder
+      (.lambda [lambdaParameter] .bool (.local captureParameter.1))
+      (.apply (.local lambdaBinder) [.bool false])
+}
+
+private def closureProgram : Program := {
+  definitions := [closureDefinition]
+}
+
+private theorem closureInputsHaveType :
+    (⟨closureProgram⟩ : CheckedProgram).RuntimeInputsHaveType
+      (key 2) [.bool true] [] closureDefinition [] := by
+  exact {
+    found := rfl
+    argumentsTyping := .cons .bool .nil
+    storeTyping := .nil
+  }
+
+private theorem closedCoreClosureHasType :
+    Core.RuntimeValueHasType []
+      (.closure .unit .unit .unit []) (.function .unit .unit) := by
+  exact .closure .nil .unit
+
+example : closureProgram.check = .ok ⟨closureProgram⟩ := by
+  rfl
+
+example (store : Core.Store) :
+    (⟨closureProgram⟩ : CheckedProgram).run 8 (key 2) [.bool true] store =
+      .done (.bool true) store := by
+  rfl
+
+example (store : Core.Store) :
+    Value.HasType closureProgram (.bool true) .bool := by
+  apply CheckedProgram.run_done_has_signature_type
+    (⟨closureProgram⟩ : CheckedProgram) 8 (key 2) [.bool true]
+      store store (.bool true)
+      { parameterTypes := [.bool], resultType := .bool }
+  · rfl
+  · rfl
+
+example :
+    ValuesRuntimeHaveTypes [] [Value.ofCore (.bool true)] [.bool] := by
+  simpa [closureDefinition, Definition.signature, captureParameter] using
+    closureInputsHaveType.convertedArguments
+
+example : Value.HasType closureProgram (.bool true) .bool := by
+  have boundary := closureInputsHaveType.run_done_boundary
+    (fuel := 8) (finalStore := []) (value := .bool true) (by rfl)
+  exact boundary.2.2
+
+example :
+    (Value.ofCore (.closure .unit .unit .unit [])).RuntimeHasType []
+      (.function .unit .unit) :=
+  Value.runtimeHasType_ofCore closedCoreClosureHasType
+
+example :
+    (⟨closureProgram⟩ : CheckedProgram).run 0 (key 2) [.bool true] [] =
+      .outOfFuel [] :=
+  closureInputsHaveType.run_zero
+
+example (store : Core.Store) :
+    (⟨closureProgram⟩ : CheckedProgram).run 8 (key 2) [] store =
+      .fault (.entryArgumentArityMismatch (key 2) 1 0) store := by
+  rfl
+
+example (store : Core.Store) :
+    (⟨closureProgram⟩ : CheckedProgram).run 8 (key 2)
+        [.word Core.Word.zero] store =
+      .fault (.entryArgumentTypeMismatch (key 2) 0 .bool .word) store := by
+  rfl
+
+end Solcore.Frontend.SourceRuntime
+
+/-!
+## Consolidated module: `Solcore.Frontend.SourceRuntimeStaticInversionProperties`
+-/
+
+/-! Inversion lemmas for the finite graph's executable static checker. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend.SourceRuntime
+
+/-- A checked pair exposes both checked children and the product result. -/
+theorem Expr.InfersType.pair_components
+    {program : Program} {context : StaticContext}
+    {left right : Expr} {expected : Core.Ty}
+    (typing : Expr.InfersType program context (.pair left right) expected) :
+    ∃ leftType rightType,
+      Expr.InfersType program context left leftType ∧
+      Expr.InfersType program context right rightType ∧
+      expected = .product leftType rightType := by
+  obtain ⟨inferred, inferredAt, erased⟩ := typing
+  unfold infer at inferredAt
+  cases leftResult : infer program context left with
+  | error error =>
+      simp [leftResult, bind, Except.bind] at inferredAt
+  | ok leftStatic =>
+      cases rightResult : infer program context right with
+      | error error =>
+          simp [leftResult, rightResult, bind, Except.bind] at inferredAt
+      | ok rightStatic =>
+          simp [leftResult, rightResult, bind, Except.bind] at inferredAt
+          cases inferredAt
+          exact ⟨leftStatic.erase, rightStatic.erase,
+            ⟨leftStatic, leftResult, rfl⟩,
+            ⟨rightStatic, rightResult, rfl⟩,
+            by simpa [StaticType.erase] using erased.symm⟩
+
+/-- A successful nonempty argument inference consists of a successful head
+inference followed by successful inference of the tail, with no omitted or
+reordered result types. -/
+theorem inferList_cons_ok
+    (program : Program) (context : StaticContext)
+    (expression : Expr) (expressions : List Expr)
+    (types : List StaticType)
+    (success : inferList program context (expression :: expressions) =
+      .ok types) :
+    ∃ head tail,
+      infer program context expression = .ok head ∧
+      inferList program context expressions = .ok tail ∧
+      types = head :: tail := by
+  unfold inferList at success
+  cases headResult : infer program context expression with
+  | error error =>
+      simp [headResult, bind, Except.bind] at success
+  | ok head =>
+      cases tailResult : inferList program context expressions with
+      | error error =>
+          simp [headResult, tailResult, bind, Except.bind] at success
+      | ok tail =>
+          simp [headResult, tailResult, bind, Except.bind] at success
+          simp only [pure, Pure.pure, Except.pure] at success
+          exact ⟨head, tail, rfl, rfl, (Except.ok.inj success).symm⟩
+
+/-- Successful inference preserves argument-list length. -/
+theorem inferList_ok_length
+    (program : Program) (context : StaticContext) :
+    ∀ (expressions : List Expr) (types : List StaticType),
+      inferList program context expressions = .ok types →
+      expressions.length = types.length := by
+  intro expressions
+  induction expressions with
+  | nil =>
+      intro types success
+      simp [inferList] at success
+      cases success
+      rfl
+  | cons expression expressions ih =>
+      intro types success
+      obtain ⟨head, tail, _, tailOk, typesEq⟩ :=
+        inferList_cons_ok program context expression expressions types success
+      subst types
+      simp [ih tail tailOk]
+
+end Solcore.Frontend.SourceRuntime
+
+/-!
+## Consolidated module: `Solcore.Frontend.SourceRuntimeStaticOperatorProperties`
+-/
+
+/-! Inversions of successful source-graph inference for primitive operations. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend.SourceRuntime
+
+theorem Expr.InfersType.unary_components
+    {program : Program} {context : StaticContext}
+    {op : Core.UnaryOp} {operand : Expr} {expected : Core.Ty}
+    (typing : Expr.InfersType program context (.unary op operand) expected) :
+    Expr.InfersType program context operand op.operandType ∧
+      expected = op.resultType := by
+  obtain ⟨inferred, inferredAt, erased⟩ := typing
+  unfold infer at inferredAt
+  cases operandResult : infer program context operand with
+  | error error =>
+      simp [operandResult, bind, Except.bind] at inferredAt
+  | ok operandType =>
+      by_cases equal : operandType.erase = op.operandType
+      · simp [operandResult, checkExpected, equal, bind, Except.bind]
+          at inferredAt
+        cases inferredAt
+        exact ⟨⟨operandType, operandResult, equal⟩,
+          by simpa [StaticType.erase] using erased.symm⟩
+      · simp [operandResult, checkExpected, equal, bind, Except.bind]
+          at inferredAt
+
+theorem Expr.InfersType.binary_components
+    {program : Program} {context : StaticContext}
+    {op : Core.BinaryOp} {left right : Expr} {expected : Core.Ty}
+    (typing : Expr.InfersType program context (.binary op left right) expected) :
+    Expr.InfersType program context left op.leftType ∧
+      Expr.InfersType program context right op.rightType ∧
+      expected = op.resultType := by
+  obtain ⟨inferred, inferredAt, erased⟩ := typing
+  unfold infer at inferredAt
+  cases leftResult : infer program context left with
+  | error error =>
+      simp [leftResult, bind, Except.bind] at inferredAt
+  | ok leftType =>
+      by_cases leftMatches : leftType.erase = op.leftType
+      · cases rightResult : infer program context right with
+        | error error =>
+            simp [leftResult, rightResult, checkExpected, leftMatches,
+              bind, Except.bind] at inferredAt
+            change Except.error error = Except.ok inferred at inferredAt
+            cases inferredAt
+        | ok rightType =>
+            by_cases rightMatches : rightType.erase = op.rightType
+            · simp [leftResult, rightResult, checkExpected, leftMatches,
+                rightMatches, bind, Except.bind] at inferredAt
+              cases inferredAt
+              exact ⟨⟨leftType, leftResult, leftMatches⟩,
+                ⟨rightType, rightResult, rightMatches⟩,
+                by simpa [StaticType.erase] using erased.symm⟩
+            · simp [leftResult, rightResult, checkExpected, leftMatches,
+                rightMatches, bind, Except.bind] at inferredAt
+              change Except.error (TypeError.typeMismatch op.rightType rightType.erase) =
+                Except.ok inferred at inferredAt
+              cases inferredAt
+      · simp [leftResult, checkExpected, leftMatches, bind, Except.bind]
+          at inferredAt
+
+theorem Expr.InfersType.wordLt_components
+    {program : Program} {context : StaticContext}
+    {left right : Expr} {expected : Core.Ty}
+    (typing : Expr.InfersType program context (.wordLt left right) expected) :
+    Expr.InfersType program context left .word ∧
+      Expr.InfersType program context right .word ∧
+      expected = .bool := by
+  obtain ⟨inferred, inferredAt, erased⟩ := typing
+  unfold infer at inferredAt
+  cases leftResult : infer program context left with
+  | error error =>
+      simp [leftResult, bind, Except.bind] at inferredAt
+  | ok leftType =>
+      by_cases leftMatches : leftType.erase = Core.Ty.word
+      · cases rightResult : infer program context right with
+        | error error =>
+            simp [leftResult, rightResult, checkExpected, leftMatches,
+              bind, Except.bind] at inferredAt
+            change Except.error error = Except.ok inferred at inferredAt
+            cases inferredAt
+        | ok rightType =>
+            by_cases rightMatches : rightType.erase = Core.Ty.word
+            · simp [leftResult, rightResult, checkExpected, leftMatches,
+                rightMatches, bind, Except.bind] at inferredAt
+              cases inferredAt
+              exact ⟨⟨leftType, leftResult, leftMatches⟩,
+                ⟨rightType, rightResult, rightMatches⟩,
+                by simpa [StaticType.erase] using erased.symm⟩
+            · simp [leftResult, rightResult, checkExpected, leftMatches,
+                rightMatches, bind, Except.bind] at inferredAt
+              change Except.error (TypeError.typeMismatch .word rightType.erase) =
+                Except.ok inferred at inferredAt
+              cases inferredAt
+      · simp [leftResult, checkExpected, leftMatches, bind, Except.bind]
+          at inferredAt
+
+theorem Expr.InfersType.ifE_components
+    {program : Program} {context : StaticContext}
+    {condition thenBranch elseBranch : Expr} {expected : Core.Ty}
+    (typing : Expr.InfersType program context
+      (.ifE condition thenBranch elseBranch) expected) :
+    Expr.InfersType program context condition .bool ∧
+      Expr.InfersType program context thenBranch expected ∧
+      Expr.InfersType program context elseBranch expected := by
+  obtain ⟨inferred, inferredAt, erased⟩ := typing
+  unfold infer at inferredAt
+  cases conditionResult : infer program context condition with
+  | error error =>
+      simp [conditionResult, bind, Except.bind] at inferredAt
+  | ok conditionType =>
+      by_cases conditionMatches : conditionType.erase = Core.Ty.bool
+      · cases thenResult : infer program context thenBranch with
+        | error error =>
+            simp [conditionResult, thenResult, checkExpected,
+              conditionMatches, bind, Except.bind] at inferredAt
+            change Except.error error = Except.ok inferred at inferredAt
+            cases inferredAt
+        | ok thenType =>
+            cases elseResult : infer program context elseBranch with
+            | error error =>
+                simp [conditionResult, thenResult, elseResult,
+                  checkExpected, conditionMatches, bind, Except.bind]
+                  at inferredAt
+                change Except.error error = Except.ok inferred at inferredAt
+                cases inferredAt
+            | ok elseType =>
+                by_cases sameType : thenType = elseType
+                · subst elseType
+                  simp [conditionResult, thenResult, elseResult,
+                    checkExpected, conditionMatches,
+                    bind, Except.bind] at inferredAt
+                  change Except.ok thenType = Except.ok inferred at inferredAt
+                  have inferredEq : inferred = thenType :=
+                    Except.ok.inj inferredAt.symm
+                  subst inferred
+                  exact ⟨⟨conditionType, conditionResult,
+                    conditionMatches⟩,
+                    ⟨thenType, thenResult, erased⟩,
+                    ⟨thenType, elseResult, erased⟩⟩
+                · by_cases sameErased : thenType.erase = elseType.erase
+                  · simp [conditionResult, thenResult, elseResult,
+                      checkExpected, conditionMatches, sameType,
+                      sameErased, bind, Except.bind] at inferredAt
+                    change Except.ok (.value elseType.erase) =
+                      Except.ok inferred at inferredAt
+                    have inferredEq : inferred = .value elseType.erase :=
+                      Except.ok.inj inferredAt.symm
+                    subst inferred
+                    have elseErased : elseType.erase = expected := by
+                      simpa [StaticType.erase] using erased
+                    have thenErased : thenType.erase = expected :=
+                      sameErased.trans elseErased
+                    exact ⟨⟨conditionType, conditionResult,
+                      conditionMatches⟩,
+                      ⟨thenType, thenResult, thenErased⟩,
+                      ⟨elseType, elseResult, elseErased⟩⟩
+                  · simp [conditionResult, thenResult, elseResult,
+                      checkExpected, conditionMatches, sameType,
+                      sameErased, bind, Except.bind] at inferredAt
+                    change Except.error (TypeError.typeMismatch
+                      thenType.erase elseType.erase) =
+                      Except.ok inferred at inferredAt
+                    cases inferredAt
+      · simp [conditionResult, checkExpected, conditionMatches,
+          bind, Except.bind] at inferredAt
+
+theorem Expr.InfersType.letE_components
+    {program : Program} {context : StaticContext}
+    {binder : Resolved.LocalId} {value body : Expr} {expected : Core.Ty}
+    (typing : Expr.InfersType program context
+      (.letE binder value body) expected) :
+    ∃ boundType,
+      Expr.InfersType program context value boundType.erase ∧
+      Expr.InfersType program ((binder, boundType) :: context) body expected := by
+  obtain ⟨inferred, inferredAt, erased⟩ := typing
+  unfold infer at inferredAt
+  split at inferredAt
+  · simp [bind, Except.bind] at inferredAt
+  · cases valueResult : infer program context value with
+    | error error =>
+        simp [valueResult, bind, Except.bind] at inferredAt
+    | ok boundType =>
+        cases bodyResult : infer program ((binder, boundType) :: context) body with
+        | error error =>
+            simp [valueResult, bodyResult, bind, Except.bind] at inferredAt
+        | ok bodyType =>
+            simp [valueResult, bodyResult, bind, Except.bind] at inferredAt
+            have inferredEq : inferred = bodyType :=
+              inferredAt.symm
+            subst inferred
+            exact ⟨boundType,
+              ⟨boundType, valueResult, rfl⟩,
+              ⟨bodyType, bodyResult, erased⟩⟩
 
 end Solcore.Frontend.SourceRuntime

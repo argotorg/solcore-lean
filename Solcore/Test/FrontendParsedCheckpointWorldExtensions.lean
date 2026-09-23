@@ -1,14 +1,11 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RuntimeArgumentConstruction
 import Solcore.Frontend.RuntimeInputValidation
-import Solcore.Frontend.ComputationReturnTreeRuntimeWorldProperties
-import Solcore.Frontend.ComputationReturnTreeRuntimeCheckpointProperties
-import Solcore.Frontend.RuntimeParametersLayout
-import Solcore.Frontend.ComputationFunctionProperties
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RuntimeParameters
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 /-! Original allocation/write order and literal saved states precede the world
 extension kernel. Raw construction and validation never guard the old entry. -/

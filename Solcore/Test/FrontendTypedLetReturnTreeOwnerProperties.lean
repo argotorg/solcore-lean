@@ -1,7 +1,6 @@
-import Solcore.Frontend.TypedLetReturnTreeRunnerOwnerProperties
-import Solcore.Frontend.TypedLetReturnBodyProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! Independent recursive provenance keeps both sibling scopes local. Owner
 transport changes identities, not syntax, positional Core, actual values or

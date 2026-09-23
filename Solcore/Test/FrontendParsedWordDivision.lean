@@ -1,9 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.TerminalReturnBodyRenamingProperties
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TerminalReturnBody
+import Solcore.Frontend.TerminalReturnTree
 
 /-! Canonical unsigned quotient and remainder preserve original operand order.
 Zero divisors produce zero only after both children execute; literal boundaries,

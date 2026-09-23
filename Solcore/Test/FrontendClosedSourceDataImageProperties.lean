@@ -1,7 +1,6 @@
-import Solcore.Frontend.ClosedSourceDataExpressionProperties
-import Solcore.Frontend.ClosedSourceEvaluation
-import Solcore.Frontend.LocalExpressionEvaluationProperties
-import Solcore.Frontend.RuntimeValueProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalExpressionEvaluation
+import Solcore.Frontend.RuntimeValue
 
 /- Independent original paths keep arbitrary Core payloads and lexical rows literal. -/
 set_option autoImplicit false

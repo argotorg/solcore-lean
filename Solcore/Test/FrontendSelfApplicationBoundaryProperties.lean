@@ -1,5 +1,5 @@
-import Solcore.Frontend.SelfApplicationCallNonreturnProperties
-import Solcore.Frontend.ClosedSourceDataBody
+import Solcore.Frontend.SelfApplication
+import Solcore.Frontend.ClosedSource
 
 /- The body gate excludes self-calling return syntax by constructor inversion.
 Only strict wrappers occur below: grouping and either side of a binary tuple.

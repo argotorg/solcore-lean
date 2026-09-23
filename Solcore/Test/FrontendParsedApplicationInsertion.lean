@@ -1,6 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalFunctionApplicationProperties
-import Solcore.Frontend.LocalFunctionApplicationExactInsertionProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Parsed source provenance is independent of the static and runtime insertion
 contexts. Nominal checking supplies no actual values; the small runtime grid

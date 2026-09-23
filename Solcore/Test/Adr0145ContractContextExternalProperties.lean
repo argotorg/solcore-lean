@@ -1,6 +1,6 @@
 import Solcore.ContractRuntime.CoreContractEntryProfileProperties
-import Solcore.ContractRuntime.TopLevelExecutionContextProperties
-import Solcore.ContractRuntime.TopLevelStorageDeltaProperties
+import Solcore.ContractRuntime.TopLevelExecution
+import Solcore.ContractRuntime.TopLevelStorageDelta
 
 /-! External compile consumers for ADR-0145 contract, context, and delta laws. -/
 

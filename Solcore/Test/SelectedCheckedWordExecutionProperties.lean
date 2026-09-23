@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.SelectedCheckedWordExecutionResumptionProperties
+import Solcore.ContractRuntime.SelectedCheckedWordExecution
 
 /-! Compile-only consumers for the public ADR-0143 proof contract. -/
 

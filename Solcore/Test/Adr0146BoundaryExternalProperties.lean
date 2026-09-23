@@ -1,12 +1,12 @@
 import Solcore.Core.ContractCallWordResultProperties
 import Solcore.Core.HostProgress
-import Solcore.ContractRuntime.CheckedContractRegistryProperties
-import Solcore.ContractRuntime.CheckedCoreWordOutcomeProperties
-import Solcore.ContractRuntime.ContractCallFailureProperties
+import Solcore.ContractRuntime.CheckedContractRegistry
+import Solcore.ContractRuntime.CheckedCoreWordOutcome
+import Solcore.ContractRuntime.ContractCallFailure
 import Solcore.ContractRuntime.HostStorageAccountPresence
-import Solcore.ContractRuntime.HostStorageContextRebase
+import Solcore.ContractRuntime.HostStorageContext
 import Solcore.ContractRuntime.NestedWordCall
-import Solcore.ContractRuntime.WorldStateDeltaProperties
+import Solcore.ContractRuntime.WorldStateDelta
 
 /-! External compile consumers for ADR-0146 boundary laws. -/
 

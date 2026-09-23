@@ -1,14 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
-import Solcore.Frontend.LocalComputationReturnTreeProperties
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.LocalComputation
 import Solcore.Core.FuelResumptionProperties
 /-! Parsed bodies instantiate shared laws with independent static/raw evidence and manual Core paths. -/
 set_option autoImplicit false

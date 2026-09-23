@@ -1,4 +1,4 @@
-import Solcore.Abi.StaticWordMethodTableProperties
+import Solcore.Abi.StaticWord
 
 /-! External compile consumers for Static Word ABI method-table contracts. -/
 

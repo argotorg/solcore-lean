@@ -1,5 +1,5 @@
 import Solcore.Oracle.V5.Wire.ResponseEncode
-import Solcore.Oracle.V5.Wire.ScenarioDiagnosticDecode
+import Solcore.Oracle.V5.Wire.ScenarioDiagnostic
 
 /-! Focused strict-decoding tests for Oracle v5 scenario diagnostics. -/
 

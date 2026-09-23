@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameContinuationContextWithTracePrefixTrapReasonMap
+import Solcore.ContractRuntime.FrameContinuationContextWithTracePrefix
 
 /-! Definition-only compile regressions for trace-prefixed reason mapping. -/
 

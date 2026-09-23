@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.ContractAdmissionDiagnostic
+import Solcore.Oracle.V5.ContractAdmission
 
 /-! Focused wire-shape tests for contract-admission diagnostics. -/
 

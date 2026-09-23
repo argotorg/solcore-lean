@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.CheckedCreationPreflightProperties
+import Solcore.ContractRuntime.CheckedCreationPreflight
 import Solcore.Test.Adr0148CheckedCreationPreflightFixture
 
 /-! External theorem consumers and actual environment-aware preflight tests. -/

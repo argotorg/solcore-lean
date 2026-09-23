@@ -1,12 +1,9 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.ComputationFunctionTypeExtensionProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationFunction
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.RuntimeParameterDeclarations
 import Solcore.Core.FuelResumptionProperties
 
 /-! A selected raw success does not license rejection preservation when an

@@ -1,6 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 
 /-! Independent cost derivations distinguish sufficient structural budgets from
 exact path costs, and never treat an unsupported zero-bound expression as checked. -/

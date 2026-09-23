@@ -1,6 +1,5 @@
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionFoldProperties
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionFoldTrapReasonMapProperties
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionViewTrapReasonMapProperties
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionFold
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionView
 
 /-! Compile-only consumers of resolution-fold reason-mapping naturality. -/
 

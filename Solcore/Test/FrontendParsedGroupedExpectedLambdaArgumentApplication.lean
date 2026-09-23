@@ -1,5 +1,5 @@
 import Solcore.Frontend.GroupedExpectedLambdaArgumentApplication
-import Solcore.Frontend.LocalApplicationWithExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Correspondence
 import Solcore.Syntax.Parser.Term
 

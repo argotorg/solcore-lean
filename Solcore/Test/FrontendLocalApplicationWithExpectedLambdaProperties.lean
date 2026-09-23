@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Eval
 /-! Independent symbolic consumer for the source-disjoint local-application dispatcher. -/
 set_option autoImplicit false

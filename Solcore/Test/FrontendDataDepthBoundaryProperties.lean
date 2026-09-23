@@ -1,4 +1,4 @@
-import Solcore.Frontend.ClosedSourceDataDepthDecisionProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Test.FrontendStrictWordDataBoundaryProperties
 
 /- Original rejection and child witnesses precede the finite-depth decision laws.

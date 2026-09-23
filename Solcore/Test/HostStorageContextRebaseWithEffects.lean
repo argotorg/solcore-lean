@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.HostStorageContextRebase
+import Solcore.ContractRuntime.HostStorageContext
 
 /-! Compile-only regressions for joint working-world and effect rebasing. -/
 

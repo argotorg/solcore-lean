@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Expression
-import Solcore.Syntax.Parser.Expression.AtomProperties
+import Solcore.Syntax.Parser.Expression.Atom
 import Solcore.Syntax.CollectionValidity
 import Solcore.Syntax.ExpressionValidity
 

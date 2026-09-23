@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameRunResultTrapReasonMap
+import Solcore.ContractRuntime.FrameRun
 
 /-! Definition-only tests for frame-run trap-reason mapping. -/
 

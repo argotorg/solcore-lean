@@ -1,7 +1,5 @@
-import Solcore.Frontend.ClosedSourceUnaryProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.WordLiteralProperties
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.WordLiteral
 import Solcore.Core.UnaryPrimitives
 import Solcore.Syntax.Parser.Term
 

@@ -1,4 +1,4 @@
-import Solcore.Core.MachineProperties
+import Solcore.Core.Machine
 
 set_option autoImplicit false
 

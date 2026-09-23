@@ -1,5 +1,5 @@
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.LocalExpressionEvaluationProperties
+import Solcore.Frontend.LocalExpressionTyping
+import Solcore.Frontend.LocalExpressionEvaluation
 import Solcore.Core.Machine
 
 /-! Canonical conditional consumers distinguish whole-expression static checks

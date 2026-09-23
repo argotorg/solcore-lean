@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ImplDeclarationTotalityProperties
+import Solcore.Syntax.Parser.Impl
 
 set_option autoImplicit false
 

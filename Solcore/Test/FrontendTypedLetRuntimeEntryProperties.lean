@@ -1,11 +1,6 @@
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionCompilationTypeExtensionProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Independent arbitrary-length entry provenance and actual cost keep prefix
 locals out of the parameter record and retain real pending let continuations. -/

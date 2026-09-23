@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalApplicationWithTwoLevelGroupedExpectedLambda
+import Solcore.Frontend.LocalApplication
 import Solcore.Core.Eval
 /-! Independent symbolic consumer for the exact-two-first ADR-0322 entry. -/
 set_option autoImplicit false

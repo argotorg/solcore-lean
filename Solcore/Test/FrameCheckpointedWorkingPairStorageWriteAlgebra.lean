@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairStorageWriteAlgebraProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPair
 
 /-! Compile-only regressions for checkpointed working storage-write algebra. -/
 

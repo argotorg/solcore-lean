@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.ReturnBody
 import Solcore.Frontend.RuntimeParameters
-import Solcore.Frontend.LocalInputsExecution
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Actual singleton return bodies retain the checked expression's Core and
 fuel behavior. Parsed declarations supply parameters and body separately; this

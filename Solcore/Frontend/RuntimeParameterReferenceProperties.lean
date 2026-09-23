@@ -1,6 +1,5 @@
-import Solcore.Frontend.RuntimeParametersPositionProperties
-import Solcore.Frontend.ReturnBodyElaboration
-import Solcore.Frontend.ReturnBodyExecutionProperties
+import Solcore.Frontend.RuntimeParameters
+import Solcore.Frontend.ReturnBody
 
 /-! A source-position witness selects the exact supplied argument. Independent
 first-match and index judgments, not type equality or row membership alone,

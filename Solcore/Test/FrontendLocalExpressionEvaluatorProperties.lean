@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalExpressionEvaluatorExecutionProperties
+import Solcore.Frontend.LocalExpressionEvaluator
 import Solcore.Frontend.LocalExpressionResumptionProperties
 import Solcore.Core.UnsignedDivision
 

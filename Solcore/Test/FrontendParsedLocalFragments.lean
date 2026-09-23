@@ -1,8 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.LocalFragmentProperties
+import Solcore.Frontend.TypedLetReturnTree
 import Solcore.Core.LocalFragment
 
 /-! Exact parsed provenance supplies fragment membership, then existing insertion

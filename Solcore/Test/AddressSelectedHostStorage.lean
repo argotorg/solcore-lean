@@ -1,6 +1,6 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuationProperties
-import Solcore.ContractRuntime.ParentIndexedFrameInitializationPresentStorageAccountCodeFrameContinuationCoherenceProperties
-import Solcore.ContractRuntime.ParentIndexedFrameResolutionFoldProperties
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPairWithPresentStorageAccountCodeFrameContinuation
+import Solcore.ContractRuntime.ParentIndexedFrameInitialization
+import Solcore.ContractRuntime.ParentIndexedFrameResolutionFold
 
 /-! End-to-end regressions for address-selected storage read/write execution. -/
 

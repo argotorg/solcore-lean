@@ -1,4 +1,4 @@
-import Solcore.Frontend.DirectDataLambdaDepthDecisionProperties
+import Solcore.Frontend.DirectDataLambdaDepth
 import Solcore.Syntax.Parser.Term
 
 /- Actual direct calls retain independently handwritten ASTs and every span.

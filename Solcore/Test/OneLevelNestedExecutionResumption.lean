@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.OneLevelNestedExecutionResumptionProperties
+import Solcore.ContractRuntime.OneLevelNestedExecution
 import Solcore.Test.OneLevelNestedExecutionFixture
 
 /-! Executable and external-consumer regressions for nested resumption. -/

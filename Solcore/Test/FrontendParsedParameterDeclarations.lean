@@ -1,7 +1,7 @@
 import Solcore.Syntax.Parser.Signature
 import Solcore.Syntax.Parser.Term
 import Solcore.Frontend.RuntimeParameterDeclarations
-import Solcore.Frontend.LocalInputsTypeErasure
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Frontend.RuntimeParameters
 import Solcore.Frontend.LocalExpressionTyping
 

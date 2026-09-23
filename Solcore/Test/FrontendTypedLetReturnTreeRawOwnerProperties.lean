@@ -1,6 +1,4 @@
-import Solcore.Frontend.TypedLetReturnTreeRawOwnerProperties
-import Solcore.Frontend.TypedLetReturnTreeOwnerProperties
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
+import Solcore.Frontend.TypedLetReturnTree
 
 /-! Raw rows need not be aligned, unique or typed. Owner transport preserves
 first matches and actual values; the final checked path has its own premises. -/

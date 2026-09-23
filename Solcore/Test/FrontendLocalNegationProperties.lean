@@ -1,4 +1,4 @@
-import Solcore.Frontend.LocalInputsExtensionProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Boolean-only canonical negation: exact syntax, dynamic values, and fuel.
 The spellings `true` and `false` remain ordinary caller-supplied names. -/

@@ -1,5 +1,5 @@
-import Solcore.Frontend.SelfApplicationCallNonreturnProperties
-import Solcore.Frontend.ClosedSourceEvaluatorOwnerProperties
+import Solcore.Frontend.SelfApplication
+import Solcore.Frontend.ClosedSource
 
 /- Independent old evaluator failures precede owner covariance. None does not
 classify failure, and inert host/Core payloads are not dispatched by these calls. -/

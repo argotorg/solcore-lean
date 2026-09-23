@@ -1,8 +1,7 @@
-import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalExpressionCostCorrespondence
+import Solcore.Frontend.Expected
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Frontend.LocalExpressionTyping
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
 import Solcore.Syntax.Parser.Term
 /- Independent raw original witnesses precede every search. Failed admission
 does not erase annotations, saved rows, source closures or an unrelated store row. -/

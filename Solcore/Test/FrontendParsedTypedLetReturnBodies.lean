@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.TypedLetReturnBodyEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
+import Solcore.Frontend.TypedLetReturnBody
+import Solcore.Frontend.RuntimeFunction
 
 /-! Parsed typed prefixes retain original initializer scopes and exact ordered
 Core without argument values. Recursive entries include this older adapter;

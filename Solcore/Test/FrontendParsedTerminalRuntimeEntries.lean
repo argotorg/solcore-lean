@@ -1,9 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionFuelBoundProperties
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.RuntimeFunctionOwnerProperties
-import Solcore.Frontend.RuntimeFunctionStoreProperties
-import Solcore.Frontend.TerminalReturnTreeFuelBoundProperties
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TerminalReturnTree
 
 /-! Compile each complete declaration once without values, then supply actual
 ordered arguments. Terminal entries preserve exact costs, genuine checkpoints,

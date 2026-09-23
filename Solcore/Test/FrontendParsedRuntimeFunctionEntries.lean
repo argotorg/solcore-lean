@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeFunctionEntry
+import Solcore.Frontend.RuntimeFunction
 
 /-! Fully parsed declarations enter the restricted runtime profile through
 their actual header, parameter list, and body. No function lookup or call

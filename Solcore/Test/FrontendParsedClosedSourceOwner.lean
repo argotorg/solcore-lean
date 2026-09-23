@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceOwnerProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 
 /- Actual parsed creation/call and fresh typed/inferred bindings precede owner

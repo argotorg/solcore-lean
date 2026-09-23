@@ -1,4 +1,4 @@
-import Solcore.Oracle.V5.ObservationValidity
+import Solcore.Oracle.V5.Observation
 import Solcore.Oracle.V5.RootInstallation
 import Solcore.Oracle.V5.ScenarioPreparation
 import Solcore.ContractRuntime.BalancedTopLevelExecution

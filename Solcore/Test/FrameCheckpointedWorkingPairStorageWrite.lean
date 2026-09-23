@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.FrameCheckpointedWorkingPairStorageWrite
+import Solcore.ContractRuntime.FrameCheckpointedWorkingPair
 
 /-! Runtime regressions for checkpointed working-world storage writes. -/
 

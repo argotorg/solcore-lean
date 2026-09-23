@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.OperatorTotalityProperties
+import Solcore.Syntax.Parser.Operator
 
 /-! External consumers for operator-selector totality contracts. -/
 

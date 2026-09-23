@@ -1,13 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationEmbeddingProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
-import Solcore.Frontend.RuntimeComputationFunctionCompilation
-import Solcore.Frontend.RuntimeApplicationFunctionCompilation
-import Solcore.Frontend.LocalComputationProperties
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.RuntimeComputationFunction
+import Solcore.Frontend.RuntimeApplicationFunction
+import Solcore.Frontend.LocalComputation
 /-! Original syntax carries independent static and raw evidence. Value-free
 nominal cases are separate from actual values and their hand-written Core paths. -/
 set_option autoImplicit false

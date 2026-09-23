@@ -1,4 +1,4 @@
-import Solcore.Frontend.DirectDataLambdaDepthDecisionProperties
+import Solcore.Frontend.DirectDataLambdaDepth
 
 /- Independent original rejection precedes finite-depth decisions. Inert type
 annotations do not repair a missing argument or a wrong mixed guard payload. -/

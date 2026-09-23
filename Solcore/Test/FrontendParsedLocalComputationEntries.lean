@@ -1,10 +1,8 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.LocalApplicationReturnBodyRunnerProperties
-import Solcore.Frontend.LocalComputationProperties
-import Solcore.Frontend.LocalComputationExecutionProperties
-import Solcore.Frontend.LocalComputationInsertionProperties
+import Solcore.Frontend.LocalApplication
+import Solcore.Frontend.LocalComputation
 import Solcore.Core.FuelResumptionProperties
-import Solcore.Frontend.RuntimeApplicationFunctionFactorizationProperties
+import Solcore.Frontend.RuntimeApplicationFunction
 
 /-! Original declarations retain their two existing entry profiles. The shared
 child does not introduce a mixed body or a new function endpoint. -/

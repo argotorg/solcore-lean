@@ -1,4 +1,4 @@
-import Solcore.Frontend.BoundedInputsLambdaDepthDecisionProperties
+import Solcore.Frontend.BoundedInputsLambdaDepth
 import Solcore.Syntax.Parser.Term
 
 /- Both supplied finite input runs precede every outer decision law. The actual

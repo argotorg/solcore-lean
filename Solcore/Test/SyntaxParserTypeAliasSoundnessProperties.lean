@@ -1,5 +1,4 @@
-import Solcore.Syntax.Parser.TypeAliasDeclarationOrdinaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.TypeAliasSoundnessProperties
+import Solcore.Syntax.Parser.TypeAlias
 
 /-! External consumers for transparent type-alias grammar soundness. -/
 

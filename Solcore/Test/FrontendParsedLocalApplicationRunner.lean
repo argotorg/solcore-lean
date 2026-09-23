@@ -1,8 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.LocalInputsApplicationRuntimeProperties
-import Solcore.Frontend.LocalInputsExecution
-import Solcore.Frontend.LocalFunctionApplicationExecutionProperties
-import Solcore.Frontend.LocalInputsProperties
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! One actual input record supplies every projection. Original source and

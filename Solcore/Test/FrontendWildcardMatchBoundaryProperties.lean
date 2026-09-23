@@ -1,9 +1,6 @@
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.RecursiveLocalComputationFragmentInsertionPaths
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.FuelResumptionProperties
 
 /-! Symbolic original ASTs distinguish unconditional selection from literal

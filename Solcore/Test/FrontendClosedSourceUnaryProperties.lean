@@ -1,7 +1,7 @@
-import Solcore.Frontend.ClosedSourceUnaryProperties
-import Solcore.Frontend.LocalReferenceProperties
-import Solcore.Resolved.LocalScopeProperties
-import Solcore.Frontend.LocalExpressionCostCorrespondence
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalReference
+import Solcore.Resolved.LocalScope
+import Solcore.Frontend.LocalFunctionApplication
 
 /- Independent old-API unary costs precede original mixed-value image and depth laws.
 Complete Core and mixed tails/stores remain separate; no projection is asserted. -/

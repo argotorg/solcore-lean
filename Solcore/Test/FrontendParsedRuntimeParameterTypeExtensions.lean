@@ -1,7 +1,6 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.RuntimeParametersTypeExtensionProperties
-import Solcore.Frontend.RuntimeParameterDeclarationBindingProperties
-import Solcore.Frontend.RuntimeParameterDeclarationsTypeExtensionProperties
+import Solcore.Frontend.RuntimeParameters
+import Solcore.Frontend.RuntimeParameterDeclarations
 
 /-! Actual parameter bindings retain complete records across meaning-preserving
 tables. Original parsed occurrences and caller values are never reconstructed

@@ -1,9 +1,7 @@
 import Solcore.Syntax.Parser.Function
-import Solcore.Frontend.StructuralTypeTableProperties
-import Solcore.Frontend.RuntimeFunctionEvaluatorProperties
-import Solcore.Frontend.RuntimeFunctionCompilation
-import Solcore.Frontend.RuntimeFunctionResumptionProperties
-import Solcore.Frontend.TypedLetReturnBodyRunner
+import Solcore.Frontend.StructuralType
+import Solcore.Frontend.RuntimeFunction
+import Solcore.Frontend.TypedLetReturnBody
 /-! Complete types carry independent meaning. One structural return annotation
 parameters and recursive lets execute; old named-only and prefix adapters remain unchanged. -/
 set_option autoImplicit false

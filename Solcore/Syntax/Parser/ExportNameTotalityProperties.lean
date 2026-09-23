@@ -1,6 +1,6 @@
 import Solcore.Syntax.Parser.ExportProperties
 import Solcore.Syntax.Parser.InvariantFreeProperties
-import Solcore.Syntax.Parser.OperatorTotalityProperties
+import Solcore.Syntax.Parser.Operator
 
 /-! Conditional totality for one exported selector name. -/
 

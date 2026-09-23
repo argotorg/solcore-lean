@@ -1,5 +1,5 @@
-import Solcore.Resolved.WordLessWithIdsEvaluationProperties
-import Solcore.Resolved.RenamingProperties
+import Solcore.Resolved.WordLessWithIds
+import Solcore.Resolved.Renaming
 
 /-! Explicit comparison temporaries are hygienic under precise premises. These
 consumers do not add canonical source operators or infer freshness from names. -/

@@ -1,6 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedSelectedExecutionCompatibilityProperties
-import Solcore.ContractRuntime.ParentIndexedSelectedExecutionFoldCoherenceProperties
-import Solcore.ContractRuntime.ParentIndexedSelectedExecutionResumptionProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecution
 
 /-! Shared measured fixture for branch-complete parent execution tests. -/
 

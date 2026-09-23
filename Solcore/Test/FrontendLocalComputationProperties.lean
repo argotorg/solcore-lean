@@ -1,7 +1,4 @@
-import Solcore.Frontend.LocalComputationProperties
-import Solcore.Frontend.LocalComputationEvaluationProperties
-import Solcore.Frontend.LocalComputationExecutionProperties
-import Solcore.Frontend.LocalComputationInsertionProperties
+import Solcore.Frontend.LocalComputation
 import Solcore.Frontend.TypedLetReturnTree
 
 /-! Independent pure and actual-call certificates preserve the raw boundary.

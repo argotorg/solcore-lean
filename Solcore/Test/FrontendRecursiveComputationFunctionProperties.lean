@@ -1,10 +1,9 @@
 import Solcore.Frontend.RecursiveComputationFunction
-import Solcore.Frontend.ComputationFunctionFactorizationProperties
-import Solcore.Frontend.ComputationReturnTreeCostProperties
-import Solcore.Frontend.RecursiveComputationReturnTreeEmbeddingProperties
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RuntimeComputationFunctionProperties
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.Computation
+import Solcore.Frontend.RecursiveComputationReturnTree
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.RuntimeComputationFunction
+import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.FuelResumptionProperties
 
 /-! Original symbolic declarations, independent actual bindings and handwritten

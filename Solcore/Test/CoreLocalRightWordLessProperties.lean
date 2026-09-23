@@ -1,5 +1,5 @@
 import Solcore.Core.LocalFragment
-import Solcore.Frontend.WordLessLocalRightCostProperties
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Independent original operand derivations exercise the local-right bridge.
 The generated lets retain operand order, nested binders, exact costs and outer

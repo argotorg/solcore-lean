@@ -1,7 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionStaticProperties
-import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 
 /-! Equal ordered structural types preserve static preparation, not runtime
 observations. Independent preparation transport is used before source cost

@@ -1,8 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluationEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnTreeEmbeddingProperties
-import Solcore.Frontend.RuntimeFunctionCompilationProperties
-import Solcore.Frontend.RuntimeFunctionEntryExecutionProperties
-import Solcore.Frontend.RuntimeFunctionPreparationFactorization
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.RuntimeFunction
 
 /-! Compilation evidence types exact open Core without runtime inhabitants.
 Supplied argument types and values remain a separate preparation boundary. -/

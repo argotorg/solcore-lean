@@ -1,5 +1,4 @@
-import Solcore.ContractRuntime.CheckedHostCoreWordProgramExecutionProperties
-import Solcore.ContractRuntime.CheckedHostCoreWordProgramProperties
+import Solcore.ContractRuntime.CheckedHostCoreWordProgram
 
 /-! Compile-only consumers for checked Word returned-frame proof contracts. -/
 

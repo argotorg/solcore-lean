@@ -1,5 +1,5 @@
 import Solcore.Core.Primitive
-import Solcore.ContractRuntime.TransactionJournalProperties
+import Solcore.ContractRuntime.TransactionJournal
 
 /-! Executable tests for ordered rollback-scoped transaction observations. -/
 

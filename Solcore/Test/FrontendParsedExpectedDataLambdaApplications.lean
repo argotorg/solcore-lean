@@ -1,12 +1,8 @@
-import Solcore.Frontend.ExpectedDataLambdaInvocationProperties
-import Solcore.Frontend.ClosedSourceDataBodyProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
-import Solcore.Frontend.LocalExpressionCostCorrespondence
-import Solcore.Frontend.LocalExpressionEvaluatorProperties
-import Solcore.Frontend.LocalExpressionTypingProperties
-import Solcore.Frontend.WordLessCostStepComposition
-import Solcore.Frontend.LocalFunctionApplicationStepComposition
+import Solcore.Frontend.Expected
+import Solcore.Frontend.ClosedSource
+import Solcore.Frontend.LocalFunctionApplication
+import Solcore.Frontend.LocalExpressionEvaluator
+import Solcore.Frontend.LocalExpressionTyping
 import Solcore.Syntax.Parser.Term
 /- Original whole-written certificates precede search. The actual grouped call
 uses invocation; no direct-call AST or source/Core closure equality is invented. -/

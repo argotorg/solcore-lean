@@ -1,6 +1,4 @@
-import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeProperties
+import Solcore.Frontend.TypedLetReturnTree
 
 /-! Independent original bodies fix raw values, lexical scopes and costs before
 direct evaluation. Whole checking, aligned identities and actual typing remain

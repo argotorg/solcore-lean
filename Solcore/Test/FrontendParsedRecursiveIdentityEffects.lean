@@ -1,7 +1,5 @@
 import Solcore.Syntax.Parser.Term
-import Solcore.Frontend.RecursiveLocalComputationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationEvaluationRenamingProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
+import Solcore.Frontend.RecursiveLocalComputation
 import Solcore.Core.ExactFuelProperties
 import Solcore.Core.FuelResumptionProperties
 /-! Original parsed children, independent raw costs and literal Core paths retain

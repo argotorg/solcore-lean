@@ -3,7 +3,7 @@ import Solcore.Syntax.Parser.FunctionParametersSoundnessProperties
 import Solcore.Syntax.Parser.GenericParametersSoundnessProperties
 import Solcore.Syntax.Parser.PredicateSequenceDiagnosticReflectionProperties
 import Solcore.Syntax.Parser.ReturnClauseSoundnessProperties
-import Solcore.Syntax.Parser.SignatureLeafDiagnosticReflectionProperties
+import Solcore.Syntax.Parser.Signature
 import Solcore.Syntax.Parser.WhereClauseSoundnessProperties
 
 /-! Diagnostic-free success soundness for complete function signatures. -/

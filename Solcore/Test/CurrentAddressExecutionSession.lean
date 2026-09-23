@@ -1,4 +1,4 @@
-import Solcore.ContractRuntime.ParentIndexedSelectedExecutionSessionFoldProperties
+import Solcore.ContractRuntime.ParentIndexedSelectedExecution
 import Solcore.Test.CurrentAddressExecutionFixture
 
 /-! Fixed-input session regressions for the current-address execution path. -/

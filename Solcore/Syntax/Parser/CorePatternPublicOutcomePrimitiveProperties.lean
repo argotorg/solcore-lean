@@ -1,5 +1,5 @@
 import Solcore.Syntax.Parser.CorePatternBoundaryOutcomeSoundnessProperties
-import Solcore.Syntax.Parser.PatternRecoveryTotalityProperties
+import Solcore.Syntax.Parser.Pattern
 
 /-! Shared executable primitives for public Core pattern outcomes. -/
 

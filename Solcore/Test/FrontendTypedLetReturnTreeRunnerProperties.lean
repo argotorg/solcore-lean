@@ -1,7 +1,5 @@
-import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
-import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
-import Solcore.Frontend.TypedLetReturnTreeRunnerEmbeddingProperties
-import Solcore.Frontend.TypedLetReturnBodyFuelBoundProperties
+import Solcore.Frontend.TypedLetReturnTree
+import Solcore.Frontend.TypedLetReturnBody
 
 /-! Original trees have independent costs and real resumable states.
 Static provenance, actual typed values and whole acceptance remain separate. -/

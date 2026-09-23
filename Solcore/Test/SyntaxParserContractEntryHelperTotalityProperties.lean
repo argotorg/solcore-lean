@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.ContractEntryHelperTotalityProperties
+import Solcore.Syntax.Parser.ContractEntry
 
 set_option autoImplicit false
 

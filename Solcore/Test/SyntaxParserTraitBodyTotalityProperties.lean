@@ -1,4 +1,4 @@
-import Solcore.Syntax.Parser.TraitBodyTotalityProperties
+import Solcore.Syntax.Parser.Trait
 
 set_option autoImplicit false
 

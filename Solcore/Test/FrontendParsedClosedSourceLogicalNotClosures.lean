@@ -1,6 +1,4 @@
-import Solcore.Frontend.ClosedSourceUnaryProperties
-import Solcore.Frontend.ClosedSourceEvaluationProperties
-import Solcore.Frontend.ClosedSourceEvaluatorSoundnessProperties
+import Solcore.Frontend.ClosedSource
 import Solcore.Syntax.Parser.Term
 set_option autoImplicit false
 set_option maxHeartbeats 1200000

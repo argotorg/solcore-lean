@@ -1,10 +1,8 @@
-import Solcore.Frontend.ComputationReturnTreeProperties
-import Solcore.Frontend.ComputationReturnTreeTypingProperties
+import Solcore.Frontend.Computation
 import Solcore.Frontend.RecursiveComputationReturnTree
-import Solcore.Frontend.RecursiveLocalComputationProperties
-import Solcore.Frontend.RecursiveLocalComputationExecutionProperties
-import Solcore.Frontend.LocalComputationReturnTree
-import Solcore.Frontend.LocalExpressionCostStepComposition
+import Solcore.Frontend.RecursiveLocalComputation
+import Solcore.Frontend.LocalComputation
+import Solcore.Frontend.LocalFunctionApplication
 
 /-! Arbitrary repeated spellings retain old initializer scope and exact rows.
 These symbolic spans are original fields, not a claim of parser validity. -/

@@ -1,4 +1,4 @@
-import Solcore.Frontend.ReturnBodyExecutionProperties
+import Solcore.Frontend.ReturnBody
 import Solcore.Core.BitwiseLogic
 
 /-! ADR-0169: singleton return wrappers preserve the checked expression and its

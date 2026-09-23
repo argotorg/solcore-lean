@@ -1,6 +1,6 @@
-import Solcore.Frontend.SourceComputationBodyEvaluationProperties
-import Solcore.Frontend.LocalReferenceProperties
-import Solcore.Resolved.LocalScopeProperties
+import Solcore.Frontend.SourceComputationBody
+import Solcore.Frontend.LocalReference
+import Solcore.Resolved.LocalScope
 
 /-! Independent reference callbacks exercise all nine successful original body
 rules. Mixed captures and stores are unrestricted data; no closed interpreter,
