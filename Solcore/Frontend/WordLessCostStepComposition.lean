@@ -1,5 +1,5 @@
 import Solcore.Frontend.LocalExpressionCostStepComposition
-import Solcore.Core.DerivedComparisons
+import Solcore.Core.Derived
 
 /-! Exact ordered paths for existing Core lets and the derived less-than tree.
 The weakened right path is an explicit premise, not a general weakening claim. -/

@@ -1,4 +1,4 @@
-import Solcore.Core.LocalFragmentExactInsertionProperties
+import Solcore.Core.LocalFragment
 import Solcore.Resolved.LocalFragmentProperties
 import Solcore.Resolved.WordLessWithIds
 

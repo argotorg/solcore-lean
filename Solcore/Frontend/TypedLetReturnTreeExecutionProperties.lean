@@ -3,7 +3,7 @@ import Solcore.Frontend.TypedLetReturnTreeEvaluationProperties
 import Solcore.Frontend.ReturnBodyContinuationProperties
 import Solcore.Frontend.WordLessCostStepComposition
 import Solcore.Frontend.LocalFragmentProperties
-import Solcore.Core.LocalFragmentExactInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Whole checked trees follow old-scope initializers and the selected arm.
 Aligned IDs suffice for correspondence, without runtime typing. Exact-cost

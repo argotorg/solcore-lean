@@ -4,7 +4,7 @@ import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.TypedLetReturnBody
 import Solcore.Frontend.LocalFragmentProperties
-import Solcore.Core.LocalFragmentExactInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Original terminal block spans and independent source/Core paths. Wrappers
 add no transitions, names or positional shifts, even around mixed prefixes. -/

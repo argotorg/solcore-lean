@@ -1,5 +1,5 @@
 import Solcore.Core.Check
-import Solcore.Core.DerivedComparisonFlagEval
+import Solcore.Core.Derived
 import Solcore.Core.Machine
 
 /-! Semantic regressions for the derived word-valued comparison flags. -/

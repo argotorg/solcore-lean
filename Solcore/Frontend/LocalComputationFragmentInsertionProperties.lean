@@ -1,5 +1,5 @@
 import Solcore.Frontend.LocalComputationFragment
-import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Caller insertion preserves literal successful results and both stores.
 Actual invoked bodies and captures are unchanged, not assumed pure or typed. -/

@@ -1,7 +1,7 @@
 import Solcore.Resolved.Eval
 import Solcore.Resolved.LocalScopeProperties
 import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Core.LocalRightWordLessEvaluationProperties
+import Solcore.Core.LocalFragment
 
 /-! Exact named-to-positional evaluation correspondence for the resolved local
 fragment. The independent relation preserves the store and is deterministic

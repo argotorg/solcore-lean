@@ -1,6 +1,6 @@
 import Solcore.Resolved.ScopeProperties
 import Solcore.Resolved.TypingProperties
-import Solcore.Core.DerivedComparisons
+import Solcore.Core.Derived
 
 /-! Inserting a fresh outer identity preserves every existing local reference.
 The prefix formulation passes under arbitrary let binders, including binders

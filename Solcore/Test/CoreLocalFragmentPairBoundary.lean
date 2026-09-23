@@ -1,5 +1,4 @@
-import Solcore.Core.LocalFragmentExactInsertionProperties
-import Solcore.Core.LocalFragmentInferenceInsertionProperties
+import Solcore.Core.LocalFragment
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent ordered pair certificates, explicit checkpoints and mathematical

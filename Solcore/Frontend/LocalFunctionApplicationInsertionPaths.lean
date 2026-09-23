@@ -1,6 +1,6 @@
 import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Core.LocalFragmentInsertionPaths
+import Solcore.Core.LocalFragment
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
 
 /-! One caller insertion preserves the literal closure and argument returned

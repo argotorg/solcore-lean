@@ -1,6 +1,6 @@
 import Solcore.Frontend.ComputationBodyFragment
 import Solcore.Frontend.WordLessCostStepComposition
-import Solcore.Core.LocalFragmentInsertionPaths
+import Solcore.Core.LocalFragment
 
 /-! One literal outcome and one cost are shared before every continuation.
 Only the child's paired-path law is required, not its typing or raw insertion. -/

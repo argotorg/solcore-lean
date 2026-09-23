@@ -3,8 +3,7 @@ import Solcore.Frontend.TypedLetReturnTreeEvaluatorExecutionProperties
 import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.LocalFragmentProperties
-import Solcore.Core.LocalFragmentExactInsertionProperties
-import Solcore.Core.LocalFragmentInferenceInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Exact parsed provenance supplies fragment membership, then existing insertion
 laws transport independently hand-composed paths. Suspensions are not equated. -/

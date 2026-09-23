@@ -1,5 +1,4 @@
-import Solcore.Core.LocalRightWordLessTypingProperties
-import Solcore.Core.LocalRightWordLessEvaluationProperties
+import Solcore.Core.LocalFragment
 import Solcore.Frontend.WordLessLocalRightCostProperties
 import Solcore.Core.FuelResumptionProperties
 

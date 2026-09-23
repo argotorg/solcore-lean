@@ -1,4 +1,4 @@
-import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Core.LocalFragment
 import Solcore.Core.Machine
 
 /-! Insertion equivalence has a syntactic boundary: creation captures the

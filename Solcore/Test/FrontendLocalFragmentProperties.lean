@@ -1,8 +1,7 @@
 import Solcore.Frontend.LocalFragmentProperties
 import Solcore.Frontend.TypedLetReturnTreeProperties
 import Solcore.Frontend.TypedLetReturnTreeEvaluation
-import Solcore.Core.LocalFragmentExactInsertionProperties
-import Solcore.Core.LocalFragmentInferenceInsertionProperties
+import Solcore.Core.LocalFragment
 import Solcore.Core.FuelResumptionProperties
 
 /-! Exact original-source witnesses supply membership; independent positional

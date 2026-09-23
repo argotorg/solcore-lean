@@ -1,4 +1,4 @@
-import Solcore.Core.ComparisonFlags
+import Solcore.Core.Derived
 import Solcore.Core.ShortCircuit
 import Solcore.Core.Machine
 

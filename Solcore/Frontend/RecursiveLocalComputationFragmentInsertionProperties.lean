@@ -1,5 +1,5 @@
 import Solcore.Frontend.RecursiveLocalComputationFragment
-import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Inserting a caller slot preserves literal successful values and stores.
 Recursive callees retain the same actual closure, captures and invoked body.

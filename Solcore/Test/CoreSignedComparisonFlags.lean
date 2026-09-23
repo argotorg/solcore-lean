@@ -1,4 +1,4 @@
-import Solcore.Core.SignedComparisonFlagEval
+import Solcore.Core.Derived
 import Solcore.Core.Check
 import Solcore.Core.Machine
 

@@ -1,6 +1,6 @@
 import Solcore.Frontend.ComputationBodyFragment
 import Solcore.Core.Eval
-import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Literal child insertion lifts through the whole body. Actual bound values
 extend the retained prefix; no typing or closure reconstruction is required. -/

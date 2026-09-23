@@ -93,14 +93,7 @@ import Solcore.Resolved.WordLessWithIds
 import Solcore.Resolved.WordLessWithIdsEvaluationProperties
 import Solcore.Frontend.WordLessCostStepComposition
 import Solcore.Core.LocalFragment
-import Solcore.Core.LocalFragmentInsertionProperties
-import Solcore.Core.LocalFragmentTypingInsertionProperties
-import Solcore.Core.LocalFragmentInferenceInsertionProperties
-import Solcore.Core.LocalFragmentInsertionPaths
-import Solcore.Core.LocalFragmentExactInsertionProperties
 import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Core.LocalRightWordLessTypingProperties
-import Solcore.Core.LocalRightWordLessEvaluationProperties
 import Solcore.Frontend.WordLessLocalRightCostProperties
 
 /-! Closed-source evaluation, ownership, compiled runtime functions, and support. -/

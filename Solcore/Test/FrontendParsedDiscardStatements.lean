@@ -4,7 +4,7 @@ import Solcore.Frontend.TypedLetReturnTreeFuelBoundProperties
 import Solcore.Frontend.TypedLetReturnTreeResumptionProperties
 import Solcore.Frontend.TypedLetReturnBody
 import Solcore.Frontend.LocalFragmentProperties
-import Solcore.Core.LocalFragmentExactInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Original strict statement prefixes, independent source evidence and manually
 composed Core paths. Discard keeps the source scope; only Core inserts a value. -/

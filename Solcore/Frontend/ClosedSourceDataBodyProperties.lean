@@ -6,7 +6,7 @@ import Solcore.Frontend.ComputationReturnTreeProperties
 import Solcore.Frontend.ComputationReturnTreeExecutionProperties
 import Solcore.Frontend.LocalExpressionExecutionProperties
 import Solcore.Frontend.LocalFragmentProperties
-import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Core.LocalFragment
 
 /- Restrict only private child predicates, then reuse the full actual-image body bridge. -/
 set_option autoImplicit false

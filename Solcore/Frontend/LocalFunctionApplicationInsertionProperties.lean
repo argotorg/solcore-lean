@@ -1,7 +1,6 @@
 import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Resolved.LocalFragmentProperties
-import Solcore.Core.LocalFragmentInsertionProperties
-import Solcore.Core.LocalFragmentTypingInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Exact application provenance supplies its two local child fragments.
 Insertion changes only caller positions, not actual closure bodies or captures.

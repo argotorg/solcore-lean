@@ -1,5 +1,4 @@
-import Solcore.Core.LocalFragmentExactInsertionProperties
-import Solcore.Core.LocalFragmentInferenceInsertionProperties
+import Solcore.Core.LocalFragment
 import Solcore.Core.Safety
 
 /-! Independent Core pairs retain original child environments and exact costs.

@@ -1,4 +1,4 @@
-import Solcore.Core.DerivedSignedNonStrictComparisonFlags
+import Solcore.Core.Derived
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
 

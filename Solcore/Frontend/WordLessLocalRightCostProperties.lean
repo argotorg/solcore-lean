@@ -1,5 +1,5 @@
 import Solcore.Frontend.WordLessCostStepComposition
-import Solcore.Core.LocalFragmentExactInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Ordered comparison costs from the two original operand paths. Exact
 insertion discharges the weakened-right premise without restricting left

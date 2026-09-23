@@ -1,5 +1,5 @@
 import Solcore.Frontend.RecursiveLocalComputationFragment
-import Solcore.Core.LocalFragmentInsertionPaths
+import Solcore.Core.LocalFragment
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
 import Solcore.Frontend.LocalExpressionCostStepComposition
 import Solcore.Frontend.WordLessCostStepComposition

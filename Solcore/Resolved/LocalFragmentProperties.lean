@@ -1,4 +1,4 @@
-import Solcore.Core.LocalRightWordLessTypingProperties
+import Solcore.Core.LocalFragment
 import Solcore.Resolved.Expr
 
 /-! Existing resolved lowering produces only the independent local Core

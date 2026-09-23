@@ -1,5 +1,5 @@
 import Solcore.Frontend.LocalComputationFragment
-import Solcore.Core.LocalFragmentInsertionPaths
+import Solcore.Core.LocalFragment
 import Solcore.Frontend.LocalFunctionApplicationStepComposition
 import Solcore.Frontend.WordLessCostStepComposition
 

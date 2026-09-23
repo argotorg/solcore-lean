@@ -1,5 +1,5 @@
 import Solcore.Core.Check
-import Solcore.Core.DerivedComparisonEval
+import Solcore.Core.Derived
 import Solcore.Core.Machine
 
 /-! Semantic regressions for the derived boolean word comparisons. -/

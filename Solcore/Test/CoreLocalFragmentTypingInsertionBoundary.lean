@@ -1,4 +1,4 @@
-import Solcore.Core.LocalFragmentInferenceInsertionProperties
+import Solcore.Core.LocalFragment
 import Solcore.Core.Renaming
 import Solcore.Core.Machine
 

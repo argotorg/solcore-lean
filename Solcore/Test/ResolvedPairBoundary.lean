@@ -1,7 +1,7 @@
 import Solcore.Resolved.RenamingProperties
 import Solcore.Resolved.ScopeExtensionProperties
 import Solcore.Resolved.ScopeExtensionReflectionProperties
-import Solcore.Core.LocalFragmentExactInsertionProperties
+import Solcore.Core.LocalFragment
 import Solcore.Core.FuelResumptionProperties
 
 /-! Independent resolved provenance and exact Core paths. Static component types

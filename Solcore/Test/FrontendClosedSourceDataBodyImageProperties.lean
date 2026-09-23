@@ -5,7 +5,7 @@ import Solcore.Frontend.ComputationReturnTreeProperties
 import Solcore.Frontend.ComputationReturnTreeExecutionProperties
 import Solcore.Frontend.LocalExpressionExecutionProperties
 import Solcore.Frontend.LocalFragmentProperties
-import Solcore.Core.LocalFragmentInsertionProperties
+import Solcore.Core.LocalFragment
 
 /- Original repeated shadowing preserves the pre-binding value and complete raw store. -/
 set_option autoImplicit false

@@ -1,5 +1,5 @@
 import Solcore.Core.Check
-import Solcore.Core.ComparisonFlags
+import Solcore.Core.Derived
 import Solcore.Core.Machine
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2

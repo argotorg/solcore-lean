@@ -1,6 +1,6 @@
 import Solcore.Frontend.TypedLetReturnTreeElaboration
 import Solcore.Frontend.LocalFragmentProperties
-import Solcore.Core.LocalFragmentTypingInsertionProperties
+import Solcore.Core.LocalFragment
 
 /-! Independent whole typing fixes recursive lets and both ordered branches.
 The original input types need no runtime values or extra name-uniqueness premise. -/

@@ -1,5 +1,5 @@
-import Solcore.Core.LocalFragmentExactInsertionProperties
-import Solcore.Core.DerivedComparisons
+import Solcore.Core.LocalFragment
+import Solcore.Core.Derived
 import Solcore.Core.FuelResumptionProperties
 
 /-! Exact final costs survive insertion; genuine let checkpoints do not become

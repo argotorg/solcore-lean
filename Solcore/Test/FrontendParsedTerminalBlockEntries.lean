@@ -1,8 +1,7 @@
 import Solcore.Syntax.Parser.Function
 import Solcore.Frontend.RuntimeFunctionLocalFragmentProperties
 import Solcore.Frontend.RuntimeFunctionPreparationFactorization
-import Solcore.Core.LocalFragmentExactInsertionProperties
-import Solcore.Core.LocalFragmentInferenceInsertionProperties
+import Solcore.Core.LocalFragment
 import Solcore.Core.FuelResumptionProperties
 import Solcore.Frontend.TypedLetReturnTreeEvaluatorProperties
 import Solcore.Frontend.RuntimeFunctionResumptionProperties

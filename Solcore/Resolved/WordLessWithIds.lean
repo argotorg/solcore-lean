@@ -1,6 +1,6 @@
 import Solcore.Resolved.Renaming
 import Solcore.Resolved.ScopeExtensionProperties
-import Solcore.Core.DerivedComparisons
+import Solcore.Core.Derived
 
 /-! An explicit-identity builder for ordered Word less-than. The two operands
 are evaluated once, left before right; only their retained values are swapped.
