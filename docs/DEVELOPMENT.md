@@ -106,8 +106,9 @@ explicit publication:
 | Change | Primary location | Also inspect |
 | --- | --- | --- |
 | Core algebra and rules | Solcore/Core | all Core proofs and frozen wire projections |
-| Runtime semantics | Solcore/Semantics | observation and verdict decisions |
+| Checked-contract runtime | Solcore/ContractRuntime | world/frame transitions, observation and verdict decisions |
 | Public protocol | Solcore/Oracle | schemas, profiles, golden cases |
+| Canonical standard-library bytes | Solcore/Standard | source identity, byte-count and hash pins; canonical workspace consumers |
 | Workspace identity | Solcore/Workspace | workspace ADR and tests |
 | Canonical source syntax | Solcore/Syntax | ADR-0153 and canonical syntax plan |
 | Historical parser maintenance | Solcore/Surface | Surface publication decisions |

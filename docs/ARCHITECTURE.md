@@ -29,7 +29,11 @@ not three interchangeable representations of values or stores.
 and a recovery-aware AST. Diagnostic-free parsing admits a source to subsequent
 phases; it does not establish name resolution or typing. `Solcore.Workspace`
 validates canonical library/module identities. The fresh canonical parser is
-independent of the frozen `Solcore.Surface` parsers.
+independent of `Solcore.Surface`: despite the generic-looking name, `Surface`
+is the frozen historical Surface v1 parser and its experimental Multi
+frontend, retained for compatibility and proof archaeology. New source parsing,
+AST work, and frontend integration belong under `Syntax`; `Surface` is not a
+second current representation and must not feed the current source pipeline.
 
 `Solcore.Resolved` already exists. It supplies stable identities and a
 syntax-independent **local-expression** foundation with lookup, typing,
@@ -122,16 +126,54 @@ feature only enters Core when the lowering supports it; source types, names,
 trait evidence, and source-typed heap forms are not Core constructs by
 default.
 
+The Core layout groups closely related definitions and proofs rather than
+giving each small theorem family its own import boundary. In particular,
+[`Core/Derived.lean`](../Solcore/Core/Derived.lean) contains the complete
+boolean- and word-valued derived-comparison interface, including signed,
+non-strict, flag, evaluation, and renaming results.
+[`Core/LocalFragment.lean`](../Solcore/Core/LocalFragment.lean) contains the
+local-fragment predicate together with its insertion, typing, evaluation,
+inference, and local-right-comparison results. These are organization changes,
+not new language or wire versions.
+
 ### Contract runtime and observation
 
-`Solcore.Semantics` models the explicit contract world and its transitions;
-`Solcore.Oracle.V5` decodes requests, checks and admits Core contracts, runs
-scenarios, and encodes observations. A Core-local cell store is distinct from
-contract accounts, storage, balances, and logs. Oracle v5 specifies checked
-Core execution, including commit/rollback behavior, but makes no claim that
-the source compiler has a public JSON interface or that its typed heap is
-contract storage. See the [Oracle v5 wire catalog](ORACLE_V5_WIRE.md) for
-the exact public protocol.
+`Solcore.ContractRuntime` models execution of checked Core code in an explicit
+contract world. It owns accounts, persistent storage, balances, logs,
+transaction/frame state, nested calls and creation, checkpoints,
+commit/rollback, traps, fuel/resumption, and the observations produced by that
+execution. The previous name `Solcore.Semantics` was too broad: this layer is
+neither the source-language semantics nor Core's own evaluator. A Core-local
+cell store is therefore distinct from contract accounts and storage.
+
+`Solcore.Oracle` is the versioned JSON/wire adapter around executable
+boundaries. Oracle v5 strictly decodes Core Wire v3 packages and scenarios,
+checks and admits their Core programs, materializes the contract-runtime world,
+runs `ContractRuntime`, and encodes a canonical observation or diagnostic. It
+does not parse canonical Solcore source, define source-language meaning, or own
+contract execution rules. See the [Oracle v5 wire
+catalog](ORACLE_V5_WIRE.md) for the exact public protocol.
+
+### Canonical standard-library data
+
+`Solcore.Standard` is data, not a parser or runtime. Its
+[`CanonicalData.lean`](../Solcore/Standard/CanonicalData.lean) module embeds the
+six canonical standard-library source files as exact UTF-8 byte arrays and
+pins each logical path, byte count, and SHA-256 digest. Consumers can construct
+a reproducible source workspace from those bytes; changing them is a standard
+library revision, not an Oracle or runtime change. This neutral data module
+does not import `Syntax`, `Core`, `ContractRuntime`, or `Oracle`.
+
+The intended execution-side dependency direction is:
+
+```text
+Core → ContractRuntime → Oracle v5
+```
+
+The source-library route consumes `Standard` data through the canonical
+`Syntax`/workspace/frontend path and may lower supported programs to Core. The
+Oracle route begins at versioned Core JSON and has no dependency on `Standard`,
+`Syntax`, or the historical `Surface` parsers.
 
 ## Proof boundary
 
@@ -173,7 +215,10 @@ silently reinterpret a frozen wire, profile, or observation.
 
 Dependencies should follow the semantic direction: syntax and workspace
 identities feed resolution and source checking; a supported specialization may
-lower into Core; the Oracle consumes Core independently of source syntax.
+lower into Core; `ContractRuntime` executes admitted Core in a contract world;
+the Oracle adapts the versioned wire protocol to that runtime independently of
+source syntax. `Standard` supplies pinned canonical source bytes, while
+historical `Surface` code remains outside the current path.
 Importing a parser AST into the Core semantic kernel, or treating a compiler
 backend as the Oracle, would erase those boundaries.
 

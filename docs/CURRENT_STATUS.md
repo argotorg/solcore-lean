@@ -3,6 +3,20 @@
 This page describes what works at the current revision and where its public
 boundary ends. It is not an implementation-history ledger.
 
+Repository organization has been tightened without changing the published
+languages or wire formats. The former `Solcore.Semantics` tree is now named
+`Solcore.ContractRuntime`, making clear that it models checked-Core execution
+in a contract world rather than source-language semantics. Core's small
+derived-comparison modules are consolidated in `Core/Derived.lean`, and the
+local-fragment theorem family is consolidated in `Core/LocalFragment.lean`.
+For source parsing, `Solcore.Syntax` is canonical; `Solcore.Surface` remains
+the frozen historical Surface v1/Multi implementation. `Solcore.Standard`
+only pins canonical standard-library source bytes and metadata, whereas
+`Solcore.Oracle` is the versioned JSON/wire adapter that checks and runs Core
+contracts through `ContractRuntime`. See [Architecture](ARCHITECTURE.md),
+[Project map](PROJECT_MAP.md), and
+[ADR-0379](adr/0379-module-boundaries-and-contract-runtime-naming.md).
+
 ## At a glance
 
 `solcore-lean` now has a public, syntax-independent path for checking Semantic
