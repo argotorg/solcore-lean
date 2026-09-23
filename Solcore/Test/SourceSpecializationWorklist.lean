@@ -34,7 +34,9 @@ private def workspace : Workspace.RawWorkspace := {
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
       "function constrained(value: Word) returns (Word) { return keep(value); }",
       "function asValue() returns (function(Word) returns (Word)) { return identity; }",
-      "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }"
+      "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
+      "function applyProduct(f: function((Word, Bool)) returns (Word), pair: (Word, Bool)) returns (Word) { return f(pair); }",
+      "function applySplit(f: function(Word, Bool) returns (Word), left: Word, right: Bool) returns (Word) { return f(left, right); }"
     ]
   }]
   externalLibraries := []
@@ -470,6 +472,68 @@ private def testIndirectCallBoundary (program : CheckedProgram) : IO Unit := do
   | result => throw (IO.userError
       s!"indirect result metadata detached from the callee was accepted: {reprStr result}")
 
+private def testIndirectArgumentCountCase (program : CheckedProgram)
+    (name : String) (expected forged : Nat) : IO Unit := do
+  let signature ← signatureNamed program name
+  let function ← functionFor program signature
+  let (call, metadata) ← match firstIndirectCall? function.typedBody.nodes with
+    | some call => pure call
+    | none => throw (IO.userError s!"{name}: indirect call metadata was absent")
+  assertTrue (decide (metadata.argumentCount = expected ∧
+      metadata.argumentTypeBeforeCoercion = .product .word .bool ∧
+      metadata.argumentTypeAfterCoercion = .product .word .bool))
+    s!"{name}: product bundle or source argument count was not retained"
+  let plan ← match ← runOrThrow name program
+      [monomorphicRequest signature] 1 with
+    | .complete plan => pure plan
+    | outcome => throw (IO.userError
+        s!"{name}: expected a complete plan, found {reprStr outcome}")
+  let forgedMetadata := { metadata with argumentCount := forged }
+  let malformedFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setIndirectMetadata function.typedBody.nodes call.id
+        forgedMetadata
+    }
+  }
+  let malformedProgram := replaceFunction program malformedFunction
+  match SourceSpecializationWorklist.run malformedProgram
+      [monomorphicRequest signature] 1 with
+  | .error (.indirectArgumentCountMismatch actual retained children) =>
+      assertTrue (actual == call.id && retained == forged && children == expected)
+        s!"{name}: worklist arity rejection lost its occurrence or counts"
+  | result => throw (IO.userError
+      s!"{name}: worklist accepted product-bundle arity tampering: {reprStr result}")
+  let malformedPlan : SourceSpecializationWorklist.Plan := {
+    plan with
+    specializations := plan.specializations.map fun specialized =>
+      if specialized.declaration == signature.id then
+        { specialized with
+          function := {
+            specialized.function with
+            typedBody := {
+              specialized.function.typedBody with
+              nodes := setIndirectMetadata
+                specialized.function.typedBody.nodes call.id forgedMetadata
+            }
+          }
+        }
+      else
+        specialized
+  }
+  match SourceRuntimeLinking.link malformedProgram (.complete malformedPlan) with
+  | .error (.invalidPlan (.worklist
+      (.indirectArgumentCountMismatch actual retained children))) =>
+      assertTrue (actual == call.id && retained == forged && children == expected)
+        s!"{name}: runtime-link rejection lost its occurrence or counts"
+  | result => throw (IO.userError
+      s!"{name}: runtime linker accepted product-bundle arity tampering: {reprStr result}")
+
+private def testIndirectArgumentCounts (program : CheckedProgram) : IO Unit := do
+  testIndirectArgumentCountCase program "applyProduct" 1 2
+  testIndirectArgumentCountCase program "applySplit" 2 1
+
 private def testMalformedTypedMetadata (program : CheckedProgram) : IO Unit := do
   let select ← signatureNamed program "select"
   let function ← functionFor program select
@@ -588,6 +652,7 @@ def testSourceSpecializationWorklist : IO Unit := do
   testAssumptionPreservation program
   testFunctionValueReference program
   testIndirectCallBoundary program
+  testIndirectArgumentCounts program
   testMalformedTypedMetadata program
 
 end Tests.SourceSpecializationWorklist

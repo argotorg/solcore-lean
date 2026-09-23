@@ -118,6 +118,8 @@ inductive Error where
       (call : ExpressionId) (metadata : IndirectCallResolution)
   | indirectCalleeNotFunction (call : ExpressionId) (type : Ty)
   | missingIndirectArgument (call argument : ExpressionId)
+  | indirectArgumentCountMismatch
+      (call : ExpressionId) (expected actual : Nat)
   | indirectArgumentBundleMismatch
       (call : ExpressionId) (expected actual : Ty)
   | indirectParameterTypeMismatch
@@ -270,6 +272,9 @@ private def validateIndirectCall (source : TypedSource)
     match source.lookupExpression? argument with
     | some argumentNode => pure argumentNode.type
     | none => throw (.missingIndirectArgument node.id argument)
+  if metadata.argumentCount != arguments.length then
+    throw (.indirectArgumentCountMismatch node.id metadata.argumentCount
+      arguments.length)
   let bundledType := Ty.productMany argumentTypes
   if metadata.argumentTypeBeforeCoercion != bundledType then
     throw (.indirectArgumentBundleMismatch node.id bundledType

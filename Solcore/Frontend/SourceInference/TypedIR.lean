@@ -142,6 +142,10 @@ argument list is bundled into one product before it is compared with the
 function parameter, so any coercion of that bundle belongs here rather than to
 the call expression's result coercion path. -/
 structure IndirectCallResolution where
+  /-- The source argument-list arity.  This is retained separately because
+  `Ty.productMany` does not distinguish one product-valued argument from
+  several arguments whose types form the same product. -/
+  argumentCount : Nat
   argumentTypeBeforeCoercion : Ty
   argumentTypeAfterCoercion : Ty
   argumentCoercions : List CoercionStep := []
@@ -431,6 +435,7 @@ namespace IndirectCallResolution
 
 def applySubstitution (substitution : Substitution)
     (metadata : IndirectCallResolution) : IndirectCallResolution := {
+  argumentCount := metadata.argumentCount
   argumentTypeBeforeCoercion :=
     substitution.apply metadata.argumentTypeBeforeCoercion
   argumentTypeAfterCoercion :=

@@ -432,6 +432,8 @@ private def lowerExpressionFuel (context : Context)
             consumed := lowered.flatMap (·.consumed)
           }
       | .call callee arguments (.indirect metadata) => do
+          if arguments.length != metadata.argumentCount then
+            throw (.callArityMismatch id metadata.argumentCount arguments.length)
           unless node.requirements.isEmpty do
             throw (.requirementsUnsupported node.id.occurrence
               node.requirements)

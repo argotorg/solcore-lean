@@ -120,6 +120,38 @@ private def rewriteFirstIndirectCall
       | _ => .expression node :: rewriteFirstIndirectCall rewrite rest
   | node :: rest => node :: rewriteFirstIndirectCall rewrite rest
 
+private def firstSingletonLambdaTail? :
+    List SourceInference.Node → Option SourceInference.StatementId
+  | [] => none
+  | .expression node :: rest =>
+      match node.form with
+      | .lambda _ _ [statement] => some statement
+      | _ => firstSingletonLambdaTail? rest
+  | _ :: rest => firstSingletonLambdaTail? rest
+
+/-- The surface parser intentionally requires semicolons inside lambda blocks.
+This test-only rewrite starts from a checked lambda with an explicit return and
+forges the equivalent resolved-carrier tail-expression shape, so the runtime
+path is covered without broadening the parser contract. -/
+private def rewriteFirstLambdaReturnAsImplicitTail
+    (nodes : List SourceInference.Node) : List SourceInference.Node :=
+  match firstSingletonLambdaTail? nodes with
+  | none => nodes
+  | some tail => nodes.map fun node =>
+      match node with
+      | .statement statement =>
+          if statement.id = tail then
+            match statement.form with
+            | .returnStmt (some expression) =>
+                .statement {
+                  statement with
+                  form := .expression expression false
+                }
+            | _ => node
+          else
+            node
+      | _ => node
+
 private def expectWord (label : String) (expected : Nat) : RunResult → IO Unit
   | .done (.word actual) _ =>
       assertTrue (actual == word expected) s!"{label} returned the wrong Word"
@@ -220,6 +252,19 @@ private def source : String := String.intercalate "\n" [
   "  return order * 100 + table[5];",
   "}",
   "function proxyValue() returns (@Word) { return @Word; }",
+  "function callProduct() returns (Word) {",
+  "  let f = lam(pair: (Word, Bool)) -> Word { return 1; };",
+  "  return f((2, true));",
+  "}",
+  "function callSplit() returns (Word) {",
+  "  let f = lam(left: Word, right: Bool) -> Word { return left; };",
+  "  return f(2, true);",
+  "}",
+  "function implicitTail() returns (Word) { 40 + 2 }",
+  "function closureImplicitTail() returns (Word) {",
+  "  let f = lam(value: Word) -> Word { return value + 1; };",
+  "  return f(41);",
+  "}",
   "function spin(value: Word) returns (Word) { return spin(value); }"
 ]
 
@@ -273,6 +318,13 @@ private def testClosuresOrderProxyAndFuel
     (runPrepared order [] 8192)
   let proxy ← prepareNamed program "proxyValue"
   expectProxyWord "proxy value" (runPrepared proxy)
+  let implicitTail ← prepareNamed program "implicitTail"
+  expectWord "top-level implicit tail return" 42 (runPrepared implicitTail)
+  let closureImplicitTail ← prepareNamed program "closureImplicitTail"
+  let closureImplicitTail := rewriteEntryNodes closureImplicitTail
+    rewriteFirstLambdaReturnAsImplicitTail
+  expectWord "closure implicit tail return" 42
+    (runPrepared closureImplicitTail)
   let spin ← prepareNamed program "spin"
   match runPrepared spin [.word (word 1)] 3 with
   | .outOfFuel _ => pure ()
@@ -410,6 +462,30 @@ private def testTamperedExecutableMetadata
       | _ => false)
     (runPrepared inconsistentResult)
 
+private def testIndirectArgumentCountMetadata
+    (program : CheckedProgram) : IO Unit := do
+  let product ← prepareNamed program "callProduct"
+  let forgedProduct := rewriteEntryNodes product <|
+    rewriteFirstIndirectCall fun metadata => {
+      metadata with argumentCount := 2
+    }
+  expectPreExecutionFault "single product argument count"
+    (fun error => match error with
+      | .argumentArityMismatch 2 1 => true
+      | _ => false)
+    (runPrepared forgedProduct)
+
+  let split ← prepareNamed program "callSplit"
+  let forgedSplit := rewriteEntryNodes split <|
+    rewriteFirstIndirectCall fun metadata => {
+      metadata with argumentCount := 1
+    }
+  expectPreExecutionFault "multiple argument count"
+    (fun error => match error with
+      | .argumentArityMismatch 1 2 => true
+      | _ => false)
+    (runPrepared forgedSplit)
+
 private def letBinderNamed
     (specialized : SourceSpecialization.SpecializedFunction) (name : String) :
     IO SourceInference.TypedBinder :=
@@ -455,6 +531,7 @@ private def testAll : IO Unit := do
   testClosuresOrderProxyAndFuel program
   testNominalInputValidation program
   testTamperedExecutableMetadata program
+  testIndirectArgumentCountMetadata program
   testAssignmentRootsAreDeferred program
   IO.println "phase-7 typed-source runtime GREEN"
 

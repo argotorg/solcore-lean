@@ -321,6 +321,7 @@ def recordIndirectCall (source : Syntax.Expr) (callee : InferredExpression)
     (fun _ step => step.target) argumentType
   recordExpression source result.result
     (.call callee.id (arguments.map (·.id)) (.indirect {
+      argumentCount := arguments.length
       argumentTypeBeforeCoercion := argumentType
       argumentTypeAfterCoercion := coercedArgumentType
       argumentCoercions := result.argumentCoercions

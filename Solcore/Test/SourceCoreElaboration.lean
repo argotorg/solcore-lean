@@ -710,6 +710,7 @@ private def testUnsupportedExpressions (function : CheckedFunction) : IO Unit :=
   let cases : List
       (String × ExpressionForm × SourceCoreElaboration.UnsupportedExpression) := [
     ("call", .call expression [] (.indirect {
+      argumentCount := 0
       argumentTypeBeforeCoercion := .unit
       argumentTypeAfterCoercion := .unit
     }), .call),

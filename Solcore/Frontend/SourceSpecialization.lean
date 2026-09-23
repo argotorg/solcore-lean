@@ -103,6 +103,7 @@ def applyReferenceResolution (substitution : ParameterSubstitution) :
 
 def applyIndirectCallResolution (substitution : ParameterSubstitution)
     (metadata : IndirectCallResolution) : IndirectCallResolution := {
+  argumentCount := metadata.argumentCount
   argumentTypeBeforeCoercion :=
     substitution.apply metadata.argumentTypeBeforeCoercion
   argumentTypeAfterCoercion :=

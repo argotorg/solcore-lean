@@ -120,6 +120,7 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
   assertTrue (decide (closed.lookupStatement? ⟨⟨owner, 0⟩⟩ = none))
     "category-safe lookup reinterpreted an expression as a statement"
   let indirect := CallResolution.indirect {
+    argumentCount := 2
     argumentTypeBeforeCoercion := variable0
     argumentTypeAfterCoercion := variable1
     argumentCoercions := [{
@@ -132,6 +133,7 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
   match indirect.applySubstitution substitution with
   | .indirect metadata =>
       assertTrue (decide (metadata.argumentTypeBeforeCoercion = .word ∧
+          metadata.argumentCount = 2 ∧
           metadata.argumentTypeAfterCoercion = .bool ∧
           metadata.argumentCoercions = [{
             requirement := requirementId

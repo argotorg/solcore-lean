@@ -530,7 +530,9 @@ private def validateExpressionMetadata (function : CheckedFunction)
       unless node.requirements = [resolution.requirement] do
         throw (.unsupportedRequirements node.requirements)
       validateLiteralResolution function source resolution
-  | .call _ _ (.indirect metadata) =>
+  | .call _ arguments (.indirect metadata) =>
+      unless arguments.length = metadata.argumentCount do
+        throw (.argumentArityMismatch metadata.argumentCount arguments.length)
       unless metadata.argumentCoercions.isEmpty do
         throw (.unsupportedIndirectCoercions node.id)
       unless node.requirements.isEmpty do
@@ -1464,8 +1466,8 @@ mutual
             match bindValues plan captured state (List.zip parameters arguments) with
             | .error error => .fault error state
             | .ok (environment, bodyState) =>
-                let flow := executeSequence
-                  (executeStatement fuel plan owner source) environment bodyState body
+                let flow := executeFunctionSequence fuel plan owner source
+                  environment bodyState body
                 expressionOfRunResult (finishFunctionFlow plan expected flow)
       | actual => .fault (.expectedFunction (actual.type? plan)) state
 
@@ -1494,9 +1496,8 @@ mutual
                     match statementIds function.typedBody.roots with
                     | .error error => .fault error bodyState
                     | .ok roots =>
-                        let flow := executeSequence
-                          (executeStatement fuel plan key function.typedBody)
-                          environment bodyState roots
+                        let flow := executeFunctionSequence fuel plan key
+                          function.typedBody environment bodyState roots
                         finishFunctionFlow plan expected flow
 
   private def executeStatement (fuel : Nat) (plan : Plan) (owner : Key)
@@ -1668,8 +1669,8 @@ mutual
           | .continuing postEnvironment postState =>
               match executeForItems fuel plan owner source postEnvironment
                   postState post with
-              | .fallthrough nextEnvironment nextState =>
-                  executeForIterations fuel plan owner source nextEnvironment
+              | .fallthrough _ nextState =>
+                  executeForIterations fuel plan owner source environment
                     nextState condition post body
               | .returned value finalState => .returned value finalState
               | .breaking _ finalState
@@ -1772,6 +1773,47 @@ mutual
                   restoreScope environment <| executeSequence
                     (executeStatement fuel plan owner source)
                     armEnvironment armState arm.body
+
+  /-- Execute a function or closure body with the source language's implicit
+  return convention.  Only a semicolon-free expression which is the final
+  top-level statement yields the function result.  Earlier expression values,
+  and expression values inside nested statement bodies, remain ordinary
+  fallthrough effects. -/
+  private def executeFunctionSequence (fuel : Nat) (plan : Plan) (owner : Key)
+      (source : TypedSource) (environment : Environment)
+      (state : RuntimeState) : List StatementId → FlowOutcome
+    | [] => .fallthrough environment state
+    | statement :: rest =>
+        match fuel with
+        | 0 => .outOfFuel state
+        | fuel + 1 =>
+            match rest with
+            | [] =>
+                match exactStatement source statement with
+                | .error error => .fault error state
+                | .ok node =>
+                    match node.form with
+                    | .expression expression false =>
+                        match evaluate fuel plan owner source environment state
+                            expression with
+                        | .done value finalState => .returned value finalState
+                        | .outOfFuel finalState => .outOfFuel finalState
+                        | .fault error finalState => .fault error finalState
+                    | _ => executeStatement fuel plan owner source environment
+                        state statement
+            | _ =>
+                match executeStatement fuel plan owner source environment state
+                    statement with
+                | .fallthrough nextEnvironment nextState =>
+                    executeFunctionSequence fuel plan owner source
+                      nextEnvironment nextState rest
+                | .returned value finalState => .returned value finalState
+                | .breaking finalEnvironment finalState =>
+                    .breaking finalEnvironment finalState
+                | .continuing finalEnvironment finalState =>
+                    .continuing finalEnvironment finalState
+                | .outOfFuel finalState => .outOfFuel finalState
+                | .fault error finalState => .fault error finalState
 
 end
 
