@@ -88,6 +88,268 @@ def implRuleParameters (rule : ProgramImplRule) :
     (rule.head.arguments.foldl appendParameters
       (appendParameters [] rule.head.subject))
 
+/-- A flexible variable occurs in the subject or an argument of a trait
+predicate.  This is the flexible-variable analogue of
+`TypeParameterOccursInPredicate`. -/
+def TypeVariableOccursInPredicate
+    (metavariable : TypeSystem.TypeVarId)
+    (predicate : ProgramPredicate) : Prop :=
+  metavariable ∈ predicate.subject.freeVariables ∨
+    ∃ argument, argument ∈ predicate.arguments ∧
+      metavariable ∈ argument.freeVariables
+
+private theorem mem_insertParameter_iff
+    (parameter candidate : TypeSystem.TypeParameterId)
+    (parameters : List TypeSystem.TypeParameterId) :
+    parameter ∈ insertParameter parameters candidate ↔
+      parameter ∈ parameters ∨ parameter = candidate := by
+  by_cases present : candidate ∈ parameters
+  · rw [insertParameter, if_pos present]
+    constructor
+    · exact Or.inl
+    · rintro (member | rfl)
+      · exact member
+      · exact present
+  · simp [insertParameter, present]
+
+private theorem mem_appendParameters_iff
+    (parameter : TypeSystem.TypeParameterId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (type : TypeSystem.Ty) :
+    parameter ∈ appendParameters parameters type ↔
+      parameter ∈ parameters ∨ TypeParameterOccurs parameter type := by
+  induction type generalizing parameters with
+  | @«variable» metavariable => simp [appendParameters, TypeParameterOccurs]
+  | @«parameter» candidate =>
+      simpa [appendParameters, TypeParameterOccurs, eq_comm] using
+        mem_insertParameter_iff parameter candidate parameters
+  | constructor constructor => simp [appendParameters, TypeParameterOccurs]
+  | application left right leftInduction rightInduction =>
+      rw [appendParameters, rightInduction, leftInduction]
+      simp [TypeParameterOccurs, or_assoc]
+  | function domain codomain domainInduction codomainInduction =>
+      rw [appendParameters, codomainInduction, domainInduction]
+      simp [TypeParameterOccurs, or_assoc]
+  | product left right leftInduction rightInduction =>
+      rw [appendParameters, rightInduction, leftInduction]
+      simp [TypeParameterOccurs, or_assoc]
+  | mapping key value keyInduction valueInduction =>
+      rw [appendParameters, valueInduction, keyInduction]
+      simp [TypeParameterOccurs, or_assoc]
+  | proxy inner induction =>
+      simpa [appendParameters, TypeParameterOccurs] using
+        induction parameters
+  | comptime inner induction =>
+      simpa [appendParameters, TypeParameterOccurs] using
+        induction parameters
+  | error => simp [appendParameters, TypeParameterOccurs]
+
+private theorem mem_foldl_appendParameters_iff
+    (parameter : TypeSystem.TypeParameterId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (types : List TypeSystem.Ty) :
+    parameter ∈ types.foldl appendParameters parameters ↔
+      parameter ∈ parameters ∨
+        ∃ type, type ∈ types ∧ TypeParameterOccurs parameter type := by
+  induction types generalizing parameters with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.foldl_cons, induction, mem_appendParameters_iff]
+      simp only [List.mem_cons]
+      constructor
+      · rintro ((member | occurs) | ⟨type, typeMem, typeOccurs⟩)
+        · exact Or.inl member
+        · exact Or.inr ⟨head, Or.inl rfl, occurs⟩
+        · exact Or.inr ⟨type, Or.inr typeMem, typeOccurs⟩
+      · rintro (member | ⟨type, typeMem, typeOccurs⟩)
+        · exact Or.inl (Or.inl member)
+        · rcases typeMem with rfl | typeMem
+          · exact Or.inl (Or.inr typeOccurs)
+          · exact Or.inr ⟨type, typeMem, typeOccurs⟩
+
+private theorem mem_insertVariable_iff
+    (metavariable candidate : TypeSystem.TypeVarId)
+    (variables : List TypeSystem.TypeVarId) :
+    metavariable ∈ insertVariable variables candidate ↔
+      metavariable ∈ variables ∨ metavariable = candidate := by
+  by_cases present : candidate ∈ variables
+  · rw [insertVariable, if_pos present]
+    constructor
+    · exact Or.inl
+    · rintro (member | rfl)
+      · exact member
+      · exact present
+  · simp [insertVariable, present]
+
+private theorem mem_foldl_insertVariable_iff
+    (metavariable : TypeSystem.TypeVarId)
+    (variables values : List TypeSystem.TypeVarId) :
+    metavariable ∈ values.foldl insertVariable variables ↔
+      metavariable ∈ variables ∨ metavariable ∈ values := by
+  induction values generalizing variables with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.foldl_cons, induction, mem_insertVariable_iff]
+      simp only [List.mem_cons]
+      exact or_assoc
+
+theorem mem_freeVariables_application_iff
+    {metavariable : TypeSystem.TypeVarId} {left right : TypeSystem.Ty} :
+    metavariable ∈ (TypeSystem.Ty.application left right).freeVariables ↔
+      metavariable ∈ left.freeVariables ∨
+        metavariable ∈ right.freeVariables := by
+  exact mem_foldl_insertVariable_iff metavariable left.freeVariables
+    right.freeVariables
+
+theorem mem_freeVariables_function_iff
+    {metavariable : TypeSystem.TypeVarId} {domain codomain : TypeSystem.Ty} :
+    metavariable ∈ (TypeSystem.Ty.function domain codomain).freeVariables ↔
+      metavariable ∈ domain.freeVariables ∨
+        metavariable ∈ codomain.freeVariables := by
+  exact mem_foldl_insertVariable_iff metavariable domain.freeVariables
+    codomain.freeVariables
+
+theorem mem_freeVariables_product_iff
+    {metavariable : TypeSystem.TypeVarId} {left right : TypeSystem.Ty} :
+    metavariable ∈ (TypeSystem.Ty.product left right).freeVariables ↔
+      metavariable ∈ left.freeVariables ∨
+        metavariable ∈ right.freeVariables := by
+  exact mem_foldl_insertVariable_iff metavariable left.freeVariables
+    right.freeVariables
+
+theorem mem_freeVariables_mapping_iff
+    {metavariable : TypeSystem.TypeVarId} {key value : TypeSystem.Ty} :
+    metavariable ∈ (TypeSystem.Ty.mapping key value).freeVariables ↔
+      metavariable ∈ key.freeVariables ∨
+        metavariable ∈ value.freeVariables := by
+  exact mem_foldl_insertVariable_iff metavariable key.freeVariables
+    value.freeVariables
+
+private theorem mem_appendVariables_iff
+    (metavariable : TypeSystem.TypeVarId)
+    (variables : List TypeSystem.TypeVarId)
+    (type : TypeSystem.Ty) :
+    metavariable ∈ appendVariables variables type ↔
+      metavariable ∈ variables ∨ metavariable ∈ type.freeVariables := by
+  exact mem_foldl_insertVariable_iff metavariable variables type.freeVariables
+
+private theorem mem_foldl_appendVariables_iff
+    (metavariable : TypeSystem.TypeVarId)
+    (variables : List TypeSystem.TypeVarId)
+    (types : List TypeSystem.Ty) :
+    metavariable ∈ types.foldl appendVariables variables ↔
+      metavariable ∈ variables ∨
+        ∃ type, type ∈ types ∧ metavariable ∈ type.freeVariables := by
+  induction types generalizing variables with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.foldl_cons, induction, mem_appendVariables_iff]
+      simp only [List.mem_cons]
+      constructor
+      · rintro ((member | occurs) | ⟨type, typeMem, typeOccurs⟩)
+        · exact Or.inl member
+        · exact Or.inr ⟨head, Or.inl rfl, occurs⟩
+        · exact Or.inr ⟨type, Or.inr typeMem, typeOccurs⟩
+      · rintro (member | ⟨type, typeMem, typeOccurs⟩)
+        · exact Or.inl (Or.inl member)
+        · rcases typeMem with rfl | typeMem
+          · exact Or.inl (Or.inr typeOccurs)
+          · exact Or.inr ⟨type, typeMem, typeOccurs⟩
+
+private theorem mem_foldl_predicateParameters_iff
+    (parameter : TypeSystem.TypeParameterId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (predicates : List ProgramPredicate) :
+    parameter ∈ predicates.foldl
+        (fun collected predicate =>
+          predicate.arguments.foldl appendParameters
+            (appendParameters collected predicate.subject)) parameters ↔
+      parameter ∈ parameters ∨
+        ∃ predicate, predicate ∈ predicates ∧
+          TypeParameterOccursInPredicate parameter predicate := by
+  induction predicates generalizing parameters with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.foldl_cons, induction, mem_foldl_appendParameters_iff,
+        mem_appendParameters_iff]
+      simp only [List.mem_cons, TypeParameterOccursInPredicate]
+      constructor
+      · rintro (((member | subjectOccurs) | ⟨argument, argumentMem,
+          argumentOccurs⟩) | ⟨predicate, predicateMem, predicateOccurs⟩)
+        · exact Or.inl member
+        · exact Or.inr ⟨head, Or.inl rfl, Or.inl subjectOccurs⟩
+        · exact Or.inr ⟨head, Or.inl rfl,
+            Or.inr ⟨argument, argumentMem, argumentOccurs⟩⟩
+        · exact Or.inr ⟨predicate, Or.inr predicateMem, predicateOccurs⟩
+      · rintro (member | ⟨predicate, predicateMem, predicateOccurs⟩)
+        · exact Or.inl (Or.inl (Or.inl member))
+        · rcases predicateMem with rfl | predicateMem
+          · rcases predicateOccurs with subjectOccurs |
+              ⟨argument, argumentMem, argumentOccurs⟩
+            · exact Or.inl (Or.inl (Or.inr subjectOccurs))
+            · exact Or.inl (Or.inr
+                ⟨argument, argumentMem, argumentOccurs⟩)
+          · exact Or.inr ⟨predicate, predicateMem, predicateOccurs⟩
+
+private theorem mem_foldl_predicateVariables_iff
+    (metavariable : TypeSystem.TypeVarId)
+    (variables : List TypeSystem.TypeVarId)
+    (predicates : List ProgramPredicate) :
+    metavariable ∈ predicates.foldl
+        (fun collected predicate =>
+          predicate.arguments.foldl appendVariables
+            (appendVariables collected predicate.subject)) variables ↔
+      metavariable ∈ variables ∨
+        ∃ predicate, predicate ∈ predicates ∧
+          TypeVariableOccursInPredicate metavariable predicate := by
+  induction predicates generalizing variables with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.foldl_cons, induction, mem_foldl_appendVariables_iff,
+        mem_appendVariables_iff]
+      simp only [List.mem_cons, TypeVariableOccursInPredicate]
+      constructor
+      · rintro (((member | subjectOccurs) | ⟨argument, argumentMem,
+          argumentOccurs⟩) | ⟨predicate, predicateMem, predicateOccurs⟩)
+        · exact Or.inl member
+        · exact Or.inr ⟨head, Or.inl rfl, Or.inl subjectOccurs⟩
+        · exact Or.inr ⟨head, Or.inl rfl,
+            Or.inr ⟨argument, argumentMem, argumentOccurs⟩⟩
+        · exact Or.inr ⟨predicate, Or.inr predicateMem, predicateOccurs⟩
+      · rintro (member | ⟨predicate, predicateMem, predicateOccurs⟩)
+        · exact Or.inl (Or.inl (Or.inl member))
+        · rcases predicateMem with rfl | predicateMem
+          · rcases predicateOccurs with subjectOccurs |
+              ⟨argument, argumentMem, argumentOccurs⟩
+            · exact Or.inl (Or.inl (Or.inr subjectOccurs))
+            · exact Or.inl (Or.inr
+                ⟨argument, argumentMem, argumentOccurs⟩)
+          · exact Or.inr ⟨predicate, predicateMem, predicateOccurs⟩
+
+/-- The implementation-rule parameter collector covers exactly every rigid
+parameter in the head and where predicates. -/
+theorem mem_implRuleParameters_iff
+    {parameter : TypeSystem.TypeParameterId} {rule : ProgramImplRule} :
+    parameter ∈ implRuleParameters rule ↔
+      TypeParameterOccursInPredicate parameter rule.head ∨
+        ∃ predicate, predicate ∈ rule.wherePredicates ∧
+          TypeParameterOccursInPredicate parameter predicate := by
+  simp only [implRuleParameters, mem_foldl_appendParameters_iff,
+    mem_appendParameters_iff, mem_foldl_predicateParameters_iff,
+    TypeParameterOccursInPredicate, List.not_mem_nil, false_or]
+
+/-- The implementation-rule variable collector covers exactly every flexible
+variable in the head and where predicates. -/
+theorem mem_implRuleVariables_iff
+    {metavariable : TypeSystem.TypeVarId} {rule : ProgramImplRule} :
+    metavariable ∈ implRuleVariables rule ↔
+      TypeVariableOccursInPredicate metavariable rule.head ∨
+        ∃ predicate, predicate ∈ rule.wherePredicates ∧
+          TypeVariableOccursInPredicate metavariable predicate := by
+  simp only [implRuleVariables, mem_foldl_appendVariables_iff,
+    mem_foldl_predicateVariables_iff,
+    TypeVariableOccursInPredicate]
+
 /-- Simultaneous replacements for both binder classes in an implementation
 rule. Replacement ranges are not recursively rewritten by the other map. -/
 structure ImplSubstitution where

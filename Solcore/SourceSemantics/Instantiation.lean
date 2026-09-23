@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Context
+import Solcore.SourceSemantics.Types
 import Solcore.Frontend.SourceInference.TypedIR
 
 /-!
@@ -50,6 +50,16 @@ theorem mem_domain_iff {substitution : TypeSystem.Substitution}
 
 end ExactSubstitution
 
+/-- Every replacement in a flexible substitution is a closed, meaningful
+type in the use-site context.  Exact domains alone do not prevent a forged
+substitution from hiding free metavariables or recovery types in an unused
+range entry. -/
+def SubstitutionRangeWellFormed (context : Context)
+    (substitution : TypeSystem.Substitution) : Prop :=
+  ∀ metavariable replacement,
+    (metavariable, replacement) ∈ substitution →
+      TypeWellFormed context replacement
+
 /-- `type` is an arbitrary exact instance of the quantified scheme. -/
 inductive SchemeInstantiates (scheme : TypeSystem.Scheme)
     (type : TypeSystem.Ty) : Prop where
@@ -60,7 +70,7 @@ inductive SchemeInstantiates (scheme : TypeSystem.Scheme)
 
 namespace SchemeInstantiates
 
-private theorem empty_apply (type : TypeSystem.Ty) :
+theorem empty_apply (type : TypeSystem.Ty) :
     TypeSystem.Substitution.apply [] type = type := by
   induction type <;>
     simp_all [TypeSystem.Substitution.apply, TypeSystem.Substitution.lookup?]
@@ -81,6 +91,42 @@ theorem has_exact_substitution {scheme : TypeSystem.Scheme}
 
 end SchemeInstantiates
 
+/-- A use-site-valid scheme instance.  Besides exact domain coverage, every
+replacement is closed in the caller's rigid scope and the quantified scheme
+itself is well formed there.  This closes the otherwise invisible range
+entries of unused quantified variables. -/
+inductive SchemeInstantiatesAt (context : Context)
+    (scheme : TypeSystem.Scheme) (type : TypeSystem.Ty) : Prop where
+  | intro
+      (scheme_well_formed : SchemeWellFormed context scheme)
+      (substitution : TypeSystem.Substitution)
+      (exact : ExactSubstitution substitution scheme.quantified)
+      (range_well_formed :
+        SubstitutionRangeWellFormed context substitution)
+      (result : substitution.apply scheme.body = type) :
+      SchemeInstantiatesAt context scheme type
+
+namespace SchemeInstantiatesAt
+
+theorem toSchemeInstantiates
+    {context : Context} {scheme : TypeSystem.Scheme} {type : TypeSystem.Ty}
+    (instantiates : SchemeInstantiatesAt context scheme type) :
+    SchemeInstantiates scheme type := by
+  cases instantiates with
+  | intro _ substitution exact _ result =>
+      exact .intro substitution exact result
+
+theorem mono {context : Context} {type : TypeSystem.Ty}
+    (wellFormed : TypeWellFormed context type) :
+    SchemeInstantiatesAt context (.mono type) type := by
+  refine .intro (SchemeWellFormed.mono wellFormed) []
+    ExactSubstitution.empty ?_ ?_
+  · intro metavariable replacement member
+    simp at member
+  · exact SchemeInstantiates.empty_apply type
+
+end SchemeInstantiatesAt
+
 namespace ParameterSubstitution
 
 /-- Rigid-parameter domain of a source declaration substitution. -/
@@ -94,6 +140,15 @@ structure Exact (substitution : TypeSystem.ParameterSubstitution)
     (parameters : List TypeSystem.TypeParameterId) : Prop where
   parameters_nodup : parameters.Nodup
   domain_permutation : domain substitution |>.Perm parameters
+
+/-- Every rigid-parameter replacement is closed and meaningful in the
+use-site context.  This is deliberately separate from `Exact`, whose domain
+property is context independent. -/
+def RangeWellFormed (context : Context)
+    (substitution : TypeSystem.ParameterSubstitution) : Prop :=
+  ∀ parameter replacement,
+    (parameter, replacement) ∈ substitution →
+      TypeWellFormed context replacement
 
 /-- Recover replacement types in declaration-parameter order.  `Exact`
 guarantees that the fallback branch is unreachable. -/
@@ -138,6 +193,9 @@ inductive Valid (context : Context)
       (substitution_exact :
         ParameterSubstitution.Exact instantiation.parameterSubstitution
           signature.scheme.parameters)
+      (substitution_range :
+        ParameterSubstitution.RangeWellFormed context
+          instantiation.parameterSubstitution)
       (type_eq :
         instantiation.type =
           TypeSystem.ParameterSubstitution.apply instantiation.parameterSubstitution
@@ -178,6 +236,9 @@ inductive Valid (context : Context)
       (substitution_exact :
         ParameterSubstitution.Exact instantiation.parameterSubstitution
           dataType.parameters)
+      (substitution_range :
+        ParameterSubstitution.RangeWellFormed context
+          instantiation.parameterSubstitution)
       (payloadTypes_eq :
         instantiation.payloadTypes = signature.payloadTypes.map
           (TypeSystem.ParameterSubstitution.apply instantiation.parameterSubstitution))

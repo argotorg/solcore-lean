@@ -33,7 +33,7 @@ inductive ReferenceHasRawType (context : Context) :
       {scheme : TypeSystem.Scheme}
       {type : TypeSystem.Ty}
       (lookup : context.LocalLookup binder scheme)
-      (instantiates : SchemeInstantiates scheme type) :
+      (instantiates : SchemeInstantiatesAt context scheme type) :
       ReferenceHasRawType context (.local binder) type
   | declaration
       {instantiation : DeclarationInstantiation}
@@ -56,7 +56,7 @@ theorem local_iff
     {type : TypeSystem.Ty} :
     ReferenceHasRawType context (.local binder) type ↔
       ∃ scheme, context.LocalLookup binder scheme ∧
-        SchemeInstantiates scheme type := by
+        SchemeInstantiatesAt context scheme type := by
   constructor
   · intro typing
     cases typing with
