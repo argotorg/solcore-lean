@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted for the first source-level formal-semantics tranche.  This decision
+Accepted as the foundation of the source-level formal semantics and extended
+by [ADR-0378](0378-declarative-resolved-source-semantics.md). This decision
 adds independent judgments over the current resolved, occurrence-addressed
-source carrier.  It does not make the source checker, specializer, compiler
+source carrier. It does not make the source checker, specializer, compiler
 facade, or any runtime backend normative by itself.
 
 ## Context
@@ -80,29 +81,32 @@ This tranche must establish, without forbidden trust escapes:
 
 ## Deferred boundary
 
-Later tranches add:
+ADR-0378 subsequently adds whole-expression, pattern, statement, declaration-
+body, implementation-method, and whole-program typing; explicit coercion and
+literal judgments; structural generic substitution; successful source
+big-step dynamics; positive fault propagation; successful-evaluation subject
+reduction; independent staging classification; and the materialization
+boundary. The following remain outside this foundation and ADR-0378:
 
 - declarative module/import lookup and raw-source-to-resolved resolution;
-- complete expression, pattern, statement, function, implementation-method,
-  and whole-program typing;
-- overload/coercion coherence and literal interpretation judgments;
 - trait-catalog overlap/coherence and soundness/completeness of the executable
   implementation-head matcher against declarative instantiation;
-- an independent staging judgment;
-- source values, heaps, control outcomes, and dynamic evaluation relations;
-- checker/evaluator soundness and completeness; and
-- progress, preservation, determinism, and backend correspondence derived from
-  the source judgments.
+- soundness and completeness of the source checker, stage analyzer,
+  specializer, and executable evaluators against the declarative judgments;
+- total or deterministic fault/rejection semantics; and
+- whole-evaluator progress, determinism, termination, and backend
+  correspondence derived from the source judgments.
 
-Until those tranches are complete, `Solcore.SourceSemantics` is a growing
-formal-specification foundation, not a claim that the complete source language
-has been formalized.  Semantic Core and Oracle v5 retain their existing public
-meanings.
+`Solcore.SourceSemantics` therefore specifies the resolved carrier's static,
+successful dynamic, and staging layers, but is not a claim that the complete
+raw source language or every failing execution has been formalized. Semantic
+Core and Oracle v5 retain their existing public meanings.
 
 ## Verification target
 
 Focused examples exercise polymorphic local instantiation, exact generic
 declaration instantiation, occurrence lookup, nested assumption evidence,
 retained-evidence representation, and resolved-reference raw typing. The
-aggregate build and test suite, semantic-kernel audit, metadata validation, and
-diff hygiene remain the acceptance boundary.
+additional ADR-0378 modules have their own focused examples. The aggregate
+build and test suite, semantic-kernel audit, metadata validation, and diff
+hygiene remain the acceptance boundary.
