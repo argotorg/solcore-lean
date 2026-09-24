@@ -2180,6 +2180,7 @@ theorem preservesWith
     {raw : Value} {rawType finalType : Ty}
     {plan : ExpressionRequirementPlan}
     (graph : OccurrenceGraphWellFormed source)
+    (requirement_ledger : ScopedRequirementLedgerWellFormed context source)
     (owner : context.currentDeclaration = some source.owner)
     (closed : context.typeParameters = [])
     (variables_closed : context.typeVariables = [])
@@ -2316,6 +2317,7 @@ theorem preservesWith
             variables_closed := variables_closed
             residual_variables_open := residual_variables_open
             graph := graph
+            requirement_ledger := requirement_ledger
             occurrence := ⟨id, node, contains, node_form, by
                 simpa [body_types] using node_raw, by
                 rw [node_form]
@@ -2564,6 +2566,33 @@ theorem covers
     apply covers.2 predicate
     simpa [fields.assumptions] using member
 
+/-- A whole-source requirement ledger is insensitive to lexical extensions.
+The non-local context fields record exactly the signature, assumption, and
+solved-row projections used by the ledger judgment. -/
+theorem scopedRequirementLedger
+    {source target : Context} {typedSource : TypedSource}
+    (fields : RuntimeContextFields source target)
+    (ledger : ScopedRequirementLedgerWellFormed source typedSource) :
+    ScopedRequirementLedgerWellFormed target typedSource := by
+  constructor
+  · simpa [RequirementIdsUnique, fields.solvedRequirements] using
+      ledger.idsUnique
+  · exact ledger.templateOwnership
+  · intro row member
+    have sourceMember : row ∈ source.solvedRequirements := by
+      simpa [fields.solvedRequirements] using member
+    cases ledger.entriesValid row sourceMember with
+    | ordinary notTemplate valid =>
+        exact .ordinary notTemplate
+          (StructuralSubstitution.SolvedRequirementValid.transportContext
+            fields.signatures fields.assumptions valid)
+    | template scopeProof => exact .template scopeProof
+  · intro owner contains
+    obtain ⟨row, rowMember, idEq⟩ :=
+      ledger.templatesComplete owner contains
+    refine ⟨row, ?_, idEq⟩
+    simpa [fields.solvedRequirements] using rowMember
+
 end RuntimeContextFields
 
 /-- Static invariants shared by every successful execution rooted in one
@@ -2580,6 +2609,7 @@ structure SourceRuntimeValid (program : Program) (context : Context)
   variables_closed : context.typeVariables = []
   residual_variables_open : context.residualTypeVariables = true
   ledger : RequirementIdsUnique context
+  requirements : ScopedRequirementLedgerWellFormed context source
 
 namespace SourceRuntimeValid
 
@@ -2597,6 +2627,7 @@ theorem transport
     residual_variables_open :=
       fields.residualTypeVariables.trans valid.residual_variables_open
     ledger := ?_
+    requirements := fields.scopedRequirementLedger valid.requirements
   }
   simpa [RequirementIdsUnique, fields.solvedRequirements] using valid.ledger
 
@@ -2669,6 +2700,7 @@ theorem wellTyped
                   requirements_well_formed := requirements_well_formed
                   generalizes := generalizes
                   graph := runtime.graph
+                  requirement_ledger := runtime.requirements
                   occurrence := ⟨node, contains, form_eq, raw_type_eq,
                     type_eq, requirements_empty, coercions_empty, ?_⟩
                 }
@@ -3780,6 +3812,7 @@ theorem sourceRuntimeValid
   variables_closed := certificate.type_variables_empty
   residual_variables_open := certificate.residual_type_variables_open
   ledger := certificate.requirement_ledger.idsUnique
+  requirements := certificate.requirement_ledger
 }
 
 end BodyInstanceTypingCertificate

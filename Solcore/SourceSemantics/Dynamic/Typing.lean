@@ -33,6 +33,7 @@ structure ClosureCodeValid (context : Context) (function : Closure) : Prop where
   variables_closed : function.context.typeVariables = []
   residual_variables_open : function.context.residualTypeVariables = true
   graph : OccurrenceGraphWellFormed function.source
+  requirement_ledger : ScopedRequirementLedgerWellFormed context function.source
   occurrence :
     ∃ id node,
       ContainsExpression function.source id node ∧
@@ -67,6 +68,8 @@ structure GeneralizedClosureCodeValid
   generalizes : SchemeGeneralizesExcept function.definitionContext
     (localSchemeTemplateIds function.binder) function.binder.scheme
   graph : OccurrenceGraphWellFormed function.source
+  requirement_ledger : ScopedRequirementLedgerWellFormed
+    function.definitionContext function.source
   occurrence :
     ∃ node,
       ContainsExpression function.source function.initializer node ∧

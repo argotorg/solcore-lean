@@ -564,6 +564,7 @@ mutual
               variables_closed := runtime.variables_closed
               residual_variables_open := runtime.residual_variables_open
               graph := runtime.graph
+              requirement_ledger := runtime.requirements
               occurrence := ⟨id, node, contains, node_form, by
                   simpa [body_types] using node_raw, by
                   rw [node_form]
@@ -1382,6 +1383,7 @@ mutual
               variables_closed := code.variables_closed
               residual_variables_open := code.residual_variables_open
               ledger := frame.requirements
+              requirements := code.requirement_ledger
             }
             rcases preserveFunctionStatementsRec program_well_formed
                 (closure_runtime.transport fields) call_evidence bound_environment
@@ -1464,6 +1466,7 @@ mutual
               variables_closed := code.variables_closed
               residual_variables_open := code.residual_variables_open
               ledger := frame.requirements
+              requirements := code.requirement_ledger
             }
             rcases preserveFunctionStatementsRec program_well_formed
                 (closure_runtime.transport fields) call_evidence bound_environment
