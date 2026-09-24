@@ -18,6 +18,24 @@ open Frontend.SourceInference
 open SourceSemantics
 open TypeSystem
 
+/-- The form-indexed inversion view keeps both formation premises of a
+generalized binding instead of retaining only its initializer typing. -/
+theorem generalizedLetFormTypingRetainsFormation
+    {source : TypedSource} {control : ControlContext}
+    {context final : SourceSemantics.Context} {binder : TypedBinder}
+    {initializer : ExpressionId}
+    (typing : SourceSemantics.Dynamic.StatementHasType.FormTyping
+      source control context (.letDecl binder (some initializer)) final)
+    (polymorphic : binder.scheme.quantified ≠ []) :
+    LocalSchemeRequirementsWellFormed context binder ∧
+      SchemeGeneralizesExcept context (localSchemeTemplateIds binder)
+        binder.scheme := by
+  cases typing with
+  | letInitialized _ monomorphic _ =>
+      exact (polymorphic monomorphic).elim
+  | letInitializedGeneralized _ requirements_well_formed generalizes _ _ =>
+      exact ⟨requirements_well_formed, generalizes⟩
+
 /-- A concrete product materialization has exactly one frontend staged-value
 representation. -/
 theorem productMaterializationHasUniqueFrontend :

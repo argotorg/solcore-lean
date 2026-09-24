@@ -2694,6 +2694,10 @@ inductive FormTyping (source : TypedSource) (control : ControlContext)
       FormTyping source control context (.letDecl binder (some initializer)) final
   | letInitializedGeneralized {binder initializer final}
       (polymorphic : binder.scheme.quantified ≠ [])
+      (requirements_well_formed :
+        LocalSchemeRequirementsWellFormed context binder)
+      (generalizes : SchemeGeneralizesExcept context
+        (localSchemeTemplateIds binder) binder.scheme)
       (initializer_type : ExpressionHasType source
         (localSchemeInitializerContext context binder) initializer
         binder.scheme.body)
@@ -2799,7 +2803,8 @@ theorem formTyping
   | letInitializedGeneralized contains form_eq polymorphic
       requirements_well_formed generalizes initializer_type extension type_eq =>
       exact ⟨_, contains,
-        form_eq ▸ .letInitializedGeneralized polymorphic initializer_type extension⟩
+        form_eq ▸ .letInitializedGeneralized polymorphic
+          requirements_well_formed generalizes initializer_type extension⟩
   | returnUnit contains form_eq return_type_eq type_eq =>
       exact ⟨_, contains, form_eq ▸ .returnUnit return_type_eq⟩
   | returnValue contains form_eq value_type type_eq =>
@@ -3145,7 +3150,8 @@ theorem preservesWith
                 ((environment_agrees.mono evaluation_extension).mono
                   allocation_extension))
           }
-      | letInitializedGeneralized polymorphic initializer_type static_extension =>
+      | letInitializedGeneralized polymorphic _requirements_well_formed
+          _generalizes initializer_type static_extension =>
           exact (polymorphic runtime_monomorphic).elim
   | returnUnit contains form_eq =>
       have node_eq := containsStatement_unique graph.nodeOccurrencesUnique

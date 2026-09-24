@@ -116,7 +116,8 @@ private theorem statementFinalContext_eq
       | letInitialized initializer_type monomorphic static_extension =>
           exact Solcore.SourceSemantics.Dynamic.BinderExtends.functional extension
             static_extension
-      | letInitializedGeneralized polymorphic initializer_type static_extension =>
+      | letInitializedGeneralized polymorphic _requirements_well_formed
+          _generalizes initializer_type static_extension =>
           exact (polymorphic runtime_monomorphic).elim
   | returnUnit contains form_eq | returnValue contains form_eq evaluate
     | expression contains form_eq evaluate
@@ -1678,7 +1679,8 @@ mutual
                   ((environment_agrees.mono evaluation_extension).mono
                     allocation_extension))
             }
-        | letInitializedGeneralized polymorphic initializer_type static_extension =>
+        | letInitializedGeneralized polymorphic _requirements_well_formed
+            _generalizes initializer_type static_extension =>
             exact (polymorphic runtime_monomorphic).elim
     | .returnUnit contains form_eq => by
         have graph : OccurrenceGraphWellFormed source := runtime.graph
