@@ -5357,6 +5357,20 @@ theorem withLocal
 
 end LocalSchemesFreshFor
 
+/-- Semantic validity of one flexible context closure.  Structural closure
+tracks types and context fields; this layer additionally rules out capture by
+retained local schemes and supplies the non-structural evidence obligation for
+implementation-backed solved requirements. -/
+structure ContextSubstitutionValid (substitution : Substitution)
+    (closedVariables : List TypeVarId) (source target : Context) : Prop where
+  closes : ContextCloses substitution closedVariables source target
+  localSchemesFresh : LocalSchemesFreshFor source substitution
+  implementationRequirements : ∀ requirement evidence,
+    requirement ∈ source.solvedRequirements →
+    requirement.evidence = .implementation evidence →
+      SolvedRequirementValid target
+        (applySolvedRequirement substitution requirement)
+
 @[simp] theorem apply_builtin (substitution : Substitution)
     (builtin : BuiltinType) :
     substitution.apply (.constructor (.builtin builtin)) =
@@ -5606,6 +5620,29 @@ theorem Substitution.mem_freeVariables_apply_of_not_mem_domain
   | error => simp [Ty.freeVariables] at occurs
 
 namespace Substitution
+
+/-- Preserve an inner flexible substitution's exact domain while applying an
+outer flexible substitution to every replacement in its range. -/
+def mapRange (outer inner : TypeSystem.Substitution) :
+    TypeSystem.Substitution :=
+  inner.map fun entry => (entry.1, outer.apply entry.2)
+
+/-- Mapping only the range preserves exact ordered domain coverage. -/
+theorem ExactSubstitution.mapRange
+    {inner : TypeSystem.Substitution} {variables : List TypeVarId}
+    (outer : TypeSystem.Substitution)
+    (exact : ExactSubstitution inner variables) :
+    ExactSubstitution
+      (FlexibleSubstitution.Substitution.mapRange outer inner) variables := by
+  constructor
+  · exact exact.variables_nodup
+  · have domainEq :
+        (FlexibleSubstitution.Substitution.mapRange outer inner).domain =
+          inner.domain := by
+      simp [FlexibleSubstitution.Substitution.mapRange,
+        TypeSystem.Substitution.domain]
+    rw [domainEq]
+    exact exact.domain_permutation
 
 private theorem mem_of_lookup?_eq_some
     {substitution : TypeSystem.Substitution}
@@ -6004,6 +6041,137 @@ theorem SubstitutionRangeWellFormed.without
   intro metavariable replacement member
   apply range metavariable replacement
   exact (Substitution.without_sublist substitution variables).subset member
+
+/-- Applying an outer flexible substitution after an exact inner one is
+equivalent to mapping the outer action over the inner range and then applying
+that mapped substitution to the outer image.  Freshness prevents the outer
+substitution from consuming inner binders; ground outer ranges prevent the
+inner substitution from capturing variables introduced by an outer
+replacement. -/
+theorem TypeWellScoped.applyFlexible_compose
+    {source target : Context}
+    {flexibleVariables substitutedVariables : List TypeVarId}
+    {type : Ty}
+    (outer inner : Substitution)
+    (outerRange : SubstitutionRangeWellFormed target outer)
+    (innerExact : ExactSubstitution inner substitutedVariables)
+    (outerFresh : ∀ metavariable,
+      metavariable ∈ substitutedVariables →
+        metavariable ∉ outer.domain)
+    (wellScoped : TypeWellScoped source flexibleVariables type) :
+    outer.apply (inner.apply type) =
+      (Substitution.mapRange outer inner).apply (outer.apply type) := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ =>
+      outer.apply (inner.apply type) =
+        (Substitution.mapRange outer inner).apply (outer.apply type))
+    (motive_2 := fun types _ =>
+      (types.map inner.apply).map outer.apply =
+        (types.map outer.apply).map
+          (Substitution.mapRange outer inner).apply)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable _
+    by_cases substituted : metavariable ∈ substitutedVariables
+    · obtain ⟨replacement, member, innerLookup⟩ :=
+        StructuralSubstitution.Substitution.exists_lookup?_eq_some innerExact
+          substituted
+      have mappedMember :
+          (metavariable, outer.apply replacement) ∈
+            Substitution.mapRange outer inner :=
+        List.mem_map.mpr ⟨(metavariable, replacement), member, rfl⟩
+      have mappedLookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_some_of_mem_of_domain_nodup
+          (Substitution.ExactSubstitution.mapRange outer innerExact).domain_nodup
+          mappedMember
+      have outerLookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+          (outerFresh metavariable substituted)
+      simp [TypeSystem.Substitution.apply, innerLookup, mappedLookup,
+        outerLookup]
+    · have innerAbsent : metavariable ∉ inner.domain := by
+        intro member
+        exact substituted ((innerExact.mem_domain_iff metavariable).mp member)
+      have mappedExact :=
+        Substitution.ExactSubstitution.mapRange outer innerExact
+      have mappedAbsent :
+          metavariable ∉ (Substitution.mapRange outer inner).domain := by
+        intro member
+        exact substituted ((mappedExact.mem_domain_iff metavariable).mp member)
+      have innerLookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+          innerAbsent
+      have mappedLookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+          mappedAbsent
+      cases outerLookup : outer.lookup? metavariable with
+      | none =>
+          simp [TypeSystem.Substitution.apply, innerLookup, mappedLookup,
+            outerLookup]
+      | some replacement =>
+          have outerMember := Substitution.mem_of_lookup?_eq_some outerLookup
+          have replacementFixed :=
+            StructuralSubstitution.TypeWellScoped.applySubstitution_eq_self
+              (Substitution.mapRange outer inner)
+              (outerRange metavariable replacement outerMember).typeWellScoped
+          simp [TypeSystem.Substitution.apply, innerLookup, outerLookup,
+            replacementFixed]
+  · intro parameter _ _
+    rfl
+  · intro builtin
+    rfl
+  · intro dataType arguments _ _ _ argumentsInduction
+    simp only [StructuralSubstitution.applyFlexible_nominal]
+    exact congrArg (fun mapped => Ty.nominal dataType.id mapped)
+      argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro left right _ _ leftInduction rightInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value _ _ keyInduction valueInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [innerInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.Substitution.apply]
+    rw [innerInduction]
+  · rfl
+  · intro head tail _ _ headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+/-- Flexible range mapping commutes with substitution of every type carried by
+an admissible trait predicate. -/
+theorem PredicateAdmissible.applyFlexible_compose
+    {source target : Context} {predicate : ProgramPredicate}
+    {substitutedVariables : List TypeVarId}
+    (outer inner : Substitution)
+    (outerRange : SubstitutionRangeWellFormed target outer)
+    (innerExact : ExactSubstitution inner substitutedVariables)
+    (outerFresh : ∀ metavariable,
+      metavariable ∈ substitutedVariables →
+        metavariable ∉ outer.domain)
+    (admissible : PredicateAdmissible source predicate) :
+    TypedTraitResolution.applySubstitution outer
+        (TypedTraitResolution.applySubstitution inner predicate) =
+      TypedTraitResolution.applySubstitution
+        (Substitution.mapRange outer inner)
+        (TypedTraitResolution.applySubstitution outer predicate) := by
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [TypedTraitResolution.applySubstitution]
+      congr 1
+      · exact TypeWellScoped.applyFlexible_compose outer inner outerRange
+          innerExact outerFresh admissible.subject.typeWellScoped
+      · simp only [List.map_map]
+        apply List.map_congr_left
+        intro argument member
+        exact TypeWellScoped.applyFlexible_compose outer inner outerRange
+          innerExact outerFresh
+          (admissible.arguments argument member).typeWellScoped
 
 private theorem Scheme.freeVariables_apply
     {context : Context} {substitution : Substitution}
@@ -7276,6 +7444,89 @@ theorem afterMonoBinders
 
 end LocalSchemesFreshFor
 
+/-- A semantically valid flexible closure transports one exact solved
+requirement.  Assumption evidence is reconstructed structurally; the validity
+object supplies the genuinely non-structural implementation case. -/
+theorem RequirementProves.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {id : RequirementId}
+    {predicate : ProgramPredicate}
+    (valid : ContextSubstitutionValid substitution closedVariables source
+      target)
+    (proves : RequirementProves source id predicate) :
+    RequirementProves target id
+      (TypedTraitResolution.applySubstitution substitution predicate) := by
+  rcases proves with ⟨requirement, contains, predicateEq, evidenceValid⟩
+  rcases contains with ⟨member, idEq⟩
+  refine ⟨applySolvedRequirement substitution requirement, ?_, ?_, ?_⟩
+  · constructor
+    · rw [← valid.closes.target_eq]
+      change applySolvedRequirement substitution requirement ∈
+        source.solvedRequirements.map (applySolvedRequirement substitution)
+      exact List.mem_map.mpr ⟨requirement, member, rfl⟩
+    · exact idEq
+  · simp [applySolvedRequirement, predicateEq]
+  · cases evidenceEq : requirement.evidence with
+    | assumption assumption =>
+        cases evidenceValid with
+        | intro retainedValid =>
+            rw [evidenceEq] at retainedValid
+            cases retainedValid with
+            | intro represents semanticValid =>
+                cases represents with
+                | assumption =>
+                    cases semanticValid with
+                    | assumption goalMem =>
+                        apply SolvedRequirementValid.intro
+                        simp only [applySolvedRequirement, evidenceEq,
+                          applyPredicateEvidence]
+                        exact .intro (.assumption _) (.assumption (by
+                          rw [← valid.closes.target_eq]
+                          exact List.mem_map.mpr
+                            ⟨requirement.predicate, goalMem, rfl⟩))
+    | implementation evidence =>
+        exact valid.implementationRequirements requirement evidence member
+          evidenceEq
+
+theorem RequirementValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {id : RequirementId}
+    (valid : ContextSubstitutionValid substitution closedVariables source
+      target)
+    (requirement : RequirementValid source id) :
+    RequirementValid target id := by
+  rcases requirement with ⟨predicate, proves⟩
+  exact ⟨TypedTraitResolution.applySubstitution substitution predicate,
+    FlexibleSubstitution.RequirementProves.applySubstitution valid proves⟩
+
+theorem RequirementIdsValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {ids : List RequirementId}
+    (valid : ContextSubstitutionValid substitution closedVariables source
+      target)
+    (requirements : RequirementIdsValid source ids) :
+    RequirementIdsValid target ids := by
+  intro id member
+  exact FlexibleSubstitution.RequirementValid.applySubstitution valid
+    (requirements id member)
+
+theorem RequirementSequenceProves.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {ids : List RequirementId}
+    {predicates : List ProgramPredicate}
+    (valid : ContextSubstitutionValid substitution closedVariables source
+      target)
+    (proves : RequirementSequenceProves source ids predicates) :
+    RequirementSequenceProves target ids
+      (predicates.map
+        (TypedTraitResolution.applySubstitution substitution)) := by
+  induction proves with
+  | nil => exact .nil
+  | cons head tail induction =>
+      exact .cons
+        (FlexibleSubstitution.RequirementProves.applySubstitution valid head)
+        induction
+
 /-- Structural context closure transports every admissible retained type.
 Variables in the closed prefix are replaced by the ground range, while fresh
 variables in the retained suffix and residual body variables remain scoped. -/
@@ -7560,22 +7811,22 @@ theorem SchemeGeneralizes.applySubstitution
     SchemeGeneralizes target (scheme.apply substitution) := by
   exact SchemeGeneralizesExcept.applySubstitution closes generalizes
 
-/-- Flexible closure preserves one qualified local-scheme requirement.  The
-generalization witness supplies freshness of the protected scheme variables. -/
-theorem LocalSchemeRequirementWellFormed.applySubstitution
+/-- Flexible closure preserves one qualified local-scheme requirement when
+the protected scheme variables are explicitly fresh for the outer
+substitution. -/
+theorem LocalSchemeRequirementWellFormed.applySubstitution_of_fresh
     {substitution : Substitution} {closedVariables : List TypeVarId}
     {source target : Context} {binder : TypedBinder}
     {requirement : LocalSchemeRequirement}
-    {exemptRequirements : List RequirementId}
     (closes : ContextCloses substitution closedVariables source target)
-    (generalizes : SchemeGeneralizesExcept source exemptRequirements
-      binder.scheme)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ substitution.domain)
     (wellFormed : LocalSchemeRequirementWellFormed source binder requirement) :
     LocalSchemeRequirementWellFormed target
       (binder.applySubstitution substitution)
       (requirement.applySubstitution
         (substitution.without binder.scheme.quantified)) := by
-  have fresh := quantified_fresh_for_closure closes generalizes
   have restricted_eq :
       substitution.without binder.scheme.quantified = substitution :=
     Substitution.without_eq_self_of_disjoint_domain substitution
@@ -7624,15 +7875,33 @@ theorem LocalSchemeRequirementWellFormed.applySubstitution
     · simp [applySolvedRequirement, applyPredicateEvidence,
         LocalSchemeRequirement.applySubstitution, restricted_eq, evidenceEq]
 
-/-- Flexible closure preserves the ordered, uniquely identified qualified
-requirements attached to one generalized local binder. -/
-theorem LocalSchemeRequirementsWellFormed.applySubstitution
+/-- Exact local generalization supplies the freshness needed by the explicit
+qualified-requirement transport theorem. -/
+theorem LocalSchemeRequirementWellFormed.applySubstitution
     {substitution : Substitution} {closedVariables : List TypeVarId}
     {source target : Context} {binder : TypedBinder}
+    {requirement : LocalSchemeRequirement}
     {exemptRequirements : List RequirementId}
     (closes : ContextCloses substitution closedVariables source target)
     (generalizes : SchemeGeneralizesExcept source exemptRequirements
       binder.scheme)
+    (wellFormed : LocalSchemeRequirementWellFormed source binder requirement) :
+    LocalSchemeRequirementWellFormed target
+      (binder.applySubstitution substitution)
+      (requirement.applySubstitution
+        (substitution.without binder.scheme.quantified)) := by
+  exact LocalSchemeRequirementWellFormed.applySubstitution_of_fresh closes
+    (quantified_fresh_for_closure closes generalizes) wellFormed
+
+/-- Explicit freshness transports the complete ordered, uniquely identified
+qualified-requirement spine of a local scheme. -/
+theorem LocalSchemeRequirementsWellFormed.applySubstitution_of_fresh
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {binder : TypedBinder}
+    (closes : ContextCloses substitution closedVariables source target)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ substitution.domain)
     (wellFormed : LocalSchemeRequirementsWellFormed source binder) :
     LocalSchemeRequirementsWellFormed target
       (binder.applySubstitution substitution) := by
@@ -7643,8 +7912,103 @@ theorem LocalSchemeRequirementsWellFormed.applySubstitution
   · intro requirement member
     rw [applyTypedBinder_schemeRequirements] at member
     rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
-    exact LocalSchemeRequirementWellFormed.applySubstitution closes generalizes
-      (wellFormed.entries original originalMember)
+    exact LocalSchemeRequirementWellFormed.applySubstitution_of_fresh closes
+      fresh (wellFormed.entries original originalMember)
+
+/-- Flexible closure preserves the qualified-requirement spine of an exactly
+generalized local scheme. -/
+theorem LocalSchemeRequirementsWellFormed.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {binder : TypedBinder}
+    {exemptRequirements : List RequirementId}
+    (closes : ContextCloses substitution closedVariables source target)
+    (generalizes : SchemeGeneralizesExcept source exemptRequirements
+      binder.scheme)
+    (wellFormed : LocalSchemeRequirementsWellFormed source binder) :
+    LocalSchemeRequirementsWellFormed target
+      (binder.applySubstitution substitution) := by
+  exact LocalSchemeRequirementsWellFormed.applySubstitution_of_fresh closes
+    (quantified_fresh_for_closure closes generalizes) wellFormed
+
+/-- Mapping an outer flexible substitution over a shared local-scheme
+instantiation commutes with its ordered qualified-predicate spine. -/
+theorem instantiateLocalSchemePredicates_applySubstitution
+    {outer : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {binder : TypedBinder} {inner : Substitution}
+    (closes : ContextCloses outer closedVariables source target)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ outer.domain)
+    (formation : LocalSchemeRequirementsWellFormed source binder)
+    (innerExact : ExactSubstitution inner binder.scheme.quantified) :
+    (instantiateLocalSchemePredicates inner binder).map
+        (TypedTraitResolution.applySubstitution outer) =
+      instantiateLocalSchemePredicates (Substitution.mapRange outer inner)
+        (binder.applySubstitution outer) := by
+  have restricted_eq : outer.without binder.scheme.quantified = outer :=
+    Substitution.without_eq_self_of_disjoint_domain outer
+      binder.scheme.quantified fresh
+  unfold instantiateLocalSchemePredicates
+  simp only [applyTypedBinder_schemeRequirements, restricted_eq, List.map_map]
+  apply List.map_congr_left
+  intro requirement member
+  exact PredicateAdmissible.applyFlexible_compose outer inner closes.range
+    innerExact fresh (formation.entries requirement member).predicate
+
+/-- Explicit scheme-binder freshness transports one complete local reference
+instantiation, including its shared type substitution and requirement spine. -/
+theorem LocalSchemeInstantiationValid.applySubstitution_of_fresh
+    {outer : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    (contextValid : ContextSubstitutionValid outer closedVariables source target)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ outer.domain)
+    (valid : LocalSchemeInstantiationValid source binder type
+      actualRequirements) :
+    LocalSchemeInstantiationValid target
+      (binder.applySubstitution outer) (outer.apply type)
+      actualRequirements := by
+  cases valid with
+  | intro formation schemeWellFormed inner innerExact innerRange result
+      actualUnique actualDisjoint requirements =>
+      have restricted_eq : outer.without binder.scheme.quantified = outer :=
+        Substitution.without_eq_self_of_disjoint_domain outer
+          binder.scheme.quantified fresh
+      refine .intro
+        (LocalSchemeRequirementsWellFormed.applySubstitution_of_fresh
+          contextValid.closes fresh formation)
+        (by simpa using (SchemeWellFormed.applySubstitution
+          contextValid.closes schemeWellFormed))
+        (Substitution.mapRange outer inner)
+        (Substitution.ExactSubstitution.mapRange outer innerExact)
+        ?_ ?_ actualUnique ?_ ?_
+      · intro metavariable replacement member
+        rcases List.mem_map.mp member with
+          ⟨⟨innerVariable, innerReplacement⟩, innerMember, entryEq⟩
+        cases entryEq
+        exact TypeAdmissible.applySubstitution contextValid.closes
+          (innerRange innerVariable innerReplacement innerMember)
+      · change (Substitution.mapRange outer inner).apply
+          (binder.applySubstitution outer).scheme.body = outer.apply type
+        rw [applyTypedBinder_scheme]
+        change (Substitution.mapRange outer inner).apply
+            ((outer.without binder.scheme.quantified).apply binder.scheme.body) =
+          outer.apply type
+        rw [restricted_eq, ← result]
+        exact (TypeWellScoped.applyFlexible_compose outer inner
+          contextValid.closes.range innerExact fresh schemeWellFormed.body).symm
+      · intro id actualMember templateMember
+        exact actualDisjoint id actualMember (by
+          simpa [localSchemeTemplateIds, TypedBinder.applySubstitution,
+            LocalSchemeRequirement.applySubstitution, List.map_map,
+            Function.comp_def] using templateMember)
+      · have transported :=
+          RequirementSequenceProves.applySubstitution contextValid requirements
+        rw [instantiateLocalSchemePredicates_applySubstitution
+          contextValid.closes fresh formation innerExact] at transported
+        exact transported
 
 /-- Flexible context closure preserves the common retained-binder formation
 judgment; scheme quantifiers protect themselves from the outer substitution. -/
@@ -7973,6 +8337,98 @@ theorem forLocal_eq_without_of_lookup
       substitution.without scheme.quantified := by
   exact forLocal_eq_without_of_lookup?
     (Resolved.LocalScope.lookup?_iff.mpr found)
+
+private theorem lookup_applyLocals
+    {locals : Resolved.LocalScope Scheme} {id : Resolved.LocalId}
+    {scheme : Scheme} (substitution : Substitution)
+    (lookup : Resolved.LocalScope.Lookup locals id scheme) :
+    Resolved.LocalScope.Lookup (applyLocals substitution locals) id
+      (scheme.apply substitution) := by
+  induction lookup with
+  | head => exact .head
+  | tail different _ induction => exact .tail different induction
+
+private theorem lookup_applyLocalSchemeRequirements
+    {locals : Resolved.LocalScope Scheme}
+    {requirements : Resolved.LocalScope (List LocalSchemeRequirement)}
+    {id : Resolved.LocalId} {scheme : Scheme}
+    {localRequirements : List LocalSchemeRequirement}
+    (substitution : Substitution)
+    (schemeLookup : Resolved.LocalScope.Lookup locals id scheme)
+    (lookup : Resolved.LocalScope.Lookup requirements id localRequirements) :
+    Resolved.LocalScope.Lookup
+      (applyLocalSchemeRequirements substitution locals requirements) id
+      (localRequirements.map
+        (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified))) := by
+  induction lookup with
+  | head =>
+      simp only [applyLocalSchemeRequirements, List.map_cons]
+      rw [forLocal_eq_without_of_lookup schemeLookup]
+      exact .head
+  | tail different _ induction =>
+      exact .tail different (induction schemeLookup)
+
+/-- Structural closure transports first-match lookup of a local scheme. -/
+theorem LocalLookup.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {id : Resolved.LocalId} {scheme : Scheme}
+    (closes : ContextCloses substitution closedVariables source target)
+    (lookup : source.LocalLookup id scheme) :
+    target.LocalLookup id (scheme.apply substitution) := by
+  rw [← closes.target_eq]
+  exact lookup_applyLocals substitution lookup
+
+/-- Qualified metadata follows its scheme lookup and therefore uses the same
+capture-avoiding restriction of the outer substitution. -/
+theorem LocalSchemeRequirementsLookup.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {id : Resolved.LocalId} {scheme : Scheme}
+    {requirements : List LocalSchemeRequirement}
+    (closes : ContextCloses substitution closedVariables source target)
+    (schemeLookup : source.LocalLookup id scheme)
+    (lookup : source.LocalSchemeRequirementsLookup id requirements) :
+    target.LocalSchemeRequirementsLookup id
+      (requirements.map
+        (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified))) := by
+  rw [← closes.target_eq]
+  exact lookup_applyLocalSchemeRequirements substitution schemeLookup lookup
+
+/-- A looked-up scheme inherits the capture protection carried by a valid
+flexible context substitution. -/
+theorem ContextSubstitutionValid.localSchemeFresh
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {id : Resolved.LocalId} {scheme : Scheme}
+    (valid : ContextSubstitutionValid substitution closedVariables source target)
+    (lookup : source.LocalLookup id scheme) :
+    ∀ metavariable, metavariable ∈ scheme.quantified →
+      metavariable ∉ substitution.domain := by
+  intro metavariable quantified
+  exact valid.localSchemesFresh (id, scheme) lookup.mem metavariable quantified
+
+/-- The local-reference case of flexible static transport.  The source
+lookup determines one shared mapped binder, and the same composed inner
+substitution validates both its raw type and its qualified requirements. -/
+theorem ReferenceUseValid.applySubstitution_local
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (schemeLookup : source.LocalLookup binder.id binder.scheme)
+    (requirementsLookup : source.LocalSchemeRequirementsLookup binder.id
+      binder.schemeRequirements)
+    (instantiation : LocalSchemeInstantiationValid source binder type
+      actualRequirements) :
+    ReferenceUseValid target (.local binder.id) (substitution.apply type)
+      actualRequirements := by
+  apply ReferenceUseValid.local (binder := binder.applySubstitution substitution)
+  · simpa using LocalLookup.applySubstitution contextValid.closes schemeLookup
+  · simpa using LocalSchemeRequirementsLookup.applySubstitution
+      contextValid.closes schemeLookup requirementsLookup
+  · exact LocalSchemeInstantiationValid.applySubstitution_of_fresh
+      contextValid (contextValid.localSchemeFresh schemeLookup) instantiation
 
 @[simp] theorem closeContext_withTypeVariables (substitution : Substitution)
     (context : Context) (variables : List TypeVarId) :
