@@ -89,4 +89,4 @@ record, Core, Resolved, parser, diagnostic and wire definitions unchanged.
 Separate definitions, proofs, consumers and publication into small commits, with
 each new proof/test file below 300 lines. Require focused and aggregate builds,
 full tests, all public/consumer standard-axiom audits, dependency closure checks,
-kernel/metadata/whitespace checks and independent reviews.
+kernel-policy and whitespace checks and independent reviews.

@@ -100,7 +100,7 @@ Any generated-Core capture, effect or resumption examples remain Core consumers,
 not raw source closure evaluation or canonical backend execution. Keep actual
 environments and stores. Run focused/aggregate/full tests, exact standard-only
 public and consumer axiom catalogs, independent reviews, old byte/header/import
-audits, and kernel/metadata/EOF/whitespace checks. Every new Lean file stays below
+audits, and kernel-policy, EOF, and whitespace checks. Every new Lean file stays below
 300 lines; record separately verified small commits.
 
 ## Non-goals

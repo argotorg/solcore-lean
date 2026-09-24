@@ -114,6 +114,6 @@ shallow binding-heap step; the deep graph and typed-state obligations remain.
 ## Verification target
 
 The focused runtime, linker, compiler, and typed-runtime modules, their runtime
-regressions, the full build and tests, semantic-kernel audit, metadata audit,
+regressions, the full build and tests, semantic-kernel audit,
 forbidden-proof scan, and whitespace check must pass.  No omitted proof, new
 axiom, unsafe definition, or native decision shortcut is permitted.

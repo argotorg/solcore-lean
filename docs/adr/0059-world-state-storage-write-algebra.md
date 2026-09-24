@@ -107,7 +107,7 @@ Keep every commit below 300 changed lines:
 ## Publication and exclusions
 
 This layer is internal and not published. It adds no parser, source form, Wire
-field or tag, Profile, or frozen artifact.
+field or tag, or frozen artifact.
 
 It fixes no trap disposition, nested frame or checkpoint rule, surviving logs,
 calls, or creations, transaction atomicity, Account creation, deletion, or
@@ -136,5 +136,5 @@ runner lines.
 
 The implementation commits are `c09942c` (166 changed lines), `0fa26af` (80),
 `104d3aa` (110), and `bb63ed1` (96). Each remains below 300 changed lines.
-Focused and full builds, tests, trust-zero, semantic-kernel, metadata,
+Focused and full builds, tests, trust-zero, semantic-kernel,
 forbidden-declaration, document-link, diff, and independent audits pass.

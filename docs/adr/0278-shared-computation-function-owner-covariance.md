@@ -80,8 +80,8 @@ exhaustion or success. A covariant arbitrary checker is not necessarily sound;
 a non-covariant checker does not acquire owner invariance from injectivity alone.
 
 Require focused/aggregate builds, full tests, exact standard-only public and
-consumer axiom catalogs, old contracts/imports/bytes, kernel/metadata/EOF/
-whitespace checks and independent reviews. Keep new proof/consumer files below
+consumer axiom catalogs, old contracts/imports/bytes, kernel-policy, EOF, and
+whitespace checks, and independent reviews. Keep new proof/consumer files below
 300 lines and decision, proof, consumers and publication in separate small commits.
 
 ## Non-goals

@@ -68,19 +68,14 @@ Focused tests cover:
 - arbitrary left and right expressions that allocate and write, proving
   exactly-once left-to-right effects;
 - wrong operand types and raw fault order;
-- exact insufficient and sufficient fuel boundaries;
-- Wire v1 rejection of the required primitive forms; and
-- exact Wire v2 projection and round trips against each handwritten normative
-  expansion.
+- exact insufficient and sufficient fuel boundaries.
 
 Tests exercise both the executable behavior and the named proof interface.
 
 ## Boundaries
 
-No frozen wire schema changes. These are ordinary existing Core expressions,
-and each wire projection continues to treat them exactly like its handwritten
-expansion. This decision does not define signed comparison, ABI decoding,
-opcode mapping, or gas cost.
+These are ordinary existing Core expressions. This decision does not define
+signed comparison, ABI decoding, opcode mapping, or gas cost.
 
 ## Consequences
 

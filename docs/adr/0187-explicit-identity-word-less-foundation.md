@@ -52,5 +52,5 @@ capturing first ID changes a right reference. An originally missing right
 reference also demonstrates why reflection needs original scoping.
 Consume exact path costs and genuine-checkpoint resumption without editing
 continuations. Register/audit every new public declaration; run focused and
-aggregate builds, full tests and kernel/metadata/forbidden-token/whitespace checks.
+aggregate builds, full tests, and kernel-policy, forbidden-token, and whitespace checks.
 Keep files below 300 lines, small exact-path commits and repository-local scratch.

@@ -112,7 +112,7 @@ owns:
 - exact-fuel and resumption results;
 - primitive arithmetic, bitwise, comparison, conversion, and shift rules;
 - renaming, local-fragment, correspondence, progress, and safety results; and
-- retained Core Wire encodings.
+- the current Core Wire encoding.
 
 Core admits only what its checker proves. Source names, inference variables,
 trait evidence, and source heaps cross this boundary only through explicit
@@ -136,7 +136,7 @@ source type.
 
 ## Reproducible Core synthesis
 
-`Solcore.Synthesis.CoreV3` generates a bounded pure Core v3 fragment from an
+`Solcore.Synthesis.Core` generates a bounded pure Core fragment from an
 explicit seed. Generated programs carry checker evidence. Its shrinker returns
 only candidates that preserve the fragment invariants and are strictly
 smaller according to the library's measure.

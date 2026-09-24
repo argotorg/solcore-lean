@@ -16,7 +16,7 @@ Authority is ordered as follows:
 
 1. Lean definitions and theorem statements in the retained public modules;
 2. accepted ADRs that constrain choices not yet fully encoded;
-3. executable tests and pinned comparison evidence; and
+3. executable tests and documented comparison evidence; and
 4. explanatory documentation.
 
 When these disagree, fix the lower-authority artifact or make an explicit ADR
@@ -53,9 +53,9 @@ The public interfaces are Lean imports:
 - `Solcore.Abi` for the retained ABI utilities; and
 - `Solcore.Synthesis` for checked Core generation and shrinking.
 
-Core Wire v1, v2, and v3 are retained closed data encodings. A new internal
-Core form does not enter an older encoding without a separately reviewed
-version decision.
+`Solcore.Core.Wire` is the single current data encoding for Semantic Core. It
+is kept in step with the supported Core boundary; the repository does not
+retain parallel historical Wire APIs.
 
 ## Required semantic structure
 
@@ -125,8 +125,9 @@ context, or every Ethereum fork.
 ## External evidence
 
 Cross-implementation comparisons are valid only when source and standard
-library bytes, profiles, initial state, resource limits, and observed results
-are aligned. Native defaults are evidence, not implicit specification choices.
+library bytes, compiler settings, initial state, resource limits, and observed
+results are aligned. Native defaults are evidence, not implicit specification
+choices.
 
 Use the classifications in
 [Compatibility evidence](COMPATIBILITY_MATRIX.md). Do not claim conformance
@@ -139,7 +140,6 @@ Lean's kernel is the proof checker. The repository additionally:
 
 - builds with warnings as errors;
 - runs executable regression and property tests;
-- validates owned data, digests, and references; and
 - scans configured semantic roots for prohibited escape hatches.
 
 Critical theorem reviews should inspect their actual axiom reports. Project

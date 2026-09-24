@@ -85,7 +85,7 @@ source lambda by inserting elaboration evidence into a raw evaluation judgment.
 
 Verify focused and aggregate builds, full tests, exact standard-only public and
 consumer axiom catalogs, independent reviews, old bytes/signatures/imports,
-kernel/metadata/EOF/whitespace checks. Keep new proof/consumer files below 300
+kernel-policy, EOF, and whitespace checks. Keep new proof and consumer files below 300
 lines and decision, implementation/proofs, consumers and publication in small
 separate commits.
 

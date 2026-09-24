@@ -35,7 +35,7 @@ identity boundary that answers four smaller questions:
    they returned?
 4. Which exact validated value is supplied to later parsing and resolution?
 
-The primary implementation evidence is pinned by `metadata/baselines.json`:
+The implementation evidence considered for this decision used:
 
 - Haskell commit `1d490d8bb5f374356f06e0720655496482eb1fb4`; and
 - Rust commit `38f4778ea461edfe59106bdb1f9f08c3307b0fc0`.
@@ -68,10 +68,9 @@ remain separate decisions.
 
 ### Additive internal boundary
 
-ADR-0014 introduces an internal Workspace Identity Kernel. It does not change
-any language version, profile, schema, or feature status. Its records are
-purpose-built Lean values rather than reinterpretations of a serialized input
-format.
+ADR-0014 introduces an internal Workspace Identity Kernel. It does not publish
+an external format or change the language status. Its records are purpose-built
+Lean values rather than reinterpretations of a serialized input format.
 
 No workspace feature becomes published merely because the internal validator
 exists. The proposed `modules.import-export` feature remains blocked until the
@@ -405,7 +404,7 @@ Judgment + Validation -> Properties
 the independent propositions to the executor. No proof-carrying syntax
 structure stores an equation about `validate`.
 
-`Path` does not import the source parser, Profile, or a host-path library.
+`Path` does not import the source parser or a host-path library.
 `Syntax` defines its own raw file record rather than reinterpreting a frozen
 wire type. The Workspace root is added to the semantic-kernel policy in the
 same commit that introduces it. It is imported by the public `Solcore`
@@ -557,5 +556,5 @@ The Workspace Identity Kernel test matrix includes:
 - exact `sourceFiles` and UTF-8 `sourceBytes` measures, including multibyte
   contents.
 
-Full build, test, metadata, semantic-kernel, English-text, formatting, and
-kernel-axiom audits are required before the slice is committed.
+Full build, test, semantic-kernel, English-text, formatting, and kernel-axiom
+audits are required before the slice is committed.

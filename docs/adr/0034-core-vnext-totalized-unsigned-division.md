@@ -16,7 +16,7 @@ binary(wordMod, numerator, divisor)
 
 Both are totalized. A zero divisor returns word zero rather than faulting. The
 generic binary typing, inference, renaming, weakening, evaluation, safety,
-machine, and Wire v2 layers already support these operators. What is missing is
+and machine layers already support these operators. What is missing is
 a focused value and store-threaded proof interface plus regressions for their
 strict evaluation behavior.
 
@@ -76,10 +76,7 @@ Focused semantic regressions cover:
 - zero-divisor executions where both operands allocate and write exactly once;
 - the exact literal boundary of four transitions insufficient and five
   sufficient;
-- measured insufficient and sufficient fuel for effectful operands;
-- frozen Wire v1 rejection; and
-- exact Wire v2 projection and round trips through the existing `wordDiv` and
-  `wordMod` tags.
+- measured insufficient and sufficient fuel for effectful operands.
 
 Compile-time examples exercise all twelve named theorems. Value tests include
 `0 / 0` and `0 % 0`, and type tests reject wrong declared results and wrong
@@ -88,8 +85,7 @@ specified order. With two allocating and writing operands, a zero divisor
 returns zero and the final store contains both writes in order.
 
 Literal programs stop at fuel four and complete at five. The effectful programs
-stop at twenty-eight and complete at twenty-nine. Wire v1 rejects the forms;
-Wire v2 projects and round-trips the exact existing tags.
+stop at twenty-eight and complete at twenty-nine.
 
 ## Existing generic proofs
 

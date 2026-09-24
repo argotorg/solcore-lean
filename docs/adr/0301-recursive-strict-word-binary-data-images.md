@@ -101,7 +101,8 @@ Retain ordered historical source and selected generated-declaration catalogs,
 append actual new names and the single new gate constructor, and check axioms.
 
 Require focused and existing-client builds, complete frontend/syntax/test builds,
-new and retained parsed suites, full tests, kernel policy, metadata and whitespace.
+new and retained parsed suites, full tests, and kernel-policy and whitespace
+checks.
 Each proof source stays below 300 lines. Keep design, grammar, private proofs,
 individual consumers, registration and docs in separate small commits.
 No runtime-typing shortcut, canonical dispatch, effects, general state-changing

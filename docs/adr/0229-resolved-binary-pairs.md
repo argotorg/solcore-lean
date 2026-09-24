@@ -50,7 +50,7 @@ the existing distinction between raw success and whole acceptance. Wrong
 ordered Core output is not accepted merely because it has the same type.
 
 Do not change Core semantics, canonical expression acceptance, source type-name
-interpretation, runtime-entry gates, parsing, diagnostics or frozen wire formats.
+interpretation, runtime-entry gates, parsing, diagnostics, or Core Wire.
 Canonical two-element tuple integration is the next separate adapter step;
 empty/larger tuples, tuple type syntax, projection spelling and multiple returns
 are not decided or enabled here. Existing source tuple negatives remain valid.
@@ -65,6 +65,6 @@ pair cost five, nesting and actual checkpoints/resumption; retain both stores
 and distinguish wrong same-typed output. Include nominal static/opaque raw
 examples without manufactured inhabitants or typing premises.
 Run focused/aggregate builds, full tests, old/new public and consumer axiom
-audits, kernel/metadata/whitespace checks and independent reviews. Keep proof
+audits, kernel-policy and whitespace checks and independent reviews. Keep proof
 files below 300 lines and definitions, proofs, consumers and publication in
 separate small commits. Preserve all paused diagnostics and repository scratch.

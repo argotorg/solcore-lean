@@ -210,7 +210,7 @@ imports another consumer; do not create a new shared public testing framework.
 Freeze prototypes before independent full review and mechanical namespace/import
 porting. Run focused builds, direct Lean, actual parsed IO, aggregate/full tests,
 all exact public/consumer names with standard-only axioms, full dependency/old-byte
-audits, kernel/metadata/EOF/whitespace checks and small commits. Final audit must
+audits, kernel-policy, EOF, and whitespace checks and small commits. Final audit must
 retain full selected file/name arrays, not only counts. Diagnostics/parser proof
 development remains paused. No new termination, totality, runtime safety, source
 closure conversion, operator semantics or whole-language correctness is claimed.

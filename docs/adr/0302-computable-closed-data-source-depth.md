@@ -85,5 +85,5 @@ effects, closure conversion or whole-language totality. Source-call and body
 search bounds remain distinct work.
 
 All new proof files remain below 300 lines. Focused and full builds, complete
-tests, kernel policy, metadata, whitespace and public axiom checks are required
+tests, kernel policy, whitespace and public axiom checks are required
 before committing. Only the standard three proof axioms are permitted.

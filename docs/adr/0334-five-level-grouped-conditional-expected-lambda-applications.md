@@ -265,7 +265,7 @@ environment, store, evaluation cost or result.
 
 ADR-0317 through ADR-0333, every existing classifier, relation, checker and theorem,
 ADR-0333's complete nested precedence, `RecursiveLocalComputation`, the ADR-0324
-branch checker, canonical source unions, runtime entries and wire versions remain
+branch checker, canonical source unions, runtime entries, and Core Wire remain
 textually and semantically unchanged. This unit adds only an opt-in static leaf.
 
 ADR-0335 is the next integration step: a nonrecursive source-only wrapper selecting
@@ -292,6 +292,6 @@ declarations, eight/three/three authored roots, safe/total flags, public simp/pr
 leaks, all-owned axiom closure limited to `propext`, `Classical.choice` and
 `Quot.sound`, masked forbidden-source and line scans, selected-failure finality,
 complete ADR-0333 preservation, direct/focused/umbrella/full builds and tests,
-parsed runner, kernel/metadata, exact six-commit/nine-path scope, source/olean drift
+parsed runner, kernel check, exact six-commit/nine-path scope, source/olean drift
 and unchanged paused files. Do not record a final ADR-0334 implementation commit
 hash in this decision.

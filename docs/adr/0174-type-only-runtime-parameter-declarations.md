@@ -61,5 +61,5 @@ identities, erasure, reconstruction, and static/runtime rejection boundaries.
 Exercise complete, diagnostic-free parsed parameter lists and signatures,
 including qualified aliases, duplicate names, unsupported annotations, and
 argument mismatch. Run focused and aggregate builds, full tests, kernel,
-metadata, forbidden-proof-token, and whitespace checks. Keep new proof files
+forbidden-proof-token, and whitespace checks. Keep new proof files
 below 300 lines and leave diagnostic proofs untouched.

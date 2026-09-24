@@ -11,7 +11,7 @@
   conditionals, with a fuelled CEK machine matching declarative evaluation.
 - **Current implementation:** The syntax, checker, big-step semantics, CEK
   executor, correspondence, progress, preservation, and fuel theorems are
-  implemented and are published through ADR-0010.
+  implemented and remain the foundation of the current Core.
 - **Boundary:** Functions, mutation, ADTs, primitives, source parsing, and
   lowering are not part of M1a.
 - **Suggested reading:** Read “Decision” and “Not decided here” first, then use
@@ -94,9 +94,8 @@ specified in a separate ADR as short-circuiting forms derived from conditionals.
 - Progress and preservation are proved for machine-state typing.
 - Every well-typed closed term terminates with some finite amount of fuel and
   cannot produce a machine fault for any fuel amount.
-- This M1a fragment alone does not promote the aggregate `corePrimitives`
-  feature to `implemented`. Earlier profile and digest records remain
-  unchanged; implementation-progress metadata records the M1a state.
+- This M1a fragment alone does not complete the aggregate primitive boundary;
+  it implements only the listed Core forms.
 
 ## Conformance requirements
 

@@ -108,5 +108,5 @@ Focused examples exercise polymorphic local instantiation, exact generic
 declaration instantiation, occurrence lookup, nested assumption evidence,
 retained-evidence representation, and resolved-reference raw typing. The
 additional ADR-0378 modules have their own focused examples. The aggregate
-build and test suite, semantic-kernel audit, metadata validation, and diff
+build and test suite, semantic-kernel audit, and diff
 hygiene remain the acceptance boundary.

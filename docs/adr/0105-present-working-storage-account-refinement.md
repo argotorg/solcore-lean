@@ -149,7 +149,7 @@ nonce, code, value transfer, call data, outcome, trace event, rollback,
 scheduling, transaction, concurrency, reentrancy, atomicity, cost, or gas rule.
 
 It adds no parser or source syntax, Core expression, Wire field,
-Profile, ABI, storage layout, serialization, or published observation.
+ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 
@@ -175,7 +175,7 @@ public runtime test once, and adds no compile-only call.
 The implementation commits are `fca91ac` (213 changed lines), `758527c` (39),
 `2b60e17` (42), and `1682e92` (165), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused trust-zero checks, the 550-job full
-build, the 992-job full test run, metadata and kernel checks, diff checks,
+build, the 992-job full test run, kernel checks, diff checks,
 declaration and simp-registration inventories, exact dependency audits, and
 independent P0-P3 audits pass.
 

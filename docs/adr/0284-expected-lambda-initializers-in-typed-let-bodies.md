@@ -103,7 +103,7 @@ general canonical backend execution or new runtime-safety theorem is supplied.
 
 Run focused and aggregate builds, full tests, exact standard-only public and
 consumer axiom catalogs, independent reviews, old byte/header/import checks,
-kernel/metadata/EOF/whitespace checks. Keep each implementation/proof/consumer
+kernel-policy, EOF, and whitespace checks. Keep each implementation, proof, and consumer
 file below 300 lines and use separately verified small commits.
 
 ## Non-goals

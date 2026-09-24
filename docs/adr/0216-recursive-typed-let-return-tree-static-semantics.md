@@ -66,6 +66,6 @@ and exact old successes without supplying nominal values.
 
 Audit all new public contracts and consumers, exact registration, standard
 axioms and acyclic body-to-entry dependency direction. Run focused/aggregate
-builds, parsed execution, full tests and kernel/metadata/whitespace checks. Keep
+builds, parsed execution, full tests, and kernel-policy and whitespace checks. Keep
 proof files below 300 lines, commits small, diagnostics paused and scratch in
 the repository.

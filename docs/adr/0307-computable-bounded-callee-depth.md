@@ -79,7 +79,7 @@ finding a callee budget, a general failed-callee decision, Core cost, effect,
 fault-classification, closure-conversion or whole-language termination theorem.
 
 Keep proof files below 300 lines. Require focused/full builds, complete tests,
-kernel policy, metadata, whitespace, independent semantic consumers and reviews,
+kernel policy, whitespace, independent semantic consumers and reviews,
 exact source ports, public axiom checks and actual formal-module ownership
 inspection before small exact-path commits. Only the standard three proof
 axioms are permitted; retain actual generated names and flags as observed.

@@ -169,5 +169,5 @@ invariant checks at the lowering boundary.
 The source-inference, requirement-identity, overload-ranking, typed-IR,
 specialization, Source Core elaboration, direct-linking, program-checking,
 public source-execution, and structural-expression regressions exercise this
-slice.  Repository-wide tests, kernel-policy checks, metadata verification, and
+slice.  Repository-wide tests, kernel-policy checks, and
 formatting checks remain the integration boundary.

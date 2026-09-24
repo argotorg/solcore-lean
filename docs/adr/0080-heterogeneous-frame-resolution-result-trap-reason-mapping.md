@@ -169,7 +169,7 @@ and resolution; that is a separate possible slice.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
 fuel or gas policy, Wire field, ABI, serialization, EVM revision,
-opcode behavior, Profile, canonical delta, or published format.
+opcode behavior, canonical delta, or published format.
 
 ## Staged implementation plan
 
@@ -218,7 +218,7 @@ trap reason without importing the laws.
 The implementation commits are `857d567` (249 changed lines), `8fa78a2` (25),
 `b9d11fa` (69), and `0759da1` (94), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, simp-termination, semantic-kernel, metadata, diff, and independent P0-P3
+axiom, simp-termination, semantic-kernel, diff, and independent P0-P3
 audits pass.
 
 The mapper remains a pure transformation of an already-resolved value. It

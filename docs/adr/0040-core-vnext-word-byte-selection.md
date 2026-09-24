@@ -9,7 +9,7 @@
 
 Core has 256-bit words but no direct operation for selecting one of their 32
 bytes. A precise internal operation supports later bit-level work without
-committing source syntax or extending frozen public formats.
+committing source syntax.
 
 ## Decision
 
@@ -59,17 +59,9 @@ Focused regressions cover:
   index effects;
 - two allocating and writing operands evaluated index then value exactly once,
   with the final store retained;
-- exact literal 4/5 and effectful 28/29 fuel boundaries; and
-- rejection by frozen Wire v1/v2 expression projection and by the Wire v2
-  `BinaryOp` conversion itself.
+- exact literal 4/5 and effectful 28/29 fuel boundaries.
 
 Compile-time examples exercise all nine theorem names.
-
-## Publication boundary
-
-`wordByte` is internal-only. Frozen Wire v1 and v2 gain no tag, and no Core or
-JSON round trip exists. Published Wire schemas, metadata, versions, and
-encodings remain unchanged.
 
 ## Exclusions
 
@@ -80,7 +72,7 @@ order, and publication boundaries remain unchanged.
 ## Consequences
 
 Internal Core gains total, explicitly ordered, big-endian byte selection while
-public formats remain frozen. Further primitives require separate ADRs.
+leaving source syntax unchanged. Further primitives require separate ADRs.
 
 ## Implementation result
 
@@ -96,9 +88,6 @@ final store.
 Literal evaluation has the exact 4/5 fuel boundary and effectful evaluation the
 exact 28/29 boundary.
 
-Frozen Wire v1 and v2 expression projections reject `wordByte`, and the Wire v2
-`BinaryOp` conversion rejects the tag directly. No Core or JSON round trip is
-introduced. The implementation and focused semantic/Wire validation are
-complete. The independent audit found no P0-P3 issue, no source trust escape
-hatch, and only the repository-approved Lean foundational dependencies.
-Published Wire schemas, metadata, versions, and encodings remain unchanged.
+The implementation and focused semantic validation are complete. The
+independent audit found no P0-P3 issue, no source trust escape hatch, and only
+the repository-approved Lean foundational dependencies.

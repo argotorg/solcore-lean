@@ -105,7 +105,7 @@ and one test import; independent audit and completion evidence.
 This internal refinement is not published. It adds no concrete event taxonomy,
 timestamp, serialization, hashing, compression, size limit, balance, code,
 host call/create behavior, ABI, EVM revision, opcode, gas schedule, parser or
-source form, Core expression, Wire field or tag, Profile, or
+source form, Core expression, Wire field or tag, or
 frozen artifact.
 
 ## Consequences
@@ -134,5 +134,5 @@ reuse of the existing total resolver.
 The implementation commits are `091434c` (174 changed lines), `d3e0649` (22),
 and `52bab8f` (53), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-semantic-kernel, metadata, document-link, diff, and independent P0-P3 audits
+semantic-kernel, document-link, diff, and independent P0-P3 audits
 pass.

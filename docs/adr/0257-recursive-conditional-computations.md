@@ -81,8 +81,8 @@ Use shared body/entry laws and arbitrary caller insertion directly.
 
 Keep proof and consumer files below 300 lines; split private-heavy proof modules
 only if necessary without exporting helper laws merely to cross a file boundary.
-Run focused, aggregate and full tests, complete standard-axiom audits, kernel,
-metadata and whitespace checks and independent reviews before publication.
+Run focused, aggregate and full tests, complete standard-axiom audits, kernel and
+whitespace checks and independent reviews before publication.
 
 Expanded comparisons, lazy Bool operator roots, unary operators and tuples do
 not gain recursive children in this unit. Source lambda construction, global

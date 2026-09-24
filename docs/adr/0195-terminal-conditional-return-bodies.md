@@ -56,6 +56,6 @@ Parsed consumers use complete canonical bodies and actual typed inputs, retain
 spans/order and test all structural and type boundaries.
 
 Audit every new public declaration for standard axioms only; run focused and
-aggregate builds, full tests, kernel/metadata/forbidden-token/whitespace checks.
+aggregate builds, full tests, and kernel-policy, forbidden-token, and whitespace checks.
 Keep new proof files below 300 lines, commits small and separated by role,
 scratch repository-local and paused diagnostic files untouched.

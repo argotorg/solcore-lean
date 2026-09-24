@@ -148,7 +148,7 @@ The work was completed in this order, with every green commit below roughly
 2. activate it in current-facing internal documents;
 3. add the single theorem and Semantics export;
 4. add the four compile regressions and one runner import;
-5. run trust, simp, axiom, dependency, build, test, metadata, kernel, and
+5. run trust, simp, axiom, dependency, build, test, kernel, and
    independent audits; and
 6. synchronize completion evidence in current-facing internal documents.
 
@@ -171,7 +171,7 @@ resolution-view naturality remain test-only dependencies.
 - the full build completed 638 jobs;
 - the complete test suite completed 1,164 jobs;
 - all changed Lean roots compiled with trust zero and warnings as errors;
-- metadata and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - the single public simp theorem reports exactly `[propext]`;
 - declaration and simplification inventories found exactly one theorem and no
   operation, helper, unchecked declaration, or reverse simp rule;

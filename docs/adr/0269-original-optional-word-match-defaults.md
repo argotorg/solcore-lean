@@ -114,7 +114,7 @@ Reuse independent source costs and literal Core paths, actual effects/captures,
 all fuels and genuine saved-state/world resumption. Preserve old default-only
 and required-default behavior.
 
-Run independent reviews, focused/aggregate/full tests, all-public/all-consumer
-standard-axiom audits, exact old-kernel contracts, dependency/kernel/metadata,
+Run independent reviews, focused, aggregate, and full tests, all-public and all-consumer
+standard-axiom audits, exact old-kernel contracts, dependency and kernel-policy,
 EOF and whitespace checks. Diagnostic/parser work stays paused and scratch
 files remain repository-local.

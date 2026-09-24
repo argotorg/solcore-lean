@@ -200,7 +200,7 @@ No duplicate runtime program was added for this proof-only slice.
 - the full build completed successfully with 619 build jobs;
 - `lake test` completed successfully with 1,126 jobs;
 - both changed Lean modules passed trust-zero with warnings as errors;
-- workspace metadata and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - two independent proof and final audits found no P0, P1, P2, or P3 issue;
 - every commit stayed below 300 changed lines; and
 - the root README, parser-facing code, runtime behavior, and public formats

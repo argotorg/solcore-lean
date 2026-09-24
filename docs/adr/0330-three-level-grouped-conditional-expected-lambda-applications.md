@@ -250,7 +250,7 @@ Core, environment, store, evaluation cost or result.
 ADR-0317 through ADR-0329, every existing classifier, relation, checker and
 theorem, ADR-0329's complete two-level-first precedence, `RecursiveLocalComputation`,
 the shared ADR-0324 branch checker, canonical source unions, runtime entries and
-public wire versions remain textually and semantically unchanged. This unit adds
+Core Wire remains textually and semantically unchanged. This unit adds
 only an opt-in static adapter.
 
 The next integration step is the additive wrapper that selects the complete

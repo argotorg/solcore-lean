@@ -163,6 +163,6 @@ production import closures and old consumer selections remain unchanged. Only no
 umbrella imports, consumer registration and bounded status/plan/matrix publication
 may change. Keep paused diagnostics/parser work and all unrelated files untouched.
 Run focused/direct checks, exact public-header and full global public/consumer axiom
-checks, aggregate/runtime tests, metadata/kernel checks and dependency/source audits.
+checks, aggregate/runtime tests, kernel checks and dependency/source audits.
 No proof placeholders, nonstandard axioms, unsafe/native shortcuts or totality claims.
 Use only .lake/trace-audits for scratch. Commit small exact frozen changes; no push.

@@ -76,7 +76,7 @@ preparation from a separately supplied checker returning no result.
 
 Require focused and aggregate builds, full tests, exact standard-only public and
 consumer axiom catalogs, independent reviews, preserved old bytes/signatures/
-imports, and kernel/metadata/EOF/whitespace checks. Keep new proof/consumer files
+imports, and kernel-policy, EOF, and whitespace checks. Keep new proof and consumer files
 below 300 lines. Record decision, proof, consumers and publication separately.
 
 ## Non-goals

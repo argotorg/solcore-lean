@@ -51,6 +51,6 @@ captured environment, and show that an unshifted free variable reads the wrong
 value. Keep full suspended states distinct instead of asserting state equality.
 
 Register/audit every new public declaration, including predicate constructors.
-Run focused and aggregate builds, full tests and standard-axiom/kernel/metadata/
-forbidden-token/whitespace checks. Use small exact-path commits, proof files below
+Run focused and aggregate builds, full tests, and standard-axiom, kernel-policy,
+forbidden-token, and whitespace checks. Use small exact-path commits, proof files below
 300 lines and repository-local scratch. Preserve all paused diagnostic files.

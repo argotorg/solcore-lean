@@ -103,7 +103,7 @@ reentrancy, gas, ABI, transaction, host I/O, or published observation rule.
 
 The equalities are pure nested `Option` observations. They make no concurrent
 mutation, cost, evaluation-count, or external-effect claim. They add no parser
-or source syntax, Core expression, Wire field, Profile, or frozen
+or source syntax, Core expression, Wire field, or frozen
 artifact.
 
 ## Staged implementation plan
@@ -127,7 +127,7 @@ runtime assertion, or runner call.
 The implementation commits are `6db16e0` (201 changed lines), `20ae522` (40),
 and `ebf0deb` (36), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused trust-zero checks, full build and test runs,
-metadata and kernel checks, diff checks, simplification review, declaration
+kernel checks, diff checks, simplification review, declaration
 inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences

@@ -76,5 +76,5 @@ are constructed independently rather than obtained from the implementation.
 
 Use small separate definition, proof, consumer, and publication commits. Require
 focused and aggregate builds, full tests, all public and consumer axiom audits,
-kernel/metadata/whitespace checks, and independent reviews. No existing parser,
+kernel-policy and whitespace checks, and independent reviews. No existing parser,
 Core/Resolved definition, body/entry contract, diagnostic policy, or wire changes.

@@ -81,7 +81,7 @@ Include an arbitrary deliberately invalid child checker only as an operational
 factorization consumer, without claiming independent typing or evaluation.
 
 Keep files and commits small, run focused/aggregate/full tests, public and
-consumer standard-axiom audits, policy/metadata/whitespace checks and independent
+consumer standard-axiom audits, kernel-policy and whitespace checks, and independent
 reviews. Source closure construction, recursion under other expression roots,
 global function resolution, general early returns, source-only fuel bounds,
 unfuelled execution and arbitrary-store safety remain outside this unit.

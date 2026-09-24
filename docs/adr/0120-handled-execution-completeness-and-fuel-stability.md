@@ -265,7 +265,7 @@ out-of-fuel results rather than stable terminal outcomes.
 - the full project build completed successfully with 619 build jobs;
 - `lake test` completed successfully with 1,126 jobs;
 - every changed Lean module passed trust-zero with warnings treated as errors;
-- workspace metadata and the semantic-kernel policy were verified; and
+- the semantic-kernel policy was verified; and
 - an independent final audit found no P0, P1, P2, or P3 issue.
 
 The audit covered both out-of-fuel readiness forms, a handled-prefix

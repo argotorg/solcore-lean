@@ -89,4 +89,4 @@ commit remains below 300 changed lines.
 
 All three public laws report exactly `[propext]`. No custom axiom, `sorryAx`, or
 unchecked declaration is present. Focused and full builds, tests, trust-zero,
-semantic-kernel, metadata, document-link, and diff checks pass.
+semantic-kernel, document-link, and diff checks pass.

@@ -72,7 +72,7 @@ not establish runtime typing, Core costs, fault classification, effects or
 closure conversion. Missing-callee classification remains a separate question.
 
 Proof files stay below 300 lines. Require focused and full builds, complete tests,
-kernel policy, metadata, whitespace, public axiom checks, exact import-only ports
+kernel policy, whitespace, public axiom checks, exact import-only ports
 and actual new-module ownership inspection before small commits. Only the
 standard three proof axioms are permitted; all compiler-generated names and
 flags are retained as observed, without prototype-generated-name equivalence.

@@ -132,7 +132,7 @@ scheduling, transaction, delta, or published observation rule.
 
 It performs no mutation, does not validate checkpoint/working relationships,
 and does not make an absent Account read as zero. It adds no parser or source
-syntax, Core expression, Wire field, Profile, or frozen artifact.
+syntax, Core expression, Wire field, or frozen artifact.
 
 ## Staged implementation plan
 
@@ -162,7 +162,7 @@ two slots against distinct working values.
 The implementation commits are `c905bef` (186 changed lines), `8d702dd` (24),
 `4563d31` (38), and `ba00324` (86), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused trust-zero checks, full build and
-test runs, metadata and kernel checks, diff checks, simp review, declaration
+test runs, kernel checks, diff checks, simp review, declaration
 inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences

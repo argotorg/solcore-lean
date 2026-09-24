@@ -181,7 +181,7 @@ transferred value, call kind, code lookup, balance, nonce, authorization,
 outcome provenance, return delivery, trap handling, stack, depth, scheduling,
 recursion, reentrancy, gas, ABI, transaction, host I/O, or published
 observation. It adds no parser or source syntax, Core expression, Wire field,
-Profile, or frozen artifact.
+or frozen artifact.
 
 ## Staged implementation plan
 
@@ -210,7 +210,7 @@ runner call.
 The implementation commits are `c4f11d3` (267 changed lines), `5e614a5` (49),
 `6b32d3e` (37), and `c7c5515` (49), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused trust-zero checks, full build and
-test runs, metadata and kernel checks, diff checks, simplification review,
+test runs, kernel checks, diff checks, simplification review,
 declaration inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences

@@ -104,7 +104,7 @@ or a shared world from structural type evidence alone.
 
 Commit decision, definitions, proof migrations, old consumers, new consumers
 and publication separately in small chunks; keep proof files below 300 lines.
-Require independent reviews, focused/aggregate/full tests, exact old contracts,
-published-catalog/all-consumer standard-axiom audits, dependency/kernel/metadata
-and EOF/whitespace checks. Diagnostic/parser proofs remain paused; scratch files
+Require independent reviews, focused, aggregate, and full tests, exact old contracts,
+published-catalog and all-consumer standard-axiom audits, dependency and
+kernel-policy, EOF, and whitespace checks. Diagnostic/parser proofs remain paused; scratch files
 stay inside the repository.

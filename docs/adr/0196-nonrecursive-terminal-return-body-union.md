@@ -51,6 +51,6 @@ whole-check rejection including invalid unselected arms and nested statements.
 Existing singleton and runtime-entry behavior must remain unchanged.
 
 Audit every new public declaration for standard axioms only. Run focused and
-aggregate builds, full tests, kernel/metadata/forbidden-token/whitespace checks.
+aggregate builds, full tests, and kernel-policy, forbidden-token, and whitespace checks.
 Use repository-local scratch, small separated commits, proof files below 300
 lines, and preserve all paused diagnostic files.

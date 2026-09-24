@@ -44,6 +44,6 @@ therefore remains open.
 
 ## Verification target
 
-The focused modules, full build and tests, metadata and kernel-policy checks,
+The focused modules, full build and tests, kernel-policy checks,
 and whitespace check must pass. No omitted proof, new axiom, unsafe definition,
 or native decision shortcut is permitted.

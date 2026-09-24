@@ -72,6 +72,6 @@ residuals. Preserve invalid headers, arguments and unselected branches rather
 than weakening shared checks.
 
 Audit all public declarations and consumers with standard axioms only; run
-focused and aggregate builds, full tests, kernel/metadata/whitespace checks and
+focused and aggregate builds, full tests, kernel-policy and whitespace checks, and
 independent reviews. Keep each new proof/consumer below 300 lines, commit design,
 proofs, consumers and publication separately, and leave diagnostics paused.

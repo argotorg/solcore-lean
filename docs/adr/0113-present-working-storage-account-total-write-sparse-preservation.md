@@ -113,7 +113,7 @@ provenance, lifetime, checkpoint, rollback, outcome, trace event, scheduling,
 transaction, concurrency, reentrancy, atomicity, cost, or gas rule.
 
 It adds no parser or source syntax, Core expression, Wire field,
-Profile, ABI, storage layout, serialization, or published observation.
+ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 
@@ -138,7 +138,7 @@ distinct-slot behaviors.
 The implementation commits are `28d8b35` (179 changed lines), `35c04a5` (49),
 and `38774f3` (33), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused trust-zero checks, the 573-job full build, the
-1034-job full test run, metadata and kernel checks, diff checks, declaration,
+1034-job full test run, kernel checks, diff checks, declaration,
 axiom, dependency, simp-registration, proof-masking, and critical-pair
 inventories, and independent P0-P3 audits pass.
 

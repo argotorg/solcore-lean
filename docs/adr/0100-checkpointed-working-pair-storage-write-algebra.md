@@ -143,7 +143,7 @@ existing failure behavior.
 
 The slice adds no retained-address duplicate, read-after-write law,
 zero-deletion witness, parser or source syntax, Core expression, Wire field,
-Profile, ABI, storage layout, gas rule, or published observation.
+ABI, storage layout, gas rule, or published observation.
 
 ## Staged implementation plan
 
@@ -173,7 +173,7 @@ helper, assertion, or runner call.
 The implementation commits are `7814798` (214 changed lines), `afbd0ec` (78),
 and `a98a71e` (53), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused trust-zero checks, the 540-job full build, the
-968-job full test run, metadata and kernel checks, diff checks, declaration
+968-job full test run, kernel checks, diff checks, declaration
 inventory, failure-stage review, and independent P0-P3 audits pass.
 
 ## Publication and consequences

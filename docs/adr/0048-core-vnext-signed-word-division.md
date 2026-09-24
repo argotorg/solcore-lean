@@ -77,16 +77,12 @@ Focused regressions cover:
   completed dividend effects;
 - two allocating and writing operands evaluated left then right exactly once,
   retaining the divisor's final store;
-- exact literal 4/5 and effectful 28/29 CEK fuel boundaries; and
-- rejection by frozen Wire v1/v2 expression projection and the Wire v2
-  `BinaryOp` conversion.
+- exact literal 4/5 and effectful 28/29 CEK fuel boundaries.
 
-## Publication and exclusions
+## Exclusions
 
-Both operations are internal-only. Do not add them to frozen Wire v1 or v2,
-their JSON enums, schemas, or versions. This slice adds no source syntax,
-standard-library API, ABI rule, opcode lowering, gas rule, or exceptional
-division behavior.
+This slice adds no source syntax, standard-library API, ABI rule, opcode
+lowering, gas rule, or exceptional division behavior.
 
 ## Consequences
 
@@ -104,8 +100,5 @@ zero. They also cover result and operand types, raw invalid operands, ordered
 faults, left-to-right effects evaluated exactly once with the final store
 retained, and exact literal 4/5 and effectful 28/29 fuel boundaries.
 
-Frozen Wire v1/v2 expression projection and the Wire v2 binary-operation
-conversion reject both internal operations, so public schemas and bytes remain
-unchanged. Focused and full warning-free builds, the full test runner, kernel
-policy, and metadata verification pass. The independent audit found no P0-P3
-issue.
+Focused and full warning-free builds, the full test runner, and the
+kernel-policy check pass. The independent audit found no P0-P3 issue.

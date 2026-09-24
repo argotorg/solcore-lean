@@ -54,5 +54,5 @@ showing why the theorem is not a claim about arbitrary Core execution.
 
 Register and audit all public declarations, keep new files below 300 lines,
 and run focused and aggregate builds, full tests, standard-axiom, kernel,
-metadata, forbidden-token and whitespace checks. Commit small exact-path units.
+forbidden-token and whitespace checks. Commit small exact-path units.
 Diagnostic proofs remain untouched.

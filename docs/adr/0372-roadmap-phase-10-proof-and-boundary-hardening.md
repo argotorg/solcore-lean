@@ -153,5 +153,4 @@ All new laws are kernel-checked without an axiom, unsafe definition, native
 decision procedure, or omitted proof.  Focused builds cover the worklist,
 staged carrier, stage algebra, typed validation, type-system, compiler, and
 compiler regression modules.  The aggregate build, test suite, kernel audit,
-metadata audit, forbidden-word scan, and whitespace check remain the release
-boundary.
+forbidden-word scan, and whitespace check remain the release boundary.

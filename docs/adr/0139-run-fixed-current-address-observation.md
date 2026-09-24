@@ -155,9 +155,7 @@ Low-level Core regressions must cover:
 - host-check acceptance of `currentAddress Unit` and closed-check rejection;
 - static rejection and exact raw fault for a non-Unit argument;
 - exact request emission, response injection, continuation, and Store reuse;
-- measured request-ready, suspension, and handled-completion fuel boundaries;
-  and
-- rejection of the internal host-function value by frozen Wire v1 and v2.
+- measured request-ready, suspension, and handled-completion fuel boundaries.
 
 End-to-end regressions must:
 
@@ -181,17 +179,15 @@ End-to-end regressions must:
 Measured fuel values are test results, not assumptions. Record the values found
 by the executable machine and update this ADR if implementation changes them.
 
-## Dependency and publication boundary
+## Dependency boundary
 
 Semantics owns the explicit Address, lossless widening, strict recovery, and
 request interpretation. Core sees only an internal Unit-to-Word capability.
 Generic host-driver and frame-continuation modules remain parameterized and do
 not acquire Address-specific meaning.
 
-Frozen Wire v1 and v2 continue to reject host-function values. Add no Wire tag,
-schema, profile, source form, parser rule, or source
-elaboration. Source-syntax and parser proofs remain paused. The root README
-does not change.
+This slice adds no source form, parser rule, or source elaboration.
+Source-syntax and parser proofs remain paused. The root README does not change.
 
 ## Non-goals
 
@@ -226,8 +222,7 @@ The decision was implemented in bounded green commits:
 3. appended the Core capability and request, closing all exhaustive machine and
    safety proofs while retaining indexes 0 through 8;
 4. added exact handler, strict-recovery, and driver laws;
-5. added focused Core layout, admission, fault, suspension, fuel, and frozen-Wire
-   regressions;
+5. added focused Core layout, admission, fault, suspension, and fuel regressions;
 6. added end-to-end selected, storage, parent, fold, and resumption regressions;
 7. ran full validation, audited the contract independently, and synchronized the
    completion record.
@@ -238,8 +233,7 @@ The decision was implemented in bounded green commits:
 9, both derived host tables have length 10, and index 10 is first unbound. The
 Unit request returns the exact widened run input, preserves the full handler
 context, continuation, and Core-local Store, and strict narrowing recovers the
-supplied Address. Existing indexes 0 through 8 and frozen Wire v1/v2 remain
-unchanged.
+supplied Address. Existing indexes 0 through 8 remain unchanged.
 
 Direct execution measures the exact request/completion boundary at fuel 4/5.
 The end-to-end observe/write/observe program measures fuel 16, 17, 23, 29,
@@ -250,7 +244,7 @@ folds make projection swaps, implicit lookup, request replay, and state loss
 observable.
 
 The 676-job build, 1,240-job test executable build, and full test run pass.
-All 33 changed Lean roots pass trust-zero with warnings as errors; metadata,
+All 33 changed Lean roots pass trust-zero with warnings as errors;
 semantic-kernel, diff, axiom, compatibility, and independent P0-P3 audits also
 pass. The root README and all published formats remain unchanged.
 

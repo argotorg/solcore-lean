@@ -74,9 +74,8 @@ public derived APIs.
 ## Boundaries
 
 No builder expansion, type, inference result, evaluation order, fuel, fault,
-effect, or store behavior changes. No Core form, primitive tag, wire version,
-encoding, source syntax, ABI rule, opcode, or gas rule is added. Existing Wire
-v1 and v2 bytes remain unchanged.
+effect, or store behavior changes. No Core form, primitive tag, source syntax,
+ABI rule, opcode, or gas rule is added.
 
 ## Consequences
 

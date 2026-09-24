@@ -96,5 +96,5 @@ and direct reuse of runtime input/safety/world premises where applicable.
 Migrate only the prior wildcard rejection newly admitted by this exact profile;
 keep old local-only interfaces and all other rejection gates unchanged.
 Run focused, aggregate and full tests, all-public/all-consumer standard-axiom
-audits, old-contract and dependency checks, kernel/metadata, EOF and whitespace
+audits, old-contract and dependency checks, kernel, EOF and whitespace
 checks. Keep diagnostic/parser proof work paused and scratch repository-local.

@@ -172,7 +172,7 @@ reasons, schedule a frame, or decide transaction rollback or atomicity.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
 fuel or gas policy, Wire field, ABI, serialization, EVM revision,
-opcode behavior, Profile, canonical delta, or published format.
+opcode behavior, canonical delta, or published format.
 
 ## Staged implementation plan
 
@@ -226,7 +226,7 @@ The implementation commits are `8c26b3a` (250 changed lines), `43ef3c8` (32),
 update is the fifth staged commit. The definition-stage commit also aligns the
 documented composition binder with the shared `MappedTrapReason` API name.
 Focused and full builds, tests, trust-zero, axiom, simp-termination,
-semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+semantic-kernel, diff, and independent P0-P3 audits pass.
 
 The lift remains a pure record transformation. It invokes no continuation or
 resolver, maps no indexed context or payload, and establishes no rollback,

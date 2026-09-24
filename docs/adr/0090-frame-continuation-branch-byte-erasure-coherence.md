@@ -124,7 +124,7 @@ selected callback returning `none`.
 It does not equate callbacks, execution traces, costs, steps, or invocation
 counts. It adds no parser or source syntax, Core expression, resource rule,
 fuel or gas policy, Wire field, ABI, serialization, EVM revision,
-opcode behavior, Profile, canonical delta, or published observation.
+opcode behavior, canonical delta, or published observation.
 
 ## Staged implementation plan
 
@@ -172,7 +172,7 @@ reason-mapped context before applying the existing continuation-invariance law.
 The implementation commits are `51d095e` (199 changed lines), `163b580` (30),
 and `3b69be5` (46), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+semantic-kernel, diff, and independent P0-P3 audits pass.
 
 The equality establishes no operational execution, callback evaluation count,
 cost, byte recovery, delivery, parent mutation, trap handling, scheduling,

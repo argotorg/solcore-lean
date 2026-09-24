@@ -50,6 +50,6 @@ with genuine checkpoints showing allocation before right evaluation. Exhibit
 the stored-closure counterexample to dropping the right-fragment boundary.
 
 Register and audit every new public API and consumer. Run focused and aggregate
-builds, full tests and standard-axiom/kernel/metadata/forbidden-token/whitespace
-checks. Keep new proof files below 300 lines, separate small exact-path commits,
+builds, full tests, and standard-axiom, kernel-policy, forbidden-token, and
+whitespace checks. Keep new proof files below 300 lines, separate small exact-path commits,
 use repository-local scratch and preserve paused diagnostic files.

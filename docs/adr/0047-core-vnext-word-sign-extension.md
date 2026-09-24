@@ -75,19 +75,16 @@ Focused regressions cover:
   index effects;
 - two allocating and writing operands evaluated index then value exactly once,
   retaining their final store;
-- exact literal 4/5 and effectful 28/29 CEK fuel boundaries; and
-- rejection by frozen Wire v1/v2 expression projection and by the Wire v2
-  `BinaryOp` conversion itself.
+- exact literal 4/5 and effectful 28/29 CEK fuel boundaries.
 
 These cases distinguish sign extension from masking, zero extension, and the
 bounded shift operations. In particular, index 0 with `0x80` must fill all
 upper bits, while index 32 must return its input exactly.
 
-## Publication and exclusions
+## Exclusions
 
-`wordSignExtend` is internal-only. Do not add it to frozen Wire v1 or v2, their
-JSON enums, schemas, or versions. This slice adds no source syntax,
-standard-library API, ABI rule, opcode lowering, or gas rule.
+This slice adds no source syntax, standard-library API, ABI rule, opcode
+lowering, or gas rule.
 
 ## Consequences
 
@@ -104,8 +101,5 @@ maximum word; result and operand types; raw invalid operands; ordered faults;
 left-to-right effects evaluated exactly once with the final store retained;
 and exact literal 4/5 and effectful 28/29 fuel boundaries.
 
-Frozen Wire v1/v2 expression projection and the Wire v2 binary-operation
-conversion reject the internal operation, so public schemas and bytes remain
-unchanged. Focused and full warning-free builds, the full test runner, kernel
-policy, and metadata verification pass. The independent audit found no P0-P3
-issue.
+Focused and full warning-free builds, the full test runner, and the
+kernel-policy check pass. The independent audit found no P0-P3 issue.

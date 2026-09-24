@@ -176,5 +176,5 @@ Focused examples must exercise static whole-program admission, representative
 successful and faulting dynamic rules, evidence/coercion closure, static
 substitution, mutation and pattern operations, stage classification,
 materialization/frontend correspondence, and program-level preservation. The
-aggregate build and tests, semantic-kernel policy scan, metadata validation,
+aggregate build and tests, semantic-kernel policy scan,
 axiom inspection, and diff hygiene remain the acceptance boundary.

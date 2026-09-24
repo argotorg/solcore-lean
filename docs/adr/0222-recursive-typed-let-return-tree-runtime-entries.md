@@ -66,5 +66,5 @@ types, actual opaque values, original argument placement and guards, asymmetric
 costs/bounds, owner/type-name/store transport and full multi-chunk checkpoints.
 Audit all changed public and consumer contracts, allowed axioms, registration and
 acyclic entry-to-body dependencies. Run focused/aggregate builds, parsed execution,
-full tests and kernel/metadata/whitespace checks. Keep proof files below 300 lines
+full tests and kernel-policy and whitespace checks. Keep proof files below 300 lines
 and commits small. Diagnostics stay paused; scratch stays in the repository.

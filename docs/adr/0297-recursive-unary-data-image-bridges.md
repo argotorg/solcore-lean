@@ -269,8 +269,8 @@ records; their exclusion from logical proof dependencies is not a claim about
 runtime replacement metadata. Accept only the standard three axioms or subsets.
 
 Before completion run focused/direct-client builds, old and new parsed IO,
-aggregate frontend/syntax/tests builds, full tests, policy/metadata/whitespace checks,
-all selected public/consumer axiom checks and complete source/edge preservation.
+aggregate frontend, syntax, and test builds, full tests, kernel-policy and whitespace
+checks, all selected public and consumer axiom checks, and complete preservation of sources and edges.
 Freeze and independently review the new audit helpers/config before execution.
 Independent executions must agree on full results. Record bounded failures without
 rewriting old evidence, then commit exact approved paths in small coherent units.

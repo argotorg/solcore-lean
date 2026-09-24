@@ -61,6 +61,6 @@ all tested argument positions, compare actual compiled Core and runtime value
 order, and distinguish operation wrap from rejected literals. Update earlier
 unsupported subtraction/multiplication fixtures while retaining other operator
 rejection. Re-audit every affected public declaration and new constructor,
-focused and aggregate builds, full tests, kernel and metadata checks, forbidden
+focused and aggregate builds, full tests, kernel checks, forbidden
 proof tokens, and whitespace. Preserve unrelated changes and leave diagnostic
 proofs untouched.

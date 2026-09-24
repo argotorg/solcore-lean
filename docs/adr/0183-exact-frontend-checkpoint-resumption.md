@@ -49,6 +49,6 @@ fully parsed entries test every genuine checkpoint below a known exact cost,
 with remaining fuel below, at, and above the residual threshold. Include a
 counterexample for discarding a continuation and whole rejection fixtures.
 Audit and register every public declaration, run focused/aggregate builds and
-full tests, and retain standard-axiom, kernel, metadata, forbidden-token and
+full tests, and retain standard-axiom, kernel, forbidden-token and
 whitespace checks. Keep files below 300 lines, commits small, and diagnostic
 proofs untouched.

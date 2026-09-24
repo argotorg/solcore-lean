@@ -231,7 +231,7 @@ Implementation is complete when it provides external consumers for:
 - commit, rollback, logs, and state deltas through an effectful selected method;
 - exhaustion before and after dispatch and inside a method, followed by exact
   resumption without duplicate effects; and
-- full build, executable suite, warnings-as-errors, trust-zero, metadata,
+- full build, executable suite, warnings-as-errors, trust-zero,
   semantic-kernel, axiom, and diff-hygiene checks.
 
 ## Exclusions and next boundary

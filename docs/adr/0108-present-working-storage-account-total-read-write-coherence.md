@@ -99,7 +99,7 @@ storage-value presence after zero or nonzero writes, and optional/total
 multi-step coherence remain separate decisions.
 
 This slice adds no parser or source syntax, Core expression, Wire field,
-Profile, ABI, storage layout, serialization, or published observation.
+ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 
@@ -124,7 +124,7 @@ runtime or public declaration, fixture, helper, assertion, or runner call.
 The implementation commits are `e251f1d` (161 changed lines), `5ef2212` (38),
 and `bda0eba` (49), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused trust-zero checks, the 561-job full build, the
-1012-job full test run, metadata and kernel checks, diff checks, declaration
+1012-job full test run, kernel checks, diff checks, declaration
 and simp-registration inventories, named composition checks, and independent
 P0-P3 audits pass.
 

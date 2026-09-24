@@ -268,8 +268,8 @@ source form, grammar, parser rule, or source elaboration. Parser work remains
 paused. The root README does not change.
 
 Acceptance requires focused and full builds, the executable suite, trust-zero
-and warning-as-error checks for every changed Lean root, metadata and semantic
-kernel checks, diff hygiene, axiom reports, and independent contract and
+and warning-as-error checks for every changed Lean root, semantic-kernel checks,
+diff hygiene, axiom reports, and independent contract and
 coverage audits.
 
 ## Non-goals
@@ -306,7 +306,7 @@ conditional legacy-success correspondence.
 
 The 723-job full build, 1,334-job test build, executable suite, and all 16
 changed Lean roots pass. The direct Lean checks use trust level zero and treat
-warnings as errors. Metadata, semantic-kernel, and diff checks pass. Every
+warnings as errors. Semantic-kernel and diff checks pass. Every
 public theorem depends only on the accepted `propext` and `Quot.sound` axioms.
 
 ## Consequences

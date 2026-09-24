@@ -207,9 +207,7 @@ Low-level Core tests must cover:
 - exact request emission, both response branches, continuation, and Store;
 - exact raw invalid-argument faults and checked-program no-fault behavior;
 - measured request-ready, suspension, handled-completion, and larger-fuel
-  boundaries rather than assumed costs; and
-- direct rejection of `.hostFunction .inputDataWordBE?` by frozen Wire v1
-  and v2.
+  boundaries rather than assumed costs.
 
 Direct end-to-end tests must vary only `inputData`, retaining code, storage,
 call value, caller Address, and code Address, and observe only the selected
@@ -229,17 +227,15 @@ optional layers. On completion, ADR-0129's resolution fold must recover both
 the exact word-derived storage entry and exact terminal bytes. It must not
 claim that the fold applies rollback or resumes a parent.
 
-## Dependency and publication boundary
+## Dependency boundary
 
 Semantics owns `InputData.wordBE?`, exact window bounds, use of the existing
 big-endian codec, byte coherence, and request interpretation. Core remains
 independent of `Bytes` and owns only the typed internal capability. Generic
 HostDriver and continuation layers remain parametric.
 
-Frozen Core Wire v1 and v2 continue to reject every host-function value. Add no
-Wire tag, runtime schema, profile, ABI
-rule, source form, parser rule, or source elaboration. The root README does
-not change. Publication requires a separate ADR.
+This slice adds no ABI rule, source form, parser rule, or source elaboration.
+The root README does not change.
 
 ## Non-goals
 
@@ -273,14 +269,14 @@ Every commit must stay green and contain at most 300 changed lines:
 3. append the Core capability and request and close every exhaustive machine,
    progress, typing, preservation, runner, and no-fault case;
 4. add exact handler, suspension, recursive-driver, and context-identity laws;
-5. update request-exhaustive custom handlers and add focused Core, fuel, and
-   frozen-Wire regressions;
+5. update request-exhaustive custom handlers and add focused Core and fuel
+   regressions;
 6. add direct optional-word observation and input-only variation regressions;
 7. add the observe-write-observe storage execution and measured fuel
    regressions;
 8. add triple-option parent completion and ADR-0129 fold regressions;
 9. register executable tests and run trust, axiom, dependency, build, test,
-   metadata, kernel, compatibility, and independent audits; and
+   kernel, compatibility, and independent audits; and
 10. synchronize completion evidence in internal documents without changing
     the root README.
 
@@ -313,15 +309,14 @@ Parent-indexed execution completes a present window at fuel 30 after its fuel
 29 exhaustion boundary. The shorter absent branch completes at fuel 12 after
 its fuel 11 exhaustion boundary. Its regressions preserve all three optional
 layers, recover the exact result through the ADR-0129 fold, preserve terminal
-bytes, and confirm completed-result stability at fuel 64. Frozen Wire v1 and
-v2 continue to reject the internal host value.
+bytes, and confirm completed-result stability at fuel 64.
 
 ## Acceptance evidence
 
 - `lake build` completed successfully with 655 jobs;
 - `lake test` completed successfully with 1,198 jobs;
 - all 21 changed Lean roots passed with `--trust=0` and warnings as errors;
-- metadata, semantic-kernel, and diff checks passed;
+- semantic-kernel and diff checks passed;
 - axiom reports use the existing `propext` and `Quot.sound`; the per-byte
   coherence theorem additionally uses `Classical.choice` through the existing
   codec proof path; and

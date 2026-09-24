@@ -163,7 +163,7 @@ store and freeze fuel 13/14.
 
 ADR-0317 through ADR-0325, every existing classifier, checker and relation,
 `RecursiveLocalComputation`, canonical source unions, runtime entries and public
-wire versions remain textually and semantically unchanged. This unit adds an
+Core Wire remains textually and semantically unchanged. This unit adds an
 opt-in static adapter only.
 
 Remain deferred: a wrapper selecting this adapter; two or more groups around a

@@ -135,7 +135,7 @@ scheduling, checkpoint creation or lifetime, trace prefix proof, append
 operation or order, event taxonomy, transaction boundary or atomicity.
 
 It adds no balances, code, host call/create behavior, parser or source form,
-Wire field or tag, Profile, ABI, storage layout, Core-result
+Wire field or tag, ABI, storage layout, Core-result
 adapter, EVM revision, opcode, gas schedule, serialization, canonical delta, or
 frozen artifact.
 
@@ -162,5 +162,5 @@ runner lines.
 The implementation commits are `82a2b53` (198 changed lines), `bae3146` (44),
 `31482b4` (51), and `c415427` (79), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+axiom, semantic-kernel, document-link, diff, and independent P0-P3
 audits pass.

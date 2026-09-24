@@ -154,7 +154,7 @@ inconclusive execution.
 
 It does not connect Core local cells to contract storage or decide storage
 layout, access warmth, refunds, gas, ABI, serialization, EVM revision, opcode
-behavior, parser or source syntax, Wire fields, Profile, canonical
+behavior, parser or source syntax, Wire fields, canonical
 delta, or published observation.
 
 ## Staged implementation plan
@@ -204,7 +204,7 @@ slot, and an unrelated account remain observable sentinels.
 The implementation commits are `f1275c4` (230 changed lines), `1ce5dbc` (21),
 `31d0ad1` (34), and `02589d3` (100), all below 300 changed lines; this
 completion update is the fifth staged commit. Focused and full builds, tests,
-trust-zero, axiom, simp-termination, semantic-kernel, metadata, diff, and
+trust-zero, axiom, simp-termination, semantic-kernel, diff, and
 independent P0-P3 audits pass.
 
 The operation establishes no address authority, account creation, checkpoint

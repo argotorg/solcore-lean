@@ -115,7 +115,7 @@ checkpoint, rollback, outcome, trap, stack, scheduling, transaction, balance,
 code, storage layout, warmth, refund, gas, ABI, serialization, EVM revision,
 delta, or published observation rule.
 
-The slice adds no parser or source syntax, Core expression, Wire field, Profile,
+The slice adds no parser or source syntax, Core expression, Wire field,
 or frozen artifact.
 
 ## Staged implementation plan
@@ -140,7 +140,7 @@ adds no public test function, runtime declaration, or runtime assertion.
 The implementation commits are `bb1d580` (170 changed lines), `140abfd` (100),
 and `a2f0142` (42), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused trust-zero checks, full build and test runs,
-metadata and kernel checks, diff checks, simplification review, declaration
+kernel checks, diff checks, simplification review, declaration
 inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences

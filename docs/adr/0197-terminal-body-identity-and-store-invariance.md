@@ -49,6 +49,6 @@ still available with their original contracts. Include a noninjective lookup
 counterexample rather than silently weakening the injectivity requirement.
 
 Audit relocated declarations and all new public APIs for standard axioms only.
-Run focused and aggregate builds, full tests, dependency-cycle, kernel/metadata,
+Run focused and aggregate builds, full tests, dependency-cycle, kernel,
 forbidden-token and whitespace checks. Keep files below 300 lines and commits
 small, preserve paused diagnostic files and use repository-local scratch.

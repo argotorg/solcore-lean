@@ -96,7 +96,7 @@ or atomicity. It proves equality of two pure value computations only.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
 fuel or gas policy, Wire field, ABI, serialization, EVM revision,
-opcode behavior, Profile, canonical delta, or published format.
+opcode behavior, canonical delta, or published format.
 
 ## Staged implementation plan
 
@@ -142,7 +142,7 @@ one result mapping by `fun reason => second (first reason)`.
 The implementation commits are `727fedd` (175 changed lines), `2006e89` (27),
 and `966816f` (35), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-simp-termination, semantic-kernel, metadata, diff, and independent P0-P3 audits
+simp-termination, semantic-kernel, diff, and independent P0-P3 audits
 pass.
 
 The theorem remains a pure equality. It invokes no continuation, maps no

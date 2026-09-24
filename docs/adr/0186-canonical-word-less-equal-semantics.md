@@ -50,6 +50,6 @@ entry contracts. Migrate only the three current frontend semantic-negative `<=`
 fixtures; leave parser/wire tests and other unsupported operators unchanged.
 
 Register and audit each new public declaration, preserve standard-axiom-only
-proofs and run focused/aggregate builds, full tests, kernel, metadata, forbidden
+proofs and run focused/aggregate builds, full tests, kernel, forbidden
 token and whitespace checks. Keep proof files below 300 lines and commits small
 with exact paths. Scratch work stays inside the repository's ignored directory.

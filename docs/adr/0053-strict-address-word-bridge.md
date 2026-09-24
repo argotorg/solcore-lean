@@ -112,8 +112,8 @@ the maximum address. They also reject the first overflowing word, `2^160`, and
 the maximum 256-bit word, demonstrating that narrowing never truncates or
 reduces modulo the address width.
 
-Focused and full builds and tests, trust-zero checking, semantic-kernel and
-metadata checks, the axiom audit, document-link validation, and diff checking
+Focused and full builds and tests, trust-zero checking, the semantic-kernel
+check, the axiom audit, document-link validation, and diff checking
 pass. The independent audit found no P0-P3 issue.
 
 ## Publication and exclusions
@@ -129,8 +129,8 @@ storage, balance, log, call, creation, checkpoint, rollback, or state delta.
 It chooses no hashing algorithm, EVM revision, gas schedule, host behavior, or
 resource-limit meaning.
 
-It adds no Wire tag, JSON schema, profile, or published observation. Frozen
-public formats and metadata remain unchanged.
+It adds no Wire tag, JSON schema, profile, or published observation. Existing
+public formats remain unchanged.
 
 ## Consequences
 

@@ -104,4 +104,4 @@ nested and higher-order calls with literal captures, arbitrary tuple/body nestin
 original selection order, and non-Word literal-first absence. Preserve actual
 source closures rather than checking only projected Core outputs.
 Run the established focused/aggregate/full, standard-only public/consumer,
-old-contract/import, independent-review, metadata and small-commit checks.
+old-contract/import, independent-review and small-commit checks.

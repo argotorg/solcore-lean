@@ -47,5 +47,5 @@ position, returned value, environment, and fuel boundary. These are finite tests
 of the general theorem, not a new public program synthesis interface.
 
 Audit all public declarations and register them, run focused and aggregate
-builds, full tests, and kernel/metadata/whitespace checks. Keep each new proof
+builds, full tests, and kernel-policy and whitespace checks. Keep each new proof
 file below 300 lines. Diagnostic proofs and all wire interfaces remain untouched.

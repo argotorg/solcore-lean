@@ -113,6 +113,6 @@ Core → ContractRuntime
 ## Verification target
 
 The aggregate Lean build and tests must succeed after import migration.
-Metadata and semantic-kernel policy checks must remain green, and repository
+The semantic-kernel policy check must remain green, and repository
 searches outside historical documentation must find no current
 `Solcore.Semantics` import or namespace.

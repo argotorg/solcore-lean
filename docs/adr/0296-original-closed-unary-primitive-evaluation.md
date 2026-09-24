@@ -211,7 +211,7 @@ No universal source-size cutoff, fuel equality or canonical operator claim follo
 First freeze this design after independent review. Prototype the affected proof
 family in isolated scratch modules using unchanged common dependencies, then
 review and port exact changes. Freeze all source bytes before reviewer reads.
-Run focused/direct builds, all old consumers, actual parsed IO, full tests,
-exact ordinary/generated kernel and standard-axiom checks after stable builds,
-whole dependency/byte-allowlist checks, raw policy/metadata/whitespace checks.
+Run focused and direct builds, all old consumers, actual parsed IO, and full tests.
+After stable builds, run exact ordinary and generated kernel and standard-axiom checks,
+whole-dependency and byte-allowlist checks, raw-policy checks, and whitespace checks.
 Publish imports/tests/status only after semantic review, in small commits.

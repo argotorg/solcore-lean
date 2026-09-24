@@ -51,6 +51,6 @@ thresholds, different genuine checkpoints and unchanged nonempty continuation
 frames. Consume forward transport, reflection and closed-path equivalence.
 
 Register and audit every new public declaration and consumer. Run focused and
-aggregate builds, full tests and standard-axiom/kernel/metadata/forbidden-token/
-whitespace checks. Keep new proof files below 300 lines and commits small; use
+aggregate builds, full tests, and standard-axiom, kernel-policy, forbidden-token,
+and whitespace checks. Keep new proof files below 300 lines and commits small; use
 repository-local scratch and preserve all paused diagnostic files.

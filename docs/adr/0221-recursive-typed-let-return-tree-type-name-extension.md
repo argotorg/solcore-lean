@@ -56,6 +56,6 @@ unselected annotations, mutual preservation of rejected shapes and names,
 harmless duplicate rows, and conflicting first-match overrides.
 
 Audit public and consumer axioms, registration and dependency direction; run
-focused/aggregate builds, actual parsed execution, full tests and kernel,
-metadata and whitespace checks. Keep proof files below 300 lines and commits
+focused/aggregate builds, actual parsed execution, full tests, kernel checks and
+whitespace checks. Keep proof files below 300 lines and commits
 small. Diagnostics remain paused; all scratch stays in the repository.

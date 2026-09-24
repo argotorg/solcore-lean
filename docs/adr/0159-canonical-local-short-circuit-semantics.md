@@ -65,5 +65,5 @@ grouping. Public declarations are audited using only standard kernel axioms.
 Existing accepted inputs keep their exact behavior. Other binary operators,
 bitwise `~`, literals, calls, source declarations, overload resolution, and
 implicit truthiness remain outside this adapter. The reference-only adapter,
-canonical parser, Core machine, Wire versions, and schemas do not change. This
+canonical parser, Core machine, and Core Wire do not change. This
 is not a new source execution service.

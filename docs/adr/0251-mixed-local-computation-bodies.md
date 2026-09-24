@@ -96,6 +96,6 @@ callers' intermediate states.
 Separate decision, definitions, proofs, consumers and publication in small
 commits, keeping new proof/test files below 300 lines. Require focused and
 aggregate builds, full tests, all public/consumer standard-axiom audits,
-dependency closure and kernel/metadata/whitespace checks, plus independent
+dependency-closure, kernel-policy, and whitespace checks, plus independent
 reviews. Parser, diagnostics, Core, old LocalFragment, old body/entry profiles
 and runtime records remain unchanged.

@@ -213,7 +213,7 @@ environment, store, evaluation cost or result.
 
 ADR-0317 through ADR-0328, every existing classifier, relation, checker and theorem,
 ADR-0327's complete nested precedence, `RecursiveLocalComputation`, the ADR-0324
-branch checker, canonical source unions, runtime entries and public wire versions
+branch checker, canonical source unions, runtime entries, and Core Wire
 remain textually and semantically unchanged. This unit adds reachability and fixed
 precedence only.
 

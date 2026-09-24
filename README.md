@@ -15,7 +15,7 @@ The repository currently provides:
   fuel properties, and safety/correspondence proofs;
 - checked-Core contract execution over explicit world and transaction state;
 - static-word ABI encoding and Keccak-256 support; and
-- reproducible generation and shrinking of a checked pure Core v3 fragment.
+- reproducible generation and shrinking of a checked pure Core fragment.
 
 The public interfaces are Lean modules. Import the smallest umbrella that owns
 the behavior you need:
@@ -30,6 +30,7 @@ the behavior you need:
 | Checked-contract execution | `Solcore.ContractRuntime` |
 | ABI utilities | `Solcore.Abi` |
 | Checked Core synthesis | `Solcore.Synthesis` |
+| Generic representation utilities | `Solcore.Util` |
 
 See the [architecture overview](docs/ARCHITECTURE.md),
 [current status](docs/CURRENT_STATUS.md), and [project map](docs/PROJECT_MAP.md)
@@ -37,9 +38,9 @@ for the boundaries and known limitations of each layer.
 
 ## Requirements
 
-- Lean 4.32.1, selected by the checked-in `lean-toolchain`
+- Lean 4.33.1, selected by the checked-in `lean-toolchain`
 - Lake, distributed with Lean
-- Node.js for the repository validation scripts
+- Node.js for the repository kernel-policy check
 
 No separate Lean package installation step is required.
 
@@ -50,13 +51,12 @@ From the repository root:
 ```text
 lake build
 lake test
-node scripts/verify-metadata.mjs
 node scripts/check-kernel.mjs
 ```
 
-Warnings are errors for the `Solcore` package. The two Node.js checks verify
-repository-owned data and enforce the kernel policy; they supplement rather
-than replace the Lean build and tests.
+Warnings are errors for the `Solcore` package. The Node.js check enforces the
+semantic-kernel policy; it supplements rather than replaces the Lean build and
+tests.
 
 ## Use as a Lean library
 
@@ -102,7 +102,7 @@ To generate a reproducible checked Core program:
 ```lean
 import Solcore.Synthesis
 
-open Solcore.Synthesis.CoreV3
+open Solcore.Synthesis.Core
 
 def generatedNodeCount : Except GenerationError Nat := do
   let generated ← generate {
@@ -112,7 +112,7 @@ def generatedNodeCount : Except GenerationError Nat := do
   pure generated.nodeCount
 ```
 
-`generate` returns a checker-sealed program in the supported pure Core v3
+`generate` returns a checker-sealed program in the supported pure Core
 fragment. `shrink` returns checker-sealed candidates that are strictly smaller
 under the library's size measure.
 
@@ -122,5 +122,5 @@ under the library's size measure.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Current status and limitations](docs/CURRENT_STATUS.md)
 - [Feature matrix](docs/FEATURE_MATRIX.md)
-- [Semantic Core Wire v3](docs/CORE_WIRE_V3.md)
+- [Semantic Core Wire](docs/CORE_WIRE.md)
 - [Development guide](docs/DEVELOPMENT.md)

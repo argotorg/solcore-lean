@@ -51,5 +51,5 @@ parsed cases compare the structural bound with known path costs, run every
 matching argument case at and above the bound, and preserve zero-budget
 unsupported-body rejection. Register and audit every public declaration, keep
 proof files below 300 lines, run focused/aggregate builds and full tests, and
-retain standard-axiom, kernel, metadata, forbidden-token and whitespace checks.
+retain standard-axiom, kernel, forbidden-token and whitespace checks.
 Use small exact-path commits and leave diagnostic proofs untouched.

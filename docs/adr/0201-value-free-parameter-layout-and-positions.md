@@ -53,6 +53,6 @@ owner transport with position preservation and retain whole-compilation failure
 when a valid parameter list is followed by an invalid body or return contract.
 
 Audit public declarations and consumers with standard axioms only; run focused,
-aggregate and full tests, kernel/metadata/whitespace checks, keep proof files
+aggregate and full tests, kernel-policy and whitespace checks, keep proof files
 below 300 lines and commits small. Leave diagnostics paused and place scratch
 files inside the repository.

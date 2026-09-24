@@ -148,5 +148,5 @@ Use actual parsed conditional selection followed by a unary call, with mixed
 source/Core/host payloads and literal raw stores. Check zero/threshold budgets,
 non-Bool guards and preservation of all pre-extension successful fixtures.
 Run focused/aggregate/full tests, all public/consumer standard-only axiom audits,
-old-header and allowlisted-diff audits, independent reviews, kernel/metadata checks,
+old-header and allowlisted-diff audits, independent reviews, kernel checks,
 and small commits. Keep diagnostics/parser proof work paused.

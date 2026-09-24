@@ -55,7 +55,7 @@ pair value even when whole Boolean checking rejects that expression. Do not
 strengthen those rules with an actual-value typing assumption. Opaque values,
 nominal static types, duplicate first matches and existing freshness/alignment
 boundaries retain their old meaning. Parsing, diagnostics, Core semantics,
-resolved semantics and frozen wire formats are unchanged.
+resolved semantics and Core Wire are unchanged.
 
 ## Validation
 
@@ -67,6 +67,6 @@ two-element tuple negatives to independently justified positives, while retainin
 unsupported arity/type/projection/entry negatives. Exercise actual parsed function
 entries through a named product alias, preserving original parameter positions.
 Run focused/aggregate builds, full tests, old/new public and consumer axiom
-audits, kernel/metadata/whitespace checks and independent reviews. Separate
+audits, kernel-policy and whitespace checks and independent reviews. Separate
 definitions, proofs, consumers and publication in small commits. Leave paused
 diagnostics untouched and keep scratch files inside the repository.

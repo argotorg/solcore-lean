@@ -197,8 +197,8 @@ code selection. A later slice must specify an exact selected-code refinement or
 an explicit non-Word branch before connecting that boundary.
 
 Acceptance requires focused and full builds, the executable suite, trust-zero
-and warning-as-error checks for every changed Lean root, metadata and semantic
-kernel checks, diff hygiene, and independent contract audits.
+and warning-as-error checks for every changed Lean root, semantic-kernel checks,
+diff hygiene, and independent contract audits.
 
 No Wire tag, schema, profile, source form, grammar, parser
 rule, or source elaboration is added. Frozen public
@@ -245,8 +245,8 @@ A cell-bearing program retains a nonempty Core Store while the frame conversion
 remains Store-independent.
 
 The 695-job full build, 1,278-job test executable build, and full test run pass.
-All 12 changed Lean roots pass trust-zero with warnings as errors. Metadata,
-semantic-kernel, and diff checks pass. No public format or root README changed.
+All 12 changed Lean roots pass trust-zero with warnings as errors.
+Semantic-kernel and diff checks pass. No public format or root README changed.
 
 ## Consequences
 

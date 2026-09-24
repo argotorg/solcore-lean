@@ -63,5 +63,6 @@ No changes to existing body/checker/entry definitions, public contracts, parser,
 Core, Resolved or Wire; no calls, mutation, runtime allocation or general returns.
 Keep definition/proof/consumer/publication commits separate and small, proof
 files below 300 lines, and public/consumer axiom and dependency audits explicit.
-Run focused/aggregate builds, actual parsed tests, full tests and kernel/metadata/
-whitespace checks. Diagnostics stay paused and scratch stays in the workspace.
+Run focused/aggregate builds, actual parsed tests, full tests, the kernel-policy
+check, and whitespace checks. Diagnostics stay paused and scratch stays in the
+workspace.

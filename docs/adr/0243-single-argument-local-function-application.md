@@ -47,7 +47,7 @@ literal coercion, new local identities or reordered child evaluation.
 No existing pure source/resolved expression grammar, checker, body adapter,
 runtime entry or generic theorem changes. In particular, old whole entries
 containing calls remain outside their existing profile. The new module is not
-imported by those lower layers. No parser, diagnostic, Core or frozen wire
+imported by those lower layers. No parser, diagnostic, Core, or Core Wire
 definition changes are needed.
 
 Static contexts may contain nominal parameter/result types without supplying
@@ -76,6 +76,6 @@ stand in for a new source-call runtime theorem. Check real suspended call frames
 and preserve the distinction between arbitrary-continuation endpoints and completion.
 
 Run focused/aggregate builds and full tests, audit all public declarations and
-consumers with standard axioms only, and perform kernel/metadata/whitespace and
+consumers with standard axioms only, and perform kernel-policy and whitespace checks and
 independent reviews. Keep new files below 300 lines and split design, definitions,
 proofs, consumers and publication into small commits. Diagnostics remain paused.

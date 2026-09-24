@@ -53,5 +53,5 @@ retain failure even when their raw selected paths replay successfully.
 Do not change diagnostics, parsers, Core, Resolved, existing entry policy or
 frozen interfaces. Audit public declarations and consumers using only standard
 axioms, and run focused/aggregate builds, actual parsed tests, full tests,
-dependency-cycle, kernel, metadata and whitespace checks. Keep proof files below
+dependency-cycle, kernel and whitespace checks. Keep proof files below
 300 lines, commits small and scratch files inside the repository.

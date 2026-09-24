@@ -56,6 +56,6 @@ why the unused-name premise is essential. Include unequal suspended states
 with equal exhaustion presence to protect the weaker observation boundary.
 
 Audit public declarations against standard kernel axioms; run focused and
-aggregate builds, complete tests, kernel and metadata checks. Keep new proof
+aggregate builds, complete tests, and kernel checks. Keep new proof
 files below 300 lines. No allocation algorithm, source rule, parser, evaluator,
 gas or elapsed-time model, wire format, or external endpoint changes.

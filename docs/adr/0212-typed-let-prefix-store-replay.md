@@ -52,6 +52,6 @@ multi-chunk resumes; preserve old-shape behavior and whole rejection.
 
 Audit all public contracts and consumers for standard axioms and exact public
 registration. Run focused/aggregate builds, actual parsed execution, full tests,
-kernel/metadata checks and dependency-direction checks. Keep new proof files
+kernel checks and dependency-direction checks. Keep new proof files
 below 300 lines and commits small; diagnostics remain paused and scratch files
 remain inside the repository.

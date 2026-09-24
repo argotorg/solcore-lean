@@ -259,5 +259,5 @@ leaks, axiom closure limited to `propext`, `Classical.choice` and `Quot.sound`,
 masked source, exact matrices and spans, selected-failure finality, universal
 complete ADR-0337 preservation, normal/trust-zero/warnings/direct/full builds and
 tests, runner, registration, six-commit/nine-path scope, dependency and
-source/olean parity, kernel/metadata and unchanged paused files. Do not record a
+source/olean parity, kernel checks and unchanged paused files. Do not record a
 final ADR-0339 implementation commit hash in this decision.

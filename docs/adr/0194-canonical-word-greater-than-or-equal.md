@@ -48,7 +48,7 @@ Parsed tests retain actual ordered arguments, provenance, precedence, short
 circuiting and nested arithmetic/conditional composition.
 
 Audit all changed public proofs and new declarations for standard axioms only.
-Run focused and aggregate builds, full tests, kernel/metadata/forbidden-token
+Run focused and aggregate builds, full tests, and kernel-policy, forbidden-token,
 and whitespace checks. Keep proof files below 300 lines and commits small;
 separate static/dynamic/consumer/publication changes. Use repository-local
 scratch and preserve all paused diagnostic files.

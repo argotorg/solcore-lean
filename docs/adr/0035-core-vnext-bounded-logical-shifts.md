@@ -16,7 +16,7 @@ binary(wordShr, value, shift)
 
 ADR-0011 fixes their 256-bit behavior. A shift below 256 uses the existing
 logical operation; a shift of 256 or more returns zero. Generic typing,
-inference, renaming, weakening, evaluation, Safety, machine, and Wire v2 layers
+inference, renaming, weakening, evaluation, Safety, and machine layers
 already support both operators. What is missing is a focused value and
 store-threaded proof interface plus symmetric boundary regressions.
 
@@ -71,9 +71,7 @@ Focused semantic regressions cover:
 - a left fault that prevents shift evaluation;
 - a right fault that observes completed value effects;
 - two allocating and writing operands evaluated exactly once in order;
-- final-store preservation and exact literal and effectful fuel boundaries;
-- Wire v1 rejection of both raw expressions; and
-- exact Wire v2 operator and operand-order projection and round trips.
+- final-store preservation and exact literal and effectful fuel boundaries.
 
 Compile-time examples exercise all fourteen named theorems.
 
@@ -81,9 +79,8 @@ Compile-time examples exercise all fourteen named theorems.
 
 This ADR does not define arithmetic shift, signed words, source spelling,
 standard-library APIs, ABI behavior, opcode lowering, or gas. It changes no
-type, value, fault, evaluator, frame, Wire tag, schema, version, byte encoding,
-or published boundary. Existing Core and Wire versions retain their exact
-meanings.
+type, value, fault, evaluator, frame, Wire tag, schema, byte encoding, or
+published boundary.
 
 ## Consequences
 
@@ -101,8 +98,6 @@ shift-right operand order.
 
 Raw faults, left-to-right effects, and the final store are checked directly.
 Literal expressions finish exactly at fuel 5 after failing at 4; two effectful
-operands finish at 29 after failing at 28. Both operators are rejected by Wire
-v1 and have exact Wire v2 projection, Core round trips, and JSON round trips.
-The final independent audit found no P0-P3 issue. No alias, tag, generic proof,
-schema, or other boundary changed. The next feature is chosen by a separate
-ADR.
+operands finish at 29 after failing at 28. The final independent audit found no
+P0-P3 issue. No alias, tag, generic proof, schema, or other boundary changed.
+The next feature is chosen by a separate ADR.

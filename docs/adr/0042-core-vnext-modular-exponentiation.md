@@ -69,19 +69,16 @@ Focused regressions cover:
   that observes base effects;
 - two allocating and writing operands evaluated base then exponent exactly once,
   with the final store retained;
-- exact literal 4/5 and effectful 28/29 CEK fuel boundaries; and
-- rejection by frozen Wire v1/v2 expression projection and by the Wire v2
-  `BinaryOp` conversion itself.
+- exact literal 4/5 and effectful 28/29 CEK fuel boundaries.
 
 Compile-time examples exercise all fourteen names. Large exponent regressions
 also ensure the internal logarithmic loop terminates without changing CEK fuel.
 
-## Publication and exclusions
+## Exclusions
 
-`wordPow` is internal-only. No Wire tag, Core/JSON round trip, schema change,
-source/standard-library API, ABI rule, opcode lowering, or gas rule is
-introduced. Existing operation values, types, faults, effects, fuel, and
-publication boundaries remain unchanged.
+No source/standard-library API, ABI rule, opcode lowering, or gas rule is
+introduced. Existing operation values, types, faults, effects, and fuel remain
+unchanged.
 
 ## Consequences
 
@@ -105,9 +102,6 @@ with the final store. Literal expressions stop at fuel 4 and complete at 5;
 effectful expressions stop at 28 and complete at 29. Maximum exponents still
 complete at fuel 5 because the internal loop remains one CEK primitive step.
 
-Frozen Wire v1/v2 expression projection and the Wire v2 `BinaryOp` conversion
-reject `wordPow`; no public Core or JSON representation was added. Published
-Wire schemas, metadata, versions, and encodings remain unchanged.
-The implementation and focused proof/semantic/Wire validation are complete.
+The implementation and focused proof/semantic validation are complete.
 After correcting the helper-bound wording above, the independent audit found no
 remaining P0-P3 issue. The next primitive or conversion requires its own ADR.

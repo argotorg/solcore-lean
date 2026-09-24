@@ -90,6 +90,6 @@ After this child foundation, shared-body owner-only covariance can use the
 existing owner map and fresh-binding commutation; that integration is separate.
 Keep proof files below 300 lines and commits small. Review decision, independent
 proofs, consumers and publication separately; run focused/aggregate/full tests,
-exact public/consumer standard-axiom catalogs, old contracts/import/kernel/
-metadata/EOF/whitespace/hash audits. Diagnostics remain paused and all scratch
+exact public/consumer standard-axiom catalogs, and old-contract, import,
+kernel-policy, EOF, whitespace, and hash audits. Diagnostics remain paused and all scratch
 stays in the repository.

@@ -68,7 +68,7 @@ may explicitly transport their old evidence with `.structural`; do not weaken
 their generic theorem headers.
 
 Run focused and aggregate builds, full tests, all old/new public and consumer
-axiom audits, kernel/metadata/whitespace checks and independent reviews. Keep
+axiom audits, kernel-policy and whitespace checks and independent reviews. Keep
 files below 300 lines and phase commits where possible; the existing combined
 header module requires a one-line exactness bridge update with its definition.
 Use repository-local scratch and leave paused diagnostics untouched.

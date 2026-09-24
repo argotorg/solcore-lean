@@ -77,4 +77,4 @@ nested calls remain outside this new profile; their old endpoints are unchanged.
 Separate decisions, definitions, proofs, consumers and publication into small
 commits. Keep each new proof/test file below 300 lines. Require focused and
 aggregate builds, full tests, all public/consumer standard-axiom audits,
-kernel/metadata/whitespace checks and independent reviews.
+kernel-policy and whitespace checks and independent reviews.

@@ -81,10 +81,10 @@ frames, exact fuel boundaries and resumption. Directly consume the existing
 recursive, shared body and entry laws, including arbitrary caller-slot insertion.
 
 Keep proof and consumer files below 300 lines. Run focused, aggregate and full
-tests, complete public/consumer standard-axiom audits, kernel, metadata and
+tests, complete public/consumer standard-axiom audits, kernel and
 whitespace checks, and independent reviews before publication.
 
 Expanded comparisons, recursive tuples, source closure construction, general
 operator resolution, early returns, source-only execution bounds and arbitrary
-store safety remain separate. Parser, Core machine, diagnostics, frozen wire
-and metadata semantics do not change.
+store safety remain separate. Parser, Core machine, diagnostics, and Core Wire
+semantics do not change.

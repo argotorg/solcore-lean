@@ -1,6 +1,6 @@
-# Semantic Core Wire v3
+# Semantic Core Wire
 
-This page is the closed JSON catalog for `solcore-semantic-core/v3`. It is a
+This page is the closed JSON catalog for `solcore-semantic-core`. It is a
 syntax-independent representation of the current Semantic Core, intended for
 checking generated Core and for building checked contract packages. It is not
 Solcore source syntax.
@@ -14,7 +14,7 @@ followed by exactly 64 lowercase hexadecimal digits.
 
 | Field | Value |
 | --- | --- |
-| `schema` | exact string `solcore-semantic-core/v3` |
+| `schema` | exact string `solcore-semantic-core` |
 | `resultType` | Type |
 | `dataDefinitions` | array of DataDefinition |
 | `body` | Expression |
@@ -113,11 +113,9 @@ indices `n` through `n + 13`; the first unbound free index is `n + 14`.
 
 - Wire-to-Core conversion is total for every value in this catalog.
 - Core-to-wire projection is partial and rejects any later Core form not listed.
-- Semantic Core Wire v1 and v2 remain separate closed types and reject v3-only
-  forms.
-- Wire v3 contains no runtime Value, closure environment, local Store, CEK
+- Core Wire contains no runtime Value, closure environment, local Store, CEK
   state, proof witness, generated ABI cache, WorldState, or execution result.
-- Static Word ABI metadata contains only a method name and a Wire v3
+- Static Word ABI metadata contains only a method name and a Wire
   implementation. Its `uint256` input/output shape, signature, and selector are
   derived during admission.
 

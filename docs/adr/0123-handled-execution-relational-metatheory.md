@@ -257,7 +257,7 @@ preventing terminal monotonicity from being generalized to out-of-fuel.
 - the full build completed successfully with 619 build jobs;
 - `lake test` completed successfully with 1,126 jobs;
 - all four changed Lean modules passed trust-zero with warnings as errors;
-- workspace metadata and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - printed axioms contain only existing standard `propext` and `Quot.sound`
   dependencies, with no custom axiom, `Classical.choice`, or `sorryAx`;
 - independent proof and final audits found no P0, P1, P2, or P3 issue;

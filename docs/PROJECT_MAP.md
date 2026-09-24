@@ -17,7 +17,7 @@ work should normally import a narrower umbrella.
 | Extend Semantic Core | [`Solcore/Core.lean`](../Solcore/Core.lean) | data, typing, evaluation, checking, machines, safety |
 | Execute checked contracts | [`Solcore/ContractRuntime.lean`](../Solcore/ContractRuntime.lean) | world, frame, transaction, host, call, creation, observation modules |
 | Change ABI support | [`Solcore/Abi.lean`](../Solcore/Abi.lean) | Keccak-256 and static-word modules |
-| Generate checked Core cases | [`Solcore/Synthesis.lean`](../Solcore/Synthesis.lean) | CoreV3 seed, fragment, generator, and shrinker |
+| Generate checked Core cases | [`Solcore/Synthesis.lean`](../Solcore/Synthesis.lean) | Core seed, fragment, generator, and shrinker |
 
 ## Canonical syntax route
 
@@ -89,11 +89,9 @@ For the local executable language, start with:
 5. safety, correspondence, fuel, renaming, local-fragment, and primitive
    property modules.
 
-The retained encoding modules are
-[`Core/Wire.lean`](../Solcore/Core/Wire.lean),
-[`Core/Wire/V2.lean`](../Solcore/Core/Wire/V2.lean), and
-[`Core/Wire/V3.lean`](../Solcore/Core/Wire/V3.lean). The current encoding is
-documented in [Core Wire v3](CORE_WIRE_V3.md).
+The current encoding is exposed by
+[`Core/Wire.lean`](../Solcore/Core/Wire.lean) and documented in
+[Core Wire](CORE_WIRE.md).
 
 ## Checked-contract route
 
@@ -114,11 +112,9 @@ complete retained boundary.
 
 - `Tests/` contains executable regression and property modules imported by
   `Tests/Main.lean`.
-- `scripts/verify-metadata.mjs` validates repository-owned data and digests.
 - `scripts/check-kernel.mjs` enforces the configured semantic-source policy.
-- `metadata/baselines.json` records pinned external-comparison evidence.
 
-Run all four checks listed in the [development guide](DEVELOPMENT.md) before
+Run all three checks listed in the [development guide](DEVELOPMENT.md) before
 handing off a cross-layer change.
 
 ## Documentation routes

@@ -75,18 +75,15 @@ Focused regressions cover:
   observes value effects;
 - two allocating and writing operands evaluated value then shift exactly once,
   with the final store retained;
-- exact literal 4/5 and effectful 28/29 fuel boundaries; and
-- rejection by frozen Wire v1/v2 expression projection and by the Wire v2
-  `BinaryOp` conversion itself.
+- exact literal 4/5 and effectful 28/29 fuel boundaries.
 
 Compile-time examples exercise all eleven theorem names.
 
-## Publication and exclusions
+## Exclusions
 
-`wordSar` is internal-only. No Wire tag, Core/JSON round trip, schema change,
-source/standard-library API, ABI rule, opcode lowering, or gas rule is
-introduced. Existing operation values, types, faults, effects, fuel, and
-publication boundaries remain unchanged.
+No source/standard-library API, ABI rule, opcode lowering, or gas rule is
+introduced. Existing operation values, types, faults, effects, and fuel remain
+unchanged.
 
 ## Consequences
 
@@ -109,11 +106,8 @@ value/shift faults, and two allocating, writing operands evaluated exactly once
 with the final store. Literal evaluation has the exact 4/5 fuel boundary and
 effectful evaluation the exact 28/29 boundary.
 
-Frozen Wire v1/v2 expression projection and the Wire v2 `BinaryOp` conversion
-reject `wordSar`; no Core or JSON round trip is introduced. Raw Core remains
-value-left/shift-right. The future source `(shift, value)` boundary remains a
-binding-before-reordering requirement. The implementation and focused
-semantic/Wire validation are complete. The independent audit found no P0-P3
-issue, no source trust escape hatch, and only the repository-approved Lean
-foundational dependencies. Published Wire schemas, metadata, versions, and
-encodings remain unchanged.
+Raw Core remains value-left/shift-right. The future source `(shift, value)`
+boundary remains a binding-before-reordering requirement. The implementation
+and focused semantic validation are complete. The independent audit found no
+P0-P3 issue, no source trust escape hatch, and only the repository-approved
+Lean foundational dependencies.

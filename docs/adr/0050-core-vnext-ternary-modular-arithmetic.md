@@ -69,9 +69,7 @@ Focused regressions cover:
 - unchecked execution returning the exact three-value
   `invalidTernaryOperands` payload;
 - ordered faults at each operand and left-to-right allocating/writing effects;
-- exact literal 6/7 and effectful 42/43 CEK fuel boundaries; and
-- rejection by frozen Wire v1/v2 expression projection, with no public
-  ternary-operation enum added.
+- exact literal 6/7 and effectful 42/43 CEK fuel boundaries.
 
 ## Staged implementation plan
 
@@ -83,15 +81,12 @@ Keep every commit below 300 changed lines and leave the tree green:
 4. activate typing, checking, Safety, correspondence, and renaming support;
 5. add the exact fourteen focused proofs;
 6. add focused semantic and machine tests;
-7. add frozen Wire rejection tests; and
-8. update completion documentation after all checks pass.
+7. update completion documentation after all checks pass.
 
-## Publication and exclusions
+## Exclusions
 
-The ternary form and both operations are internal-only. Frozen Wire v1/v2,
-their JSON forms, schemas, profiles, and versions remain unchanged and reject
-the new form. This slice adds no source syntax,
-standard-library API, ABI rule, opcode lowering, or gas rule.
+This slice adds no source syntax, standard-library API, ABI rule, opcode
+lowering, or gas rule.
 
 ## Consequences
 

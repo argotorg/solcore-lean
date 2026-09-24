@@ -182,7 +182,7 @@ HostDriver import, and Core gains no reverse dependency on the frame layer.
 
 The operation is re-exported only through the internal Semantics facade. It
 does not change Core, host requests, WorldState, execution, fuel, parser,
-source syntax, ABI, Wire, schemas, profiles, or the root README.
+source syntax, ABI, Wire, or the root README.
 
 ## Non-goals
 
@@ -236,14 +236,14 @@ layers under additional fuel.
 - the full build completed 630 jobs;
 - the complete test suite completed 1,148 jobs and all runtime checks passed;
 - every changed Lean module compiled with trust zero and warnings as errors;
-- metadata and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - all four public laws report exactly `[propext]`;
 - no new simplification rule, unchecked declaration, runtime branch, or public
   format was added; and
 - independent production and regression audits found no P0-P3 issue.
 
 The parser, source syntax, Core, host protocol, WorldState, execution, fuel, ABI,
-Wire formats, schemas, profiles, and root README did not change.
+Wire formats, and root README did not change.
 
 ## Consequences
 

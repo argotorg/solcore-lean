@@ -65,15 +65,12 @@ Focused regressions cover:
   observes the completed left store;
 - allocating and writing operands evaluated source-left then source-right
   exactly once, retaining the final store;
-- exact literal 10/11 and effectful 34/35 CEK fuel boundaries; and
-- frozen Wire v1/v2 rejection of both the builder and its handwritten exact
-  expansion, including rejection of the underlying `wordSgt` operation.
+- exact literal 10/11 and effectful 34/35 CEK fuel boundaries.
 
 ## Publication and exclusions
 
-This slice adds a derived builder, not a Core form or primitive tag. Frozen Wire
-v1/v2, their JSON enums, schemas, versions, and bytes remain unchanged. It adds
-no source spelling, ABI rule, opcode lowering, or gas rule. Word-valued signed
+This slice adds a derived builder, not a Core form or primitive tag. It adds no
+source spelling, ABI rule, opcode lowering, or gas rule. Word-valued signed
 flags remain a separate future decision.
 
 ## Consequences
@@ -85,7 +82,4 @@ The nested bindings leave variable zero naming the computed right value and
 variable one naming the computed left value. Value and type boundaries,
 underlying invalid-operand faults, ordered faults, effects, final stores, and
 exact literal 10/11 and effectful 34/35 fuel boundaries are executable
-regressions. Frozen Wire v1/v2 reject the builder and its handwritten
-expansion, while Wire v2 also rejects the underlying `wordSgt` operation.
-Public formats and bytes are unchanged. The independent audit found no P0-P3
-issue.
+regressions. The independent audit found no P0-P3 issue.

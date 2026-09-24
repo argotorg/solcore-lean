@@ -89,7 +89,7 @@ Consume the existing shared body and entry laws directly for the new trees.
 
 Keep new proof and consumer files below 300 lines, separate definitions,
 proofs, consumers and publication commits, and run focused, aggregate and full
-tests, all-public/all-consumer standard-axiom audits, metadata/kernel/whitespace
+tests, all-public and all-consumer standard-axiom audits, kernel-policy and whitespace
 checks and independent reviews before publication.
 
 Expanded comparisons (<, <=, >=, !=), lazy Bool operators, tuples, unary and

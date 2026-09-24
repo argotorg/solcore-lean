@@ -242,7 +242,7 @@ Neither wrapper branch changes Core, environment, store, evaluation cost or resu
 ADR-0317 through ADR-0334, every existing classifier, relation, checker and
 theorem, ADR-0333's complete nested precedence, `RecursiveLocalComputation`, the
 shared ADR-0324 branch checker, canonical source unions, runtime entries and
-public wire versions remain textually and semantically unchanged. ADR-0335 adds
+Core Wire remains textually and semantically unchanged. ADR-0335 adds
 only reachability and fixed precedence.
 
 ADR-0336 is the next smallest standalone semantic leaf: exactly six
@@ -287,5 +287,5 @@ branch equations, selected-failure finality, universal complete ADR-0333
 preservation and exact 14/6 and 14/19 outcome partitions; direct/focused/umbrella/
 aggregate builds, direct parsed runner and full tests; registration counts; exact
 six-commit/nine-path range; preservation of ADR-0317 through ADR-0334 and all
-paused files; source/olean drift, dependency closure, kernel and metadata. Do not
+paused files; source/olean drift, dependency closure and kernel checks. Do not
 record a final ADR-0335 implementation commit hash in this decision.

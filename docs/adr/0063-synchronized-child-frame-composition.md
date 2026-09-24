@@ -99,7 +99,7 @@ stack, invocation operation, frame identity, call depth, checkpoint creation,
 trace construction, event taxonomy or order, append behavior, transaction
 boundary or atomicity, or trap disposition.
 
-It adds no parser or source form, Wire field or tag, Profile,
+It adds no parser or source form, Wire field or tag,
 ABI, Core-result adapter, EVM revision, opcode, gas schedule, serialization,
 canonical delta, or frozen artifact.
 
@@ -123,5 +123,5 @@ fixtures.
 The implementation commits are `5066992` (154 changed lines), `e1fc6f4` (48),
 and `7e7f6ca` (76). Each remains below 300 changed lines; this completion update
 is the fourth staged commit. Focused and full builds, tests, trust-zero,
-semantic-kernel, metadata, forbidden-declaration, document-link, and diff
+semantic-kernel, forbidden-declaration, document-link, and diff
 checks pass. Independent stage audits found no P0-P3 issue.

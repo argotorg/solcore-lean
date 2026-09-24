@@ -137,8 +137,7 @@ Core publishes and verifies:
 - executable/declarative correspondence for the new emission branch;
 - response typing, suspension typing, typed progress, and preservation;
 - no-fault execution for checked host programs;
-- unchanged runner soundness, relational replay, and fuel completeness; and
-- continued rejection of the new host-function value by frozen Wire v1/v2.
+- unchanged runner soundness, relational replay, and fuel completeness.
 
 Semantics publishes and verifies:
 
@@ -176,8 +175,7 @@ Tests cover:
 - identical completed value, Core-local store, and final host context under a
   larger budget by the public stability theorem;
 - unchanged read/write/read, repeated-write, sparse-zero, and fuel-boundary
-  regressions from ADR-0119 and ADR-0120; and
-- direct Wire v1 and v2 rejection of `.hostFunction .storageAddress`.
+  regressions from ADR-0119 and ADR-0120.
 
 ## Dependency boundary
 
@@ -190,12 +188,11 @@ Semantics owns interpretation and reuses the Address-to-Word bridge. Generic
 No parser, source syntax, ABI, schema, profile, or gas module participates in
 the implementation.
 
-## Compatibility and publication
+## Compatibility
 
-This capability is internal and unpublished. Frozen Core Wire v1/v2 continue
-to reject host-function values, while source syntax, parser, schemas, profiles,
-and published metadata remain unchanged. No new Core expression tag is needed;
-internal programs use existing variables, application, and Unit syntax.
+Source syntax and the parser remain unchanged. No new Core expression tag is
+needed; internal programs use existing variables, application, and Unit
+syntax.
 
 The extension is behavior-preserving for existing programs because the old
 capability positions remain fixed. It is not Lean source-compatible for every
@@ -265,8 +262,7 @@ No out-of-fuel stability theorem was added.
 The Core regressions fix indices 0, 1, and 2, all table entries, Unit argument
 typing, exact request and Word resumption, invalid raw arguments, and checked
 no-fault execution. The minimal observation is request-ready out of fuel at
-fuel 4 and done at fuel 5. Frozen Wire v1 and v2 both continue to reject
-`.hostFunction .storageAddress`.
+fuel 4 and done at fuel 5.
 
 The address-selected fixture deliberately uses different values for
 `codeAddress` and `storageAddress`. The minimal program returns
@@ -292,7 +288,7 @@ out-of-fuel regressions remain unchanged.
 - the full build completed successfully with 619 build jobs;
 - `lake test` completed successfully with 1,126 jobs;
 - all 16 changed Lean modules passed trust-zero with warnings as errors;
-- workspace metadata and the semantic-kernel policy were verified;
+- the semantic-kernel policy was verified;
 - an independent final audit found no P0, P1, P2, or P3 issue;
 - every implementation and documentation commit stayed below 300 changed
   lines; and
@@ -300,9 +296,8 @@ out-of-fuel regressions remain unchanged.
 
 The acceptance audit also confirmed exact context identity for the observation,
 lossless Address widening, distinct code and storage roles, handled-write
-retention, the fuel 4/5/23/29/30/64 boundaries, frozen Wire rejection, and the
-intentional absence of an out-of-fuel stability claim. Source syntax, parser,
-schemas, profiles, and published formats remain unchanged.
+retention, the fuel 4/5/23/29/30/64 boundaries, and the intentional absence of
+an out-of-fuel stability claim. Source syntax and the parser remain unchanged.
 
 ## Consequences
 

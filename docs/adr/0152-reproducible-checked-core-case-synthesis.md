@@ -7,8 +7,8 @@
 
 ## Context
 
-Semantic Core Wire v3 is a closed, versioned target with an executable checker
-and a soundness theorem. It is therefore suitable for reproducible generation
+Semantic Core Wire is a closed target with an executable checker and a
+soundness theorem. It is therefore suitable for reproducible generation
 of well-typed programs independently of source parsing and lowering.
 
 Generating arbitrary raw trees and discarding checker failures would reject
@@ -19,9 +19,9 @@ large.
 
 ## Decision
 
-`Solcore.Synthesis.CoreV3` provides a pure Lean library for reproducible Core
-v3 program generation and deterministic, checker-sealed shrinking. The first
-versioned fragment is G0 and consists of:
+`Solcore.Synthesis.Core` provides a pure Lean library for reproducible Core
+program generation and deterministic, checker-sealed shrinking. The initial
+fragment is G0 and consists of:
 
 1. a fixed pure pseudo-random source;
 2. a bounded type-directed Word/Boolean expression generator;
@@ -41,13 +41,14 @@ node count, then calls `generate`. Success returns a `GeneratedProgram` with:
 - the initial and final seed states;
 - the requested node bound;
 - a constructor-private `CheckedWordProgram`; and
-- projections for the generated `V3.Program`, its node count, and its features.
+- projections for the generated `Solcore.Core.Wire.Program`, its node count,
+  and its features.
 
 `CheckedWordProgram.ofProgram?` is the sole admission path for an externally
-supplied candidate. It requires the v3 checker to accept the Program, the
+supplied candidate. It requires the Wire checker to accept the Program, the
 result type to be Word, the named-data-definition list to be empty, and the
 body to belong to G0. Its `wellTyped` theorem projects checker acceptance into
-the declarative v3 contract.
+the declarative Wire contract.
 
 The public `shrink` function accepts a `CheckedWordProgram` and returns a list
 of `ShrinkCandidate`s. Each candidate records its rechecked Program and exact
@@ -63,7 +64,7 @@ fixed in code. `Seed.algorithmId` identifies the choice algorithm, and
 The same generator version, initial seed, and node bound produce the same:
 
 - final seed state;
-- Core Wire v3 Program;
+- Core Wire Program;
 - node count; and
 - structural feature sequence.
 
@@ -97,7 +98,7 @@ more nodes than requested.
 
 ## Checker sealing
 
-Generation constructs a type-directed candidate, invokes the existing v3
+Generation constructs a type-directed candidate, invokes the existing Wire
 checker, and admits the result through `CheckedWordProgram.ofProgram?`. Checker
 rejection is `GenerationError.checkerInvariant`, because rejection indicates a
 bug in the generator rather than an ordinary sampling outcome.
@@ -139,7 +140,7 @@ The implementation is validated by tests for:
 - binder-safe shrinking without variable capture; and
 - complete constructor and operator coverage for the G0 corpus.
 
-The aggregate build, tests, metadata checks, semantic-kernel checks, and axiom
+The aggregate build, tests, semantic-kernel checks, and axiom
 checks remain required.
 
 ## Exclusions and next boundary

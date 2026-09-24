@@ -122,5 +122,5 @@ Cover a genuinely image-exact child instance for both directions of the stronger
 
 Keep callback models explicit and bounded, without a closed-evaluator claim.
 Run focused/aggregate/full tests, exact standard-only public and consumer catalogs,
-independent reviews, unchanged old bytes/headers/imports, kernel, metadata,
+independent reviews, unchanged old bytes/headers/imports, kernel,
 EOF, whitespace and small-commit checks.

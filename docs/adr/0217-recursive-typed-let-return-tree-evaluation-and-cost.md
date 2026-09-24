@@ -65,5 +65,5 @@ missing runtime initializer values, aligned but untyped environments and
 misaligned IDs. Check exact paths with empty, safe pending and incompatible
 continuations. Audit every public contract and consumer, standard axioms,
 registration/dependency direction, focused and aggregate builds, parsed execution,
-full tests and kernel/metadata/whitespace policy. Keep proof files below 300
+full tests, and kernel-policy and whitespace checks. Keep proof files below 300
 lines, commits small, diagnostics paused and scratch inside the repository.

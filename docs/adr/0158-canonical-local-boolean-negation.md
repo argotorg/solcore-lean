@@ -53,7 +53,7 @@ Grouping adds no Core transitions, and nesting follows the actual Core tree.
 These are execution bounds, not parser/checker complexity or EVM gas.
 
 This is not a new external source service or a change to any frozen publication.
-Canonical parser behavior, Semantic Core constructors, and schemas remain
+Canonical parser behavior, Semantic Core constructors, and Core Wire remain
 unchanged.
 
 Tests cover both Boolean inputs, double negation, grouping and conditional
@@ -61,4 +61,4 @@ nesting, arbitrary source ranges, caller-controlled names, non-Boolean operands,
 continued rejection of unsupported operators, the exact fuel boundary, bundled
 input execution, and unused-name preservation. Source-text tests parse and
 execute the actual checker-returned Core. All affected public proofs are
-re-audited, with focused/aggregate builds, kernel/metadata checks, and full tests.
+re-audited, with focused/aggregate builds, kernel checks, and full tests.

@@ -44,10 +44,6 @@ source-elaboration rule. Later named algebraic data may elaborate to sums and
 products or receive a separate Core representation; this ADR does not decide
 that question.
 
-The feature is internal. It adds no tag to Semantic Core v1 or v2. Frozen wire
-projections reject sum types, injections, case expressions, injected values,
-and programs containing them.
-
 No equality, ordering, hashing, ABI encoding, or storage layout operation is
 added for sum values.
 
@@ -64,8 +60,8 @@ added for sum values.
 - progress, preservation, total evaluation, sufficient fuel, and fault
   exclusion;
 - weakening beneath both branch binders; and
-- focused nesting, selection, order, diagnostic, exact-fuel, interaction, and
-  frozen-wire tests.
+- focused nesting, selection, order, diagnostic, exact-fuel, and interaction
+  tests.
 
 ## Consequences
 

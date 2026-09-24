@@ -76,4 +76,4 @@ of nominal types. Source closures/global resolution/arrays/index/projection,
 parser and diagnostic proofs remain outside this proof-only change.
 Use independent reviews, small phase commits, focused and aggregate builds,
 full tests, all-public/all-consumer standard-axiom audits, unchanged-contract
-and dependency checks, policy/metadata/whitespace checks and local scratch.
+and dependency checks, kernel-policy and whitespace checks, and local scratch.

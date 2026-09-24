@@ -61,7 +61,7 @@ Exercise unused inputs and ID relabeling without confusing completed-result
 preservation with equality of intermediate states after input insertion.
 
 Audit affected public proofs against standard kernel axioms and run focused
-and aggregate builds, complete tests, kernel checks, and metadata checks.
+and aggregate builds, complete tests, and kernel checks.
 Keep proof files below 300 lines. This adds no Core rule, parser behavior,
 arithmetic/comparison policy, assignment or declaration semantics, source-wide
 allocator, wire format, external endpoint, or capability change.

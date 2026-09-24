@@ -12,7 +12,7 @@ the current Lean modules expose and which larger claims remain open. The
 | Canonical syntax | Executable lexer/parser, diagnostics and recovery, source-preserving AST, grammar and parser properties | `Solcore.Syntax` |
 | Workspace and frontend | Explicit-root workspace checking, resolution, inference, trait evidence, staging, specialization, linking, and restricted backend selection | `Solcore.Frontend.Current` |
 | Declarative source semantics | Independent static, staging, successful dynamic, fault, substitution, and preservation judgments for the modeled resolved language | `Solcore.SourceSemantics` |
-| Semantic Core | Checked executable IR, local and host evaluation, machines, primitives, fuel/resumption, safety, and wire encodings | `Solcore.Core` |
+| Semantic Core | Checked executable IR, local and host evaluation, machines, primitives, fuel/resumption, safety, and the Core Wire encoding | `Solcore.Core` |
 | Checked-contract runtime | Explicit world, transaction and frame execution, nested calls, creation, checkpoints, commit/rollback, logs, and observations | `Solcore.ContractRuntime` |
 | ABI | Keccak-256 and static-word ABI support | `Solcore.Abi` |
 | Core synthesis | Seeded checked pure-Core generation and strict shrinking | `Solcore.Synthesis` |
@@ -116,10 +116,9 @@ The implementation includes:
 - correspondence, progress, and state/value safety results at their documented
   boundaries.
 
-Core Wire v3 is the current retained encoding. Earlier retained wire modules
-remain closed encodings: new internal constructors must not be silently added
-to an older representation. The exact v3 data rules are cataloged in
-[CORE_WIRE_V3.md](CORE_WIRE_V3.md).
+`Solcore.Core.Wire` is the current Core encoding. Its exact data rules are
+cataloged in [CORE_WIRE.md](CORE_WIRE.md). Historical wire variants are not
+retained as parallel APIs.
 
 ## Checked-contract execution
 
@@ -149,7 +148,7 @@ memory model, and compiler-to-bytecode pipeline are outside the current API.
 
 ## Reproducible Core synthesis
 
-`Solcore.Synthesis.CoreV3` accepts an explicit 64-bit seed and program-node
+`Solcore.Synthesis.Core` accepts an explicit 64-bit seed and program-node
 bound. It generates checked programs in a pure Word/Boolean fragment and
 returns the seed state needed for replay. The fragment includes literals,
 Word locals, `let`, `if`, and the supported Word operations.
@@ -193,14 +192,12 @@ Run the full local checks from the repository root:
 ```text
 lake build
 lake test
-node scripts/verify-metadata.mjs
 node scripts/check-kernel.mjs
 ```
 
 The build checks all imported declarations with warnings as errors. Tests
-exercise executable examples and regression properties. Repository validation
-checks owned data and configured dependency invariants. The kernel-policy
-check scans semantic roots for disallowed escape hatches.
+exercise executable examples and regression properties. The kernel-policy check
+scans semantic roots for disallowed escape hatches.
 
 These checks establish only the statements and behaviors present in this
 revision. They do not fill an explicitly open proof boundary or establish

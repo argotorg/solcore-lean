@@ -148,7 +148,7 @@ evidence.
 
 This proof-only slice is not published. It adds no balance, code, call data,
 transferred value, host call/create behavior, storage layout, serialization,
-canonical delta, Profile, frozen artifact, or public format.
+canonical delta, frozen artifact, or public format.
 
 ## Consequences
 
@@ -176,7 +176,7 @@ test function, or runner call is added.
 The implementation commits are `4193f22` (209 changed lines), `edd88b4` (59),
 and `e01f208` (79), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-non-simp, semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+non-simp, semantic-kernel, diff, and independent P0-P3 audits pass.
 
 Successful selection is still only a pure value-level fact, and the prefix is
 still non-strict. These laws prove no runtime propagation, enclosing-frame

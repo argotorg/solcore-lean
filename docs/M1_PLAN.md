@@ -34,23 +34,21 @@ A Core feature is complete only when the affected obligations are addressed:
 5. machine execution where applicable;
 6. correspondence, progress, and preservation at the changed boundary;
 7. fuel and resumption behavior; and
-8. explicit representation or rejection in each retained wire encoding.
+8. explicit representation or rejection at the current Wire boundary.
 
 Core values and stores remain separate from source heaps and contract world
 state. New source concepts enter Core only through an explicit lowering with a
 stated proof boundary.
 
-## Retained wire encodings
+## Core Wire
 
-Core Wire v1, v2, and v3 are closed representations. Their modules may decode,
-encode, or project only the constructors assigned to that version. Adding an
-internal Core constructor must not change the meaning of existing encoded
-values.
+`Solcore.Core.Wire` is the single current closed representation. It encodes,
+decodes, and projects the constructors assigned to the supported Core boundary.
+The repository does not retain parallel historical variants.
 
-- [ADR-0010](adr/0010-m1b-core-wire-v1.md) records the v1 boundary.
-- [Core Wire v3](CORE_WIRE_V3.md) catalogs the current encoding.
-- [ADR-0151](adr/0151-versioned-checked-core-execution.md) records how checked
-  Core v3 enters the retained execution stack.
+- [Core Wire](CORE_WIRE.md) catalogs the encoding.
+- [ADR-0151](adr/0151-checked-core-execution.md) records how checked
+  Core enters the execution stack.
 
 Strict decoding should reject missing or unknown fields, invalid tags,
 noncanonical scalar encodings, duplicate keys, and configured resource-limit
@@ -104,7 +102,7 @@ scope.
 ## Synthesis policy
 
 [ADR-0152](adr/0152-reproducible-checked-core-case-synthesis.md) governs the
-pure Core v3 generator and shrinker. Reproducibility requires an explicit seed,
+pure Core generator and shrinker. Reproducibility requires an explicit seed,
 versioned fragment assumptions, deterministic generation, checker-sealed
 output, and a returned final seed state.
 
@@ -126,7 +124,7 @@ For a vertical Core/runtime increment:
 1. settle the declarative rule and observable edge cases;
 2. implement the checker/evaluator path;
 3. establish machine and safety results;
-4. update retained encoding isolation;
+4. update the Core Wire boundary;
 5. add contract-runtime or ABI adapters only when required;
 6. extend synthesis only after the checker boundary is stable; and
 7. update status, feature, and compatibility documentation.
@@ -137,7 +135,7 @@ A change may be marked complete when:
 
 - all changed Lean modules build with warnings as errors;
 - focused and full tests pass;
-- repository-data and kernel-policy checks pass;
-- retained encodings either represent or reject the form explicitly;
+- the kernel-policy check passes;
+- Core Wire either represents or rejects the form explicitly;
 - resource and rollback behavior are tested at their boundaries; and
 - open proof or interoperability work is named without broadening the claim.

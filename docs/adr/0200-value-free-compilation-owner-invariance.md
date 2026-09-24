@@ -50,6 +50,6 @@ header, duplicate-name, unsupported-body and malformed-parser rejection boundari
 No runtime values are needed for these parsed checks.
 
 Audit every public declaration and consumer with standard axioms only; run
-focused/aggregate builds and full tests, kernel/metadata/whitespace checks, keep
+focused and aggregate builds and full tests, kernel-policy and whitespace checks, keep
 proof files below 300 lines and commits small. Leave diagnostic proofs untouched
 and use repository-local scratch files.

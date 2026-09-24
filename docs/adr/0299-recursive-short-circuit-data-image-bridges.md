@@ -118,7 +118,7 @@ public logical closures. Do not predict compiler-generated names or normalize
 numeric binder atoms. Preserve the complete ordered historical catalogs.
 Require focused and direct-client builds, full frontend/syntax/tests builds,
 new and retained parsed tests, full tests, standard-axiom and kernel-policy
-checks, metadata verification and whitespace checks before completion.
+checks and whitespace checks before completion.
 
 This slice adds no Word binary dispatch, effects, mutation, source/Core closure
 identity, whole-frontend totality or canonical Rust compiler-correctness claim.

@@ -60,16 +60,13 @@ Focused regressions cover:
 - allocating and writing operands evaluated left then right exactly once with
   the final store retained;
 - insufficient/sufficient literal and effectful CEK fuel boundaries:
-  7/8 and 31/32 for `wordSgtFlag`, 13/14 and 37/38 for `wordSltFlag`; and
-- frozen Wire v1/v2 rejection of each builder and handwritten expansion, plus
-  Wire v2 rejection of the underlying `wordSgt` operation.
+  7/8 and 31/32 for `wordSgtFlag`, 13/14 and 37/38 for `wordSltFlag`.
 
 ## Publication and exclusions
 
 This slice composes existing internal expressions. It adds no Core form,
 primitive tag, source spelling, ABI rule, opcode lowering, gas rule, schema,
-Wire version, or public byte. Frozen Wire v1/v2 and their published operation
-enums remain unchanged.
+or public byte.
 
 ## Consequences
 
@@ -82,7 +79,5 @@ cases conditionally return canonical word one or zero from their order;
 cross-sign cases return the corresponding constant result. Executable
 regressions cover values and types, invalid payloads on both sides, ordered
 faults, effects and final stores, and exact fuel boundaries: 7/8 and 31/32 for
-`wordSgtFlag`, and 13/14 and 37/38 for `wordSltFlag`. Frozen Wire v1/v2 reject
-both builders and both handwritten expansions, and Wire v2 rejects `wordSgt`.
-Public formats and bytes are unchanged. The independent audit found no P0-P3
-issue.
+`wordSgtFlag`, and 13/14 and 37/38 for `wordSltFlag`. The independent audit
+found no P0-P3 issue.

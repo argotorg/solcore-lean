@@ -262,7 +262,7 @@ retain 10/11. No runtime cost, result or store changes.
 
 ADR-0317 through ADR-0337, every existing classifier, relation, checker and
 theorem, ADR-0337's complete nested precedence, `RecursiveLocalComputation`, the
-ADR-0324 branch checker, canonical source unions, runtime entries and wire versions
+ADR-0324 branch checker, canonical source unions, runtime entries, and Core Wire
 remain textually and semantically unchanged. This adds one opt-in leaf.
 
 ADR-0339 is the next integration step: a nonrecursive source-only wrapper selecting
@@ -289,5 +289,5 @@ public simp/proof leaks, axiom closure limited to `propext`, `Classical.choice`
 and `Quot.sound`, masked source, the exact matrices and spans, selected-failure
 finality, complete ADR-0337 preservation, normal/trust-zero/warnings/direct/full
 builds and tests, runner, registration, exact six-commit/nine-path scope,
-dependency and source/olean parity, kernel/metadata and unchanged paused files.
+dependency and source/olean parity, kernel checks and unchanged paused files.
 Do not record a final ADR-0338 implementation commit hash in this decision.

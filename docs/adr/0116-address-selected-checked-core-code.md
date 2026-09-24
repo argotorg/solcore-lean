@@ -151,8 +151,8 @@ that imports both `WorldState` and checked-code execution. This prevents every
 state-only consumer from acquiring an execution dependency.
 
 Place the new semantic modules after the current WorldState storage foundation
-and before frame-specific refinements. Keep public Wire schemas and the frozen
-frontend dependency graph unchanged.
+and before frame-specific refinements. Keep the Core Wire and frontend
+dependency graph unchanged.
 
 ## What this slice does not decide
 
@@ -217,8 +217,8 @@ Implementation commits are `45a896f`, `8e42979`, `e643dca`, `6416914`,
 35, 113, 25, 234, 216, 9, and 12; every commit is below 300 changed lines.
 
 Trust-zero checks report only `[propext]` or `[propext, Quot.sound]` exactly as
-specified. The 587-job full build, 1062-job full test run, metadata verification,
-kernel policy, dependency and declaration inventories, diff checks, and
+specified. The 587-job full build, 1062-job full test run, kernel policy,
+dependency and declaration inventories, diff checks, and
 independent P0-P3 semantic and static audits pass.
 
 ## Publication and consequences

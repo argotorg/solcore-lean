@@ -74,6 +74,6 @@ same-typed nonlocal Core and arbitrary-record counterexamples.
 
 Keep proof/test modules under 300 lines, separate proof/consumer/publication
 commits and repository-local scratch. Run focused and aggregate builds, full
-tests, all public/consumer axiom audits, kernel/metadata/whitespace checks and
+tests, all public and consumer axiom audits, kernel-policy and whitespace checks, and
 independent reviews. Diagnostics, Core/Resolved definitions, parser, wire formats
 and all accepted/rejected source policies remain unchanged.

@@ -52,6 +52,6 @@ useful, without assuming allocation or application safety.
 
 Add complete-source regressions comparing actual preparation projections and
 actual runs, register and audit every public declaration, run focused/aggregate
-builds and full tests, and check kernel, metadata, and whitespace policies.
+builds and full tests, and check kernel and whitespace policies.
 Keep each new proof file below 300 lines; diagnostic proofs and wire data stay
 untouched.

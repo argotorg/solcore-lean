@@ -21,8 +21,7 @@ can use that existing language.
 
 ## Decision
 
-Keep `Expr`, `HasType`, and the frozen wire expression languages unchanged.
-Add one runtime-only function value:
+Keep `Expr` and `HasType` unchanged. Add one runtime-only function value:
 
 ```lean
 inductive HostFunction where
@@ -119,10 +118,7 @@ Do not claim that a checked host program eventually returns `.done` without a
 handler. A well-typed program may suspend. The honest finite result is done,
 suspended, or out of fuel, with machine faults excluded.
 
-## Compatibility and dependency boundary
-
-Wire v1 and v2 explicitly reject `Value.hostFunction`. No existing schema or
-profile changes.
+## Dependency boundary
 
 Core defines only the host function, typed request, suspension, and resumption.
 It does not import `Solcore.Semantics`. The Semantics handler interprets a read
@@ -141,8 +137,8 @@ capability and must return an updated proven-present carrier.
 Tests cover host-check acceptance and rejection, exact capability lookup,
 function-before-argument order, exact request slots, raw invalid arguments,
 continuation and local-store preservation, typed resume, repeated suspensions,
-exact fuel edges, unchanged pure execution, both frozen wire rejections, and
-direct use of the safety and correspondence theorems.
+exact fuel edges, unchanged pure execution, and direct use of the safety and
+correspondence theorems.
 
 ## Implementation record
 
@@ -157,8 +153,8 @@ The Semantics handler reads from the proven-present working Account and resumes
 the saved continuation without changing that Account context or the Core-local
 store. Tests cover accepted and rejected admission, request order and slots,
 invalid raw arguments, local cells, exact fuel edges, repeated suspensions,
-typed resume, and frozen Wire rejection. Full build and test validation,
-trust-zero checks, kernel and metadata policy checks, and two independent
+and typed resume. Full build and test validation, trust-zero checks, the
+kernel-policy check, and two independent
 audits pass. Every implementation commit stayed below 300 changed lines.
 
 ## Consequences

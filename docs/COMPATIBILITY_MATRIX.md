@@ -4,20 +4,18 @@ This document records external comparison evidence. It is not the language
 specification, and agreement between implementations is not sufficient to
 establish a Solcore rule.
 
-## Pinned evidence baseline
+## Recorded evidence revisions
 
-The machine-readable baseline is
-[`metadata/baselines.json`](../metadata/baselines.json). At the recorded
-observation date it identifies:
+The comparison evidence was inspected on 2026-07-23 at these revisions:
 
 | Target | Revision |
 | --- | --- |
 | Haskell `argotorg/solcore` | `1d490d8bb5f374356f06e0720655496482eb1fb4` |
 | Rust `argotorg/solcore-rs` | `38f4778ea461edfe59106bdb1f9f08c3307b0fc0` |
 
-The intended comparison profile selects the tabled solver, generated dispatch,
-and the Osaka primitive set. Results from different revisions, solver modes,
-dispatch settings, or execution revisions are different evidence sets.
+The intended comparison configuration selects the tabled solver, generated
+dispatch, and the Osaka primitive set. Results from different revisions, solver
+modes, dispatch settings, or execution revisions are different evidence sets.
 
 ## What can be compared now
 
@@ -27,7 +25,7 @@ dispatch settings, or execution revisions are different evidence sets.
 | Workspace and module identity | No normalized external adapter | Lean defines its current identity and visibility behavior; no cross-compiler agreement follows |
 | Source checking and specialization | No complete aligned result adapter | Individual examples can motivate rules, but general source conformance is unverified |
 | Declarative source semantics | Mathematical Lean relations | External compiler behavior can be compared only through a separately justified translation |
-| Semantic Core | External compilers do not consume the retained Core encodings | Lean checking and execution are reproducible, not cross-compiler evidence |
+| Semantic Core | External compilers do not consume Core Wire | Lean checking and execution are reproducible, not cross-compiler evidence |
 | Checked-contract runtime | No compiler-to-normalized-runtime adapter | Lean world-state behavior is testable internally; EVM equivalence is not established |
 | ABI utilities | Standard hash/encoding vectors can be compared | Agreement is limited to the modeled Keccak-256 and static-word functions |
 | Core synthesis | Produces Lean Core values | Useful for internal property tests; not differential evidence until independent adapters exist |
@@ -37,16 +35,16 @@ dispatch settings, or execution revisions are different evidence sets.
 Use these labels consistently:
 
 - **conformant**: agrees with a normative result under the same inputs and
-  profile;
+  settings;
 - **divergent**: differs from that result under aligned conditions;
 - **mode-dependent**: changes with solver or compiler mode;
 - **phase-dependent**: changes with the phase reached;
 - **partial**: implements only part of the compared path;
 - **unsupported**: the selected boundary defines no behavior; and
-- **unverified**: the aligned baseline has not been executed.
+- **unverified**: the aligned comparison has not been executed.
 
-Source inspection and historical logs remain unverified until the exact pinned
-revisions are run with aligned inputs and settings.
+Source inspection and historical logs remain unverified until the exact
+recorded revisions are run with aligned inputs and settings.
 
 ## Specification decisions informed by implementations
 
@@ -92,7 +90,7 @@ Source-level comparison requires each implementation to consume the same:
 
 - source and standard-library bytes;
 - library/module identities and selected root;
-- solver, staging, and specialization profile;
+- solver, staging, and specialization settings;
 - initial world and transaction sequence where effects are involved;
 - resource limits; and
 - normalized observation definition.
@@ -104,5 +102,5 @@ independent adapters exist; replaying multiple Lean functions over the same
 definitions is not enough.
 
 Bytecode equality, generated names, optimization traces, and wall-clock time
-are not semantic conformance criteria unless a separate profile explicitly
-makes them observable.
+are not semantic conformance criteria unless an explicit comparison
+configuration makes them observable.

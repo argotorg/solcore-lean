@@ -155,7 +155,7 @@ frame, repeat through ancestors, or decide transaction rollback or atomicity.
 
 It also adds no parser or source syntax, Core fault adapter, resource-limit
 rule, fuel or gas policy, Wire field, ABI, serialization, EVM
-revision, opcode behavior, Profile, canonical delta, or published format.
+revision, opcode behavior, canonical delta, or published format.
 
 ## Staged implementation plan
 
@@ -202,8 +202,8 @@ The implementation commits are `4b28f83` (227 changed lines), `0273aca` (27),
 `045a326` (52), and `d37a1a8` (66), all below 300 changed lines; this completion
 update is the fifth staged commit. The definition-stage commit also corrects
 the ADR to describe Lean's three generated equations in the plural. Focused and
-full builds, tests, trust-zero, axiom, simp-termination, semantic-kernel,
-metadata, diff, and independent P0-P3 audits pass.
+full builds, tests, trust-zero, axiom, simp-termination, semantic-kernel, diff,
+and independent P0-P3 audits pass.
 
 Mapping remains caller-owned and may be lossy. This slice proves no runtime
 propagation, ancestry, fatality, recoverability, parent execution, handling,

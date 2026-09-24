@@ -159,17 +159,6 @@ well-formedness as an explicit premise. This is an intentional change to the
 unpublished internal Lean proof API; it does not change any published wire or
 serialization interface.
 
-This feature is internal. Semantic Core v1 and v2 have no definition-table or
-named-data encoding. Both frozen wire projections must reject:
-
-- every named-data type, value, constructor expression, and match expression;
-- every program containing one of those forms; and
-- every program whose internal definition table is nonempty, even if its main
-  expression does not mention the table.
-
-Existing published wire schemas and fault encodings remain unchanged.
-Publication requires a new additive Core version and a separate decision.
-
 ## Required implementation
 
 - program-local definition-table, data-type, and constructor identities;
@@ -190,7 +179,7 @@ Publication requires a new additive Core version and a separate decision.
   and fault exclusion;
 - weakening beneath each payload binder; and
 - focused recursive, mutual, empty-data, order, effects, diagnostics,
-  exact-fuel, cell-reference, and frozen-wire tests.
+  exact-fuel, and cell-reference tests.
 
 ## Deferred
 
@@ -207,8 +196,7 @@ This ADR does not add:
 - recursive functions, loops, divergence, or coinductive/infinite values;
 - changing the existing admissible contents of local cells;
 - ABI encoding, storage layout, public serialization, or contract-state
-  meaning; or
-- a public Core version or wire operation.
+  meaning.
 
 ## Consequences
 

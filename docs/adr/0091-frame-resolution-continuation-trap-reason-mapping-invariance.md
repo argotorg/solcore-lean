@@ -112,7 +112,7 @@ trap handling, diagnosis, propagation, or transaction transition.
 
 It adds no parser or source syntax, Core expression, resource rule, fuel or gas
 policy, Wire field, ABI, serialization, EVM revision, opcode behavior,
-Profile, canonical delta, or published observation.
+canonical delta or published observation.
 
 ## Staged implementation plan
 
@@ -159,7 +159,7 @@ Both retain distinct arbitrary return and revert callbacks and close by `simp`.
 The implementation commits are `1c557e3` (187 changed lines), `67419cf` (28),
 and `3006788` (43), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-simp-convergence, semantic-kernel, metadata, diff, and independent P0-P3 audits
+simp-convergence, semantic-kernel, diff, and independent P0-P3 audits
 pass.
 
 The equality establishes no mapper evaluation behavior, callback invocation

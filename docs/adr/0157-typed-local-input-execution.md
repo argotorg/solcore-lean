@@ -70,11 +70,11 @@ effectful fragments must establish their own stronger environment conditions.
 
 The bundle does not collect source declarations, resolve imports, fix mutable
 source binding semantics, or allocate globally unique program IDs. Parser,
-Core, and frozen wire behavior remain unchanged. Tests cover automatic
+Core and Core Wire behavior remain unchanged. Tests cover automatic
 identity alignment, exact row lookup, fresh repeated insertion, repeated-name
 priority, check failure versus fuel exhaustion, selected branches, exact
 results/stores, and the essential whole-expression static-check premise.
-Public axioms, focused/aggregate builds, kernel policy, metadata, and the full
+Public axioms, focused/aggregate builds, kernel policy, and the full
 test suite are audited before publication.
 Executable source-text regressions also pass parsed expressions through fresh
 input construction, checking, and the stateful runner for both branch choices.

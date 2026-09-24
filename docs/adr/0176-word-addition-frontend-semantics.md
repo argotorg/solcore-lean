@@ -61,6 +61,6 @@ Fully parse arithmetic and mixed bitwise expressions to check grouping,
 associativity, precedence, actual Core, argument order, store preservation, and
 fuel boundaries. Keep out-of-range literal and unary-plus rejection distinct.
 Audit every affected public declaration and new constructor, focused and
-aggregate builds, full tests, kernel and metadata checks, forbidden proof
+aggregate builds, full tests, kernel checks, forbidden proof
 tokens, and whitespace. Keep new proof files below 300 lines, preserve existing
 user changes, and leave diagnostic proofs untouched.

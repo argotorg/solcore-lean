@@ -42,12 +42,6 @@ normative expansion.
 unchecked raw fault and exact fuel differ. It may be proved equivalent or used
 by a future optimizer, but cannot replace the normative expansion silently.
 
-## Wire boundary
-
-Wire v1 rejects the primitive forms required by the expansion. Wire v2 projects
-exactly the ordinary `boolToWord(wordToBool(x))` expression. Frozen schemas and
-their encodings do not change.
-
 ## Required implementation, proof, and tests
 
 - define the builder solely by the normative expansion and prove that equality;
@@ -58,8 +52,7 @@ their encodings do not change.
 - prove commutation with `Expr.weakenAt`;
 - test zero, one, maximum word, representative nonzero values, and bad types;
 - test effectful operands, allocation/write preservation, and unchecked faults;
-- test exact sufficient and insufficient fuel boundaries; and
-- test wire v1 rejection and exact wire v2 projection with no new tag.
+- test exact sufficient and insufficient fuel boundaries.
 
 ## Consequences
 
@@ -72,6 +65,5 @@ inference, general and zero/nonzero store-preserving evaluation, and weakening
 theorems. Tests cover zero, one, two, and maximum word values; operand types and
 the raw unchecked fault; exact insufficient/sufficient fuel at 9/10 steps;
 allocation and write effects exactly once with final-store preservation; the
-distinctions from `wordToBool`, `wordIsZero`, and ABI decoding; and exact wire
-v1 rejection and v2 projection. Warning, trust, axiom, and whitespace audits
-pass.
+distinctions from `wordToBool`, `wordIsZero`, and ABI decoding; and the exact
+canonical expansion. Warning, trust, axiom, and whitespace audits pass.

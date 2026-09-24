@@ -95,9 +95,9 @@ definitions or exact fuel.
 
 ## Boundaries
 
-No new public tag or wire projection is introduced, so all frozen wire behavior
-is unchanged. This ADR defines no source syntax, elaboration, optimizer rewrite,
-ABI rule, opcode mapping, gas rule, or new comparison operation.
+Core Wire is unchanged. This ADR defines no source syntax, elaboration,
+optimizer rewrite, ABI rule, opcode mapping, gas rule, or new comparison
+operation.
 
 ## Consequences
 

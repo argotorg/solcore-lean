@@ -56,8 +56,7 @@ argument can produce the existing `invalidHostArgument` machine fault.
 
 The capability is appended at host index 13. Indexes 0 through 12 retain their
 meaning, both canonical host tables have length 14, and index 14 becomes the
-first unbound position. The frozen Wire language continues to reject internal
-host values and applications.
+first unbound position.
 
 ### Rollback-scoped transaction journal
 
@@ -162,8 +161,8 @@ Implementation establishes:
   or duplicate creation recording.
 
 The Core boundary also retains the standard host progress, suspension typing,
-resume typing, transition safety, checked no-fault, registry order, and frozen
-Wire rejection obligations.
+resume typing, transition safety, checked no-fault, and registry order
+obligations.
 
 ## Required executable tests
 
@@ -185,15 +184,14 @@ Checked Core programs and boundary fixtures cover:
 - exhaustion immediately before and after emission, proving exactly-once
   resumption; and
 - host indexes 0 through 12 unchanged, new index 13, length 14, first-unbound
-  14, checker acceptance/rejection, raw machine suspension, and frozen-Wire
-  rejection.
+  14, checker acceptance/rejection, and raw machine suspension.
 
 ## Publication and exclusions
 
 This is an internal executable-semantics milestone. It adds no source syntax,
 parser rule or parser proof, Solidity event declaration policy, ABI signature,
 selector, indexed-argument rule, multi-topic or byte-array log operation,
-serialization, public Profile, external request/result, or Wire tag.
+serialization, external request/result, or Wire tag.
 
 It also does not add gas charging, log limits, bloom filters, receipts, block
 context, EVM revision selection, recursive calls, reentrancy, delegate/static
@@ -216,7 +214,7 @@ proof/audit closure; and documentation completion.
 
 The implementation now follows this decision end to end. `emitLogWord` is the
 append-only capability at index 13; both canonical host tables have 14 entries
-and index 14 is unbound. Frozen Wire v1 and v2 reject the internal host value.
+and index 14 is unbound.
 
 Terminal execution returns ordered, duplicate-preserving logs and successful
 creation Addresses alongside the existing state result. A returned root
@@ -229,4 +227,4 @@ preflights leave the journal unchanged.
 Fuel exhaustion retains the exact journal-bearing scheduler mode. Zero-fuel,
 split-fuel, and one-shot executions agree without repeating a log or successful
 creation observation. Full builds, executable tests, strict Lean validation,
-metadata checks, semantic-kernel checks, and diff hygiene pass.
+semantic-kernel checks, and diff hygiene pass.

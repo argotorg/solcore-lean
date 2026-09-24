@@ -207,8 +207,8 @@ recorded before adoption. Prototype and freeze before independent full proof
 review and mechanical porting. All new files stay below 300 lines; every
 public declaration uses only standard axioms. Existing implementation bytes,
 full public/consumer selections and generated names are retained.
-Run focused/direct, actual parsed, aggregate/full tests, exact selected-name
-axiom audits, whole dependency/old-byte checks, policy/metadata/whitespace checks
+Run focused and direct checks, actual parsed tests, aggregate and full tests, exact selected-name
+axiom audits, whole-dependency and old-byte checks, and kernel-policy and whitespace checks
 and small separate commits. Preserve full catalog file/name arrays in final audit.
 
 The exact baseline has437 production roots/454 dependencies,357 public files/1933

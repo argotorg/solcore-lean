@@ -71,5 +71,5 @@ cannot be replaced by a raw tag/reference scan.
 Keep all prior semantic contracts and executable entry definitions unchanged.
 Use separate small definition/proof/consumer/publication commits, independent
 reviews, focused/aggregate/full tests and complete standard-axiom, dependency,
-kernel/metadata/whitespace/EOF audits. Keep scratch repository-local and parser
+kernel-policy, whitespace, and EOF audits. Keep scratch repository-local and parser
 and diagnostic work paused.

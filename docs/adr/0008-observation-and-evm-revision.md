@@ -9,8 +9,8 @@
 - **Decision:** Contract observations require an explicit EVM revision and
   compare semantic state effects rather than compiler artifacts.
 - **Current implementation:** `ContractRuntime` exposes pure checked execution
-  and observations through direct Lean APIs. Current profiles intentionally
-  omit an EVM revision; no EVM-backed execution profile is implemented.
+  and observations through direct Lean APIs. No EVM-backed execution
+  configuration is implemented.
 - **Boundary:** Gas belongs only to a separately versioned observation profile;
   it is not part of the current gas-free Core observations.
 - **Suggested reading:** Read “Decision” for the observation envelope and
@@ -46,10 +46,10 @@ For each transaction, the standard contract observation includes:
 State updates made by a reverted frame are rolled back, while call traces and
 revertdata that normatively survive remain in the observation.
 
-The standard `evmStateV1` observation excludes gas, wall-clock time,
-compiler-generated names, Hull/Yul ordering, and optimizer traces. Gas comparisons
-use a dedicated `evmStateWithGasV1` profile with both the EVM revision and gas
-schedule fixed.
+The gas-free observation excludes gas, wall-clock time, compiler-generated
+names, Hull/Yul ordering, and optimizer traces. A comparison that makes gas
+observable requires a separate configuration with both the EVM revision and
+gas schedule fixed.
 
 Words, addresses, and byte strings use lowercase fixed-width hexadecimal;
 integers use decimal strings. Map-like outputs and diagnostics are normalized to

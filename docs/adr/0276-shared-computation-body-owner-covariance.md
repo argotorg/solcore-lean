@@ -73,7 +73,7 @@ Do not infer raw body owner covariance or runtime safety from this static unit.
 Include whole rejection and the fresh-allocation limitation of arbitrary
 binder-index maps. Keep malformed actual values separate from static evidence.
 
-Require focused and aggregate builds, full tests, kernel/metadata/whitespace
+Require focused and aggregate builds, full tests, and kernel-policy and whitespace
 checks, exact old-contract/import/catalog audits, standard-only public and
 consumer axioms, and independent reviews. Each new proof/consumer file remains
 under 300 lines; decision, proof, consumers and publication use small commits.

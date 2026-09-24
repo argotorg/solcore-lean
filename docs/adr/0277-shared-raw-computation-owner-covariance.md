@@ -78,8 +78,8 @@ fuel thresholds, full saved states and resumption using the same actual values.
 Arbitrary raw rows must not acquire a positional-Core or runtime-world claim.
 
 Require focused and aggregate builds, full tests, standard-only exact public
-and consumer axiom catalogs, old-contract/import audits, kernel/metadata/EOF/
-whitespace checks and independent reviews. Keep each new proof/consumer file
+and consumer axiom catalogs, old-contract/import audits, kernel-policy, EOF, and
+whitespace checks, and independent reviews. Keep each new proof/consumer file
 under 300 lines, and decision, proof, consumers and publication in small commits.
 
 ## Non-goals

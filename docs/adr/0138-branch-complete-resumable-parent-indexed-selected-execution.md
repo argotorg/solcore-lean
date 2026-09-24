@@ -252,7 +252,7 @@ Core must not import frame or WorldState semantics.
 
 Acceptance requires focused and full builds, the complete executable test
 suite, trust-zero and warning-as-error checks for every changed Lean root,
-metadata and semantic-kernel checks, whitespace and diff checks, and an axiom
+semantic-kernel checks, whitespace and diff checks, and an axiom
 audit of the six branch laws, erasure coherence, split/summed resumption,
 sequential resumption, and completed coherence. No placeholder, custom axiom,
 trust increase, new noncomputable dependency, or accidental simp rule is
@@ -299,8 +299,8 @@ both absence branches, retained exhaustion, request non-replay, synthetic fault
 identity, completion, and all three fold outcomes.
 
 The 673-job full build, 1,234-job test executable build, and full test run pass.
-All 16 changed Lean roots pass trust-zero with warnings as errors; metadata,
-semantic-kernel, and diff checks pass. The 21 audited theorem reports use only
+All 16 changed Lean roots pass trust-zero with warnings as errors;
+semantic-kernel and diff checks pass. The 21 audited theorem reports use only
 `propext` and `Quot.sound`. The independent audit found no P0-P3 issue. The
 three legacy implementation/proof files and root README remain unchanged.
 

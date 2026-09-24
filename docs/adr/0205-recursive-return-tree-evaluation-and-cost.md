@@ -56,5 +56,5 @@ but aligned environments, identity misalignment, and invalid skipped subtrees
 with raw success but whole rejection. Use original parsed bodies and their real
 accepted Core, not hand-built compilation records. Audit all public declarations
 and consumers with standard axioms only; run focused/aggregate builds, full
-tests and kernel/metadata/whitespace checks. Keep proof files below 300 lines,
+tests and kernel-policy and whitespace checks. Keep proof files below 300 lines,
 commits small, diagnostics paused and scratch files inside the repository.

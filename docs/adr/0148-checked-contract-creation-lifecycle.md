@@ -54,8 +54,7 @@ This milestone does not define:
 - ABI encoding, constructor arguments, storage layout, or ordered traces; or
 - an external serialized request or enumerable state-diff schema.
 
-Those choices remain separate milestones. Older Wire profiles do not gain the
-new Core host function.
+Those choices remain separate milestones.
 
 ## Account nonce
 
@@ -127,8 +126,8 @@ Parameters are template identifier, transferred value, and initializer input.
 The reused `ContractCallWordResult` reports a created Address, revert data, trap
 reason, or preflight/depth failure respectively.
 
-The canonical host table length becomes 13. Frozen Wire languages must reject
-the new constructor while continuing to preserve all older indexes.
+The canonical host table length becomes 13 while all older indexes retain
+their meaning.
 
 ## Preflight and initializer start
 
@@ -255,9 +254,9 @@ cover:
 - root, pre-initializer, initializer, and post-initializer exhaustion;
 - exact split-fuel equality without double derivation, increment, or transfer;
 - creator, created, and untouched account/nonce/code/storage/balance deltas;
-- stable host indexes, result injection, depth failure, and frozen-Wire rejection;
+- stable host indexes, result injection, and depth failure;
 - private result construction and fixed-environment reachability sealing; and
-- full build, runtime suite, trust-zero, kernel-policy, metadata, and axiom
+- full build, runtime suite, trust-zero, kernel-policy, and axiom
   audits for the new semantic roots.
 
 The executable lifecycle now covers these acceptance cases with checked Core
@@ -268,7 +267,7 @@ Creation exhaustion resumes under the same fixed environment and agrees with a
 one-shot run, including creation followed by a same-root runtime call.
 
 The full 836-job build, 1,556-job test build, and runtime suite pass. All 80
-changed Lean roots pass warnings-as-errors and trust-zero validation. Metadata,
-semantic-kernel, and diff checks pass. Axiom reports contain only `propext`,
+changed Lean roots pass warnings-as-errors and trust-zero validation.
+Semantic-kernel and diff checks pass. Axiom reports contain only `propext`,
 `Quot.sound`, and, for some execution and resumption proofs,
 `Classical.choice`; there is no `sorry`, `admit`, or `unsafe` declaration.

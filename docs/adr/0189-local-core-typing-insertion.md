@@ -43,6 +43,6 @@ context type without inventing a runtime inhabitant, a lowered Resolved term,
 and counterexamples for unshifted lookup and clamped insertion positions.
 
 Register and audit all new public declarations and consumers. Run focused and
-aggregate builds, full tests, standard-axiom, kernel, metadata, forbidden-token
+aggregate builds, full tests, standard-axiom, kernel, forbidden-token
 and whitespace checks. Keep proof files below 300 lines, use small exact-path
 commits and repository-local scratch, and preserve paused diagnostic files.

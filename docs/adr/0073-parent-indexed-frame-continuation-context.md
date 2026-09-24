@@ -152,7 +152,7 @@ independent audit and completion evidence.
 This internal refinement is not published. It adds no concrete event taxonomy,
 balance, code, call data, transferred value, host call/create behavior, ABI,
 EVM revision, opcode, gas schedule, parser or source form, Core expression,
-Wire field or tag, Profile, serialization, canonical delta,
+Wire field or tag, serialization, canonical delta,
 or frozen artifact.
 
 ## Consequences
@@ -184,5 +184,5 @@ with distinct parent and nested state/rollback witnesses.
 The implementation commits are `981548d` (216 changed lines), `09a8a2c` (23),
 `a9e9fa2` (67), and `7186ef1` (103), all below 300 changed lines; this
 completion update is the fifth staged commit. Focused and full builds, tests,
-trust-zero, axiom, semantic-kernel, metadata, document-link, diff, and
+trust-zero, axiom, semantic-kernel, document-link, diff, and
 independent P0-P3 audits pass.

@@ -78,7 +78,7 @@ the existing shared contracts.
 
 This adds no source lambdas, global resolution, projection/index/array forms,
 new tuple-type policy, source-only fuel bound, store invariance or arbitrary-store
-safety. Core/Resolved semantics, parser, diagnostics and frozen wires do not change.
-Run focused/aggregate builds, full tests, public/consumer axiom audits, kernel/
-metadata/whitespace checks and independent reviews. Keep phase commits small,
+safety. Core/Resolved semantics, parser, diagnostics, and Core Wire do not change.
+Run focused/aggregate builds, full tests, public/consumer axiom audits,
+kernel-policy and whitespace checks, and independent reviews. Keep phase commits small,
 leave paused diagnostics untouched and use repository-local scratch.

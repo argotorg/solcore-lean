@@ -129,7 +129,7 @@ composition or invocation, trace ownership rule, concrete effect or event
 taxonomy, ordering, append operation or algebra, transaction boundary, or trap
 disposition.
 
-It adds no parser or source form, Wire field or tag, Profile,
+It adds no parser or source form, Wire field or tag,
 ABI, Core-result adapter, EVM revision, opcode, gas schedule, serialization,
 canonical delta, or frozen artifact.
 
@@ -153,6 +153,6 @@ with two runner lines and exercise both product projections.
 
 The implementation commits are `f12a3fa` (185 changed lines), `bc0183c` (28),
 `7481d5c` (79), and `c86afac` (68). Each remains below 300 changed lines.
-Focused and full builds, tests, trust-zero, semantic-kernel, metadata,
+Focused and full builds, tests, trust-zero, semantic-kernel,
 forbidden-declaration, document-link, and diff checks pass. Independent stage
 audits found no P0-P3 issue.

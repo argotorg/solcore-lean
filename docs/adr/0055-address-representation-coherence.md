@@ -107,7 +107,7 @@ The staged implementation is recorded by commits `fe06803` (decision),
 
 All four public laws report exactly `propext`, `Classical.choice`, and
 `Quot.sound`. There are no custom axioms or unchecked declarations. Focused and
-full builds and tests, trust-zero, semantic-kernel, and metadata checks pass.
+full builds and tests, trust-zero, and semantic-kernel checks pass.
 The independent audit found no P0-P3 issue.
 
 ## Publication and exclusions
@@ -122,8 +122,8 @@ frame adapter, trap taxonomy, world state, account, storage, balance, log, call,
 creation, checkpoint, rollback, state delta, EVM revision, gas schedule, host
 behavior, or resource-limit meaning.
 
-It adds no Wire tag, JSON schema, profile, or published observation. Frozen
-public formats and metadata remain unchanged.
+It adds no Wire tag, JSON schema, profile, or published observation. Existing
+public formats remain unchanged.
 
 ## Consequences
 

@@ -209,7 +209,7 @@ to the fixed registry. Numeric and runtime regressions retain indexes 0 through
 
 The 51-job focused build, 659-job full build, 1,206-job test executable build,
 and full `lake test` run pass. All four changed Lean roots pass trust-zero with
-warnings as errors; metadata, semantic-kernel, and diff checks also pass. Main
+warnings as errors; semantic-kernel and diff checks also pass. Main
 theorem reports are axiom-free, use only `propext`, or use `propext` with
 `Quot.sound`. There is no custom axiom or `sorry`. An independent trust-zero
 audit directly checked all thirty

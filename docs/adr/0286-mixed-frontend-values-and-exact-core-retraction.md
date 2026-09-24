@@ -99,8 +99,8 @@ may point into. Construct only data and proof witnesses; do not call this raw
 closure creation, application or canonical execution.
 
 Run focused/aggregate/full tests, exact standard-only public and consumer axiom
-catalogs, independent reviews, unchanged old bytes/headers/imports and kernel,
-metadata, EOF and whitespace checks. Use separately verified small commits.
+catalogs, independent reviews, unchanged old bytes/headers/imports, kernel,
+EOF and whitespace checks. Use separately verified small commits.
 
 ## Non-goals
 

@@ -89,8 +89,8 @@ Open local tables may carry any existing Core type or value; an opaque cell
 reference or closure can be looked up, but this fragment cannot dereference,
 mutate, or call it.
 
-The new Lean umbrella is additive. Core Wire v1 through v3 and the canonical
-parser retain their existing behavior and bytes. In particular, this is not a
+The new Lean umbrella is additive. Core Wire and the canonical parser retain
+their existing behavior. In particular, this is not a
 source-text execution endpoint or a completed source resolver.
 
 ## Validation
@@ -99,5 +99,5 @@ Public theorem dependencies are audited under the existing standard Lean
 foundations. Resolved files are included in the semantic-kernel policy scan.
 Regressions cover lexical binding extent, capture avoidance under distinct
 identities, explicit duplicate-table behavior, unbound references, type errors,
-conditional selection, and exact Core execution. Full build, test, metadata,
-and kernel checks remain required.
+conditional selection, and exact Core execution. Full build, test, and kernel
+checks remain required.

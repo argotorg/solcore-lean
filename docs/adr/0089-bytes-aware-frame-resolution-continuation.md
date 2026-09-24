@@ -170,7 +170,7 @@ does not prove how its input was produced.
 
 It adds no parser or source syntax, Core expression, resource rule, fuel or gas
 policy, Wire field, ABI, serialization, EVM revision, opcode behavior,
-Profile, canonical delta, or published observation.
+canonical delta or published observation.
 
 ## Staged implementation plan
 
@@ -217,7 +217,7 @@ callback is selected. The tests import no laws and call no resolver.
 The implementation commits are `4eb7b0c` (244 changed lines), `e5db941` (29),
 `a3d1899` (55), and `695dc84` (85), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, simp-termination, semantic-kernel, metadata, diff, and independent
+axiom, simp-termination, semantic-kernel, diff, and independent
 P0-P3 audits pass.
 
 The continuation establishes no delivery, parent mutation, scheduling,

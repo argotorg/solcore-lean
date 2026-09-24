@@ -79,7 +79,7 @@ scenario theorem, frame stack, invocation operation, checkpoint creation or
 ownership, trace taxonomy, append operation or order, concrete event
 representation, transaction boundary, or trap policy.
 
-It adds no parser or source form, Wire field or tag, Profile,
+It adds no parser or source form, Wire field or tag,
 ABI, Core-result adapter, EVM revision, opcode, gas schedule, serialization,
 canonical delta, or frozen artifact.
 
@@ -102,5 +102,5 @@ value, rollback snapshot, and trace snapshot for return and revert.
 The implementation commits are `25ce7bf` (147 changed lines), `c98d2e3` (45),
 and `9bc43c5` (63), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-semantic-kernel, metadata, document-link, diff, and independent P0-P3 audits
+semantic-kernel, document-link, diff, and independent P0-P3 audits
 pass.

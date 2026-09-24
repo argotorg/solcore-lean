@@ -80,9 +80,9 @@ unsigned boundaries, literal caller insertion, generated-binding checkpoints,
 all fuel thresholds, resumed success/fault and ordered cell effects.
 
 Run focused and aggregate builds, full tests, complete public/consumer standard
-axiom audits, kernel/metadata/forbidden-token/whitespace checks and independent
+axiom audits, kernel-policy, forbidden-token, and whitespace checks and independent
 reviews before publication. Keep definitions, proofs, consumers and publication
 in small separate commits, using repository-local scratch. Paused syntax and
 diagnostic work remains untouched. Recursive tuples, source closure construction,
 general resolution, early returns, source-only bounds and store safety remain
-separate; the Core machine and frozen wire formats do not change.
+separate; the Core machine and Core Wire do not change.

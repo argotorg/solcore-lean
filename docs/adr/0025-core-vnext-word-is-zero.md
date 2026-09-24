@@ -69,16 +69,11 @@ Neither operation is an ABI decoder. This ADR defines no canonical-input
 validation, byte width, padding, byte order, calldata layout, storage layout,
 or other encoding rule. The word result zero or one is a semantic value only.
 
-## Core and wire boundary
+## Core boundary
 
 This slice adds no type, value, expression, operation, frame, transition,
 machine-fault, diagnostic, schema field, or public tag. It also adds no new
 big-step rule or CEK transition.
-
-Wire v1 lacks the existing primitive form needed by the expansion and therefore
-continues to reject it. Wire v2 projects it using only its existing `if`, word,
-binary `wordEq`, and related ordinary expression forms. No frozen wire schema
-changes.
 
 ## Required implementation, proof, and tests
 
@@ -93,9 +88,7 @@ changes.
 - test zero, one, the maximum word, and representative nonzero values;
 - test rejection of a non-word operand and the unchecked expansion's fault;
 - test an effectful operand to detect skipped or duplicate evaluation;
-- test exact sufficient and insufficient fuel boundaries; and
-- test that wire v1 rejects while wire v2 projects exactly the handwritten
-  expansion, with no new tag.
+- test exact sufficient and insufficient fuel boundaries.
 
 ## Consequences
 

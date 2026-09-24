@@ -183,19 +183,9 @@ reference or a closure that contains one.
 
 The existing `Program.run` interface remains as a compatibility wrapper. It
 uses the stateful runner and erases the final local store from a successful
-result. The frozen wire languages cannot construct cells, so their local store
-remains empty and their existing values, faults, and fuel behavior are
-unchanged.
+result.
 
-## Version and publication boundary
-
-This feature is internal. It adds no tag to Semantic Core v1 or v2 and no new
-public wire schema. Both frozen Core wire projections must reject:
-
-- cell types;
-- cell allocation, load, and store expressions;
-- cell-reference values; and
-- programs containing any of those forms.
+## Boundary
 
 Cell locations are local runtime identities. They are not contract-storage
 keys, account addresses, ABI values, or public serialized identities.
@@ -226,14 +216,12 @@ This ADR does not add:
 - reference equality, ordering, hashing, or serialization;
 - deallocation, regions, garbage collection, borrowing, or concurrency;
 - contract storage, accounts, balances, logs, calls, transactions, or
-  rollback; or
-- a public Core version or wire operation.
+  rollback.
 
 ## Test coverage
 
 Focused tests cover allocation identity, initializer-before-allocation,
 reference-before-right-hand-side order, exactly-once evaluation, reads after
 writes, aliases shared by multiple closures, rejected higher-order payloads,
-invalid raw references, exact fuel, final-store results, and rejection by both
-frozen wire projections. Existing Core and Wire regression tests remain
-requirements.
+invalid raw references, exact fuel, and final-store results. Existing Core
+regression tests remain requirements.

@@ -1,4 +1,4 @@
-# ADR-0011: M1c primitive semantics and publication boundary
+# ADR-0011: M1c primitive semantics
 
 - Status: Accepted
 - Decision date: 2026-07-23
@@ -7,22 +7,20 @@
 ## Reader summary / Current implementation
 
 - **Decision:** Add the closed boolean/word primitive set with exact arithmetic
-  edge cases and left-to-right, exactly-once evaluation, then publish it through
-  draft.3 and Core Wire v2.
-- **Current implementation:** Primitive typing and execution, Core v2 codecs,
-  correspondence and safety proofs, profile metadata, and executable tests are
-  complete.
+  edge cases and left-to-right, exactly-once evaluation.
+- **Current implementation:** Primitive typing and execution, correspondence
+  and safety proofs, and executable tests are complete.
 - **Boundary:** Short-circuit source operators, functions, conversions, ADTs,
   source elaboration, and unlisted primitives remain outside M1c.
 - **Suggested reading:** Read the primitive signature and operation tables in
-  “Decision”, then the publication and conformance subsections.
+  “Decision”, then the conformance requirements.
 
 ## Context
 
-M1a and M1b published a typed and executable Semantic Core containing literals,
+M1a and M1b defined a typed and executable Semantic Core containing literals,
 immutable bindings, and conditionals. Primitive operations remained outside the
-normative fragment because their arithmetic edge cases, operand order, and wire
-representation had not been fixed independently of either compiler.
+normative fragment because their arithmetic edge cases and operand order had
+not been fixed independently of either compiler.
 
 The implementation audit used these pinned witnesses:
 
@@ -129,57 +127,6 @@ x || y = if x then true else y
 operations, byte selection, arithmetic shift, and count-leading-zero remain
 outside M1c.
 
-### Fine-grained normative features
-
-Add four feature identifiers:
-
-- `coreBoolNot`
-- `coreWordArithmetic`
-- `coreWordComparison`
-- `coreWordBitwise`
-
-`coreWordBitwise` includes `wordAnd`, `wordOr`, `wordXor`, `wordNot`,
-`wordShl`, and `wordShr`. The aggregate `corePrimitives` feature remains
-`directionAccepted` and `partialSupport`.
-
-### Language version and profile
-
-Publish the completed M1c fragment as:
-
-- language version `solcore/0.1.0-draft.3`;
-- profile `core-m1c-v1`;
-- `staticSemanticsVersion = 2`;
-- `dynamicSemanticsVersion = 2`.
-
-The profile enables the five M1b features and the four M1c features. Grammar,
-ABI, and storage-layout versions remain undefined. The implementation-baseline
-pins do not change.
-
-The draft.1 and draft.2 language rules and feature matrices remain unchanged.
-M1c metadata is appended through new `m1cAll` and `m1cFeatureMatrix` values
-rather than changing either legacy feature array.
-
-### Core Wire versions
-
-Primitive expression constructors require a new closed Core schema:
-
-- `solcore-semantic-core/v1` remains the six-constructor M1b grammar;
-- `solcore-semantic-core/v2` adds tagged unary and binary expressions;
-- unary expressions contain `op` and `operand`;
-- binary expressions contain `op`, `left`, and `right`.
-
-Each wire version has its own closed type, value, expression, and program
-types, with total encoders defined only over those version-local types. They
-embed into the internal Core types, while conversion from arbitrary internal
-types, values, expressions, and programs back to a wire version is partial.
-This prevents future internal type or syntax growth from silently widening a
-frozen schema and preserves unconditional version-specific encoder/decoder
-round-trip theorems.
-
-The draft.2 profile remains bound to Core Wire v1 and the draft.3 profile is
-bound to Core Wire v2. Callers use the version-local Lean codecs directly;
-there is no ambient widening from internal Core syntax into a frozen schema.
-
 ## Consequences
 
 - Semantic differential fuzzing can compare operation edge cases against a
@@ -187,9 +134,6 @@ there is no ambient widening from internal Core syntax into a frozen schema.
 - Compiler-specific builtin typing, partial-folding coverage, host integer
   conversion, and eager boolean defects are not reproduced.
 - Core traces fix operand evaluation order independently of later lowering.
-- Older Core Wire validators and decoders retain their exact contracts.
-- Adding another internal Core expression form cannot implicitly add it to a
-  published wire version.
 
 ## Conformance requirements
 
@@ -204,10 +148,5 @@ there is no ambient widening from internal Core syntax into a frozen schema.
 - Test all 256-bit bitwise operations.
 - Test left and right shifts at 0, 255, 256, and the maximum word shift amount.
 - Test left-to-right operand evaluation and structured operand type errors.
-- Provide bounded round-trip and canonicalization proofs for Core wire v2 while
-  retaining the corresponding v1 proofs over the closed v1 wire AST.
-- Add Core Wire v2 positive, negative, malformed-wire, cross-version rejection,
-  and exact-fuel cases.
-- Do not change the accepted Core Wire v1 language or profile metadata.
 - Keep the semantic kernel free of `sorry`, `admit`, `partial`, `unsafe`, and
   undeclared axioms.

@@ -79,7 +79,7 @@ remain separate work, as do Core transition costs, fault classification,
 runtime typing, effects, closure conversion and whole-language totality.
 
 All new proof files remain below 300 lines. Focused and full builds, complete
-tests, kernel policy, metadata, whitespace and public axiom checks are required.
+tests, kernel policy, whitespace and public axiom checks are required.
 Actual module ownership is audited separately from public declarations.
 Compiler-generated recursive companions retain their observed flags and are
 checked separately from authored definitions and public logical dependencies.

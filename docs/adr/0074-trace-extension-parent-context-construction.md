@@ -152,7 +152,7 @@ wiring; independent audit and completion evidence.
 This construction helper is internal. It adds no event taxonomy, balance,
 code, call data, transferred value, host call/create behavior, ABI, EVM
 revision, opcode, gas schedule, parser or source form, Core expression, Wire
-field or tag, Profile, serialization, canonical delta, or
+field or tag, serialization, canonical delta, or
 frozen artifact.
 
 ## Consequences
@@ -179,4 +179,4 @@ of the supplied frame result.
 The implementation commits are `d2e1959` (217 changed lines), `ef17abe` (32),
 `d2b9e30` (59), and `fc3956b` (89), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+axiom, semantic-kernel, diff, and independent P0-P3 audits pass.

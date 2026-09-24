@@ -126,7 +126,7 @@ mechanism, concrete effect or event taxonomy, event ordering, trace append
 operation or algebra, transaction boundary, ABI, Core-result adapter, trap
 taxonomy, EVM revision, opcode, gas schedule, or resource-limit policy.
 
-It adds no parser or source form, Wire field or tag, Profile,
+It adds no parser or source form, Wire field or tag,
 serialization, canonical delta, or frozen artifact. Integration with
 `FrameRunResult` remains a separate decision.
 
@@ -150,6 +150,6 @@ live in a 64-line definition-only test module with two runner lines.
 
 The implementation commits are `8b5aa9f` (181 changed lines), `26f609f` (33),
 `a31e18f` (58), and `3f66922` (66). Each remains below 300 changed lines.
-Focused and full builds, tests, trust-zero, semantic-kernel, metadata,
+Focused and full builds, tests, trust-zero, semantic-kernel,
 forbidden-declaration, document-link, and diff checks pass. Independent stage
 audits found no P0-P3 issue.

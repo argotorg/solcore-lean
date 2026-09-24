@@ -105,7 +105,7 @@ identity, call tree, stack, depth, scheduling, or reentrancy.
 It chooses no trap disposition, rollback filtering, transaction boundary or
 atomicity, concrete event taxonomy, timestamp, serialization, hashing, size
 limit, compression, canonical observation, ABI, EVM revision, opcode, gas
-schedule, parser or source form, Core expression, Wire field or tag, Profile,
+schedule, parser or source form, Core expression, Wire field or tag,
 balance, code, host call/create behavior, or frozen artifact.
 
 ## Consequences
@@ -129,5 +129,5 @@ test import contains exactly four private examples and no runtime call.
 The implementation commits are `183e0a2` (165 changed lines), `cb423e4` (17),
 `7644bba` (38), and `51f793a` (42), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+axiom, semantic-kernel, document-link, diff, and independent P0-P3
 audits pass.

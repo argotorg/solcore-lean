@@ -14,7 +14,7 @@ unary(boolNot, operand)
 unary(wordNot, operand)
 ```
 
-The generic typing, evaluation, safety, machine, and Wire v2 layers support both
+The generic typing, evaluation, safety, and machine layers support both
 operators. Existing tests cover part of `boolNot` and the value-level fact that
 the complement of word zero is the maximum word. The two direct primitives do
 not yet have the focused named proof interface and symmetric regressions used by
@@ -59,16 +59,11 @@ Focused semantic tests cover:
 - word and boolean result types and wrong operand rejection;
 - raw invalid-operand faults for both operators;
 - an effectful operand evaluated exactly once with its final store retained;
-- exact insufficient and sufficient fuel for literals and effectful operands;
-- frozen Wire v1 rejection of both raw unary expressions; and
-- exact Wire v2 projection and round trips through the existing `boolNot` and
-  `wordNot` tags.
+- exact insufficient and sufficient fuel for literals and effectful operands.
 
 Compile-time examples exercise every named theorem. Literal unary expressions
 stop at fuel two and complete at three. The allocating and writing `wordNot`
 operand stops at fourteen and completes at fifteen with its final store intact.
-Wire v1 rejects both raw forms; Wire v2 projects and round-trips the exact
-existing tags.
 
 ## Existing generic proofs
 
@@ -79,9 +74,9 @@ simulation. The named interface is a specialization of those existing results.
 ## Boundaries
 
 No expression form, operator, evaluator rule, machine frame, fault, type, Wire
-tag, version, byte encoding, source syntax, ABI rule, opcode, or gas rule
-changes. Existing weakening, evaluation, fault, effect, fuel, and Wire behavior
-remain normative.
+tag, byte encoding, source syntax, ABI rule, opcode, or gas rule changes.
+Existing weakening, evaluation, fault, effect, and fuel behavior remains
+normative.
 
 ## Consequences
 

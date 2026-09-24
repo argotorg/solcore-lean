@@ -179,7 +179,7 @@ A syntax change is complete when:
 - focused tests cover valid, invalid, boundary, and recovery examples;
 - workspace/frontend consumers either support the new node or reject it with
   an explicit later-phase diagnostic; and
-- the full build, tests, repository-data checks, and kernel-policy check pass.
+- the full build, tests, and kernel-policy check pass.
 
 Future grammar work should extend this one canonical path. Do not introduce a
 parallel AST or parser solely to bypass an unfinished proof obligation.

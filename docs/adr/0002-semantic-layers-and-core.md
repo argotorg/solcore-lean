@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Decision date: 2026-07-23
-- Scope: `solcore/0.1.0-draft.1`
+- Scope: semantic-layer architecture and Core boundaries
 
 ## Reader summary / Current implementation
 

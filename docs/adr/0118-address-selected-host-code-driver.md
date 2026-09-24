@@ -136,8 +136,7 @@ continues to know only typed host functions, requests, suspensions, and the raw
 runner. Core must not import Address, Account, WorldState, checkpoint, rollback,
 or frame state.
 
-No frozen wire schema, profile, or public source syntax changes. Host function
-values remain rejected by wire v1 and v2.
+No public source syntax changes.
 
 ## Required regressions
 
@@ -175,7 +174,7 @@ two dependent reads at exact fuel 11/12 boundaries; finish from a resumed final
 state with zero remaining fuel; preserve a Core-local cell; change the result
 when working storage changes; and directly consume the public selection,
 typing, no-fault, promotion, resumption, and fuel-accounting theorems. Full
-build, test, trust-zero, metadata, and kernel-policy checks pass, as do three
+build, test, trust-zero, and kernel-policy checks pass, as do three
 independent P0-P3 audits. Every implementation commit remains below 300 changed
 lines.
 

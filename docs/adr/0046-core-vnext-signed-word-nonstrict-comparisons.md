@@ -62,15 +62,13 @@ Focused regressions cover:
 - allocating and writing operands evaluated left then right exactly once with
   their final store retained;
 - insufficient/sufficient literal and effectful CEK fuel boundaries: 6/7 and
-  30/31 for `wordSle`, 12/13 and 36/37 for `wordSge`; and
-- frozen Wire v1/v2 rejection of each builder and handwritten expansion, plus
-  Wire v2 rejection of the underlying `wordSgt` operation.
+  30/31 for `wordSle`, 12/13 and 36/37 for `wordSge`.
 
 ## Publication and exclusions
 
 This slice adds derived builders, not Core forms or primitive tags. It adds no
-source spelling, ABI rule, opcode lowering, gas rule, schema, Wire version,
-public enum member, or public byte. Frozen Wire v1/v2 remain unchanged.
+source spelling, ABI rule, opcode lowering, gas rule, schema, public enum
+member, or public byte.
 
 ## Consequences
 
@@ -86,9 +84,8 @@ strict-order decision; cross-sign cases reduce to the constants described
 above, and equality returns true. The executable regressions cover both sign
 boundaries, types, underlying invalid operands, ordered faults, exactly-once
 effects, final stores, and the exact 6/7, 30/31, 12/13, and 36/37 fuel
-boundaries. Frozen Wire v1/v2 reject both builders and their handwritten
-expansions, and Wire v2 continues to reject `wordSgt`.
+boundaries.
 
-Focused and full warning-free builds, the full test runner, kernel policy, and
-metadata verification pass. Public formats and bytes are unchanged. The
+Focused and full warning-free builds, the full test runner, and kernel policy
+check pass. Public formats and bytes are unchanged. The
 independent audit found no P0-P3 issue.

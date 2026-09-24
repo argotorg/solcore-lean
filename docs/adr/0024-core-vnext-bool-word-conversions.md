@@ -91,13 +91,10 @@ or diagnostic tag. In particular:
 
 - the CEK machine receives no new frame or transition;
 - big-step evaluation receives no new rule;
-- Semantic Core wire v1 and v2 receive no new tag or schema field; and
 - no public source spelling or cast operation is introduced.
 
-A wire projection sees only the expanded ordinary expression. Each frozen wire
-version therefore accepts or rejects that expression according to the forms it
-already supports. This is not a new wire feature and does not widen either
-closed schema.
+A Wire projection sees only the expanded ordinary expression. This is not a
+new Wire feature.
 
 ## Required implementation and proof
 
@@ -115,13 +112,11 @@ closed schema.
 - test type-correct and type-incorrect operands;
 - test false, true, zero, one, and representative nonzero word boundaries,
   including the maximum word;
-- test an effectful operand to detect duplicate or skipped evaluation; and
-- test frozen-wire boundaries, including that no new tag appears and that
-  projections behave exactly like the handwritten expansions.
+- test an effectful operand to detect duplicate or skipped evaluation.
 
 The completed implementation provides dedicated typing, inference, evaluation,
 zero/nonzero, store-threading, and weakening theorems. Focused tests cover
-effects, exact fuel, type errors, word boundaries, and unchanged wire behavior;
+effects, exact fuel, type errors, word boundaries, and canonical expansions;
 the full test, warning, kernel-trust, axiom, and whitespace audits pass.
 
 ## Deferred

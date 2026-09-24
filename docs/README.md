@@ -37,7 +37,7 @@ smaller dependency boundary matters.
 
 ## Reference catalogs
 
-- [Semantic Core Wire v3](CORE_WIRE_V3.md) describes the retained Core data
+- [Semantic Core Wire](CORE_WIRE.md) describes the current Core data
   encoding.
 - [Compatibility evidence](COMPATIBILITY_MATRIX.md) records what comparisons
   with the pinned Haskell and Rust revisions do and do not establish.

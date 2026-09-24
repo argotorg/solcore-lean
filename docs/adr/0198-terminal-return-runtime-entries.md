@@ -54,6 +54,6 @@ arguments, unequal selected costs, exact Core and actual suspended environments,
 owner/store changes, value-free compilation and binding factorization, and all
 fuel thresholds/resumptions. Audit all affected public contracts and consumers
 for standard axioms; run focused/aggregate builds, full tests, dependency-cycle,
-kernel, metadata, forbidden-token and whitespace checks. Keep proof files below
+kernel, forbidden-token and whitespace checks. Keep proof files below
 300 lines and commits small; leave paused diagnostics untouched and use local
 repository scratch.

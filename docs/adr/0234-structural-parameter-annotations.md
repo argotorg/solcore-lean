@@ -45,7 +45,7 @@ constructors remain rejected. Larger tuple type lists stay outside this slice.
 
 Typed let annotations remain named-only. Header clause policy, whole-body
 checking, Core/resolved semantics, execution, costs, fuel, checkpoints, diagnostics
-and frozen wire formats do not change. No parallel compiler or argument layout is
+and Core Wire do not change. No parallel compiler or argument layout is
 introduced.
 
 ## Consumer migration
@@ -72,7 +72,7 @@ unused parameters, Unit argument retention, single product arguments, wrong
 arity/order/association, and same-typed incorrect Core provenance.
 
 Run focused/aggregate builds, full tests, old/new public and consumer axiom
-audits, kernel/metadata/whitespace checks and independent reviews. Use
+audits, kernel-policy and whitespace checks and independent reviews. Use
 repository-local scratch; leave paused diagnostics untouched. Keep new proof
 files below 300 lines and phase commits where possible; existing combined
 definition/exactness modules require their bridge repairs in the definition phase.

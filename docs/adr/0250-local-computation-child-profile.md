@@ -72,5 +72,5 @@ versus unselected branches, independent manual costs, unknown names, invalid
 stores, insertion and pending-continuation boundaries. Keep proof/test files
 below 300 lines and separate decision, definitions, proofs, consumers and
 publication commits. Require focused/aggregate builds, full tests, all
-public/consumer standard-axiom audits, dependency closure and kernel/metadata/
+public/consumer standard-axiom audits, dependency closure, kernel-policy and
 whitespace checks, plus independent reviews.

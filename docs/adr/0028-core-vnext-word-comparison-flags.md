@@ -53,12 +53,6 @@ already expressible. Names such as `eqWord` or opcode-shaped aliases are not
 chosen: this ADR defines an internal typed Core convenience, not a source API,
 standard-library function, or instruction mapping.
 
-## Wire boundary
-
-Wire v1 rejects the primitive forms required by both expansions. Wire v2
-projects exactly the corresponding handwritten comparison-plus-`boolToWord`
-trees. Frozen schemas and their encodings do not change.
-
 ## Required implementation, proof, and tests
 
 - define both builders solely by the normative expansions and prove them;
@@ -68,8 +62,7 @@ trees. Frozen schemas and their encodings do not change.
 - prove commutation with `Expr.weakenAt`;
 - test equality, unsigned boundaries, operand types, and raw unchecked faults;
 - test left/right allocation and writes, order, and final-store preservation;
-- test exact sufficient and insufficient fuel boundaries; and
-- test wire v1 rejection and exact wire v2 projection with no new tag.
+- test exact sufficient and insufficient fuel boundaries.
 
 ## Exclusions
 
@@ -87,5 +80,5 @@ store-threaded evaluation and equality, inequality, greater, and not-greater
 case theorems, plus weakening. Tests cover values and unsigned boundaries,
 types and raw fault order, two allocating and writing operands with the exact
 final store, literal 7/8 and effectful 31/32 fuel boundaries, preservation of
-the existing boolean comparisons, wire v1 rejection, and exact wire v2
-projections. Warning, trust, axiom, test, and whitespace audits pass.
+the existing boolean comparisons, and the canonical expansions. Warning,
+trust, axiom, test, and whitespace audits pass.

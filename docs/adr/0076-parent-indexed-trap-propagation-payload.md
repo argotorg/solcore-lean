@@ -167,7 +167,7 @@ and runner wiring; independent audit and completion evidence.
 
 This internal payload selector is not published. It adds no balance, code, call
 data, transferred value, host call/create behavior, storage layout,
-serialization, canonical delta, Profile, frozen artifact, or public format.
+serialization, canonical delta, frozen artifact, or public format.
 
 ## Consequences
 
@@ -198,7 +198,7 @@ parent-then-nested trace, and preserves one concrete trap reason.
 The implementation commits are `8f89c3c` (224 changed lines), `9e6a3aa` (25),
 `c8a6330` (57), and `3e7afee` (93), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+axiom, semantic-kernel, diff, and independent P0-P3 audits pass.
 
 The operation constructs a value for one caller-designated prospective
 enclosing boundary. It still does not perform or prove runtime propagation,

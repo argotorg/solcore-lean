@@ -11,7 +11,6 @@ Use the checked-in Lean toolchain from the repository root:
 ```text
 lake build
 lake test
-node scripts/verify-metadata.mjs
 node scripts/check-kernel.mjs
 ```
 
@@ -44,7 +43,7 @@ Before implementation:
 2. write or update an ADR when the behavior is a durable design choice;
 3. list affected syntax, static, dynamic, resource, diagnostic, and proof
    obligations; and
-4. identify every retained encoding or adapter that must reject or represent
+4. identify whether Core Wire or an adapter must reject or represent
    the new form.
 
 During implementation:
@@ -61,7 +60,7 @@ After implementation:
 
 1. build changed modules with warnings as errors;
 2. run the full test suite;
-3. run repository-data and kernel-policy checks;
+3. run the kernel-policy check;
 4. inspect axiom reports for new critical theorems;
 5. update [Current status](CURRENT_STATUS.md) and the
    [feature matrix](FEATURE_MATRIX.md); and
@@ -79,7 +78,7 @@ the expected value. Reviewers should be able to locate, as applicable:
 - value, environment, heap, frame, or state preservation;
 - resource and resumption behavior;
 - deterministic diagnostic behavior; and
-- isolation of retained encodings.
+- isolation of the Core Wire boundary.
 
 If a proof direction is delayed, mark the feature partial and name the missing
 result. Do not describe a local theorem as an end-to-end guarantee.
@@ -105,9 +104,9 @@ For an upstream syntax change:
 ## Core and runtime changes
 
 Core changes must update the independent typing/evaluation rules, executable
-checker/evaluator, machine paths, safety/correspondence theorems, and retained
-wire projections. Older encodings are closed; unsupported new constructors
-must be rejected rather than silently coerced.
+checker/evaluator, machine paths, safety/correspondence theorems, and the
+current wire projection. Unsupported constructors must be rejected rather
+than silently coerced.
 
 Contract changes belong in `Solcore.ContractRuntime` when they concern world
 state, transaction/frame lifecycle, host effects, calls, creation, or

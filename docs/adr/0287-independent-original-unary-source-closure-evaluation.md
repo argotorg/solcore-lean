@@ -111,7 +111,7 @@ recovered syntax. Unknown/comptime annotation meaning is explicitly outside this
 raw profile; do not relabel a raw witness as typing or staging admission.
 Keep old whole-entry rejection and Core-only execution claims separate.
 Run focused/aggregate/full tests, exact standard-only catalogs, independent
-reviews and unchanged old bytes/headers/imports, kernel, metadata and formatting checks.
+reviews and unchanged old bytes/headers/imports, kernel and formatting checks.
 
 ## Non-goals
 

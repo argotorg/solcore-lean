@@ -71,5 +71,5 @@ binary expressions can supply these products without broadening expression synta
 No tuple-expression arity, projection, inference, shadowing, call, Core transition,
 fuel bound, parser, diagnostic, wire format or broader language policy changes.
 Validate focused and aggregate builds, full tests, all public/consumer axioms,
-kernel/metadata/whitespace and independent reviews. Keep files under 300 lines,
+kernel-policy and whitespace checks and independent reviews. Keep files under 300 lines,
 commits small and scratch repository-local; leave paused diagnostics untouched.

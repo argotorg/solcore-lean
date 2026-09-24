@@ -53,5 +53,5 @@ frontend negative `l == r` fixtures; syntax/wire equality tests remain unchanged
 
 Register and audit every new public declaration while retaining old names;
 run focused/aggregate builds and full tests plus standard-axiom, kernel,
-metadata, forbidden-token and whitespace checks. Keep proof files below 300
+forbidden-token and whitespace checks. Keep proof files below 300
 lines and commits small with exact paths. Leave diagnostic proofs untouched.

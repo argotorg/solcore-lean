@@ -39,7 +39,7 @@ without an additional wrapper cost or weakened compilation/preparation provenanc
 
 This is a local explicit-table adapter policy, not general Solcore overloading.
 Syntax, parser precedence/associativity, Core and Resolved constructors,
-primitive definitions, wire schemas, and published profiles remain unchanged.
+primitive definitions, and Core Wire remain unchanged.
 Literal input stays strictly range-checked. Signed division, source calls, mutable
 bindings and general recursive statement/early-return semantics are not added.
 
@@ -52,5 +52,5 @@ Migrate obsolete unsupported-operator negatives only where this decision changes
 acceptance. Update structural-bound expectations even for still-ill-typed expressions;
 do not erase unrelated rejection coverage. Audit all public declarations and
 consumers, run focused/aggregate builds and full tests, and keep standard axioms,
-kernel/metadata policy, files below 300 lines and small commits. Leave diagnostic
+kernel policy, files below 300 lines and small commits. Leave diagnostic
 proofs paused and use repository-local scratch.

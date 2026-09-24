@@ -59,6 +59,6 @@ Keep raw skipped-branch evaluation distinct from checked failure, and test
 parseable unsupported body shapes as well as malformed or partial source text.
 
 Audit all public declarations against the permitted standard kernel axioms;
-run focused and aggregate builds, full tests, and kernel/metadata/whitespace
+run focused and aggregate builds, full tests, and kernel-policy and whitespace
 checks. Keep new proof files below 300 lines. No existing parser, expression
 semantics, Core machine, or wire-format behavior changes.

@@ -57,6 +57,6 @@ counterexamples for owner collapse and arbitrary injective index shifts.
 
 Audit old and new public contracts and consumers for standard axioms and exact
 registration. Verify focused and aggregate builds, parsed execution, full tests,
-kernel/metadata policy and acyclic dependency direction. Keep proof files below
+kernel policy and acyclic dependency direction. Keep proof files below
 300 lines and commits small; diagnostics remain paused and scratch stays inside
 the repository.

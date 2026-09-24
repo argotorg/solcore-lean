@@ -71,7 +71,7 @@ child/parent law, frame stack, invocation operation, checkpoint creation,
 trace taxonomy, append operation or order, concrete event representation,
 transaction boundary, fatal-trap policy, or resolved trap carrier.
 
-It adds no parser or source form, Wire field or tag, Profile,
+It adds no parser or source form, Wire field or tag,
 ABI, Core-result adapter, EVM revision, opcode, gas schedule, serialization,
 canonical delta, or frozen artifact.
 
@@ -94,5 +94,5 @@ and confirms that binding a sentinel continuation still returns `none`.
 The implementation commits are `6baba07` (122 changed lines), `12fa73d` (27),
 and `a1aca0f` (36), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-semantic-kernel, metadata, document-link, diff, and independent P0-P3 audits
+semantic-kernel, document-link, diff, and independent P0-P3 audits
 pass.

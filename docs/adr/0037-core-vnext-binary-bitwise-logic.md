@@ -15,8 +15,8 @@ binary(wordOr, left, right)
 binary(wordXor, left, right)
 ```
 
-Generic typing, inference, renaming, weakening, evaluation, Safety, machine,
-and Wire v2 layers support all three. Focused reusable value laws,
+Generic typing, inference, renaming, weakening, evaluation, Safety, and machine
+layers support all three. Focused reusable value laws,
 primitive-application equations, and strict store-threaded evaluation results
 remain missing.
 
@@ -61,10 +61,7 @@ Focused regressions cover:
 - left faults that prevent right evaluation and right faults that observe left
   effects;
 - two allocating and writing operands evaluated exactly once in order;
-- final stores and exact literal 4/5 and effectful 28/29 fuel boundaries;
-- Wire v1 rejection for all three raw expressions; and
-- exact Wire v2 operator and operand-order projection, Core round trips, and
-  JSON round trips for all three operations.
+- final stores and exact literal 4/5 and effectful 28/29 fuel boundaries.
 
 ## Boundaries
 
@@ -90,7 +87,6 @@ Tests confirm `0xAA` and `0xCC` produce `0x88`, `0xEE`, and `0x66`, together
 with zero, maximum, and self boundaries. Type rejection, raw and ordered faults,
 two exactly-once effectful operands, and the final store are covered for all
 three operations. Literal execution has the exact 4/5 fuel boundary and
-effectful execution the exact 28/29 boundary. Wire v1 rejects every expression;
-Wire v2 has exact projection, Core round trips, and JSON round trips. The final
-audit found no P0-P3 issue. No alias, generic proof duplicate, tag, or schema
-changed. The next feature is selected by a separate ADR.
+effectful execution the exact 28/29 boundary. The final audit found no P0-P3
+issue. No alias, generic proof duplicate, tag, or schema changed. The next
+feature is selected by a separate ADR.

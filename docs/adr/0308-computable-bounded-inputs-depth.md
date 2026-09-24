@@ -82,7 +82,7 @@ typing, staging, Core cost, effect, fault classification or closure conversion.
 Parser and diagnostic proof work remains paused.
 
 Keep every proof file below 300 lines and every commit within 300 changed lines.
-Require complete focused/full builds, tests, policy/metadata and whitespace,
+Require complete focused/full builds, tests, kernel-policy and whitespace checks,
 independent semantic consumers and reviews, exact source ports, public proof
 checks and actual formal-module ownership inspection. Retain all versions and
 failed captures; only the standard three proof axioms are permitted.

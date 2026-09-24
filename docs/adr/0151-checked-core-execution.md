@@ -1,8 +1,8 @@
-# ADR-0151: Versioned Checked-Core Execution
+# ADR-0151: Checked-Core Execution
 
 - Status: Accepted
 - Decision date: 2026-08-30
-- Scope: Core Wire v3 admission, checked contract execution, and Static Word ABI
+- Scope: Core Wire admission, checked contract execution, and Static Word ABI
 - Implementation: Complete
 
 ## Context
@@ -21,15 +21,15 @@ second evaluator, ABI dispatcher, state transition, or rollback policy.
 
 ## Decision
 
-Use Semantic Core Wire v3 as the closed representation of the current Core
+Use Semantic Core Wire as the closed representation of the current Core
 algebra, and use the existing checker and `ContractRuntime` APIs as the sole
 admission and execution path.
 
 The direct Lean workflow is:
 
-1. construct or decode a finite Wire v3 Program;
+1. construct or decode a finite Wire Program;
 2. convert it to ordinary Core;
-3. check it against the frozen v3 host context;
+3. check it against the Wire host context;
 4. admit it into an explicit checked-contract profile;
 5. construct a finite `WorldState` and `ExecutionEnvironment`; and
 6. invoke `BalancedTopLevelExecution.runWithEnvironment`.
@@ -37,9 +37,9 @@ The direct Lean workflow is:
 Every result is the existing total runtime result. This decision adds no
 parallel evaluator or runtime semantics.
 
-## Semantic Core Wire v3
+## Semantic Core Wire
 
-Wire v3 is a closed algebra covering the current internal:
+Core Wire is a closed algebra covering the current internal:
 
 - primitive, product, function, sum, cell, and named-data types;
 - data definitions and constructor identities;
@@ -47,10 +47,10 @@ Wire v3 is a closed algebra covering the current internal:
   conditionals, and primitive-operation expressions; and
 - the supported unary, binary, and ternary operators.
 
-The complete field and operator catalog is fixed in
-[Core Wire v3](../CORE_WIRE_V3.md). Wire-to-Core conversion is total.
+The complete field and operator catalog is recorded in
+[Core Wire](../CORE_WIRE.md). Wire-to-Core conversion is total.
 Core-to-wire conversion returns `Option`, so an unassigned future constructor
-or operator is rejected until a later version gives it an explicit meaning.
+or operator is rejected until the current Wire boundary explicitly supports it.
 
 Canonical scalar encoding uses exact lowercase hexadecimal forms for Word,
 Address, and byte values. Natural numbers encode as integers. Structural
@@ -59,10 +59,10 @@ values beyond explicit depth and node budgets.
 
 ## Frozen host context and checker promotion
 
-Wire v3 fixes the host-function order and each function's parameter and result
+Core Wire fixes the host-function order and each function's parameter and result
 types. Admission checks against that frozen context rather than the append-only
-current host table. A later host-table extension therefore cannot make a
-previously invalid v3 free variable valid.
+current host table. A later host-table extension therefore cannot silently make
+a previously invalid Wire free variable valid.
 
 The detailed context-parameterized checker preserves paths and rejection
 reasons. Successful checking promotes to the current
@@ -134,7 +134,7 @@ not an independently computed transition.
 
 Implementation is complete when tests and proofs cover:
 
-- complete Wire v3 conversion and codec round trips;
+- complete Core Wire conversion and codec round trips;
 - every closed tag, scalar, depth, node, and collection boundary;
 - frozen-host checker acceptance and rejection with detailed diagnostics;
 - checked Core and Static Word contract admission;

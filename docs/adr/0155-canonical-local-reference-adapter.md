@@ -60,7 +60,7 @@ This adapter adds no dynamic effects.
 ## Publication and validation
 
 Only the additive Lean library boundary changes. Canonical parser behavior and
-frozen wire languages remain unchanged. This is not a source-text execution
+Core Wire remains unchanged. This is not a source-text execution
 service or a completed source type checker.
 
 Regressions cover exact spelling, distinct arbitrary source spans, nested
@@ -68,7 +68,7 @@ groups, duplicate-name priority, unsupported nodes, missing context identities,
 exact nonzero Core indices, caller-controlled Boolean values, and the precise
 zero/positive fuel boundary. Type/value correspondence must keep identity-order
 agreement explicit. New frontend files are included in the kernel policy scan;
-public axioms, focused and aggregate builds, tests, and metadata are audited.
+public axioms, focused and aggregate builds, and tests are audited.
 An explicit reordered-environment counterexample preserves positional Boolean
 typing while changing which identity the Core index reads. It protects the
 identity-order premise from being dropped in later compositions.

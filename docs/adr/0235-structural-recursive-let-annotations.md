@@ -72,6 +72,6 @@ Retain missing/unknown/type-mismatched and unsupported annotations, self/forward
 sibling references and bad unselected children at the appropriate boundary.
 
 Run focused/aggregate builds, full tests, public and all-consumer axiom audits,
-kernel/metadata/whitespace checks and independent reviews. Keep files below
+kernel-policy and whitespace checks and independent reviews. Keep files below
 300 lines and phase commits small where possible. Use repository-local scratch;
-leave diagnostics and frozen wire formats unchanged.
+leave diagnostics and Core Wire unchanged.

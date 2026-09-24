@@ -82,6 +82,6 @@ checks.
 ## Verification target
 
 The worklist properties, direct linker, specialization regressions, full build,
-test suite, semantic-kernel audit, metadata audit, forbidden-proof scan, and
+test suite, semantic-kernel audit, forbidden-proof scan, and
 whitespace check must pass.  No omitted proof, new axiom, unsafe definition, or
 native decision shortcut is permitted.

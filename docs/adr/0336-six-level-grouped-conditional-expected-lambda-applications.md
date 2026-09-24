@@ -268,5 +268,5 @@ flags, public simp/proof leaks, axiom closure limited to `propext`,
 `Classical.choice` and `Quot.sound`, masked source, selected-failure finality,
 complete ADR-0335 preservation, normal/trust-zero/warnings/direct/full builds and
 tests, runner, registration, exact six-commit/nine-path scope, dependency and
-source/olean parity, kernel/metadata and unchanged paused files. Do not record a
+source/olean parity, kernel checks and unchanged paused files. Do not record a
 final ADR-0336 implementation commit hash in this decision.

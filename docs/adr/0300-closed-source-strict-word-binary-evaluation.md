@@ -121,7 +121,7 @@ helpers are acceptable only where independently shown absent from every public
 logical closure; authored proof escapes remain forbidden.
 
 Require focused and direct-client builds, complete frontend/syntax/test builds,
-retained and new parsed tests, full tests, kernel policy, metadata and whitespace
+retained and new parsed tests, full tests, kernel policy and whitespace
 checks before completion. Keep design, meanings, execution, individual proofs/
 consumers, registration and documentation in separate small commits.
 No effects, global resolution, general runtime typing, closure conversion,

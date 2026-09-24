@@ -62,5 +62,5 @@ names, shadowing, fresh environment collisions, opaque values, genuine absence
 and raw/whole contrasts. Include allocator-noncommuting equal-result examples
 and unequal-visible-value counterexamples, without claiming checkpoint equality.
 Run focused and aggregate builds, full tests, public and consumer axiom audits,
-kernel/metadata/whitespace checks and independent reviews. Keep proof files
+kernel-policy and whitespace checks and independent reviews. Keep proof files
 below 300 lines, commits small and publication separate from implementation.

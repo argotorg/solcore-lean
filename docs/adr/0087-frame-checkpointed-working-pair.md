@@ -104,7 +104,7 @@ rollback, or atomicity.
 
 It adds no parser or source syntax, Core expression, resource-limit rule, fuel
 or gas policy, Wire field, ABI, serialization, EVM revision, opcode
-behavior, Profile, canonical delta, or published observation.
+behavior, canonical delta, or published observation.
 
 ## Staged implementation plan
 
@@ -158,7 +158,7 @@ storage values `0x56` and `0x78`, rollback sentinels `10` and `20`, and traces
 The implementation commits are `e3ee763` (186 changed lines), `8791470` (18),
 and `e765508` (54), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+semantic-kernel, diff, and independent P0-P3 audits pass.
 
 The carrier establishes no checkpoint/working relationship, capture or entry
 event, currentness, initialization, lifecycle, ownership, execution,

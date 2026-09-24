@@ -76,7 +76,7 @@ general nested calls, runtime typing, Core costs, fault classification, effects,
 closure conversion or whole-language totality.
 
 Keep proof files below 300 lines. Require focused/full builds, complete tests,
-kernel policy, metadata, whitespace, independent consumers, public axiom checks,
+kernel policy, whitespace, independent consumers, public axiom checks,
 exact source ports and actual formal-module ownership inspection before small
 commits. Permit only the standard three proof axioms and retain all actual
 compiler-generated names and flags without normalizing prototype differences.

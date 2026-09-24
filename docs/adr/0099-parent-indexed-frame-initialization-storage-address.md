@@ -147,7 +147,7 @@ delivery, trap handling, event, stack, depth, scheduling, recursion,
 reentrancy, gas, ABI, transaction, host I/O, or published observation.
 
 It adds no parser or source syntax, Core expression, Wire field,
-Profile, or frozen artifact. It makes no concurrency, cost, evaluation-count,
+or frozen artifact. It makes no concurrency, cost, evaluation-count,
 or external-effect claim.
 
 ## Staged implementation plan
@@ -176,7 +176,7 @@ declaration, assertion, helper, or runner call.
 The implementation commits are `6164149` (217 changed lines), `60d5b97` (25),
 `f586ff2` (35), and `8d43460` (51), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused trust-zero checks, the 538-job full
-build, the 964-job full test run, metadata and kernel checks, diff checks,
+build, the 964-job full test run, kernel checks, diff checks,
 simplification review, declaration inventory, and independent P0-P3 audits
 pass.
 

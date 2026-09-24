@@ -80,5 +80,5 @@ independently. Keep the old header gate distinct from a successful body check.
 Separate decisions, definitions, proofs, consumers and publication in small
 commits, with new proof/test files below 300 lines. Require focused/aggregate
 builds, full tests, all public/consumer standard-axiom audits, dependency and
-kernel/metadata/whitespace checks, and independent reviews. No Core, parser,
+kernel-policy and whitespace checks, and independent reviews. No Core, parser,
 diagnostic, old entry, runtime-record or old body definition changes are needed.

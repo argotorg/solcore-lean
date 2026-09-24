@@ -163,8 +163,8 @@ source form, grammar, parser rule, or source elaboration. The parser proof
 program remains paused. The root README does not change.
 
 Acceptance requires focused and full builds, the executable suite, trust-zero
-and warning-as-error checks for every changed Lean root, metadata and semantic
-kernel checks, diff hygiene, axiom reports, and an independent contract audit.
+and warning-as-error checks for every changed Lean root, semantic-kernel checks,
+diff hygiene, axiom reports, and an independent contract audit.
 
 ## Non-goals
 
@@ -206,8 +206,8 @@ Account without code, checked non-Word and Word programs, both projections, and
 classification preservation across an actual Account storage write.
 
 The 701-job full build, 1,290-job test executable build, and full test run pass.
-All eight changed Lean roots pass trust-zero with warnings as errors. Metadata,
-semantic-kernel, and diff checks pass. Every public theorem reports only
+All eight changed Lean roots pass trust-zero with warnings as errors.
+Semantic-kernel and diff checks pass. Every public theorem reports only
 `propext`; the independent audit found no P0-P3 issue. No public format or root
 README changed.
 

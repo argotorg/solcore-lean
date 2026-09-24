@@ -80,8 +80,8 @@ Directly consume the existing recursive, body and entry laws, including literal
 caller-slot insertion and overlap with pure derivations that skip unknown syntax.
 
 Run focused, aggregate and full tests, complete public/consumer standard-axiom
-audits, kernel, metadata and whitespace checks, and independent reviews before
+audits, kernel and whitespace checks, and independent reviews before
 publication. Keep proof/consumer files below 300 lines and commits small.
-Parser, diagnostics, Core machine and frozen wire/metadata semantics do not change.
+Parser, diagnostics, Core machine, and Core Wire do not change.
 Source closure construction, general operator resolution, early returns,
 source-only execution bounds and arbitrary-store safety remain separate.

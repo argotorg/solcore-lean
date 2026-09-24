@@ -72,4 +72,4 @@ No new semantic relation or executable definition is needed. Keep lower proof
 imports free of return-body and whole-entry layers. Separate decision, proofs,
 consumers and publication into small commits. Require focused/aggregate builds,
 full tests, all public/consumer standard-axiom audits, dependency closure checks,
-kernel/metadata/whitespace checks and independent reviews.
+kernel-policy and whitespace checks and independent reviews.

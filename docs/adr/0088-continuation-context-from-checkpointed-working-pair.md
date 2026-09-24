@@ -149,7 +149,7 @@ transaction commit, rollback, or atomicity.
 It does not call resolution or continuation and makes no cost, step-count,
 evaluation-order, or exactly-once claim. It adds no parser or source syntax,
 Core expression, resource rule, fuel or gas policy, Wire field, ABI,
-serialization, EVM revision, opcode behavior, Profile, canonical delta, or
+serialization, EVM revision, opcode behavior, canonical delta, or
 published observation.
 
 ## Staged implementation plan
@@ -199,7 +199,7 @@ continuation.
 The implementation commits are `4910627` (225 changed lines), `1d18d3f` (26),
 `4b0f21a` (48), and `a9c3825` (69), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, simp-termination, semantic-kernel, metadata, diff, and independent
+axiom, simp-termination, semantic-kernel, diff, and independent
 P0-P3 audits pass.
 
 The adapter establishes no execution completion, outcome provenance,

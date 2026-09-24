@@ -80,7 +80,7 @@ about nondeterminism of the actual source language or a checker graph.
 
 Require focused/aggregate builds, full tests, exact standard-only public and
 consumer axiom catalogs, independent semantic reviews, old bytes/contracts/
-imports, kernel/metadata/EOF/whitespace checks. Keep new proof/consumer files
+imports, kernel-policy, EOF, and whitespace checks. Keep new proof and consumer files
 below 300 lines and decision, proof, consumers and publication in small commits.
 
 ## Non-goals

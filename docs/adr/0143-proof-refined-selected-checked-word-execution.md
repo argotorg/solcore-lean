@@ -199,8 +199,8 @@ source form, grammar, parser rule, or source elaboration. Parser work remains
 paused. The root README does not change.
 
 Acceptance requires focused and full builds, the executable suite, trust-zero
-and warning-as-error checks for every changed Lean root, metadata and semantic
-kernel checks, diff hygiene, axiom reports, and an independent contract audit.
+and warning-as-error checks for every changed Lean root, semantic-kernel checks,
+diff hygiene, axiom reports, and an independent contract audit.
 
 ## Non-goals
 
@@ -236,8 +236,8 @@ resumption, and terminal stability. Successful tests retain the exact Store and
 host context and verify canonical 32-byte data, decoding, and frame projection.
 
 The full 709-job build, 1,306-job test-executable build, and test suite pass.
-All 10 changed Lean roots pass trust-zero and warning-as-error checks; metadata,
-semantic-kernel, and diff checks pass. Public theorem axiom reports are exactly
+All 10 changed Lean roots pass trust-zero and warning-as-error checks;
+semantic-kernel and diff checks pass. Public theorem axiom reports are exactly
 `[propext, Quot.sound]`. Independent coverage and contract audits found no
 P0-P3 issue.
 

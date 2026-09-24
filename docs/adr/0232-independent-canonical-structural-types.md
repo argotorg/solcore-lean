@@ -56,7 +56,7 @@ to use the old named-only adapter in this change. Their tuple-type rejection
 tests stay unchanged. A subsequent separately scoped integration must transport
 those independent contracts and preserve original source/parameter records.
 Expression arities and evaluation, Core/resolved semantics, diagnostics, parser
-ranges, source module policy and frozen wire formats remain unchanged.
+ranges, source module policy, and Core Wire remain unchanged.
 
 ## Validation
 
@@ -69,5 +69,5 @@ Contrast old named-only rejection with new structural acceptance and test old
 entry rejection explicitly. Cover safe append/prepend, meaning-changing
 shadowing, and newly enabled names under one-way extension. Run focused and
 aggregate builds, full tests, old/new public and consumer axiom audits,
-kernel/metadata/whitespace checks and independent reviews. Keep proof files
+kernel-policy and whitespace checks and independent reviews. Keep proof files
 under 300 lines, commits small and phased, diagnostics paused and scratch local.

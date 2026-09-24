@@ -57,7 +57,7 @@ Tests cover decimal/hex agreement, both hex letter cases, leading zeroes,
 zero/one/maximum and the first out-of-range value, malformed payloads, Unicode
 digits, separators/signs/whitespace, string rejection, and full parsed-source
 consumption. Public proofs use only standard kernel axioms. Run focused and
-aggregate builds, complete tests, kernel checks, and metadata checks.
+aggregate builds, complete tests, and kernel checks.
 
 This adds no local-expression typing/evaluation constructor, general source
 type policy, parser change, external endpoint, Core machine rule, Wire format,

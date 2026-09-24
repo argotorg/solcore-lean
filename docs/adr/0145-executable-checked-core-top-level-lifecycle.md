@@ -237,8 +237,8 @@ completion policies. At minimum they cover:
 
 All public theorems require external compile consumers. Acceptance also
 requires focused and full builds, the executable suite, trust-zero and
-warning-as-error checks for every changed Lean root, metadata and semantic-
-kernel checks, diff hygiene, axiom reports, and independent contract and
+warning-as-error checks for every changed Lean root, semantic-kernel checks,
+diff hygiene, axiom reports, and independent contract and
 coverage audits.
 
 ## Non-goals
@@ -279,8 +279,8 @@ read-only program that observes caller, input size and byte, and all three
 direct target address roles.
 
 All 45 theorem contracts introduced by this milestone have external compile
-consumers. Full build and runtime tests, trust-zero compilation, metadata and
-kernel-policy checks, diff hygiene, and axiom reports pass. The only reported
+consumers. Full build and runtime tests, trust-zero compilation, kernel-policy
+checks, diff hygiene, and axiom reports pass. The only reported
 Lean axioms are the repository-accepted `propext` and `Quot.sound`.
 
 ## Consequences

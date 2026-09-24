@@ -62,16 +62,13 @@ Focused regressions cover:
 - two allocating and writing operands evaluated left then right exactly once,
   retaining the right operand's final store;
 - exact literal and effectful CEK fuel boundaries: 9/10 and 33/34 for
-  `wordSleFlag`, and 15/16 and 39/40 for `wordSgeFlag`; and
-- frozen Wire v1/v2 rejection of each builder and its handwritten expansion,
-  plus Wire v2 rejection of the underlying `wordSgt` operation.
+  `wordSleFlag`, and 15/16 and 39/40 for `wordSgeFlag`.
 
 ## Publication and exclusions
 
 This slice only composes existing internal expressions. It adds no Core form,
 primitive tag, source spelling, standard-library API, ABI rule, opcode
-lowering, gas rule, schema, Wire version, or public byte. Frozen Wire v1/v2 and
-their public operation enums remain unchanged.
+lowering, gas rule, schema, or public byte.
 
 ## Consequences
 
@@ -89,8 +86,5 @@ left-to-right effects evaluated exactly once, and the retained final store.
 Exact CEK boundaries pass at 9/10 and 33/34 for `wordSleFlag`, and 15/16 and
 39/40 for `wordSgeFlag`.
 
-Frozen Wire v1/v2 reject each builder and handwritten expansion, and Wire v2
-rejects the underlying `wordSgt` operation. Public schemas and bytes remain
-unchanged. Focused and full warning-free builds, the full test runner, kernel
-policy, and metadata verification pass. The independent audit found no P0-P3
-issue.
+Focused and full warning-free builds, the full test runner, and the
+kernel-policy check pass. The independent audit found no P0-P3 issue.

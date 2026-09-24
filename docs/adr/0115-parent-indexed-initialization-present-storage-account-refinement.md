@@ -162,7 +162,7 @@ trace event, scheduling, transaction, concurrency, reentrancy, atomicity, cost,
 or gas rule.
 
 It adds no parser or source syntax, Core expression, Wire field,
-Profile, ABI, storage layout, serialization, or published observation.
+ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 
@@ -193,7 +193,7 @@ fixture, or runner call was added.
 The implementation commits are `e4bd5fd` (231 changed lines), `ea12a69` (27),
 `9c5b2fe` (55), and `4839106` (84), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused trust-zero checks, the 578-job full
-build, the 1044-job full test run, metadata and kernel checks, diff checks,
+build, the 1044-job full test run, kernel checks, diff checks,
 declaration, generated-equation, axiom, dependency, simp-convergence,
 proof-masking, and runtime inventories, and independent P0-P3 audits pass.
 

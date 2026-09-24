@@ -141,8 +141,7 @@ Account. It exposes no map iteration, insertion order, comparison order,
 serialization, canonical state delta, or observation schema.
 
 It adds no source form, Core type or expression, Wire tag, JSON schema,
-profile, or published observation.
-Frozen public formats and metadata remain unchanged.
+profile, or published observation. Existing public formats remain unchanged.
 
 ## Consequences
 
@@ -170,6 +169,6 @@ WorldState lookup laws, the four Account write/read laws, and the three absent,
 same-address, and other-address WorldState write laws. The two empty Account
 laws, `storageValue?_empty` and `storageRead_empty`, report
 `[propext, Quot.sound]`. No custom axiom, `sorryAx`, or unchecked declaration is
-present. Trust-zero, focused and full builds and tests, metadata, semantic
+present. Trust-zero, focused and full builds and tests, semantic
 kernel, privacy, and recursor checks pass. The final independent audit found no
 P0-P3 issue.

@@ -101,5 +101,5 @@ Do not count parser acceptance alone as frontend acceptance.
 
 Run focused/aggregate/full tests, independent reviews, exact old theorem
 contracts, published-catalog and all-consumer standard-axiom audits, import
-closure/kernel/metadata and EOF/whitespace checks. Diagnostic/parser proofs
+dependency-closure, kernel-policy, EOF, and whitespace checks. Diagnostic/parser proofs
 stay paused; all scratch files remain repository-local.

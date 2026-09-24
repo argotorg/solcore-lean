@@ -163,7 +163,7 @@ and runner wiring; independent audit and completion evidence.
 
 This internal selector is not published. It adds no concrete event kind,
 balance, code, call data, transferred value, host call/create behavior, storage
-layout, serialization, canonical delta, Profile, frozen artifact, or public
+layout, serialization, canonical delta, frozen artifact, or public
 format.
 
 ## Consequences
@@ -192,7 +192,7 @@ witnesses.
 The implementation commits are `73c87f6` (226 changed lines), `dece6a7` (31),
 `2a43bb0` (57), and `d290213` (86), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, semantic-kernel, metadata, diff, and independent P0-P3 audits pass.
+axiom, semantic-kernel, diff, and independent P0-P3 audits pass.
 
 The retained `FrameTrace` is the new narrow internal policy fixed by this ADR;
 it does not imply survival of concrete contract logs or every future effect.

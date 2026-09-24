@@ -124,7 +124,7 @@ outcome, trace event, rollback, scheduling, transaction, concurrency,
 reentrancy, atomicity, cost, or gas rule.
 
 It adds no parser or source syntax, Core expression, Wire field,
-Profile, ABI, storage layout, serialization, or published observation.
+ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 
@@ -150,7 +150,7 @@ once, and adds no compile-only call.
 The implementation commits are `6b319ab` (187 changed lines), `f1e0dc1` (21),
 `af37c2d` (25), and `8c391b8` (107), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused trust-zero checks, the 554-job full
-build, the 1000-job full test run, metadata and kernel checks, diff checks,
+build, the 1000-job full test run, kernel checks, diff checks,
 declaration and simp-registration inventories, exact dependency audits, and
 independent P0-P3 audits pass.
 

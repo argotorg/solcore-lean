@@ -71,6 +71,6 @@ costs, genuine checkpoints and contrasting raw success/fault on rejected inputs.
 
 Keep old semantic kernels and executable definitions byte-identical. Use small
 definition/proof/consumer/publication commits, independent reviews, complete
-axiom/dependency/kernel/metadata/EOF/whitespace audits and focused/aggregate/full
-tests. New Lean files stay under 300 lines. Scratch remains repository-local;
+axiom, dependency, kernel-policy, EOF, and whitespace audits and focused,
+aggregate, and full tests. New Lean files stay under 300 lines. Scratch remains repository-local;
 parser and diagnostic proof work remains paused.

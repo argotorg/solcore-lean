@@ -32,8 +32,7 @@ when it is false. The names distinguish these word-valued flags from the
 existing boolean-valued builders.
 
 These definitions are ordinary compositions of existing Core expressions.
-They add no Core form, primitive tag, evaluation rule, fault, wire version, or
-wire behavior.
+They add no Core form, primitive tag, evaluation rule, or fault.
 
 ## Evaluation order
 
@@ -74,9 +73,7 @@ Focused regressions cover:
 - checker acceptance, word result types, and wrong-operand rejection;
 - left-first raw faults and exactly-once left-to-right effects;
 - final-store preservation with allocating and writing operands;
-- exact insufficient and sufficient fuel for every derived form; and
-- rejection by frozen Wire v1 plus exact Wire v2 projection and round trips
-  against the handwritten canonical expansions.
+- exact insufficient and sufficient fuel for every derived form.
 
 Compile-time examples exercise the public typing, inference, and evaluation
 theorems.

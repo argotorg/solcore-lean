@@ -9,7 +9,7 @@
 
 Core has fixed-width 256-bit words but no operation for counting their leading
 zero bits. This internal operation supports later normalization and bit
-algorithms without requiring source syntax or publication through frozen Wire.
+algorithms without requiring source syntax.
 
 ## Decision
 
@@ -28,9 +28,6 @@ Add one `UnaryOp.wordClz` tag to internal Core syntax and extend existing
 typing, inference, renaming, weakening, evaluator, machine, Safety, and proof
 cases consistently. The operand evaluates exactly once, and its final store is
 the operation's final store.
-
-This tag is not published. Frozen Wire v1 and Wire v2 must both reject it. No
-public wire tag, schema, version, or encoding changes.
 
 ## Required proof interface
 
@@ -58,23 +55,21 @@ Focused regressions cover:
 - the raw invalid-unary-operand fault;
 - an allocating and writing operand evaluated exactly once with its final
   store retained;
-- exact literal 2/3 and effectful 14/15 fuel boundaries; and
-- rejection by both frozen Wire v1 and Wire v2 encoders.
+- exact literal 2/3 and effectful 14/15 fuel boundaries.
 
-Compile-time examples exercise all eleven names. Tests also confirm that no
-Core or JSON round trip exists for the unpublished operation.
+Compile-time examples exercise all eleven names.
 
 ## Boundaries
 
 This decision adds no `Expr` alias, source or standard-library API, ABI rule,
 opcode lowering, or gas rule. It does not define leading-zero count for
 unbounded integers or widths other than 256. Existing operation values, types,
-faults, effects, fuel, and Wire meaning remain unchanged.
+faults, effects, and fuel remain unchanged.
 
 ## Consequences
 
-Internal Core gains one precise, total bit-analysis primitive while its public
-formats remain frozen. Further primitives require separate ADRs.
+Internal Core gains one precise, total bit-analysis primitive. Further
+primitives require separate ADRs.
 
 ## Implementation result
 
@@ -87,10 +82,8 @@ Compile-time and runtime tests cover 0, 1, 2, `2^255`, and maximum; Word result
 typing and wrong result/operand types; the raw invalid-unary-operand fault; and
 an allocating, writing operand evaluated exactly once with its final store.
 Literal evaluation has the exact 2/3 fuel boundary and effectful evaluation the
-exact 14/15 boundary. Frozen Wire v1 and v2 both reject `wordClz`, so no Core or
-JSON projection is introduced.
+exact 14/15 boundary.
 
-The implementation, focused semantic/Wire validation, and independent audit
+The implementation, focused semantic validation, and independent audit
 are complete. The audit found no P0-P3 issue, no source trust escape hatch, and
-only the repository-approved Lean foundational dependencies. Published Wire
-metadata, schemas, versions, and encodings remain unchanged.
+only the repository-approved Lean foundational dependencies.

@@ -94,7 +94,7 @@ source-to-Core operational correspondence theorem.
 
 Run focused and aggregate builds, full tests, public and consumer exact
 standard-only axiom catalogs, independent reviews, old byte/header/import
-checks, kernel/metadata/EOF/whitespace checks. Keep the decision, implementation
+checks, and kernel-policy, EOF, and whitespace checks. Keep the decision, implementation
 and proofs, consumers, and publication in small separately verified commits.
 
 ## Non-goals

@@ -168,9 +168,7 @@ Core must expose and verify:
   resume laws;
 - executable/declarative request correspondence and determinism;
 - response and suspension typing, typed progress, preservation, and no-fault;
-- unchanged generic runner soundness, completeness, and terminal stability;
-  and
-- frozen Wire v1 and v2 rejection of the internal host-function value.
+- unchanged generic runner soundness, completeness, and terminal stability.
 
 Semantics must expose and verify:
 
@@ -193,7 +191,6 @@ Add focused tests for:
   observation;
 - static rejection and raw-machine faulting for a non-Unit argument;
 - exact emission, Word resumption, continuation, and local-store reuse;
-- direct frozen Wire v1 and v2 rejection;
 - exact handler response and lossless narrowing;
 - request-ready exhaustion at fuel 4 and completion at fuel 5;
 - a selected fixture with `codeAddress != storageAddress` returning the code
@@ -215,9 +212,8 @@ imports no Address or WorldState meaning. Semantics owns the Address response
 and the invariant that the selected entry point uses one selector for lookup
 and execution.
 
-No parser, source syntax, ABI, schema, profile, gas, or public runtime module
-changes. Frozen Wire projections continue to reject every host function. The
-root README does not change.
+No parser, source syntax, ABI, gas, or public runtime module changes. The root
+README does not change.
 
 ## Non-goals
 
@@ -258,7 +254,7 @@ remain unchanged.
 Core appends `codeAddress` as capability index 3 and as a first-order host
 request. Its Unit argument, Word response, suspension, resumption, progress,
 preservation, and checked no-fault path use the same machinery as the existing
-host capabilities. Frozen Wire v1 and v2 still reject all internal host values.
+host capabilities.
 
 Semantics returns `addressToWord codeAddress` without changing the handler
 context. Public laws expose the exact resumed control, continuation, local
@@ -275,7 +271,7 @@ and local store at fuel 32.
 - the full build completed 627 jobs;
 - the complete test suite completed 1,142 jobs and all runtime checks passed;
 - all changed Lean modules compiled with trust zero and warnings as errors;
-- metadata and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - the public selector laws use only the repository's permitted logical
   foundations; and
 - independent implementation and regression audits found no correctness gap.

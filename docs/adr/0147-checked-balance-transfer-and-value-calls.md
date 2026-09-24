@@ -245,7 +245,7 @@ proof consumers cover:
 - arbitrary root, child, and untouched balance-delta queries; and
 - coherence of the legacy zero-value call with ADR-0146.
 
-Full build and executable tests, warning-as-error, trust-zero checks, metadata,
+Full build and executable tests, warning-as-error and trust-zero checks,
 semantic-kernel policy, diff hygiene, and independent acceptance audit must
 pass.
 
@@ -276,5 +276,4 @@ unavailable targets, and exact arbitrary-address deltas. Split execution is
 tested while the root is running, while the child is running, and immediately
 after child completion; each resumed result matches one-shot execution without
 replaying a transfer or child effect. Full build, tests, trust-zero checks,
-metadata validation, semantic-kernel policy, public-constructor rejection, and
-diff hygiene pass.
+semantic-kernel policy, public-constructor rejection, and diff hygiene pass.

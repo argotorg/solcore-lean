@@ -70,6 +70,6 @@ legitimate actual arguments without manufacturing nominal data inhabitants.
 Keep definitions, checking/execution proofs, exact-cost/resumption proofs,
 runtime-world proofs, consumers and publication in small commits, each new file
 below 300 lines. Require focused and aggregate builds, full tests, all public
-and consumer standard-axiom audits, kernel/metadata/whitespace checks and
+and consumer standard-axiom audits, kernel-policy and whitespace checks, and
 independent reviews. Diagnostics, Core/Resolved, parser and wire definitions
 remain unchanged.

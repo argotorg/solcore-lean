@@ -227,7 +227,7 @@ consumer; general parser and diagnostic proof development remains paused.
 ADR-0317 through ADR-0327 production, decisions and public semantics remain
 textually and semantically unchanged. Preserve every existing classifier, checker,
 relation and theorem; `RecursiveLocalComputation`; the shared ADR-0324 branch
-contract; canonical source unions; runtime entries; public wire versions; and the
+contract; canonical source unions; runtime entries; Core Wire; and the
 eight paused untracked parser/diagnostic proof files. This unit adds only an opt-in
 static adapter and no new runtime expression semantics.
 

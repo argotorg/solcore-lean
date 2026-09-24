@@ -14,11 +14,11 @@ addresses, and byte strings to have canonical lowercase hexadecimal
 representations. That requirement needs an executable, proved foundation
 before contract state or ABI rules can use it.
 
-The frozen Core Wire v1 and v2 codecs each contain a private Word-only
-hexadecimal implementation. Source-level hexadecimal literals are not suitable
-for runtime observations: they permit uppercase spelling, omit the `0x` prefix,
-and do not preserve a fixed runtime width. A new syntax-independent kernel is
-therefore required.
+Core Wire and runtime observations both require canonical Word hexadecimal
+text. Source-level hexadecimal literals are not suitable for runtime
+observations: they permit uppercase spelling, omit the `0x` prefix, and do not
+preserve a fixed runtime width. A shared syntax-independent kernel is therefore
+required.
 
 ## Decision
 
@@ -83,26 +83,24 @@ Focused regressions cover:
   and 31;
 - rejection of missing prefixes, uppercase digits, invalid characters, odd
   byte-string widths, and incorrect Address and Word widths;
-- encode/decode round trips and accepted-input canonicalization; and
-- equality of the new Word text with frozen Core Wire v1 and v2 output for
-  representative values, while metadata remains unchanged.
+- encode/decode round trips and accepted-input canonicalization;
+- equality of runtime and Core Wire Word text for representative values.
 
 ## Staged implementation plan
 
 Keep every commit at roughly 300 changed lines or fewer and leave the tree
 green:
 
-1. add a proof-oriented fixed-radix byte kernel and include Foundation in the
+1. add a proof-oriented fixed-radix byte kernel and include `Solcore.Util` in the
    semantic-kernel policy scan;
 2. add canonical lowercase hexadecimal encoding and strict decoding;
 3. add `Bytes`, `Address`, and existing-Word runtime scalar APIs;
 4. add the exact sixteen focused scalar theorems;
-5. add boundary, rejection, big-endian, and frozen-Wire compatibility tests;
+5. add boundary, rejection, big-endian, and Core Wire coherence tests;
 6. independently audit the slice and update completion documentation.
 
-The frozen Wire implementations may later delegate to the shared foundation,
-but such refactoring is not required for this slice and must preserve their
-error ordering, JSON bytes, schemas, and profiles exactly.
+Core Wire and runtime scalar implementations should share this foundation
+while preserving their boundary-specific error ordering.
 
 ## Completion evidence
 
@@ -115,11 +113,9 @@ canonicality, text injectivity, exact 32-byte Word width, and agreement with
 
 Executable regressions cover the required boundaries and rejection cases, a
 complete 32-byte big-endian fixture, accepted-input canonicalization, and Word
-text compatibility with frozen Core Wire v1 and v2. The frozen Wire codecs were
-not refactored; the tests compare their existing output with the new internal
-encoder. Focused and full builds and tests, trust-zero checking, the semantic
-kernel and metadata checks, and the axiom audit pass. The independent audit
-found no P0-P3 issue.
+text coherence with Core Wire. Focused and full builds and tests, trust-zero
+checking, the semantic kernel check, and the axiom audit pass. The independent
+audit found no P0-P3 issue.
 
 ## Publication and exclusions
 
@@ -129,7 +125,7 @@ published observation profile. It adds no hashing, selector, ABI padding,
 storage layout, address-to-word conversion, address truncation, contract
 state, call, rollback, EVM revision, gas, or map-order rule.
 
-Publication of runtime observations remains a separate versioned decision.
+Publication of runtime observations remains a separate decision.
 Keccak and selectors require a later resource and trust-boundary decision;
 contract execution requires separate state and outcome decisions.
 

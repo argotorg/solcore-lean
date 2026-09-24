@@ -117,7 +117,7 @@ Keep source block sequencing and lambda creation outside this extension.
 
 Commit decision, scope definitions/proofs, shared definitions/proofs, old
 consumers, new consumers and publication separately in small chunks. Keep
-proof files below 300 lines. Require independent reviews, focused/aggregate/full
-tests, exact public contracts/catalogs, standard-axiom audits, import/kernel/
-metadata and EOF/whitespace checks. Diagnostic/parser proofs stay paused;
+proof files below 300 lines. Require independent reviews, focused, aggregate, and full
+tests, exact public contracts and catalogs, standard-axiom audits, and import,
+kernel-policy, EOF, and whitespace checks. Diagnostic/parser proofs stay paused;
 all working files stay inside the repository.

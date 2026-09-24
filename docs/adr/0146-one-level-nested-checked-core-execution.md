@@ -257,8 +257,8 @@ cover:
   and identity rollback.
 
 The public theorems have external compile consumers. Focused and full builds,
-the executable suite, trust-zero and warning-as-error checks, metadata and
-semantic-kernel checks, diff hygiene, axiom reports, and independent contract
+the executable suite, trust-zero and warning-as-error checks, semantic-kernel
+checks, diff hygiene, axiom reports, and independent contract
 and coverage audits complete the acceptance boundary.
 
 ## Non-goals and following milestones

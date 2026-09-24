@@ -60,5 +60,6 @@ from this raw law. No source syntax or executable policy changes are required.
 
 Keep proof/consumer/publication commits separate and small, proof files below
 300 lines, public/consumer axiom and dependency audits explicit. Run focused and
-aggregate builds, complete parsed execution, full tests and kernel/metadata/
-whitespace checks. Diagnostics remain paused; scratch stays in the workspace.
+aggregate builds, complete parsed execution, full tests, the kernel-policy
+check, and whitespace checks. Diagnostics remain paused; scratch stays in the
+workspace.

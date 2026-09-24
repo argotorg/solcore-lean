@@ -99,7 +99,7 @@ Also compare the generic engine instantiated with the old child to the old
 successful/failed checker fixtures without changing the old endpoint.
 
 Run focused and aggregate builds, full tests, all public/consumer standard
-axiom audits, policy/metadata/whitespace checks and independent reviews.
+axiom audits, kernel-policy and whitespace checks, and independent reviews.
 The generic engine reduces future duplication, not the initial proof effort.
 General early returns, recursive operators, generated source closures, global
 functions, whole-entry integration, unfuelled execution and arbitrary-store

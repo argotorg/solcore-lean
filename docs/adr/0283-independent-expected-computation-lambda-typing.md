@@ -82,7 +82,7 @@ source-lambda evaluation or canonical backend execution proofs.
 
 Run focused and aggregate builds, full tests, exact standard-only public and
 consumer axiom audits, independent reviews, old byte/header/import checks and
-kernel/metadata/EOF/whitespace checks. Keep each new file below 300 lines and use
+kernel-policy, EOF, and whitespace checks. Keep each new file below 300 lines and use
 small separate decision, implementation/proof, consumer and publication commits.
 
 ## Non-goals

@@ -175,8 +175,7 @@ Low-level Core tests must cover:
 - static rejection and exact raw fault for a non-Unit argument;
 - exact request emission, response injection, continuation, and Store reuse;
 - request-ready exhaustion at raw-Core fuel 4, request suspension at raw-Core
-  fuel 5, and handled completion at fuel 5; and
-- direct rejection of `.hostFunction .callerAddress` by Wire v1 and v2.
+  fuel 5, and handled completion at fuel 5.
 
 End-to-end regressions must:
 
@@ -198,17 +197,15 @@ The measured resource boundary, not an assumed index-independent cost, is the
 acceptance result. If the implementation changes the 4/5 boundary, the ADR must
 be revisited rather than silently changing the expected test.
 
-## Dependency and publication boundary
+## Dependency boundary
 
 Semantics owns `callerAddress : Address`, lossless Address-to-Word widening,
 strict recovery, and request interpretation. Core sees only a Unit-to-Word
 internal capability. Generic HostDriver and continuation layers remain
 parameterized and must not import Address-specific meaning.
 
-Frozen Core Wire v1 and v2 continue to reject every host-function value. Add no
-Wire tag, external runtime request, schema, profile, metadata
-capability, ABI rule, source form, parser rule, or source elaboration in this
-slice. The root README does not change. Publication requires a separate ADR.
+This slice adds no external runtime request, ABI rule, source form, parser rule,
+or source elaboration. The root README does not change.
 
 ## Non-goals
 
@@ -249,7 +246,7 @@ The work was completed in bounded commits in this order:
 4. added the exact handler, suspension, strict-recovery, and recursive-driver
    laws;
 5. repaired request-exhaustive custom handlers and added focused Core
-   admission, raw-fault, layout, fuel, resumption, and Wire regressions;
+   admission, raw-fault, layout, fuel, and resumption regressions;
 6. added direct selected execution, absent-Account, caller-only variation,
    observe-write-observe, parent completion, and resolution-fold regressions;
    and
@@ -270,8 +267,7 @@ Core appends `HostFunction.callerAddress : unit -> word` at index 5 without
 moving indexes 0 through 4. The matching request, response, application,
 emission, invalid-argument fault, resumption, progress, transition, state
 typing, runner, and checked no-fault branches are complete. Host-context and
-host-environment lengths are 6. Frozen Wire v1 and v2 explicitly reject the
-internal host-function value.
+host-environment lengths are 6.
 
 The storage handler returns `addressToWord inputs.callerAddress` exactly. It
 performs no Account or code lookup, leaves the complete mutable context
@@ -303,10 +299,10 @@ entry and designated terminal bytes.
 
 - the full build completed successfully with 643 jobs;
 - the complete 1,174-job executable test suite passed;
-- metadata verification and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - focused Core regressions cover append-only indexes and tables, checked and
   closed admission, exact request and resumption, the invalid-argument fault,
-  fuel 4/5, first-unbound index 6, and frozen Wire v1/v2 rejection;
+  fuel 4/5, and first-unbound index 6;
 - end-to-end regressions cover fuel 4/5/23/29/30/32, exact widening, caller
   Account absence, caller-only input variation, context preservation,
   caller-derived storage mutation, terminal stability, parent-indexed

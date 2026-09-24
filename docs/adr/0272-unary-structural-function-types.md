@@ -98,7 +98,7 @@ explicit and unchanged.
 
 Commit decision, definitions, proof migrations, old consumers, new consumers
 and publication separately in small chunks. Keep proof files below 300 lines.
-Require independent reviews, focused/aggregate/full tests, protected public
-contracts, published-catalog/all-consumer standard-axiom audits, dependency,
-kernel, metadata and EOF/whitespace checks. Keep diagnostic/parser proof work
+Require independent reviews, focused, aggregate, and full tests, protected public
+contracts, published-catalog and all-consumer standard-axiom audits, dependency,
+kernel-policy, EOF, and whitespace checks. Keep diagnostic/parser proof work
 paused and all work files inside the repository.

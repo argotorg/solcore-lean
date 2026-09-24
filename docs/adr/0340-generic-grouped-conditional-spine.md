@@ -138,7 +138,7 @@ Deliver in small commits, each within the repository's 300-changed-line limit:
 5. add an independent parsed consumer with proof-producing AST/span equality and
    unchanged conditional fuel 13/14, result and store;
 6. register only the completed standalone adapter and consumers, update status
-   documents, and run focused/full builds, all tests, kernel/metadata checks and
+   documents, and run focused/full builds, all tests, kernel checks and
    paused-file verification;
 7. specify and implement the generic-first wrapper under a separate ADR after the
    standalone adapter is complete.

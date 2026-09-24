@@ -187,8 +187,8 @@ unchanged. The session is an additive safe interface, not a replacement or a
 new public format.
 
 Acceptance requires focused and full builds, the executable suite, trust-zero
-and warning-as-error checks for every changed Lean root, metadata and semantic
-kernel checks, diff hygiene, and an independent contract audit.
+and warning-as-error checks for every changed Lean root, semantic-kernel checks,
+diff hygiene, and an independent contract audit.
 
 No Wire tag, schema, profile, source form, grammar, parser
 rule, or source elaboration is added. The parser proof
@@ -242,8 +242,8 @@ the one-shot fuel-30 result; changing only `currentAddress` requires a distinct
 start, and another 7 units leave the completed result unchanged.
 
 The 685-job build, 1,258-job test executable build, and full test run pass. All
-11 changed Lean roots pass trust-zero with warnings as errors. Metadata,
-semantic-kernel, and diff checks pass; 32 public theorem reports use only
+11 changed Lean roots pass trust-zero with warnings as errors. Semantic-kernel
+and diff checks pass; 32 public theorem reports use only
 `propext` and `Quot.sound`. Independent audits found no P0-P2 issue and the one
 P3 documentation typo was corrected. The root README and public Core, Wire, and
 source-syntax boundaries remain unchanged.

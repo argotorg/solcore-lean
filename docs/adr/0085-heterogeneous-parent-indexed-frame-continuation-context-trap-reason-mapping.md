@@ -177,7 +177,7 @@ transaction rollback or atomicity.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
 fuel or gas policy, Wire field, ABI, serialization, EVM revision,
-opcode behavior, Profile, canonical delta, or published format.
+opcode behavior, canonical delta, or published format.
 
 ## Staged implementation plan
 
@@ -226,7 +226,7 @@ proofs, the fixed index, and one mapped trap reason.
 The implementation commits are `68b751c` (259 changed lines), `f6546ac` (30),
 `3e3c63d` (68), and `6a1a181` (110), all below 300 changed lines; this
 completion update is the fifth staged commit. Focused and full builds, tests,
-trust-zero, axiom, simp-termination, semantic-kernel, metadata, diff, and
+trust-zero, axiom, simp-termination, semantic-kernel, diff, and
 independent P0-P3 audits pass.
 
 The lift maps no parent state, effects, trace, type index, or proof object and

@@ -107,7 +107,7 @@ fixture explicitly retains all 19 leading zero octets.
 The axiom audit reports `propext` and `Quot.sound` for laws one through five;
 the byte-index agreement law additionally reports `Classical.choice`. There
 are no custom axioms, `sorryAx`, or unchecked declarations. Focused and full
-builds and tests, trust-zero, semantic-kernel, metadata, document-link, and diff
+builds and tests, trust-zero, semantic-kernel, document-link, and diff
 checks pass. The independent audit found no P0-P3 issue.
 
 ## Publication and exclusions
@@ -123,8 +123,8 @@ frame adapter, trap taxonomy, world state, account, storage, balance, log, call,
 creation, checkpoint, rollback, state delta, EVM revision, gas schedule, host
 behavior, or resource-limit meaning.
 
-It adds no Wire tag, JSON schema, profile, or published observation. Frozen
-public formats and metadata remain unchanged.
+It adds no Wire tag, JSON schema, profile, or published observation. Existing
+public formats remain unchanged.
 
 ## Consequences
 

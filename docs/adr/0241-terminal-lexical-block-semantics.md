@@ -88,5 +88,5 @@ records remain unchanged.
 Keep body-to-entry imports acyclic and new proof/test files under 300 lines.
 Separate definitions, proofs, migrations, consumers and publication commits.
 Run focused/aggregate builds, full tests, all public/consumer axiom audits,
-kernel/metadata/whitespace checks and independent reviews. Scratch remains
+kernel-policy and whitespace checks and independent reviews. Scratch remains
 inside the repository, and paused diagnostic files remain untouched.

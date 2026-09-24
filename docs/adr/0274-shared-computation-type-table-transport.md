@@ -81,6 +81,6 @@ checkpoints; include effects and corrupt/missing-reference faults where useful.
 
 Commit decision, body proofs, function proofs, consumers and publication in
 small reviewed chunks. All proof files stay below 300 lines. Run focused,
-aggregate and full tests, public/consumer exact-name standard-axiom audits,
-original contract/import/kernel/metadata and EOF/whitespace/hash checks.
+aggregate and full tests, public and consumer exact-name standard-axiom audits,
+and original-contract, import, kernel-policy, EOF, whitespace, and hash checks.
 Diagnostic/parser proof work stays paused; scratch stays inside the repository.

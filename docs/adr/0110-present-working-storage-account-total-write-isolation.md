@@ -102,7 +102,7 @@ multi-step coherence remain separate consumer decisions.
 This slice adds no balance, nonce, code, value transfer, call data, outcome,
 trace event, rollback, scheduling, transaction, concurrency, reentrancy,
 atomicity, cost, gas, parser or source syntax, Core expression, Wire field,
-Profile, ABI, storage layout, serialization, or published observation.
+ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 
@@ -127,7 +127,7 @@ no runtime or public declaration, fixture, helper, assertion, or runner call.
 The implementation commits are `633a4a7` (161 changed lines), `b49a68d` (29),
 and `867bb51` (43), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused trust-zero checks, the 566-job full build, the
-1020-job full test run, metadata and kernel checks, diff checks, declaration,
+1020-job full test run, kernel checks, diff checks, declaration,
 axiom, dependency, and simp-registration inventories, named two-write
 composition and proof-masking checks, and independent P0-P3 audit pass.
 

@@ -50,6 +50,6 @@ inhabitants or hidden names. Keep existing explicit-ID consumers passing.
 
 Register and audit all five new constructors and every changed public definition
 or proof, as well as independent consumers. Run focused and aggregate builds,
-full tests and standard-axiom/kernel/metadata/forbidden-token/whitespace checks.
+full tests and standard-axiom, kernel-policy, forbidden-token, and whitespace checks.
 Keep new/changed proof files below 300 lines and exact-path commits small; use
 repository-local scratch and preserve paused diagnostic files.

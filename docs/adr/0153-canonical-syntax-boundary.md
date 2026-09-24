@@ -124,7 +124,7 @@ The decision is implemented when:
 - comments and UTF-8 spans preserve their documented ranges;
 - executable parsing and declarative grammar judgments agree at the public
   diagnostic-free boundary; and
-- the complete repository build, tests, metadata checks, and kernel-policy
+- the complete repository build, tests, and kernel-policy
   checks pass.
 
 ## Consequences

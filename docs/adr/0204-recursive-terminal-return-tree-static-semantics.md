@@ -57,6 +57,6 @@ actual source blocks and static parameter declarations without runtime values,
 and contrast new deep success with unchanged old body/entry rejection.
 
 Audit all public declarations and consumers with standard axioms only; run
-focused/aggregate builds, full tests and kernel/metadata/whitespace checks.
+focused and aggregate builds, full tests, and kernel-policy and whitespace checks.
 Keep proof files below 300 lines and commits small, preserve paused diagnostics,
 and place all scratch files inside the repository.

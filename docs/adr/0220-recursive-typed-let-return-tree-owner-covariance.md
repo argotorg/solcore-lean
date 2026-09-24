@@ -56,5 +56,5 @@ Contrast owner collapse and arbitrary index shifts at the allocator boundary.
 
 Audit all five contracts and source/parsed consumers, standard axioms,
 registration and dependency direction, focused/aggregate builds, actual parsed
-execution, full tests and kernel/metadata/whitespace policy. Keep proof files
+execution, full tests, and kernel-policy and whitespace checks. Keep proof files
 below 300 lines, commits small, diagnostics paused and scratch in the repository.

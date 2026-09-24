@@ -168,7 +168,7 @@ rollback or atomicity.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
 fuel or gas policy, Wire field, ABI, serialization, EVM revision,
-opcode behavior, Profile, canonical delta, or published format.
+opcode behavior, canonical delta, or published format.
 
 ## Staged implementation plan
 
@@ -216,7 +216,7 @@ equality with distinct states, journals, nonempty traces, and mapped reason.
 The implementation commits are `eb333b6` (246 changed lines), `264dac4` (28),
 `1700720` (62), and `366f8e9` (96), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, simp-termination, semantic-kernel, metadata, diff, and independent P0-P3
+axiom, simp-termination, semantic-kernel, diff, and independent P0-P3
 audits pass.
 
 The lift maps no parent index, checkpoint equality, rollback selection,

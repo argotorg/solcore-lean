@@ -59,5 +59,5 @@ different real ID tables, full same-fuel completion and exhaustion equality,
 opaque typed closure/cell values, and rejected whole declarations. Keep the
 index-shift allocation counterexample explicit. Add completely parsed entry
 regressions and audit every public declaration. Run focused and aggregate builds,
-full tests, kernel/metadata/whitespace checks, and keep new proof files below
+full tests, kernel-policy and whitespace checks, and keep new proof files below
 300 lines. Leave diagnostic proofs untouched.

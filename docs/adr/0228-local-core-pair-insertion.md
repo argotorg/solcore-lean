@@ -50,7 +50,7 @@ continuations are not executed by the transported endpoint paths. Genuine
 checkpoints retain their own frames and environments and need not be equal.
 
 Do not change Resolved constructors, canonical source acceptance, entry gates,
-parser, diagnostics or frozen wire interfaces. Two-element source tuples,
+parser, diagnostics, or Core Wire. Two-element source tuples,
 nullary or larger tuples, tuple type syntax, projection spelling and multiple
 returns are not implemented by this prerequisite. Historical ADRs remain intact.
 
@@ -62,5 +62,5 @@ missing or wrongly shaped children, nominal static types without inhabitants,
 L+R+3 cost, both insertion directions and actual pair checkpoints/resumption.
 Retain old lambda/application/cell and wire-rejection counterexamples.
 Run focused/aggregate builds, full tests, all-public and consumer axiom audits,
-kernel/metadata/whitespace checks and independent reviews. Keep files below
+kernel-policy and whitespace checks and independent reviews. Keep files below
 300 lines and definition, proof, consumer and publication commits separate.

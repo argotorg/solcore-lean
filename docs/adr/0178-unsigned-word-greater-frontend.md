@@ -60,5 +60,5 @@ against actual open Core, supplied argument order, and runtime states. Include
 computed arithmetic conditions with independently determined exact costs.
 
 Run focused and aggregate builds, full tests, public standard-axiom audits,
-kernel and metadata checks, forbidden proof-token and whitespace checks. Commit
+kernel checks, forbidden proof-token and whitespace checks. Commit
 small exact-path units; preserve unrelated diagnostic work without extending it.

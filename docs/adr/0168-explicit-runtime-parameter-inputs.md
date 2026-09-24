@@ -63,5 +63,5 @@ declarations, runtime argument decoding, and wire endpoints remain outside this
 input-preparation adapter.
 
 Audit all public declarations against the permitted standard kernel axioms,
-run focused and aggregate builds and full tests, and verify kernel, metadata,
-and whitespace policies. Keep new proof files below 300 lines.
+run focused and aggregate builds and full tests, and verify kernel and
+whitespace policies. Keep new proof files below 300 lines.

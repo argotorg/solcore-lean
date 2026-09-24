@@ -50,5 +50,5 @@ fixtures for newly supported `!=`, preserving unrelated parser/wire tests.
 
 Register every new public declaration and audit all changed semantic interfaces
 and consumers for standard axioms only. Run focused and aggregate builds, full
-tests, kernel/metadata/forbidden-token/whitespace checks and small exact-path
+tests, kernel-policy, forbidden-token, and whitespace checks, and small exact-path
 commits. Place scratch files inside the repository's ignored working directory.

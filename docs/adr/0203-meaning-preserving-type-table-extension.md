@@ -53,6 +53,6 @@ existing contracts for identical full execution and cost with common actual
 arguments, without fabricating runtime values.
 
 Audit every public declaration and consumer with standard axioms only; run
-focused/aggregate builds and full tests, kernel/metadata/whitespace checks, keep
+focused and aggregate builds and full tests, kernel-policy and whitespace checks, keep
 proof files below 300 lines and commits small. Keep diagnostics paused and use
 repository-local scratch files.

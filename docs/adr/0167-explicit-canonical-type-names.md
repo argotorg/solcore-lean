@@ -54,5 +54,5 @@ Existing expression semantics, exact costs, input invariance, parser behavior,
 Core execution, and wire formats remain unchanged.
 
 Audit public declarations using only the permitted standard kernel axioms;
-run focused and aggregate builds, full tests, kernel, metadata, and whitespace
+run focused and aggregate builds, full tests, kernel, and whitespace
 checks. Keep new proof files below 300 lines.

@@ -52,6 +52,6 @@ eventual value yet different Core trees, costs, and suspended states. Equal
 argument type lists do not allow replacing actual values on one side.
 
 Register every public theorem, keep new files below 300 lines, and run focused
-and aggregate builds, full tests, standard-axiom, kernel, metadata, forbidden
+and aggregate builds, full tests, standard-axiom, kernel, forbidden
 proof-token, and whitespace checks. Commit small exact-path units and preserve
 unrelated diagnostic work without extending it.

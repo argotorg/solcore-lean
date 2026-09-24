@@ -181,9 +181,7 @@ Low-level Core tests must cover:
 - static rejection and exact raw fault for a non-Unit argument;
 - exact request emission, Word response injection, continuation, and Store;
 - measured request-ready, suspension, and handled-completion fuel rather than
-  an assumed cost; and
-- direct rejection of `.hostFunction .inputDataSize` by frozen Wire v1 and
-  v2.
+  an assumed cost.
 
 End-to-end regressions must:
 
@@ -202,17 +200,15 @@ End-to-end regressions must:
 Every `ExecutionInputs` construction continues to supply bounded input data
 explicitly. No test may introduce a hidden empty-input compatibility path.
 
-## Dependency and publication boundary
+## Dependency boundary
 
 Semantics owns `InputData`, its strict length proof, `sizeWord`, byte-boundary
 coherence, and request interpretation. Core owns only a Unit-to-Word internal
 host capability. Generic HostDriver and continuation layers remain parametric
 and must not import input-specific meaning.
 
-Frozen Core Wire v1 and v2 continue to reject every host-function value. Add no
-Wire tag, runtime schema, profile, ABI
-rule, source form, parser rule, or source elaboration. The root README does
-not change. Publication requires a separate ADR.
+This slice adds no ABI rule, source form, parser rule, or source elaboration.
+The root README does not change.
 
 ## Non-goals
 
@@ -247,12 +243,12 @@ Keep each green commit at roughly 300 changed lines or fewer:
 3. append the Core capability and request and close exhaustive machine,
    progress, typing, preservation, runner, and no-fault cases;
 4. add exact handler, suspension, recursive-driver, and context-identity laws;
-5. repair request-exhaustive custom handlers and add focused Core, fuel, and
-   Wire regressions;
+5. repair request-exhaustive custom handlers and add focused Core and fuel
+   regressions;
 6. add direct size observation, input-only variation, and
    observe-write-observe selected-execution regressions;
 7. add triple-option parent completion and ADR-0129 fold regressions;
-8. run trust, axiom, dependency, build, test, metadata, kernel,
+8. run trust, axiom, dependency, build, test, kernel,
    compatibility, and independent audits; and
 9. synchronize completion evidence in current-facing internal documents.
 
@@ -271,8 +267,7 @@ Core appends `inputDataSize : unit -> word` at index 7, making both host tables
 length 8 and index 8 the first unbound position. The request has a total Word
 response. Exact emission, raw invalid-argument faults, response injection,
 resumption, progress, typing, preservation, runner correspondence, and checked
-no-fault safety are complete. Frozen Wire v1 and v2 reject the internal host
-value.
+no-fault safety are complete.
 
 The canonical handler returns `(context, inputs.inputData.sizeWord)`. It
 preserves the complete mutable context, saved continuation, and Core-local
@@ -291,12 +286,11 @@ ADR-0129 fold recovers the exact size-derived storage entry and terminal bytes.
 - the full build completed successfully with 652 jobs;
 - the complete 1,192-job test target and executable suite passed;
 - all 21 changed Lean roots passed with `--trust=0` and warnings as errors;
-- metadata verification and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - key axiom reports contain only the existing `propext` and `Quot.sound`;
 - independent full-contract and completion audits found no remaining P0-P3
   issue; and
-- no parser, source syntax, schema, profile, Wire tag, public format, or root
-  README changed.
+- no parser, source syntax, public format, or root README changed.
 
 ## Consequences
 

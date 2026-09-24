@@ -136,8 +136,8 @@ Enumerate generated declarations using a count-independent discovery configurati
 before final kernel comparison freeze the actual public/consumer inventories,
 affected direct clients and literal name/type rules from those complete captures.
 Before completion require focused and direct-client builds, new and retained parsed
-regressions, full frontend/syntax/tests builds, full tests, policy/metadata/whitespace
-checks, selected public/consumer axiom checks and independently repeated final audits.
+regressions, full frontend, syntax, and test builds, full tests, kernel-policy and
+whitespace checks, selected public and consumer axiom checks, and independently repeated final audits.
 Retain bounded failed attempts. Commit exact approved paths in small coherent units.
 
 No Word binary semantics, overload dispatch, staging, mutation, effects, recursion

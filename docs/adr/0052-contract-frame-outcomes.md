@@ -125,8 +125,8 @@ nonmatching projections, two distinct trap reasons, and constructor
 distinction. In particular, the tests verify that `some` empty bytes remain
 different from an absent projection.
 
-Focused and full builds and tests, trust-zero checking, semantic-kernel and
-metadata checks, the axiom audit, document-link validation, and diff checking
+Focused and full builds and tests, trust-zero checking, the semantic-kernel
+check, the axiom audit, document-link validation, and diff checking
 pass. The independent audit found no P0-P3 issue.
 
 ## Publication and exclusions

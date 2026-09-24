@@ -96,5 +96,5 @@ profile; do not change older local-only body/entry interfaces.
 
 Keep diagnostic/parser work paused, scratch repository-local, files and commits
 small, and run independent review, focused/aggregate/full tests, all-public and
-all-consumer standard-axiom audits, dependency, kernel/metadata, EOF and whitespace
+all-consumer standard-axiom audits, dependency, kernel, EOF and whitespace
 checks before publication.

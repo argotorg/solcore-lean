@@ -152,7 +152,7 @@ injective, reversible, lossless, or semantically admissible.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
 fuel or gas policy, Wire field, ABI, serialization, EVM revision,
-opcode behavior, Profile, canonical delta, or published format.
+opcode behavior, canonical delta, or published format.
 
 ## Staged implementation plan
 
@@ -203,7 +203,7 @@ storage values without importing the proof laws.
 The implementation commits are `d21219c` (235 changed lines), `24bae38` (21),
 `92634b5` (58), and `4a06204` (85), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, simp-termination, semantic-kernel, metadata, diff, and independent P0-P3
+axiom, simp-termination, semantic-kernel, diff, and independent P0-P3
 audits pass.
 
 The lift remains a pure value transformation. It resolves no state, maps no

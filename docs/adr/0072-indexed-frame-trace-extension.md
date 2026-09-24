@@ -142,7 +142,7 @@ example, and runner wiring; independent audit and completion evidence.
 This internal construction API is not published. It fixes no concrete event
 taxonomy, timestamp, serialization, hashing, compression, size limit, balance,
 code, host call/create behavior, ABI, EVM revision, opcode, gas schedule,
-parser or source form, Core expression, Wire field or tag, Profile, or frozen
+parser or source form, Core expression, Wire field or tag, or frozen
 artifact.
 
 ## Consequences
@@ -168,5 +168,5 @@ one private ADR-0071 integration example.
 The implementation commits are `34b43e8` (206 changed lines), `a68391b` (44),
 `0075a51` (39), and `9111f10` (73), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+axiom, semantic-kernel, document-link, diff, and independent P0-P3
 audits pass.

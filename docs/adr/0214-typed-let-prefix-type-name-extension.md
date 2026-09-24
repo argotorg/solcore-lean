@@ -54,6 +54,6 @@ Include unknown-annotation repair, changed-head counterexamples, differing hidde
 duplicates and distinct qualified component keys. Keep runtime values explicit.
 
 Audit all public contracts and consumers, exact registration and standard axioms.
-Run focused/aggregate builds, actual parsed execution, full tests, kernel/metadata
+Run focused/aggregate builds, actual parsed execution, full tests, kernel
 checks and acyclic dependency-direction checks. Keep proof files below 300 lines,
 commits small, diagnostics paused and all scratch files inside the repository.

@@ -56,6 +56,6 @@ runtime endpoint across argument lists and fuel boundaries, including function
 and reference values supplied with their existing typing evidence.
 
 Register and audit all new public declarations. Keep new files below 300 lines,
-run focused and aggregate builds, full tests, standard-axiom, kernel, metadata,
+run focused and aggregate builds, full tests, standard-axiom, kernel,
 forbidden-token and whitespace checks, and commit small exact-path units.
 Diagnostic proofs remain outside this work.

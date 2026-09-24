@@ -61,7 +61,7 @@ hostEnvironment =
 
 Storage read keeps its existing index and type. The new lookup laws state the
 exact type and runtime value at index 1, and both table lengths become 2.
-`Expr`, `HasType`, and the frozen Wire expression formats remain unchanged.
+`Expr` and `HasType` remain unchanged.
 
 ## Request and dependent response
 
@@ -198,7 +198,7 @@ Core must publish and verify:
 - response typing and suspension typing for both request constructors;
 - preservation and progress through a typed write application;
 - impossibility of a machine fault for checked host execution; and
-- unchanged runner soundness, fuel accounting, and frozen Wire rejection.
+- unchanged runner soundness and fuel accounting.
 
 Semantics must publish and verify:
 
@@ -237,12 +237,11 @@ Tests cover:
 - the read/write/read boundaries at fuel 21, 22, 27, and 28;
 - sparse-zero execution immediately before and at completion at fuel 15/16;
 - completion observed with zero fuel after the final resume;
-- direct use of public typing, no-fault, context-update, and fuel theorems; and
-- continued Wire v1/v2 rejection of both host function values.
+- direct use of public typing, no-fault, context-update, and fuel theorems.
 
 The executable regressions and public proof-interface regressions are part of
-the acceptance evidence below. Repository-wide build, test, metadata, and
-kernel-policy gates all pass on the accepted revision.
+the acceptance evidence below. Repository-wide build, test, and kernel-policy
+gates all pass on the accepted revision.
 
 ## Dependency boundary
 
@@ -252,7 +251,7 @@ It remains independent of `Solcore.Semantics`.
 
 Semantics owns the generic handler driver and the concrete interpretation of
 storage requests through the proven-present working Account. Parser, source
-syntax, ABI, published profiles, and gas schedules are unchanged.
+syntax, ABI, and gas schedules are unchanged.
 
 ## Write lifecycle is not decided here
 
@@ -320,7 +319,7 @@ Focused module builds and trust-zero checks passed during implementation. An
 independent fuel audit reconstructed the de Bruijn programs, confirmed both
 host checks, reproduced the 21/22/27/28 and 15/16 boundaries, and left no
 tracked audit artifact. The final 617-job build and 1122-job test suite pass,
-as do metadata verification and the semantic-kernel policy check. No P0 or P1
+as does the semantic-kernel policy check. No P0 or P1
 implementation gap remains in the independent acceptance audit. This record
 does not expand the feature into ABI, call, or transaction-lifecycle semantics.
 

@@ -106,7 +106,7 @@ ancestry provenance, scheduling, stack, depth, return delivery, trap handling,
 rollback, transaction, concurrency, reentrancy, atomicity, cost, or gas policy.
 
 It adds no storage selector, Account-presence rule, parser or source syntax,
-Core expression, Wire field, Profile, ABI, serialization, or
+Core expression, Wire field, ABI, serialization, or
 published observation.
 
 ## Staged implementation plan
@@ -132,7 +132,7 @@ public declaration, fixture, helper, assertion, or runner call.
 The implementation commits are `b63720a` (175 changed lines), `06c7cdd` (30),
 and `e98f8e5` (53), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused trust-zero checks, the 548-job full build, the
-984-job full test run, metadata and kernel checks, diff checks, declaration and
+984-job full test run, kernel checks, diff checks, declaration and
 simp-registration inventories, existing projection-law interactions, consumer
 transport, and independent P0-P3 audits pass.
 

@@ -54,10 +54,6 @@ multiple-argument convention, polymorphism, effects, or explicit return.
 Multiple arguments can be represented by nesting unary functions, but no
 source-language elaboration rule is fixed here.
 
-The feature is internal. It adds no tag to Semantic Core v1 or v2. Frozen wire
-projections reject function types, lambda and application expressions, closure
-values, and programs containing them.
-
 Closure equality is structural only because the internal Lean data types need
 decidable equality for tests and machine results. This ADR does not make
 closure equality available as a Core primitive or observable language
@@ -76,8 +72,7 @@ operation.
 - value, environment, frame, and state typing for captured environments;
 - progress, preservation, typed results, sufficient fuel, and fault exclusion;
 - weakening beneath a lambda binder; and
-- focused capture, shadowing, order, diagnostic, exact-fuel, fault, and frozen
-  wire tests.
+- focused capture, shadowing, order, diagnostic, exact-fuel, and fault tests.
 
 ## Consequences
 

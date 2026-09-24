@@ -123,7 +123,7 @@ trap, stack, scheduling, transaction, delta, or observation policy.
 
 It does not reinterpret an absent Account as zero storage. `none` remains a
 strictly different result from `some Core.Word.zero`. It adds no parser or
-source syntax, Core expression, Wire field, Profile, or published format.
+source syntax, Core expression, Wire field, or published format.
 
 ## Staged implementation plan
 
@@ -153,7 +153,7 @@ values.
 The implementation commits are `bde695e` (178 changed lines), `8f2a89c` (18),
 `03f2be3` (29), and `0d6872b` (58), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused trust-zero checks, full build and
-test runs, metadata and kernel checks, diff checks, simp review, declaration
+test runs, kernel checks, diff checks, simp review, declaration
 inventory, and independent P0-P3 audits pass.
 
 ## Publication and consequences

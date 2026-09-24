@@ -72,5 +72,5 @@ an untyped write can change the type at an existing location.
 
 Keep parser and diagnostic work paused and scratch repository-local. Use small
 proof/consumer/publication commits, independent reviews, focused/aggregate/full
-tests and complete standard-axiom, dependency, kernel/metadata/EOF/whitespace
+tests and complete standard-axiom, dependency, kernel-policy, EOF, and whitespace
 audits. New Lean files stay below 300 lines.

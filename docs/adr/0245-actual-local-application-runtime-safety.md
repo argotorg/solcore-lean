@@ -76,4 +76,4 @@ No executable evaluator, checker, body/entry grammar, parser, diagnostic, Core
 definition or wire change is introduced. Split design, proofs, consumers and
 publication into small commits; keep new files below 300 lines. Require focused
 and aggregate builds, full tests, all public/consumer standard-axiom audits,
-kernel/metadata/whitespace checks, and independent reviews.
+kernel-policy and whitespace checks, and independent reviews.

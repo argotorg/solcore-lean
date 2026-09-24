@@ -69,6 +69,6 @@ This is inference within the existing monomorphic initialized fragment, not
 general Hindley–Milner inference, polymorphism, overload resolution, missing
 initializer support, assignment or a new shadowing policy. Core/Resolved
 definitions, parameter/return annotation policies, parser, diagnostics and
-frozen wire formats do not change. Run focused/aggregate builds, full tests,
-all public/consumer axiom audits, kernel/metadata/whitespace and independent
+Core Wire does not change. Run focused/aggregate builds, full tests,
+all public and consumer axiom audits, kernel-policy and whitespace checks, and independent
 reviews. Keep proof/test modules under 300 lines and scratch repository-local.

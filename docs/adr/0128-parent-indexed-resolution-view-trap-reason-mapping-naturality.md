@@ -185,7 +185,7 @@ from silently drifting.
 - the full build completed 632 jobs;
 - the complete test suite completed 1,152 jobs and all runtime checks passed;
 - every changed Lean module compiled with trust zero and warnings as errors;
-- metadata and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - the only new public theorem reports exactly `[propext]`;
 - declaration and simplification inventories found exactly one new simp law
   and no runtime definition or unchecked declaration; and

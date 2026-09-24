@@ -72,6 +72,6 @@ runtime inhabitants, argument arity/type/order rejection, invalid whole headers
 and bodies, and matching actual arguments whose values or costs differ while
 their compiled projection stays fixed. Completely parse full declarations and
 test value-free checking followed by unchanged checked execution. Audit all
-public declarations, focused and aggregate builds, full tests, kernel and
-metadata checks, forbidden proof tokens, and whitespace. Keep new proof files
+public declarations, focused and aggregate builds, full tests, kernel checks,
+forbidden proof tokens, and whitespace. Keep new proof files
 below 300 lines and leave diagnostic proofs untouched.

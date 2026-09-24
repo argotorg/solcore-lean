@@ -70,7 +70,7 @@ invocation, general nested calls or whole-language evaluation, nor does it defin
 Core transition costs, fault classification, effects or closure conversion.
 
 Proof files remain below 300 lines. Require focused and full builds, complete
-tests, kernel policy, metadata, whitespace, public axiom checks, exact source
+tests, kernel policy, whitespace, public axiom checks, exact source
 ports and actual new-module ownership inspection before small commits. Only the
 standard three proof axioms are permitted; generated names and flags are kept
 as observed, with no prototype-generated-name equivalence claim.

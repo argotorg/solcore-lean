@@ -16,7 +16,7 @@ binary(wordMul, left, right)
 ```
 
 ADR-0011 fixes every result modulo `2^256`. Generic typing, inference, renaming,
-weakening, evaluation, Safety, machine, and Wire v2 layers already support all
+weakening, evaluation, Safety, and machine layers already support all
 three operations. Focused value and store-threaded proof names and symmetric
 strict-evaluation regressions are still missing.
 
@@ -70,10 +70,7 @@ Focused regressions cover:
 - a left fault that prevents right evaluation;
 - a right fault that observes completed left effects;
 - two allocating and writing operands evaluated exactly once in order;
-- the final store and exact literal 4/5 and effectful 28/29 fuel boundaries;
-- Wire v1 rejection for all three raw expressions; and
-- exact Wire v2 operator and operand-order projection, Core round trips, and
-  JSON round trips for all three operations.
+- the final store and exact literal 4/5 and effectful 28/29 fuel boundaries.
 
 ## Boundaries
 
@@ -99,8 +96,7 @@ maximum; and the left-minus-right order of subtraction.
 
 Type rejection, raw and ordered faults, two exactly-once effectful operands, and
 the final store are checked for all three operations. Literal execution has the
-exact 4/5 fuel boundary and effectful execution the exact 28/29 boundary. Wire
-v1 rejects every raw expression; Wire v2 has exact operator and operand-order
-projection, Core round trips, and JSON round trips. The final independent audit
-found no P0-P3 issue. No alias, generic proof duplicate, tag, schema, or other
-published boundary changed. The next feature is selected by a separate ADR.
+exact 4/5 fuel boundary and effectful execution the exact 28/29 boundary. The
+final independent audit found no P0-P3 issue. No alias, generic proof duplicate,
+tag, schema, or other published boundary changed. The next feature is selected
+by a separate ADR.

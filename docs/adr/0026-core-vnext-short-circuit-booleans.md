@@ -69,16 +69,11 @@ prevents branch evaluation, and a fault in `y` is observable only when `y` is
 selected. Fuel use likewise follows the selected conditional path rather than
 an eager two-operand cost.
 
-## Core and wire boundary
+## Core boundary
 
 This slice adds no type, value, expression, primitive operation, frame,
 transition, machine fault, diagnostic, schema field, or public tag. It adds no
 big-step rule or CEK transition.
-
-Wire v1 and wire v2 both project each builder exactly as the corresponding
-handwritten `ifE` expression using their existing conditional and boolean forms.
-No new encoding exists, and decoding that expansion reconstructs only the
-ordinary conditional tree. Frozen schemas do not change.
 
 ## Required implementation, proof, and tests
 
@@ -93,9 +88,7 @@ ordinary conditional tree. Frozen schemas do not change.
 - test all boolean value pairs and rejection of non-boolean operands;
 - test effectful left and right operands, including skipped allocation/write;
 - test that skipped faults are unobservable and selected faults are preserved;
-- test exact fuel boundaries for selected and skipped paths; and
-- test wire v1 and v2 projection equality with handwritten expansions and the
-  absence of new tags.
+- test exact fuel boundaries for selected and skipped paths.
 
 ## Deferred
 
@@ -113,4 +106,4 @@ The implementation provides the named expansions, typing and inference
 theorems, and all four store-threaded branch evaluations. Tests cover truth
 tables, operand types, skipped and selected faults, allocation and writes,
 left-to-right store threading into the selected right operand, exact fuel,
-weakening, and exact wire v1 and v2 projection of the handwritten expansions.
+and weakening.

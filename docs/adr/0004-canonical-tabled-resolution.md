@@ -8,8 +8,9 @@
 
 - **Decision:** Normative class resolution uses tabled search and returns sound,
   coherent evidence; reaching an explicit search limit is inconclusive.
-- **Current implementation:** The feature is recorded as direction-accepted but
-  planned. No source resolver or tabled class-resolution executor is present.
+- **Current implementation:** The frontend implements bounded
+  trait/implementation-method resolution with explicit success, failure, and
+  inconclusive outcomes. Unrestricted soundness and coherence remain unclaimed.
 - **Boundary:** The completed M1 Core checker has no classes, and compiler legacy
   search behavior remains comparison evidence only.
 - **Suggested reading:** Read “Decision” for solver semantics and
@@ -37,8 +38,8 @@ Normative class resolution in Lean uses tabled resolution.
   and step count.
 - Reaching a limit is `inconclusive`, not a type error.
 
-Legacy resolution is represented only as an `ImplementationBaseline` in the
-compatibility harness and is not included in a normative `SpecProfile`.
+Legacy resolution remains comparison evidence only and is not part of the
+normative tabled-resolution policy.
 
 ## Consequences
 

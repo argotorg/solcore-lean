@@ -145,7 +145,7 @@ call tree, stack, depth, scheduling, reentrancy, rollback filtering, trap
 disposition, transaction boundary, or atomicity. Whether a particular event is
 recorded before or after a call remains part of the future transition rules.
 
-It adds no parser or source form, Core expression, Wire field or tag, Profile,
+It adds no parser or source form, Core expression, Wire field or tag,
 ABI, storage layout, EVM revision, opcode, gas schedule,
 balance, code, host call/create behavior, or frozen artifact.
 
@@ -177,5 +177,5 @@ identities, and association.
 The implementation commits are `fc8ecb1` (210 changed lines), `fc9859b` (38),
 `4306c0c` (66), and `f1f9245` (89), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+axiom, semantic-kernel, document-link, diff, and independent P0-P3
 audits pass.

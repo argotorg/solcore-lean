@@ -61,18 +61,14 @@ Focused regressions cover:
   that observes completed left effects;
 - two allocating and writing operands evaluated left then right exactly once,
   with their final store retained;
-- exact literal 4/5 and effectful 28/29 CEK fuel boundaries; and
-- rejection by frozen Wire v1/v2 expression projection and by the Wire v2
-  `BinaryOp` conversion itself.
+- exact literal 4/5 and effectful 28/29 CEK fuel boundaries.
 
 Compile-time examples exercise all eleven theorem names.
 
-## Publication and exclusions
+## Exclusions
 
-`wordSgt` is internal-only. Do not add it to frozen Wire v1 or v2, their JSON
-enums, schemas, or versions. No source spelling, standard-library API, ABI rule,
-opcode lowering, or gas rule is introduced. Existing public behavior and bytes
-remain unchanged.
+No source spelling, standard-library API, ABI rule, opcode lowering, or gas
+rule is introduced.
 
 ## Consequences
 
@@ -92,6 +88,4 @@ and ordered faults. Two allocating and writing operands run left then right
 exactly once and retain their final store. Literal expressions stop at fuel 4
 and complete at 5; effectful expressions stop at 28 and complete at 29.
 
-Frozen Wire v1/v2 expression projections and the Wire v2 `BinaryOp` conversion
-reject `wordSgt`. No public enum, schema, JSON value, version, or byte sequence
-changed. The independent audit found no P0-P3 issue.
+The independent audit found no P0-P3 issue.

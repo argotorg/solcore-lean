@@ -71,7 +71,7 @@ annotation remains a type mismatch; association and extra Unit are not coerced.
 Manual singleton tuple nodes remain outside this canonical adapter because the
 parser produces grouping there. Projection/index/array/call, shadowing, inference,
 multiple return annotations, earlier named-only prefix adapters, Core/Resolved
-definitions, parser, diagnostics and frozen wire formats remain unchanged.
+definitions, parser, diagnostics, and Core Wire remain unchanged.
 Run focused/aggregate builds, full tests, all public/consumer axiom audits,
-kernel/metadata/whitespace and independent reviews. Keep new proof/test files
+kernel-policy and whitespace checks and independent reviews. Keep new proof and test files
 under 300 lines, phase commits small and scratch repository-local.

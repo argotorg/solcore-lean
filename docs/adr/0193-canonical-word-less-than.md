@@ -51,7 +51,7 @@ rejection. Migrate only six obsolete source `<` rejection fixtures to still
 unsupported `>=`, removing duplicate entries where necessary.
 
 Register and audit all new public declarations and every changed public proof.
-Run focused and aggregate builds, full tests and standard-axiom/kernel/metadata/
-forbidden-token/whitespace checks. Keep proof files below 300 lines and commits
+Run focused and aggregate builds, full tests, and standard-axiom, kernel-policy,
+forbidden-token, and whitespace checks. Keep proof files below 300 lines and commits
 small, separate static/dynamic/consumer/registration changes, use repository-local
 scratch and preserve paused diagnostic files.

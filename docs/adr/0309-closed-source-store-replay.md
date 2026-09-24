@@ -65,7 +65,7 @@ Core execution, effect or cost theorem is claimed. Returned cell references need
 not be valid in the replacement store: this is not runtime-world preservation.
 
 Keep proof files below 300 lines and commits within 300 changed lines. Require
-focused/full builds, tests, policy/metadata, exact source ports, independent
+focused/full builds, tests, policy checks, exact source ports, independent
 consumers/reviews, all-public proof checks and complete actual module ownership
 inspection. Retain all proof versions and failed captures. Public dependencies
 may use only the standard three proof axioms.

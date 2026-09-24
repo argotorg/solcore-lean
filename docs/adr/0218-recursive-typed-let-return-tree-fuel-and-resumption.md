@@ -65,6 +65,6 @@ checkpoints and test zero, insufficient, exact and surplus residual fuel across
 multiple chunks; contrast restarting or losing captured frames. Check old
 successes/full singleton Options, unchanged old entry rejection, all public and
 consumer axioms, registration/dependency direction, focused/aggregate builds,
-actual parsed execution, full tests and kernel/metadata/whitespace policy. Keep
+actual parsed execution, full tests, and kernel-policy and whitespace checks. Keep
 proof files below 300 lines, commits small and scratch inside the repository;
 diagnostic proofs remain paused.

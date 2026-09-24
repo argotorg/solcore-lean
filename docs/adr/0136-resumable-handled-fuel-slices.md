@@ -261,8 +261,8 @@ demonstrates that changing an input can change an input-sensitive suffix. It
 also checks the checkpoint, effects, and unrelated Account are preserved.
 
 The 659-job build, 1,206-job test executable build, and full test run pass. All
-seven changed Lean roots pass trust-zero with warnings as errors. Metadata,
-semantic-kernel, and diff checks pass. The eight main theorem axiom reports use
+seven changed Lean roots pass trust-zero with warnings as errors.
+Semantic-kernel and diff checks pass. The eight main theorem axiom reports use
 only `propext` and `Quot.sound`; there is no custom axiom or `sorry`. The
 independent completion audit found no P0-P3 issue.
 

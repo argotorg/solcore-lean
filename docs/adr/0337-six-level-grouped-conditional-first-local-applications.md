@@ -289,5 +289,5 @@ safe/total flags, public simp/proof leaks, axiom closure limited to `propext`,
 universal complete ADR-0335 preservation and exact 16/6 and 16/20 partitions,
 normal/trust-zero/warnings/direct/full
 builds and tests, runner, registration, exact six-commit/nine-path scope,
-dependency and source/olean parity, kernel/metadata and unchanged paused files.
+dependency and source/olean parity, kernel checks and unchanged paused files.
 Do not record a final ADR-0337 implementation commit hash in this decision.

@@ -120,7 +120,7 @@ only equates the existing immutable optional-value expressions.
 
 The slice adds no distinct-address duplicate, zero-deletion witness,
 read-after-write law, address-preservation projection, initialization-specific
-law, parser or source syntax, Core expression, Wire field, Profile,
+law, parser or source syntax, Core expression, Wire field,
 ABI, storage layout, gas rule, or published observation.
 
 ## Staged implementation plan
@@ -147,7 +147,7 @@ The implementation commits are `dc15fbc` (186 changed lines), `f0efa42` (69),
 `0cce11e` (59), and `58d8e43` (39), all below 300 changed lines; this completion
 update is the fifth commit after the critical-pair correction added one stage
 to the original plan. Focused trust-zero checks, the 542-job full build, the
-972-job full test run, metadata and kernel checks, diff checks, declaration
+972-job full test run, kernel checks, diff checks, declaration
 inventory, named-rewrite present-case checks, and independent P0-P3 audits
 pass.
 

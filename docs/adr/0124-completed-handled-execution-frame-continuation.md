@@ -277,7 +277,7 @@ No test converts exhaustion or a raw fault into a trap.
 - the full test build completed successfully with 1,134 jobs and all runtime
   checks passed;
 - all seven changed Lean modules passed trust-zero with warnings as errors;
-- workspace metadata and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - printed axioms contain only existing standard `propext` and `Quot.sound`
   dependencies, with no custom axiom, `Classical.choice`, or `sorryAx`;
 - independent production and cross-audits found no P0, P1, P2, or P3 issue;

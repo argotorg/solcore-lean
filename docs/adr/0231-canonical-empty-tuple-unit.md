@@ -53,7 +53,7 @@ Whole checking continues to inspect all written children. True-and/false-or
 can forward a selected raw unit value while whole Boolean typing rejects it;
 do not add an actual Boolean-result premise to those raw rules. Unit initializes
 strict lets normally, without removing their two Core binding transitions.
-Diagnostics, Core/resolved semantics, parameter layout and frozen wires do not change.
+Diagnostics, Core/resolved semantics, parameter layout, and Core Wire do not change.
 
 ## Validation
 
@@ -66,5 +66,5 @@ general unsupported-arity consumer to exclude both supported arities zero/two;
 add independent empty positives. Keep `returns(Pair){return ();}` rejected by
 return typing, along with empty type/header and other unchanged negatives.
 Run focused/aggregate builds, full tests, public/consumer axiom audits,
-kernel/metadata/whitespace checks and independent reviews. Retain proof files
+kernel-policy and whitespace checks and independent reviews. Retain proof files
 below 300 lines, separate small commits, paused diagnostics and repository scratch.

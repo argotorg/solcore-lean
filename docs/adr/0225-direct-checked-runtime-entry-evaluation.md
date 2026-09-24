@@ -62,5 +62,6 @@ parser/Core/Resolved/Wire, source syntax or binding policy changes. No source
 calls, mutation, cell allocation, closure invocation, defaults or inference.
 Keep definition/proof/consumer/publication commits separate and small, proof
 files below 300 lines, public/consumer axiom and dependency audits explicit.
-Run focused/aggregate builds, parsed execution, full tests and kernel/metadata/
-whitespace checks. Diagnostics remain paused; scratch stays in the workspace.
+Run focused/aggregate builds, parsed execution, full tests, the kernel-policy
+check, and whitespace checks. Diagnostics remain paused; scratch stays in the
+workspace.

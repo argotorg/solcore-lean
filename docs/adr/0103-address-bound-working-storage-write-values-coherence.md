@@ -103,7 +103,7 @@ transaction, concurrency, reentrancy, atomicity, cost, gas, or external-effect
 policy.
 
 It adds no parser or source syntax, Core expression, Wire field,
-Profile, ABI, storage layout, serialization, or published observation.
+ABI, storage layout, serialization, or published observation.
 
 ## Staged implementation plan
 
@@ -128,7 +128,7 @@ declaration, fixture, helper, assertion, or runner call.
 The implementation commits are `656e9f3` (169 changed lines), `25f5c01` (25),
 and `ed3b869` (39), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused trust-zero checks, the 546-job full build, the
-980-job full test run, metadata and kernel checks, diff checks, declaration
+980-job full test run, kernel checks, diff checks, declaration
 inventory, abstract/present/absent simp critical-path checks, arbitrary-consumer
 transport, and independent P0-P3 audits pass.
 

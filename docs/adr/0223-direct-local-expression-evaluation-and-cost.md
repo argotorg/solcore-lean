@@ -66,4 +66,4 @@ opaque values, exact costs, stores, checked paths and real fuel boundaries.
 Keep definitions/proofs/consumers/publication in small separate commits, proof
 files below 300 lines, and public/consumer axiom and dependency audits explicit.
 Run focused and aggregate builds, actual parsed execution, full tests and
-kernel/metadata/whitespace checks. Diagnostics remain paused; scratch stays local.
+kernel-policy and whitespace checks. Diagnostics remain paused; scratch stays local.

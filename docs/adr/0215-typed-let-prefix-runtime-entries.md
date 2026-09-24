@@ -66,5 +66,5 @@ factorization, owner/type-name/store changes, full real checkpoints and multi-ch
 resumption. Retain complete negative header, parameter and body boundaries.
 Audit changed contracts, every public theorem and consumer, standard axioms,
 registration and acyclic entry-to-body dependencies. Run focused/aggregate builds,
-parsed execution, full tests, kernel/metadata and whitespace checks. Keep proof
+parsed execution, full tests, kernel and whitespace checks. Keep proof
 files below 300 lines, commits small, diagnostics paused and scratch in the repo.

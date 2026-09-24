@@ -52,10 +52,7 @@ Focused regressions cover:
 - a left fault that skips the right and a right fault after visible left effects;
 - two allocating and writing operands, their left-to-right exactly-once order,
   and the final store;
-- exact literal 4/5 and effectful 28/29 fuel boundaries;
-- Wire v1 rejection for both raw expressions; and
-- exact Wire v2 operator and operand-order projection, Core round trips, and
-  JSON round trips for both operations.
+- exact literal 4/5 and effectful 28/29 fuel boundaries.
 
 ## Boundaries
 
@@ -81,9 +78,7 @@ Tests cover zero, one, maximum, equality, inequality, strict greater-than, and
 not-greater-than results; boolean result typing and invalid result/operand
 types; raw invalid operands and ordered left/right faults; and two allocating,
 writing operands with the exact final store. Literal evaluation has the exact
-4/5 fuel boundary and effectful evaluation the exact 28/29 boundary. Wire v1
-rejects both operations, while Wire v2 preserves exact operator and operand
-projection through Core and JSON round trips.
+4/5 fuel boundary and effectful evaluation the exact 28/29 boundary.
 
 The implementation, focused Wire suite, semantic suite, and independent audit
 are complete. The audit found no P0-P3 issue, no source trust escape hatch, and

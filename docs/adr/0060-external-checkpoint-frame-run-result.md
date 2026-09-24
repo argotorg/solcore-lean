@@ -101,7 +101,7 @@ stack, parent-child commit rule, logs, calls, creations, surviving effects,
 transaction boundary or atomicity, ABI, Core-result adapter, trap taxonomy, EVM
 revision, opcode, gas schedule, or resource-limit policy.
 
-It adds no parser or source form, Wire field or tag, Profile,
+It adds no parser or source form, Wire field or tag,
 state delta, ordering, serialization, or frozen artifact. It does not execute a
 frame and does not choose how the external checkpoint was created.
 
@@ -127,5 +127,5 @@ lines cover resolution and the public working, payload, and reason projections.
 
 The implementation commits are `0e4baab` (156 changed lines), `cb58b25` (29),
 `116f3f9` (33), and `5e83e6d` (70). Each remains below 300 changed lines.
-Focused and full builds, tests, trust-zero, semantic-kernel, metadata,
+Focused and full builds, tests, trust-zero, semantic-kernel,
 forbidden-declaration, document-link, diff, and independent audits pass.

@@ -11,8 +11,8 @@
   selector collisions are rejected before generation.
 - **Current implementation:** ADR-0150 completes an internal Static Word ABI
   profile for `uint256 -> uint256`, including its collision checker and checked
-  Core dispatcher. Published profiles still carry no ABI version. Unsupported
-  source shapes are recorded in the feature matrix.
+  Core dispatcher. Unsupported source shapes are recorded in the feature
+  matrix.
 - **Boundary:** The current direct Lean ABI API covers only the explicitly
   checked static-word profile; it does not claim general source dispatch.
 - **Suggested reading:** Read “Decision” for admissibility and

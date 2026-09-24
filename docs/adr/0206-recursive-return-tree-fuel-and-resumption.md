@@ -56,6 +56,6 @@ checkpoints, missing/invalid skipped arms, unsupported zero bounds and unchanged
 old entry rejection. Distinguish aligned untyped faults from typed-input safety.
 
 Audit all public declarations and consumers with standard axioms only; run
-focused/aggregate builds, full tests and kernel/metadata/whitespace checks.
+focused and aggregate builds, full tests, and kernel-policy and whitespace checks.
 Keep proof files below 300 lines, commits small, diagnostics paused and all
 scratch files inside the repository.

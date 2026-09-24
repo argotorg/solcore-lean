@@ -64,7 +64,7 @@ Keep each commit below 300 changed lines:
 ## Publication and exclusions
 
 This proof-only slice is internal and not published. It adds no parser, source
-syntax, Wire field or tag, Profile, or frozen artifact.
+syntax, Wire field or tag, or frozen artifact.
 
 It fixes no trap policy, nested frame or checkpoint rule, surviving log, call,
 or creation effect, Account lifecycle, transaction atomicity, state delta,
@@ -92,5 +92,5 @@ axiom, `sorryAx`, or unchecked declaration.
 
 The implementation commits are `a3bfd88` (123 changed lines), `7ae4bb0` (32),
 `64590b0` (67), and `05e5f5d` (78). Each is below 300 changed lines. Focused and
-full builds, tests, trust-zero, semantic-kernel, metadata, forbidden-declaration,
+full builds, tests, trust-zero, semantic-kernel, forbidden-declaration,
 document-link, diff, and independent audits pass.

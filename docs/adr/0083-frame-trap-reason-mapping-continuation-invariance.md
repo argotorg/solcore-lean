@@ -105,7 +105,7 @@ equality of two pure continuation computations only.
 
 It adds no parser or source syntax, Core fault adapter, resource-limit rule,
 fuel or gas policy, Wire field, ABI, serialization, EVM revision,
-opcode behavior, Profile, canonical delta, or published format.
+opcode behavior, canonical delta, or published format.
 
 ## Staged implementation plan
 
@@ -152,7 +152,7 @@ heterogeneous mappings to the original `continue?` result.
 The implementation commits are `8a9b1b4` (187 changed lines), `9bfacdb` (31),
 and `70cdc05` (39), all below 300 changed lines; this completion update is the
 fourth staged commit. Focused and full builds, tests, trust-zero, axiom,
-simp-termination, semantic-kernel, metadata, diff, and independent P0-P3 audits
+simp-termination, semantic-kernel, diff, and independent P0-P3 audits
 pass.
 
 The equality remains limited to the returned `Option Next` value. It adds no

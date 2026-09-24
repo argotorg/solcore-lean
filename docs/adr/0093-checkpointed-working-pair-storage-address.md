@@ -180,7 +180,7 @@ transaction behavior.
 
 It adds no balance, nonce, call-kind or delegate-call rule, Core-local-store
 bridge, storage layout, access warmth, refund, gas, ABI, serialization, EVM
-revision, parser or source syntax, Wire field, Profile, canonical
+revision, parser or source syntax, Wire field, canonical
 delta, or published observation. It performs no in-place mutation.
 
 ## Staged implementation plan
@@ -214,7 +214,7 @@ the selector, and the unselected account.
 The implementation commits are `aa74372` (251 changed lines), `b9103a6` (35),
 `b5e914a` (45), and `fab671e` (96), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused trust-zero checks, full build and
-test runs, metadata and kernel checks, diff checks, declaration inventories,
+test runs, kernel checks, diff checks, declaration inventories,
 simp review, and independent P0-P3 audits pass.
 
 ## Publication and exclusions

@@ -62,5 +62,5 @@ not an ordered default.  General builtin-method execution and runtime
 Focused tests fix the exact builtin-first combined rule order, both primitive
 evidence trees, unary arity rejection, builtin/source name disjointness, source
 `Int` resolution, and unchanged source trait/implementation/rule counts.  The
-full source inference, executable-method, direct-linking, kernel, metadata, and
+full source inference, executable-method, direct-linking, kernel, and
 format checks remain part of repository validation.

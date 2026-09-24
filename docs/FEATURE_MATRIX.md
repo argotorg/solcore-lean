@@ -66,9 +66,7 @@ Parsing does not by itself establish module resolution or source typing.
 | Host operations and host machine | Complete for the frozen host context | `Host`, `HostMachine`, `HostRunner`, progress and safety modules |
 | Word primitive algebra | Complete for current operators | Dedicated arithmetic, division, shift, conversion, bitwise, and comparison modules |
 | Renaming and local fragments | Complete | `Renaming` and `LocalFragment` |
-| Core Wire v1 | Retained | Closed base encoding in `Solcore.Core.Wire` |
-| Core Wire v2 | Retained | Closed encoding in `Solcore.Core.Wire.V2` |
-| Core Wire v3 | Complete/current | Strict current encoding in `Solcore.Core.Wire.V3`; see [catalog](CORE_WIRE_V3.md) |
+| Core Wire | Complete/current | Strict current encoding in `Solcore.Core.Wire`; see [catalog](CORE_WIRE.md) |
 
 ## Checked-contract runtime
 
@@ -94,9 +92,9 @@ Parsing does not by itself establish module resolution or source typing.
 | Keccak-256 | Complete for the implemented function | `Solcore.Abi.Keccak256` |
 | Static Word ABI | Complete for current call boundary | `Solcore.Abi.StaticWord` |
 | General dynamic ABI | Planned | No claim |
-| Seeded pure Core v3 generation | Complete for the admitted Word/Boolean fragment | `Solcore.Synthesis.CoreV3.Generator` |
+| Seeded pure Core generation | Complete for the admitted Word/Boolean fragment | `Solcore.Synthesis.Core.Generator` |
 | Checker-sealed output | Complete | Generated results retain successful checking evidence |
-| Scope-preserving strict shrinking | Complete for the generated fragment | `Solcore.Synthesis.CoreV3.Shrink` |
+| Scope-preserving strict shrinking | Complete for the generated fragment | `Solcore.Synthesis.Core.Shrink` |
 | Function/data/cell/host-effect generation | Planned | Outside the current fragment |
 
 ## External evidence
@@ -105,15 +103,15 @@ Parsing does not by itself establish module resolution or source typing.
 | --- | --- | --- |
 | Canonical syntax corpus against pinned implementations | Partial evidence | Can identify lexical, parse, AST, or diagnostic differences on aligned inputs |
 | Source checking and elaboration | Unverified across implementations | Internal Lean execution does not establish cross-compiler agreement |
-| Core execution | Lean-only boundary | External compilers do not consume the retained Core encodings |
+| Core execution | Lean-only boundary | External compilers do not consume the Core encoding |
 | Contract execution | Lean-only boundary | No normalized end-to-end adapter to compiler-generated EVM exists |
 
-See [Compatibility evidence](COMPATIBILITY_MATRIX.md) for baseline and
-classification rules.
+See [Compatibility evidence](COMPATIBILITY_MATRIX.md) for evidence revisions
+and classification rules.
 
 ## Compatibility rule
 
-Retained wire encodings are closed. Extending internal Core does not authorize
-adding constructors to an older encoding. Any adapter between source,
-frontend, Core, contract runtime, ABI, or synthesis layers must be explicit
-and must preserve the failure information owned by the source layer.
+Core Wire is an explicit boundary and changes together with the supported Core
+algebra. Any adapter between source, frontend, Core, contract runtime, ABI, or
+synthesis layers must be explicit and must preserve the failure information
+owned by the source layer.

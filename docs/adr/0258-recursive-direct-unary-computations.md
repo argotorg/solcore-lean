@@ -76,11 +76,11 @@ caller-slot insertion and actual closure/capture preservation.
 
 Keep proof and consumer files below 300 lines, splitting internal implementation
 only when necessary without exporting helper laws solely to cross file boundaries.
-Run focused, aggregate and full tests, complete standard-axiom audits, kernel,
-metadata and whitespace checks, and independent reviews before publication.
+Run focused, aggregate and full tests, complete standard-axiom audits, kernel and
+whitespace checks, and independent reviews before publication.
 
 Expanded comparisons, lazy Bool roots and tuples do not gain recursive children.
 Source lambda construction, global function/class resolution, general early
 returns, unfuelled execution, source-only bounds and arbitrary-store safety
-remain separate. Parser, Core machine, diagnostics, frozen wire and metadata
-semantics do not change.
+remain separate. Parser, Core machine, diagnostics, and Core Wire do
+not change.

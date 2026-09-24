@@ -164,8 +164,7 @@ Low-level Core tests must cover:
 - exact response injection with continuation and Store preservation;
 - a non-Unit raw application producing the exact invalid-host-argument fault;
 - a checked call-value observation program and rejection of the ill-typed
-  variant; and
-- rejection of the internal host value by frozen Core Wire v1 and v2.
+  variant.
 
 The end-to-end storage fixture must use three distinct nonzero observations:
 storage address, code address, and call value. A checked program applying the
@@ -187,16 +186,15 @@ value-derived working storage and terminal bytes rather than an unrelated
 context. Tests must distinguish the three static/storage observations
 numerically.
 
-## Dependency and publication boundary
+## Dependency boundary
 
 Core owns only the append-only typed capability and first-order request. It
 does not import Address, WorldState, frames, or the storage driver. Semantics
 owns `ExecutionInputs`, Address widening, request interpretation, selected code
 lookup, and the execution/continuation chain.
 
-The change is internal and additive to Core vNext. Frozen Core Wire v1 and v2
-continue to reject all host-function values. Source syntax, parser, ABI,
-schemas, profiles, metadata digests, and the root README do not change.
+The change is internal and additive to Core vNext. Source syntax, parser, ABI,
+and the root README do not change.
 
 ## Non-goals
 
@@ -251,8 +249,7 @@ the matching first-order `HostRequest.callValue`. Host-context and environment
 lengths are 5. Application, request emission, invalid argument handling,
 response injection, resumption, progress, transition preservation, state
 typing, runner correspondence, and checked-program no-fault coverage all
-include the new constructor. Frozen Wire v1 and v2 continue to reject the
-internal host value.
+include the new constructor.
 
 The storage handler returns `inputs.callValue` exactly and leaves its complete
 mutable context unchanged. Its suspension law preserves the saved Core
@@ -273,10 +270,9 @@ ADR-0125 optional boundary.
 
 - the full build completed successfully with 643 jobs;
 - the complete executable test suite passed;
-- metadata verification and semantic-kernel policy checks passed;
+- the semantic-kernel policy check passed;
 - focused Core regressions cover acceptance, ill-typed and raw-machine
-  rejection, exact emission and resumption, append-only layout, fuel 4/5, and
-  frozen Wire v1/v2 rejection;
+  rejection, exact emission and resumption, append-only layout, and fuel 4/5;
 - end-to-end regressions cover three distinct observations, context identity,
   a value-derived storage write, larger-fuel stability, parent-indexed
   completion, and the exact resolution-fold result; and

@@ -41,16 +41,6 @@ that belongs to a source-elaboration decision.
 
 ## Boundary
 
-This feature is internal. It adds no tag to Semantic Core v1 or v2.
-
-The frozen wire projections return no representation for:
-
-- product types;
-- pair expressions;
-- projection expressions;
-- pair values; and
-- programs containing those forms.
-
 Product equality, ordering, hashing, ABI encoding, storage layout, source
 syntax, and source diagnostics are outside this decision.
 
@@ -64,12 +54,10 @@ syntax, and source diagnostics are outside this decision.
 - evaluator/machine correspondence and determinism;
 - value, environment, frame, and state typing;
 - progress, preservation, typed results, sufficient fuel, and fault exclusion;
-- focused execution, diagnostic, nesting, order, and wire-isolation tests.
+- focused execution, diagnostic, nesting, and order tests.
 
 ## Consequences
 
-Core type and value equality become recursive. Frozen wire languages remain
-closed because conversion from the internal Core is a rejecting projection.
-
-The feature provides a useful template for later sum and algebraic-data
+Core type and value equality become recursive. The feature provides a useful
+template for later sum and algebraic-data
 extensions while retaining all termination properties of the current language.

@@ -48,6 +48,6 @@ execution. Earlier tests of unsupported `~` are updated to assert its new
 Word-only boundary. Audit all affected public proofs using standard axioms,
 compile public consumers, and run focused, aggregate, and full tests.
 
-The canonical parser, Core machine, frozen Wire formats, and metadata remain
-unchanged. No source execution endpoint or general binary-operator support is
+The canonical parser, Core machine, and Core Wire remain unchanged.
+No source execution endpoint or general binary-operator support is
 added.

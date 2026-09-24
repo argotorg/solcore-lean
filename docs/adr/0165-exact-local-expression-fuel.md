@@ -70,5 +70,5 @@ capability changes.
 Consumers cover all cost formulas, exact completion and exhaustion thresholds,
 nonempty stores, selected and skipped branches, raw untypable or unresolved
 examples, and terminal path boundaries. Audit every public proof against
-standard kernel axioms; run focused and aggregate builds, full tests, kernel
-and metadata checks. Keep each new proof file below 300 lines.
+standard kernel axioms; run focused and aggregate builds, full tests, and kernel
+checks. Keep each new proof file below 300 lines.

@@ -79,5 +79,5 @@ parser, diagnostics, wire formats and runtime records remain unchanged.
 Maintain body-to-entry acyclicity and proof/test files under 300 lines. Split
 definition, proof, migration, consumer and publication commits where practical.
 Run focused/aggregate builds, full tests, all public/consumer axiom audits,
-kernel/metadata/whitespace checks and independent reviews. Keep scratch local
+kernel-policy and whitespace checks and independent reviews. Keep scratch local
 to the repository; retain the paused diagnostic files untouched.

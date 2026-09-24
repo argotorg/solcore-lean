@@ -88,7 +88,7 @@ pending continuations, and arbitrary inserted caller values without claiming
 that intermediate states or resulting closures are related by type erasure.
 
 Run focused builds, aggregate syntax/tests, the full suite, all public and
-consumer standard-axiom audits, policy/metadata/whitespace checks and
+consumer standard-axiom audits, kernel-policy and whitespace checks, and
 independent reviews before publication.
 
 Calls underneath operators, tuples or conditionals are not made recursive

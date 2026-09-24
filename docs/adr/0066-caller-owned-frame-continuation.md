@@ -84,7 +84,7 @@ trace construction, prefixing, append operation or order, event taxonomy,
 transaction boundary or atomicity, or trap/failure diagnosis.
 
 It adds no balances, code, call/create host behavior, parser or source form,
-Wire field or tag, Profile, ABI, storage layout, Core-result
+Wire field or tag, ABI, storage layout, Core-result
 adapter, EVM revision, opcode, gas schedule, serialization, canonical delta, or
 frozen artifact.
 
@@ -109,5 +109,5 @@ test module with two runner lines.
 The implementation commits are `3bd1e00` (149 changed lines), `f02e3d4` (26),
 `2c9795a` (60), and `bdd7e84` (73), all below 300 changed lines; this completion
 update is the fifth staged commit. Focused and full builds, tests, trust-zero,
-axiom, semantic-kernel, metadata, document-link, diff, and independent P0-P3
+axiom, semantic-kernel, document-link, diff, and independent P0-P3
 audits pass.
