@@ -9672,6 +9672,122 @@ theorem ExpressionRequirementPlan.Valid.applySubstitution
         (by simp [requirementsEq,
           coercionRequirementIds_applySubstitution])
 
+/-- A monomorphic writable local remains writable after flexible substitution
+of its body type. -/
+theorem WritableLocal.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {id : Resolved.LocalId} {type : Ty}
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (writable : WritableLocal source id type) :
+    WritableLocal target id (substitution.apply type) := by
+  cases writable with
+  | intro lookup schemeWellFormed quantifiedEq bodyEq =>
+      exact .intro
+        (LocalLookup.applySubstitution contextValid.closes lookup)
+        (SchemeWellFormed.applySubstitution contextValid.closes
+          schemeWellFormed)
+        (by simp [quantifiedEq])
+        (by simp [TypeSystem.Scheme.apply, TypeSystem.Substitution.without,
+          quantifiedEq, bodyEq])
+
+/-- A positional member that is uniform across every constructor remains
+uniform when ambient flexible variables in its nominal arguments are
+instantiated. -/
+theorem UniformMemberProjection.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {base member : Ty} {index : Nat}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (projection : UniformMemberProjection source base index member) :
+    UniformMemberProjection target (substitution.apply base) index
+      (substitution.apply member) := by
+  cases projection with
+  | intro dataTypeMem innerExact baseEq baseWellFormed memberWellFormed
+      constructorsNonempty memberUniform validInstantiations =>
+      rename_i dataType inner
+      have dataWellFormed := catalog.data_semantic dataType dataTypeMem
+      have mappedExact :=
+        ParameterSubstitution.Exact.mapRange substitution innerExact
+      have mappedUniform : ∀ constructor,
+          constructor ∈ dataType.constructors →
+          (constructor.payloadTypes.map
+            (ParameterSubstitution.mapRange substitution inner).apply)[index]? =
+              some (substitution.apply member) := by
+        intro constructor constructorMem
+        have payloadWellFormed :=
+          dataWellFormed.constructor_payloads constructor constructorMem
+        have compose :=
+          TypesWellScoped.applyFlexible_composeParameters
+            (context := signatureContext source.signatures dataType.id
+              dataType.parameters)
+            substitution inner innerExact
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              payloadWellFormed)
+        rw [← compose, List.getElem?_map,
+          memberUniform constructor constructorMem]
+        rfl
+      exact .intro
+        (by
+          rw [← contextValid.closes.target_eq]
+          exact dataTypeMem)
+        mappedExact
+        (by
+          rw [baseEq, StructuralSubstitution.applyFlexible_nominal,
+            ParameterSubstitution.orderedArguments_mapRange substitution
+              innerExact])
+        (TypeAdmissible.applySubstitution contextValid.closes baseWellFormed)
+        (TypeAdmissible.applySubstitution contextValid.closes memberWellFormed)
+        constructorsNonempty mappedUniform
+        (by
+          intro instantiation instantiationValid resultEq
+          cases instantiationValid with
+          | intro instantiatedData constructor instantiatedDataMem constructorMem
+              constructorOwner constructorEq instantiatedExact instantiatedRange
+              payloadTypesEq resultTypeEq =>
+              have instantiatedDataMemSource :
+                  instantiatedData ∈ source.signatures.dataTypes := by
+                rw [← contextValid.closes.target_eq] at instantiatedDataMem
+                exact instantiatedDataMem
+              have nominalEq :
+                  Ty.nominal instantiatedData.id
+                      (SourceSemantics.ParameterSubstitution.orderedArguments
+                        instantiation.parameterSubstitution
+                        instantiatedData.parameters) =
+                    Ty.nominal dataType.id
+                      (SourceSemantics.ParameterSubstitution.orderedArguments
+                        (ParameterSubstitution.mapRange substitution inner)
+                        dataType.parameters) := by
+                rw [← resultTypeEq, resultEq, baseEq,
+                  StructuralSubstitution.applyFlexible_nominal,
+                  ParameterSubstitution.orderedArguments_mapRange substitution
+                    innerExact]
+              have nominalParts :=
+                StructuralSubstitution.nominal_injective nominalEq
+              have dataEq : instantiatedData = dataType :=
+                StructuralSubstitution.eq_of_mem_of_mapped_nodup
+                  catalog.data_ids instantiatedDataMemSource dataTypeMem
+                  nominalParts.1
+              subst instantiatedData
+              have payloadWellFormed :=
+                dataWellFormed.constructor_payloads constructor constructorMem
+              have payloadMapsEq :
+                  constructor.payloadTypes.map
+                      instantiation.parameterSubstitution.apply =
+                    constructor.payloadTypes.map
+                      (ParameterSubstitution.mapRange substitution inner).apply := by
+                apply List.map_congr_left
+                intro payload payloadMem
+                exact
+                  StructuralSubstitution.TypeWellScoped.applyParameters_eq_of_orderedArguments_eq
+                    instantiation.parameterSubstitution
+                    (ParameterSubstitution.mapRange substitution inner)
+                    instantiatedExact mappedExact nominalParts.2
+                    (payloadWellFormed payload payloadMem).typeWellScoped
+              rw [payloadTypesEq, payloadMapsEq]
+              exact mappedUniform constructor constructorMem)
+
 @[simp] theorem closeContext_withTypeVariables (substitution : Substitution)
     (context : Context) (variables : List TypeVarId) :
     closeContext substitution (context.withTypeVariables variables) =
