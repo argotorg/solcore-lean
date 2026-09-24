@@ -274,24 +274,21 @@ structure CellWellTyped (context : Context) (heap : Heap) (cell : Cell) : Prop w
 def HeapWellTyped (context : Context) (heap : Heap) : Prop :=
   ∀ cell, cell ∈ heap.cells → CellWellTyped context heap cell
 
-/-- A later heap preserves every old location and its declared type.  Cell
-values may change. -/
-def HeapTypesExtend (before after : Heap) : Prop :=
-  ∀ location cell, Heap.Reads before location cell →
-    ∃ updatedCell,
-      Heap.Reads after location updatedCell ∧ updatedCell.type = cell.type
+/-- Compatibility name for the strong heap extension relation used by dynamic
+typing.  A later heap preserves both the declared type and the generalized
+closure descriptor of every old location; only ordinary cell values may
+change. -/
+abbrev HeapTypesExtend (before after : Heap) : Prop :=
+  HeapMetadataExtend before after
 
 namespace HeapMetadataExtend
 
-/-- Forget generalized-cell metadata preservation while retaining the type
-extension interface consumed by existing value-typing proofs. -/
+/-- View metadata-preserving growth through the established dynamic-typing
+name.  The two relations are now definitionally identical. -/
 theorem toTypes {before after : Heap}
     (extension : HeapMetadataExtend before after) :
-    HeapTypesExtend before after := by
-  intro location cell read
-  rcases extension location cell read with
-    ⟨updatedCell, updatedRead, updatedType, _⟩
-  exact ⟨updatedCell, updatedRead, updatedType⟩
+    HeapTypesExtend before after :=
+  extension
 
 end HeapMetadataExtend
 
@@ -600,7 +597,8 @@ theorem mono
   induction agrees with
   | nil => exact .nil
   | cons read cell_type monomorphic _ ih =>
-      rcases extension _ _ read with ⟨updatedCell, updatedRead, updatedType⟩
+      rcases extension _ _ read with
+        ⟨updatedCell, updatedRead, updatedType, _⟩
       exact .cons updatedRead (updatedType.trans cell_type) monomorphic ih
 
 end EnvironmentAgrees
@@ -608,47 +606,34 @@ end EnvironmentAgrees
 namespace HeapTypesExtend
 
 theorem refl (heap : Heap) : HeapTypesExtend heap heap := by
-  intro location cell read
-  exact ⟨cell, read, rfl⟩
+  exact HeapMetadataExtend.refl heap
 
 theorem trans {first middle last : Heap}
     (left : HeapTypesExtend first middle)
     (right : HeapTypesExtend middle last) :
-    HeapTypesExtend first last := by
-  intro location cell read
-  rcases left location cell read with ⟨middleCell, middleRead, middleType⟩
-  rcases right location middleCell middleRead with
-    ⟨lastCell, lastRead, lastType⟩
-  exact ⟨lastCell, lastRead, lastType.trans middleType⟩
+    HeapTypesExtend first last :=
+  HeapMetadataExtend.trans left right
 
 theorem of_allocation
     {before after : Heap} {type : Ty} {value : Option Value}
     {location : Location}
     (allocation : Heap.Allocates before type value location after) :
-    HeapTypesExtend before after := by
-  intro oldLocation cell read
-  exact ⟨cell, allocation.preserves_read read, rfl⟩
+    HeapTypesExtend before after :=
+  HeapMetadataExtend.of_allocation allocation
 
 theorem of_generalized_allocation
     {before after : Heap} {function : GeneralizedClosure}
     {location : Location}
     (allocation : Heap.AllocatesGeneralized before function location after) :
     HeapTypesExtend before after :=
-  (HeapMetadataExtend.of_generalized_allocation allocation).toTypes
+  HeapMetadataExtend.of_generalized_allocation allocation
 
 theorem of_write
     {before after : Heap} {writtenLocation : Location}
     {value : Option Value}
     (write : Heap.Writes before writtenLocation value after) :
-    HeapTypesExtend before after := by
-  intro location cell read
-  by_cases same : location = writtenLocation
-  · subst location
-    rcases write.reads_updated with ⟨previous, previousRead, updatedRead⟩
-    have cell_eq : cell = previous := read.functional previousRead
-    subst cell
-    exact ⟨{ previous with value := value }, updatedRead, rfl⟩
-  · exact ⟨cell, write.preserves_other same read, rfl⟩
+    HeapTypesExtend before after :=
+  HeapMetadataExtend.of_write write
 
 end HeapTypesExtend
 

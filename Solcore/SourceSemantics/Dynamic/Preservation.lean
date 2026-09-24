@@ -1723,7 +1723,7 @@ theorem preserves
           have initial_cell_eq := initial_read.functional static_read
           subst staticCell
           rcases extension _ _ initial_read with
-            ⟨updatedCell, updated_read, updated_type⟩
+            ⟨updatedCell, updated_read, updated_type, _⟩
           have updated_cell_eq := current_read.functional updated_read
           subst updatedCell
           have root_type : currentCell.type = rootType :=

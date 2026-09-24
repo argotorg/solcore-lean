@@ -68,4 +68,39 @@ example {source target : Context} {before after : Heap}
     GeneralizedClosureWellTyped target after function :=
   (typed.transportContext supports).mono extension
 
+/-- Ordinary allocation preserves the complete descriptor of every older
+cell, not only its declared type. -/
+example {before after : Heap} {type : Ty} {value : Option Value}
+    {fresh old : Location} {cell : Cell}
+    (allocation : Heap.Allocates before type value fresh after)
+    (read : Heap.Reads before old cell) :
+    ∃ updatedCell,
+      Heap.Reads after old updatedCell ∧
+      updatedCell.type = cell.type ∧
+      updatedCell.generalized = cell.generalized :=
+  HeapTypesExtend.of_allocation allocation old cell read
+
+/-- A value write leaves the selected cell's generalized descriptor intact. -/
+example {before after : Heap} {written old : Location}
+    {value : Option Value} {cell : Cell}
+    (write : Heap.Writes before written value after)
+    (read : Heap.Reads before old cell) :
+    ∃ updatedCell,
+      Heap.Reads after old updatedCell ∧
+      updatedCell.type = cell.type ∧
+      updatedCell.generalized = cell.generalized :=
+  HeapTypesExtend.of_write write old cell read
+
+/-- Descriptor preservation composes transitively across multiple heap
+steps. -/
+example {first middle last : Heap} {location : Location} {cell : Cell}
+    (left : HeapTypesExtend first middle)
+    (right : HeapTypesExtend middle last)
+    (read : Heap.Reads first location cell) :
+    ∃ updatedCell,
+      Heap.Reads last location updatedCell ∧
+      updatedCell.type = cell.type ∧
+      updatedCell.generalized = cell.generalized :=
+  left.trans right location cell read
+
 end Solcore.Test.SourceSemanticsGeneralizedClosureTyping
