@@ -61,9 +61,33 @@ theorem IntegerLiteralResolution.applySubstitution_predicate
     (node.applySubstitution substitution).requirements = node.requirements := by
   rfl
 
+@[simp] theorem ExpressionNode.applySubstitution_rawType
+    (substitution : TypeSystem.Substitution) (node : ExpressionNode) :
+    (node.applySubstitution substitution).rawType =
+      substitution.apply node.rawType := by
+  cases coercions : node.coercions with
+  | nil =>
+      simp [ExpressionNode.applySubstitution, ExpressionNode.rawType,
+        coercions]
+  | cons first rest =>
+      simp [ExpressionNode.applySubstitution, ExpressionNode.rawType,
+        coercions, CoercionStep.applySubstitution]
+
 @[simp] theorem StatementNode.applySubstitution_id
     (substitution : TypeSystem.Substitution) (node : StatementNode) :
     (node.applySubstitution substitution).id = node.id := by
+  rfl
+
+@[simp] theorem PlaceResolution.applySubstitution_projections
+    (substitution : TypeSystem.Substitution) (place : PlaceResolution) :
+    (place.applySubstitution substitution).projections = place.projections := by
+  rfl
+
+@[simp] theorem AssignmentResolution.applySubstitution_requirements
+    (substitution : TypeSystem.Substitution)
+    (assignment : AssignmentResolution) :
+    (assignment.applySubstitution substitution).requirements =
+      assignment.requirements := by
   rfl
 
 @[simp] theorem Node.id_applySubstitution
@@ -90,6 +114,12 @@ theorem IntegerLiteralResolution.applySubstitution_predicate
     (substitution : TypeSystem.Substitution) (source : TypedSource) :
     (source.applySubstitution substitution).nodes.map Node.id =
       source.nodes.map Node.id := by
+  simp [TypedSource.applySubstitution]
+
+@[simp] theorem TypedSource.applySubstitution_nodeOccurrenceIds
+    (substitution : TypeSystem.Substitution) (source : TypedSource) :
+    (source.applySubstitution substitution).nodes.map Node.occurrenceId =
+      source.nodes.map Node.occurrenceId := by
   simp [TypedSource.applySubstitution]
 
 end Solcore.Frontend.SourceInference

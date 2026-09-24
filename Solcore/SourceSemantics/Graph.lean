@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.Ownership
 import Solcore.SourceSemantics.Substitution
+import Solcore.Frontend.SourceInference.TypedIRProperties
 
 /-!
 Reachability and acyclicity of resolved source occurrence graphs.
@@ -499,3 +500,237 @@ theorem OccurrenceGraphClosed.applyParameters
     exact closed.acyclic id (descends_of_applyParameters path)
 
 end Solcore.SourceSemantics.StructuralSubstitution
+
+/-!
+Flexible inference substitution changes only retained type and evidence data.
+The occurrence graph therefore transports unchanged when a generalized local
+initializer is closed at one use site.
+-/
+
+namespace Solcore.SourceSemantics.FlexibleSubstitution
+
+open Frontend.SourceInference
+open TypeSystem
+
+@[simp] theorem applyAssignmentResolution_placeChildIds
+    (substitution : Substitution) (assignment : AssignmentResolution) :
+    assignmentChildIds (assignment.applySubstitution substitution) =
+      assignmentChildIds assignment := by
+  simp [assignmentChildIds, placeChildIds,
+    AssignmentResolution.applySubstitution,
+    PlaceResolution.applySubstitution]
+
+@[simp] theorem applyTypedMatchCase_childIds
+    (substitution : Substitution) (matchCase : TypedMatchCase) :
+    matchCaseChildIds (matchCase.applySubstitution substitution) =
+      matchCaseChildIds matchCase := by
+  rfl
+
+@[simp] theorem applyTypedMatchCases_childIds
+    (substitution : Substitution) (cases : List TypedMatchCase) :
+    (cases.map (TypedMatchCase.applySubstitution substitution)).flatMap
+        matchCaseChildIds =
+      cases.flatMap matchCaseChildIds := by
+  induction cases with
+  | nil => rfl
+  | cons matchCase cases induction => simp [induction]
+
+@[simp] theorem applyForItemForm_childIds
+    (substitution : Substitution) (item : ForItemForm) :
+    forItemChildIds (item.applySubstitution substitution) =
+      forItemChildIds item := by
+  cases item <;>
+    simp [ForItemForm.applySubstitution, forItemChildIds]
+
+@[simp] theorem applyForItemForms_childIds
+    (substitution : Substitution) (items : List ForItemForm) :
+    (items.map (ForItemForm.applySubstitution substitution)).flatMap
+        forItemChildIds =
+      items.flatMap forItemChildIds := by
+  induction items with
+  | nil => rfl
+  | cons item items induction => simp [induction]
+
+@[simp] theorem applyExpressionForm_childIds
+    (substitution : Substitution) (form : ExpressionForm) :
+    expressionChildIds (form.applySubstitution substitution) =
+      expressionChildIds form := by
+  cases form <;> rfl
+
+@[simp] theorem applyStatementForm_childIds
+    (substitution : Substitution) (form : StatementForm) :
+    statementChildIds (form.applySubstitution substitution) =
+      statementChildIds form := by
+  cases form <;>
+    simp [StatementForm.applySubstitution, MatchResolution.applySubstitution,
+      statementChildIds, matchChildIds]
+
+@[simp] theorem applyNode_childIds
+    (substitution : Substitution) (node : Node) :
+    nodeChildIds (node.applySubstitution substitution) = nodeChildIds node := by
+  cases node <;>
+    simp [Node.applySubstitution, ExpressionNode.applySubstitution,
+      StatementNode.applySubstitution, nodeChildIds]
+
+@[simp] theorem applyTypedSource_nodeIds
+    (substitution : Substitution) (source : TypedSource) :
+    nodeIds (source.applySubstitution substitution) = nodeIds source := by
+  simp [nodeIds]
+
+@[simp] theorem applyTypedSource_nodeOccurrenceIds
+    (substitution : Substitution) (source : TypedSource) :
+    nodeOccurrenceIds (source.applySubstitution substitution) =
+      nodeOccurrenceIds source := by
+  simp [nodeOccurrenceIds]
+
+/-- Closing flexible types transports an expression occurrence without
+changing its category-safe identity. -/
+theorem ContainsExpression.applySubstitution
+    {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
+    (substitution : Substitution)
+    (contains : ContainsExpression source id node) :
+    ContainsExpression (source.applySubstitution substitution) id
+      (node.applySubstitution substitution) := by
+  exact ⟨List.mem_map.mpr ⟨.expression node, contains.1, rfl⟩,
+    by simpa using contains.2⟩
+
+/-- Closing flexible types transports a statement occurrence without changing
+its category-safe identity. -/
+theorem ContainsStatement.applySubstitution
+    {source : TypedSource} {id : StatementId} {node : StatementNode}
+    (substitution : Substitution)
+    (contains : ContainsStatement source id node) :
+    ContainsStatement (source.applySubstitution substitution) id
+      (node.applySubstitution substitution) := by
+  exact ⟨List.mem_map.mpr ⟨.statement node, contains.1, rfl⟩,
+    by simpa using contains.2⟩
+
+/-- Flexible substitution transports one retained heterogeneous node. -/
+theorem containsNode_applySubstitution
+    {source : TypedSource} {id : NodeId} {node : Node}
+    (substitution : Substitution)
+    (contains : ContainsNode source id node) :
+    ContainsNode (source.applySubstitution substitution) id
+      (node.applySubstitution substitution) := by
+  exact ⟨List.mem_map.mpr ⟨node, contains.1, rfl⟩,
+    by simpa using contains.2⟩
+
+/-- Flexible substitution reflects retained node membership because it maps
+the table pointwise and preserves every node identity. -/
+theorem containsNode_of_applySubstitution
+    {source : TypedSource} {id : NodeId} {node : Node}
+    {substitution : Substitution}
+    (contains : ContainsNode (source.applySubstitution substitution) id node) :
+    ∃ original, ContainsNode source id original ∧
+      original.applySubstitution substitution = node := by
+  rcases List.mem_map.mp contains.1 with ⟨original, originalMem, rfl⟩
+  exact ⟨original, ⟨originalMem, by simpa using contains.2⟩, rfl⟩
+
+theorem directChild_applySubstitution
+    {source : TypedSource} {parent child : NodeId}
+    (substitution : Substitution)
+    (edge : DirectChild source parent child) :
+    DirectChild (source.applySubstitution substitution) parent child := by
+  rcases edge with ⟨node, contains, childMem⟩
+  exact ⟨node.applySubstitution substitution,
+    containsNode_applySubstitution substitution contains,
+    by simpa using childMem⟩
+
+theorem directChild_of_applySubstitution
+    {source : TypedSource} {parent child : NodeId}
+    {substitution : Substitution}
+    (edge : DirectChild (source.applySubstitution substitution) parent child) :
+    DirectChild source parent child := by
+  rcases edge with ⟨node, contains, childMem⟩
+  rcases containsNode_of_applySubstitution contains with
+    ⟨original, originalContains, rfl⟩
+  exact ⟨original, originalContains, by simpa using childMem⟩
+
+theorem descends_applySubstitution
+    {source : TypedSource} {parent child : NodeId}
+    (substitution : Substitution)
+    (path : Descends source parent child) :
+    Descends (source.applySubstitution substitution) parent child := by
+  induction path with
+  | direct edge =>
+      exact .direct (directChild_applySubstitution substitution edge)
+  | step edge _ induction =>
+      exact .step (directChild_applySubstitution substitution edge) induction
+
+theorem descends_of_applySubstitution
+    {source : TypedSource} {parent child : NodeId}
+    {substitution : Substitution}
+    (path : Descends (source.applySubstitution substitution) parent child) :
+    Descends source parent child := by
+  induction path with
+  | direct edge => exact .direct (directChild_of_applySubstitution edge)
+  | step edge _ induction =>
+      exact .step (directChild_of_applySubstitution edge) induction
+
+theorem reachable_applySubstitution
+    {source : TypedSource} {id : NodeId}
+    (substitution : Substitution)
+    (reachable : Reachable source id) :
+    Reachable (source.applySubstitution substitution) id := by
+  induction reachable with
+  | root member => exact .root (by simpa using member)
+  | child _ edge induction =>
+      exact .child induction (directChild_applySubstitution substitution edge)
+
+/-- The initial occurrence-graph well-formedness layer is invariant under
+flexible type substitution. -/
+theorem OccurrenceGraphWellFormed.applySubstitution
+    {source : TypedSource} (substitution : Substitution)
+    (wellFormed : OccurrenceGraphWellFormed source) :
+    OccurrenceGraphWellFormed (source.applySubstitution substitution) := by
+  refine {
+    nodeOccurrencesUnique := by
+      simpa [NodeOccurrencesUnique] using wellFormed.nodeOccurrencesUnique
+    nodesOwned := ?_
+    rootsOwned := by simpa [RootsOwned] using wellFormed.rootsOwned
+    rootsExist := by simpa [RootsExist] using wellFormed.rootsExist
+    childEdgesExist := ?_
+  }
+  · intro node member
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    simpa using wellFormed.nodesOwned original originalMem
+  · intro node member child childMem
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    simpa using wellFormed.childEdgesExist original originalMem child
+      (by simpa using childMem)
+
+/-- Full occurrence-graph closure is invariant under flexible type
+substitution. -/
+theorem OccurrenceGraphClosed.applySubstitution
+    {source : TypedSource} (substitution : Substitution)
+    (closed : OccurrenceGraphClosed source) :
+    OccurrenceGraphClosed (source.applySubstitution substitution) := by
+  refine {
+    wellFormed :=
+      OccurrenceGraphWellFormed.applySubstitution substitution closed.wellFormed
+    rootsUnique := by simpa [RootsUnique] using closed.rootsUnique
+    childSlotsUnique := ?_
+    childHasUniqueParent := ?_
+    rootsHaveNoParent := ?_
+    allNodesReachable := ?_
+    acyclic := ?_
+  }
+  · intro node member
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    simpa using closed.childSlotsUnique original originalMem
+  · intro left right child leftEdge rightEdge
+    exact closed.childHasUniqueParent
+      (directChild_of_applySubstitution leftEdge)
+      (directChild_of_applySubstitution rightEdge)
+  · intro root parent rootMem edge
+    exact closed.rootsHaveNoParent (by simpa using rootMem)
+      (directChild_of_applySubstitution edge)
+  · intro node member
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    have reachable := reachable_applySubstitution substitution
+      (closed.allNodesReachable original originalMem)
+    simpa using reachable
+  · intro id path
+    exact closed.acyclic id (descends_of_applySubstitution path)
+
+end Solcore.SourceSemantics.FlexibleSubstitution
