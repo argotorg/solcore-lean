@@ -59,6 +59,69 @@ theorem scopes_initializer
 
 end LocalSchemeTemplateOwner
 
+/-- A retained template row has a primary requirement occurrence inside the
+initializer subtree of the exact local scheme which owns it.  Whole-body
+requirement ownership separately makes that primary occurrence unique.  This
+strengthens flat template ownership with the lexical fact needed by a scoped
+ledger. -/
+inductive LocalSchemeTemplateRowScoped (source : TypedSource)
+    (row : SolvedRequirement) : Prop where
+  | intro
+      (owner : LocalSchemeTemplateOwner)
+      (contains : ContainsLocalSchemeTemplate source owner)
+      (id_eq : row.id = owner.requirement.templateRequirement)
+      (predicate_eq : row.predicate = owner.requirement.predicate)
+      (evidence_eq : row.evidence = .assumption owner.requirement.predicate)
+      (occurrence : NodeId)
+      (occurs : PrimaryRequirementOccursAt source occurrence row.id)
+      (inScope : owner.Scopes source occurrence) :
+      LocalSchemeTemplateRowScoped source row
+
+namespace LocalSchemeTemplateRowScoped
+
+/-- Scoped template use entails the corresponding exact source ownership. -/
+theorem owned
+    {source : TypedSource} {row : SolvedRequirement}
+    (rowScoped : LocalSchemeTemplateRowScoped source row) :
+    LocalSchemeTemplateRowOwned source row := by
+  cases rowScoped with
+  | intro owner contains idEq predicateEq evidenceEq _ _ _ =>
+      exact .intro owner contains idEq predicateEq evidenceEq
+
+/-- The identity of a scoped row belongs to the source template inventory. -/
+theorem template_id_mem
+    {source : TypedSource} {row : SolvedRequirement}
+    (rowScoped : LocalSchemeTemplateRowScoped source row) :
+    row.id ∈ sourceLocalSchemeTemplateIds source :=
+  rowScoped.owned.template_id_mem
+
+/-- A scoped row has a primary source attachment. -/
+theorem primary_occurrence
+    {source : TypedSource} {row : SolvedRequirement}
+    (rowScoped : LocalSchemeTemplateRowScoped source row) :
+    ∃ occurrence, PrimaryRequirementOccursAt source occurrence row.id := by
+  cases rowScoped with
+  | intro _ _ _ _ _ occurrence occurs _ => exact ⟨occurrence, occurs⟩
+
+/-- Expose the exact owner and the initializer-local primary occurrence
+without reopening the inductive relation at downstream use sites. -/
+theorem exact_owner
+    {source : TypedSource} {row : SolvedRequirement}
+    (rowScoped : LocalSchemeTemplateRowScoped source row) :
+    ∃ owner occurrence,
+      ContainsLocalSchemeTemplate source owner ∧
+      row.id = owner.requirement.templateRequirement ∧
+      row.predicate = owner.requirement.predicate ∧
+      row.evidence = .assumption owner.requirement.predicate ∧
+      PrimaryRequirementOccursAt source occurrence row.id ∧
+      owner.Scopes source occurrence := by
+  cases rowScoped with
+  | intro owner contains idEq predicateEq evidenceEq occurrence occurs inScope =>
+      exact ⟨owner, occurrence, contains, idEq, predicateEq, evidenceEq,
+        occurs, inScope⟩
+
+end LocalSchemeTemplateRowScoped
+
 /-- An occurrence is reachable from one of the declaration roots. -/
 inductive Reachable (source : TypedSource) : NodeId → Prop where
   | root {id : NodeId} (member : id ∈ source.roots) : Reachable source id

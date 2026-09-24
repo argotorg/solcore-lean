@@ -73,6 +73,105 @@ def declarationContext (signatures : ProgramSignatures)
     |>.withSolvedRequirements requirements)
     |>.withResidualTypeVariables)
 
+/-- One solved row is valid for a whole source either as ordinary evidence in
+the declaration context or as an assumption template with a primary use
+scoped by its owning generalized initializer.  `RequirementOwnership`
+separately makes the primary use unique at the body boundary. -/
+inductive ScopedRequirementEntryValid (context : Context)
+    (source : TypedSource) (row : SolvedRequirement) : Prop where
+  | ordinary
+      (not_template : row.id ∉ sourceLocalSchemeTemplateIds source)
+      (valid : SolvedRequirementValid context row) :
+      ScopedRequirementEntryValid context source row
+  | template
+      (scopeProof : LocalSchemeTemplateRowScoped source row) :
+      ScopedRequirementEntryValid context source row
+
+/-- A whole-body requirement ledger separates declaration-wide evidence from
+qualified local-scheme templates.  Template identities are source-unique,
+each ledger row obeys its corresponding validation mode, and every declared
+template owner has a retained row. -/
+structure ScopedRequirementLedgerWellFormed (context : Context)
+    (source : TypedSource) : Prop where
+  idsUnique : RequirementIdsUnique context
+  templateOwnership : LocalSchemeTemplateOwnership source
+  entriesValid :
+    ∀ row, row ∈ context.solvedRequirements →
+      ScopedRequirementEntryValid context source row
+  templatesComplete :
+    ∀ owner, ContainsLocalSchemeTemplate source owner →
+      ∃ row, row ∈ context.solvedRequirements ∧
+        row.id = owner.requirement.templateRequirement
+
+namespace ScopedRequirementLedgerWellFormed
+
+/-- A non-template ledger row retains ordinary declaration-context evidence
+validity. -/
+theorem ordinary_valid
+    {context : Context} {source : TypedSource}
+    (wellFormed : ScopedRequirementLedgerWellFormed context source)
+    {row : SolvedRequirement}
+    (member : row ∈ context.solvedRequirements)
+    (notTemplate : row.id ∉ sourceLocalSchemeTemplateIds source) :
+    SolvedRequirementValid context row := by
+  cases wellFormed.entriesValid row member with
+  | ordinary _ valid => exact valid
+  | template scopeProof =>
+      exact False.elim (notTemplate scopeProof.template_id_mem)
+
+/-- A ledger row whose identity is owned by a local template has an exact
+initializer-scoped primary use. -/
+theorem template_scoped
+    {context : Context} {source : TypedSource}
+    (wellFormed : ScopedRequirementLedgerWellFormed context source)
+    {row : SolvedRequirement}
+    (member : row ∈ context.solvedRequirements)
+    (templateId : row.id ∈ sourceLocalSchemeTemplateIds source) :
+    LocalSchemeTemplateRowScoped source row := by
+  cases wellFormed.entriesValid row member with
+  | ordinary notTemplate _ => exact False.elim (notTemplate templateId)
+  | template scopeProof => exact scopeProof
+
+/-- Recover the exact scoped ledger row promised for one source template
+owner. -/
+theorem template_row
+    {context : Context} {source : TypedSource}
+    (wellFormed : ScopedRequirementLedgerWellFormed context source)
+    {owner : LocalSchemeTemplateOwner}
+    (contains : ContainsLocalSchemeTemplate source owner) :
+    ∃ row, row ∈ context.solvedRequirements ∧
+      row.id = owner.requirement.templateRequirement ∧
+      LocalSchemeTemplateRowScoped source row := by
+  rcases wellFormed.templatesComplete owner contains with
+    ⟨row, member, idEq⟩
+  have templateId : row.id ∈ sourceLocalSchemeTemplateIds source := by
+    rw [idEq]
+    exact sourceLocalSchemeTemplateIds_mem_iff.mpr
+      ⟨owner, contains, rfl⟩
+  exact ⟨row, member, idEq, wellFormed.template_scoped member templateId⟩
+
+/-- An ordinary well-formed ledger is a scoped ledger whenever the source
+declares no qualified local templates. -/
+theorem ofRequirementLedger
+    {context : Context} {source : TypedSource}
+    (wellFormed : RequirementLedgerWellFormed context)
+    (templatesEmpty : sourceLocalSchemeTemplateIds source = []) :
+    ScopedRequirementLedgerWellFormed context source := by
+  constructor
+  · exact wellFormed.idsUnique
+  · constructor
+    simp [templatesEmpty]
+  · intro row member
+    exact ScopedRequirementEntryValid.ordinary (by simp [templatesEmpty])
+      (wellFormed.entriesValid row member)
+  · intro owner contains
+    have member : owner.requirement.templateRequirement ∈
+        sourceLocalSchemeTemplateIds source :=
+      sourceLocalSchemeTemplateIds_mem_iff.mpr ⟨owner, contains, rfl⟩
+    simp [templatesEmpty] at member
+
+end ScopedRequirementLedgerWellFormed
+
 /-- Pointwise closed type well-formedness. -/
 def TypesWellFormed (context : Context) (types : List TypeSystem.Ty) : Prop :=
   ∀ type, type ∈ types → TypeWellFormed context type

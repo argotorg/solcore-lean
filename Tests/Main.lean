@@ -2,6 +2,7 @@ import Solcore
 import Solcore.Test.SourceSemantics
 import Solcore.Test.SourceSemanticsSubstitution
 import Solcore.Test.SourceSemanticsProgram
+import Solcore.Test.SourceSemanticsScopedRequirements
 import Solcore.Test.SourceSemanticsFault
 import Solcore.Test.SourceSemanticsExecution
 import Solcore.Test.SourceSemanticsPublicBoundary

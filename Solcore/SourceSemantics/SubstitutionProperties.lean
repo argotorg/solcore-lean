@@ -639,6 +639,30 @@ their exact primary owning occurrences. -/
       PrimaryRequirementOccursAt source occurrence requirement := by
   simp [PrimaryRequirementOccursAt]
 
+theorem LocalSchemeTemplateRowScoped.applyParameters
+    {source : TypedSource} {row : SolvedRequirement}
+    (substitution : ParameterSubstitution)
+    (rowScoped : LocalSchemeTemplateRowScoped source row) :
+    LocalSchemeTemplateRowScoped (applyTypedSource substitution source)
+      (applySolvedRequirement substitution row) := by
+  cases rowScoped with
+  | intro owner contains idEq predicateEq evidenceEq occurrence occurs scope =>
+      refine .intro (applyLocalSchemeTemplateOwner substitution owner)
+        (StructuralSubstitution.ContainsLocalSchemeTemplate.applyParameters
+          substitution contains) ?_ ?_ ?_ occurrence ?_ ?_
+      · simpa [applySolvedRequirement] using idEq
+      · simpa [applySolvedRequirement, applyLocalSchemeTemplateOwner,
+          LocalSchemeRequirement.applyParameters] using congrArg
+            (ProgramPredicate.applyParameters substitution) predicateEq
+      · simpa [applySolvedRequirement, applyLocalSchemeTemplateOwner,
+          LocalSchemeRequirement.applyParameters, applyPredicateEvidence] using
+            congrArg (applyPredicateEvidence substitution) evidenceEq
+      · simpa [applySolvedRequirement] using
+          (primaryRequirementOccursAt_applyTypedSource substitution source
+            occurrence row.id).mpr occurs
+      · exact LocalSchemeTemplateOwner.Scopes.applyParameters substitution
+          scope
+
 theorem RequirementOwnership.applyParameters
     (substitution : ParameterSubstitution) {context : Context}
     {source : TypedSource}

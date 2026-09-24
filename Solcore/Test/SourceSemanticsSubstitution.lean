@@ -125,6 +125,15 @@ example (substitution : ParameterSubstitution) (source : TypedSource)
       (applySolvedRequirement substitution row) :=
   LocalSchemeTemplateRowOwned.applyParameters substitution owned
 
+/-- Exact template ownership, its primary attachment, and initializer scope
+all survive rigid declaration instantiation together. -/
+example (substitution : ParameterSubstitution) (source : TypedSource)
+    (row : SolvedRequirement)
+    (rowScoped : LocalSchemeTemplateRowScoped source row) :
+    LocalSchemeTemplateRowScoped (applyTypedSource substitution source)
+      (applySolvedRequirement substitution row) :=
+  LocalSchemeTemplateRowScoped.applyParameters substitution rowScoped
+
 /-- Rigid instantiation preserves the initializer subtree in which a template
 owner may be used. -/
 example (substitution : ParameterSubstitution) (source : TypedSource)
