@@ -5423,98 +5423,8 @@ private theorem filter_mergeVariables (keep : TypeVarId → Bool)
         · simp [mergeVariables, kept, present]
         · simp [mergeVariables, kept, present, List.filter_append]
 
-/-- A ground flexible substitution removes exactly its domain variables from
-the free-variable membership of a type; it cannot create fresh occurrences. -/
-theorem mem_freeVariables_apply_iff
-    {context : Context} {substitution : TypeSystem.Substitution}
-    (range : SubstitutionRangeWellFormed context substitution)
-    (metavariable : TypeVarId) (type : Ty) :
-    metavariable ∈ (substitution.apply type).freeVariables ↔
-      metavariable ∈ type.freeVariables ∧
-        metavariable ∉ substitution.domain := by
-  induction type with
-  | «variable» candidate =>
-      cases found : substitution.lookup? candidate with
-      | none =>
-          have absent :=
-            (lookup?_eq_none_iff_not_mem_domain substitution candidate).mp found
-          simp only [TypeSystem.Substitution.apply, found, Option.getD_none,
-            Ty.freeVariables, List.mem_singleton]
-          constructor
-          · intro same
-            subst metavariable
-            exact ⟨rfl, absent⟩
-          · exact fun result => result.1
-      | some replacement =>
-          have member := mem_of_lookup?_eq_some found
-          have closed :=
-            StructuralSubstitution.TypeWellFormed.freeVariables_eq_nil
-              (range candidate replacement member)
-          have present : candidate ∈ substitution.domain :=
-            List.mem_map.mpr ⟨(candidate, replacement), member, rfl⟩
-          simp only [TypeSystem.Substitution.apply, found, Option.getD_some,
-            closed, List.not_mem_nil, Ty.freeVariables, List.mem_singleton,
-            false_iff]
-          rintro ⟨same, absent⟩
-          subst metavariable
-          exact absent present
-  | parameter parameter => simp [TypeSystem.Substitution.apply, Ty.freeVariables]
-  | constructor constructor =>
-      simp [TypeSystem.Substitution.apply, Ty.freeVariables]
-  | application left right leftInduction rightInduction =>
-      simp only [TypeSystem.Substitution.apply]
-      rw [SourceSemantics.mem_freeVariables_application_iff,
-        SourceSemantics.mem_freeVariables_application_iff,
-        leftInduction, rightInduction]
-      constructor
-      · rintro (⟨leftMember, absent⟩ | ⟨rightMember, absent⟩)
-        · exact ⟨Or.inl leftMember, absent⟩
-        · exact ⟨Or.inr rightMember, absent⟩
-      · rintro ⟨leftMember | rightMember, absent⟩
-        · exact Or.inl ⟨leftMember, absent⟩
-        · exact Or.inr ⟨rightMember, absent⟩
-  | function parameter result parameterInduction resultInduction =>
-      simp only [TypeSystem.Substitution.apply]
-      rw [SourceSemantics.mem_freeVariables_function_iff,
-        SourceSemantics.mem_freeVariables_function_iff,
-        parameterInduction, resultInduction]
-      constructor
-      · rintro (⟨parameterMember, absent⟩ | ⟨resultMember, absent⟩)
-        · exact ⟨Or.inl parameterMember, absent⟩
-        · exact ⟨Or.inr resultMember, absent⟩
-      · rintro ⟨parameterMember | resultMember, absent⟩
-        · exact Or.inl ⟨parameterMember, absent⟩
-        · exact Or.inr ⟨resultMember, absent⟩
-  | product left right leftInduction rightInduction =>
-      simp only [TypeSystem.Substitution.apply]
-      rw [SourceSemantics.mem_freeVariables_product_iff,
-        SourceSemantics.mem_freeVariables_product_iff,
-        leftInduction, rightInduction]
-      constructor
-      · rintro (⟨leftMember, absent⟩ | ⟨rightMember, absent⟩)
-        · exact ⟨Or.inl leftMember, absent⟩
-        · exact ⟨Or.inr rightMember, absent⟩
-      · rintro ⟨leftMember | rightMember, absent⟩
-        · exact Or.inl ⟨leftMember, absent⟩
-        · exact Or.inr ⟨rightMember, absent⟩
-  | mapping key value keyInduction valueInduction =>
-      simp only [TypeSystem.Substitution.apply]
-      rw [SourceSemantics.mem_freeVariables_mapping_iff,
-        SourceSemantics.mem_freeVariables_mapping_iff,
-        keyInduction, valueInduction]
-      constructor
-      · rintro (⟨keyMember, absent⟩ | ⟨valueMember, absent⟩)
-        · exact ⟨Or.inl keyMember, absent⟩
-        · exact ⟨Or.inr valueMember, absent⟩
-      · rintro ⟨keyMember | valueMember, absent⟩
-        · exact Or.inl ⟨keyMember, absent⟩
-        · exact Or.inr ⟨valueMember, absent⟩
-  | proxy inner induction => exact induction
-  | comptime inner induction => exact induction
-  | error => simp [TypeSystem.Substitution.apply, Ty.freeVariables]
-
-/-- List-level form of `mem_freeVariables_apply_iff`, retaining the stable
-left-to-right order of the surviving source variables. -/
+/-- A ground flexible substitution removes exactly its domain variables while
+retaining the stable left-to-right order of every surviving source variable. -/
 theorem freeVariables_apply
     {context : Context} {substitution : TypeSystem.Substitution}
     (range : SubstitutionRangeWellFormed context substitution)
@@ -5574,6 +5484,18 @@ theorem freeVariables_apply
   | proxy inner induction => exact induction
   | comptime inner induction => exact induction
   | error => rfl
+
+/-- Membership form of `freeVariables_apply`: a ground substitution cannot
+create a fresh flexible-variable occurrence. -/
+theorem mem_freeVariables_apply_iff
+    {context : Context} {substitution : TypeSystem.Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (metavariable : TypeVarId) (type : Ty) :
+    metavariable ∈ (substitution.apply type).freeVariables ↔
+      metavariable ∈ type.freeVariables ∧
+        metavariable ∉ substitution.domain := by
+  rw [freeVariables_apply range]
+  simp
 
 private theorem without_sublist (substitution : TypeSystem.Substitution)
     (variables : List TypeVarId) :
