@@ -5619,6 +5619,38 @@ theorem Substitution.mem_freeVariables_apply_of_not_mem_domain
       exact induction occurs
   | error => simp [Ty.freeVariables] at occurs
 
+namespace ParameterSubstitution
+
+/-- Apply a flexible substitution to every replacement of a rigid-parameter
+substitution while preserving its rigid domain. -/
+def mapRange (outer : TypeSystem.Substitution)
+    (inner : TypeSystem.ParameterSubstitution) :
+    TypeSystem.ParameterSubstitution :=
+  inner.map fun entry => (entry.1, outer.apply entry.2)
+
+/-- Flexible range mapping preserves exact rigid-parameter coverage. -/
+theorem Exact.mapRange
+    {inner : TypeSystem.ParameterSubstitution}
+    {parameters : List TypeParameterId}
+    (outer : TypeSystem.Substitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact inner parameters) :
+    SourceSemantics.ParameterSubstitution.Exact
+      (FlexibleSubstitution.ParameterSubstitution.mapRange outer inner)
+      parameters := by
+  constructor
+  · exact exact.parameters_nodup
+  · have domainEq :
+        SourceSemantics.ParameterSubstitution.domain
+            (FlexibleSubstitution.ParameterSubstitution.mapRange outer inner) =
+          SourceSemantics.ParameterSubstitution.domain inner := by
+      simp [FlexibleSubstitution.ParameterSubstitution.mapRange,
+        SourceSemantics.ParameterSubstitution.domain, List.map_map,
+        Function.comp_def]
+    rw [domainEq]
+    exact exact.domain_permutation
+
+end ParameterSubstitution
+
 namespace Substitution
 
 /-- Preserve an inner flexible substitution's exact domain while applying an
@@ -6041,6 +6073,205 @@ theorem SubstitutionRangeWellFormed.without
   intro metavariable replacement member
   apply range metavariable replacement
   exact (Substitution.without_sublist substitution variables).subset member
+
+/-- A flexible substitution may be pushed through the range of an exact
+rigid-parameter substitution when the source type has no free flexible
+variables. -/
+theorem TypeWellScoped.applyFlexible_composeParameters
+    {context : Context} {type : Ty}
+    (outer : Substitution) (inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellScoped : TypeWellScoped context [] type) :
+    outer.apply (inner.apply type) =
+      (ParameterSubstitution.mapRange outer inner).apply type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ =>
+      outer.apply (inner.apply type) =
+        (ParameterSubstitution.mapRange outer inner).apply type)
+    (motive_2 := fun types _ =>
+      (types.map inner.apply).map outer.apply =
+        types.map (ParameterSubstitution.mapRange outer inner).apply)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    simp at bound
+  · intro parameter bound _
+    obtain ⟨replacement, member, innerLookup⟩ :=
+      StructuralSubstitution.ParameterSubstitution.exists_lookup?_eq_some
+        innerExact bound
+    have mappedMember :
+        (parameter, outer.apply replacement) ∈
+          ParameterSubstitution.mapRange outer inner :=
+      List.mem_map.mpr ⟨(parameter, replacement), member, rfl⟩
+    have mappedLookup :=
+      StructuralSubstitution.ParameterSubstitution.lookup?_eq_some_of_mem_of_domain_nodup
+        (ParameterSubstitution.Exact.mapRange outer innerExact).domain_nodup
+        mappedMember
+    simp [TypeSystem.ParameterSubstitution.apply, innerLookup, mappedLookup]
+  · intro builtin
+    rfl
+  · intro dataType arguments _ _ _ argumentsInduction
+    rw [StructuralSubstitution.apply_nominal,
+      StructuralSubstitution.applyFlexible_nominal,
+      StructuralSubstitution.apply_nominal]
+    exact congrArg (fun mapped => Ty.nominal dataType.id mapped)
+      argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro left right _ _ leftInduction rightInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value _ _ keyInduction valueInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · rfl
+  · intro head tail _ _ headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+theorem TypesWellScoped.applyFlexible_composeParameters
+    {context : Context} {types : List Ty}
+    (outer : Substitution) (inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellScoped : TypesWellScoped context [] types) :
+    (types.map inner.apply).map outer.apply =
+      types.map (ParameterSubstitution.mapRange outer inner).apply := by
+  refine TypesWellScoped.rec
+    (motive_1 := fun type _ =>
+      outer.apply (inner.apply type) =
+        (ParameterSubstitution.mapRange outer inner).apply type)
+    (motive_2 := fun types _ =>
+      (types.map inner.apply).map outer.apply =
+        types.map (ParameterSubstitution.mapRange outer inner).apply)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    simp at bound
+  · intro parameter bound _
+    obtain ⟨replacement, member, innerLookup⟩ :=
+      StructuralSubstitution.ParameterSubstitution.exists_lookup?_eq_some
+        innerExact bound
+    have mappedMember :
+        (parameter, outer.apply replacement) ∈
+          ParameterSubstitution.mapRange outer inner :=
+      List.mem_map.mpr ⟨(parameter, replacement), member, rfl⟩
+    have mappedLookup :=
+      StructuralSubstitution.ParameterSubstitution.lookup?_eq_some_of_mem_of_domain_nodup
+        (ParameterSubstitution.Exact.mapRange outer innerExact).domain_nodup
+        mappedMember
+    simp [TypeSystem.ParameterSubstitution.apply, innerLookup, mappedLookup]
+  · intro builtin
+    rfl
+  · intro dataType arguments _ _ _ argumentsInduction
+    rw [StructuralSubstitution.apply_nominal,
+      StructuralSubstitution.applyFlexible_nominal,
+      StructuralSubstitution.apply_nominal]
+    exact congrArg (fun mapped => Ty.nominal dataType.id mapped)
+      argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [parameterInduction, resultInduction]
+  · intro left right _ _ leftInduction rightInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [leftInduction, rightInduction]
+  · intro key value _ _ keyInduction valueInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [keyInduction, valueInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · intro innerType _ innerInduction
+    simp only [TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [innerInduction]
+  · rfl
+  · intro head tail _ _ headInduction tailInduction
+    simp only [List.map_cons]
+    rw [headInduction, tailInduction]
+
+theorem PredicateWellFormed.applyFlexible_composeParameters
+    {context : Context} {predicate : ProgramPredicate}
+    (outer : Substitution) (inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellFormed : PredicateWellFormed context predicate) :
+    TypedTraitResolution.applySubstitution outer
+        (ProgramPredicate.applyParameters inner predicate) =
+      ProgramPredicate.applyParameters
+        (ParameterSubstitution.mapRange outer inner) predicate := by
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [TypedTraitResolution.applySubstitution,
+        ProgramPredicate.applyParameters]
+      congr 1
+      · exact TypeWellScoped.applyFlexible_composeParameters outer inner
+          innerExact wellFormed.subject.typeWellScoped
+      · rw [List.map_map]
+        apply List.map_congr_left
+        intro argument member
+        exact TypeWellScoped.applyFlexible_composeParameters outer inner
+          innerExact (wellFormed.arguments argument member).typeWellScoped
+
+theorem PredicatesWellFormed.applyFlexible_composeParameters
+    {context : Context} {predicates : List ProgramPredicate}
+    (outer : Substitution) (inner : ParameterSubstitution)
+    (innerExact : SourceSemantics.ParameterSubstitution.Exact inner
+      context.typeParameters)
+    (wellFormed : PredicatesWellFormed context predicates) :
+    (predicates.map (ProgramPredicate.applyParameters inner)).map
+        (TypedTraitResolution.applySubstitution outer) =
+      predicates.map (ProgramPredicate.applyParameters
+        (ParameterSubstitution.mapRange outer inner)) := by
+  induction predicates with
+  | nil => rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, List.cons.injEq]
+      constructor
+      · exact PredicateWellFormed.applyFlexible_composeParameters outer inner
+          innerExact (wellFormed head (by simp))
+      · exact induction (fun predicate member =>
+          wellFormed predicate (by simp [member]))
+
+theorem ParameterSubstitution.orderedArguments_mapRange
+    {inner : ParameterSubstitution} {parameters : List TypeParameterId}
+    (outer : Substitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact inner parameters) :
+    SourceSemantics.ParameterSubstitution.orderedArguments
+        (ParameterSubstitution.mapRange outer inner) parameters =
+      (SourceSemantics.ParameterSubstitution.orderedArguments inner
+        parameters).map outer.apply := by
+  unfold SourceSemantics.ParameterSubstitution.orderedArguments
+  rw [List.map_map]
+  apply List.map_congr_left
+  intro parameter member
+  obtain ⟨replacement, pairMember, innerLookup⟩ :=
+    StructuralSubstitution.ParameterSubstitution.exists_lookup?_eq_some exact
+      member
+  have mappedMember :
+      (parameter, outer.apply replacement) ∈
+        ParameterSubstitution.mapRange outer inner :=
+    List.mem_map.mpr ⟨(parameter, replacement), pairMember, rfl⟩
+  have mappedLookup :=
+    StructuralSubstitution.ParameterSubstitution.lookup?_eq_some_of_mem_of_domain_nodup
+      (ParameterSubstitution.Exact.mapRange outer exact).domain_nodup
+      mappedMember
+  simp [innerLookup, mappedLookup]
 
 /-- Applying an outer flexible substitution after an exact inner one is
 equivalent to mapping the outer action over the inner range and then applying
@@ -7613,6 +7844,40 @@ theorem TypeWellFormed.applySubstitution
   · intro metavariable member
     simp at member
   · exact wellFormed.typeWellScoped
+
+/-- Flexible closure transports every closed rigid-parameter replacement
+while preserving the parameter domain. -/
+theorem ParameterSubstitution.RangeWellFormed.applyFlexible
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {inner : ParameterSubstitution}
+    (closes : ContextCloses substitution closedVariables source target)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed source
+      inner) :
+    SourceSemantics.ParameterSubstitution.RangeWellFormed target
+      (ParameterSubstitution.mapRange substitution inner) := by
+  intro parameter replacement member
+  rcases List.mem_map.mp member with
+    ⟨⟨sourceParameter, sourceReplacement⟩, sourceMember, entryEq⟩
+  cases entryEq
+  exact TypeWellFormed.applySubstitution closes
+    (range sourceParameter sourceReplacement sourceMember)
+
+/-- Flexible closure transports admissible rigid-parameter replacements,
+including lexical and residual metavariables. -/
+theorem ParameterSubstitution.RangeAdmissible.applyFlexible
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {inner : ParameterSubstitution}
+    (closes : ContextCloses substitution closedVariables source target)
+    (range : SourceSemantics.ParameterSubstitution.RangeAdmissible source
+      inner) :
+    SourceSemantics.ParameterSubstitution.RangeAdmissible target
+      (ParameterSubstitution.mapRange substitution inner) := by
+  intro parameter replacement member
+  rcases List.mem_map.mp member with
+    ⟨⟨sourceParameter, sourceReplacement⟩, sourceMember, entryEq⟩
+  cases entryEq
+  exact TypeAdmissible.applySubstitution closes
+    (range sourceParameter sourceReplacement sourceMember)
 
 /-- Capture-avoiding flexible substitution preserves rank-1 scheme
 well-formedness across a structural context closure. -/

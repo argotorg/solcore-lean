@@ -536,33 +536,12 @@ open Frontend
 open Frontend.SourceInference
 open TypeSystem
 
-private def mapParameterRange (outer : Substitution)
-    (inner : ParameterSubstitution) : ParameterSubstitution :=
-  inner.map fun entry => (entry.1, outer.apply entry.2)
-
-private theorem ParameterSubstitution.Exact.mapFlexibleRange
-    {inner : ParameterSubstitution} {parameters : List TypeParameterId}
-    (outer : Substitution)
-    (exact : SourceSemantics.ParameterSubstitution.Exact inner parameters) :
-    SourceSemantics.ParameterSubstitution.Exact
-      (mapParameterRange outer inner) parameters := by
-  constructor
-  · exact exact.parameters_nodup
-  · have domainEq :
-        SourceSemantics.ParameterSubstitution.domain
-            (mapParameterRange outer inner) =
-          SourceSemantics.ParameterSubstitution.domain inner := by
-      simp [mapParameterRange, SourceSemantics.ParameterSubstitution.domain,
-        List.map_map, Function.comp_def]
-    rw [domainEq]
-    exact exact.domain_permutation
-
 /-- Push an outer flexible substitution through both ranges of an
 implementation-head substitution. -/
 def mapImplSubstitutionRange (outer : Substitution)
     (inner : SourceSemantics.ImplSubstitution) :
     SourceSemantics.ImplSubstitution := {
-  parameters := mapParameterRange outer inner.parameters
+  parameters := ParameterSubstitution.mapRange outer inner.parameters
   variables := Substitution.mapRange outer inner.variables
 }
 
@@ -571,7 +550,7 @@ theorem ImplSubstitution.ExactFor.mapRange
     (outer : Substitution) (exact : inner.ExactFor rule) :
     (mapImplSubstitutionRange outer inner).ExactFor rule := by
   constructor
-  · exact ParameterSubstitution.Exact.mapFlexibleRange outer exact.parameters
+  · exact ParameterSubstitution.Exact.mapRange outer exact.parameters
   · exact Substitution.ExactSubstitution.mapRange outer exact.variables
 
 private theorem applyType_mapRange_of_covered
@@ -608,11 +587,11 @@ private theorem applyType_mapRange_of_covered
           (parametersCovered parameter (by simp [TypeParameterOccurs]))
       have mappedMember :
           (parameter, outer.apply replacement) ∈
-            mapParameterRange outer inner.parameters :=
+            ParameterSubstitution.mapRange outer inner.parameters :=
         List.mem_map.mpr ⟨(parameter, replacement), member, rfl⟩
       have mappedLookup :=
         StructuralSubstitution.ParameterSubstitution.lookup?_eq_some_of_mem_of_domain_nodup
-          (ParameterSubstitution.Exact.mapFlexibleRange outer
+          (ParameterSubstitution.Exact.mapRange outer
             exact.parameters).domain_nodup mappedMember
       simp [SourceSemantics.ImplSubstitution.applyType,
         mapImplSubstitutionRange, lookup, mappedLookup]
