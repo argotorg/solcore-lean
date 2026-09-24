@@ -126,6 +126,28 @@ private def testSuccessfulCollection : IO Unit := do
   | constructors => throw (IO.userError
       s!"Box constructor catalog changed: {reprStr constructors}")
 
+private def testDefaultImplementationMarkerCollection : IO Unit := do
+  let source ← parsed "default_implementations.solc" (String.intercalate "\n" [
+    "trait Select<T> {}",
+    "default impl<T> Select<T> {}",
+    "impl Select<Word> {}"
+  ])
+  let environment ← catalog [source]
+  let signatures ← match buildProgramSignatures environment with
+    | .ok signatures => pure signatures
+    | .error errors => throw (IO.userError
+        s!"default implementation signature failure: {reprStr errors}")
+  match signatures.implementations, signatures.implRules with
+  | [fallback, specific], [fallbackRule, specificRule] =>
+      assertTrue (decide (
+          fallback.isDefault ∧ fallback.source.value.defaultMarker.isSome ∧
+          fallbackRule.isDefault ∧ fallbackRule.id = fallback.id ∧
+          !specific.isDefault ∧ specific.source.value.defaultMarker.isNone ∧
+          !specificRule.isDefault ∧ specificRule.id = specific.id))
+        "default impl marker was not preserved by the signature/rule projection"
+  | implementations, rules => throw (IO.userError
+      s!"default implementation catalog changed: {reprStr implementations}; {reprStr rules}")
+
 private def testComptimeMarkerCollection : IO Unit := do
   let source ← parsed "comptime_signatures.solc" (String.intercalate "\n" [
     "trait Stage<T> {",
@@ -526,6 +548,7 @@ end ProgramSignatures
 /-- Run the first source-connected signature and trait-rule vertical slice. -/
 def testProgramSignatures : IO Unit := do
   ProgramSignatures.testSuccessfulCollection
+  ProgramSignatures.testDefaultImplementationMarkerCollection
   ProgramSignatures.testComptimeMarkerCollection
   ProgramSignatures.testBuiltinIntResolutionProfile
   ProgramSignatures.testMethodCatalog

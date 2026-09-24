@@ -19,6 +19,9 @@ structure ImplRule (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
   id : ImplId
   head : Predicate Trait Ty
   wherePredicates : List (Predicate Trait Ty)
+  /-- A default implementation participates only when the ordinary tier has a
+  definite `noSolution`.  The default preserves existing rule literals. -/
+  isDefault : Bool := false
   deriving Repr, BEq, DecidableEq
 
 /-- One implementation whose head matched a goal. `premises` must already have
@@ -26,6 +29,8 @@ the head matcher's substitution applied. -/
 structure Candidate (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
   implId : ImplId
   premises : List (Predicate Trait Ty)
+  /-- The priority tier inherited from the matched implementation rule. -/
+  isDefault : Bool := false
   deriving Repr, BEq, DecidableEq
 
 /-- Boundary owned by the type layer: freshen an implementation, match its head,
@@ -55,7 +60,19 @@ namespace Program
     (goal : Predicate Trait Ty) : List (Candidate Trait Ty ImplId) :=
   program.rules.filterMap fun rule =>
     (program.matchHead rule goal).map fun premises =>
-      { implId := rule.id, premises := premises }
+      { implId := rule.id
+        premises := premises
+        isDefault := rule.isDefault }
+
+/-- Matching non-default implementations in their declaration order. -/
+@[reducible] def ordinaryCandidates (program : Program Trait Ty ImplId)
+    (goal : Predicate Trait Ty) : List (Candidate Trait Ty ImplId) :=
+  (program.candidates goal).filter fun candidate => !candidate.isDefault
+
+/-- Matching default implementations in their declaration order. -/
+@[reducible] def defaultCandidates (program : Program Trait Ty ImplId)
+    (goal : Predicate Trait Ty) : List (Candidate Trait Ty ImplId) :=
+  (program.candidates goal).filter fun candidate => candidate.isDefault
 
 end Program
 
@@ -219,14 +236,24 @@ inductive PremiseOutcome
                     statistics.expandedGoals := state.statistics.expandedGoals + 1 }
                 let resolveChild nextState child :=
                   resolveAux program remaining (goal :: active) nextState child
-                let (outcome, finished) :=
+                let (ordinaryOutcome, afterOrdinary) :=
                   resolveCandidates resolveChild goal expanded
-                    (program.candidates goal) none none
+                    (program.ordinaryCandidates goal) none none
+                let (outcome, finished) :=
+                  match ordinaryOutcome with
+                  | .noSolution =>
+                      resolveCandidates resolveChild goal afterOrdinary
+                        (program.defaultCandidates goal) none none
+                  | .success _
+                  | .inconclusive _ => (ordinaryOutcome, afterOrdinary)
                 (outcome, cacheConclusive goal outcome finished)
 
 end Detail
 
 /-- Resolve one trait obligation with a maximum implementation-chain depth.
+The ordinary implementation tier is exhaustive and has priority.  The default
+tier is searched only after ordinary resolution establishes a definite
+`noSolution`; any ordinary ambiguity or incomplete search blocks fallback.
 Completed success and no-solution entries are tabled. Cycles, depth exhaustion,
 ambiguity, and searches that might still hide a competing implementation remain
 explicitly inconclusive. -/

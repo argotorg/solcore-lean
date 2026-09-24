@@ -171,6 +171,68 @@ private def testInconclusive : IO Unit := do
       s!"overlapping impls had the wrong failure class: {reprStr errors}")
   | .ok _ => throw (IO.userError "overlapping Add implementations were selected")
 
+private def defaultImplementationWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc"
+  mainSources := [{
+    path := "main.solc"
+    content := String.intercalate "\n" [
+      "trait Ready<T> {}",
+      "trait Select<T> {}",
+      "default impl<T> Select<T> {}",
+      "impl Select<Word> {}",
+      "impl Select<Bool> where Bool: Ready {}",
+      "function select<T>(value: T) returns (T) where T: Select { return value; }",
+      "function selectWord(value: Word) returns (Word) { return select(value); }",
+      "function selectBool(value: Bool) returns (Bool) { return select(value); }"
+    ]
+  }]
+  externalLibraries := []
+}
+
+private def testDefaultImplementationPriority : IO Unit := do
+  let checked ← match checkProgram defaultImplementationWorkspace with
+    | .ok checked => pure checked
+    | .error errors => throw (IO.userError
+        s!"default implementation program failed: {reprStr errors}")
+  let fallback ← match checked.signatures.implementations.find? fun implementation =>
+      implementation.isDefault with
+    | some implementation => pure implementation
+    | none => throw (IO.userError "default implementation was not retained")
+  let wordSpecific ← match checked.signatures.implementations.find? fun implementation =>
+      !implementation.isDefault && implementation.head.subject == .word with
+    | some implementation => pure implementation
+    | none => throw (IO.userError "specific Word implementation was not retained")
+  let failedBoolSpecific ← match checked.signatures.implementations.find?
+      fun implementation =>
+        !implementation.isDefault && implementation.head.subject == .bool with
+    | some implementation => pure implementation
+    | none => throw (IO.userError "conditional Bool implementation was not retained")
+  let checkedNamed (name : String) := checked.functions.find? fun function =>
+    match checked.environment.declaration? function.declaration with
+    | some declaration => declaration.name == some name
+    | none => false
+  let wordFunction ← match checkedNamed "selectWord" with
+    | some function => pure function
+    | none => throw (IO.userError "selectWord was not checked")
+  let boolFunction ← match checkedNamed "selectBool" with
+    | some function => pure function
+    | none => throw (IO.userError "selectBool was not checked")
+  match wordFunction.solvedRequirements with
+  | [{ evidence := .implementation
+        (.byImpl _ (.declaration implementation) []), .. }] =>
+      assertTrue (decide (implementation = wordSpecific.id))
+        "a matching default implementation displaced the ordinary Word implementation"
+  | requirements => throw (IO.userError
+      s!"selectWord evidence changed: {reprStr requirements}")
+  match boolFunction.solvedRequirements with
+  | [{ evidence := .implementation
+        (.byImpl _ (.declaration implementation) []), .. }] =>
+      assertTrue (decide (implementation = fallback.id ∧
+          implementation ≠ failedBoolSpecific.id))
+        "default implementation was not selected after the ordinary candidate failed"
+  | requirements => throw (IO.userError
+      s!"selectBool evidence changed: {reprStr requirements}")
+
 private def singleSourceWorkspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{ path := "main.solc", content }]
@@ -210,6 +272,7 @@ def testProgramChecking : IO Unit := do
   testImportedTypeProgram
   testNoSolution
   testInconclusive
+  testDefaultImplementationPriority
   testStageClassification
 
 end Tests.ProgramChecking

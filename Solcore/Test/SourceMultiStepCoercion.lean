@@ -141,6 +141,59 @@ private def testDirectPathBeatsTwoStepPath : IO Unit := do
       throw (IO.userError
         s!"unexpected implementation/evidence counts: {implementations.length}/{evidence.length}")
 
+private def testDefaultImplementationCoercionPriority : IO Unit := do
+  let ordinaryFixture ← check (String.intercalate "\n" [
+    "trait Coerce<From, To> {}",
+    "enum A { Only }",
+    "enum B { Only }",
+    "default impl Coerce<A, B> {}",
+    "impl Coerce<A, B> {}",
+    "function accept(value: B) returns (B) { return value; }",
+    "function convert(value: A) returns (B) { return accept(value); }"
+  ])
+  let ordinaryConvert ← checkedNamed ordinaryFixture "convert"
+  let ordinaryA ← namedType ordinaryFixture.environment "A"
+  let ordinaryB ← namedType ordinaryFixture.environment "B"
+  let ordinaryCoerce ← namedTrait ordinaryFixture.environment "Coerce"
+  let ordinaryPredicate :=
+    coercionPredicate ordinaryCoerce ordinaryA ordinaryB
+  match implementationIds ordinaryFixture.environment,
+      ordinaryConvert.evidence with
+  | _defaultImpl :: ordinaryImpl :: [], [evidence] =>
+      assertTrue (decide (ordinaryConvert.predicates = [ordinaryPredicate]) &&
+          isImplementationEvidence ordinaryPredicate ordinaryImpl evidence)
+        "a default coercion duplicated its edge or outranked an ordinary implementation"
+  | implementations, evidence =>
+      throw (IO.userError
+        s!"unexpected ordinary/default coercion evidence: {implementations.length}/{evidence.length}")
+
+  let fallbackFixture ← check (String.intercalate "\n" [
+    "trait Ready<T> {}",
+    "trait Coerce<From, To> {}",
+    "enum A { Only }",
+    "enum B { Only }",
+    "enum Missing { Only }",
+    "default impl Coerce<A, B> {}",
+    "impl Coerce<A, B> where Missing: Ready {}",
+    "function accept(value: B) returns (B) { return value; }",
+    "function convert(value: A) returns (B) { return accept(value); }"
+  ])
+  let fallbackConvert ← checkedNamed fallbackFixture "convert"
+  let fallbackA ← namedType fallbackFixture.environment "A"
+  let fallbackB ← namedType fallbackFixture.environment "B"
+  let fallbackCoerce ← namedTrait fallbackFixture.environment "Coerce"
+  let fallbackPredicate :=
+    coercionPredicate fallbackCoerce fallbackA fallbackB
+  match implementationIds fallbackFixture.environment,
+      fallbackConvert.evidence with
+  | defaultImpl :: _ordinaryImpl :: [], [evidence] =>
+      assertTrue (decide (fallbackConvert.predicates = [fallbackPredicate]) &&
+          isImplementationEvidence fallbackPredicate defaultImpl evidence)
+        "a failed ordinary coercion premise did not fall back to the default tier"
+  | implementations, evidence =>
+      throw (IO.userError
+        s!"unexpected fallback coercion evidence: {implementations.length}/{evidence.length}")
+
 private def testIrrelevantAmbiguousBranchDoesNotBlock : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
     "trait Coerce<From, To> {}",
@@ -399,6 +452,7 @@ and the explicit bounded-search failure through parsed source. -/
 def testSourceMultiStepCoercion : IO Unit := do
   testTwoStepPathRetainsOrderedEvidence
   testDirectPathBeatsTwoStepPath
+  testDefaultImplementationCoercionPriority
   testIrrelevantAmbiguousBranchDoesNotBlock
   testAssumptionEdgeRetainsEvidence
   testGenericEdgeSolvesWherePredicate

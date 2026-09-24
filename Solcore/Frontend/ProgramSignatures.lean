@@ -252,6 +252,8 @@ structure ProgramTraitSignature where
 order and the parsed method bodies. -/
 structure ProgramImplementationSignature where
   id : Resolved.DeclarationId
+  /-- Whether the source declaration used the `default impl` marker. -/
+  isDefault : Bool := false
   parameters : List TypeSystem.TypeParameterId
   head : ProgramPredicate
   wherePredicates : List ProgramPredicate
@@ -294,6 +296,7 @@ def implRule (implementation : ProgramImplementationSignature) :
   id := implementation.id
   head := implementation.head
   wherePredicates := implementation.wherePredicates
+  isDefault := implementation.isDefault
 }
 
 /-- Present an implementation method to the existing function-body checker.
@@ -960,6 +963,7 @@ private def implementationSignatureOfDeclaration
   let methods ← attachTraitMethods traitSignature.methods unmatchedMethods
   pure {
     id := declaration.id
+    isDefault := source.value.defaultMarker.isSome
     parameters := declarationParameters declaration
     head := { trait, subject, arguments }
     wherePredicates

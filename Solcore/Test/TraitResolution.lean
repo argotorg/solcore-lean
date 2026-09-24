@@ -40,6 +40,13 @@ private abbrev eqIntRule (id : Nat := 0) : TestRule :=
 private abbrev showIntRule (id : Nat := 1) (premises : List TestPredicate := [eqInt]) : TestRule :=
   { id := id, head := showInt, wherePredicates := premises }
 
+private abbrev defaultShowIntRule (id : Nat)
+    (premises : List TestPredicate := []) : TestRule :=
+  { id := id
+    head := showInt
+    wherePredicates := premises
+    isDefault := true }
+
 theorem exact_head_and_where_predicate_produce_nested_evidence :
     (match (resolve (exactProgram [eqIntRule, showIntRule]) 2 showInt).outcome with
     | .success (.byImpl actualGoal 1 [.byImpl actualPremise 0 []]) =>
@@ -73,6 +80,46 @@ theorem two_successful_impls_are_explicitly_ambiguous :
 theorem one_success_does_not_hide_an_inconclusive_competitor :
     (resolve (exactProgram [showIntRule 10 [], showIntRule 11 [loopInt], loopRule]) 8 showInt).outcome ==
       .inconclusive (.incompleteCandidates showInt 10) := by
+  rfl
+
+theorem an_ordinary_success_wins_even_when_a_default_is_declared_first :
+    (match (resolve
+      (exactProgram [defaultShowIntRule 30, showIntRule 31 []]) 1 showInt).outcome with
+    | .success (.byImpl actualGoal 31 []) => actualGoal == showInt
+    | _ => false) = true := by
+  decide
+
+theorem an_ordinary_success_does_not_expand_default_premises :
+    (let report := resolve (exactProgram
+      [defaultShowIntRule 41 [loopInt], showIntRule 42 [], loopRule]) 8 showInt
+    (match report.outcome with
+      | .success (.byImpl actualGoal 42 []) => actualGoal == showInt
+      | _ => false) && report.statistics.expandedGoals == 1) = true := by
+  decide
+
+theorem ordinary_premise_no_solution_falls_back_to_default :
+    (match (resolve
+      (exactProgram [showIntRule 32 [eqBool], defaultShowIntRule 33]) 2 showInt).outcome with
+    | .success (.byImpl actualGoal 33 []) => actualGoal == showInt
+    | _ => false) = true := by
+  decide
+
+theorem ordinary_inconclusive_search_blocks_default_fallback :
+    (resolve (exactProgram
+      [showIntRule 34 [loopInt], defaultShowIntRule 35, loopRule]) 8 showInt).outcome ==
+      .inconclusive (.cycle loopInt) := by
+  rfl
+
+theorem ordinary_tier_ambiguity_blocks_default_fallback :
+    (resolve (exactProgram
+      [defaultShowIntRule 36, showIntRule 37 [], showIntRule 38 []]) 1 showInt).outcome ==
+      .inconclusive (.ambiguous showInt 37 38) := by
+  rfl
+
+theorem default_tier_retains_existing_ambiguity_check :
+    (resolve (exactProgram
+      [defaultShowIntRule 39, defaultShowIntRule 40]) 1 showInt).outcome ==
+      .inconclusive (.ambiguous showInt 39 40) := by
   rfl
 
 private abbrev sharedPremiseProgram : TestProgram :=

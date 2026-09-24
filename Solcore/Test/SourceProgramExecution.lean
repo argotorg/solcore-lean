@@ -148,6 +148,41 @@ private def testDefaultedIntegerLiterals : IO Unit := do
   | .error error => throw (IO.userError
       s!"public defaulted integer literal failed: {reprStr error}")
 
+private def testDefaultImplementationPriority : IO Unit := do
+  let moduleId ← mainModule "main.solc"
+  let workspace := rawWorkspace "main.solc" [("main.solc",
+    String.intercalate "\n" [
+      "trait Add<T> {",
+      "  function add(left: T, right: T) returns (T);",
+      "}",
+      "default impl<T> Add<T> {",
+      "  function add(left: T, right: T) returns (T) { return left; }",
+      "}",
+      "impl Add<Word> {",
+      "  function add(left: Word, right: Word) returns (Word) { return 73; }",
+      "}",
+      "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
+      "  return left + right;",
+      "}",
+      "function ordinary() returns (Word) { return addWithEvidence(1, 2); }",
+      "function fallbackCase(left: Bool, right: Bool) returns (Bool) {",
+      "  return addWithEvidence(left, right);",
+      "}"
+    ])]
+  match run workspace (Seed.named moduleId "ordinary") [] generousLimits with
+  | .ok result =>
+      assertTrue (decide (result = .done (.word (word 73)) []))
+        s!"an ordinary implementation did not outrank a matching default: {reprStr result}"
+  | .error error => throw (IO.userError
+      s!"public ordinary implementation execution failed: {reprStr error}")
+  match run workspace (Seed.named moduleId "fallbackCase")
+      [.bool false, .bool true] generousLimits with
+  | .ok result =>
+      assertTrue (decide (result = .done (.bool false) []))
+        s!"a default implementation did not handle an unmatched ordinary tier: {reprStr result}"
+  | .error error => throw (IO.userError
+      s!"public default implementation execution failed: {reprStr error}")
+
 private def testSeedErrors : IO Unit := do
   let moduleId ← mainModule "main.solc"
   let missingModule ← mainModule "missing.solc"
@@ -304,6 +339,7 @@ def testSourceProgramExecution : IO Unit := do
   testModuleQualifiedName
   testDeferredIntegerOperators
   testDefaultedIntegerLiterals
+  testDefaultImplementationPriority
   testSeedErrors
   testAmbiguousAndNonFunctionSeeds
   testStageErrors
