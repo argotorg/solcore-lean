@@ -211,6 +211,7 @@ example := @Solcore.SourceSemantics.Dynamic.RequirementsProduceEnvironment.suppl
 example := @Solcore.SourceSemantics.Dynamic.RequirementsProduceEnvironment.toRequirementSequenceProves
 example := @Solcore.SourceSemantics.Dynamic.LocalSchemeRuntimeInstantiation
 example := @Solcore.SourceSemantics.Dynamic.LocalSchemeRuntimeInstantiation.toLocalSchemeInstantiationValid
+example := @Solcore.SourceSemantics.Dynamic.LocalSchemeRuntimeInstantiation.substitution_range_well_formed
 example := @Solcore.SourceSemantics.Dynamic.LocalSchemeRuntimeInstantiation.actual_requirements_length_eq
 example := @Solcore.SourceSemantics.Dynamic.LocalSchemeRuntimeInstantiation.produced_evidence_valid
 example := @Solcore.SourceSemantics.Dynamic.LocalSchemeRuntimeInstantiation.combined_evidence_covers

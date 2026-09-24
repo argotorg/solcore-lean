@@ -51,7 +51,10 @@ structure LocalSchemeRuntimeInstantiation
   formation : LocalSchemeRequirementsWellFormed context binder
   scheme_well_formed : SchemeWellFormed context binder.scheme
   exact : ExactSubstitution substitution binder.scheme.quantified
-  range : SubstitutionRangeAdmissible context substitution
+  /-- Runtime instances are ground.  Static use-site instantiation permits
+  admissible residual variables, but executable closure code must not turn an
+  outer generalized variable into a fresh residual variable. -/
+  range : SubstitutionRangeWellFormed context substitution
   result : substitution.apply binder.scheme.body = type
   actual_requirements_unique : actualRequirements.Nodup
   actual_templates_disjoint :
@@ -73,10 +76,23 @@ theorem toLocalSchemeInstantiationValid
       binder type actualRequirements substitution producedEvidence) :
     LocalSchemeInstantiationValid context binder type actualRequirements := by
   exact .intro instantiation.formation instantiation.scheme_well_formed
-    substitution instantiation.exact instantiation.range instantiation.result
+    substitution instantiation.exact instantiation.range.toAdmissible
+    instantiation.result
     instantiation.actual_requirements_unique
     instantiation.actual_templates_disjoint
     instantiation.produces.toRequirementSequenceProves
+
+/-- Every replacement selected for executable local-scheme code is closed in
+the caller context. -/
+theorem substitution_range_well_formed
+    {context : Context} {callerEvidence producedEvidence : EvidenceEnvironment}
+    {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    {substitution : Substitution}
+    (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
+      binder type actualRequirements substitution producedEvidence) :
+    SubstitutionRangeWellFormed context substitution :=
+  instantiation.range
 
 /-- Runtime closure preserves the source-ordered qualified-predicate arity. -/
 theorem actual_requirements_length_eq
