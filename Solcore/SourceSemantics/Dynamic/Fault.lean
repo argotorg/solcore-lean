@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.Dynamic.Evaluation
+import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 
 /-!
 Declarative faulting big-step dynamics for resolved source programs.
@@ -1367,9 +1368,9 @@ mutual
           .controlEscapedFunction after
 
   /-- Fault while executing one statement occurrence.  A generalized local
-  reports an explicit unsupported-runtime fault before its initializer is
-  evaluated; initializer faults therefore propagate only for monomorphic
-  locals. -/
+  whose initializer is not a canonical direct lambda reports an explicit
+  unsupported-runtime fault before that initializer is evaluated;
+  initializer faults therefore propagate only for monomorphic locals. -/
   inductive StatementFaults (program : Program) :
       Context → EvidenceEnvironment → TypedSource → Environment →
         Heap → StatementId → SemanticFault → Heap → Prop where
@@ -1382,7 +1383,9 @@ mutual
         {context evidence source environment heap id node binder initializer}
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .letDecl binder initializer)
-        (polymorphic : binder.scheme.quantified ≠ []) :
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (unsupported : GeneralizedInitializerUnsupported source binder
+          initializer) :
         StatementFaults program context evidence source environment heap id
           (.unsupportedPolymorphicBinder binder.id) heap
     | letInitializer
@@ -1761,13 +1764,15 @@ mutual
           place (.invalidUnaryOperand .bitNot) after
 
   /-- Fault in one canonical `for` header item, including the explicit
-  generalized-local runtime boundary. -/
+  boundary for unsupported generalized initializer shapes. -/
   inductive ForItemFaults (program : Program) :
       Context → EvidenceEnvironment → TypedSource → Environment → Heap →
         ForItemForm → SemanticFault → Heap → Prop where
     | polymorphicLet
         {context evidence source environment heap binder initializer}
-        (polymorphic : binder.scheme.quantified ≠ []) :
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (unsupported : GeneralizedInitializerUnsupported source binder
+          initializer) :
         ForItemFaults program context evidence source environment heap
           (.letDecl binder initializer)
           (.unsupportedPolymorphicBinder binder.id) heap

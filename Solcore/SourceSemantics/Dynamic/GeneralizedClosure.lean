@@ -264,4 +264,157 @@ theorem occurrence
 
 end GeneralizedClosureCaptures
 
+/-! ## Generalized-initializer runtime boundary -/
+
+/-- Positive structural reasons why a generalized local initializer cannot
+yet be retained as a principal direct-lambda closure.  Each constructor names
+one concrete obstruction; failure to derive a successful evaluation is never
+used as fault evidence. -/
+inductive GeneralizedInitializerMalformed (source : TypedSource)
+    (binder : TypedBinder) : Option ExpressionId → Prop where
+  | noInitializer : GeneralizedInitializerMalformed source binder none
+  | missing
+      {initializer : ExpressionId}
+      (lookup_eq : source.lookupExpression? initializer = none) :
+      GeneralizedInitializerMalformed source binder (some initializer)
+  | nonLambda
+      {initializer : ExpressionId} {node : ExpressionNode}
+      (lookup_eq : source.lookupExpression? initializer = some node)
+      (form_ne : ∀ parameters resultType body,
+        node.form ≠ .lambda parameters resultType body) :
+      GeneralizedInitializerMalformed source binder (some initializer)
+  | rawTypeMismatch
+      {initializer : ExpressionId} {node : ExpressionNode}
+      {parameters : List TypedBinder} {resultType : Ty}
+      {body : List StatementId}
+      (lookup_eq : source.lookupExpression? initializer = some node)
+      (form_eq : node.form = .lambda parameters resultType body)
+      (raw_type_ne : node.rawType ≠ binder.scheme.body) :
+      GeneralizedInitializerMalformed source binder (some initializer)
+  | typeMismatch
+      {initializer : ExpressionId} {node : ExpressionNode}
+      {parameters : List TypedBinder} {resultType : Ty}
+      {body : List StatementId}
+      (lookup_eq : source.lookupExpression? initializer = some node)
+      (form_eq : node.form = .lambda parameters resultType body)
+      (type_ne : node.type ≠ binder.scheme.body) :
+      GeneralizedInitializerMalformed source binder (some initializer)
+  | requirementsPresent
+      {initializer : ExpressionId} {node : ExpressionNode}
+      {parameters : List TypedBinder} {resultType : Ty}
+      {body : List StatementId}
+      (lookup_eq : source.lookupExpression? initializer = some node)
+      (form_eq : node.form = .lambda parameters resultType body)
+      (requirements_ne : node.requirements ≠ []) :
+      GeneralizedInitializerMalformed source binder (some initializer)
+  | coercionsPresent
+      {initializer : ExpressionId} {node : ExpressionNode}
+      {parameters : List TypedBinder} {resultType : Ty}
+      {body : List StatementId}
+      (lookup_eq : source.lookupExpression? initializer = some node)
+      (form_eq : node.form = .lambda parameters resultType body)
+      (coercions_ne : node.coercions ≠ []) :
+      GeneralizedInitializerMalformed source binder (some initializer)
+
+/-- A generalized initializer reaches the explicit unsupported-runtime
+boundary only with a concrete malformed shape in an occurrence-unique source.
+The uniqueness premise makes the classification deterministic even though the
+declarative source carrier itself remains forgeable. -/
+structure GeneralizedInitializerUnsupported (source : TypedSource)
+    (binder : TypedBinder) (initializer : Option ExpressionId) : Prop where
+  source_unique : NodeOccurrencesUnique source
+  malformed : GeneralizedInitializerMalformed source binder initializer
+
+namespace GeneralizedInitializerUnsupported
+
+/-- Every initializer in an occurrence-unique source is either the canonical
+direct-lambda capture currently supported by the runtime, or carries one of
+the explicit unsupported-shape witnesses above. -/
+theorem captures_or_unsupported
+    (context : Context) (source : TypedSource) (environment : Environment)
+    (binder : TypedBinder) (initializer : Option ExpressionId)
+    (source_unique : NodeOccurrencesUnique source) :
+    (∃ initializerId function,
+      initializer = some initializerId ∧
+      GeneralizedClosureCaptures context source environment binder
+        initializerId function) ∨
+    GeneralizedInitializerUnsupported source binder initializer := by
+  cases initializer with
+  | none => exact .inr ⟨source_unique, .noInitializer⟩
+  | some initializer =>
+      cases lookup_eq : source.lookupExpression? initializer with
+      | none => exact .inr ⟨source_unique, .missing lookup_eq⟩
+      | some node =>
+          by_cases lambda_form : ∃ parameters resultType body,
+              node.form = .lambda parameters resultType body
+          · rcases lambda_form with ⟨parameters, resultType, body, form_eq⟩
+            by_cases raw_type_eq : node.rawType = binder.scheme.body
+            · by_cases type_eq : node.type = binder.scheme.body
+              · by_cases requirements_empty : node.requirements = []
+                · by_cases coercions_empty : node.coercions = []
+                  · refine .inl ⟨initializer,
+                      GeneralizedClosure.ofDirectLambda context source
+                        environment binder initializer parameters resultType
+                        body,
+                      rfl, ?_⟩
+                    exact .directLambda
+                      (lookupExpression?_sound lookup_eq) form_eq raw_type_eq
+                      type_eq requirements_empty coercions_empty
+                  · exact .inr ⟨source_unique,
+                      .coercionsPresent lookup_eq form_eq coercions_empty⟩
+                · exact .inr ⟨source_unique,
+                    .requirementsPresent lookup_eq form_eq requirements_empty⟩
+              · exact .inr ⟨source_unique,
+                  .typeMismatch lookup_eq form_eq type_eq⟩
+            · exact .inr ⟨source_unique,
+                .rawTypeMismatch lookup_eq form_eq raw_type_eq⟩
+          · exact .inr ⟨source_unique,
+              .nonLambda lookup_eq (by
+                intro parameters resultType body form_eq
+                exact lambda_form ⟨parameters, resultType, body, form_eq⟩)⟩
+
+/-- A canonical direct-lambda capture and an unsupported-initializer witness
+cannot describe the same generalized binding. -/
+theorem not_captures
+    {context : Context} {source : TypedSource} {environment : Environment}
+    {binder : TypedBinder} {initializer : ExpressionId}
+    {function : GeneralizedClosure}
+    (unsupported : GeneralizedInitializerUnsupported source binder
+      (some initializer))
+    (captures : GeneralizedClosureCaptures context source environment binder
+      initializer function) : False := by
+  cases captures with
+  | @directLambda node parameters resultType body contains form_eq raw_type_eq
+      type_eq requirements_empty coercions_empty =>
+      have found : source.lookupExpression? initializer = some node :=
+        lookupExpression?_complete unsupported.source_unique contains
+      cases unsupported.malformed with
+      | missing lookup_eq => simp [found] at lookup_eq
+      | @nonLambda _ candidate lookup_eq form_ne =>
+          rw [found] at lookup_eq
+          cases Option.some.inj lookup_eq
+          exact form_ne parameters resultType body form_eq
+      | @rawTypeMismatch _ candidate otherParameters otherResultType otherBody
+          lookup_eq other_form_eq raw_type_ne =>
+          rw [found] at lookup_eq
+          cases Option.some.inj lookup_eq
+          exact raw_type_ne raw_type_eq
+      | @typeMismatch _ candidate otherParameters otherResultType otherBody
+          lookup_eq other_form_eq type_ne =>
+          rw [found] at lookup_eq
+          cases Option.some.inj lookup_eq
+          exact type_ne type_eq
+      | @requirementsPresent _ candidate otherParameters otherResultType
+          otherBody lookup_eq other_form_eq requirements_ne =>
+          rw [found] at lookup_eq
+          cases Option.some.inj lookup_eq
+          exact requirements_ne requirements_empty
+      | @coercionsPresent _ candidate otherParameters otherResultType otherBody
+          lookup_eq other_form_eq coercions_ne =>
+          rw [found] at lookup_eq
+          cases Option.some.inj lookup_eq
+          exact coercions_ne coercions_empty
+
+end GeneralizedInitializerUnsupported
+
 end Solcore.SourceSemantics.Dynamic

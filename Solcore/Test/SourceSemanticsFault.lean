@@ -117,10 +117,11 @@ example (program : Program) (context : SourceSemantics.Context)
     (initializer : Option ExpressionId)
     (contains : ContainsStatement source id node)
     (form_eq : node.form = .letDecl binder initializer)
-    (polymorphic : binder.scheme.quantified ≠ []) :
+    (polymorphic : binder.scheme.quantified ≠ [])
+    (unsupported : GeneralizedInitializerUnsupported source binder initializer) :
     StatementFaults program context evidence source environment heap id
       (.unsupportedPolymorphicBinder binder.id) heap := by
-  exact .polymorphicLet contains form_eq polymorphic
+  exact .polymorphicLet contains form_eq polymorphic unsupported
 
 /-- The same explicit boundary applies to generalized binders in a `for`
 header. -/
@@ -128,11 +129,12 @@ example (program : Program) (context : SourceSemantics.Context)
     (evidence : EvidenceEnvironment) (source : TypedSource)
     (environment : Environment) (heap : Heap) (binder : TypedBinder)
     (initializer : Option ExpressionId)
-    (polymorphic : binder.scheme.quantified ≠ []) :
+    (polymorphic : binder.scheme.quantified ≠ [])
+    (unsupported : GeneralizedInitializerUnsupported source binder initializer) :
     ForItemFaults program context evidence source environment heap
       (.letDecl binder initializer)
       (.unsupportedPolymorphicBinder binder.id) heap := by
-  exact .polymorphicLet polymorphic
+  exact .polymorphicLet polymorphic unsupported
 
 /-- A `for`-header vector stops at its first faulting item and preserves that
 item's exact fault and heap. -/

@@ -138,6 +138,32 @@ example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
   · rfl
   · rfl
 
+/-- The runtime boundary is exhaustive once source occurrences are unique:
+an initializer is either captured canonically or has positive unsupported
+shape evidence. -/
+example (context : SourceSemantics.Context) (source : TypedSource)
+    (environment : SourceSemantics.Dynamic.Environment) (binder : TypedBinder)
+    (initializer : Option ExpressionId)
+    (unique : NodeOccurrencesUnique source) :
+    (∃ initializerId function,
+      initializer = some initializerId ∧
+      GeneralizedClosureCaptures context source environment binder
+        initializerId function) ∨
+    GeneralizedInitializerUnsupported source binder initializer := by
+  exact GeneralizedInitializerUnsupported.captures_or_unsupported
+    context source environment binder initializer unique
+
+/-- In particular, the unsupported classifier cannot reclassify a canonical
+direct-lambda capture as a faulting initializer. -/
+example (context : SourceSemantics.Context) (source : TypedSource)
+    (environment : SourceSemantics.Dynamic.Environment) (binder : TypedBinder)
+    (initializer : ExpressionId) (function : GeneralizedClosure)
+    (unsupported : GeneralizedInitializerUnsupported source binder
+      (some initializer))
+    (captures : GeneralizedClosureCaptures context source environment binder
+      initializer function) : False := by
+  exact unsupported.not_captures captures
+
 /-- Materialization closes direct-lambda types and initializer assumptions,
 while the quantified variable of an existing lexical scheme (and its paired
 requirement metadata) remains capture-protected.  Code identities, captured
