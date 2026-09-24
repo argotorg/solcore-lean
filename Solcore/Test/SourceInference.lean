@@ -714,6 +714,43 @@ private def testQualifiedLocalSchemeRequirements : IO Unit := do
       references.any (validatesReference .bool))
     "qualified local references did not freshen type and Eq evidence together"
 
+private def testNestedQualifiedRequirementOwnership : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
+    "function run(flag: Bool) returns (Word, Bool) {",
+    "  let outer = lam(value) {",
+    "    let inner = lam(item) { return keep(item); };",
+    "    return value;",
+    "  };",
+    "  return (outer(1), outer(flag));",
+    "}"
+  ]
+  let loaded ← load source
+  let checked ← match SourceInference.checkLoadedProgram loaded with
+    | .ok checked => pure checked
+    | .error errors => throw (IO.userError
+        s!"nested qualified ownership failed: {reprStr errors}")
+  let function ← checkedNamed loaded.environment checked "run"
+  let binders := function.typedBody.nodes.filterMap fun
+    | .statement { form := .letDecl binder (some _), .. } => some binder
+    | _ => none
+  let outer ← match binders.find? fun binder => binder.name == "outer" with
+    | some binder => pure binder
+    | none => throw (IO.userError "nested qualified fixture lost outer")
+  let inner ← match binders.find? fun binder => binder.name == "inner" with
+    | some binder => pure binder
+    | none => throw (IO.userError "nested qualified fixture lost inner")
+  let template ← match inner.schemeRequirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"inner retained {requirements.length} qualified requirements")
+  let owners := binders.filter fun binder =>
+    binder.schemeRequirements.any fun requirement =>
+      requirement.templateRequirement == template.templateRequirement
+  assertTrue (decide (outer.schemeRequirements = [] ∧ owners = [inner]))
+    "an outer local scheme recaptured its nested binder's template requirement"
+
 private def testOperatorMethodPredicates : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {}",
@@ -921,6 +958,7 @@ def testSourceInference : IO Unit := do
   testUnsolvedCoercionMethodPredicate
   testConstrainedLetDoesNotGeneralizeAwayEvidence
   testQualifiedLocalSchemeRequirements
+  testNestedQualifiedRequirementOwnership
   testOperatorMethodPredicates
   testUnsolvedOperatorMethodPredicates
   testOperatorMethodCatalogDiagnostics

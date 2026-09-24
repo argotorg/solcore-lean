@@ -77,7 +77,8 @@ def generalizeValue (state : State) (locals : TypeSystem.Environment)
   let priorRequirements := state.requirements.take requirementStart
   let introducedRequirements := state.requirements.drop requirementStart
   let eligibleRequirements := introducedRequirements.filter fun requirement =>
-    state.directCallRequirements.contains requirement.id
+    state.directCallRequirements.contains requirement.id &&
+      !state.localSchemeAssumptions.contains requirement.id
   let operationalRequirements := introducedRequirements.filter fun requirement =>
     !state.directCallRequirements.contains requirement.id
   let blockedVariables := locals.freeVariables ++
