@@ -35,6 +35,13 @@ private def workspace : Workspace.RawWorkspace := {
         "function polymorphicLocal(flag: Bool) returns (Word, Bool) {",
         "  let id = lam(value) { return globalIdentity(value); };",
         "  return (id(11), id(flag));",
+        "}",
+        "function nestedPolymorphicLocal(flag: Bool) returns (Word, Bool) {",
+        "  let outer = lam(value) {",
+        "    let inner = lam(innerValue) { return globalIdentity(innerValue); };",
+        "    return inner(value);",
+        "  };",
+        "  return (outer(13), outer(flag));",
         "}"
       ]
     },
@@ -113,12 +120,15 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let recursive ← compileNamed checked "main.solc" "recurse"
   let typed ← compileNamed checked "main.solc" "visibleAlias"
   let polymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
+  let nestedPolymorphicLocal ←
+    compileNamed checked "main.solc" "nestedPolymorphicLocal"
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
       recursive.backend = .callGraph ∧
       typed.backend = .typedSource ∧
-      polymorphicLocal.backend = .typedSource))
+      polymorphicLocal.backend = .typedSource ∧
+      nestedPolymorphicLocal.backend = .typedSource))
     "automatic backend precedence changed"
   assertTrue (decide (
       direct.key.declaration.moduleId = main ∧
@@ -137,6 +147,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     "a single-function fixture retained an unexpected specialization plan"
   assertTrue (polymorphicLocal.specializationCount == 3)
     "local polymorphism did not retain its root and two generic helper instances"
+  assertTrue (nestedPolymorphicLocal.specializationCount == 3)
+    "depth-2 local polymorphism did not retain its root and two generic helper instances"
   let polymorphicRequest ←
     match SourceProgramExecution.resolveSeed checked
         (Seed.named main "polymorphicLocal") with
@@ -150,6 +162,27 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "local polymorphism did not discover both contextual generic calls"
   | result => throw (IO.userError
       s!"polymorphic-local plan reconstruction failed: {reprStr result}")
+  let nestedPolymorphicRequest ←
+    match SourceProgramExecution.resolveSeed checked
+        (Seed.named main "nestedPolymorphicLocal") with
+    | .ok request => pure request
+    | .error error => throw (IO.userError
+        s!"depth-2 polymorphic-local seed resolution failed: {reprStr error}")
+  match SourceSpecializationWorklist.run checked [nestedPolymorphicRequest]
+      compilerOptions.specializationBudget with
+  | .ok (.complete plan) =>
+      let edges := plan.callEdges.filter fun edge =>
+        decide (edge.caller = nestedPolymorphicLocal.key)
+      assertTrue (decide (
+          plan.specializations.length = 3 ∧
+          plan.callEdges.length = 2 ∧
+          edges.length = 2 ∧
+          (edges.map (·.occurrence)).eraseDups.length = 1 ∧
+          (edges.map (·.callee.arguments)).contains [.word] ∧
+          (edges.map (·.callee.arguments)).contains [.bool]))
+        "depth-2 local polymorphism did not discover two contextual generic calls"
+  | result => throw (IO.userError
+      s!"depth-2 polymorphic-local plan reconstruction failed: {reprStr result}")
   expectCoreWord "direct Core root" 14 <|
     direct.runCore [.word (word 7)] runtimeOptions
   expectCoreWord "reused direct Core root" 18 <|
@@ -171,6 +204,13 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "runtime let-polymorphism did not independently instantiate Word and Bool"
   | result => throw (IO.userError
       s!"runtime let-polymorphism returned {reprStr result}")
+  match nestedPolymorphicLocal.runTyped [.bool true] runtimeOptions with
+  | .ok (.typedSource (.done
+      (.product (.word actualWord) (.bool actualBool)) _)) =>
+      assertTrue (actualWord == word 13 && actualBool)
+        "runtime depth-2 let-polymorphism did not independently instantiate Word and Bool"
+  | result => throw (IO.userError
+      s!"runtime depth-2 let-polymorphism returned {reprStr result}")
   pure { checked, direct, recursive, typed }
 
 private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
