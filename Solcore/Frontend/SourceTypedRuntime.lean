@@ -32,6 +32,17 @@ structure Location where
 
 abbrev Environment := List (Resolved.LocalId × Location)
 
+/-- Runtime evidence attached to one concrete use of a qualified local
+scheme.  Requirement identities, rather than predicate equality, connect the
+assumption in the stored lambda body to the independently solved obligation at
+the local-reference occurrence. -/
+structure LocalRequirementWitness where
+  templateRequirement : RequirementId
+  actualRequirement : RequirementId
+  predicate : ProgramPredicate
+  evidence : TypedTraitResolution.Evidence
+  deriving Repr
+
 /-- Values which deliberately retain source-level types.  Mapping entries are
 ordered by first insertion; replacement preserves that order. -/
 inductive Value where
@@ -58,7 +69,10 @@ inductive Value where
   The wrapper keeps the stored closure and its plan provenance unchanged;
   callable execution applies the substitution to the closure's checked source
   graph just before entering its body. -/
-  | instantiated (substitution : Substitution) (principal : Value)
+  | instantiated
+      (substitution : Substitution)
+      (requirements : List LocalRequirementWitness)
+      (principal : Value)
   | global (key : Key)
   | builtin (function : BuiltinFunctionId)
   deriving Repr
@@ -135,7 +149,7 @@ mutual
     | .mapping keyType valueType _ => some (.mapping keyType valueType)
     | .closure parameters resultType _ _ _ _ =>
         some (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType)
-    | .instantiated substitution principal =>
+    | .instantiated substitution _ principal =>
         substitution.apply <$> principal.type? plan
     | .global key => do
         let specialized ← findSpecialization? plan key
@@ -405,6 +419,36 @@ inductive RuntimeError where
   | callEvidenceNotSelected
       (caller : Key) (id : ExpressionId) (requirement : RequirementId)
       (goal : ProgramPredicate) (implementation : ProgramImplId)
+  | localSchemeInstanceMismatch
+      (caller : Key) (id : ExpressionId) (binder : Resolved.LocalId)
+      (expected actual : Ty)
+  | localSchemeRequirementCountMismatch
+      (caller : Key) (id : ExpressionId) (binder : Resolved.LocalId)
+      (expected actual : Nat)
+  | duplicateLocalSchemeTemplateRequirement
+      (caller : Key) (id : ExpressionId) (binder : Resolved.LocalId)
+      (requirement : RequirementId)
+  | duplicateLocalSchemeActualRequirement
+      (caller : Key) (id : ExpressionId) (binder : Resolved.LocalId)
+      (requirement : RequirementId)
+  | localSchemeTemplateExpectedAssumption
+      (caller : Key) (id : ExpressionId) (binder : Resolved.LocalId)
+      (requirement : RequirementId)
+  | localSchemeActualExpectedImplementation
+      (caller : Key) (id : ExpressionId) (binder : Resolved.LocalId)
+      (requirement : RequirementId)
+  | nonGroundLocalSchemePredicate
+      (caller : Key) (id : ExpressionId) (binder : Resolved.LocalId)
+      (requirement : RequirementId) (predicate : ProgramPredicate)
+  | unsupportedQualifiedLocalReference
+      (caller : Key) (id : ExpressionId) (binder : Resolved.LocalId)
+  | unsupportedQualifiedLocalInitializer
+      (caller : Key) (binder : Resolved.LocalId) (initializer : ExpressionId)
+  | unsupportedLocalSchemeTemplateUse
+      (caller : Key) (binder : Resolved.LocalId)
+      (requirement : RequirementId)
+  | unsupportedConstrainedDeclarationReference
+      (caller : Key) (call callee : ExpressionId)
   | duplicateReferenceEdge (caller : Key) (id : ExpressionId) (count : Nat)
   | missingReferenceEdge (caller : Key) (id : ExpressionId)
   | declarationMetadataMismatch (call callee : ExpressionId)
@@ -571,6 +615,19 @@ private def firstDuplicateRequirement :
       if rest.contains requirement then some requirement
       else firstDuplicateRequirement rest
 
+private def directLambdaLetBinder? (source : TypedSource)
+    (id : Resolved.LocalId) : Option TypedBinder :=
+  source.nodes.findSome? fun
+    | .statement { form := .letDecl binder (some initializer), .. } =>
+        if binder.id != id || binder.scheme.quantified.isEmpty then
+          none
+        else if SourceSpecialization.isDirectLambdaInitializer source
+            initializer then
+          some binder
+        else
+          none
+    | _ => none
+
 private def exactCallSolvedRequirement
     (caller : SourceSpecialization.SpecializedFunction)
     (occurrence : ExpressionId) (requirement : RequirementId) :
@@ -582,6 +639,74 @@ private def exactCallSolvedRequirement
   | [solved] => .ok solved
   | solved => .error (.duplicateSolvedRequirements caller.key occurrence
       requirement solved.length)
+
+private def localRequirementWitnesses
+    (caller : SourceSpecialization.SpecializedFunction)
+    (binder : TypedBinder) (node : ExpressionNode) :
+    Except RuntimeError (Substitution × List LocalRequirementWitness) := do
+  let substitution ←
+    match SourceSpecialization.matchClosedSchemeInstance? binder.scheme
+        node.rawType with
+    | some substitution => pure substitution
+    | none => throw (.localSchemeInstanceMismatch caller.key node.id binder.id
+        binder.scheme.body node.rawType)
+  if binder.schemeRequirements.length != node.requirements.length then
+    throw (.localSchemeRequirementCountMismatch caller.key node.id binder.id
+      binder.schemeRequirements.length node.requirements.length)
+  let templateIds := binder.schemeRequirements.map (·.templateRequirement)
+  match firstDuplicateRequirement templateIds with
+  | some requirement =>
+      throw (.duplicateLocalSchemeTemplateRequirement caller.key node.id
+        binder.id requirement)
+  | none => pure ()
+  match firstDuplicateRequirement node.requirements with
+  | some requirement =>
+      throw (.duplicateLocalSchemeActualRequirement caller.key node.id
+        binder.id requirement)
+  | none => pure ()
+  let pairs := List.zip binder.schemeRequirements node.requirements
+  let mut witnesses := []
+  for (template, actualRequirement) in pairs do
+    let templateSolved ← exactCallSolvedRequirement caller node.id
+      template.templateRequirement
+    if templateSolved.predicate != template.predicate then
+      throw (.callRequirementPredicateMismatch caller.key node.id
+        template.templateRequirement template.predicate
+        templateSolved.predicate)
+    if templateSolved.evidence.goal != template.predicate then
+      throw (.callRequirementEvidenceGoalMismatch caller.key node.id
+        template.templateRequirement template.predicate
+        templateSolved.evidence.goal)
+    match templateSolved.evidence with
+    | .assumption _ => pure ()
+    | .implementation _ =>
+        throw (.localSchemeTemplateExpectedAssumption caller.key node.id
+          binder.id template.templateRequirement)
+    let predicate :=
+      (template.applySubstitution substitution).predicate
+    if !(TypedTraitResolution.predicateVariables predicate).isEmpty then
+      throw (.nonGroundLocalSchemePredicate caller.key node.id binder.id
+        actualRequirement predicate)
+    let actualSolved ← exactCallSolvedRequirement caller node.id
+      actualRequirement
+    if actualSolved.predicate != predicate then
+      throw (.callRequirementPredicateMismatch caller.key node.id
+        actualRequirement predicate actualSolved.predicate)
+    if actualSolved.evidence.goal != predicate then
+      throw (.callRequirementEvidenceGoalMismatch caller.key node.id
+        actualRequirement predicate actualSolved.evidence.goal)
+    let evidence ← match actualSolved.evidence with
+      | .implementation evidence => pure evidence
+      | .assumption _ =>
+          throw (.localSchemeActualExpectedImplementation caller.key node.id
+            binder.id actualRequirement)
+    witnesses := witnesses ++ [{
+      templateRequirement := template.templateRequirement
+      actualRequirement
+      predicate
+      evidence
+    }]
+  pure (substitution, witnesses)
 
 private def validateCallRequirementEvidence
     (caller : SourceSpecialization.SpecializedFunction)
@@ -679,6 +804,286 @@ private def validateDirectCallImplementationEvidence
   validateCallImplementationEvidence signatures caller node.id
     node.requirements instantiation.predicates
 
+private def directLambdaBodyRoots? (source : TypedSource)
+    (binderId : Resolved.LocalId) : Option (List NodeId) :=
+  source.nodes.findSome? fun
+    | .statement { form := .letDecl binder (some initializer), .. } =>
+        if binder.id != binderId then
+          none
+        else
+          match source.lookupExpression? initializer with
+          | some { form := .lambda _ _ body, .. } =>
+              some (body.map NodeId.statement)
+          | _ => none
+    | _ => none
+
+private def directLambdaInitializer? (source : TypedSource)
+    (binderId : Resolved.LocalId) : Option ExpressionId :=
+  source.nodes.findSome? fun
+    | .statement { form := .letDecl binder (some initializer), .. } =>
+        if binder.id == binderId &&
+            SourceSpecialization.isDirectLambdaInitializer source initializer then
+          some initializer
+        else
+          none
+    | _ => none
+
+private def directLexicalChildren (source : TypedSource)
+    (id : NodeId) : List NodeId :=
+  match source.lookupNode? id.occurrenceId with
+  | some (.expression { form := .lambda _ _ _, .. }) => []
+  | some (.expression node) =>
+      SourceSpecialization.expressionChildNodeIds node
+  | some (.statement node) =>
+      SourceSpecialization.statementChildNodeIds source node
+  | none => []
+
+private def directLexicalFuel (source : TypedSource)
+    (roots : List NodeId) : Nat :=
+  roots.length + source.nodes.foldl (fun count node =>
+    count + match node with
+      | .expression expression =>
+          (SourceSpecialization.expressionChildNodeIds expression).length
+      | .statement statement =>
+          (SourceSpecialization.statementChildNodeIds source statement).length) 0 + 1
+
+private def collectDirectLexicalNodes (source : TypedSource) :
+    Nat → List NodeId → List NodeId → List NodeId
+  | 0, _, seen => seen
+  | _ + 1, [], seen => seen
+  | fuel + 1, pending :: rest, seen =>
+      if seen.contains pending then
+        collectDirectLexicalNodes source fuel rest seen
+      else
+        let nextSeen := seen ++ [pending]
+        let children := (directLexicalChildren source pending).filter fun child =>
+          !nextSeen.contains child && !rest.contains child
+        collectDirectLexicalNodes source fuel (rest ++ children) nextSeen
+
+private def directLambdaBodyContains (source : TypedSource)
+    (binder : TypedBinder) (occurrence : ExpressionId) : Bool :=
+  match directLambdaBodyRoots? source binder.id with
+  | none => false
+  | some roots =>
+      (collectDirectLexicalNodes source (directLexicalFuel source roots)
+        roots []).contains (.expression occurrence)
+
+private def expressionRequirementCount (source : TypedSource)
+    (requirement : RequirementId) : Nat :=
+  source.nodes.foldl (fun count node =>
+    match node with
+    | .expression expression =>
+        count + (expression.requirements.filter fun candidate =>
+          candidate == requirement).length
+    | .statement _ => count) 0
+
+private def scopedLocalTemplateOwner? (source : TypedSource)
+    (occurrence : ExpressionId) (requirement : RequirementId)
+    (predicate : ProgramPredicate) : Option TypedBinder :=
+  if expressionRequirementCount source requirement != 1 then
+    none
+  else
+    match source.nodes.filterMap fun
+      | .statement { form := .letDecl binder (some initializer), .. } =>
+          if binder.scheme.quantified.isEmpty ||
+              !SourceSpecialization.isDirectLambdaInitializer source initializer ||
+              !directLambdaBodyContains source binder occurrence ||
+              !(binder.schemeRequirements.any fun owned =>
+                owned.templateRequirement == requirement &&
+                  owned.predicate == predicate) then
+            none
+          else
+            some binder
+      | _ => none with
+    | [binder] => some binder
+    | _ => none
+
+private def validateExecutableCallRequirementEvidence
+    (caller : SourceSpecialization.SpecializedFunction)
+    (occurrence : ExpressionId) :
+    List RequirementId → List ProgramPredicate → Except RuntimeError Unit
+  | [], [] => pure ()
+  | requirement :: requirements, predicate :: predicates => do
+      let solved ← exactCallSolvedRequirement caller occurrence requirement
+      if solved.predicate != predicate then
+        throw (.callRequirementPredicateMismatch caller.key occurrence
+          requirement predicate solved.predicate)
+      if solved.evidence.goal != predicate then
+        throw (.callRequirementEvidenceGoalMismatch caller.key occurrence
+          requirement predicate solved.evidence.goal)
+      match solved.evidence with
+      | .implementation _ => pure ()
+      | .assumption assumption =>
+          if (scopedLocalTemplateOwner? caller.function.typedBody occurrence
+              requirement predicate).isNone then
+            throw (.unsupportedCallAssumptionEvidence caller.key occurrence
+              requirement assumption)
+      validateExecutableCallRequirementEvidence caller occurrence requirements
+        predicates
+  | requirements, predicates =>
+      throw (.callRequirementCountMismatch caller.key occurrence
+        predicates.length requirements.length)
+
+private def validateExecutableDirectCallRequirements
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    Except RuntimeError Unit := do
+  if node.requirements.length != instantiation.predicates.length then
+    throw (.callRequirementCountMismatch caller.key node.id
+      instantiation.predicates.length node.requirements.length)
+  match firstDuplicateRequirement node.requirements with
+  | some requirement =>
+      throw (.duplicateCallRequirement caller.key node.id requirement)
+  | none =>
+      validateExecutableCallRequirementEvidence caller node.id
+        node.requirements instantiation.predicates
+
+private def validateExecutableCallImplementationEvidence
+    (signatures : ProgramSignatures)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (occurrence : ExpressionId) :
+    List RequirementId → List ProgramPredicate → Except RuntimeError Unit
+  | [], [] => pure ()
+  | requirement :: requirements, predicate :: predicates => do
+      let solved ← exactCallSolvedRequirement caller occurrence requirement
+      match solved.evidence with
+      | .assumption _ => pure ()
+      | .implementation evidence =>
+          validateSelectedCallImplementationEvidence signatures caller
+            occurrence requirement predicate evidence
+      validateExecutableCallImplementationEvidence signatures caller occurrence
+        requirements predicates
+  | requirements, predicates =>
+      throw (.callRequirementCountMismatch caller.key occurrence
+        predicates.length requirements.length)
+
+private def validateExecutableDirectCallImplementationEvidence
+    (signatures : ProgramSignatures)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    Except RuntimeError Unit := do
+  validateExecutableDirectCallRequirements caller node instantiation
+  validateExecutableCallImplementationEvidence signatures caller node.id
+    node.requirements instantiation.predicates
+
+private def nodeUseCount (source : TypedSource) (target : NodeId) : Nat :=
+  let rootCount := (source.roots.filter fun root => root == target).length
+  source.nodes.foldl (fun count node =>
+    count + match node with
+      | .expression expression =>
+          (SourceSpecialization.expressionChildNodeIds expression |>.filter
+            fun child => child == target).length
+      | .statement statement =>
+          (SourceSpecialization.statementChildNodeIds source statement |>.filter
+            fun child => child == target).length) rootCount
+
+private def indirectCalleeUseCount (source : TypedSource)
+    (target : ExpressionId) : Nat :=
+  source.nodes.foldl (fun count node =>
+    match node with
+    | .expression { form := .call callee _ (.indirect _), .. } =>
+        if callee == target then count + 1 else count
+    | _ => count) 0
+
+private def isExclusiveIndirectCallee (source : TypedSource)
+    (target : ExpressionId) : Bool :=
+  indirectCalleeUseCount source target == 1 &&
+    nodeUseCount source (.expression target) == 1
+
+private def directDeclarationCalleeUseCount (source : TypedSource)
+    (target : ExpressionId) : Nat :=
+  source.nodes.foldl (fun count node =>
+    match node with
+    | .expression { form := .call callee _ (.declaration _), .. } =>
+        if callee == target then count + 1 else count
+    | _ => count) 0
+
+private def validateQualifiedLocalTemplateCoverage
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (binder : TypedBinder) : Except RuntimeError Unit := do
+  let templateIds := binder.schemeRequirements.map (·.templateRequirement)
+  match firstDuplicateRequirement templateIds with
+  | some requirement =>
+      throw (.duplicateLocalSchemeTemplateRequirement caller.key node.id
+        binder.id requirement)
+  | none => pure ()
+  let source := caller.function.typedBody
+  let initializer ← match directLambdaInitializer? source binder.id with
+    | some initializer => pure initializer
+    | none => throw (.unsupportedQualifiedLocalReference caller.key node.id
+        binder.id)
+  unless nodeUseCount source (.expression initializer) == 1 do
+    throw (.unsupportedQualifiedLocalInitializer caller.key binder.id initializer)
+  let templateCalls := source.nodes.filterMap fun
+    | .expression expression@{
+        form := .call _ _ (.declaration instantiation), .. } =>
+        if expression.requirements.any templateIds.contains then
+          some (expression, instantiation)
+        else
+          none
+    | _ => none
+  for (call, instantiation) in templateCalls do
+    let expected := binder.schemeRequirements.filter fun template =>
+      call.requirements.contains template.templateRequirement
+    let actual := (List.zip call.requirements instantiation.predicates).filter
+      fun pair => templateIds.contains pair.1
+    unless actual.map Prod.fst == expected.map (·.templateRequirement) &&
+        actual.map Prod.snd == expected.map (·.predicate) do
+      match expected.head? with
+      | some first =>
+          throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
+            first.templateRequirement)
+      | none => throw (.unsupportedRequirements call.requirements)
+  for template in binder.schemeRequirements do
+    let uses := source.nodes.filterMap fun
+      | .expression expression =>
+          if expression.requirements.contains template.templateRequirement then
+            some expression
+          else
+            none
+      | .statement _ => none
+    let (call, callee, instantiation) ← match uses with
+      | [call] =>
+          match call.form with
+          | .call callee _ (.declaration instantiation) =>
+              pure (call, callee, instantiation)
+          | _ => throw (.unsupportedLocalSchemeTemplateUse caller.key
+              binder.id template.templateRequirement)
+      | _ => throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
+          template.templateRequirement)
+    unless directLambdaBodyContains source binder call.id do
+      throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
+        template.templateRequirement)
+    unless call.requirements.length == instantiation.predicates.length &&
+        (List.zip call.requirements instantiation.predicates).any (fun pair =>
+          pair.1 == template.templateRequirement &&
+            pair.2 == template.predicate) do
+      throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
+        template.templateRequirement)
+    unless directDeclarationCalleeUseCount source callee == 1 &&
+        nodeUseCount source (.expression callee) == 1 do
+      throw (.unsupportedConstrainedDeclarationReference caller.key call.id
+        callee)
+
+private def validateQualifiedLocalReference
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (binder : TypedBinder) :
+    Except RuntimeError (List LocalRequirementWitness) := do
+  validateQualifiedLocalTemplateCoverage caller node binder
+  unless isExclusiveIndirectCallee caller.function.typedBody node.id do
+    throw (.unsupportedQualifiedLocalReference caller.key node.id binder.id)
+  let (_, witnesses) ← localRequirementWitnesses caller binder node
+  pure witnesses
+
+private def validateQualifiedLocalReferenceEvidence
+    (signatures : ProgramSignatures)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (binder : TypedBinder) : Except RuntimeError Unit := do
+  let witnesses ← validateQualifiedLocalReference caller node binder
+  for witness in witnesses do
+    validateSelectedCallImplementationEvidence signatures caller node.id
+      witness.actualRequirement witness.predicate witness.evidence
+
 private def literalEvidenceIsBuiltin (function : CheckedFunction)
     (resolution : IntegerLiteralResolution) : Bool :=
   match exactSolvedRequirement? function resolution.requirement with
@@ -757,7 +1162,18 @@ private def validateExpressionMetadata
       unless node.requirements.isEmpty do
         throw (.unsupportedRequirements node.requirements)
   | .call _ _ (.declaration instantiation) =>
-      validateDirectCallRequirements specialized node instantiation
+      validateExecutableDirectCallRequirements specialized node instantiation
+  | .reference _ (.local binderId) =>
+      match directLambdaLetBinder? function.typedBody binderId with
+      | some binder =>
+          if binder.schemeRequirements.isEmpty then
+            unless node.requirements.isEmpty do
+              throw (.unsupportedRequirements node.requirements)
+          else
+            discard <| validateQualifiedLocalReference specialized node binder
+      | none =>
+          unless node.requirements.isEmpty do
+            throw (.unsupportedRequirements node.requirements)
   | _ =>
       unless node.requirements.isEmpty do
         throw (.unsupportedRequirements node.requirements)
@@ -913,8 +1329,16 @@ def validateExecutablePlanEvidence (signatures : ProgramSignatures)
       | .expression node =>
           match node.form with
           | .call _ _ (.declaration instantiation) =>
-              validateDirectCallImplementationEvidence signatures specialized
-                node instantiation
+              validateExecutableDirectCallImplementationEvidence signatures
+                specialized node instantiation
+          | .reference _ (.local binderId) =>
+              match directLambdaLetBinder?
+                  specialized.function.typedBody binderId with
+              | some binder =>
+                  unless binder.schemeRequirements.isEmpty do
+                    validateQualifiedLocalReferenceEvidence signatures
+                      specialized node binder
+              | none => pure ()
           | _ => pure ()
       | .statement _ => pure ()
 
@@ -1537,35 +1961,56 @@ private def modifyLeafBitNot (plan : Plan) :
   | some actual => throw (.invalidUnaryOperand .bitNot (actual.type? plan))
   | none => throw (.invalidUnaryOperand .bitNot none)
 
-/-- Recover the principal scheme only for the executable let-polymorphism
-profile: an initialized ordinary let whose initializer is syntactically a
-lambda node.  Specialization validates the corresponding residual-type scope;
-the runtime repeats the shape check so no other polymorphic cell is adapted. -/
-private def directLambdaLetScheme? (source : TypedSource)
-    (id : Resolved.LocalId) : Option Scheme :=
-  source.nodes.findSome? fun
-    | .statement { form := .letDecl binder (some initializer), .. } =>
-        if binder.id != id || binder.scheme.quantified.isEmpty then
-          none
-        else if SourceSpecialization.isDirectLambdaInitializer source
-            initializer then
-          some binder.scheme
-        else
-          none
-    | _ => none
-
 /-- Produce a concrete occurrence view without rewriting the principal value
 stored in the heap.  The occurrence must be closed and every quantified
 variable must have been determined by matching the scheme body. -/
-private def instantiateDirectLambdaLet? (plan : Plan) (source : TypedSource)
-    (id : Resolved.LocalId) (expected : Ty) (value : Value) : Option Value := do
-  let scheme ← directLambdaLetScheme? source id
-  if value.type? plan != some scheme.body then none else pure ()
-  let substitution ←
-    SourceSpecialization.matchClosedSchemeInstance? scheme expected
+private def instantiateDirectLambdaLet? (plan : Plan) (owner : Key)
+    (source : TypedSource) (id : Resolved.LocalId) (node : ExpressionNode)
+    (value : Value) : Except RuntimeError (Option Value) := do
+  let some binder := directLambdaLetBinder? source id
+    | pure none
+  if value.type? plan != some binder.scheme.body then
+    throw (.localSchemeInstanceMismatch owner node.id binder.id
+      binder.scheme.body (Option.getD (value.type? plan) Ty.error))
+  let caller ← exactSpecialization plan owner
+  let (substitution, requirements) ←
+    localRequirementWitnesses caller binder node
   match value with
-  | .closure _ _ _ _ _ _ => some (.instantiated substitution value)
-  | _ => none
+  | .closure _ _ _ _ _ _ =>
+      pure (some (.instantiated substitution requirements value))
+  | _ => pure none
+
+private def rewriteLocalRequirement
+    (requirements : List LocalRequirementWitness)
+    (requirement : RequirementId) : RequirementId :=
+  match requirements.find? fun witness =>
+      witness.templateRequirement == requirement with
+  | some witness => witness.actualRequirement
+  | none => requirement
+
+private def rewriteExpressionLocalRequirements
+    (requirements : List LocalRequirementWitness)
+    (node : ExpressionNode) : ExpressionNode := {
+  node with
+  requirements := node.requirements.map
+    (rewriteLocalRequirement requirements)
+}
+
+private def rewriteNodeLocalRequirements
+    (requirements : List LocalRequirementWitness) : Node → Node
+  | .expression node =>
+      .expression (rewriteExpressionLocalRequirements requirements node)
+  | node => node
+
+/-- Rewrite only the expression-level requirement ledger.  The qualified
+local runtime profile validates that owned template requirements occur solely
+on supported direct declaration calls before constructing this view. -/
+private def rewriteLocalRequirements
+    (requirements : List LocalRequirementWitness)
+    (source : TypedSource) : TypedSource := {
+  source with
+  nodes := source.nodes.map (rewriteNodeLocalRequirements requirements)
+}
 
 mutual
 
@@ -1613,10 +2058,11 @@ mutual
                   | some { value := none, .. } =>
                       .fault (.uninitializedLocal binder) state
                   | some { value := some value, .. } =>
-                      match instantiateDirectLambdaLet? plan source binder
-                          node.rawType value with
-                      | some instantiated => .done instantiated state
-                      | none => .done value state
+                      match instantiateDirectLambdaLet? plan owner source binder
+                          node value with
+                      | .ok (some instantiated) => .done instantiated state
+                      | .ok none => .done value state
+                      | .error error => .fault error state
           | .reference _ (.builtinBoolean value) =>
               .done (.bool value) state
           | .reference _ (.builtinFunction function) =>
@@ -1784,12 +2230,13 @@ mutual
                 let flow := executeFunctionSequence fuel plan owner source
                   environment bodyState body
                 expressionOfRunResult (finishFunctionFlow plan expected flow)
-      | .instantiated substitution
+      | .instantiated substitution requirements
           (.closure parameters expected body source owner captured) =>
           let parameters := parameters.map
             (TypedBinder.applySubstitution substitution)
           let expected := substitution.apply expected
-          let source := source.applySubstitution substitution
+          let source := rewriteLocalRequirements requirements
+            (source.applySubstitution substitution)
           if parameters.length != arguments.length then
             .fault (.argumentArityMismatch parameters.length arguments.length) state
           else
@@ -2363,7 +2810,7 @@ def Value.HasDeepTypeFuel :
                 ∃ cell, state.read? binding.2 = some cell ∧
                   ∀ capturedValue, cell.value = some capturedValue →
                     capturedValue.HasDeepTypeFuel fuel signatures plan state cell.type
-        | .instantiated _ principal =>
+        | .instantiated _ _ principal =>
             match principal.type? plan with
             | some principalType =>
                 principal.HasDeepTypeFuel fuel signatures plan state principalType
@@ -2386,14 +2833,15 @@ theorem Value.HasDeepType.instantiated
     {principalType : Ty} {principal : Value}
     (substitution : Substitution)
     (principalShape : principal.type? plan = some principalType)
-    (typed : principal.HasDeepType signatures plan state principalType) :
-    (Value.instantiated substitution principal).HasDeepType signatures plan
+    (typed : principal.HasDeepType signatures plan state principalType)
+    (requirements : List LocalRequirementWitness := []) :
+    (Value.instantiated substitution requirements principal).HasDeepType signatures plan
       state (substitution.apply principalType) := by
   intro fuel
   cases fuel with
   | zero => trivial
   | succ fuel =>
-      change (Value.instantiated substitution principal).type? plan =
+      change (Value.instantiated substitution requirements principal).type? plan =
           some (substitution.apply principalType) ∧
         (match principal.type? plan with
         | some innerType => principal.HasDeepTypeFuel fuel signatures plan
@@ -2433,13 +2881,44 @@ theorem TypedSource.lookupExpression?_applySubstitution
           rfl
       | statement selectedNode => simp [selected] at found
 
+/-- Requirement-handle rewriting preserves expression occurrence identity and
+returns the pointwise rewritten node at the same table position. -/
+theorem TypedSource.lookupExpression?_rewriteLocalRequirements
+    (source : TypedSource) (requirements : List LocalRequirementWitness)
+    (id : ExpressionId) (node : ExpressionNode)
+    (found : source.lookupExpression? id = some node) :
+    (rewriteLocalRequirements requirements source).lookupExpression? id =
+      some (rewriteExpressionLocalRequirements requirements node) := by
+  unfold TypedSource.lookupExpression? TypedSource.lookupNode? at found ⊢
+  simp only [rewriteLocalRequirements, List.find?_map]
+  have samePredicate :
+      ((fun candidate => decide (candidate.occurrenceId = id.occurrence)) ∘
+        rewriteNodeLocalRequirements requirements) =
+      (fun candidate => decide (candidate.occurrenceId = id.occurrence)) := by
+    funext candidate
+    cases candidate <;> rfl
+  rw [samePredicate]
+  cases selected : List.find?
+      (fun candidate => decide (candidate.occurrenceId = id.occurrence))
+      source.nodes with
+  | none => simp [selected] at found
+  | some candidate =>
+      cases candidate with
+      | expression selectedNode =>
+          simp [selected] at found ⊢
+          cases found
+          rfl
+      | statement selectedNode => simp [selected] at found
+
 /-- Provenance for the concrete source graph executed by an instantiated
 closure.  Besides retaining the principal closure's checked-plan origin, this
 relation records that the lambda occurrence survives in the exact
-`TypedSource.applySubstitution` image used by `applyCallable`, with the
-parameters and result type transformed by the same substitution. -/
+type-substituted and requirement-handle-rewritten image used by
+`applyCallable`, with the parameters and result type transformed by the same
+substitution. -/
 def Value.HasInstantiatedPlanCode (principal : Value)
-    (substitution : Substitution) (plan : Plan) : Prop :=
+    (substitution : Substitution) (plan : Plan)
+    (requirements : List LocalRequirementWitness := []) : Prop :=
   match principal with
   | .closure parameters resultType body source owner _ =>
       validateExecutablePlan plan = .ok () ∧
@@ -2449,8 +2928,10 @@ def Value.HasInstantiatedPlanCode (principal : Value)
             node.form = .lambda parameters resultType body ∧
             node.type = .function
               (Ty.productMany (parameters.map (·.scheme.body))) resultType ∧
-            (source.applySubstitution substitution).lookupExpression? id =
-              some (node.applySubstitution substitution) ∧
+            (rewriteLocalRequirements requirements
+              (source.applySubstitution substitution)).lookupExpression? id =
+              some (rewriteExpressionLocalRequirements requirements
+                (node.applySubstitution substitution)) ∧
             (node.applySubstitution substitution).form = .lambda
               (parameters.map (TypedBinder.applySubstitution substitution))
               (substitution.apply resultType) body
@@ -2481,9 +2962,9 @@ def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
                 node.form = .lambda parameters resultType body ∧
                 node.type = .function
                   (Ty.productMany (parameters.map (·.scheme.body))) resultType
-      | .instantiated substitution principal =>
+      | .instantiated substitution requirements principal =>
           principal.HasPlanCodeFuel fuel plan ∧
-            principal.HasInstantiatedPlanCode substitution plan
+            principal.HasInstantiatedPlanCode substitution plan requirements
       | .global key =>
           validateExecutablePlan plan = .ok () ∧
             ∃ specialized, exactSpecialization plan key = .ok specialized
@@ -2494,14 +2975,15 @@ def Value.HasPlanCode (value : Value) (plan : Plan) : Prop :=
 
 /-- Runtime occurrence instantiation preserves the principal closure's
 checked-code provenance and explicitly relates the source graph executed by
-`applyCallable` to its pointwise substitution image. -/
+`applyCallable` to its type-substituted, requirement-rewritten image. -/
 theorem Value.HasPlanCode.instantiated
     {plan : Plan} {parameters : List TypedBinder} {resultType : Ty}
     {body : List StatementId} {source : TypedSource} {owner : Key}
     {captured : Environment} (substitution : Substitution)
     (code : (Value.closure parameters resultType body source owner
-      captured).HasPlanCode plan) :
-    (Value.instantiated substitution
+      captured).HasPlanCode plan)
+    (requirements : List LocalRequirementWitness := []) :
+    (Value.instantiated substitution requirements
       (.closure parameters resultType body source owner captured)).HasPlanCode
         plan := by
   have origin := code 1
@@ -2517,11 +2999,14 @@ theorem Value.HasPlanCode.instantiated
       id, node, found, shape, nodeType⟩
   have instantiatedOrigin :
       (Value.closure parameters resultType body source owner captured).HasInstantiatedPlanCode
-        substitution plan := by
+        substitution plan requirements := by
     exact ⟨validated, specialized, specializedAt, sameSource,
       id, node, found, shape, nodeType,
-      TypedSource.lookupExpression?_applySubstitution source substitution id
-        node found,
+      TypedSource.lookupExpression?_rewriteLocalRequirements
+        (source.applySubstitution substitution) requirements id
+        (node.applySubstitution substitution)
+        (TypedSource.lookupExpression?_applySubstitution source substitution id
+          node found),
       by simp [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution,
         shape]⟩
   intro fuel
@@ -2533,9 +3018,10 @@ theorem Value.HasPlanCode.instantiated
 closure and the exact substituted source/lambda relation used by execution. -/
 theorem Value.HasPlanCode.instantiated_origin
     {plan : Plan} {substitution : Substitution} {principal : Value}
-    (code : (Value.instantiated substitution principal).HasPlanCode plan) :
+    {requirements : List LocalRequirementWitness}
+    (code : (Value.instantiated substitution requirements principal).HasPlanCode plan) :
     principal.HasPlanCode plan ∧
-      principal.HasInstantiatedPlanCode substitution plan := by
+      principal.HasInstantiatedPlanCode substitution plan requirements := by
   constructor
   · intro fuel
     cases fuel with
@@ -3002,7 +3488,7 @@ theorem Value.HasDeepTypeFuel.down
                 fun capturedValue initialized =>
                   inductionHypothesis cell.type capturedValue
                     (cellTyped capturedValue initialized)⟩⟩
-      | instantiated substitution principal =>
+      | instantiated substitution _ principal =>
           change _ ∧ (match principal.type? plan with
             | some principalType => principal.HasDeepTypeFuel (fuel + 1)
                 signatures plan state principalType
@@ -3096,7 +3582,7 @@ theorem Value.HasDeepTypeFuel.transport_world
                 fun capturedValue initialized =>
                   inductionHypothesis cell.type capturedValue
                     (cellTyped capturedValue initialized)⟩⟩
-      | instantiated substitution principal =>
+      | instantiated substitution _ principal =>
           change _ ∧ (match principal.type? plan with
             | some principalType => principal.HasDeepTypeFuel fuel
                 signatures plan oldWorld principalType
@@ -3157,7 +3643,7 @@ theorem Value.HasDeepTypeFuel.transport_typed_world
               obtain ⟨newCell, newFound, _⟩ :=
                 preservedTypes binding.2 oldCell found
               exact ⟨newCell, newFound, fun _ _ => trivial⟩⟩
-      | instantiated _ _ => exact typed
+      | instantiated _ _ _ => exact typed
       | product _ _ => exact typed
       | mapping _ _ _ => exact typed
       | constructed _ _ => exact typed
@@ -3202,7 +3688,7 @@ theorem Value.HasDeepTypeFuel.transport_typed_world
                     signatures plan newWorld newCell.type :=
                   newTyping.read_value newFound initialized
                 exact sameType ▸ typedNew⟩⟩
-      | instantiated substitution principal =>
+      | instantiated substitution _ principal =>
           change _ ∧ (match principal.type? plan with
             | some principalType => principal.HasDeepTypeFuel (fuel + 1)
                 signatures plan oldWorld principalType

@@ -22,7 +22,7 @@ plan provenance merely because its principal value has trivial provenance. -/
 private theorem nonClosureInstantiationHasNoPlanCode
     (plan : SourceSpecializationWorklist.Plan)
     (substitution : TypeSystem.Substitution) :
-    ¬ (Value.instantiated substitution .unit).HasPlanCode plan := by
+    ¬ (Value.instantiated substitution [] .unit).HasPlanCode plan := by
   intro code
   exact (Value.HasPlanCode.instantiated_origin code).2
 
@@ -301,6 +301,12 @@ private def source : String := String.intercalate "\n" [
   "impl Proof<Word> {}",
   "trait Eq<T> {}",
   "impl Eq<Word> where Word: Proof {}",
+  "impl Eq<Bool> {}",
+  "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
+  "function qualifiedLocalProof(flag: Bool) returns (Word, Bool) {",
+  "  let f = lam(value) { return keep(value); };",
+  "  return (f(53), f(flag));",
+  "}",
   "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
   "function localProof(flag: Bool) returns (Word, Bool) {",
   "  let f = lam(value) { return keepAs(1, value); };",
@@ -392,6 +398,18 @@ private def testLocalLetPolymorphism (program : CheckedProgram) : IO Unit := do
   | other => throw (IO.userError
       s!"local let-polymorphism returned {reprStr other}")
   expectShallowHeap "local let-polymorphism" prepared.plan result
+
+private def testQualifiedLocalLetPolymorphism
+    (program : CheckedProgram) : IO Unit := do
+  let prepared ← prepareNamed program "qualifiedLocalProof"
+  let result := runPrepared prepared [.bool true]
+  match result with
+  | .done (.product (.word actual) (.bool selected)) _ =>
+      assertTrue (actual == word 53 && selected)
+        "qualified local scheme did not select independent Word/Bool evidence"
+  | other => throw (IO.userError
+      s!"qualified local let-polymorphism returned {reprStr other}")
+  expectShallowHeap "qualified local let-polymorphism" prepared.plan result
 
 private def expectWordBool (label : String) (expectedWord : Nat)
     (expectedBool : Bool) : RunResult → IO Unit
@@ -691,6 +709,88 @@ private def rewriteEntryExpressionAt (prepared : Prepared)
         if expression.id == target then .expression (rewrite expression)
         else node
     | _ => node
+
+private def rewriteEntryLetBinder (prepared : Prepared)
+    (target : Resolved.LocalId)
+    (rewrite : SourceInference.TypedBinder → SourceInference.TypedBinder) :
+    Prepared :=
+  rewriteEntryNodes prepared fun nodes => nodes.map fun node =>
+    match node with
+    | .statement statement@{ form := .letDecl binder initializer, .. } =>
+        if binder.id == target then
+          .statement { statement with
+            form := .letDecl (rewrite binder) initializer }
+        else
+          node
+    | _ => node
+
+private structure QualifiedLocalFixture where
+  prepared : Prepared
+  binder : SourceInference.TypedBinder
+  initializer : SourceInference.ExpressionId
+  template : SourceInference.LocalSchemeRequirement
+  templateSolved : SourceInference.SolvedRequirement
+  call : SourceInference.ExpressionNode
+  callee : SourceInference.ExpressionId
+  reference : SourceInference.ExpressionNode
+  actualRequirement : SourceInference.RequirementId
+  actualSolved : SourceInference.SolvedRequirement
+
+private def qualifiedLocalFixture
+    (program : CheckedProgram) : IO QualifiedLocalFixture := do
+  let prepared ← prepareNamed program "qualifiedLocalProof"
+  let specialized ← entrySpecialization prepared
+  let binder ← letBinderNamed specialized "f"
+  let initializer ← match specialized.function.typedBody.nodes.filterMap fun
+      | .statement { form := .letDecl candidate (some initializer), .. } =>
+          if candidate.id == binder.id then some initializer else none
+      | _ => none with
+    | [initializer] => pure initializer
+    | initializers => throw (IO.userError
+        s!"qualified f retained {initializers.length} initializers")
+  let template ← match binder.schemeRequirements with
+    | [template] => pure template
+    | requirements => throw (IO.userError
+        s!"qualified f retained {requirements.length} template requirements")
+  let templateSolved ← match specialized.function.solvedRequirements.filter
+      fun solved => solved.id == template.templateRequirement with
+    | [solved] => pure solved
+    | solved => throw (IO.userError
+        s!"qualified f retained {solved.length} template solutions")
+  let call ← match specialized.function.typedBody.nodes.filterMap fun
+      | .expression node@{ form := .call _ _ (.declaration _), .. } =>
+          if node.requirements.contains template.templateRequirement then
+            some node
+          else
+            none
+      | _ => none with
+    | [call] => pure call
+    | calls => throw (IO.userError
+        s!"qualified f retained {calls.length} template call uses")
+  let callee ← match call.form with
+    | .call callee _ (.declaration _) => pure callee
+    | _ => throw (IO.userError "qualified template call changed form")
+  let references := specialized.function.typedBody.nodes.filterMap fun
+    | .expression node@{ form := .reference _ (.local id), .. } =>
+        if id == binder.id then some node else none
+    | _ => none
+  let reference ← match references.find? fun node =>
+      decide (node.rawType = .function .word .word) with
+    | some reference => pure reference
+    | none => throw (IO.userError "qualified f lost its Word reference")
+  let actualRequirement ← match reference.requirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"qualified Word reference retained {requirements.length} requirements")
+  let actualSolved ← match specialized.function.solvedRequirements.filter
+      fun solved => solved.id == actualRequirement with
+    | [solved] => pure solved
+    | solved => throw (IO.userError
+        s!"qualified Word reference retained {solved.length} solutions")
+  pure {
+    prepared, binder, initializer, template, templateSolved, call, callee, reference,
+    actualRequirement, actualSolved
+  }
 
 private structure ConstrainedCallFixture where
   prepared : Prepared
@@ -1007,6 +1107,169 @@ private def testContextualCallRequirementValidation
       | _ => false)
     (SourceTypedRuntime.validateExecutablePlan constrainedReference.plan)
 
+private def testQualifiedLocalRequirementValidation
+    (program : CheckedProgram) : IO Unit := do
+  let fixture ← qualifiedLocalFixture program
+  let prepared := fixture.prepared
+
+  let missingActual := rewriteEntryExpressionAt prepared fixture.reference.id
+    fun node => { node with requirements := [] }
+  expectPreExecutionFault "missing qualified-local actual requirement"
+    (fun error => match error with
+      | .localSchemeRequirementCountMismatch caller occurrence binder 1 0 =>
+          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
+            binder = fixture.binder.id)
+      | _ => false)
+    (runPrepared missingActual [.bool true])
+
+  let missingSolved := rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := function.solvedRequirements.filter fun solved =>
+      solved.id != fixture.actualRequirement
+  }
+  expectPreExecutionFault "missing qualified-local actual solution"
+    (fun error => match error with
+      | .missingSolvedRequirement caller occurrence requirement =>
+          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
+            requirement = fixture.actualRequirement)
+      | _ => false)
+    (runPrepared missingSolved [.bool true])
+
+  let duplicateSolved := rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := fixture.actualSolved :: function.solvedRequirements
+  }
+  expectPreExecutionFault "duplicate qualified-local actual solutions"
+    (fun error => match error with
+      | .duplicateSolvedRequirements caller occurrence requirement 2 =>
+          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
+            requirement = fixture.actualRequirement)
+      | _ => false)
+    (runPrepared duplicateSolved [.bool true])
+
+  let wrongPredicate : ProgramPredicate := {
+    fixture.actualSolved.predicate with subject := .bool
+  }
+  let predicateMismatch := rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := function.solvedRequirements.map fun solved =>
+      if solved.id == fixture.actualRequirement then
+        { solved with predicate := wrongPredicate }
+      else
+        solved
+  }
+  expectPreExecutionFault "qualified-local actual predicate mismatch"
+    (fun error => match error with
+      | .callRequirementPredicateMismatch caller occurrence requirement _ actual =>
+          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
+            requirement = fixture.actualRequirement ∧ actual = wrongPredicate)
+      | _ => false)
+    (runPrepared predicateMismatch [.bool true])
+
+  let assumption := rewriteEntrySolvedEvidence prepared
+    fixture.actualRequirement (.assumption fixture.actualSolved.predicate)
+  expectPreExecutionFault "qualified-local actual assumption evidence"
+    (fun error => match error with
+      | .localSchemeActualExpectedImplementation caller occurrence binder
+          requirement =>
+          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
+            binder = fixture.binder.id ∧
+            requirement = fixture.actualRequirement)
+      | _ => false)
+    (runPrepared assumption [.bool true])
+
+  let forgedEvidence : SourceInference.PredicateEvidence :=
+    .implementation (.byImpl fixture.actualSolved.predicate
+      (.builtin .intWord) [])
+  let forged := rewriteEntrySolvedEvidence prepared fixture.actualRequirement
+    forgedEvidence
+  expectPreExecutionFault "forged qualified-local implementation evidence"
+    (fun error => match error with
+      | .callEvidenceNotSelected caller occurrence requirement goal _ =>
+          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
+            requirement = fixture.actualRequirement ∧
+            goal = fixture.actualSolved.predicate)
+      | _ => false)
+    (runPrepared forged [.bool true])
+
+  let duplicateTemplate := rewriteEntryLetBinder prepared fixture.binder.id
+    fun binder => {
+      binder with
+      schemeRequirements := binder.schemeRequirements ++ [fixture.template]
+    }
+  expectPreExecutionFault "duplicate qualified-local template"
+    (fun error => match error with
+      | .duplicateLocalSchemeTemplateRequirement caller occurrence binder
+          requirement =>
+          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
+            binder = fixture.binder.id ∧
+            requirement = fixture.template.templateRequirement)
+      | _ => false)
+    (runPrepared duplicateTemplate [.bool true])
+
+  let unusedId : SourceInference.RequirementId := {
+    index := fixture.template.templateRequirement.index + 1000000
+  }
+  let unusedTemplate := rewriteEntryLetBinder prepared fixture.binder.id
+    fun binder => {
+      binder with
+      schemeRequirements := binder.schemeRequirements ++ [{
+        fixture.template with templateRequirement := unusedId
+      }]
+    }
+  expectPreExecutionFault "unused qualified-local template"
+    (fun error => match error with
+      | .unsupportedLocalSchemeTemplateUse caller binder requirement =>
+          decide (caller = prepared.key ∧ binder = fixture.binder.id ∧
+            requirement = unusedId)
+      | _ => false)
+    (runPrepared unusedTemplate [.bool true])
+
+  let escapedReference := rewriteEntryFunction prepared fun function => {
+    function with
+    typedBody := {
+      function.typedBody with
+      roots := .expression fixture.reference.id :: function.typedBody.roots
+    }
+  }
+  expectPreExecutionFault "escaped qualified-local reference"
+    (fun error => match error with
+      | .unsupportedQualifiedLocalReference caller occurrence binder =>
+          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
+            binder = fixture.binder.id)
+      | _ => false)
+    (runPrepared escapedReference [.bool true])
+
+  let escapedCallee := rewriteEntryFunction prepared fun function => {
+    function with
+    typedBody := {
+      function.typedBody with
+      roots := .expression fixture.callee :: function.typedBody.roots
+    }
+  }
+  expectPreExecutionFault "escaped constrained declaration reference"
+    (fun error => match error with
+      | .unsupportedConstrainedDeclarationReference caller call callee =>
+          decide (caller = prepared.key ∧ call = fixture.call.id ∧
+            callee = fixture.callee)
+      | _ => false)
+    (runPrepared escapedCallee [.bool true])
+
+  let escapedInitializer := rewriteEntryFunction prepared fun function => {
+    function with
+    typedBody := {
+      function.typedBody with
+      roots := .expression fixture.initializer :: function.typedBody.roots
+    }
+  }
+  expectPreExecutionFault "escaped qualified-local initializer"
+    (fun error => match error with
+      | .unsupportedQualifiedLocalInitializer caller binder initializer =>
+          decide (caller = prepared.key ∧ binder = fixture.binder.id ∧
+            initializer = fixture.initializer)
+      | _ => false)
+    (runPrepared escapedInitializer [.bool true])
+
 private def testAssignmentRootsAreDeferred
     (program : CheckedProgram) : IO Unit := do
   let assignments ← prepareNamed program "assignments"
@@ -1032,8 +1295,10 @@ private def testAll : IO Unit := do
   testAssignmentsMappingsAndControl program
   testClosuresOrderProxyAndFuel program
   testLocalLetPolymorphism program
+  testQualifiedLocalLetPolymorphism program
   testContextualLocalGenericCalls program
   testContextualCallRequirementValidation program
+  testQualifiedLocalRequirementValidation program
   testNominalInputValidation program
   testTamperedExecutableMetadata program
   testIndirectArgumentCountMetadata program
