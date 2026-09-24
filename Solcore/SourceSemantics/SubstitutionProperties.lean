@@ -5423,6 +5423,89 @@ private theorem filter_mergeVariables (keep : TypeVarId → Bool)
         · simp [mergeVariables, kept, present]
         · simp [mergeVariables, kept, present, List.filter_append]
 
+private theorem mem_mergeVariables_iff (metavariable : TypeVarId)
+    (left right : List TypeVarId) :
+    metavariable ∈ mergeVariables left right ↔
+      metavariable ∈ left ∨ metavariable ∈ right := by
+  induction right generalizing left with
+  | nil => simp [mergeVariables]
+  | cons head tail induction =>
+      change metavariable ∈ mergeVariables
+          (if head ∈ left then left else left ++ [head]) tail ↔
+        metavariable ∈ left ∨ metavariable ∈ head :: tail
+      rw [induction]
+      by_cases present : head ∈ left
+      · simp only [if_pos present, List.mem_cons]
+        constructor
+        · rintro (member | member)
+          · exact Or.inl member
+          · exact Or.inr (Or.inr member)
+        · rintro (member | same | member)
+          · exact Or.inl member
+          · exact Or.inl (by simpa [same] using present)
+          · exact Or.inr member
+      · simp [present, or_assoc]
+
+private theorem mem_foldl_mergeVariables_iff (metavariable : TypeVarId)
+    (initial : List TypeVarId) (types : List Ty) :
+    metavariable ∈ types.foldl
+        (fun variables type =>
+          mergeVariables variables type.freeVariables) initial ↔
+      metavariable ∈ initial ∨
+        ∃ type, type ∈ types ∧ metavariable ∈ type.freeVariables := by
+  induction types generalizing initial with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.foldl_cons, induction,
+        mem_mergeVariables_iff metavariable initial head.freeVariables]
+      simp only [List.mem_cons]
+      constructor
+      · rintro ((member | occurs) | ⟨type, typeMember, typeOccurs⟩)
+        · exact Or.inl member
+        · exact Or.inr ⟨head, Or.inl rfl, occurs⟩
+        · exact Or.inr ⟨type, Or.inr typeMember, typeOccurs⟩
+      · rintro (member | ⟨type, typeMember, typeOccurs⟩)
+        · exact Or.inl (Or.inl member)
+        · rcases typeMember with rfl | typeMember
+          · exact Or.inl (Or.inr typeOccurs)
+          · exact Or.inr ⟨type, typeMember, typeOccurs⟩
+
+private theorem mem_predicateVariables_iff
+    (metavariable : TypeVarId) (predicate : ProgramPredicate) :
+    metavariable ∈
+        Frontend.TypedTraitResolution.predicateVariables predicate ↔
+      metavariable ∈ predicate.subject.freeVariables ∨
+        ∃ argument, argument ∈ predicate.arguments ∧
+          metavariable ∈ argument.freeVariables := by
+  cases predicate with
+  | mk trait subject arguments =>
+      change metavariable ∈ arguments.foldl
+          (fun variables type =>
+            mergeVariables variables type.freeVariables)
+          subject.freeVariables ↔ _
+      exact mem_foldl_mergeVariables_iff metavariable
+        subject.freeVariables arguments
+
+/-- A flexible variable outside the substitution domain remains in the
+subject/argument collector of a substituted trait predicate. -/
+theorem mem_predicateVariables_applySubstitution_of_not_mem_domain
+    (substitution : Substitution) {metavariable : TypeVarId}
+    {predicate : ProgramPredicate}
+    (absent : metavariable ∉ substitution.domain)
+    (occurs : metavariable ∈
+      Frontend.TypedTraitResolution.predicateVariables predicate) :
+    metavariable ∈ Frontend.TypedTraitResolution.predicateVariables
+      (TypedTraitResolution.applySubstitution substitution predicate) := by
+  rw [mem_predicateVariables_iff] at occurs ⊢
+  rcases occurs with subject | ⟨argument, argumentMember, argumentOccurs⟩
+  · exact Or.inl
+      (Substitution.mem_freeVariables_apply_of_not_mem_domain substitution
+        absent subject)
+  · exact Or.inr ⟨substitution.apply argument,
+      List.mem_map.mpr ⟨argument, argumentMember, rfl⟩,
+      Substitution.mem_freeVariables_apply_of_not_mem_domain substitution
+        absent argumentOccurs⟩
+
 /-- A ground flexible substitution removes exactly its domain variables while
 retaining the stable left-to-right order of every surviving source variable. -/
 theorem freeVariables_apply
@@ -5714,9 +5797,52 @@ theorem TypesWellScoped.applySubstitution
           (go tailWellScoped)
   exact go wellScoped
 
+/-- Restricting a substitution before applying a scheme is idempotent because
+`Scheme.apply` itself protects the same quantified variables. -/
+@[simp] theorem Scheme.apply_without_quantified
+    (substitution : Substitution) (scheme : Scheme) :
+    scheme.apply (substitution.without scheme.quantified) =
+      scheme.apply substitution := by
+  have disjoint : ∀ metavariable, metavariable ∈ scheme.quantified →
+      metavariable ∉ (substitution.without scheme.quantified).domain := by
+    intro metavariable quantified domainMember
+    have retained := (Substitution.mem_domain_without_iff substitution
+      scheme.quantified metavariable).mp domainMember
+    exact retained.2 quantified
+  have idempotent := Substitution.without_eq_self_of_disjoint_domain
+    (substitution.without scheme.quantified) scheme.quantified disjoint
+  simp only [TypeSystem.Scheme.apply]
+  rw [idempotent]
+
 @[simp] theorem applyTypedBinder_id (substitution : Substitution)
     (binder : TypedBinder) :
     (binder.applySubstitution substitution).id = binder.id := by
+  rfl
+
+@[simp] theorem applyLocalSchemeRequirement_templateRequirement
+    (substitution : Substitution) (requirement : LocalSchemeRequirement) :
+    (requirement.applySubstitution substitution).templateRequirement =
+      requirement.templateRequirement := by
+  rfl
+
+@[simp] theorem applyTypedBinder_scheme (substitution : Substitution)
+    (binder : TypedBinder) :
+    (binder.applySubstitution substitution).scheme =
+      binder.scheme.apply substitution := by
+  simp [TypedBinder.applySubstitution]
+
+@[simp] theorem applyTypedBinder_scheme_quantified
+    (substitution : Substitution) (binder : TypedBinder) :
+    (binder.applySubstitution substitution).scheme.quantified =
+      binder.scheme.quantified := by
+  simp
+
+@[simp] theorem applyTypedBinder_schemeRequirements
+    (substitution : Substitution) (binder : TypedBinder) :
+    (binder.applySubstitution substitution).schemeRequirements =
+      binder.schemeRequirements.map
+        (LocalSchemeRequirement.applySubstitution
+          (substitution.without binder.scheme.quantified)) := by
   rfl
 
 @[simp] theorem patternInstructionBinderIds_applySubstitution
@@ -6553,6 +6679,35 @@ theorem withTypeVariables {substitution : Substitution}
     rw [applyContext_withTypeVariables_append, closes.target_eq]
 }
 
+/-- Entering a generalized initializer preserves an outer context closure
+when its quantified variables are fresh for the outer substitution domain. -/
+theorem localSchemeInitializer {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (binder : TypedBinder)
+    (fresh : ∀ metavariable, metavariable ∈ binder.scheme.quantified →
+      metavariable ∉ substitution.domain) :
+    ContextCloses substitution closedVariables
+      (localSchemeInitializerContext source binder)
+      (localSchemeInitializerContext target
+        (binder.applySubstitution substitution)) := by
+  have restricted_eq :
+      substitution.without binder.scheme.quantified = substitution :=
+    Substitution.without_eq_self_of_disjoint_domain substitution
+      binder.scheme.quantified fresh
+  have assumptions_eq :
+      target.assumptions = source.assumptions.map
+        (TypedTraitResolution.applySubstitution substitution) := by
+    rw [← closes.target_eq]
+    rfl
+  have extended :=
+    (closes.withTypeVariables binder.scheme.quantified fresh).withAssumptions
+      (source.assumptions ++ binder.schemeRequirements.map
+        (fun requirement => requirement.predicate))
+  simpa [localSchemeInitializerContext, assumptions_eq, restricted_eq,
+    TypedBinder.applySubstitution, LocalSchemeRequirement.applySubstitution,
+    List.map_append, List.map_map, Function.comp_def] using extended
+
 end ContextCloses
 
 /-- Structural context closure transports every admissible retained type.
@@ -6641,6 +6796,261 @@ theorem TypeWellFormed.applySubstitution
   · intro metavariable member
     simp at member
   · exact wellFormed.typeWellScoped
+
+/-- Capture-avoiding flexible substitution preserves rank-1 scheme
+well-formedness across a structural context closure. -/
+theorem SchemeWellFormed.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {scheme : Scheme}
+    (closes : ContextCloses substitution closedVariables source target)
+    (wellFormed : SchemeWellFormed source scheme) :
+    SchemeWellFormed target (scheme.apply substitution) := by
+  let restricted := substitution.without scheme.quantified
+  have signatures_eq : target.signatures = source.signatures := by
+    rw [← closes.target_eq]
+    rfl
+  have parameters_eq : target.typeParameters = source.typeParameters := by
+    rw [← closes.target_eq]
+    rfl
+  have declaration_eq :
+      target.currentDeclaration = source.currentDeclaration := by
+    rw [← closes.target_eq]
+    rfl
+  have residual_eq :
+      target.residualTypeVariables = source.residualTypeVariables := by
+    rw [← closes.target_eq]
+    rfl
+  refine {
+    binders :=
+      StructuralSubstitution.TypeParameterBindersWellFormed.transportContext
+        parameters_eq declaration_eq wellFormed.binders
+    quantified_nodup := by
+      simpa [TypeSystem.Scheme.apply] using wellFormed.quantified_nodup
+    body := ?_
+  }
+  change TypeWellScoped target
+    (admissibleTypeVariables target (restricted.apply scheme.body) ++
+      scheme.quantified)
+    (restricted.apply scheme.body)
+  apply TypeWellScoped.applySubstitution
+    (sourceVariables :=
+      admissibleTypeVariables source scheme.body ++ scheme.quantified)
+    (targetVariables :=
+      admissibleTypeVariables target (restricted.apply scheme.body) ++
+        scheme.quantified)
+    (Substitution.domain_without_nodup substitution scheme.quantified
+      closes.exact.domain_nodup)
+    (SubstitutionRangeWellFormed.without closes.range scheme.quantified)
+    signatures_eq parameters_eq
+    declaration_eq
+  · intro metavariable member absent
+    rcases List.mem_append.mp member with ambient | quantified
+    · unfold admissibleTypeVariables at ambient ⊢
+      rw [residual_eq]
+      rcases List.mem_append.mp ambient with lexical | residual
+      · rw [closes.variables_eq] at lexical
+        rcases List.mem_append.mp lexical with closed | retained
+        · by_cases quantified : metavariable ∈ scheme.quantified
+          · exact List.mem_append.mpr (Or.inr quantified)
+          · have originalDomain : metavariable ∈ substitution.domain :=
+              (closes.exact.mem_domain_iff metavariable).mpr closed
+            have restrictedDomain : metavariable ∈ restricted.domain :=
+              (Substitution.mem_domain_without_iff substitution
+                scheme.quantified metavariable).mpr
+                ⟨originalDomain, quantified⟩
+            exact (absent restrictedDomain).elim
+        · apply List.mem_append.mpr
+          apply Or.inl
+          exact List.mem_append.mpr (Or.inl retained)
+      · cases openVariables : source.residualTypeVariables with
+        | false => simp [openVariables] at residual
+        | true =>
+            apply List.mem_append.mpr
+            apply Or.inl
+            apply List.mem_append.mpr
+            apply Or.inr
+            apply (Substitution.mem_freeVariables_apply_iff
+              (SubstitutionRangeWellFormed.without closes.range
+                scheme.quantified) metavariable
+              scheme.body).mpr
+            exact ⟨by simpa [openVariables] using residual, absent⟩
+    · exact List.mem_append.mpr (Or.inr quantified)
+  · exact wellFormed.body
+
+/-- Flexible context closure preserves admissible trait predicates pointwise
+while retaining the resolved trait identity and arity. -/
+theorem PredicateAdmissible.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {predicate : ProgramPredicate}
+    (closes : ContextCloses substitution closedVariables source target)
+    (admissible : PredicateAdmissible source predicate) :
+    PredicateAdmissible target
+      (TypedTraitResolution.applySubstitution substitution predicate) := by
+  constructor
+  · exact TypeAdmissible.applySubstitution closes admissible.subject
+  · intro argument member
+    rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
+    exact TypeAdmissible.applySubstitution closes
+      (admissible.arguments original originalMember)
+  · have signatures_eq : target.signatures = source.signatures := by
+      rw [← closes.target_eq]
+      rfl
+    cases traitEq : predicate.trait with
+    | builtin builtin =>
+        cases builtin with
+        | int =>
+            have traitValid := admissible.trait
+            rw [traitEq] at traitValid
+            simpa [TypedTraitResolution.applySubstitution, traitEq] using
+              traitValid
+    | declaration id =>
+        have traitValid := admissible.trait
+        rw [traitEq] at traitValid
+        rcases traitValid with ⟨signature, member, idEq, arity⟩
+        simp only [TypedTraitResolution.applySubstitution, traitEq]
+        exact ⟨signature, by simpa [signatures_eq] using member, idEq,
+          by simpa [TypedTraitResolution.applySubstitution] using arity⟩
+
+/-- Variables selected for generalization are fresh for the ambient lexical
+flexible-variable scope. -/
+theorem SchemeGeneralizesExcept.quantified_fresh
+    {context : Context} {exemptRequirements : List RequirementId}
+    {scheme : Scheme}
+    (generalizes : SchemeGeneralizesExcept context exemptRequirements scheme) :
+    ∀ metavariable, metavariable ∈ scheme.quantified →
+      metavariable ∉ context.typeVariables := by
+  intro metavariable quantified ambient
+  rw [generalizes] at quantified
+  have selected := (List.mem_filter.mp quantified).2
+  have blocked : metavariable ∈
+      GeneralizationBlockedVariablesExcept context exemptRequirements := by
+    simp [GeneralizationBlockedVariablesExcept, ambient]
+  have notBlocked : metavariable ∉
+      GeneralizationBlockedVariablesExcept context exemptRequirements := by
+    simpa using selected
+  exact notBlocked blocked
+
+private theorem quantified_fresh_for_closure
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {exemptRequirements : List RequirementId}
+    {scheme : Scheme}
+    (closes : ContextCloses substitution closedVariables source target)
+    (generalizes : SchemeGeneralizesExcept source exemptRequirements scheme) :
+    ∀ metavariable, metavariable ∈ scheme.quantified →
+      metavariable ∉ substitution.domain := by
+  intro metavariable quantified domainMember
+  apply SchemeGeneralizesExcept.quantified_fresh generalizes metavariable
+    quantified
+  rw [closes.variables_eq]
+  exact List.mem_append.mpr (Or.inl
+    ((closes.exact.mem_domain_iff metavariable).mp domainMember))
+
+/-- Flexible closure preserves one qualified local-scheme requirement.  The
+generalization witness supplies freshness of the protected scheme variables. -/
+theorem LocalSchemeRequirementWellFormed.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {binder : TypedBinder}
+    {requirement : LocalSchemeRequirement}
+    {exemptRequirements : List RequirementId}
+    (closes : ContextCloses substitution closedVariables source target)
+    (generalizes : SchemeGeneralizesExcept source exemptRequirements
+      binder.scheme)
+    (wellFormed : LocalSchemeRequirementWellFormed source binder requirement) :
+    LocalSchemeRequirementWellFormed target
+      (binder.applySubstitution substitution)
+      (requirement.applySubstitution
+        (substitution.without binder.scheme.quantified)) := by
+  have fresh := quantified_fresh_for_closure closes generalizes
+  have restricted_eq :
+      substitution.without binder.scheme.quantified = substitution :=
+    Substitution.without_eq_self_of_disjoint_domain substitution
+      binder.scheme.quantified fresh
+  have initializerCloses :=
+    closes.localSchemeInitializer binder fresh
+  constructor
+  · simpa [LocalSchemeRequirement.applySubstitution, restricted_eq] using
+      (PredicateAdmissible.applySubstitution initializerCloses
+        wellFormed.predicate)
+  · rcases wellFormed.depends_on_quantified with
+      ⟨metavariable, quantified, occurs⟩
+    refine ⟨metavariable, by simpa using quantified, ?_⟩
+    simpa [LocalSchemeRequirement.applySubstitution, restricted_eq] using
+      (Substitution.mem_predicateVariables_applySubstitution_of_not_mem_domain
+        substitution (fresh metavariable quantified) occurs)
+  · rcases wellFormed.template with
+      ⟨solved, solvedUnique, idEq, predicateEq, evidenceEq⟩
+    have solvedRequirements_eq :
+        target.solvedRequirements =
+          source.solvedRequirements.map
+            (applySolvedRequirement substitution) := by
+      rw [← closes.target_eq]
+      rfl
+    have filtered :
+        ((source.solvedRequirements.map
+            (applySolvedRequirement substitution)).filter fun candidate =>
+              candidate.id == requirement.templateRequirement) =
+          (source.solvedRequirements.filter fun candidate =>
+              candidate.id == requirement.templateRequirement).map
+            (applySolvedRequirement substitution) := by
+      induction source.solvedRequirements with
+      | nil => rfl
+      | cons candidate requirements induction =>
+          by_cases selected :
+              candidate.id == requirement.templateRequirement
+          · simp [applySolvedRequirement, selected, induction]
+          · simp [applySolvedRequirement, selected, induction]
+    refine ⟨applySolvedRequirement substitution solved, ?_, ?_, ?_, ?_⟩
+    · rw [solvedRequirements_eq]
+      simpa [LocalSchemeRequirement.applySubstitution, filtered] using congrArg
+        (List.map (applySolvedRequirement substitution)) solvedUnique
+    · exact idEq
+    · simp [applySolvedRequirement, LocalSchemeRequirement.applySubstitution,
+        restricted_eq, predicateEq]
+    · simp [applySolvedRequirement, applyPredicateEvidence,
+        LocalSchemeRequirement.applySubstitution, restricted_eq, evidenceEq]
+
+/-- Flexible closure preserves the ordered, uniquely identified qualified
+requirements attached to one generalized local binder. -/
+theorem LocalSchemeRequirementsWellFormed.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {binder : TypedBinder}
+    {exemptRequirements : List RequirementId}
+    (closes : ContextCloses substitution closedVariables source target)
+    (generalizes : SchemeGeneralizesExcept source exemptRequirements
+      binder.scheme)
+    (wellFormed : LocalSchemeRequirementsWellFormed source binder) :
+    LocalSchemeRequirementsWellFormed target
+      (binder.applySubstitution substitution) := by
+  constructor
+  · simpa [localSchemeTemplateIds, TypedBinder.applySubstitution,
+      LocalSchemeRequirement.applySubstitution, List.map_map,
+      Function.comp_def] using wellFormed.ids_unique
+  · intro requirement member
+    rw [applyTypedBinder_schemeRequirements] at member
+    rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
+    exact LocalSchemeRequirementWellFormed.applySubstitution closes generalizes
+      (wellFormed.entries original originalMember)
+
+/-- Flexible context closure preserves the common retained-binder formation
+judgment; scheme quantifiers protect themselves from the outer substitution. -/
+theorem BinderWellFormed.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {owner : Resolved.DeclarationId}
+    {binder : TypedBinder}
+    (closes : ContextCloses substitution closedVariables source target)
+    (wellFormed : BinderWellFormed source owner binder) :
+    BinderWellFormed target owner
+      (binder.applySubstitution substitution) := {
+  owned := by simpa using wellFormed.owned
+  scheme := by
+    simpa using SchemeWellFormed.applySubstitution closes wellFormed.scheme
+  monomorphic_requirements_empty := by
+    intro quantifiedEmpty
+    have originalQuantifiedEmpty : binder.scheme.quantified = [] := by
+      simpa using quantifiedEmpty
+    simp [TypedBinder.applySubstitution,
+      wellFormed.monomorphic_requirements_empty originalQuantifiedEmpty]
+}
 
 @[simp] theorem closeContext_signatures (substitution : Substitution)
     (context : Context) :

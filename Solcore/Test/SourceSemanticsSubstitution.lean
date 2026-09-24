@@ -439,6 +439,93 @@ example (signatures : ProgramSignatures) :
     (FlexibleSubstitution.TypeWellFormed.applySubstitution closes
       sourceWellFormed)
 
+/-- Rank-1 scheme formation transports through an outer closure while the
+scheme's own quantified variables remain protected. -/
+example (substitution : Substitution) (closedVariables : List TypeVarId)
+    (source target : SourceSemantics.Context) (scheme : Scheme)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (wellFormed : SchemeWellFormed source scheme) :
+    SchemeWellFormed target (scheme.apply substitution) :=
+  FlexibleSubstitution.SchemeWellFormed.applySubstitution closes wellFormed
+
+/-- Admissible predicates reuse type transport for the subject and every
+source-ordered argument without changing trait selection. -/
+example (substitution : Substitution) (closedVariables : List TypeVarId)
+    (source target : SourceSemantics.Context)
+    (predicate : ProgramPredicate)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (admissible : PredicateAdmissible source predicate) :
+    PredicateAdmissible target
+      (TypedTraitResolution.applySubstitution substitution predicate) :=
+  FlexibleSubstitution.PredicateAdmissible.applySubstitution closes admissible
+
+/-- Exact generalization makes each scheme variable fresh for the ambient
+lexical scope, hence also for an exact outer-closing substitution. -/
+example (substitution : Substitution) (closedVariables : List TypeVarId)
+    (source target : SourceSemantics.Context) (binder : TypedBinder)
+    (exemptRequirements : List RequirementId)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (generalizes : SchemeGeneralizesExcept source exemptRequirements
+      binder.scheme) :
+    FlexibleSubstitution.ContextCloses substitution closedVariables
+      (localSchemeInitializerContext source binder)
+      (localSchemeInitializerContext target
+        (binder.applySubstitution substitution)) := by
+  apply FlexibleSubstitution.ContextCloses.localSchemeInitializer closes binder
+  intro metavariable quantified domainMember
+  apply FlexibleSubstitution.SchemeGeneralizesExcept.quantified_fresh
+    generalizes metavariable quantified
+  rw [closes.variables_eq]
+  exact List.mem_append.mpr (Or.inl
+    ((closes.exact.mem_domain_iff metavariable).mp domainMember))
+
+/-- Qualified predicate formation and template identity transport together
+using the same capture-avoiding substitution as the binder. -/
+example (substitution : Substitution) (closedVariables : List TypeVarId)
+    (source target : SourceSemantics.Context) (binder : TypedBinder)
+    (requirement : LocalSchemeRequirement)
+    (exemptRequirements : List RequirementId)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (generalizes : SchemeGeneralizesExcept source exemptRequirements
+      binder.scheme)
+    (wellFormed : LocalSchemeRequirementWellFormed source binder requirement) :
+    LocalSchemeRequirementWellFormed target
+      (binder.applySubstitution substitution)
+      (requirement.applySubstitution
+        (substitution.without binder.scheme.quantified)) :=
+  FlexibleSubstitution.LocalSchemeRequirementWellFormed.applySubstitution
+    closes generalizes wellFormed
+
+/-- The list judgment preserves both source order and uniqueness of stable
+template requirement identities. -/
+example (substitution : Substitution) (closedVariables : List TypeVarId)
+    (source target : SourceSemantics.Context) (binder : TypedBinder)
+    (exemptRequirements : List RequirementId)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (generalizes : SchemeGeneralizesExcept source exemptRequirements
+      binder.scheme)
+    (wellFormed : LocalSchemeRequirementsWellFormed source binder) :
+    LocalSchemeRequirementsWellFormed target
+      (binder.applySubstitution substitution) :=
+  FlexibleSubstitution.LocalSchemeRequirementsWellFormed.applySubstitution
+    closes generalizes wellFormed
+
+/-- Common binder formation needs no generalization premise: capture avoidance
+is already part of `TypedBinder.applySubstitution`. -/
+example (substitution : Substitution) (closedVariables : List TypeVarId)
+    (source target : SourceSemantics.Context)
+    (owner : Resolved.DeclarationId) (binder : TypedBinder)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (wellFormed : BinderWellFormed source owner binder) :
+    BinderWellFormed target owner (binder.applySubstitution substitution) :=
+  FlexibleSubstitution.BinderWellFormed.applySubstitution closes wellFormed
+
 /-- Fresh inner binders extend a structural outer closure without being
 captured by its exact substitution. -/
 example (substitution : Substitution) (closedVariables variables : List TypeVarId)
