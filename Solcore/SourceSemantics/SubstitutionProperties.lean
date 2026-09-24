@@ -11177,6 +11177,47 @@ theorem StatementsHaveType.applySubstitution
   · exact catalog
   · exact contextValid
 
+/-- Flexible substitution transports a lambda form without exposing the
+complete mutually recursive expression-typing recursor.  This focused entry
+point is useful when a retained closure already identifies its source
+occurrence as a lambda. -/
+theorem ExpressionFormHasRawType.applySubstitution_lambda
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source : TypedSource} {context target : Context}
+    {parameters : List TypedBinder} {returnType rawType : Ty}
+    {body : List StatementId} {plan : ExpressionRequirementPlan}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables context target)
+    (typing : ExpressionFormHasRawType source context
+      (.lambda parameters returnType body) rawType plan) :
+    ExpressionFormHasRawType (source.applySubstitution substitution) target
+      ((ExpressionForm.lambda parameters returnType body).applySubstitution
+        substitution)
+      (substitution.apply rawType)
+      (applyExpressionRequirementPlan substitution plan) := by
+  cases typing with
+  | @lambda _ lambdaContext finalContext _ parameterTypes _ _ bodyFacts
+      namesUnique parametersExtend bodyType bodyCompletes =>
+      have lambdaCatalog :
+          SignatureCatalogWellFormed lambdaContext.signatures := by
+        rw [StructuralSubstitution.MonoBindersExtend.signatures_eq
+          parametersExtend]
+        exact catalog
+      have lambdaValid := contextValid.afterMonoBinders parametersExtend
+      simpa [ExpressionForm.applySubstitution, applyExpressionRequirementPlan,
+        apply_productMany, List.map_map, Function.comp_def,
+        TypedBinder.applySubstitution] using
+        (ExpressionFormHasRawType.lambda
+          (source := source.applySubstitution substitution)
+          (by simpa [List.map_map, Function.comp_def,
+            TypedBinder.applySubstitution] using namesUnique)
+          (MonoBindersExtend.applySubstitution contextValid.closes
+            parametersExtend)
+          (StatementsHaveType.applySubstitution lambdaCatalog lambdaValid
+            bodyType)
+          (BodyCompletes.applySubstitution substitution bodyCompletes))
+
 /-- Flexible instantiation preserves a complete declaration body, including
 its root-shape invariant and completion certificate. -/
 theorem BodyHasType.applySubstitution

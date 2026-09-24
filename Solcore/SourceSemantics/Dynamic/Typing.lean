@@ -83,6 +83,46 @@ structure GeneralizedClosureCodeValid
           function.binder)
         node.form function.binder.scheme.body (.ordinary [])
 
+namespace GeneralizedClosureCodeValid
+
+private theorem parameterBodyTypes_eq
+    {owner : Resolved.DeclarationId} {context finalContext : Context}
+    {parameters : List TypedBinder} {parameterTypes : List Ty}
+    (extension : MonoBindersExtend owner context parameters parameterTypes
+      finalContext) :
+    parameters.map (fun binder => binder.scheme.body) = parameterTypes := by
+  induction extension with
+  | nil => rfl
+  | cons schemeEq _ _ induction =>
+      simp [schemeEq, TypeSystem.Scheme.mono, induction]
+
+/-- The principal scheme body of a retained generalized lambda is exactly
+the function type determined by its retained parameter schemes and result
+type. -/
+theorem functionType_eq
+    {function : GeneralizedClosure}
+    (valid : GeneralizedClosureCodeValid function) :
+    function.binder.scheme.body =
+      .function
+        (Ty.productMany
+          (function.parameters.map (fun binder => binder.scheme.body)))
+        function.resultType := by
+  rcases valid.occurrence with
+    ⟨node, _contains, formEq, _rawTypeEq, _typeEq, _requirementsEmpty,
+      _coercionsEmpty, formTyping⟩
+  rw [formEq] at formTyping
+  generalize rawTypeEq : function.binder.scheme.body = rawType at formTyping
+  cases formTyping with
+  | @lambda _ _ _ _ parameterTypes _ _ _ _ parametersExtend _ _ =>
+      have parameterTypesEq :
+          function.parameters.map (fun binder => binder.scheme.body) =
+            parameterTypes := parameterBodyTypes_eq parametersExtend
+      exact congrArg
+        (fun types => Ty.function (Ty.productMany types) function.resultType)
+        parameterTypesEq.symm
+
+end GeneralizedClosureCodeValid
+
 /-- Runtime storage associated with one lexical local.  Ordinary cells carry
 no principal descriptor and therefore require a monomorphic scheme.  A
 generalized cell instead retains a descriptor whose stable identity and
