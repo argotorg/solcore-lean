@@ -951,6 +951,30 @@ theorem ContextSubstitutionValid.ofScopedRequirementLedger
         cases impossible
 }
 
+/-- Close every flexible variable in a well-typed body.  Exactness and range
+well-formedness establish the structural context closure; the validated
+whole-body ledger supplies the implementation evidence that remains after
+substitution.  This is the declaration-independent boundary used by source
+inference once it has produced a complete substitution. -/
+theorem BodyHasType.close
+    {substitution : Substitution} {source : TypedSource}
+    {context : Context} {resultType : Ty} {facts : BodyFacts}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (exact : SourceSemantics.ExactSubstitution substitution
+      context.typeVariables)
+    (range : SourceSemantics.SubstitutionRangeWellFormed
+      (closeContext substitution context) substitution)
+    (schemesFresh : LocalSchemesFreshFor context substitution)
+    (ledger : SourceSemantics.ScopedRequirementLedgerWellFormed context source)
+    (typing : BodyHasType source context resultType facts) :
+    BodyHasType (source.applySubstitution substitution)
+      (closeContext substitution context)
+      (substitution.apply resultType) (applyBodyFacts substitution facts) := by
+  exact BodyHasType.applySubstitution catalog
+    (ContextSubstitutionValid.ofScopedRequirementLedger
+      (ContextCloses.close exact range) schemesFresh ledger)
+    typing
+
 end Solcore.SourceSemantics.FlexibleSubstitution
 
 namespace Solcore.SourceSemantics.Dynamic
