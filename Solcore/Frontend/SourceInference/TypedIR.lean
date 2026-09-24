@@ -566,9 +566,11 @@ def applySubstitution (substitution : Substitution)
 
 end ExpressionNode
 
-namespace MatchPatternResolution
+namespace MatchPatternInstruction
 
-private def applyInstructionSubstitution (substitution : Substitution) :
+/-- Close retained pattern-instruction types without changing binder
+identities or structural classification. -/
+def applySubstitution (substitution : Substitution) :
     MatchPatternInstruction → MatchPatternInstruction
   | .wildcard => .wildcard
   | .integerLiteral source resolution =>
@@ -579,6 +581,10 @@ private def applyInstructionSubstitution (substitution : Substitution) :
       .constructor (instantiation.applySubstitution substitution) argumentCount
   | .tuple elementCount => .tuple elementCount
 
+end MatchPatternInstruction
+
+namespace MatchPatternResolution
+
 def applySubstitution (substitution : Substitution) :
     MatchPatternResolution → MatchPatternResolution
   | .wildcard => .wildcard
@@ -588,9 +594,9 @@ def applySubstitution (substitution : Substitution) :
       .binder (selectedBinder.applySubstitution substitution)
   | .constructor instantiation arguments =>
       .constructor (instantiation.applySubstitution substitution)
-        (arguments.map (applyInstructionSubstitution substitution))
+        (arguments.map (MatchPatternInstruction.applySubstitution substitution))
   | .tuple elements =>
-      .tuple (elements.map (applyInstructionSubstitution substitution))
+      .tuple (elements.map (MatchPatternInstruction.applySubstitution substitution))
 
 end MatchPatternResolution
 

@@ -301,6 +301,49 @@ example (substitution : Substitution) (context : SourceSemantics.Context)
   FlexibleSubstitution.closeContext_localSchemeInitializerContext
     substitution context binder
 
+/-- Flexible closing preserves globally unique, declaration-owned local
+identities. -/
+example (substitution : Substitution) (source : TypedSource)
+    (ownership : LocalIdentityOwnership source) :
+    LocalIdentityOwnership (source.applySubstitution substitution) :=
+  FlexibleSubstitution.LocalIdentityOwnership.applySubstitution substitution
+    ownership
+
+/-- A qualified local template row is transformed with its owner's
+capture-avoiding substitution, rather than the unrestricted outer map. -/
+example (substitution : Substitution) (source : TypedSource)
+    (row : SolvedRequirement)
+    (owned : LocalSchemeTemplateRowOwned source row) :
+    ∃ owner, ContainsLocalSchemeTemplate source owner ∧
+      LocalSchemeTemplateRowOwned (source.applySubstitution substitution)
+        (FlexibleSubstitution.applyLocalSchemeTemplateRow substitution owner
+          row) :=
+  FlexibleSubstitution.LocalSchemeTemplateRowOwned.applySubstitution
+    substitution owned
+
+/-- Owner-local substitution preserves both a template row's primary
+attachment and its initializer scope. -/
+example (substitution : Substitution) (source : TypedSource)
+    (row : SolvedRequirement)
+    (rowScoped : LocalSchemeTemplateRowScoped source row) :
+    ∃ owner, ContainsLocalSchemeTemplate source owner ∧
+      LocalSchemeTemplateRowScoped (source.applySubstitution substitution)
+        (FlexibleSubstitution.applyLocalSchemeTemplateRow substitution owner
+          row) :=
+  FlexibleSubstitution.LocalSchemeTemplateRowScoped.applySubstitution
+    substitution rowScoped
+
+/-- Flexible source and context closure preserve the exact correspondence
+between primary requirement attachments and ledger identities. -/
+example (substitution : Substitution) (context : SourceSemantics.Context)
+    (source : TypedSource)
+    (ownership : RequirementOwnership context source) :
+    RequirementOwnership
+      (FlexibleSubstitution.closeContext substitution context)
+      (source.applySubstitution substitution) :=
+  FlexibleSubstitution.RequirementOwnership.applySubstitution substitution
+    ownership
+
 /-- The relational view of an exact primary attachment transports without
 changing either stable identity. -/
 example (substitution : ParameterSubstitution) (source : TypedSource)

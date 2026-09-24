@@ -5295,6 +5295,532 @@ theorem applySolvedRequirement_goal_alignment (substitution : Substitution)
     TypedTraitResolution.applySubstitution substitution requirement.predicate
   rw [applyPredicateEvidence_goal, aligned]
 
+@[simp] theorem applyTypedBinder_id (substitution : Substitution)
+    (binder : TypedBinder) :
+    (binder.applySubstitution substitution).id = binder.id := by
+  rfl
+
+@[simp] theorem patternInstructionBinderIds_applySubstitution
+    (substitution : Substitution)
+    (instructions : List MatchPatternInstruction) :
+    patternInstructionBinderIds
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution)) =
+      patternInstructionBinderIds instructions := by
+  induction instructions with
+  | nil => rfl
+  | cons instruction rest induction =>
+      cases instruction <;>
+        simpa [patternInstructionBinderIds,
+          MatchPatternInstruction.applySubstitution,
+          TypedBinder.applySubstitution] using induction
+
+@[simp] theorem patternBinderIds_applySubstitution
+    (substitution : Substitution) (pattern : TypedMatchPattern) :
+    patternBinderIds (pattern.applySubstitution substitution) =
+      patternBinderIds pattern := by
+  cases pattern with
+  | mk source type resolution requirements =>
+      cases resolution <;>
+        simp [patternBinderIds, TypedMatchPattern.applySubstitution,
+          MatchPatternResolution.applySubstitution,
+          TypedBinder.applySubstitution]
+
+@[simp] theorem forItemDefinedLocalIds_applySubstitution
+    (substitution : Substitution) (item : ForItemForm) :
+    forItemDefinedLocalIds (item.applySubstitution substitution) =
+      forItemDefinedLocalIds item := by
+  cases item <;> rfl
+
+@[simp] theorem expressionDefinedLocalIds_applySubstitution
+    (substitution : Substitution) (form : ExpressionForm) :
+    expressionDefinedLocalIds (form.applySubstitution substitution) =
+      expressionDefinedLocalIds form := by
+  cases form <;>
+    simp [expressionDefinedLocalIds, ExpressionForm.applySubstitution,
+      TypedBinder.applySubstitution, List.map_map, Function.comp_def]
+
+@[simp] theorem statementDefinedLocalIds_applySubstitution
+    (substitution : Substitution) (form : StatementForm) :
+    statementDefinedLocalIds (form.applySubstitution substitution) =
+      statementDefinedLocalIds form := by
+  cases form <;>
+    simp [statementDefinedLocalIds, StatementForm.applySubstitution,
+      MatchResolution.applySubstitution, TypedMatchCase.applySubstitution,
+      TypedBinder.applySubstitution, List.flatMap_map]
+
+@[simp] theorem nodeDefinedLocalIds_applySubstitution
+    (substitution : Substitution) (node : Node) :
+    (match node.applySubstitution substitution with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form) =
+    (match node with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form) := by
+  cases node <;>
+    simp [Node.applySubstitution, ExpressionNode.applySubstitution,
+      StatementNode.applySubstitution]
+
+@[simp] theorem flatMap_definedLocalIds_applySubstitution
+    (substitution : Substitution) (nodes : List Node) :
+    (nodes.map (Node.applySubstitution substitution)).flatMap (fun node =>
+      match node with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form) =
+    nodes.flatMap (fun node =>
+      match node with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form) := by
+  induction nodes with
+  | nil => rfl
+  | cons node nodes induction => simp [induction]
+
+/-- Closing flexible types preserves every source-owned local identity. -/
+@[simp] theorem definedLocalIds_applySubstitution
+    (substitution : Substitution) (source : TypedSource) :
+    definedLocalIds (source.applySubstitution substitution) =
+      definedLocalIds source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      change
+        ((inputs.map (TypedBinder.applySubstitution substitution)).map
+            (fun binder => binder.id)) ++
+            ((nodes.map (Node.applySubstitution substitution)).flatMap fun node =>
+              match node with
+              | .expression expression =>
+                  expressionDefinedLocalIds expression.form
+              | .statement statement =>
+                  statementDefinedLocalIds statement.form) =
+          (inputs.map (fun binder => binder.id)) ++
+            (nodes.flatMap fun node =>
+              match node with
+              | .expression expression =>
+                  expressionDefinedLocalIds expression.form
+              | .statement statement =>
+                  statementDefinedLocalIds statement.form)
+      rw [flatMap_definedLocalIds_applySubstitution]
+      simp [List.map_map, Function.comp_def]
+
+/-- Flexible type closure cannot change declaration ownership or uniqueness
+of stable local identities. -/
+theorem LocalIdentityOwnership.applySubstitution
+    (substitution : Substitution) {source : TypedSource}
+    (ownership : LocalIdentityOwnership source) :
+    LocalIdentityOwnership (source.applySubstitution substitution) := by
+  constructor
+  · simpa using ownership.unique
+  · intro id member
+    simpa using ownership.owned id (by simpa using member)
+
+/-- Flexible substitution acts on one initialized local while retaining its
+initializer occurrence. -/
+def applyInitializedLetBinding (substitution : Substitution)
+    (binding : InitializedLetBinding) : InitializedLetBinding := {
+  binder := binding.binder.applySubstitution substitution
+  initializer := binding.initializer
+}
+
+/-- Apply the capture-avoiding substitution of a generalized binder to one
+of its exact qualified-requirement owners. -/
+def applyLocalSchemeTemplateOwner (substitution : Substitution)
+    (owner : LocalSchemeTemplateOwner) : LocalSchemeTemplateOwner := {
+  binder := owner.binder.applySubstitution substitution
+  initializer := owner.initializer
+  requirement := owner.requirement.applySubstitution
+    (substitution.without owner.binder.scheme.quantified)
+}
+
+/-- A template ledger row uses the same binder-local restriction as its
+source owner. -/
+def applyLocalSchemeTemplateRow (substitution : Substitution)
+    (owner : LocalSchemeTemplateOwner)
+    (row : SolvedRequirement) : SolvedRequirement :=
+  applySolvedRequirement
+    (substitution.without owner.binder.scheme.quantified) row
+
+@[simp] theorem forItemInitializedLetBindings_applySubstitution
+    (substitution : Substitution) (item : ForItemForm) :
+    forItemInitializedLetBindings (item.applySubstitution substitution) =
+      (forItemInitializedLetBindings item).map
+        (applyInitializedLetBinding substitution) := by
+  cases item with
+  | letDecl binder initializer => cases initializer <;> rfl
+  | expression expression => rfl
+  | assignValue assignment operator value => rfl
+  | assignBitNot assignment => rfl
+
+@[simp] theorem statementInitializedLetBindings_applySubstitution
+    (substitution : Substitution) (form : StatementForm) :
+    statementInitializedLetBindings (form.applySubstitution substitution) =
+      (statementInitializedLetBindings form).map
+        (applyInitializedLetBinding substitution) := by
+  cases form with
+  | letDecl binder initializer => cases initializer <;> rfl
+  | returnStmt value => rfl
+  | expression expression trailingSemicolon => rfl
+  | assignValue assignment operator value => rfl
+  | assignBitNot assignment => rfl
+  | ifThen condition thenBody elseBody => rfl
+  | block body => rfl
+  | matchWith resolution => rfl
+  | forLoop initializer condition post body =>
+      simp [statementInitializedLetBindings, StatementForm.applySubstitution,
+        List.flatMap_map, List.map_flatMap]
+  | whileLoop condition body => rfl
+  | breakStmt => rfl
+  | continueStmt => rfl
+
+@[simp] theorem nodeInitializedLetBindings_applySubstitution
+    (substitution : Substitution) (node : Node) :
+    (match node.applySubstitution substitution with
+      | .expression _ => []
+      | .statement statement =>
+          statementInitializedLetBindings statement.form) =
+    (match node with
+      | .expression _ => []
+      | .statement statement =>
+          statementInitializedLetBindings statement.form).map
+        (applyInitializedLetBinding substitution) := by
+  cases node <;>
+    simp [Node.applySubstitution, StatementNode.applySubstitution]
+
+@[simp] theorem initializedLetBindings_applySubstitution
+    (substitution : Substitution) (source : TypedSource) :
+    initializedLetBindings (source.applySubstitution substitution) =
+      (initializedLetBindings source).map
+        (applyInitializedLetBinding substitution) := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      simp only [initializedLetBindings, TypedSource.applySubstitution,
+        List.flatMap_map, List.map_flatMap]
+      induction nodes with
+      | nil => rfl
+      | cons node nodes induction =>
+          simp only [List.flatMap_cons]
+          calc
+            _ = (match node with
+                  | .expression _ => []
+                  | .statement statement =>
+                      statementInitializedLetBindings statement.form).map
+                    (applyInitializedLetBinding substitution) ++
+                List.flatMap
+                  (fun node =>
+                    match node.applySubstitution substitution with
+                    | .expression _ => []
+                    | .statement statement =>
+                        statementInitializedLetBindings statement.form)
+                  nodes := congrArg
+                    (fun head => head ++ List.flatMap
+                      (fun node =>
+                        match node.applySubstitution substitution with
+                        | .expression _ => []
+                        | .statement statement =>
+                            statementInitializedLetBindings statement.form)
+                      nodes)
+                    (nodeInitializedLetBindings_applySubstitution
+                      substitution node)
+            _ = _ := congrArg
+              (fun tail =>
+                (match node with
+                  | .expression _ => []
+                  | .statement statement =>
+                      statementInitializedLetBindings statement.form).map
+                    (applyInitializedLetBinding substitution) ++ tail)
+              induction
+
+@[simp] theorem templateOwners_applyInitializedLetBinding
+    (substitution : Substitution) (binding : InitializedLetBinding) :
+    InitializedLetBinding.templateOwners
+        (applyInitializedLetBinding substitution binding) =
+      binding.templateOwners.map
+        (applyLocalSchemeTemplateOwner substitution) := by
+  simp [InitializedLetBinding.templateOwners, applyInitializedLetBinding,
+    applyLocalSchemeTemplateOwner, TypedBinder.applySubstitution,
+    List.map_map, Function.comp_def]
+
+@[simp] theorem localSchemeTemplateOwners_applySubstitution
+    (substitution : Substitution) (source : TypedSource) :
+    localSchemeTemplateOwners (source.applySubstitution substitution) =
+      (localSchemeTemplateOwners source).map
+        (applyLocalSchemeTemplateOwner substitution) := by
+  simp [localSchemeTemplateOwners, List.flatMap_map, List.map_flatMap]
+
+@[simp] theorem applyLocalSchemeTemplateOwner_templateRequirement
+    (substitution : Substitution) (owner : LocalSchemeTemplateOwner) :
+    (applyLocalSchemeTemplateOwner substitution owner).requirement.templateRequirement =
+      owner.requirement.templateRequirement := by
+  rfl
+
+/-- Flexible substitution preserves the ordered inventory of qualified-local
+template identities. -/
+@[simp] theorem sourceLocalSchemeTemplateIds_applySubstitution
+    (substitution : Substitution) (source : TypedSource) :
+    sourceLocalSchemeTemplateIds (source.applySubstitution substitution) =
+      sourceLocalSchemeTemplateIds source := by
+  simp [sourceLocalSchemeTemplateIds, List.map_map, Function.comp_def]
+
+theorem ContainsLocalSchemeTemplate.applySubstitution
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    (substitution : Substitution)
+    (contains : ContainsLocalSchemeTemplate source owner) :
+    ContainsLocalSchemeTemplate (source.applySubstitution substitution)
+      (applyLocalSchemeTemplateOwner substitution owner) := by
+  unfold ContainsLocalSchemeTemplate at contains ⊢
+  rw [localSchemeTemplateOwners_applySubstitution]
+  exact List.mem_map.mpr ⟨owner, contains, rfl⟩
+
+theorem LocalSchemeTemplateOwnership.applySubstitution
+    (substitution : Substitution) {source : TypedSource}
+    (ownership : LocalSchemeTemplateOwnership source) :
+    LocalSchemeTemplateOwnership
+      (source.applySubstitution substitution) := by
+  constructor
+  simpa using ownership.ids_unique
+
+theorem InReflexiveSubtree.applySubstitution
+    {source : TypedSource} {root occurrence : NodeId}
+    (substitution : Substitution)
+    (scope : InReflexiveSubtree source root occurrence) :
+    InReflexiveSubtree (source.applySubstitution substitution)
+      root occurrence := by
+  rcases scope with rootEq | descends
+  · exact Or.inl rootEq
+  · exact Or.inr
+      (FlexibleSubstitution.descends_applySubstitution substitution descends)
+
+theorem InInitializedLetSubtree.applySubstitution
+    {source : TypedSource} {binding : InitializedLetBinding}
+    {occurrence : NodeId} (substitution : Substitution)
+    (scope : InInitializedLetSubtree source binding occurrence) :
+    InInitializedLetSubtree (source.applySubstitution substitution)
+      (applyInitializedLetBinding substitution binding) occurrence := by
+  exact ⟨by
+    rw [initializedLetBindings_applySubstitution]
+    exact List.mem_map.mpr ⟨binding, scope.1, rfl⟩,
+    FlexibleSubstitution.InReflexiveSubtree.applySubstitution substitution
+      scope.2⟩
+
+theorem LocalSchemeTemplateOwner.Scopes.applySubstitution
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    {occurrence : NodeId} (substitution : Substitution)
+    (scope : owner.Scopes source occurrence) :
+    (applyLocalSchemeTemplateOwner substitution owner).Scopes
+      (source.applySubstitution substitution) occurrence := by
+  exact ⟨FlexibleSubstitution.ContainsLocalSchemeTemplate.applySubstitution
+      substitution scope.1,
+    FlexibleSubstitution.InReflexiveSubtree.applySubstitution substitution
+      scope.2⟩
+
+/-- Exact template-row ownership transports with the capture-avoiding
+substitution selected by its source owner. -/
+theorem LocalSchemeTemplateRowOwned.applySubstitutionForOwner
+    {source : TypedSource} {row : SolvedRequirement}
+    (substitution : Substitution) (owner : LocalSchemeTemplateOwner)
+    (contains : ContainsLocalSchemeTemplate source owner)
+    (idEq : row.id = owner.requirement.templateRequirement)
+    (predicateEq : row.predicate = owner.requirement.predicate)
+    (evidenceEq : row.evidence =
+      .assumption owner.requirement.predicate) :
+    LocalSchemeTemplateRowOwned (source.applySubstitution substitution)
+      (applyLocalSchemeTemplateRow substitution owner row) := by
+  refine .intro (applyLocalSchemeTemplateOwner substitution owner)
+    (FlexibleSubstitution.ContainsLocalSchemeTemplate.applySubstitution
+      substitution contains) ?_ ?_ ?_
+  · simpa [applyLocalSchemeTemplateRow] using idEq
+  · simpa [applyLocalSchemeTemplateRow, applySolvedRequirement,
+      applyLocalSchemeTemplateOwner,
+      LocalSchemeRequirement.applySubstitution] using congrArg
+        (TypedTraitResolution.applySubstitution
+          (substitution.without owner.binder.scheme.quantified)) predicateEq
+  · simpa [applyLocalSchemeTemplateRow, applySolvedRequirement,
+      applyLocalSchemeTemplateOwner,
+      LocalSchemeRequirement.applySubstitution, applyPredicateEvidence] using
+        congrArg (applyPredicateEvidence
+          (substitution.without owner.binder.scheme.quantified)) evidenceEq
+
+/-- Every owned template row has a uniquely determined owner-local transport;
+the existential exposes that owner because capture avoidance depends on its
+quantified variables. -/
+theorem LocalSchemeTemplateRowOwned.applySubstitution
+    {source : TypedSource} {row : SolvedRequirement}
+    (substitution : Substitution)
+    (owned : LocalSchemeTemplateRowOwned source row) :
+    ∃ owner, ContainsLocalSchemeTemplate source owner ∧
+      LocalSchemeTemplateRowOwned (source.applySubstitution substitution)
+        (applyLocalSchemeTemplateRow substitution owner row) := by
+  cases owned with
+  | intro owner contains idEq predicateEq evidenceEq =>
+      exact ⟨owner, contains,
+        LocalSchemeTemplateRowOwned.applySubstitutionForOwner substitution
+          owner contains idEq predicateEq evidenceEq⟩
+
+@[simp] theorem forItemPrimaryRequirementIds_applySubstitution
+    (substitution : Substitution) (item : ForItemForm) :
+    forItemPrimaryRequirementIds (item.applySubstitution substitution) =
+      forItemPrimaryRequirementIds item := by
+  cases item <;>
+    simp [forItemPrimaryRequirementIds, ForItemForm.applySubstitution,
+      AssignmentResolution.applySubstitution]
+
+@[simp] theorem statementPrimaryRequirementIds_applySubstitution
+    (substitution : Substitution) (form : StatementForm) :
+    statementPrimaryRequirementIds (form.applySubstitution substitution) =
+      statementPrimaryRequirementIds form := by
+  cases form <;>
+    simp [statementPrimaryRequirementIds, StatementForm.applySubstitution,
+      AssignmentResolution.applySubstitution, MatchResolution.applySubstitution,
+      TypedMatchCase.applySubstitution, TypedMatchPattern.applySubstitution,
+      List.flatMap_map]
+
+@[simp] theorem nodePrimaryRequirementIds_applySubstitution
+    (substitution : Substitution) (node : Node) :
+    (match node.applySubstitution substitution with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form) =
+    (match node with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form) := by
+  cases node <;>
+    simp [Node.applySubstitution, ExpressionNode.applySubstitution,
+      StatementNode.applySubstitution]
+
+@[simp] theorem flatMap_primaryRequirementIds_applySubstitution
+    (substitution : Substitution) (nodes : List Node) :
+    (nodes.map (Node.applySubstitution substitution)).flatMap (fun node =>
+      match node with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form) =
+    nodes.flatMap (fun node =>
+      match node with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form) := by
+  induction nodes with
+  | nil => rfl
+  | cons node nodes induction => simp [induction]
+
+/-- Flexible substitution preserves the ordered primary requirement ledger
+attached to the source graph. -/
+@[simp] theorem primaryRequirementIds_applySubstitution
+    (substitution : Substitution) (source : TypedSource) :
+    primaryRequirementIds (source.applySubstitution substitution) =
+      primaryRequirementIds source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      exact flatMap_primaryRequirementIds_applySubstitution substitution nodes
+
+@[simp] theorem expressionPrimaryRequirementOccurrences_applySubstitution
+    (substitution : Substitution) (expression : ExpressionNode) :
+    expressionPrimaryRequirementOccurrences
+        (expression.applySubstitution substitution) =
+      expressionPrimaryRequirementOccurrences expression := by
+  simp [expressionPrimaryRequirementOccurrences,
+    ExpressionNode.applySubstitution]
+
+@[simp] theorem statementPrimaryRequirementOccurrences_applySubstitution
+    (substitution : Substitution) (statement : StatementNode) :
+    statementPrimaryRequirementOccurrences
+        (statement.applySubstitution substitution) =
+      statementPrimaryRequirementOccurrences statement := by
+  simp [statementPrimaryRequirementOccurrences,
+    StatementNode.applySubstitution]
+
+@[simp] theorem nodePrimaryRequirementOccurrences_applySubstitution
+    (substitution : Substitution) (node : Node) :
+    nodePrimaryRequirementOccurrences (node.applySubstitution substitution) =
+      nodePrimaryRequirementOccurrences node := by
+  cases node <;>
+    simp [nodePrimaryRequirementOccurrences, Node.applySubstitution]
+
+@[simp] theorem flatMap_primaryRequirementOccurrences_applySubstitution
+    (substitution : Substitution) (nodes : List Node) :
+    (nodes.map (Node.applySubstitution substitution)).flatMap
+        nodePrimaryRequirementOccurrences =
+      nodes.flatMap nodePrimaryRequirementOccurrences := by
+  induction nodes with
+  | nil => rfl
+  | cons node nodes induction => simp [induction]
+
+/-- Flexible substitution preserves each requirement's exact primary source
+occurrence. -/
+@[simp] theorem primaryRequirementOccurrences_applySubstitution
+    (substitution : Substitution) (source : TypedSource) :
+    primaryRequirementOccurrences (source.applySubstitution substitution) =
+      primaryRequirementOccurrences source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      exact flatMap_primaryRequirementOccurrences_applySubstitution
+        substitution nodes
+
+@[simp] theorem primaryRequirementOccursAt_applySubstitution
+    (substitution : Substitution) (source : TypedSource)
+    (occurrence : NodeId) (requirement : RequirementId) :
+    PrimaryRequirementOccursAt (source.applySubstitution substitution)
+        occurrence requirement ↔
+      PrimaryRequirementOccursAt source occurrence requirement := by
+  simp [PrimaryRequirementOccursAt]
+
+/-- Exact template-row scope transports with the capture-avoiding
+substitution selected by its source owner. -/
+theorem LocalSchemeTemplateRowScoped.applySubstitutionForOwner
+    {source : TypedSource} {row : SolvedRequirement}
+    (substitution : Substitution) (owner : LocalSchemeTemplateOwner)
+    (contains : ContainsLocalSchemeTemplate source owner)
+    (idEq : row.id = owner.requirement.templateRequirement)
+    (predicateEq : row.predicate = owner.requirement.predicate)
+    (evidenceEq : row.evidence =
+      .assumption owner.requirement.predicate)
+    (occurrence : NodeId)
+    (occurs : PrimaryRequirementOccursAt source occurrence row.id)
+    (scope : owner.Scopes source occurrence) :
+    LocalSchemeTemplateRowScoped (source.applySubstitution substitution)
+      (applyLocalSchemeTemplateRow substitution owner row) := by
+  refine .intro (applyLocalSchemeTemplateOwner substitution owner)
+    (FlexibleSubstitution.ContainsLocalSchemeTemplate.applySubstitution
+      substitution contains) ?_ ?_ ?_ occurrence ?_ ?_
+  · simpa [applyLocalSchemeTemplateRow] using idEq
+  · simpa [applyLocalSchemeTemplateRow, applySolvedRequirement,
+      applyLocalSchemeTemplateOwner,
+      LocalSchemeRequirement.applySubstitution] using congrArg
+        (TypedTraitResolution.applySubstitution
+          (substitution.without owner.binder.scheme.quantified)) predicateEq
+  · simpa [applyLocalSchemeTemplateRow, applySolvedRequirement,
+      applyLocalSchemeTemplateOwner,
+      LocalSchemeRequirement.applySubstitution, applyPredicateEvidence] using
+        congrArg (applyPredicateEvidence
+          (substitution.without owner.binder.scheme.quantified)) evidenceEq
+  · simpa [applyLocalSchemeTemplateRow] using
+      (primaryRequirementOccursAt_applySubstitution substitution source
+        occurrence row.id).mpr occurs
+  · exact LocalSchemeTemplateOwner.Scopes.applySubstitution substitution scope
+
+/-- Every scoped template row has an owner-local transport with the same
+primary occurrence and initializer subtree. -/
+theorem LocalSchemeTemplateRowScoped.applySubstitution
+    {source : TypedSource} {row : SolvedRequirement}
+    (substitution : Substitution)
+    (rowScoped : LocalSchemeTemplateRowScoped source row) :
+    ∃ owner, ContainsLocalSchemeTemplate source owner ∧
+      LocalSchemeTemplateRowScoped (source.applySubstitution substitution)
+        (applyLocalSchemeTemplateRow substitution owner row) := by
+  cases rowScoped with
+  | intro owner contains idEq predicateEq evidenceEq occurrence occurs scope =>
+      exact ⟨owner, contains,
+        LocalSchemeTemplateRowScoped.applySubstitutionForOwner substitution
+          owner contains idEq predicateEq evidenceEq occurrence occurs scope⟩
+
+/-- Closing flexible types preserves exact primary-to-ledger requirement
+ownership because neither side changes stable requirement identities. -/
+theorem RequirementOwnership.applySubstitution
+    (substitution : Substitution) {context : Context}
+    {source : TypedSource}
+    (ownership : RequirementOwnership context source) :
+    RequirementOwnership (closeContext substitution context)
+      (source.applySubstitution substitution) := by
+  constructor
+  · simpa using ownership.primary_unique
+  · simpa [closeContext, applySolvedRequirement, List.map_map,
+      Function.comp_def] using ownership.ledger_exact
+
 @[simp] theorem closeContext_signatures (substitution : Substitution)
     (context : Context) :
     (closeContext substitution context).signatures = context.signatures := by
