@@ -21,6 +21,7 @@ import Solcore.SourceSemantics.Static
 import Solcore.SourceSemantics.Program
 import Solcore.SourceSemantics.SubstitutionProperties
 import Solcore.SourceSemantics.TraitSubstitutionProperties
+import Solcore.SourceSemantics.SourceInferenceSoundness
 import Solcore.SourceSemantics.Dynamic
 import Solcore.SourceSemantics.Staging
 

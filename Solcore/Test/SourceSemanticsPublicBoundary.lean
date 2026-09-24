@@ -240,6 +240,7 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.ForItemsHaveType.contex
 example := @Solcore.SourceSemantics.FlexibleSubstitution.StatementsHaveType.applySubstitution
 example := @Solcore.SourceSemantics.FlexibleSubstitution.BodyHasType.applySubstitution
 example := @Solcore.SourceSemantics.FlexibleSubstitution.BodyHasType.close
+example := @Solcore.SourceSemantics.FlexibleSubstitution.finalize_bodyHasType
 example := @Solcore.SourceSemantics.FlexibleSubstitution.BodyCompletes.applySubstitution
 example := @Solcore.SourceSemantics.FlexibleSubstitution.mergeBodyControls_applyBodyFacts
 example := @Solcore.SourceSemantics.FlexibleSubstitution.applySolvedRequirement_id

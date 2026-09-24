@@ -6,6 +6,8 @@ namespace Tests
 
 example :=
   @Solcore.Frontend.SourceInference.Detail.solveRequirements_ids_nodup
+example := @Solcore.Frontend.SourceInference.Detail.finalize_type
+example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource
 
 example := @Solcore.Frontend.LocalNameTable
 example := @Solcore.Frontend.LocalNameTable.lookup?
