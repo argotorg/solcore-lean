@@ -9168,6 +9168,121 @@ theorem ReferenceUseValid.applySubstitution
       simpa [ReferenceResolution.applySubstitution] using
         (ReferenceUseValid.builtinBoolean (context := target) value)
 
+/-- A declaration application remains admissible when its ambient flexible
+variables are instantiated.  The occurrence's rigid substitution is mapped
+pointwise, while the declaration signature itself remains unchanged. -/
+theorem DeclarationApplicationValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    {instantiation : DeclarationInstantiation}
+    {parameterTypes : List Ty} {resultType : Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : DeclarationApplicationValid source instantiation parameterTypes
+      resultType predicates) :
+    DeclarationApplicationValid target
+      (instantiation.applySubstitution substitution)
+      (parameterTypes.map substitution.apply) (substitution.apply resultType)
+      (predicates.map
+        (TypedTraitResolution.applySubstitution substitution)) := by
+  cases valid with
+  | intro signatureMem instantiationValid declarationEq
+      parameterTypesEq resultTypeEq functionTypeEq predicatesEq =>
+      rename_i signature
+      cases instantiationValid with
+      | intro selectedSignature selectedMem selectedDeclarationEq innerExact
+          innerRange instantiationTypeEq instantiationPredicatesEq
+          parameterComptimeEq returnComptimeEq =>
+      have selectedEq : selectedSignature = signature :=
+        StructuralSubstitution.eq_of_mem_of_mapped_nodup
+          catalog.function_ids selectedMem signatureMem
+          (by rw [← selectedDeclarationEq, declarationEq])
+      subst selectedSignature
+      have instantiationValid :
+          SourceSemantics.DeclarationInstantiation.Admissible source
+            instantiation :=
+        .intro signature selectedMem selectedDeclarationEq innerExact innerRange
+          instantiationTypeEq instantiationPredicatesEq parameterComptimeEq
+          returnComptimeEq
+      have signatureWellFormed := catalog.functions_semantic signature signatureMem
+      have parameterCompose :=
+        TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext source.signatures signature.id
+            signature.scheme.parameters signature.scheme.predicates)
+          substitution instantiation.parameterSubstitution innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            signatureWellFormed.parameter_types)
+      have resultScoped :=
+        StructuralSubstitution.TypesWellScoped.productMany
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            signatureWellFormed.return_types)
+      have resultCompose :=
+        TypeWellScoped.applyFlexible_composeParameters
+          (context := signatureContext source.signatures signature.id
+            signature.scheme.parameters signature.scheme.predicates)
+          substitution instantiation.parameterSubstitution innerExact
+          resultScoped
+      exact .intro (by
+          rw [← contextValid.closes.target_eq]
+          exact signatureMem)
+        (DeclarationInstantiation.Admissible.applySubstitution catalog
+          contextValid instantiationValid)
+        declarationEq
+        (by
+          change signature.parameterTypes.map
+              (ParameterSubstitution.mapRange substitution
+                instantiation.parameterSubstitution).apply =
+            parameterTypes.map substitution.apply
+          rw [← parameterCompose, parameterTypesEq])
+        (by
+          change (ParameterSubstitution.mapRange substitution
+              instantiation.parameterSubstitution).apply
+              (Ty.productMany signature.returnTypes) =
+            substitution.apply resultType
+          rw [← resultCompose, resultTypeEq])
+        (by
+          simp [DeclarationInstantiation.applySubstitution, functionTypeEq,
+            apply_productMany])
+        (by
+          simp [DeclarationInstantiation.applySubstitution, predicatesEq])
+
+/-- Flexible substitution preserves a declaration-valued callee occurrence,
+including its mapped instantiation and empty coercion/evidence annotations. -/
+theorem DirectDeclarationCalleeValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext : Context}
+    {source : TypedSource} {callee : ExpressionId}
+    {instantiation : DeclarationInstantiation}
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : ContextSubstitutionValid substitution closedVariables
+      sourceContext targetContext)
+    (valid : DirectDeclarationCalleeValid sourceContext source callee
+      instantiation) :
+    DirectDeclarationCalleeValid targetContext
+      (source.applySubstitution substitution) callee
+      (instantiation.applySubstitution substitution) := by
+  cases valid with
+  | @intro node name _ contains formEq instantiationValid typeEq
+      requirementsEq coercionsEq =>
+      exact .intro
+        (ContainsExpression.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .reference name
+              (.declaration
+                (instantiation.applySubstitution substitution))
+          rw [formEq]
+          rfl)
+        (DeclarationInstantiation.Admissible.applySubstitution catalog
+          contextValid instantiationValid)
+        (by
+          simp [ExpressionNode.applySubstitution,
+            DeclarationInstantiation.applySubstitution, typeEq])
+        (by simp [requirementsEq])
+        (by simp [ExpressionNode.applySubstitution, coercionsEq])
+
 /-- A direct builtin callee retains its occurrence identity, empty evidence
 spine, and fixed closed function type under flexible substitution. -/
 theorem DirectBuiltinCalleeValid.applySubstitution
