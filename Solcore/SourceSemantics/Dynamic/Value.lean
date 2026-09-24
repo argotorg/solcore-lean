@@ -43,6 +43,21 @@ structure Closure where
   evidence : EvidenceEnvironment
   deriving Repr
 
+/-- Principal code stored for a generalized direct-lambda local.  Evidence is
+supplied at each use site because distinct instantiations can require distinct
+dictionaries.  The initializer identity keeps the carrier tied to the exact
+source occurrence from which the direct-lambda components were recovered. -/
+structure GeneralizedClosure where
+  binder : TypedBinder
+  initializer : ExpressionId
+  parameters : List TypedBinder
+  resultType : Ty
+  body : List StatementId
+  source : TypedSource
+  captured : Environment
+  definitionContext : Context
+  deriving Repr
+
 /-- A first-class top-level function at one exact generic instantiation. -/
 structure GlobalFunction where
   instantiation : DeclarationInstantiation

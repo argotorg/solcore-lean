@@ -185,6 +185,10 @@ example := @Solcore.SourceSemantics.Program
 example := @Solcore.SourceSemantics.ProgramWellFormed
 
 example := @Solcore.SourceSemantics.Dynamic.Value
+example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure
+example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure.instantiate
+example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure.instantiate_context
+example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure.instantiate_evidence
 example := @Solcore.SourceSemantics.Dynamic.Heap
 example := @Solcore.SourceSemantics.Dynamic.BodyInstance
 example := @Solcore.SourceSemantics.Dynamic.SemanticFault

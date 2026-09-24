@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.Dynamic.Value
+import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.Dynamic.Heap
 import Solcore.SourceSemantics.Dynamic.Typing
 import Solcore.SourceSemantics.Dynamic.Default
