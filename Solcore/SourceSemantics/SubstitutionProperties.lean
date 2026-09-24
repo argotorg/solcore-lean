@@ -1182,17 +1182,66 @@ theorem TypeAdmissible.applyParameters
         StructuralSubstitution.freeVariables_applyParameters substitution range
           type
 
+@[simp] theorem GeneralizationBlockedVariablesExcept.applyParameters
+    {context : Context} (substitution : ParameterSubstitution)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (exemptRequirements : List RequirementId) :
+    GeneralizationBlockedVariablesExcept (applyContext substitution context)
+        exemptRequirements =
+      GeneralizationBlockedVariablesExcept context exemptRequirements := by
+  have ledger :
+      ((context.solvedRequirements.map (applySolvedRequirement substitution)).filter
+          fun requirement => !exemptRequirements.contains requirement.id).flatMap
+            (fun requirement =>
+              Frontend.TypedTraitResolution.predicateVariables
+                requirement.predicate) =
+        (context.solvedRequirements.filter fun requirement =>
+          !exemptRequirements.contains requirement.id).flatMap
+            (fun requirement =>
+              Frontend.TypedTraitResolution.predicateVariables
+                requirement.predicate) := by
+    induction context.solvedRequirements with
+    | nil => rfl
+    | cons requirement requirements induction =>
+        by_cases exempt : exemptRequirements.contains requirement.id
+        · simp [applySolvedRequirement, exempt, induction]
+        · simp [applySolvedRequirement, exempt, induction,
+            StructuralSubstitution.predicateVariables_applyParameters
+              substitution range]
+  simp [GeneralizationBlockedVariablesExcept, applyContext, applyLocals,
+    StructuralSubstitution.Scheme.freeVariables_applyScheme substitution range,
+    List.flatMap_map, ledger]
+
 @[simp] theorem GeneralizationBlockedVariables.applyParameters
     {context : Context} (substitution : ParameterSubstitution)
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
       (applyContext substitution context) substitution) :
     GeneralizationBlockedVariables (applyContext substitution context) =
       GeneralizationBlockedVariables context := by
-  simp [GeneralizationBlockedVariables, applyContext, applyLocals,
-    applySolvedRequirement,
-    StructuralSubstitution.Scheme.freeVariables_applyScheme substitution range,
-    StructuralSubstitution.predicateVariables_applyParameters substitution range,
-    List.flatMap_map]
+  exact GeneralizationBlockedVariablesExcept.applyParameters substitution range []
+
+theorem SchemeGeneralizesExcept.applyParameters
+    {context : Context} {scheme : Scheme}
+    (substitution : ParameterSubstitution)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (exemptRequirements : List RequirementId)
+    (generalizes : SchemeGeneralizesExcept context exemptRequirements scheme) :
+    SchemeGeneralizesExcept (applyContext substitution context)
+      exemptRequirements (applyScheme substitution scheme) := by
+  unfold SchemeGeneralizesExcept at generalizes ⊢
+  change
+    scheme.quantified =
+      (substitution.apply scheme.body).freeVariables.filter
+        (fun metavariable =>
+          !(GeneralizationBlockedVariablesExcept
+            (applyContext substitution context) exemptRequirements).contains
+              metavariable)
+  rw [StructuralSubstitution.freeVariables_applyParameters substitution range,
+    StructuralSubstitution.GeneralizationBlockedVariablesExcept.applyParameters
+      substitution range]
+  exact generalizes
 
 theorem SchemeGeneralizes.applyParameters
     {context : Context} {scheme : Scheme}
@@ -1202,17 +1251,7 @@ theorem SchemeGeneralizes.applyParameters
     (generalizes : SchemeGeneralizes context scheme) :
     SchemeGeneralizes (applyContext substitution context)
       (applyScheme substitution scheme) := by
-  unfold SchemeGeneralizes at generalizes ⊢
-  change
-    scheme.quantified =
-      (substitution.apply scheme.body).freeVariables.filter
-        (fun metavariable =>
-          !(GeneralizationBlockedVariables
-            (applyContext substitution context)).contains metavariable)
-  rw [StructuralSubstitution.freeVariables_applyParameters substitution range,
-    StructuralSubstitution.GeneralizationBlockedVariables.applyParameters
-      substitution range]
-  exact generalizes
+  exact SchemeGeneralizesExcept.applyParameters substitution range [] generalizes
 
 theorem SchemeWellFormed.applyParameters
     {context : Context} {scheme : Scheme}
@@ -1673,6 +1712,39 @@ theorem PredicateWellFormed.applyParameters
         exact ⟨signature, by simpa [applyContext] using member, idEq,
           by simpa [ProgramPredicate.applyParameters] using arity⟩
 
+theorem PredicateAdmissible.applyParameters
+    {context : Context} {predicate : ProgramPredicate}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (admissible : PredicateAdmissible context predicate) :
+    PredicateAdmissible (applyContext substitution context)
+      (ProgramPredicate.applyParameters substitution predicate) := by
+  constructor
+  · exact StructuralSubstitution.TypeAdmissible.applyParameters substitution
+      exact range admissible.subject
+  · intro argument member
+    rcases List.mem_map.mp member with ⟨original, originalMember, argumentEq⟩
+    subst argument
+    exact StructuralSubstitution.TypeAdmissible.applyParameters substitution
+      exact range (admissible.arguments original originalMember)
+  · cases traitEq : predicate.trait with
+    | builtin builtin =>
+        cases builtin with
+        | int =>
+            have traitValid := admissible.trait
+            rw [traitEq] at traitValid
+            simpa [ProgramPredicate.applyParameters, traitEq] using traitValid
+    | declaration id =>
+        have traitValid := admissible.trait
+        rw [traitEq] at traitValid
+        rcases traitValid with ⟨signature, member, idEq, arity⟩
+        simp only [ProgramPredicate.applyParameters, traitEq]
+        exact ⟨signature, by simpa [applyContext] using member, idEq,
+          by simpa [ProgramPredicate.applyParameters] using arity⟩
+
 theorem PredicatesWellFormed.applyParameters
     {context : Context} {predicates : List ProgramPredicate}
     (substitution : ParameterSubstitution)
@@ -1776,6 +1848,17 @@ end ParameterSubstitution.RangeWellFormed
     applyContext substitution context.withResidualTypeVariables =
       (applyContext substitution context).withResidualTypeVariables := by
   rfl
+
+@[simp] theorem applyContext_localSchemeInitializerContext
+    (substitution : ParameterSubstitution) (context : Context)
+    (binder : TypedBinder) :
+    applyContext substitution (localSchemeInitializerContext context binder) =
+      localSchemeInitializerContext (applyContext substitution context)
+        (applyBinder substitution binder) := by
+  simp [localSchemeInitializerContext, applyContext, Context.withTypeVariables,
+    Context.withAssumptions, applyBinder, applyScheme,
+    LocalSchemeRequirement.applyParameters, List.map_map,
+    Function.comp_def]
 
 @[simp] theorem applyContext_declarationContext
     (substitution : ParameterSubstitution) (signatures : ProgramSignatures)
@@ -1883,6 +1966,41 @@ theorem ContextSubstitutionValid.withTypeVariables
       (target := applyContext substitution
         (context.withTypeVariables variables))
       rfl rfl (valid.requirements requirement originalMember)
+}
+
+/-- Rigid substitution remains valid while the predicates abstracted by a
+qualified local scheme are temporarily added as initializer assumptions. -/
+theorem ContextSubstitutionValid.localSchemeInitializer
+    {substitution : ParameterSubstitution} {context : Context}
+    (valid : ContextSubstitutionValid substitution context)
+    (binder : TypedBinder) :
+    ContextSubstitutionValid substitution
+      (localSchemeInitializerContext context binder) := {
+  exact := by
+    simpa [localSchemeInitializerContext, Context.withTypeVariables,
+      Context.withAssumptions] using valid.exact
+  range := by
+    intro parameter replacement member
+    exact StructuralSubstitution.TypeWellFormed.transportContext
+      (source := applyContext substitution context)
+      (target := applyContext substitution
+        (localSchemeInitializerContext context binder))
+      rfl rfl rfl (valid.range parameter replacement member)
+  requirements := by
+    intro requirement member
+    have originalMember : requirement ∈ context.solvedRequirements := by
+      simpa [localSchemeInitializerContext, Context.withTypeVariables,
+        Context.withAssumptions] using member
+    cases valid.requirements requirement originalMember with
+    | intro evidenceValid =>
+        exact .intro (evidenceValid.weakenAssumptions (by
+          intro predicate predicateMem
+          rw [StructuralSubstitution.applyContext_localSchemeInitializerContext]
+          change predicate ∈
+            (applyContext substitution context).assumptions ++
+              (applyBinder substitution binder).schemeRequirements.map
+                (fun requirement => requirement.predicate)
+          exact List.mem_append_left _ predicateMem))
 }
 
 theorem RequirementProves.applyParameters
@@ -2872,6 +2990,12 @@ theorem PatternBinderValid.applyParameters
       owned := original.owned
       scheme := StructuralSubstitution.SchemeWellFormed.applyParameters
         substitution contextValid.exact contextValid.range original.scheme
+      monomorphic_requirements_empty := by
+        intro quantifiedEmpty
+        have originalQuantifiedEmpty : binder.scheme.quantified = [] := by
+          simpa [applyBinder, applyScheme] using quantifiedEmpty
+        simp [applyBinder, original.monomorphic_requirements_empty
+          originalQuantifiedEmpty]
     }
 
 theorem PatternBindersDistinct.applyParameters
@@ -3195,6 +3319,96 @@ theorem MatchExhaustive.applyParameters
           StructuralSubstitution.PatternCoversConstructor.applyParameters
             covers⟩
 
+@[simp] theorem localSchemeTemplateIds_applyBinder
+    (substitution : ParameterSubstitution) (binder : TypedBinder) :
+    localSchemeTemplateIds (applyBinder substitution binder) =
+      localSchemeTemplateIds binder := by
+  simp [localSchemeTemplateIds, applyBinder,
+    LocalSchemeRequirement.applyParameters, List.map_map,
+    Function.comp_def]
+
+theorem LocalSchemeRequirementWellFormed.applyParameters
+    {context : Context} {binder : TypedBinder}
+    {requirement : LocalSchemeRequirement}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : LocalSchemeRequirementWellFormed context binder requirement) :
+    LocalSchemeRequirementWellFormed (applyContext substitution context)
+      (applyBinder substitution binder)
+      (requirement.applyParameters substitution) := by
+  have initializerExact :
+      SourceSemantics.ParameterSubstitution.Exact substitution
+        (localSchemeInitializerContext context binder).typeParameters := by
+    simpa [localSchemeInitializerContext, Context.withTypeVariables,
+      Context.withAssumptions] using exact
+  have initializerRange :
+      SourceSemantics.ParameterSubstitution.RangeWellFormed
+        (applyContext substitution
+          (localSchemeInitializerContext context binder)) substitution := by
+    intro parameter replacement member
+    exact StructuralSubstitution.TypeWellFormed.transportContext
+      (source := applyContext substitution context)
+      (target := applyContext substitution
+        (localSchemeInitializerContext context binder))
+      rfl rfl rfl (range parameter replacement member)
+  constructor
+  · simpa [StructuralSubstitution.applyContext_localSchemeInitializerContext,
+      LocalSchemeRequirement.applyParameters] using
+      (StructuralSubstitution.PredicateAdmissible.applyParameters substitution
+        initializerExact initializerRange wellFormed.predicate)
+  · rcases wellFormed.depends_on_quantified with
+      ⟨metavariable, quantified, occurs⟩
+    refine ⟨metavariable, ?_, ?_⟩
+    · simpa [applyBinder, applyScheme] using quantified
+    · simpa [LocalSchemeRequirement.applyParameters,
+        StructuralSubstitution.predicateVariables_applyParameters substitution
+          range] using occurs
+  · rcases wellFormed.template with
+      ⟨solved, solvedUnique, idEq, predicateEq, evidenceEq⟩
+    refine ⟨applySolvedRequirement substitution solved, ?_, ?_, ?_, ?_⟩
+    · have filtered :
+          ((context.solvedRequirements.map
+              (applySolvedRequirement substitution)).filter fun candidate =>
+                candidate.id == requirement.templateRequirement) =
+            (context.solvedRequirements.filter fun candidate =>
+                candidate.id == requirement.templateRequirement).map
+              (applySolvedRequirement substitution) := by
+          induction context.solvedRequirements with
+          | nil => rfl
+          | cons candidate requirements induction =>
+              by_cases selected :
+                  candidate.id == requirement.templateRequirement
+              · simp [applySolvedRequirement, selected, induction]
+              · simp [applySolvedRequirement, selected, induction]
+      simpa [applyContext, LocalSchemeRequirement.applyParameters, filtered]
+        using congrArg
+          (List.map (applySolvedRequirement substitution)) solvedUnique
+    · exact idEq
+    · simp [applySolvedRequirement, LocalSchemeRequirement.applyParameters,
+        predicateEq]
+    · simp [applySolvedRequirement, applyPredicateEvidence,
+        LocalSchemeRequirement.applyParameters, evidenceEq]
+
+theorem LocalSchemeRequirementsWellFormed.applyParameters
+    {context : Context} {binder : TypedBinder}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : LocalSchemeRequirementsWellFormed context binder) :
+    LocalSchemeRequirementsWellFormed (applyContext substitution context)
+      (applyBinder substitution binder) := by
+  constructor
+  · simpa using wellFormed.ids_unique
+  · intro requirement member
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    exact StructuralSubstitution.LocalSchemeRequirementWellFormed.applyParameters
+      substitution exact range (wellFormed.entries original originalMem)
+
 theorem BinderWellFormed.applyParameters
     {context : Context} {owner : Resolved.DeclarationId}
     {binder : TypedBinder}
@@ -3209,6 +3423,12 @@ theorem BinderWellFormed.applyParameters
   owned := wellFormed.owned
   scheme := StructuralSubstitution.SchemeWellFormed.applyParameters substitution
     exact range wellFormed.scheme
+  monomorphic_requirements_empty := by
+    intro quantifiedEmpty
+    have originalQuantifiedEmpty : binder.scheme.quantified = [] := by
+      simpa [applyBinder, applyScheme] using quantifiedEmpty
+    simp [applyBinder, wellFormed.monomorphic_requirements_empty
+      originalQuantifiedEmpty]
 }
 
 theorem BinderExtends.applyParameters
@@ -3357,7 +3577,7 @@ theorem StatementHasType.signatures_eq
   cases typing with
   | letUninitialized _ _ _ _ extension _ => exact extension.context_fields.1
   | letInitialized _ _ _ _ _ extension _ => exact extension.context_fields.1
-  | letInitializedGeneralized _ _ _ _ _ extension _ =>
+  | letInitializedGeneralized _ _ _ _ _ _ extension _ =>
       exact extension.context_fields.1
   | returnUnit | returnValue | expressionValue | expressionDiscard |
       assignValue | assignBitNot | ifWithoutElse | ifWithElse | block |
@@ -3376,7 +3596,7 @@ theorem StatementHasType.contextSubstitutionValid
       exact contextValid.afterBinder extension
   | letInitialized _ _ _ _ _ extension _ =>
       exact contextValid.afterBinder extension
-  | letInitializedGeneralized _ _ _ _ _ extension _ =>
+  | letInitializedGeneralized _ _ _ _ _ _ extension _ =>
       exact contextValid.afterBinder extension
   | returnUnit | returnValue | expressionValue | expressionDiscard |
       assignValue | assignBitNot | ifWithoutElse | ifWithElse | block |
@@ -3391,7 +3611,7 @@ theorem ForItemHasType.signatures_eq
   cases typing with
   | letUninitialized _ _ extension => exact extension.context_fields.1
   | letInitialized _ _ _ extension => exact extension.context_fields.1
-  | letInitializedGeneralized _ _ _ extension =>
+  | letInitializedGeneralized _ _ _ _ extension =>
       exact extension.context_fields.1
   | expression | assignValue | assignBitNot => rfl
 
@@ -3405,7 +3625,7 @@ theorem ForItemHasType.contextSubstitutionValid
   cases typing with
   | letUninitialized _ _ extension => exact contextValid.afterBinder extension
   | letInitialized _ _ _ extension => exact contextValid.afterBinder extension
-  | letInitializedGeneralized _ _ _ extension =>
+  | letInitializedGeneralized _ _ _ _ extension =>
       exact contextValid.afterBinder extension
   | expression | assignValue | assignBitNot => exact contextValid
 
@@ -3926,7 +4146,7 @@ theorem StatementsHaveType.applyParameters
         (by simpa [applyStatementNode] using
           (congrArg substitution.apply typeEq)))
   · intro control context final id node binder initializer contains formEq
-      polymorphic generalizes initializerType extension typeEq
+      polymorphic requirementsWellFormed generalizes initializerType extension typeEq
       initializerInduction catalog contextValid
     simpa [applyStatementFacts] using
       (StatementHasType.letInitializedGeneralized
@@ -3938,13 +4158,19 @@ theorem StatementsHaveType.applyParameters
           rw [formEq]
           rfl)
         (by simpa [applyBinder, applyScheme] using polymorphic)
-        (StructuralSubstitution.SchemeGeneralizes.applyParameters substitution
-          contextValid.range generalizes)
+        (StructuralSubstitution.LocalSchemeRequirementsWellFormed.applyParameters
+          substitution contextValid.exact contextValid.range
+          requirementsWellFormed)
         (by
-          simpa [applyBinder, applyScheme,
-            StructuralSubstitution.applyContext_withTypeVariables] using
+          rw [StructuralSubstitution.localSchemeTemplateIds_applyBinder]
+          simpa [applyBinder] using
+            (StructuralSubstitution.SchemeGeneralizesExcept.applyParameters
+              substitution contextValid.range (localSchemeTemplateIds binder)
+              generalizes))
+        (by
+          simpa [applyBinder, applyScheme] using
             (initializerInduction catalog
-              (contextValid.withTypeVariables binder.scheme.quantified)))
+              (contextValid.localSchemeInitializer binder)))
         (StructuralSubstitution.BinderExtends.applyParameters substitution
           contextValid.exact contextValid.range extension)
         (by simpa [applyStatementNode] using
@@ -4265,17 +4491,25 @@ theorem StatementsHaveType.applyParameters
         contextValid.range generalizes)
       (StructuralSubstitution.BinderExtends.applyParameters substitution
         contextValid.exact contextValid.range extension)
-  · intro control context final binder initializer polymorphic generalizes
-      initializerType extension initializerInduction catalog contextValid
+  · intro control context final binder initializer polymorphic
+      requirementsWellFormed generalizes initializerType extension
+      initializerInduction catalog
+      contextValid
     exact .letInitializedGeneralized
       (by simpa [applyBinder, applyScheme] using polymorphic)
-      (StructuralSubstitution.SchemeGeneralizes.applyParameters substitution
-        contextValid.range generalizes)
+      (StructuralSubstitution.LocalSchemeRequirementsWellFormed.applyParameters
+        substitution contextValid.exact contextValid.range
+        requirementsWellFormed)
       (by
-        simpa [applyBinder, applyScheme,
-          StructuralSubstitution.applyContext_withTypeVariables] using
+        rw [StructuralSubstitution.localSchemeTemplateIds_applyBinder]
+        simpa [applyBinder] using
+          (StructuralSubstitution.SchemeGeneralizesExcept.applyParameters
+            substitution contextValid.range (localSchemeTemplateIds binder)
+            generalizes))
+      (by
+        simpa [applyBinder, applyScheme] using
           (initializerInduction catalog
-            (contextValid.withTypeVariables binder.scheme.quantified)))
+            (contextValid.localSchemeInitializer binder)))
       (StructuralSubstitution.BinderExtends.applyParameters substitution
         contextValid.exact contextValid.range extension)
   · intro control context expression type expressionType expressionInduction

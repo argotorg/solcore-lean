@@ -250,7 +250,8 @@ theorem precedingLocalVariableBlocksGeneralization
         quantified := []
         body := .variable blocked
       }) := by
-  simp [GeneralizationBlockedVariables, Context.withLocal,
+  simp [GeneralizationBlockedVariables, GeneralizationBlockedVariablesExcept,
+    Context.withLocal,
     TypeSystem.Scheme.freeVariables, TypeSystem.Ty.freeVariables]
 
 /-- Variables retained by solved predicates also participate in the
@@ -269,7 +270,8 @@ theorem solvedRequirementVariableBlocksGeneralization
     }
     blocked ∈ GeneralizationBlockedVariables
       (context.withSolvedRequirements [requirement]) := by
-  simp [GeneralizationBlockedVariables, Context.withSolvedRequirements,
+  simp [GeneralizationBlockedVariables, GeneralizationBlockedVariablesExcept,
+    Context.withSolvedRequirements,
     Frontend.TypedTraitResolution.predicateVariables,
     TypeSystem.Ty.freeVariables]
 
@@ -295,11 +297,252 @@ theorem generalizesOnlyFreshVariable
       body := .product (.variable ambient) (.variable fresh)
     } := by
   unfold SchemeGeneralizes
-  rw [blocked]
+  unfold SchemeGeneralizesExcept
+  rw [GeneralizationBlockedVariablesExcept_nil, blocked]
   change [fresh] =
     (if fresh ∈ [ambient] then [ambient] else [ambient] ++ [fresh]).filter
       (fun metavariable => ![ambient].contains metavariable)
   simp [different]
+
+private def qualifiedLocalTemplateId :
+    Frontend.SourceInference.RequirementId :=
+  ⟨100⟩
+
+private def qualifiedLocalPredicate (fresh : TypeVarId) :
+    ProgramPredicate :=
+  ProgramSignatures.builtinIntPredicate (.variable fresh)
+
+private def qualifiedLocalTemplate (fresh : TypeVarId) :
+    Frontend.SourceInference.SolvedRequirement := {
+  id := qualifiedLocalTemplateId
+  predicate := qualifiedLocalPredicate fresh
+  evidence := .assumption (qualifiedLocalPredicate fresh)
+}
+
+private def qualifiedLocalRequirement (fresh : TypeVarId) :
+    Frontend.SourceInference.LocalSchemeRequirement := {
+  templateRequirement := qualifiedLocalTemplateId
+  predicate := qualifiedLocalPredicate fresh
+}
+
+private def qualifiedLocalBinder
+    (owner : Resolved.DeclarationId) (fresh : TypeVarId) :
+    Frontend.SourceInference.TypedBinder := {
+  id := ⟨owner, 100⟩
+  name := "qualified"
+  scheme := {
+    quantified := [fresh]
+    body := .function (.variable fresh) (.variable fresh)
+  }
+  schemeRequirements := [qualifiedLocalRequirement fresh]
+}
+
+private def qualifiedLocalContext
+    (signatures : ProgramSignatures) (fresh : TypeVarId) :
+    Solcore.SourceSemantics.Context :=
+  (Context.ofSignatures signatures).withSolvedRequirements
+    [qualifiedLocalTemplate fresh]
+
+private def duplicateQualifiedLocalContext
+    (signatures : ProgramSignatures) (fresh : TypeVarId) :
+    Solcore.SourceSemantics.Context :=
+  (Context.ofSignatures signatures).withSolvedRequirements
+    [qualifiedLocalTemplate fresh, qualifiedLocalTemplate fresh]
+
+/-- A qualified local predicate is formed in the initializer scope, where
+the scheme variable is admissible and the exact retained assumption row is
+identified by its stable template requirement ID. -/
+theorem qualifiedLocalRequirementFormation
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    LocalSchemeRequirementWellFormed
+      (qualifiedLocalContext signatures fresh)
+      (qualifiedLocalBinder owner fresh)
+      (qualifiedLocalRequirement fresh) := by
+  constructor
+  · constructor
+    · constructor
+      · constructor
+        · simp [qualifiedLocalContext, localSchemeInitializerContext,
+            qualifiedLocalBinder, Context.ofSignatures,
+            Context.withSolvedRequirements, Context.withTypeVariables,
+            Context.withAssumptions]
+        · intro parameter member
+          simp [qualifiedLocalContext, localSchemeInitializerContext,
+            qualifiedLocalBinder, Context.ofSignatures,
+            Context.withSolvedRequirements, Context.withTypeVariables,
+            Context.withAssumptions] at member
+      · apply TypeWellScoped.variable
+        simp [admissibleTypeVariables, qualifiedLocalContext,
+          localSchemeInitializerContext, qualifiedLocalBinder,
+          Context.ofSignatures, Context.withSolvedRequirements,
+          Context.withTypeVariables, Context.withAssumptions]
+    · intro argument member
+      simp [qualifiedLocalRequirement, qualifiedLocalPredicate,
+        ProgramSignatures.builtinIntPredicate] at member
+    · rfl
+  · refine ⟨fresh, by simp [qualifiedLocalBinder], ?_⟩
+    simp [qualifiedLocalRequirement, qualifiedLocalPredicate,
+      ProgramSignatures.builtinIntPredicate,
+      Frontend.TypedTraitResolution.predicateVariables,
+      TypeSystem.Ty.freeVariables]
+  · refine ⟨qualifiedLocalTemplate fresh, ?_, rfl, rfl, rfl⟩
+    change [qualifiedLocalTemplate fresh].filter (fun candidate =>
+      candidate.id == (qualifiedLocalTemplate fresh).id) =
+        [qualifiedLocalTemplate fresh]
+    have selected :
+        ((qualifiedLocalTemplate fresh).id ==
+          (qualifiedLocalTemplate fresh).id) = true :=
+      by rfl
+    rw [List.filter_cons, if_pos selected]
+    rfl
+
+/-- The source-ordered singleton set of qualified predicates satisfies the
+binder-level uniqueness and pointwise-formation judgment. -/
+theorem qualifiedLocalRequirementsFormation
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    LocalSchemeRequirementsWellFormed
+      (qualifiedLocalContext signatures fresh)
+      (qualifiedLocalBinder owner fresh) := by
+  constructor
+  · simp [localSchemeTemplateIds, qualifiedLocalBinder,
+      qualifiedLocalRequirement]
+  · intro requirement member
+    simp [qualifiedLocalBinder] at member
+    subst requirement
+    exact qualifiedLocalRequirementFormation signatures owner fresh
+
+/-- Abstracting a template requirement removes only that row from the exact
+generalization barrier, so its predicate variable can be quantified. -/
+theorem qualifiedLocalTemplateIsExemptFromGeneralization
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    SchemeGeneralizesExcept (qualifiedLocalContext signatures fresh)
+      (localSchemeTemplateIds (qualifiedLocalBinder owner fresh))
+      (qualifiedLocalBinder owner fresh).scheme := by
+  have filtered :
+      (qualifiedLocalContext signatures fresh).solvedRequirements.filter
+          (fun requirement =>
+            !(localSchemeTemplateIds
+              (qualifiedLocalBinder owner fresh)).contains requirement.id) =
+        [] := by
+    change [qualifiedLocalTemplate fresh].filter _ = []
+    simp only [List.filter_cons, List.filter_nil]
+    have contained :
+        (localSchemeTemplateIds (qualifiedLocalBinder owner fresh)).contains
+            (qualifiedLocalTemplate fresh).id = true := by
+      simp [localSchemeTemplateIds, qualifiedLocalBinder,
+        qualifiedLocalRequirement, qualifiedLocalTemplate,
+        qualifiedLocalTemplateId]
+      exact beq_self_eq_true' (qualifiedLocalTemplate fresh).id
+    rw [contained]
+    rfl
+  have blocked :
+      GeneralizationBlockedVariablesExcept
+          (qualifiedLocalContext signatures fresh)
+          (localSchemeTemplateIds (qualifiedLocalBinder owner fresh)) = [] := by
+    unfold GeneralizationBlockedVariablesExcept
+    rw [filtered]
+    simp [qualifiedLocalContext, Context.ofSignatures,
+      Context.withSolvedRequirements]
+  unfold SchemeGeneralizesExcept
+  rw [blocked]
+  change [fresh] =
+    (if fresh ∈ [fresh] then [fresh] else [fresh] ++ [fresh]).filter
+      (fun _ => true)
+  simp
+
+/-- The initializer-only assumption scope validates the retained template.
+This deliberately does not claim whole-body `RequirementLedgerWellFormed`:
+open template rows are integrated with that global judgment in a later step. -/
+theorem qualifiedLocalInitializerProvesTemplate
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    RequirementProves
+      (localSchemeInitializerContext (qualifiedLocalContext signatures fresh)
+        (qualifiedLocalBinder owner fresh))
+      qualifiedLocalTemplateId (qualifiedLocalPredicate fresh) := by
+  refine ⟨qualifiedLocalTemplate fresh, ?_⟩
+  constructor
+  · constructor
+    · simp [qualifiedLocalContext, localSchemeInitializerContext,
+        qualifiedLocalBinder, Context.withSolvedRequirements,
+        Context.withTypeVariables, Context.withAssumptions]
+    · rfl
+  · constructor
+    · simp [qualifiedLocalTemplate]
+    · unfold qualifiedLocalTemplate
+      apply SolvedRequirementValid.intro
+      apply RetainedEvidenceValid.intro (.assumption _)
+      apply EvidenceValid.assumption
+      simp [qualifiedLocalContext, localSchemeInitializerContext,
+        qualifiedLocalBinder, qualifiedLocalRequirement,
+        Context.ofSignatures, Context.withSolvedRequirements,
+        Context.withTypeVariables, Context.withAssumptions]
+
+/-- Duplicate template identities are rejected before use-site
+instantiation. -/
+theorem duplicateQualifiedLocalTemplatesRejected
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    ¬ LocalSchemeRequirementsWellFormed
+      (qualifiedLocalContext signatures fresh)
+      { (qualifiedLocalBinder owner fresh) with
+        schemeRequirements :=
+          [qualifiedLocalRequirement fresh, qualifiedLocalRequirement fresh] } := by
+  intro wellFormed
+  simpa [localSchemeTemplateIds, qualifiedLocalBinder,
+    qualifiedLocalRequirement] using wellFormed.ids_unique
+
+/-- A qualified predicate cannot cite a template row absent from the source
+requirement ledger. -/
+theorem missingQualifiedLocalTemplateRejected
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    ¬ LocalSchemeRequirementWellFormed
+      (Context.ofSignatures signatures)
+      (qualifiedLocalBinder owner fresh)
+      (qualifiedLocalRequirement fresh) := by
+  intro wellFormed
+  rcases wellFormed.template with ⟨solved, member, _⟩
+  simp [Context.ofSignatures] at member
+
+/-- A template identity denotes exactly one ledger occurrence; duplicating
+even an otherwise identical retained row is rejected. -/
+theorem duplicateQualifiedLocalLedgerRowsRejected
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    ¬ LocalSchemeRequirementWellFormed
+      (duplicateQualifiedLocalContext signatures fresh)
+      (qualifiedLocalBinder owner fresh)
+      (qualifiedLocalRequirement fresh) := by
+  intro wellFormed
+  rcases wellFormed.template with ⟨solved, exactOne, _⟩
+  change
+    [qualifiedLocalTemplate fresh, qualifiedLocalTemplate fresh].filter
+      (fun candidate => candidate.id ==
+        (qualifiedLocalTemplate fresh).id) = [solved] at exactOne
+  have selected :
+      ((qualifiedLocalTemplate fresh).id ==
+        (qualifiedLocalTemplate fresh).id) = true :=
+    by rfl
+  rw [List.filter_cons, if_pos selected, List.filter_cons,
+    if_pos selected] at exactOne
+  have lengths := congrArg List.length exactOne
+  simp at lengths
+
+/-- Monomorphic binders cannot smuggle qualified-scheme metadata into
+parameter, pattern, or ordinary-let positions. -/
+theorem monomorphicQualifiedMetadataRejected
+    (context : Solcore.SourceSemantics.Context)
+    (owner : Resolved.DeclarationId) (fresh : TypeVarId) :
+    ¬ BinderWellFormed context owner
+      { (qualifiedLocalBinder owner fresh) with scheme := .mono .word } := by
+  intro wellFormed
+  have empty := wellFormed.monomorphic_requirements_empty (by
+    simp [TypeSystem.Scheme.mono])
+  simp [qualifiedLocalBinder] at empty
 
 private def generalizedLetExpressionId
     (owner : Resolved.DeclarationId) :
@@ -409,8 +652,10 @@ theorem generalizedInitializedLetHasType
       · simp [RequirementIdsValid]
       · exact .nil _
       · rfl
-  have generalizes : SchemeGeneralizes context binder.scheme := by
-    simp [SchemeGeneralizes, GeneralizationBlockedVariables, context,
+  have generalizes : SchemeGeneralizesExcept context
+      (localSchemeTemplateIds binder) binder.scheme := by
+    simp [SchemeGeneralizesExcept, GeneralizationBlockedVariablesExcept,
+      localSchemeTemplateIds, context,
       Context.ofSignatures, binder, generalizedLetBinder,
       TypeSystem.Ty.freeVariables]
   have extension : BinderExtends owner context binder
@@ -419,16 +664,19 @@ theorem generalizedInitializedLetHasType
     · refine {
         owned := by simp [binder, generalizedLetBinder]
         scheme := ?_
+        monomorphic_requirements_empty := ?_
       }
-      refine {
-        binders
-        quantified_nodup := by simp [binder, generalizedLetBinder]
-        body := ?_
-      }
-      apply TypeWellScoped.proxy
-      apply TypeWellScoped.variable
-      simp [admissibleTypeVariables, context, Context.ofSignatures, binder,
-        generalizedLetBinder]
+      · refine {
+          binders
+          quantified_nodup := by simp [binder, generalizedLetBinder]
+          body := ?_
+        }
+        apply TypeWellScoped.proxy
+        apply TypeWellScoped.variable
+        simp [admissibleTypeVariables, context, Context.ofSignatures, binder,
+          generalizedLetBinder]
+      · intro quantifiedEmpty
+        simp [binder, generalizedLetBinder] at quantifiedEmpty
     · simp [LocalFresh, context, Context.ofSignatures]
   change StatementHasType source { returnType := .unit } context statement
     (context.withLocal binder.id binder.scheme) _
@@ -445,8 +693,12 @@ theorem generalizedInitializedLetHasType
       generalizedLetExpressionId]
   · rfl
   · simp [binder, generalizedLetBinder]
+  · exact LocalSchemeRequirementsWellFormed.empty context binder (by
+      simp [binder, generalizedLetBinder])
   · exact generalizes
-  · exact initializerType
+  · simpa [localSchemeInitializerContext, context, binder,
+      generalizedLetBinder, Context.withTypeVariables,
+      Context.withAssumptions] using initializerType
   · exact extension
   · rfl
 

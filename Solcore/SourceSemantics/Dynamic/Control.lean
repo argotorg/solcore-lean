@@ -841,8 +841,8 @@ theorem controlBindersExtend
   | letInitialized contains form_eq initializer_type monomorphic generalizes
       extension type_eq =>
       exact ⟨[_], .cons extension (.nil _)⟩
-  | letInitializedGeneralized contains form_eq polymorphic generalizes
-      initializer_type extension type_eq =>
+  | letInitializedGeneralized contains form_eq polymorphic
+      requirements_well_formed generalizes initializer_type extension type_eq =>
       exact ⟨[_], .cons extension (.nil _)⟩
   | returnUnit | returnValue | expressionValue | expressionDiscard |
       assignValue | assignBitNot | ifWithoutElse | ifWithElse | block |

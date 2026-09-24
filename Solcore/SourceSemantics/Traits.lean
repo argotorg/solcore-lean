@@ -465,6 +465,39 @@ def Entails
 
 namespace EvidenceValid
 
+mutual
+
+/-- Semantic evidence remains valid when more explicit hypotheses become
+available. -/
+theorem weakenAssumptions
+    {smaller larger : List ProgramPredicate}
+    {rules : List ProgramImplRule}
+    {goal : ProgramPredicate} {evidence : TraitEvidence}
+    (included : ∀ predicate, predicate ∈ smaller → predicate ∈ larger)
+    (valid : EvidenceValid smaller rules goal evidence) :
+    EvidenceValid larger rules goal evidence := by
+  cases valid with
+  | assumption goal_mem => exact .assumption (included _ goal_mem)
+  | implementation rule_mem id_eq head_instantiates premises_valid =>
+      exact .implementation rule_mem id_eq head_instantiates
+        (Forall₂EvidenceValid.weakenAssumptions included premises_valid)
+
+/-- Pointwise hypothesis weakening for an evidence-premise spine. -/
+theorem Forall₂EvidenceValid.weakenAssumptions
+    {smaller larger : List ProgramPredicate}
+    {rules : List ProgramImplRule}
+    {goals : List ProgramPredicate} {evidence : List TraitEvidence}
+    (included : ∀ predicate, predicate ∈ smaller → predicate ∈ larger)
+    (valid : Forall₂ (EvidenceValid smaller rules) goals evidence) :
+    Forall₂ (EvidenceValid larger rules) goals evidence := by
+  cases valid with
+  | nil => exact .nil
+  | cons head tail =>
+      exact .cons (EvidenceValid.weakenAssumptions included head)
+        (Forall₂EvidenceValid.weakenAssumptions included tail)
+
+end
+
 theorem evidence_goal_eq
     {assumptions : List ProgramPredicate}
     {rules : List ProgramImplRule}
@@ -611,6 +644,19 @@ inductive RetainedEvidenceValid
       RetainedEvidenceValid assumptions rules goal retained
 
 namespace RetainedEvidenceValid
+
+/-- Retained evidence is monotone in the available assumption set. -/
+theorem weakenAssumptions
+    {smaller larger : List ProgramPredicate}
+    {rules : List ProgramImplRule}
+    {goal : ProgramPredicate}
+    {retained : Frontend.SourceInference.PredicateEvidence}
+    (included : ∀ predicate, predicate ∈ smaller → predicate ∈ larger)
+    (valid : RetainedEvidenceValid smaller rules goal retained) :
+    RetainedEvidenceValid larger rules goal retained := by
+  cases valid with
+  | intro represents semanticValid =>
+      exact .intro represents (semanticValid.weakenAssumptions included)
 
 theorem entails
     {assumptions : List ProgramPredicate}

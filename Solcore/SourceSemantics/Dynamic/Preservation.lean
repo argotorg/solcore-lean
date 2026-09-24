@@ -2722,7 +2722,7 @@ inductive FormTyping (source : TypedSource) (control : ControlContext)
   | letInitializedGeneralized {binder initializer final}
       (polymorphic : binder.scheme.quantified ≠ [])
       (initializer_type : ExpressionHasType source
-        (context.withTypeVariables binder.scheme.quantified) initializer
+        (localSchemeInitializerContext context binder) initializer
         binder.scheme.body)
       (extension : BinderExtends source.owner context binder final) :
       FormTyping source control context (.letDecl binder (some initializer)) final
@@ -2823,8 +2823,8 @@ theorem formTyping
       extension type_eq =>
       exact ⟨_, contains,
         form_eq ▸ .letInitialized initializer_type monomorphic extension⟩
-  | letInitializedGeneralized contains form_eq polymorphic generalizes
-      initializer_type extension type_eq =>
+  | letInitializedGeneralized contains form_eq polymorphic
+      requirements_well_formed generalizes initializer_type extension type_eq =>
       exact ⟨_, contains,
         form_eq ▸ .letInitializedGeneralized polymorphic initializer_type extension⟩
   | returnUnit contains form_eq return_type_eq type_eq =>

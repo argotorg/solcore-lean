@@ -418,9 +418,12 @@ mutual
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .letDecl binder (some initializer))
         (polymorphic : binder.scheme.quantified ≠ [])
-        (generalizes : SchemeGeneralizes context binder.scheme)
+        (requirements_well_formed :
+          LocalSchemeRequirementsWellFormed context binder)
+        (generalizes : SchemeGeneralizesExcept context
+          (localSchemeTemplateIds binder) binder.scheme)
         (initializer_type : ExpressionHasType source
-          (context.withTypeVariables binder.scheme.quantified) initializer
+          (localSchemeInitializerContext context binder) initializer
           binder.scheme.body)
         (extension : BinderExtends source.owner context binder final)
         (type_eq : node.type = .unit) :
@@ -716,9 +719,12 @@ mutual
         {binder : TypedBinder}
         {initializer : ExpressionId}
         (polymorphic : binder.scheme.quantified ≠ [])
-        (generalizes : SchemeGeneralizes context binder.scheme)
+        (requirements_well_formed :
+          LocalSchemeRequirementsWellFormed context binder)
+        (generalizes : SchemeGeneralizesExcept context
+          (localSchemeTemplateIds binder) binder.scheme)
         (initializer_type : ExpressionHasType source
-          (context.withTypeVariables binder.scheme.quantified) initializer
+          (localSchemeInitializerContext context binder) initializer
           binder.scheme.body)
         (extension : BinderExtends source.owner context binder final) :
         ForItemHasType source control context

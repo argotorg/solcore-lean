@@ -119,25 +119,51 @@ structure SchemeWellFormed (context : Context)
     (admissibleTypeVariables context scheme.body ++ scheme.quantified)
     scheme.body
 
-/-- Flexible variables which cannot be generalized at the current lexical
-point.  This is the declarative counterpart of the frontend's generalization
-barrier: ambient initializer variables, free variables of preceding locals,
-and variables mentioned by retained trait obligations all remain shared with
-the surrounding context. -/
-def GeneralizationBlockedVariables (context : Context) :
+/-- Flexible variables which remain blocked after removing a set of
+requirement rows abstracted into the qualified scheme currently being formed.
+The exemption is local to that one binder: once the binder has been installed,
+its template rows again participate in the ordinary barrier for later lets. -/
+def GeneralizationBlockedVariablesExcept (context : Context)
+    (exemptRequirements : List Frontend.SourceInference.RequirementId) :
     List TypeSystem.TypeVarId :=
   context.typeVariables ++
     context.locals.flatMap (fun entry => entry.2.freeVariables) ++
-    context.solvedRequirements.flatMap fun requirement =>
-      Frontend.TypedTraitResolution.predicateVariables requirement.predicate
+    (context.solvedRequirements.filter fun requirement =>
+      !exemptRequirements.contains requirement.id).flatMap fun requirement =>
+        Frontend.TypedTraitResolution.predicateVariables requirement.predicate
 
-/-- A retained local scheme quantifies exactly the flexible variables allowed
-by the declarative rank-1 barrier.  This relation does not assume that the
-frontend generalization algorithm succeeded. -/
-def SchemeGeneralizes (context : Context)
+/-- Flexible variables which cannot be generalized at the current lexical
+point.  This is the no-exemption instance of the qualified generalization
+barrier. -/
+def GeneralizationBlockedVariables (context : Context) :
+    List TypeSystem.TypeVarId :=
+  GeneralizationBlockedVariablesExcept context []
+
+/-- Qualified rank-1 generalization ignores precisely the proof-only
+requirement templates abstracted by this binder. -/
+def SchemeGeneralizesExcept (context : Context)
+    (exemptRequirements : List Frontend.SourceInference.RequirementId)
     (scheme : TypeSystem.Scheme) : Prop :=
   scheme.quantified = scheme.body.freeVariables.filter fun metavariable =>
-    !(GeneralizationBlockedVariables context).contains metavariable
+    !(GeneralizationBlockedVariablesExcept context exemptRequirements).contains
+      metavariable
+
+/-- A retained local scheme with no abstracted predicates quantifies exactly
+the flexible variables allowed by the ordinary rank-1 barrier. -/
+def SchemeGeneralizes (context : Context)
+    (scheme : TypeSystem.Scheme) : Prop :=
+  SchemeGeneralizesExcept context [] scheme
+
+theorem GeneralizationBlockedVariablesExcept_nil (context : Context) :
+    GeneralizationBlockedVariablesExcept context [] =
+      GeneralizationBlockedVariables context := by
+  rfl
+
+theorem SchemeGeneralizesExcept_nil (context : Context)
+    (scheme : TypeSystem.Scheme) :
+    SchemeGeneralizesExcept context [] scheme ↔
+      SchemeGeneralizes context scheme := by
+  rfl
 
 /-- Syntactic occurrence of one rigid declaration parameter in a type.  This
 is intentionally independent of substitution lookup and is used to rule out
@@ -174,6 +200,21 @@ structure PredicateWellFormed (context : Context)
   subject : TypeWellFormed context predicate.subject
   arguments : ∀ argument, argument ∈ predicate.arguments →
     TypeWellFormed context argument
+  trait : match predicate.trait with
+    | .builtin .int => predicate.arguments = []
+    | .declaration id =>
+        ∃ signature ∈ context.signatures.traits,
+          signature.id = id ∧
+          predicate.arguments.length + 1 = signature.parameters.length
+
+/-- Occurrence-level predicate formation.  Unlike `PredicateWellFormed`, the
+component types may mention the lexical generalized-initializer variables or
+body-wide residual metavariables admitted by the context. -/
+structure PredicateAdmissible (context : Context)
+    (predicate : Frontend.ProgramPredicate) : Prop where
+  subject : TypeAdmissible context predicate.subject
+  arguments : ∀ argument, argument ∈ predicate.arguments →
+    TypeAdmissible context argument
   trait : match predicate.trait with
     | .builtin .int => predicate.arguments = []
     | .declaration id =>
