@@ -5388,6 +5388,59 @@ structure ContextSubstitutionValid (substitution : Substitution)
 @[simp] theorem apply_unit (substitution : Substitution) :
     substitution.apply Ty.unit = Ty.unit := rfl
 
+@[simp] theorem apply_function (substitution : Substitution)
+    (parameter result : Ty) :
+    substitution.apply (.function parameter result) =
+      .function (substitution.apply parameter)
+        (substitution.apply result) := rfl
+
+@[simp] theorem apply_product (substitution : Substitution)
+    (left right : Ty) :
+    substitution.apply (.product left right) =
+      .product (substitution.apply left) (substitution.apply right) := rfl
+
+@[simp] theorem apply_mapping (substitution : Substitution)
+    (key value : Ty) :
+    substitution.apply (.mapping key value) =
+      .mapping (substitution.apply key) (substitution.apply value) := rfl
+
+@[simp] theorem apply_proxy (substitution : Substitution) (inner : Ty) :
+    substitution.apply (.proxy inner) = .proxy (substitution.apply inner) := rfl
+
+@[simp] theorem apply_comptime (substitution : Substitution) (inner : Ty) :
+    substitution.apply (.comptime inner) =
+      .comptime (substitution.apply inner) := rfl
+
+/-- Flexible substitution distributes through source product spines. -/
+theorem apply_productMany (substitution : Substitution) (types : List Ty) :
+    substitution.apply (Ty.productMany types) =
+      Ty.productMany (types.map substitution.apply) := by
+  induction types with
+  | nil => rfl
+  | cons head tail induction =>
+      cases tail with
+      | nil => rfl
+      | cons next rest =>
+          simp only [Ty.productMany, apply_product, List.map_cons]
+          rw [induction]
+          rfl
+
+/-- Flexible substitution preserves the ordered requirement identities owned
+by a coercion path. -/
+@[simp] theorem coercionRequirementIds_applySubstitution
+    (substitution : Substitution) (steps : List CoercionStep) :
+    coercionRequirementIds
+        (steps.map (CoercionStep.applySubstitution substitution)) =
+      coercionRequirementIds steps := by
+  induction steps with
+  | nil => rfl
+  | cons head tail induction =>
+      change (head.applySubstitution substitution).requirements ++
+          coercionRequirementIds
+            (tail.map (CoercionStep.applySubstitution substitution)) =
+        head.requirements ++ coercionRequirementIds tail
+      rw [CoercionStep.applySubstitution_requirements, induction]
+
 @[simp] theorem apply_ite (substitution : Substitution)
     (condition : Prop) [Decidable condition] (thenType elseType : Ty) :
     substitution.apply (if condition then thenType else elseType) =
@@ -6674,6 +6727,16 @@ theorem TypesWellScoped.applySubstitution
           (substitution.without binder.scheme.quantified)) := by
   rfl
 
+/-- Flexible substitution changes qualified predicates but preserves their
+stable template requirement identities. -/
+@[simp] theorem localSchemeTemplateIds_applySubstitution
+    (substitution : Substitution) (binder : TypedBinder) :
+    localSchemeTemplateIds (binder.applySubstitution substitution) =
+      localSchemeTemplateIds binder := by
+  simp [localSchemeTemplateIds, TypedBinder.applySubstitution,
+    LocalSchemeRequirement.applySubstitution, List.map_map,
+    Function.comp_def]
+
 @[simp] theorem patternInstructionBinderIds_applySubstitution
     (substitution : Substitution)
     (instructions : List MatchPatternInstruction) :
@@ -7758,6 +7821,31 @@ theorem RequirementSequenceProves.applySubstitution
         (FlexibleSubstitution.RequirementProves.applySubstitution valid head)
         induction
 
+/-- Flexible context closure preserves either retained interpretation of an
+integer literal and its exact trait requirement. -/
+theorem IntegerLiteralValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {literal : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : IntegerLiteralValid source literal resolution) :
+    IntegerLiteralValid target literal
+      (resolution.applySubstitution substitution) := by
+  cases valid with
+  | word meaning targetEq evidence =>
+      refine .word meaning ?_ ?_
+      · simp [targetEq]
+      · simpa [ProgramSignatures.builtinIntPredicate,
+          TypedTraitResolution.applySubstitution] using
+          (RequirementProves.applySubstitution contextValid evidence)
+  | integer meaning targetEq evidence =>
+      refine .integer meaning ?_ ?_
+      · simp [targetEq]
+      · simpa [ProgramSignatures.builtinIntPredicate,
+          TypedTraitResolution.applySubstitution] using
+          (RequirementProves.applySubstitution contextValid evidence)
+
 /-- Structural context closure transports every admissible retained type.
 Variables in the closed prefix are replaced by the ground range, while fresh
 variables in the retained suffix and residual body variables remain scoped. -/
@@ -8826,6 +8914,31 @@ theorem ReferenceUseValid.applySubstitution_local
       contextValid.closes schemeLookup requirementsLookup
   · exact LocalSchemeInstantiationValid.applySubstitution_of_fresh
       contextValid (contextValid.localSchemeFresh schemeLookup) instantiation
+
+/-- A direct builtin callee retains its occurrence identity, empty evidence
+spine, and fixed closed function type under flexible substitution. -/
+theorem DirectBuiltinCalleeValid.applySubstitution
+    {substitution : Substitution} {source : TypedSource}
+    {callee : ExpressionId} {function : BuiltinFunctionId}
+    (valid : DirectBuiltinCalleeValid source callee function) :
+    DirectBuiltinCalleeValid (source.applySubstitution substitution) callee
+      function := by
+  cases valid with
+  | @intro node name _ contains formEq typeEq requirementsEq coercionsEq =>
+      refine .intro
+        (ContainsExpression.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .reference name (.builtinFunction function)
+          rw [formEq]
+          rfl) ?_
+        (by simp [requirementsEq])
+        (by simp [ExpressionNode.applySubstitution, coercionsEq])
+      change substitution.apply node.type = function.type
+      rw [typeEq]
+      unfold BuiltinFunctionId.type
+      rw [apply_function, apply_productMany]
+      cases function <;> rfl
 
 @[simp] theorem closeContext_withTypeVariables (substitution : Substitution)
     (context : Context) (variables : List TypeVarId) :
