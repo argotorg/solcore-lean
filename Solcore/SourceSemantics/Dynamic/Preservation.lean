@@ -2480,24 +2480,21 @@ theorem builtinPreserves
 
 end CallableApplies
 
-/-- Lexical extension changes only locals; these are the non-local fields used
-by dynamic typing, evidence, and closure-code provenance. -/
-structure RuntimeContextFields (source target : Context) : Prop where
-  signatures : target.signatures = source.signatures
-  currentDeclaration :
-    target.currentDeclaration = source.currentDeclaration
-  typeParameters : target.typeParameters = source.typeParameters
-  typeVariables : target.typeVariables = source.typeVariables
-  residualTypeVariables :
-    target.residualTypeVariables = source.residualTypeVariables
-  assumptions : target.assumptions = source.assumptions
-  solvedRequirements :
-    target.solvedRequirements = source.solvedRequirements
-
 namespace RuntimeContextFields
 
 theorem refl (context : Context) : RuntimeContextFields context context :=
   ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+theorem symm {source target : Context}
+    (fields : RuntimeContextFields source target) :
+    RuntimeContextFields target source :=
+  ⟨fields.signatures.symm,
+    fields.currentDeclaration.symm,
+    fields.typeParameters.symm,
+    fields.typeVariables.symm,
+    fields.residualTypeVariables.symm,
+    fields.assumptions.symm,
+    fields.solvedRequirements.symm⟩
 
 theorem trans {first middle last : Context}
     (left : RuntimeContextFields first middle)

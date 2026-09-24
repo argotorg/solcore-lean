@@ -19,6 +19,22 @@ namespace Solcore.SourceSemantics.Dynamic
 open Frontend.SourceInference
 open TypeSystem
 
+/-- Lexical extension changes only locals; these are the non-local fields used
+by dynamic typing, evidence, and closure-code provenance.  The relation lives
+with generalized closures because both evaluation and preservation need to
+relate a definition site to a later materialization site. -/
+structure RuntimeContextFields (source target : Context) : Prop where
+  signatures : target.signatures = source.signatures
+  currentDeclaration :
+    target.currentDeclaration = source.currentDeclaration
+  typeParameters : target.typeParameters = source.typeParameters
+  typeVariables : target.typeVariables = source.typeVariables
+  residualTypeVariables :
+    target.residualTypeVariables = source.residualTypeVariables
+  assumptions : target.assumptions = source.assumptions
+  solvedRequirements :
+    target.solvedRequirements = source.solvedRequirements
+
 namespace GeneralizedClosure
 
 /-- Canonical principal descriptor captured from one direct-lambda local
