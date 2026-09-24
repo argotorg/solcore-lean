@@ -84,6 +84,60 @@ private def principalClosure (signatures : ProgramSignatures)
     protectedRequirement
 }
 
+private def captureSourceId : Syntax.SourceId := {
+  origin := .main
+  path := "generalized_closure_capture.sol"
+}
+
+private def captureSpan : Syntax.SourceSpan := {
+  source := captureSourceId
+  startByte := 0
+  endByte := 0
+}
+
+private def captureInitializer (owner : Resolved.DeclarationId) : ExpressionId :=
+  ⟨⟨owner, 30⟩⟩
+
+private def captureNode (owner : Resolved.DeclarationId)
+    (metavariable : TypeVarId) (body : StatementId) : ExpressionNode := {
+  id := captureInitializer owner
+  span := captureSpan
+  type := .function (.variable metavariable) (.variable metavariable)
+  form := .lambda [lambdaParameter owner metavariable]
+    (.variable metavariable) [body]
+}
+
+private def captureSource (owner : Resolved.DeclarationId)
+    (metavariable : TypeVarId) (body : StatementId) : TypedSource := {
+  owner
+  inputs := []
+  roots := [.expression (captureInitializer owner)]
+  nodes := [.expression (captureNode owner metavariable body)]
+}
+
+/-- A concrete direct-lambda occurrence constructs exactly the canonical
+principal descriptor retained by `GeneralizedClosureCaptures`. -/
+example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (metavariable : TypeVarId) (body : StatementId)
+    (templateRequirement : RequirementId) :
+    GeneralizedClosureCaptures (Context.ofSignatures signatures)
+      (captureSource owner metavariable body) []
+      (generalizedBinder owner metavariable templateRequirement)
+      (captureInitializer owner)
+      (GeneralizedClosure.ofDirectLambda (Context.ofSignatures signatures)
+        (captureSource owner metavariable body) []
+        (generalizedBinder owner metavariable templateRequirement)
+        (captureInitializer owner) [lambdaParameter owner metavariable]
+        (.variable metavariable) [body]) := by
+  apply GeneralizedClosureCaptures.directLambda
+      (node := captureNode owner metavariable body)
+  · exact ⟨by simp [captureSource], rfl⟩
+  · rfl
+  · simp [captureNode, ExpressionNode.rawType, generalizedBinder]
+  · simp [captureNode, generalizedBinder]
+  · rfl
+  · rfl
+
 /-- Materialization closes direct-lambda types and initializer assumptions,
 while the quantified variable of an existing lexical scheme (and its paired
 requirement metadata) remains capture-protected.  Code identities, captured
