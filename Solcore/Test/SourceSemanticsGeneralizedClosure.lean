@@ -125,6 +125,7 @@ example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
     requirement, predicate, Context.ofSignatures, Context.withAssumptions,
     Context.withLocal, localSchemeInitializerContext,
     Context.withTypeVariables, FlexibleSubstitution.closeContext,
+    FlexibleSubstitution.applyContext,
     FlexibleSubstitution.applyLocals,
     FlexibleSubstitution.applyLocalSchemeRequirements,
     FlexibleSubstitution.forLocal, Resolved.LocalScope.lookup?,
