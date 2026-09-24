@@ -1,5 +1,4 @@
 import Lean.Data.Json
-import Solcore.Foundation.Hash
 
 set_option autoImplicit false
 
@@ -180,19 +179,6 @@ structure SemVer where
   prerelease : Option String := none
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
-structure StdFileDigest where
-  path : String
-  byteSize : Nat
-  sha256 : String
-  deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
-
-structure StdBundle where
-  sourceRevision : String
-  manifestAlgorithm : String
-  manifestSha256 : String
-  files : Array StdFileDigest
-  deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
-
 structure LanguageVersion where
   id : String
   release : SemVer
@@ -201,7 +187,6 @@ structure LanguageVersion where
   dynamicSemanticsVersion : Option Nat
   abiVersion : Option Nat
   storageLayoutVersion : Option Nat
-  standardLibrary : StdBundle
   knownFeatures : Array Feature
   deriving Repr, BEq, DecidableEq, Lean.ToJson, Lean.FromJson
 
@@ -244,39 +229,6 @@ theorem ObservationPolicy.checkedCoreStateV1_matchesScope_iff
       scope = .contract ∧ runtime = none := by
   cases scope <;> cases runtime <;> simp [ObservationPolicy.matchesScope]
 
-def StdFileDigest.validationErrors (file : StdFileDigest) : List String :=
-  let pathErrors :=
-    if file.path.isEmpty || !file.path.endsWith ".solc" then
-      ["standard-library path must be a relative .solc path"]
-    else
-      []
-  let digestErrors :=
-    if Foundation.isSha256 file.sha256 then
-      []
-    else
-      ["standard-library file SHA-256 must be 64 lowercase hexadecimal digits"]
-  pathErrors ++ digestErrors
-
-def StdBundle.validationErrors (bundle : StdBundle) : List String :=
-  let revisionErrors :=
-    if Foundation.isGitCommit bundle.sourceRevision then
-      []
-    else
-      ["standard-library source revision must be a 40-digit Git commit"]
-  let manifestErrors :=
-    if bundle.manifestAlgorithm == "solcore-fileset-sha256-v1" &&
-        Foundation.isSha256 bundle.manifestSha256 then
-      []
-    else
-      ["standard-library manifest algorithm or digest is invalid"]
-  let duplicateErrors :=
-    if hasDuplicates (bundle.files.toList.map (·.path)) then
-      ["standard-library paths must be unique"]
-    else
-      []
-  revisionErrors ++ manifestErrors ++ duplicateErrors ++
-    bundle.files.toList.flatMap StdFileDigest.validationErrors
-
 def SpecProfile.validationErrors (profile : SpecProfile) : List String :=
   let identityErrors :=
     (if profile.id.isEmpty then ["profile id must not be empty"] else []) ++
@@ -309,49 +261,10 @@ def SpecProfile.validationErrors (profile : SpecProfile) : List String :=
       []
     else
       ["source encoding must be UTF-8"]
-  identityErrors ++ featureErrors ++ scopeErrors ++ encodingErrors ++
-    profile.language.standardLibrary.validationErrors
+  identityErrors ++ featureErrors ++ scopeErrors ++ encodingErrors
 
 def SpecProfile.Valid (profile : SpecProfile) : Prop :=
   profile.validationErrors = []
-
-def canonicalStd : StdBundle := {
-  sourceRevision := "1d490d8bb5f374356f06e0720655496482eb1fb4"
-  manifestAlgorithm := "solcore-fileset-sha256-v1"
-  manifestSha256 := "3f81bebfd1fc161ee08972be9e7a52150d02bdf55dd7449dfa058cd81cfafc22"
-  files := #[
-    {
-      path := "ABIGeneric.solc"
-      byteSize := 5540
-      sha256 := "b14f31abd374d65e194c7706183086082558ab2a60d230ec5b9e6f1b9c9b9ae2"
-    },
-    {
-      path := "Generic.solc"
-      byteSize := 445
-      sha256 := "913a02e32829e0230e31db6512151c36e019f5630e3dbd0be9d033a9019194d7"
-    },
-    {
-      path := "StorageGeneric.solc"
-      byteSize := 10546
-      sha256 := "8d68601447f40a6e662de8b6cff06031998628339ca23ec917a970157c301a6a"
-    },
-    {
-      path := "dispatch.solc"
-      byteSize := 11249
-      sha256 := "b723ec9a0a76a6abf091d49a12467c6a4628b634c48d8c34e82e2c45d6e939f5"
-    },
-    {
-      path := "opcodes.solc"
-      byteSize := 10377
-      sha256 := "a6a08beed16ccdf722f65c60af835dcfd0eaec61f34f041082bbc0fca1e69bab"
-    },
-    {
-      path := "std.solc"
-      byteSize := 72958
-      sha256 := "e8ec755232347bbf4a130dcc05c7c5a3230c4d0cb0223445a2d82260d4474fec"
-    }
-  ]
-}
 
 def draftLanguage : LanguageVersion := {
   id := "solcore/0.1.0-draft.1"
@@ -366,7 +279,6 @@ def draftLanguage : LanguageVersion := {
   dynamicSemanticsVersion := none
   abiVersion := none
   storageLayoutVersion := none
-  standardLibrary := canonicalStd
   knownFeatures := Feature.legacyAll
 }
 
@@ -383,7 +295,7 @@ def draftCoreProfile : SpecProfile := {
 }
 
 def draftCoreProfileDigest : String :=
-  "sha256:2ccae018d736fa61910a6c2475fe3088bad2e924b60d43a9748852b7cc817ec8"
+  "sha256:b5b8415eba19451d147e4fe9ae35ae2e110891f59cf80ecb70af73a162da3c92"
 
 theorem draftCoreProfile_valid : draftCoreProfile.Valid := by
   change draftCoreProfile.validationErrors = []
@@ -402,7 +314,6 @@ def m1aLanguage : LanguageVersion := {
   dynamicSemanticsVersion := some 1
   abiVersion := none
   storageLayoutVersion := none
-  standardLibrary := canonicalStd
   knownFeatures := Feature.m1aAll
 }
 
@@ -425,7 +336,7 @@ def m1aCoreProfile : SpecProfile := {
 }
 
 def m1aCoreProfileDigest : String :=
-  "sha256:3645c44ee266496e6ae13e33971d34c6836dee105a543e6805e5dd8b674ff867"
+  "sha256:284ddda1ea6e979648c5ac796f7992058f448c5ce889a9e82a2602d4f012f5d1"
 
 theorem m1aCoreProfile_valid : m1aCoreProfile.Valid := by
   change m1aCoreProfile.validationErrors = []
@@ -444,7 +355,6 @@ def m1cLanguage : LanguageVersion := {
   dynamicSemanticsVersion := some 2
   abiVersion := none
   storageLayoutVersion := none
-  standardLibrary := canonicalStd
   knownFeatures := Feature.m1cAll
 }
 
@@ -471,7 +381,7 @@ def m1cCoreProfile : SpecProfile := {
 }
 
 def m1cCoreProfileDigest : String :=
-  "sha256:111ad60f90a5dca6eaafa582475b6582d081bc081ee59766d6040173061f2693"
+  "sha256:d86d3e11460cc07aec6ea2ed89a48b20c972829eebb5ef61de4580bf5cc88acd"
 
 theorem m1cCoreProfile_valid : m1cCoreProfile.Valid := by
   change m1cCoreProfile.validationErrors = []
@@ -490,7 +400,6 @@ def m3aLanguage : LanguageVersion := {
   dynamicSemanticsVersion := some 3
   abiVersion := some 1
   storageLayoutVersion := none
-  standardLibrary := canonicalStd
   knownFeatures := Feature.m3aAll
 }
 
@@ -525,7 +434,7 @@ def m3aContractProfile : SpecProfile := {
 }
 
 def m3aContractProfileDigest : String :=
-  "sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5"
+  "sha256:b01693cbb3f0598a1aabc516c48c54d78f37fe0e75359504a48dde30858492a9"
 
 theorem m3aContractProfile_valid : m3aContractProfile.Valid := by
   change m3aContractProfile.validationErrors = []

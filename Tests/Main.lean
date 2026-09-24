@@ -507,7 +507,6 @@ import Solcore.Test.FrontendOwnerCheckedBinaryDataExpressionProperties
 import Solcore.Test.FrontendParsedOwnerCheckedDataExpression
 import Solcore.Core.Wire
 import Solcore.Core.Wire.V2
-import Solcore.Standard.CanonicalData
 import Solcore.Test.SyntaxCallableDeclarationValidity
 import Solcore.Test.SyntaxContractDeclarationValidity
 import Solcore.Test.SyntaxCoreTermValidity
@@ -1284,11 +1283,6 @@ def isError {ε α : Type} : Except ε α → Bool
 def testProfile : IO Unit := do
   assertTrue draftCoreProfile.validationErrors.isEmpty
     s!"draft profile is invalid: {draftCoreProfile.validationErrors}"
-  assertTrue (canonicalStd.files.size == 6) "canonical std must contain six .solc files"
-  assertTrue
-    (canonicalStd.manifestSha256 ==
-      "3f81bebfd1fc161ee08972be9e7a52150d02bdf55dd7449dfa058cd81cfafc22")
-    "canonical std manifest digest changed"
   assertJsonRoundTrip "draft profile" draftCoreProfile
   let profileText ← IO.FS.readFile "profiles/solcore-0.1.0-draft.1-core.json"
   let profileJson ←
@@ -1297,8 +1291,6 @@ def testProfile : IO Unit := do
     | .error error => throw (IO.userError s!"profile JSON is invalid: {error}")
   assertTrue (profileJson == Lean.toJson draftCoreProfile)
     "checked-in profile JSON differs from the Lean profile"
-  assertTrue rustStdCompatibilitySnapshot.validationErrors.isEmpty
-    "Rust compatibility std snapshot metadata is invalid"
 
 def testFeatureMatrix : IO Unit := do
   assertTrue featureMatrixIsComplete
@@ -2005,7 +1997,6 @@ def testSchemaJson : IO Unit := do
       ["schema/semantic-core-v1.schema.json",
         "schema/semantic-core-v2.schema.json",
         "metadata/baselines.json",
-        "metadata/standard-library.json",
         "profiles/manifest.json",
         "profiles/solcore-0.1.0-draft.1-core.json",
         "profiles/solcore-0.1.0-draft.2-core-m1a.json",
@@ -2469,93 +2460,6 @@ def testWorkspaceValidationEquivalence : IO Unit := do
     "redistribution fixture must contain different raw declaration grouping"
   assertWorkspaceValidationEqual redistributedLeft redistributedRight
     "redistributing sources across duplicate same-name declarations must preserve validation"
-
-structure CanonicalMetadataExpectation where
-  id : Solcore.Standard.CanonicalFileId
-  logicalPath : String
-  byteCount : Nat
-  sha256Bytes : Vector UInt8 32
-
-def canonicalMetadataExpectations : Vector CanonicalMetadataExpectation 6 :=
-  #v[
-    {
-      id := .abiGeneric
-      logicalPath := "ABIGeneric.solc"
-      byteCount := 5540
-      sha256Bytes :=
-        #v[0xb1, 0x4f, 0x31, 0xab, 0xd3, 0x74, 0xd6, 0x5e,
-          0x19, 0x4c, 0x77, 0x06, 0x18, 0x30, 0x86, 0x08,
-          0x25, 0x58, 0xab, 0x2a, 0x60, 0xd2, 0x30, 0xec,
-          0x5b, 0x9e, 0x6f, 0x1b, 0x9c, 0x9b, 0x9a, 0xe2]
-    },
-    {
-      id := .generic
-      logicalPath := "Generic.solc"
-      byteCount := 445
-      sha256Bytes :=
-        #v[0x91, 0x3a, 0x02, 0xe3, 0x28, 0x29, 0xe0, 0x23,
-          0x0e, 0x31, 0xdb, 0x65, 0x12, 0x15, 0x1c, 0x36,
-          0xe0, 0x19, 0xf5, 0x63, 0x0e, 0x3d, 0xbd, 0x0b,
-          0xe9, 0xd0, 0x33, 0xa9, 0x01, 0x91, 0x94, 0xd7]
-    },
-    {
-      id := .storageGeneric
-      logicalPath := "StorageGeneric.solc"
-      byteCount := 10546
-      sha256Bytes :=
-        #v[0x8d, 0x68, 0x60, 0x14, 0x47, 0xf4, 0x0a, 0x6e,
-          0x66, 0x2d, 0xe8, 0xb6, 0xcf, 0xf0, 0x60, 0x31,
-          0x99, 0x86, 0x28, 0x33, 0x9c, 0xa2, 0x3e, 0xc9,
-          0x17, 0xa9, 0x70, 0x15, 0x7c, 0x30, 0x1a, 0x6a]
-    },
-    {
-      id := .dispatch
-      logicalPath := "dispatch.solc"
-      byteCount := 11249
-      sha256Bytes :=
-        #v[0xb7, 0x23, 0xec, 0x9a, 0x0a, 0x76, 0xa6, 0xab,
-          0xf0, 0x91, 0xd4, 0x9a, 0x12, 0x46, 0x7c, 0x6a,
-          0x46, 0x28, 0xb6, 0x34, 0xc4, 0x8d, 0x8c, 0x34,
-          0xe8, 0x2e, 0x2c, 0x45, 0xd6, 0xe9, 0x39, 0xf5]
-    },
-    {
-      id := .opcodes
-      logicalPath := "opcodes.solc"
-      byteCount := 10377
-      sha256Bytes :=
-        #v[0xa6, 0xa0, 0x8b, 0xee, 0xd1, 0x6c, 0xcd, 0xf7,
-          0x22, 0xf6, 0x5c, 0x60, 0xaf, 0x83, 0x5d, 0xcf,
-          0xd0, 0xea, 0xec, 0x61, 0xf3, 0x4f, 0x04, 0x10,
-          0x82, 0xbb, 0xc0, 0xfc, 0xa1, 0xe6, 0x9b, 0xab]
-    },
-    {
-      id := .std
-      logicalPath := "std.solc"
-      byteCount := 72958
-      sha256Bytes :=
-        #v[0xe8, 0xec, 0x75, 0x52, 0x32, 0x34, 0x7b, 0xbf,
-          0x4a, 0x13, 0x0d, 0xcc, 0x05, 0xc7, 0xc5, 0xa3,
-          0x23, 0x0c, 0x4d, 0x0c, 0xb0, 0x22, 0x34, 0x45,
-          0xa2, 0xd8, 0x22, 0x60, 0xd4, 0x47, 0x4f, 0xec]
-    }
-  ]
-
-def testCanonicalRawData : IO Unit := do
-  let rawFiles := Solcore.Standard.canonicalRawFiles.toArray
-  let expectations := canonicalMetadataExpectations.toArray
-  assertTrue (rawFiles.size == 6 && expectations.size == 6)
-    "canonical raw data and metadata must each contain exactly six files"
-  for (raw, expected) in rawFiles.zip expectations do
-    assertTrue (raw.id == expected.id)
-      s!"canonical file order changed at {reprStr expected.id}"
-    assertTrue (raw.logicalPathUtf8 == expected.logicalPath.toUTF8)
-      s!"canonical logical path bytes changed for {reprStr expected.id}"
-    assertTrue (raw.expectedByteCount == expected.byteCount)
-      s!"canonical byte-count metadata changed for {reprStr expected.id}"
-    assertTrue (raw.expectedSha256Bytes == expected.sha256Bytes)
-      s!"canonical SHA-256 metadata changed for {reprStr expected.id}"
-    assertTrue (raw.contentUtf8.size == raw.expectedByteCount)
-      s!"canonical content size differs from its metadata for {reprStr expected.id}"
 
 def staticSemanticsSpineTests : IO Unit := do
   testProgramEnvironmentAndTypeResolution
@@ -3046,7 +2950,6 @@ def run : IO Unit := do
   testWorkspaceEqualContentIdentity
   testWorkspaceValidationErrors
   testWorkspaceValidationEquivalence
-  testCanonicalRawData
 
 end Tests
 

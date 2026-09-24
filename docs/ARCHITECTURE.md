@@ -144,13 +144,6 @@ smaller according to the library's measure.
 Synthesis targets Core directly. It is test-input infrastructure and does not
 parse or compile source programs.
 
-## Canonical standard-library data
-
-`Solcore.Standard.CanonicalData` embeds the canonical standard-library files
-as exact bytes and pins their logical paths, byte counts, and digests. It is
-data rather than a parser, checker, or runtime. Workspace/frontend clients may
-consume those bytes through the normal syntax path.
-
 ## Proof and trust boundary
 
 Lean's kernel checks declarations and proofs. Executable functions are paired

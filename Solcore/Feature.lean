@@ -42,7 +42,7 @@ def featureMatrix : Array FeatureRow := #[
   ⟨.contracts, .directionAccepted, "M3", .planned, some "0005", "Contract entry and transactions."⟩,
   ⟨.externalAbi, .directionAccepted, "M3", .blocked, some "0006", "Structured unsupported cases remain."⟩,
   ⟨.storage, .deferred, "M3", .blocked, some "0008", "Storage rules require a layout ADR."⟩,
-  ⟨.storageArrays, .proposed, "M3", .blocked, some "0008", "Present in the current upstream std snapshot."⟩,
+  ⟨.storageArrays, .proposed, "M3", .blocked, some "0008", "Storage-array semantics remain to be specified."⟩,
   ⟨.inlineYul, .deferred, "M4", .unsupported, some "0002", "Specified as a lowering boundary."⟩
 ]
 

@@ -48,10 +48,9 @@ does not by itself constitute a normative decision. Differences are recorded
 as evidence, and any required semantic choice is decided by an ADR.
 
 `LanguageVersion` identifies the grammar, static semantics, dynamic semantics,
-ABI, storage layout, standard-library digest, and known feature set. A
-component version whose normative rules are incomplete is `none`. An EVM
-revision is specified by a contract-scope runtime profile, not by the pure
-Core.
+ABI, storage layout, and known feature set. A component version whose normative
+rules are incomplete is `none`. An EVM revision is specified by a
+contract-scope runtime profile, not by the pure Core.
 
 Compiler commits, solver modes, dispatch settings, backends, and resource
 limits are recorded in `ImplementationBaseline` and kept separate from the

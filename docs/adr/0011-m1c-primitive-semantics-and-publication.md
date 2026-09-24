@@ -152,12 +152,12 @@ Publish the completed M1c fragment as:
 - `dynamicSemanticsVersion = 2`.
 
 The profile enables the five M1b features and the four M1c features. Grammar,
-ABI, and storage-layout versions remain undefined. The standard-library and
-baseline pins do not change.
+ABI, and storage-layout versions remain undefined. The implementation-baseline
+pins do not change.
 
-The draft.1 and draft.2 language versions, profiles, feature matrices, and
-digests remain immutable. M1c metadata is appended through new `m1cAll` and
-`m1cFeatureMatrix` values rather than changing either legacy array.
+The draft.1 and draft.2 language rules and feature matrices remain unchanged.
+M1c metadata is appended through new `m1cAll` and `m1cFeatureMatrix` values
+rather than changing either legacy feature array.
 
 ### Core Wire versions
 

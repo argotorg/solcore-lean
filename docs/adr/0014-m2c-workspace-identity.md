@@ -55,8 +55,8 @@ source-syntax algebra. In particular:
 - workspace identity alone supplies no import or export declarations;
 - a public interface must distinguish entities, module aliases, constructor
   visibility, and instances;
-- the canonical standard-library source depends on an explicit intrinsic
-  environment before it can be resolved; and
+- sources in the reserved standard namespace depend on an explicit intrinsic
+  environment before they can be resolved; and
 - member selection and constructor shorthand include type-directed
   occurrences that must remain unresolved until checking.
 
@@ -342,30 +342,16 @@ external name, because validation deliberately flattens that invalid group.
 It is an equivalence relation. Equivalent raw workspaces produce equal
 validation results, including the complete structural error list.
 
-### Standard-library assembly is a separate boundary
+### The standard namespace is a separate boundary
 
 The raw validator neither accepts nor inserts standard sources. Its output is
 `ValidatedUserWorkspace`, not a closed resolver workspace.
 
-A later layer will define `VerifiedStandardBundle`. Construction of that value
-must recompute and verify the exact six-file set, raw bytes, per-file digests,
-manifest digest, upstream revision, and language-version binding fixed by
-ADR-0007. A byte or digest mismatch is server configuration failure, not a
-source-workspace error and not a language rejection.
-
-Only after verification may an assembly function combine the user workspace
-and standard sources into `ClosedWorkspace`. That value will use global
-canonical library order `main`, `standard`, then external libraries by name.
-The standard bundle is not caller-overridable.
-
-Byte verification alone does not provide parsed declarations, resolved
-interfaces, intrinsic targets, or resolution derivations. The subsequent
-resolver ADR must define the closed intrinsic dependency set and require the
-canonical standard sources to be parsed and resolved by the same semantic
-pipeline. It may not silently replace them with an unproved pre-resolved map.
-
-Neither `VerifiedStandardBundle` nor `ClosedWorkspace` is part of the first
-implementation slice.
+Supplying sources for the reserved namespace and combining them with a user
+workspace are separate from structural validation. Those sources still require
+ordinary parsing and resolution; namespace identity alone does not provide
+parsed declarations, resolved interfaces, intrinsic targets, or resolution
+derivations.
 
 ### Measures and future resource precedence
 
@@ -375,9 +361,8 @@ user workspaces:
 - `sourceFiles` is the number of main and external source records;
 - `sourceBytes` is the sum of `content.utf8ByteSize` over those records.
 
-Paths, external names, JSON syntax, and the fixed standard bundle do not
-contribute to `sourceBytes`. Empty external-library declarations do not
-contribute to `sourceFiles`.
+Paths, external names, and JSON syntax do not contribute to `sourceBytes`.
+Empty external-library declarations do not contribute to `sourceFiles`.
 
 The first internal validator has no operational limit. A future strict wire and
 handler must apply stages in this order:
@@ -385,8 +370,7 @@ handler must apply stages in this order:
 1. bounded strict decoding and JSON-shape validation;
 2. workspace structural validation;
 3. caller-supplied `sourceFiles` and `sourceBytes` preflight;
-4. server-side standard-bundle verification; and
-5. reachable parsing and resolution under separately fixed limits.
+4. reachable parsing and resolution under separately fixed limits.
 
 Thus malformed workspace structure is a protocol error even when its source
 contents would exceed a semantic resource limit. Exact limits proceed, and one
@@ -489,8 +473,8 @@ close all of the following independently:
 - module, entity, class, constructor, member, and field qualification rules;
 - exact namespace and duplicate policy;
 - every lexical frame, binder-numbering rule, and shadowing boundary;
-- the complete structured intrinsic set required to resolve the canonical
-  standard sources;
+- the complete structured intrinsic set required to resolve any sources in the
+  reserved standard namespace;
 - source-error and resource precedence after reachable parsing begins; and
 - soundness, completeness, determinism, uniqueness, non-dangling, and scope
   non-leakage theorems for the exact accepted fragment.
@@ -510,8 +494,8 @@ structured target identity.
   structural validation.
 - Successful validation has one canonical order and is invariant under raw
   record permutation.
-- Standard-library identity remains explicit without pretending that a digest
-  is a resolution derivation.
+- Standard-library identity remains explicit and separate from source content
+  and resolution derivations.
 - Workspace identity remains independent of the resolver's source-syntax
   algebra and semantic choices.
 
@@ -550,11 +534,6 @@ the complete canonical error set.
 
 Rejected because untagged child indices collide across fields, methods,
 constructors, bodies, and scopes.
-
-### Treat a verified standard digest as a resolved interface
-
-Rejected because byte identity alone proves neither parsing nor resolution and
-does not supply structured targets for intrinsic dependencies.
 
 ## Conformance requirements
 

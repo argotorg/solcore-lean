@@ -33,30 +33,6 @@ function sortedObject(value) {
   return value;
 }
 
-function verifyFileSet(bundle) {
-  const paths = bundle.files.map((file) => file.path);
-  assert(
-    JSON.stringify(paths) === JSON.stringify([...paths].sort()),
-    `${bundle.id}: files are not in C byte order`,
-  );
-  const entries = bundle.files
-    .map((file) => `${file.path}\t${file.byteSize}\t${file.sha256}\n`)
-    .join("");
-  const digest = sha256(`solcore-fileset-sha256-v1\n${entries}`);
-  assert(
-    digest === bundle.manifestSha256,
-    `${bundle.id}: manifest digest mismatch (${digest})`,
-  );
-}
-
-function verifyFilesOnDisk(bundle, sourceRoot) {
-  for (const file of bundle.files) {
-    const bytes = readFileSync(join(sourceRoot, file.path));
-    assert(bytes.byteLength === file.byteSize, `${bundle.id}/${file.path}: byte size mismatch`);
-    assert(sha256(bytes) === file.sha256, `${bundle.id}/${file.path}: content digest mismatch`);
-  }
-}
-
 function resolveJsonPointer(document, fragment) {
   let pointer;
   try {
@@ -119,31 +95,6 @@ function verifySchemaNode(value, schema, path = "$") {
   }
   for (const [key, entry] of Object.entries(value)) {
     verifySchemaNode(entry, schema, `${path}.${key}`);
-  }
-}
-
-const standardLibrary = readJson("metadata/standard-library.json");
-assert(
-  standardLibrary.digestAlgorithm.id === "solcore-fileset-sha256-v1",
-  "unknown standard-library digest algorithm",
-);
-verifyFileSet(standardLibrary.canonical);
-for (const snapshot of standardLibrary.compatibilitySnapshots) {
-  verifyFileSet(snapshot);
-}
-
-const argumentValue = (name) => {
-  const index = process.argv.indexOf(name);
-  return index < 0 ? undefined : process.argv[index + 1];
-};
-const canonicalSourceRoot = argumentValue("--canonical-source-root");
-if (canonicalSourceRoot !== undefined) {
-  verifyFilesOnDisk(standardLibrary.canonical, canonicalSourceRoot);
-}
-const compatibilitySourceRoot = argumentValue("--compatibility-source-root");
-if (compatibilitySourceRoot !== undefined) {
-  for (const snapshot of standardLibrary.compatibilitySnapshots) {
-    verifyFilesOnDisk(snapshot, compatibilitySourceRoot);
   }
 }
 
@@ -220,18 +171,6 @@ for (const entry of profileManifest.profiles) {
   profileIds.add(entry.id);
   const digest = `sha256:${sha256(JSON.stringify(sortedObject(profile)))}`;
   assert(digest === entry.digest, `${entry.path}: profile digest mismatch (${digest})`);
-}
-
-const baselineManifest = readJson("metadata/baselines.json");
-const bundleIds = new Set([
-  standardLibrary.canonical.id,
-  ...standardLibrary.compatibilitySnapshots.map((snapshot) => snapshot.id),
-]);
-for (const implementation of baselineManifest.implementations) {
-  assert(
-    bundleIds.has(implementation.standardLibraryBundle),
-    `${implementation.id}: unknown standard-library bundle`,
-  );
 }
 
 console.log("solcore metadata verified");

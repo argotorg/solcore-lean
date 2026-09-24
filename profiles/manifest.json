@@ -6,25 +6,25 @@
       "id": "core-v1",
       "spec": "solcore/0.1.0-draft.1",
       "path": "profiles/solcore-0.1.0-draft.1-core.json",
-      "digest": "sha256:2ccae018d736fa61910a6c2475fe3088bad2e924b60d43a9748852b7cc817ec8"
+      "digest": "sha256:b5b8415eba19451d147e4fe9ae35ae2e110891f59cf80ecb70af73a162da3c92"
     },
     {
       "id": "core-m1a-v1",
       "spec": "solcore/0.1.0-draft.2",
       "path": "profiles/solcore-0.1.0-draft.2-core-m1a.json",
-      "digest": "sha256:3645c44ee266496e6ae13e33971d34c6836dee105a543e6805e5dd8b674ff867"
+      "digest": "sha256:284ddda1ea6e979648c5ac796f7992058f448c5ce889a9e82a2602d4f012f5d1"
     },
     {
       "id": "core-m1c-v1",
       "spec": "solcore/0.1.0-draft.3",
       "path": "profiles/solcore-0.1.0-draft.3-core-m1c.json",
-      "digest": "sha256:111ad60f90a5dca6eaafa582475b6582d081bc081ee59766d6040173061f2693"
+      "digest": "sha256:d86d3e11460cc07aec6ea2ed89a48b20c972829eebb5ef61de4580bf5cc88acd"
     },
     {
       "id": "contract-m3a-v1",
       "spec": "solcore/0.1.0-draft.5",
       "path": "profiles/solcore-0.1.0-draft.5-contract-m3a.json",
-      "digest": "sha256:da3d49b830d25705634cfda568691f1f12fe5a7d038bd0b7ca5839134c1073d5"
+      "digest": "sha256:b01693cbb3f0598a1aabc516c48c54d78f37fe0e75359504a48dde30858492a9"
     }
   ]
 }

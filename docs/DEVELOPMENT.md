@@ -18,19 +18,12 @@ node scripts/check-kernel.mjs
 Warnings are errors. During development, build the narrowest changed module
 first, then run the complete suite before handing off the change.
 
-To verify the embedded canonical standard-library bytes against an upstream
-checkout:
-
-```text
-node scripts/verify-metadata.mjs --canonical-source-root <solcore-checkout>/std
-```
-
 ## Choose the owning layer
 
 | Change | Primary location | Also inspect |
 | --- | --- | --- |
 | Tokens, grammar, recovery, AST | `Solcore/Syntax` | parser properties, fixtures, workspace handoff |
-| Library/module identity | `Solcore/Workspace` | loading, imports, standard-library catalog |
+| Library/module identity | `Solcore/Workspace` | loading, imports, reserved standard namespace |
 | Source types and inference machinery | `Solcore/TypeSystem` | frontend inference and declarative source judgments |
 | Executable resolution/checking/compilation | `Solcore/Frontend` | Syntax, Workspace, TypeSystem, Core adapters |
 | Normative source judgments | `Solcore/SourceSemantics` | substitutions, staging, dynamics, preservation |
@@ -38,7 +31,6 @@ node scripts/verify-metadata.mjs --canonical-source-root <solcore-checkout>/std
 | Accounts, frames, transactions, calls | `Solcore/ContractRuntime` | Core host operations, ABI boundary, observations |
 | Hashing and call-data encoding | `Solcore/Abi` | contract-entry profiles and tests |
 | Seeded Core generation/shrinking | `Solcore/Synthesis` | checker sealing, scope and size proofs |
-| Canonical source bytes | `Solcore/Standard` | hashes, logical paths, workspace consumers |
 
 Do not place source-language rules in contract execution, contract state in the
 Core local store, or executable frontend success as a premise of an

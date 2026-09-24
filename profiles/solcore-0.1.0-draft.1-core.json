@@ -34,43 +34,6 @@
       "patch": 0,
       "prerelease": "draft.1"
     },
-    "standardLibrary": {
-      "files": [
-        {
-          "byteSize": 5540,
-          "path": "ABIGeneric.solc",
-          "sha256": "b14f31abd374d65e194c7706183086082558ab2a60d230ec5b9e6f1b9c9b9ae2"
-        },
-        {
-          "byteSize": 445,
-          "path": "Generic.solc",
-          "sha256": "913a02e32829e0230e31db6512151c36e019f5630e3dbd0be9d033a9019194d7"
-        },
-        {
-          "byteSize": 10546,
-          "path": "StorageGeneric.solc",
-          "sha256": "8d68601447f40a6e662de8b6cff06031998628339ca23ec917a970157c301a6a"
-        },
-        {
-          "byteSize": 11249,
-          "path": "dispatch.solc",
-          "sha256": "b723ec9a0a76a6abf091d49a12467c6a4628b634c48d8c34e82e2c45d6e939f5"
-        },
-        {
-          "byteSize": 10377,
-          "path": "opcodes.solc",
-          "sha256": "a6a08beed16ccdf722f65c60af835dcfd0eaec61f34f041082bbc0fca1e69bab"
-        },
-        {
-          "byteSize": 72958,
-          "path": "std.solc",
-          "sha256": "e8ec755232347bbf4a130dcc05c7c5a3230c4d0cb0223445a2d82260d4474fec"
-        }
-      ],
-      "manifestAlgorithm": "solcore-fileset-sha256-v1",
-      "manifestSha256": "3f81bebfd1fc161ee08972be9e7a52150d02bdf55dd7449dfa058cd81cfafc22",
-      "sourceRevision": "1d490d8bb5f374356f06e0720655496482eb1fb4"
-    },
     "staticSemanticsVersion": null,
     "storageLayoutVersion": null
   },

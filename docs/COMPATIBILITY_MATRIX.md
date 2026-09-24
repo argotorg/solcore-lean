@@ -16,9 +16,8 @@ observation date it identifies:
 | Rust `argotorg/solcore-rs` | `38f4778ea461edfe59106bdb1f9f08c3307b0fc0` |
 
 The intended comparison profile selects the tabled solver, generated dispatch,
-the Osaka primitive set, and the canonical Haskell standard-library bundle.
-Results from different revisions, library bytes, solver modes, dispatch
-settings, or execution revisions are different evidence sets.
+and the Osaka primitive set. Results from different revisions, solver modes,
+dispatch settings, or execution revisions are different evidence sets.
 
 ## What can be compared now
 

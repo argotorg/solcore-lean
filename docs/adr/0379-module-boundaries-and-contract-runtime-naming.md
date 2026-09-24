@@ -3,8 +3,7 @@
 ## Status
 
 Accepted. This is a source-tree and Lean-module organization decision. It does
-not revise a language, evaluation rule, Core representation, or canonical
-standard-library byte.
+not revise a language, evaluation rule, or Core representation.
 
 ## Context
 
@@ -20,12 +19,8 @@ which semantic layer it contained. It modeled checked Core programs running in
 a contract world, while `Solcore.SourceSemantics` and `Solcore.Core` own other
 semantic layers.
 
-Two names have explicit roles in this organization:
-
-- `Solcore.Syntax` is the canonical lexer, recovery-aware AST, parser, and
-  parser-proof tree.
-- `Solcore.Standard` embeds canonical source-file bytes and their identity,
-  length, and hash pins. It is data ownership, not parsing or execution.
+`Solcore.Syntax` has an explicit role in this organization: it is the canonical
+lexer, recovery-aware AST, parser, and parser-proof tree.
 
 ## Decision
 
@@ -85,15 +80,11 @@ expression evaluator and local store remain in `Solcore.Core`; resolved source
 meaning remains in `Solcore.SourceSemantics`.
 
 Canonical language and frontend work imports `Solcore.Syntax`.
-`Solcore.Standard.CanonicalData` contains the exact canonical source-file byte
-arrays, logical paths, byte counts, and SHA-256 pins. It has no parser,
-typechecker, Core, or runtime dependency.
 
 The source dependency route is:
 
 ```text
-Standard bytes (when the canonical library is requested)
-  → Syntax → Workspace/Frontend → supported lowering → Core
+Syntax → Workspace/Frontend → supported lowering → Core
 ```
 
 Checked Core execution follows a separate internal route:

@@ -93,13 +93,13 @@ private def incompatibleObservationProfilesAreRejected : Bool :=
     !frontendScope.validationErrors.isEmpty &&
     !withRuntime.validationErrors.isEmpty
 
-private def legacyDigestsAreUnchanged : Bool :=
+private def profileDigestsAreCurrent : Bool :=
   draftCoreProfileDigest ==
-      "sha256:2ccae018d736fa61910a6c2475fe3088bad2e924b60d43a9748852b7cc817ec8" &&
+      "sha256:b5b8415eba19451d147e4fe9ae35ae2e110891f59cf80ecb70af73a162da3c92" &&
     m1aCoreProfileDigest ==
-      "sha256:3645c44ee266496e6ae13e33971d34c6836dee105a543e6805e5dd8b674ff867" &&
+      "sha256:284ddda1ea6e979648c5ac796f7992058f448c5ce889a9e82a2602d4f012f5d1" &&
     m1cCoreProfileDigest ==
-      "sha256:111ad60f90a5dca6eaafa582475b6582d081bc081ee59766d6040173061f2693"
+      "sha256:d86d3e11460cc07aec6ea2ed89a48b20c972829eebb5ef61de4580bf5cc88acd"
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do
@@ -114,8 +114,8 @@ def testProfileM3a : IO Unit := do
     "the v5-only feature matrix changed"
   assertTrue incompatibleObservationProfilesAreRejected
     "checkedCoreStateV1 escaped contract scope without a runtime"
-  assertTrue legacyDigestsAreUnchanged
-    "an older profile digest changed"
+  assertTrue profileDigestsAreCurrent
+    "a published profile digest constant is stale"
   let profileText ← IO.FS.readFile
     "profiles/solcore-0.1.0-draft.5-contract-m3a.json"
   let profileJson ←

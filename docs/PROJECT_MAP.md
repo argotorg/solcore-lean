@@ -18,7 +18,6 @@ work should normally import a narrower umbrella.
 | Execute checked contracts | [`Solcore/ContractRuntime.lean`](../Solcore/ContractRuntime.lean) | world, frame, transaction, host, call, creation, observation modules |
 | Change ABI support | [`Solcore/Abi.lean`](../Solcore/Abi.lean) | Keccak-256 and static-word modules |
 | Generate checked Core cases | [`Solcore/Synthesis.lean`](../Solcore/Synthesis.lean) | CoreV3 seed, fragment, generator, and shrinker |
-| Inspect canonical library bytes | [`Solcore/Standard/CanonicalData.lean`](../Solcore/Standard/CanonicalData.lean) | workspace/frontend consumers and metadata validation |
 
 ## Canonical syntax route
 

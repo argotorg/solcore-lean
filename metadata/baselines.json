@@ -5,8 +5,7 @@
     "status": "notYetExecuted",
     "solver": "tabled",
     "generatedDispatch": true,
-    "evmRevision": "osaka",
-    "standardLibraryBundle": "canonical-haskell-1d490d8"
+    "evmRevision": "osaka"
   },
   "implementations": [
     {
@@ -16,7 +15,6 @@
       "commitDate": "2026-07-21T07:40:24-03:00",
       "packageVersion": "0.0.0.0",
       "role": "upstreamEvidence",
-      "standardLibraryBundle": "canonical-haskell-1d490d8",
       "capabilityNote": "Defaults are evidence only. The external Yul compiler target is not pinned.",
       "nativeSettings": {
         "solver": {
@@ -65,8 +63,7 @@
       "commitDate": "2026-07-17T20:17:18+09:00",
       "packageVersion": "0.1.0",
       "role": "comparisonImplementation",
-      "standardLibraryBundle": "rust-compatibility-ac6f8957",
-      "capabilityNote": "The vendored std is older, and the external Yul compiler target is not pinned.",
+      "capabilityNote": "The external Yul compiler target is not pinned.",
       "nativeSettings": {
         "solver": {
           "mode": "tabled",
@@ -102,7 +99,6 @@
         }
       },
       "notes": [
-        "The vendored standard library is an older compatibility snapshot.",
         "The tracked worktree matched the recorded revision when these values were observed."
       ]
     }
@@ -117,8 +113,7 @@
     "validationDate": "2026-07-14",
     "baseline": {
       "haskellRevision": "ac6f8957a78dc53248dbe053f1ddbc2a2201b81f",
-      "rustRevision": "631d40814b28755bfd0afb6fa97a7a79895fa6ee",
-      "standardLibraryRevision": "ac6f8957a78dc53248dbe053f1ddbc2a2201b81f"
+      "rustRevision": "631d40814b28755bfd0afb6fa97a7a79895fa6ee"
     },
     "referenceFrontendConfiguration": {
       "haskellFlags": [
@@ -152,6 +147,6 @@
         "sha256": "9d141f2b322afd9517270885d5eca178c8d233ebef04d13834852c907801bccd"
       }
     ],
-    "reason": "Its revisions, solver mode, dispatch phase, and standard-library snapshot do not match the current comparison baseline."
+    "reason": "Its revisions, solver mode, and dispatch phase do not match the current comparison baseline."
   }
 }

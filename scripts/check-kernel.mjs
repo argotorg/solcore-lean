@@ -15,7 +15,6 @@ const kernelRoots = [
   "Solcore/TypeSystem.lean",
   "Solcore/Frontend",
   "Solcore/Frontend.lean",
-  "Solcore/Standard",
   "Solcore/Syntax",
   "Solcore/Workspace",
 ];
