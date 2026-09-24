@@ -9111,6 +9111,108 @@ theorem ContextSubstitutionValid.localSchemeInitializer
           exact List.mem_append_left _ predicateMem))
 }
 
+/-- A typed statement threads full flexible-substitution validity through the
+same lexical binder extension recorded by its typing constructor. -/
+theorem StatementHasType.contextSubstitutionValid
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext final : Context}
+    {source : TypedSource} {control : ControlContext}
+    {id : StatementId} {facts : StatementFacts}
+    (valid : ContextSubstitutionValid substitution closedVariables
+      sourceContext targetContext)
+    (typing : StatementHasType source control sourceContext id final facts) :
+    ContextSubstitutionValid substitution closedVariables final
+      (applyContext substitution targetContext.typeVariables final) := by
+  cases typing with
+  | letUninitialized _ _ _ _ extension _ => exact valid.afterBinder extension
+  | letInitialized _ _ _ _ _ extension _ => exact valid.afterBinder extension
+  | letInitializedGeneralized _ _ _ _ _ _ extension _ =>
+      exact valid.afterBinder extension
+  | returnUnit | returnValue | expressionValue | expressionDiscard |
+      assignValue | assignBitNot | ifWithoutElse | ifWithElse | block |
+      matchWithoutDefault | matchWithDefault | forLoop | whileLoop |
+      breakStmt | continueStmt =>
+      rw [valid.closes.target_eq]
+      exact valid
+
+/-- A typed statement sequence threads full flexible-substitution validity
+through every statement-local binder extension. -/
+theorem StatementsHaveType.contextSubstitutionValid
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext final : Context}
+    {source : TypedSource} {control : ControlContext}
+    {statements : List StatementId} {facts : BodyFacts}
+    (valid : ContextSubstitutionValid substitution closedVariables
+      sourceContext targetContext)
+    (typing : StatementsHaveType source control sourceContext statements final
+      facts) :
+    ContextSubstitutionValid substitution closedVariables final
+      (applyContext substitution targetContext.typeVariables final) := by
+  induction statements generalizing sourceContext targetContext final facts with
+  | nil =>
+      cases typing
+      rw [valid.closes.target_eq]
+      exact valid
+  | cons statement statements induction =>
+      cases statements with
+      | nil =>
+          cases typing with
+          | singleton head =>
+              exact FlexibleSubstitution.StatementHasType.contextSubstitutionValid
+                valid head
+      | cons next rest =>
+          cases typing with
+          | cons head tail =>
+              have middleValid :=
+                FlexibleSubstitution.StatementHasType.contextSubstitutionValid
+                  valid head
+              simpa using induction middleValid tail
+
+/-- A typed `for` item threads full flexible-substitution validity through its
+recorded lexical binder extension. -/
+theorem ForItemHasType.contextSubstitutionValid
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext final : Context}
+    {source : TypedSource} {control : ControlContext} {item : ForItemForm}
+    (valid : ContextSubstitutionValid substitution closedVariables
+      sourceContext targetContext)
+    (typing : ForItemHasType source control sourceContext item final) :
+    ContextSubstitutionValid substitution closedVariables final
+      (applyContext substitution targetContext.typeVariables final) := by
+  cases typing with
+  | letUninitialized _ _ extension => exact valid.afterBinder extension
+  | letInitialized _ _ _ extension => exact valid.afterBinder extension
+  | letInitializedGeneralized _ _ _ _ extension =>
+      exact valid.afterBinder extension
+  | expression | assignValue | assignBitNot =>
+      rw [valid.closes.target_eq]
+      exact valid
+
+/-- A typed `for` item sequence threads full flexible-substitution validity
+through every item-local binder extension. -/
+theorem ForItemsHaveType.contextSubstitutionValid
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext final : Context}
+    {source : TypedSource} {control : ControlContext}
+    {items : List ForItemForm}
+    (valid : ContextSubstitutionValid substitution closedVariables
+      sourceContext targetContext)
+    (typing : ForItemsHaveType source control sourceContext items final) :
+    ContextSubstitutionValid substitution closedVariables final
+      (applyContext substitution targetContext.typeVariables final) := by
+  induction items generalizing sourceContext targetContext final with
+  | nil =>
+      cases typing
+      rw [valid.closes.target_eq]
+      exact valid
+  | cons item items induction =>
+      cases typing with
+      | cons head tail =>
+          have middleValid :=
+            FlexibleSubstitution.ForItemHasType.contextSubstitutionValid
+              valid head
+          simpa using induction middleValid tail
+
 /-- The local-reference case of flexible static transport.  The source
 lookup determines one shared mapped binder, and the same composed inner
 substitution validates both its raw type and its qualified requirements. -/
@@ -10172,6 +10274,802 @@ theorem MatchExhaustive.applySubstitution
         exact ⟨matchCase.applySubstitution substitution,
           List.mem_map.mpr ⟨matchCase, matchCaseMem, rfl⟩,
           PatternCoversConstructor.applySubstitution covers⟩
+
+/-- Flexible instantiation transports the complete mutually recursive source
+typing derivation.  Every motive quantifies over its target context because
+generalized initializers and lexical binders temporarily change the retained
+flexible-variable suffix. -/
+theorem StatementsHaveType.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source : TypedSource} {control : ControlContext}
+    {context target final : Context}
+    {statements : List StatementId} {facts : BodyFacts}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables context target)
+    (typing : StatementsHaveType source control context statements final facts) :
+    StatementsHaveType (source.applySubstitution substitution)
+      (applyControlContext substitution control) target statements
+      (applyContext substitution target.typeVariables final)
+      (applyBodyFacts substitution facts) := by
+  apply StatementsHaveType.rec
+    (motive_1 := fun context id type _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        ExpressionHasType (source.applySubstitution substitution)
+          targetContext id (substitution.apply type))
+    (motive_2 := fun context form rawType plan _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        ExpressionFormHasRawType (source.applySubstitution substitution)
+          targetContext (form.applySubstitution substitution)
+          (substitution.apply rawType)
+          (applyExpressionRequirementPlan substitution plan))
+    (motive_3 := fun context expressions types _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        ExpressionsHaveTypes (source.applySubstitution substitution)
+          targetContext expressions (types.map substitution.apply))
+    (motive_4 := fun context initial projections result _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        SourceProjectionsHaveType (source.applySubstitution substitution)
+          targetContext (substitution.apply initial) projections
+          (substitution.apply result))
+    (motive_5 := fun context place type _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        SourcePlaceHasType (source.applySubstitution substitution)
+          targetContext (place.applySubstitution substitution)
+          (substitution.apply type))
+    (motive_6 := fun context assignment operator value _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        SourceAssignmentHasType (source.applySubstitution substitution)
+          targetContext (assignment.applySubstitution substitution)
+          operator value)
+    (motive_7 := fun context assignment _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        SourceBitNotAssignmentValid (source.applySubstitution substitution)
+          targetContext (assignment.applySubstitution substitution))
+    (motive_8 := fun control context id final facts _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        StatementHasType (source.applySubstitution substitution)
+          (applyControlContext substitution control) targetContext id
+          (applyContext substitution targetContext.typeVariables final)
+          (applyStatementFacts substitution facts))
+    (motive_9 := fun control context statements final facts _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        StatementsHaveType (source.applySubstitution substitution)
+          (applyControlContext substitution control) targetContext statements
+          (applyContext substitution targetContext.typeVariables final)
+          (applyBodyFacts substitution facts))
+    (motive_10 := fun control context item final _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        ForItemHasType (source.applySubstitution substitution)
+          (applyControlContext substitution control) targetContext
+          (item.applySubstitution substitution)
+          (applyContext substitution targetContext.typeVariables final))
+    (motive_11 := fun control context items final _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        ForItemsHaveType (source.applySubstitution substitution)
+          (applyControlContext substitution control) targetContext
+          (items.map (ForItemForm.applySubstitution substitution))
+          (applyContext substitution targetContext.typeVariables final))
+    (motive_12 := fun control context scrutineeType matchCase facts _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        MatchCaseHasType (source.applySubstitution substitution)
+          (applyControlContext substitution control) targetContext
+          (substitution.apply scrutineeType)
+          (matchCase.applySubstitution substitution)
+          (applyBodyFacts substitution facts))
+    (motive_13 := fun control context scrutineeType cases facts _ =>
+      ∀ targetContext,
+        SignatureCatalogWellFormed context.signatures →
+        ContextSubstitutionValid substitution closedVariables context
+            targetContext →
+        MatchCasesHaveType (source.applySubstitution substitution)
+          (applyControlContext substitution control) targetContext
+          (substitution.apply scrutineeType)
+          (cases.map (TypedMatchCase.applySubstitution substitution))
+          (facts.map (applyBodyFacts substitution)))
+  · intro context id node rawType plan contains formType rawTypeEq
+      rawWellFormed typeWellFormed requirements formInduction targetContext
+      catalog contextValid
+    exact .intro
+      (ContainsExpression.applySubstitution substitution contains)
+      (formInduction targetContext catalog contextValid)
+      (by simp [rawTypeEq])
+      (TypeAdmissible.applySubstitution contextValid.closes rawWellFormed)
+      (TypeAdmissible.applySubstitution contextValid.closes typeWellFormed)
+      (ExpressionRequirementPlan.Valid.applySubstitution catalog contextValid
+        requirements)
+  · intro context literal valid targetContext catalog contextValid
+    exact .literal valid
+  · intro context literal resolution valid targetContext catalog contextValid
+    exact .integerLiteral
+      (IntegerLiteralValid.applySubstitution contextValid valid)
+  · intro context name resolution type requirements referenceUse
+      targetContext catalog contextValid
+    exact .reference
+      (ReferenceUseValid.applySubstitution catalog contextValid referenceUse)
+  · intro context inner type innerType innerInduction targetContext catalog
+      contextValid
+    exact .group (innerInduction targetContext catalog contextValid)
+  · intro context elements types elementsType elementsInduction targetContext
+      catalog contextValid
+    simpa [ExpressionForm.applySubstitution, applyExpressionRequirementPlan,
+      apply_productMany] using
+      (ExpressionFormHasRawType.tuple
+        (elementsInduction targetContext catalog contextValid))
+  · intro context operator operand operandType resultType requirements
+      operandTypeProof operatorType operandInduction targetContext catalog
+      contextValid
+    exact .unary (operandInduction targetContext catalog contextValid)
+      (UnaryOperatorHasType.applySubstitution catalog contextValid operatorType)
+  · intro context operator left right operandType resultType requirements
+      leftType rightType operatorType leftInduction rightInduction targetContext
+      catalog contextValid
+    exact .binary (leftInduction targetContext catalog contextValid)
+      (rightInduction targetContext catalog contextValid)
+      (BinaryOperatorHasType.applySubstitution catalog contextValid operatorType)
+  · intro context condition thenBranch elseBranch type conditionType thenType
+      elseType conditionInduction thenInduction elseInduction targetContext
+      catalog contextValid
+    exact .conditional (conditionInduction targetContext catalog contextValid)
+      (thenInduction targetContext catalog contextValid)
+      (elseInduction targetContext catalog contextValid)
+  · intro context lambdaContext finalContext parameters parameterTypes
+      returnType body bodyFacts namesUnique parametersExtend bodyType bodyCompletes
+      bodyInduction targetContext catalog contextValid
+    have lambdaCatalog :
+        SignatureCatalogWellFormed lambdaContext.signatures := by
+      rw [StructuralSubstitution.MonoBindersExtend.signatures_eq parametersExtend]
+      exact catalog
+    have lambdaValid := contextValid.afterMonoBinders parametersExtend
+    simpa [ExpressionForm.applySubstitution, applyExpressionRequirementPlan,
+      apply_productMany, List.map_map, Function.comp_def,
+      TypedBinder.applySubstitution] using
+      (ExpressionFormHasRawType.lambda
+        (source := source.applySubstitution substitution)
+        (by simpa [List.map_map, Function.comp_def,
+          TypedBinder.applySubstitution] using namesUnique)
+        (MonoBindersExtend.applySubstitution contextValid.closes
+          parametersExtend)
+        (bodyInduction
+          (applyContext substitution targetContext.typeVariables lambdaContext)
+          lambdaCatalog lambdaValid)
+        (BodyCompletes.applySubstitution substitution bodyCompletes))
+  · intro context callee arguments instantiation parameterTypes resultType
+      predicates calleeValid application argumentsType argumentsInduction
+      targetContext catalog contextValid
+    exact .directCall
+      (DirectDeclarationCalleeValid.applySubstitution catalog contextValid
+        calleeValid)
+      (DeclarationApplicationValid.applySubstitution catalog contextValid
+        application)
+      (argumentsInduction targetContext catalog contextValid)
+  · intro context callee arguments function calleeValid argumentsType
+      argumentsInduction targetContext catalog contextValid
+    have calleeAfter :=
+      DirectBuiltinCalleeValid.applySubstitution
+        (substitution := substitution) calleeValid
+    have argumentsAfter := argumentsInduction targetContext catalog contextValid
+    cases function <;>
+      simpa [BuiltinFunctionId.parameterTypes, BuiltinFunctionId.returnType,
+        ExpressionForm.applySubstitution, applyExpressionRequirementPlan,
+        CallResolution.applySubstitution] using
+        (ExpressionFormHasRawType.builtinCall calleeAfter argumentsAfter)
+  · intro context callee arguments argumentTypes parameterType resultType
+      metadata calleeType argumentsType application calleeInduction
+      argumentsInduction targetContext catalog contextValid
+    exact .indirectCall
+      (calleeInduction targetContext catalog contextValid)
+      (argumentsInduction targetContext catalog contextValid)
+      (IndirectApplicationValid.applySubstitution catalog contextValid
+        application)
+  · intro context instantiation arguments valid argumentsType
+      argumentsInduction targetContext catalog contextValid
+    exact .constructor
+      (DataConstructorInstantiation.Admissible.applySubstitution catalog
+        contextValid valid)
+      (argumentsInduction targetContext catalog contextValid)
+  · intro context base name index baseType memberType baseTypeProof
+      memberTypeProof baseInduction targetContext catalog contextValid
+    exact .member (baseInduction targetContext catalog contextValid)
+      (UniformMemberProjection.applySubstitution catalog contextValid
+        memberTypeProof)
+  · intro context inner innerWellFormed targetContext catalog contextValid
+    exact .proxy
+      (TypeAdmissible.applySubstitution contextValid.closes innerWellFormed)
+  · intro context base key keyType valueType baseType keyTypeProof
+      baseInduction keyInduction targetContext catalog contextValid
+    exact .index (baseInduction targetContext catalog contextValid)
+      (keyInduction targetContext catalog contextValid)
+  · intro context targetContext catalog contextValid
+    exact .nil _
+  · intro context expression expressions type types head tail headInduction
+      tailInduction targetContext catalog contextValid
+    exact .cons (headInduction targetContext catalog contextValid)
+      (tailInduction targetContext catalog contextValid)
+  · intro context type targetContext catalog contextValid
+    exact .nil _
+  · intro context key keyType valueType finalType rest keyTypeProof restType
+      keyInduction restInduction targetContext catalog contextValid
+    exact .index (keyInduction targetContext catalog contextValid)
+      (restInduction targetContext catalog contextValid)
+  · intro context name index baseType memberType finalType rest selected
+      restType restInduction targetContext catalog contextValid
+    exact .member
+      (UniformMemberProjection.applySubstitution catalog contextValid selected)
+      (restInduction targetContext catalog contextValid)
+  · intro context place rootType finalType rootTypeProof projectionsType
+      storedTypeEq projectionsInduction targetContext catalog contextValid
+    exact .intro
+      (WritableLocal.applySubstitution contextValid rootTypeProof)
+      (projectionsInduction targetContext catalog contextValid)
+      (by simpa [PlaceResolution.applySubstitution] using
+        (congrArg substitution.apply storedTypeEq))
+  · intro context assignment value type targetType valueType requirementsEq
+      targetInduction valueInduction targetContext catalog contextValid
+    exact .equal (targetInduction targetContext catalog contextValid)
+      (valueInduction targetContext catalog contextValid)
+      (by simpa [AssignmentResolution.applySubstitution] using requirementsEq)
+  · intro context assignment operator value operatorKind targetType valueType
+      requirementsEq targetInduction valueInduction targetContext catalog
+      contextValid
+    exact .wordCompound operatorKind
+      (by simpa [AssignmentResolution.applySubstitution,
+        PlaceResolution.applySubstitution] using
+          targetInduction targetContext catalog contextValid)
+      (by simpa using valueInduction targetContext catalog contextValid)
+      (by simpa [AssignmentResolution.applySubstitution] using requirementsEq)
+  · intro context assignment targetType requirementsEq targetInduction
+      targetContext catalog contextValid
+    exact .intro
+      (by simpa [AssignmentResolution.applySubstitution,
+        PlaceResolution.applySubstitution] using
+          targetInduction targetContext catalog contextValid)
+      (by simpa [AssignmentResolution.applySubstitution] using requirementsEq)
+  · intro control context final id node binder contains formEq monomorphic
+      generalizes extension typeEq targetContext catalog contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.letUninitialized
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .letDecl (binder.applySubstitution substitution) none
+          rw [formEq]
+          rfl)
+        (by simp [TypeSystem.Scheme.apply, monomorphic])
+        (by simpa using
+          (SchemeGeneralizes.applySubstitution (substitution := substitution)
+            contextValid.closes generalizes))
+        (BinderExtends.applySubstitution contextValid.closes extension)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context final id node binder initializer contains formEq
+      initializerType monomorphic generalizes extension typeEq
+      initializerInduction targetContext catalog contextValid
+    simpa [applyStatementFacts] using
+      (StatementHasType.letInitialized
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .letDecl (binder.applySubstitution substitution) (some initializer)
+          rw [formEq]
+          rfl)
+        (by simpa [TypeSystem.Scheme.apply, Substitution.without,
+          monomorphic] using
+            initializerInduction targetContext catalog contextValid)
+        (by simp [TypeSystem.Scheme.apply, monomorphic])
+        (by simpa using
+          (SchemeGeneralizes.applySubstitution (substitution := substitution)
+            contextValid.closes generalizes))
+        (BinderExtends.applySubstitution contextValid.closes extension)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context final id node binder initializer contains formEq
+      polymorphic requirementsWellFormed generalizes initializerType extension
+      typeEq initializerInduction targetContext catalog contextValid
+    have fresh := quantified_fresh_for_closure contextValid.closes generalizes
+    have restrictedEq :
+        substitution.without binder.scheme.quantified = substitution :=
+      Substitution.without_eq_self_of_disjoint_domain substitution
+        binder.scheme.quantified fresh
+    simpa [applyStatementFacts] using
+      (StatementHasType.letInitializedGeneralized
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .letDecl (binder.applySubstitution substitution) (some initializer)
+          rw [formEq]
+          rfl)
+        (by simpa [TypedBinder.applySubstitution, TypeSystem.Scheme.apply]
+          using polymorphic)
+        (LocalSchemeRequirementsWellFormed.applySubstitution
+          contextValid.closes generalizes requirementsWellFormed)
+        (by
+          simpa using
+            (SchemeGeneralizesExcept.applySubstitution
+              (substitution := substitution) contextValid.closes generalizes))
+        (by
+          simpa [TypeSystem.Scheme.apply, restrictedEq] using
+            (initializerInduction
+              (localSchemeInitializerContext targetContext
+                (binder.applySubstitution substitution))
+              catalog (contextValid.localSchemeInitializer binder fresh)))
+        (BinderExtends.applySubstitution contextValid.closes extension)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node contains formEq returnTypeEq typeEq
+      targetContext catalog contextValid
+    simpa [applyStatementFacts, applyControlContext,
+      contextValid.closes.target_eq] using
+      (StatementHasType.returnUnit
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution = .returnStmt none
+          rw [formEq]
+          rfl)
+        (by simpa [applyControlContext] using
+          (congrArg substitution.apply returnTypeEq))
+        (by simpa [StatementNode.applySubstitution, applyControlContext] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node value contains formEq valueType typeEq
+      valueInduction targetContext catalog contextValid
+    simpa [applyStatementFacts, applyControlContext,
+      contextValid.closes.target_eq] using
+      (StatementHasType.returnValue
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .returnStmt (some value)
+          rw [formEq]
+          rfl)
+        (valueInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution, applyControlContext] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node expression type contains formEq
+      expressionType typeEq expressionInduction targetContext catalog
+      contextValid
+    simpa [applyStatementFacts, contextValid.closes.target_eq] using
+      (StatementHasType.expressionValue
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .expression expression false
+          rw [formEq]
+          rfl)
+        (expressionInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node expression type contains formEq
+      expressionType typeEq expressionInduction targetContext catalog
+      contextValid
+    simpa [applyStatementFacts, contextValid.closes.target_eq] using
+      (StatementHasType.expressionDiscard
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .expression expression true
+          rw [formEq]
+          rfl)
+        (expressionInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node assignment operator value contains formEq
+      assignmentType typeEq assignmentInduction targetContext catalog
+      contextValid
+    simpa [applyStatementFacts, contextValid.closes.target_eq] using
+      (StatementHasType.assignValue
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .assignValue (assignment.applySubstitution substitution) operator
+              value
+          rw [formEq]
+          rfl)
+        (assignmentInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node assignment contains formEq assignmentType
+      typeEq assignmentInduction targetContext catalog contextValid
+    simpa [applyStatementFacts, contextValid.closes.target_eq] using
+      (StatementHasType.assignBitNot
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .assignBitNot (assignment.applySubstitution substitution)
+          rw [formEq]
+          rfl)
+        (assignmentInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context thenFinal id node condition thenBody thenFacts
+      contains formEq conditionType thenType typeEq conditionInduction
+      thenInduction targetContext catalog contextValid
+    simpa [applyStatementFacts, applyBodyFacts,
+      contextValid.closes.target_eq] using
+      (StatementHasType.ifWithoutElse
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .ifThen condition thenBody none
+          rw [formEq]
+          rfl)
+        (conditionInduction targetContext catalog contextValid)
+        (thenInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context thenFinal elseFinal id node condition thenBody
+      elseBody thenFacts elseFacts contains formEq conditionType thenType
+      elseType typeEq conditionInduction thenInduction elseInduction
+      targetContext catalog contextValid
+    simpa [applyStatementFacts, applyControlContext, applyBodyFacts,
+      contextValid.closes.target_eq] using
+      (StatementHasType.ifWithElse
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .ifThen condition thenBody (some elseBody)
+          rw [formEq]
+          rfl)
+        (conditionInduction targetContext catalog contextValid)
+        (thenInduction targetContext catalog contextValid)
+        (elseInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution, applyControlContext,
+          applyBodyFacts] using (congrArg substitution.apply typeEq)))
+  · intro control context innerFinal id node body bodyFacts contains formEq
+      bodyType typeEq bodyInduction targetContext catalog contextValid
+    simpa [applyStatementFacts, applyBodyFacts,
+      contextValid.closes.target_eq] using
+      (StatementHasType.block
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution = .block body
+          rw [formEq]
+          rfl)
+        (bodyInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution, applyBodyFacts] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node resolution scrutineeType caseFacts summary
+      contains formEq defaultEq scrutineeTypeProof casesType requirementsEq
+      exhaustive merged typeEq scrutineeInduction casesInduction targetContext
+      catalog contextValid
+    simpa [applyStatementFacts, MatchResolution.applySubstitution,
+      applyBodyFacts, applyControlContext, contextValid.closes.target_eq] using
+      (StatementHasType.matchWithoutDefault
+        (resolution := resolution.applySubstitution substitution)
+        (caseFacts := caseFacts.map (applyBodyFacts substitution))
+        (summary := applyControlSummary substitution summary)
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .matchWith (resolution.applySubstitution substitution)
+          rw [formEq]
+          rfl)
+        (by simpa [MatchResolution.applySubstitution] using defaultEq)
+        (scrutineeInduction targetContext catalog contextValid)
+        (casesInduction targetContext catalog contextValid)
+        (by simpa [MatchResolution.applySubstitution,
+          flatMap_patternRequirements_applySubstitution] using requirementsEq)
+        (MatchExhaustive.applySubstitution contextValid.closes exhaustive)
+        (by
+          calc
+            mergeBodyControls
+                (caseFacts.map (applyBodyFacts substitution)) none =
+                (mergeBodyControls caseFacts none).map
+                  (applyControlSummary substitution) := by
+                    simpa using
+                      (mergeBodyControls_applyBodyFacts substitution caseFacts
+                        none)
+            _ = some (applyControlSummary substitution summary) := by
+              rw [merged]
+              rfl)
+        (by simpa [StatementNode.applySubstitution, applyControlContext,
+          applyBodyFacts] using (congrArg substitution.apply typeEq)))
+  · intro control context defaultFinal id node resolution defaultBody
+      scrutineeType caseFacts defaultFacts summary contains formEq defaultEq
+      scrutineeTypeProof casesType defaultType requirementsEq merged typeEq
+      scrutineeInduction casesInduction defaultInduction targetContext catalog
+      contextValid
+    simpa [applyStatementFacts, MatchResolution.applySubstitution,
+      applyBodyFacts, applyControlContext, contextValid.closes.target_eq] using
+      (StatementHasType.matchWithDefault
+        (resolution := resolution.applySubstitution substitution)
+        (caseFacts := caseFacts.map (applyBodyFacts substitution))
+        (defaultFacts := applyBodyFacts substitution defaultFacts)
+        (summary := applyControlSummary substitution summary)
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .matchWith (resolution.applySubstitution substitution)
+          rw [formEq]
+          rfl)
+        (by simpa [MatchResolution.applySubstitution] using defaultEq)
+        (scrutineeInduction targetContext catalog contextValid)
+        (casesInduction targetContext catalog contextValid)
+        (defaultInduction targetContext catalog contextValid)
+        (by simpa [MatchResolution.applySubstitution,
+          flatMap_patternRequirements_applySubstitution] using requirementsEq)
+        (by
+          calc
+            mergeBodyControls
+                (caseFacts.map (applyBodyFacts substitution))
+                (some (applyBodyFacts substitution defaultFacts)) =
+                (mergeBodyControls caseFacts (some defaultFacts)).map
+                  (applyControlSummary substitution) := by
+                    simpa using
+                      (mergeBodyControls_applyBodyFacts substitution caseFacts
+                        (some defaultFacts))
+            _ = some (applyControlSummary substitution summary) := by
+              rw [merged]
+              rfl)
+        (by simpa [StatementNode.applySubstitution, applyControlContext,
+          applyBodyFacts] using (congrArg substitution.apply typeEq)))
+  · intro control context loopContext postContext bodyFinal id node
+      initializer post condition body bodyFacts contains formEq initializerType
+      conditionType bodyType postType typeEq initializerInduction
+      conditionInduction bodyInduction postInduction targetContext catalog
+      contextValid
+    have loopCatalog : SignatureCatalogWellFormed loopContext.signatures := by
+      rw [StructuralSubstitution.ForItemsHaveType.signatures_eq initializerType]
+      exact catalog
+    have loopValid :=
+      ForItemsHaveType.contextSubstitutionValid contextValid initializerType
+    simpa [applyStatementFacts, applyBodyFacts,
+      contextValid.closes.target_eq] using
+      (StatementHasType.forLoop
+        (control := applyControlContext substitution control)
+        (bodyFacts := applyBodyFacts substitution bodyFacts)
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .forLoop
+              (initializer.map (ForItemForm.applySubstitution substitution))
+              condition (post.map (ForItemForm.applySubstitution substitution))
+              body
+          rw [formEq]
+          rfl)
+        (initializerInduction targetContext catalog contextValid)
+        (conditionInduction
+          (applyContext substitution targetContext.typeVariables loopContext)
+          loopCatalog loopValid)
+        (by simpa using
+          (bodyInduction
+            (applyContext substitution targetContext.typeVariables loopContext)
+            loopCatalog loopValid))
+        (by simpa using
+          (postInduction
+            (applyContext substitution targetContext.typeVariables loopContext)
+            loopCatalog loopValid))
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context bodyFinal id node condition body bodyFacts contains
+      formEq conditionType bodyType typeEq conditionInduction bodyInduction
+      targetContext catalog contextValid
+    simpa [applyStatementFacts, applyBodyFacts,
+      contextValid.closes.target_eq] using
+      (StatementHasType.whileLoop
+        (control := applyControlContext substitution control)
+        (bodyFacts := applyBodyFacts substitution bodyFacts)
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution =
+            .whileLoop condition body
+          rw [formEq]
+          rfl)
+        (conditionInduction targetContext catalog contextValid)
+        (by simpa using bodyInduction targetContext catalog contextValid)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node contains formEq allowed typeEq
+      targetContext catalog contextValid
+    simpa [applyStatementFacts, contextValid.closes.target_eq] using
+      (StatementHasType.breakStmt
+        (control := applyControlContext substitution control)
+        (context := targetContext)
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution = .breakStmt
+          rw [formEq]
+          rfl)
+        (by simpa [applyControlContext, ControlContext.loopAllowed] using
+          allowed)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context id node contains formEq allowed typeEq
+      targetContext catalog contextValid
+    simpa [applyStatementFacts, contextValid.closes.target_eq] using
+      (StatementHasType.continueStmt
+        (control := applyControlContext substitution control)
+        (context := targetContext)
+        (ContainsStatement.applySubstitution substitution contains)
+        (by
+          change node.form.applySubstitution substitution = .continueStmt
+          rw [formEq]
+          rfl)
+        (by simpa [applyControlContext, ControlContext.loopAllowed] using
+          allowed)
+        (by simpa [StatementNode.applySubstitution] using
+          (congrArg substitution.apply typeEq)))
+  · intro control context targetContext catalog contextValid
+    simpa [contextValid.closes.target_eq] using
+      (StatementsHaveType.nil
+        (source := source.applySubstitution substitution)
+        (applyControlContext substitution control) targetContext)
+  · intro control context final statement statementFacts head headInduction
+      targetContext catalog contextValid
+    simpa using StatementsHaveType.singleton
+      (headInduction targetContext catalog contextValid)
+  · intro control context middle final statement next rest headFacts
+      tailFacts head tail headInduction tailInduction targetContext catalog
+      contextValid
+    have middleCatalog : SignatureCatalogWellFormed middle.signatures := by
+      rw [StructuralSubstitution.StatementHasType.signatures_eq head]
+      exact catalog
+    have middleValid :=
+      StatementHasType.contextSubstitutionValid contextValid head
+    simpa using StatementsHaveType.cons
+      (headInduction targetContext catalog contextValid)
+      (tailInduction
+        (applyContext substitution targetContext.typeVariables middle)
+        middleCatalog middleValid)
+  · intro control context final binder monomorphic generalizes extension
+      targetContext catalog contextValid
+    exact .letUninitialized
+      (by simp [TypeSystem.Scheme.apply, monomorphic])
+      (by simpa using
+        (SchemeGeneralizes.applySubstitution (substitution := substitution)
+          contextValid.closes generalizes))
+      (BinderExtends.applySubstitution contextValid.closes extension)
+  · intro control context final binder initializer initializerType
+      monomorphic generalizes extension initializerInduction targetContext
+      catalog contextValid
+    exact .letInitialized
+      (by simpa [TypeSystem.Scheme.apply, Substitution.without,
+        monomorphic] using
+          initializerInduction targetContext catalog contextValid)
+      (by simp [TypeSystem.Scheme.apply, monomorphic])
+      (by simpa using
+        (SchemeGeneralizes.applySubstitution (substitution := substitution)
+          contextValid.closes generalizes))
+      (BinderExtends.applySubstitution contextValid.closes extension)
+  · intro control context final binder initializer polymorphic
+      requirementsWellFormed generalizes initializerType extension
+      initializerInduction targetContext catalog contextValid
+    have fresh := quantified_fresh_for_closure contextValid.closes generalizes
+    have restrictedEq :
+        substitution.without binder.scheme.quantified = substitution :=
+      Substitution.without_eq_self_of_disjoint_domain substitution
+        binder.scheme.quantified fresh
+    exact .letInitializedGeneralized
+      (by simpa [ForItemForm.applySubstitution, TypedBinder.applySubstitution,
+        TypeSystem.Scheme.apply] using polymorphic)
+      (LocalSchemeRequirementsWellFormed.applySubstitution
+        contextValid.closes generalizes requirementsWellFormed)
+      (by
+        simpa using
+          (SchemeGeneralizesExcept.applySubstitution
+            (substitution := substitution) contextValid.closes generalizes))
+      (by
+        simpa [TypeSystem.Scheme.apply, restrictedEq] using
+          (initializerInduction
+            (localSchemeInitializerContext targetContext
+              (binder.applySubstitution substitution))
+            catalog (contextValid.localSchemeInitializer binder fresh)))
+      (BinderExtends.applySubstitution contextValid.closes extension)
+  · intro control context expression type expressionType expressionInduction
+      targetContext catalog contextValid
+    simpa [ForItemForm.applySubstitution,
+      contextValid.closes.target_eq] using
+      (ForItemHasType.expression
+        (expressionInduction targetContext catalog contextValid))
+  · intro control context assignment operator value assignmentType
+      assignmentInduction targetContext catalog contextValid
+    simpa [ForItemForm.applySubstitution,
+      contextValid.closes.target_eq] using
+      (ForItemHasType.assignValue
+        (assignmentInduction targetContext catalog contextValid))
+  · intro control context assignment assignmentType assignmentInduction
+      targetContext catalog contextValid
+    simpa [ForItemForm.applySubstitution,
+      contextValid.closes.target_eq] using
+      (ForItemHasType.assignBitNot
+        (assignmentInduction targetContext catalog contextValid))
+  · intro control context targetContext catalog contextValid
+    simpa [contextValid.closes.target_eq] using
+      (ForItemsHaveType.nil
+        (source := source.applySubstitution substitution)
+        (applyControlContext substitution control) targetContext)
+  · intro control context middle final item items head tail headInduction
+      tailInduction targetContext catalog contextValid
+    have middleCatalog : SignatureCatalogWellFormed middle.signatures := by
+      rw [StructuralSubstitution.ForItemHasType.signatures_eq head]
+      exact catalog
+    have middleValid :=
+      ForItemHasType.contextSubstitutionValid contextValid head
+    simpa using ForItemsHaveType.cons
+      (headInduction targetContext catalog contextValid)
+      (tailInduction
+        (applyContext substitution targetContext.typeVariables middle)
+        middleCatalog middleValid)
+  · intro control context scrutineeType matchCase binders rootArity armContext
+      finalContext facts patternType bindersExtend bodyType bodyInduction
+      targetContext catalog contextValid
+    have armCatalog : SignatureCatalogWellFormed armContext.signatures := by
+      rw [StructuralSubstitution.BindersExtend.signatures_eq bindersExtend]
+      exact catalog
+    have armValid := contextValid.afterBinders bindersExtend
+    exact .intro
+      (TypedMatchPatternHasType.applySubstitution catalog contextValid
+        patternType)
+      (BindersExtend.applySubstitution contextValid.closes bindersExtend)
+      (bodyInduction
+        (applyContext substitution targetContext.typeVariables armContext)
+        armCatalog armValid)
+  · intro control context scrutineeType targetContext catalog contextValid
+    exact .nil _ _ _
+  · intro control context scrutineeType matchCase cases facts caseFacts head
+      tail headInduction tailInduction targetContext catalog contextValid
+    exact .cons (headInduction targetContext catalog contextValid)
+      (tailInduction targetContext catalog contextValid)
+  · exact typing
+  · exact catalog
+  · exact contextValid
+
+/-- Flexible instantiation preserves a complete declaration body, including
+its root-shape invariant and completion certificate. -/
+theorem BodyHasType.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source : TypedSource} {context target : Context}
+    {resultType : Ty} {facts : BodyFacts}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables context target)
+    (typing : BodyHasType source context resultType facts) :
+    BodyHasType (source.applySubstitution substitution) target
+      (substitution.apply resultType) (applyBodyFacts substitution facts) := by
+  rcases typing with ⟨finalContext, statementsType, noExpressionRoots,
+    completes⟩
+  refine ⟨applyContext substitution target.typeVariables finalContext, ?_,
+    ?_, ?_⟩
+  · simpa [applyControlContext] using
+      (StatementsHaveType.applySubstitution catalog contextValid statementsType)
+  · intro expression member
+    exact noExpressionRoots expression (by simpa using member)
+  · exact BodyCompletes.applySubstitution substitution completes
 
 @[simp] theorem closeContext_withTypeVariables (substitution : Substitution)
     (context : Context) (variables : List TypeVarId) :
