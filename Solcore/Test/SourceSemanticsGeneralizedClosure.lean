@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
+import Solcore.SourceSemantics.Dynamic.Heap
 
 /-! Focused checks for proof-facing generalized-closure materialization. -/
 
@@ -134,5 +135,32 @@ example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
     ProgramSignatures.builtinIntPredicate, TypeSystem.Substitution.without,
     TypeSystem.Substitution.erase, TypeSystem.Substitution.apply,
     TypeSystem.Substitution.lookup?]
+
+/-- A generalized allocation stores the untouched principal closure and no
+ordinary value at the unique fresh location. -/
+example (heap : Heap) (function : GeneralizedClosure) :
+    let location : Location := ⟨heap.cells.length⟩
+    let updated : Heap := ⟨heap.cells ++ [{
+      type := function.binder.scheme.body
+      value := none
+      generalized := some function
+    }]⟩
+    Heap.AllocatesGeneralized heap function location updated ∧
+      Heap.Reads updated location {
+        type := function.binder.scheme.body
+        value := none
+        generalized := some function
+      } := by
+  exact ⟨.append, Heap.AllocatesGeneralized.reads_new .append⟩
+
+/-- Generalized allocation and later ordinary writes compose without changing
+the metadata of cells that were already present. -/
+example {before middle after : Heap} {function : GeneralizedClosure}
+    {fresh written : Location} {value : Option Value}
+    (allocation : Heap.AllocatesGeneralized before function fresh middle)
+    (write : Heap.Writes middle written value after) :
+    HeapMetadataExtend before after :=
+  (HeapMetadataExtend.of_generalized_allocation allocation).trans
+    (HeapMetadataExtend.of_write write)
 
 end Solcore.Test.SourceSemanticsGeneralizedClosure

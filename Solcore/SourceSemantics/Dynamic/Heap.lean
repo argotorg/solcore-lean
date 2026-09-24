@@ -15,10 +15,13 @@ namespace Solcore.SourceSemantics.Dynamic
 
 open TypeSystem
 
-/-- One mutable cell retains its source type even when uninitialized. -/
+/-- One mutable cell retains its source type even when uninitialized.  A
+generalized direct-lambda cell additionally retains its principal closure so
+each read can materialize a use-site-specific ordinary closure. -/
 structure Cell where
   type : Ty
   value : Option Value
+  generalized : Option GeneralizedClosure := none
   deriving Repr
 
 /-- A finite source heap.  Locations are stable list indices. -/
@@ -94,6 +97,19 @@ inductive Allocates (heap : Heap) (type : Ty) (value : Option Value) :
   | append :
       Allocates heap type value ⟨heap.cells.length⟩
         ⟨heap.cells ++ [({ type := type, value := value } : Cell)]⟩
+
+/-- Allocate one principal generalized closure at the fresh final location.
+The retained cell type is the binder's principal scheme body; no ordinary
+value is materialized until a particular use site supplies an instantiation. -/
+inductive AllocatesGeneralized (heap : Heap) (function : GeneralizedClosure) :
+    Location → Heap → Prop where
+  | append :
+      AllocatesGeneralized heap function ⟨heap.cells.length⟩
+        ⟨heap.cells ++ [{
+          type := function.binder.scheme.body
+          value := none
+          generalized := some function
+        }]⟩
 
 /-- Write only the optional value of one existing cell. -/
 inductive Writes (heap : Heap) (location : Location)
@@ -242,6 +258,53 @@ theorem preserves_read
 
 end Allocates
 
+namespace AllocatesGeneralized
+
+theorem location_fresh
+    {heap : Heap} {function : GeneralizedClosure}
+    {location : Location} {updated : Heap}
+    (allocation : AllocatesGeneralized heap function location updated) :
+    location.index = heap.cells.length := by
+  cases allocation
+  rfl
+
+theorem length_eq_succ
+    {heap : Heap} {function : GeneralizedClosure}
+    {location : Location} {updated : Heap}
+    (allocation : AllocatesGeneralized heap function location updated) :
+    updated.cells.length = heap.cells.length + 1 := by
+  cases allocation
+  simp
+
+theorem reads_new
+    {heap : Heap} {function : GeneralizedClosure}
+    {location : Location} {updated : Heap}
+    (allocation : AllocatesGeneralized heap function location updated) :
+    Reads updated location {
+      type := function.binder.scheme.body
+      value := none
+      generalized := some function
+    } := by
+  cases allocation
+  exact .intro (CellAt.append_last heap.cells {
+    type := function.binder.scheme.body
+    value := none
+    generalized := some function
+  })
+
+theorem preserves_read
+    {heap : Heap} {function : GeneralizedClosure}
+    {location : Location} {updated : Heap}
+    (allocation : AllocatesGeneralized heap function location updated)
+    {oldLocation : Location} {cell : Cell}
+    (read : Reads heap oldLocation cell) :
+    Reads updated oldLocation cell := by
+  cases allocation
+  cases read with
+  | intro selected => exact .intro selected.append_left
+
+end AllocatesGeneralized
+
 namespace Writes
 
 theorem length_eq
@@ -284,6 +347,66 @@ theorem preserves_other
 end Writes
 
 end Heap
+
+/-- A later heap preserves the static metadata of every old cell.  Ordinary
+values may change, while declared types and principal generalized closures
+remain fixed. -/
+def HeapMetadataExtend (before after : Heap) : Prop :=
+  ∀ location cell, Heap.Reads before location cell →
+    ∃ updatedCell,
+      Heap.Reads after location updatedCell ∧
+      updatedCell.type = cell.type ∧
+      updatedCell.generalized = cell.generalized
+
+namespace HeapMetadataExtend
+
+theorem refl (heap : Heap) : HeapMetadataExtend heap heap := by
+  intro location cell read
+  exact ⟨cell, read, rfl, rfl⟩
+
+theorem trans {first middle last : Heap}
+    (left : HeapMetadataExtend first middle)
+    (right : HeapMetadataExtend middle last) :
+    HeapMetadataExtend first last := by
+  intro location cell read
+  rcases left location cell read with
+    ⟨middleCell, middleRead, middleType, middleGeneralized⟩
+  rcases right location middleCell middleRead with
+    ⟨lastCell, lastRead, lastType, lastGeneralized⟩
+  exact ⟨lastCell, lastRead, lastType.trans middleType,
+    lastGeneralized.trans middleGeneralized⟩
+
+theorem of_allocation
+    {before after : Heap} {type : Ty} {value : Option Value}
+    {location : Location}
+    (allocation : Heap.Allocates before type value location after) :
+    HeapMetadataExtend before after := by
+  intro oldLocation cell read
+  exact ⟨cell, allocation.preserves_read read, rfl, rfl⟩
+
+theorem of_generalized_allocation
+    {before after : Heap} {function : GeneralizedClosure}
+    {location : Location}
+    (allocation : Heap.AllocatesGeneralized before function location after) :
+    HeapMetadataExtend before after := by
+  intro oldLocation cell read
+  exact ⟨cell, allocation.preserves_read read, rfl, rfl⟩
+
+theorem of_write
+    {before after : Heap} {writtenLocation : Location}
+    {value : Option Value}
+    (write : Heap.Writes before writtenLocation value after) :
+    HeapMetadataExtend before after := by
+  intro location cell read
+  by_cases same : location = writtenLocation
+  · subst location
+    rcases write.reads_updated with ⟨previous, previousRead, updatedRead⟩
+    have cell_eq : cell = previous := read.functional previousRead
+    subst cell
+    exact ⟨{ previous with value := value }, updatedRead, rfl, rfl⟩
+  · exact ⟨cell, write.preserves_other same read, rfl, rfl⟩
+
+end HeapMetadataExtend
 
 /-- Allocation followed by first-match lexical extension. -/
 inductive Binds (environment : Environment) (heap : Heap)
