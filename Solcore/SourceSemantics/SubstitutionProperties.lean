@@ -5580,6 +5580,46 @@ theorem mem_freeVariables_apply_iff
   rw [freeVariables_apply range]
   simp
 
+private theorem foldl_mergeVariables_apply
+    {context : Context} {substitution : TypeSystem.Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (initial : List TypeVarId) (types : List Ty) :
+    (types.map substitution.apply).foldl
+        (fun variables type => mergeVariables variables type.freeVariables)
+        (initial.filter fun metavariable =>
+          !(substitution.domain.contains metavariable)) =
+      (types.foldl
+        (fun variables type => mergeVariables variables type.freeVariables)
+        initial).filter fun metavariable =>
+          !(substitution.domain.contains metavariable) := by
+  induction types generalizing initial with
+  | nil => rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, List.foldl_cons]
+      rw [freeVariables_apply range, ← filter_mergeVariables]
+      exact induction (mergeVariables initial head.freeVariables)
+
+private theorem predicateVariables_apply
+    {context : Context} {substitution : TypeSystem.Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (predicate : ProgramPredicate) :
+    Frontend.TypedTraitResolution.predicateVariables
+        (TypedTraitResolution.applySubstitution substitution predicate) =
+      (Frontend.TypedTraitResolution.predicateVariables predicate).filter
+        fun metavariable =>
+          !(substitution.domain.contains metavariable) := by
+  cases predicate with
+  | mk trait subject arguments =>
+      change (arguments.map substitution.apply).foldl
+          (fun variables type => mergeVariables variables type.freeVariables)
+          (substitution.apply subject).freeVariables =
+        (arguments.foldl
+          (fun variables type => mergeVariables variables type.freeVariables)
+          subject.freeVariables).filter fun metavariable =>
+            !(substitution.domain.contains metavariable)
+      rw [freeVariables_apply range]
+      exact foldl_mergeVariables_apply range subject.freeVariables arguments
+
 private theorem without_sublist (substitution : TypeSystem.Substitution)
     (variables : List TypeVarId) :
     List.Sublist (substitution.without variables) substitution := by
@@ -5702,6 +5742,134 @@ theorem SubstitutionRangeWellFormed.without
   intro metavariable replacement member
   apply range metavariable replacement
   exact (Substitution.without_sublist substitution variables).subset member
+
+private theorem Scheme.freeVariables_apply
+    {context : Context} {substitution : Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (scheme : Scheme) :
+    (scheme.apply substitution).freeVariables =
+      scheme.freeVariables.filter fun metavariable =>
+        !(substitution.domain.contains metavariable) := by
+  simp only [Scheme.apply, Scheme.freeVariables]
+  rw [Substitution.freeVariables_apply
+    (SubstitutionRangeWellFormed.without range scheme.quantified)]
+  simp only [List.filter_filter]
+  apply List.filter_congr
+  intro metavariable _
+  by_cases quantified : metavariable ∈ scheme.quantified <;>
+    by_cases substituted : metavariable ∈ substitution.domain <;>
+      simp [quantified, substituted, Substitution.mem_domain_without_iff]
+
+private theorem localSchemeVariables_apply
+    {context : Context} {substitution : Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (locals : Resolved.LocalScope Scheme) :
+    (applyLocals substitution locals).flatMap
+        (fun entry => entry.2.freeVariables) =
+      (locals.flatMap (fun entry => entry.2.freeVariables)).filter
+        fun metavariable =>
+          !(substitution.domain.contains metavariable) := by
+  induction locals with
+  | nil => rfl
+  | cons entry rest induction =>
+      rcases entry with ⟨id, scheme⟩
+      change (scheme.apply substitution).freeVariables ++
+          (applyLocals substitution rest).flatMap
+            (fun entry => entry.2.freeVariables) =
+        (scheme.freeVariables ++
+          rest.flatMap (fun entry => entry.2.freeVariables)).filter
+            fun metavariable =>
+              !(substitution.domain.contains metavariable)
+      rw [Scheme.freeVariables_apply range, induction, List.filter_append]
+
+private theorem solvedRequirementVariables_apply
+    {context : Context} {substitution : Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (exemptRequirements : List RequirementId)
+    (requirements : List SolvedRequirement) :
+    ((requirements.map (applySolvedRequirement substitution)).filter
+        fun requirement =>
+          !exemptRequirements.contains requirement.id).flatMap
+        (fun requirement =>
+          TypedTraitResolution.predicateVariables requirement.predicate) =
+      ((requirements.filter fun requirement =>
+        !exemptRequirements.contains requirement.id).flatMap
+          (fun requirement =>
+            TypedTraitResolution.predicateVariables
+              requirement.predicate)).filter fun metavariable =>
+                !(substitution.domain.contains metavariable) := by
+  induction requirements with
+  | nil => rfl
+  | cons requirement rest induction =>
+      by_cases exempt : exemptRequirements.contains requirement.id
+      · simp [applySolvedRequirement, exempt, induction]
+      · simp [applySolvedRequirement, exempt, induction,
+          Substitution.predicateVariables_apply range, List.filter_append]
+
+private theorem targetTypeVariables_eq_filter
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target) :
+    target.typeVariables =
+      source.typeVariables.filter fun metavariable =>
+        !(substitution.domain.contains metavariable) := by
+  have closed_eq :
+      closedVariables.filter (fun metavariable =>
+        !(substitution.domain.contains metavariable)) = [] := by
+    apply List.filter_eq_nil_iff.mpr
+    intro metavariable member
+    simp [((closes.exact.mem_domain_iff metavariable).mpr member)]
+  have retained_eq :
+      target.typeVariables.filter (fun metavariable =>
+        !(substitution.domain.contains metavariable)) =
+        target.typeVariables := by
+    apply List.filter_eq_self.mpr
+    intro metavariable member
+    simp [closes.retained_fresh metavariable member]
+  rw [closes.variables_eq, List.filter_append, closed_eq, retained_eq]
+  rfl
+
+private theorem generalizationBlockedVariablesExcept_applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (exemptRequirements : List RequirementId) :
+    GeneralizationBlockedVariablesExcept target exemptRequirements =
+      (GeneralizationBlockedVariablesExcept source exemptRequirements).filter
+        fun metavariable =>
+          !(substitution.domain.contains metavariable) := by
+  have locals_eq : target.locals =
+      applyLocals substitution source.locals := by
+    rw [← closes.target_eq]
+    rfl
+  have solvedRequirements_eq : target.solvedRequirements =
+      source.solvedRequirements.map
+        (applySolvedRequirement substitution) := by
+    rw [← closes.target_eq]
+    rfl
+  unfold GeneralizationBlockedVariablesExcept
+  rw [targetTypeVariables_eq_filter closes, locals_eq,
+    solvedRequirements_eq, localSchemeVariables_apply closes.range,
+    solvedRequirementVariables_apply closes.range]
+  simp [List.filter_append]
+
+private theorem filter_unblocked_after_domain
+    (variables blocked domain : List TypeVarId)
+    (domain_blocked : ∀ metavariable, metavariable ∈ domain →
+      metavariable ∈ blocked) :
+    (variables.filter fun metavariable =>
+        !(domain.contains metavariable)).filter (fun metavariable =>
+          !((blocked.filter fun candidate =>
+            !(domain.contains candidate)).contains metavariable)) =
+      variables.filter fun metavariable =>
+        !(blocked.contains metavariable) := by
+  simp only [List.filter_filter]
+  apply List.filter_congr
+  intro metavariable _
+  by_cases substituted : metavariable ∈ domain
+  · have blockedMember := domain_blocked metavariable substituted
+    simp [substituted, blockedMember]
+  · simp [substituted]
 
 /-- Simultaneous flexible substitution transports a scoped type when every
 replacement is closed in the target context and every untouched source
@@ -6944,6 +7112,55 @@ private theorem quantified_fresh_for_closure
   rw [closes.variables_eq]
   exact List.mem_append.mpr (Or.inl
     ((closes.exact.mem_domain_iff metavariable).mp domainMember))
+
+/-- Closing an outer flexible scope preserves the exact qualified
+generalization frontier of a capture-avoiding rank-1 scheme. -/
+theorem SchemeGeneralizesExcept.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {exemptRequirements : List RequirementId}
+    {scheme : Scheme}
+    (closes : ContextCloses substitution closedVariables source target)
+    (generalizes :
+      SchemeGeneralizesExcept source exemptRequirements scheme) :
+    SchemeGeneralizesExcept target exemptRequirements
+      (scheme.apply substitution) := by
+  have fresh := quantified_fresh_for_closure closes generalizes
+  have restricted_eq :
+      substitution.without scheme.quantified = substitution :=
+    Substitution.without_eq_self_of_disjoint_domain substitution
+      scheme.quantified fresh
+  have domain_blocked : ∀ metavariable,
+      metavariable ∈ substitution.domain →
+        metavariable ∈
+          GeneralizationBlockedVariablesExcept source exemptRequirements := by
+    intro metavariable member
+    have closed := (closes.exact.mem_domain_iff metavariable).mp member
+    have ambient : metavariable ∈ source.typeVariables := by
+      rw [closes.variables_eq]
+      exact List.mem_append.mpr (Or.inl closed)
+    simp [GeneralizationBlockedVariablesExcept, ambient]
+  unfold SchemeGeneralizesExcept at generalizes ⊢
+  change scheme.quantified =
+    ((substitution.without scheme.quantified).apply
+      scheme.body).freeVariables.filter (fun metavariable =>
+        !(GeneralizationBlockedVariablesExcept target exemptRequirements).contains
+          metavariable)
+  rw [restricted_eq, Substitution.freeVariables_apply closes.range,
+    generalizationBlockedVariablesExcept_applySubstitution closes,
+    filter_unblocked_after_domain scheme.body.freeVariables
+      (GeneralizationBlockedVariablesExcept source exemptRequirements)
+      substitution.domain domain_blocked]
+  exact generalizes
+
+/-- Ordinary rank-1 generalization is the empty-exemption instance of
+qualified generalization transport. -/
+theorem SchemeGeneralizes.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {scheme : Scheme}
+    (closes : ContextCloses substitution closedVariables source target)
+    (generalizes : SchemeGeneralizes source scheme) :
+    SchemeGeneralizes target (scheme.apply substitution) := by
+  exact SchemeGeneralizesExcept.applySubstitution closes generalizes
 
 /-- Flexible closure preserves one qualified local-scheme requirement.  The
 generalization witness supplies freshness of the protected scheme variables. -/

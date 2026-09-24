@@ -461,6 +461,58 @@ example (substitution : Substitution) (closedVariables : List TypeVarId)
       (TypedTraitResolution.applySubstitution substitution predicate) :=
   FlexibleSubstitution.PredicateAdmissible.applySubstitution closes admissible
 
+/-- Exact outer closure removes the outer generalized variable from a nested
+scheme body while preserving the inner variable as that scheme's sole
+quantifier. -/
+example (signatures : ProgramSignatures) :
+    let outer : TypeVarId := ⟨0⟩
+    let inner : TypeVarId := ⟨1⟩
+    let source := (SourceSemantics.Context.ofSignatures signatures)
+      |>.withTypeVariables [outer]
+    let target := SourceSemantics.Context.ofSignatures signatures
+    let scheme : Scheme := {
+      quantified := [inner]
+      body := .product (.variable outer) (.variable inner)
+    }
+    SchemeGeneralizes source scheme ∧
+      SchemeGeneralizes target (scheme.apply [(outer, .word)]) := by
+  let outer : TypeVarId := ⟨0⟩
+  let inner : TypeVarId := ⟨1⟩
+  let source := (SourceSemantics.Context.ofSignatures signatures)
+    |>.withTypeVariables [outer]
+  let target := SourceSemantics.Context.ofSignatures signatures
+  let scheme : Scheme := {
+    quantified := [inner]
+    body := .product (.variable outer) (.variable inner)
+  }
+  have closes : FlexibleSubstitution.ContextCloses
+      [(outer, .word)] [outer] source target := {
+    variables_eq := rfl
+    exact := ExactSubstitution.singleton outer .word
+    retained_fresh := by
+      simp [target, SourceSemantics.Context.ofSignatures]
+    range := by
+      intro metavariable replacement member
+      simp only [List.mem_singleton] at member
+      cases member
+      exact {
+        binders := TypeParameterBindersWellFormed.ofSignatures signatures
+        typeWellScoped := .builtin .word
+      }
+    target_eq := rfl
+  }
+  have generalizes : SchemeGeneralizes source scheme := by
+    simp only [SchemeGeneralizes, SchemeGeneralizesExcept, scheme, source,
+      GeneralizationBlockedVariablesExcept, Context.withTypeVariables,
+      Context.ofSignatures, Ty.freeVariables, outer, inner]
+    change [inner] =
+      ([outer, inner] : List TypeVarId).filter (fun metavariable =>
+        !(metavariable ∈ [outer]))
+    simp [outer, inner]
+  refine ⟨by simpa [outer, inner, source, target, scheme] using generalizes, ?_⟩
+  simpa [outer, inner, source, target, scheme] using
+    (FlexibleSubstitution.SchemeGeneralizes.applySubstitution closes generalizes)
+
 /-- Exact generalization makes each scheme variable fresh for the ambient
 lexical scope, hence also for an exact outer-closing substitution. -/
 example (substitution : Substitution) (closedVariables : List TypeVarId)
