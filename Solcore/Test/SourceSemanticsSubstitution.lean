@@ -134,6 +134,29 @@ example (substitution : ParameterSubstitution) (source : TypedSource)
       (applyTypedSource substitution source) occurrence :=
   LocalSchemeTemplateOwner.Scopes.applyParameters substitution scope
 
+/-- The occurrence-aware primary-requirement inventory forgets to the legacy
+flat identity inventory exactly. -/
+example (source : TypedSource) :
+    (primaryRequirementOccurrences source).map
+        (fun occurrence => occurrence.requirement) =
+      primaryRequirementIds source :=
+  primaryRequirementOccurrenceIds_eq source
+
+/-- Rigid substitution preserves exact primary requirement attachment sites. -/
+example (substitution : ParameterSubstitution) (source : TypedSource) :
+    primaryRequirementOccurrences (applyTypedSource substitution source) =
+      primaryRequirementOccurrences source :=
+  primaryRequirementOccurrences_applyTypedSource substitution source
+
+/-- The relational view of an exact primary attachment transports without
+changing either stable identity. -/
+example (substitution : ParameterSubstitution) (source : TypedSource)
+    (occurrence : NodeId) (requirement : RequirementId)
+    (occurs : PrimaryRequirementOccursAt source occurrence requirement) :
+    PrimaryRequirementOccursAt (applyTypedSource substitution source)
+      occurrence requirement := by
+  simpa using occurs
+
 /-- The declaration-level API closes the evidence side condition internally:
 an exact, range-valid rigid substitution transports both input binders and the
 complete generic body typing derivation. -/

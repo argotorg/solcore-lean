@@ -591,6 +591,54 @@ theorem LocalSchemeTemplateRowOwned.applyParameters
       exact StructuralSubstitution.flatMap_primaryRequirementIds_applyNodes
         substitution nodes
 
+@[simp] theorem expressionPrimaryRequirementOccurrences_applyExpressionNode
+    (substitution : ParameterSubstitution) (expression : ExpressionNode) :
+    expressionPrimaryRequirementOccurrences
+        (applyExpressionNode substitution expression) =
+      expressionPrimaryRequirementOccurrences expression := by
+  simp [expressionPrimaryRequirementOccurrences, applyExpressionNode]
+
+@[simp] theorem statementPrimaryRequirementOccurrences_applyStatementNode
+    (substitution : ParameterSubstitution) (statement : StatementNode) :
+    statementPrimaryRequirementOccurrences
+        (applyStatementNode substitution statement) =
+      statementPrimaryRequirementOccurrences statement := by
+  simp [statementPrimaryRequirementOccurrences, applyStatementNode]
+
+@[simp] theorem nodePrimaryRequirementOccurrences_applyNode
+    (substitution : ParameterSubstitution) (node : Node) :
+    nodePrimaryRequirementOccurrences (applyNode substitution node) =
+      nodePrimaryRequirementOccurrences node := by
+  cases node <;>
+    simp [nodePrimaryRequirementOccurrences, applyNode]
+
+@[simp] theorem flatMap_primaryRequirementOccurrences_applyNodes
+    (substitution : ParameterSubstitution) (nodes : List Node) :
+    (nodes.map (applyNode substitution)).flatMap
+        nodePrimaryRequirementOccurrences =
+      nodes.flatMap nodePrimaryRequirementOccurrences := by
+  induction nodes with
+  | nil => rfl
+  | cons node nodes induction => simp [induction]
+
+/-- Rigid type substitution preserves both stable requirement identities and
+their exact primary owning occurrences. -/
+@[simp] theorem primaryRequirementOccurrences_applyTypedSource
+    (substitution : ParameterSubstitution) (source : TypedSource) :
+    primaryRequirementOccurrences (applyTypedSource substitution source) =
+      primaryRequirementOccurrences source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      exact flatMap_primaryRequirementOccurrences_applyNodes substitution nodes
+
+@[simp] theorem primaryRequirementOccursAt_applyTypedSource
+    (substitution : ParameterSubstitution) (source : TypedSource)
+    (occurrence : NodeId) (requirement : RequirementId) :
+    PrimaryRequirementOccursAt (applyTypedSource substitution source)
+        occurrence requirement ↔
+      PrimaryRequirementOccursAt source occurrence requirement := by
+  simp [PrimaryRequirementOccursAt]
+
 theorem RequirementOwnership.applyParameters
     (substitution : ParameterSubstitution) {context : Context}
     {source : TypedSource}

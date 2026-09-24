@@ -236,12 +236,90 @@ def statementPrimaryRequirementIds : StatementForm → List RequirementId
         post.flatMap forItemPrimaryRequirementIds
   | _ => []
 
+/-- One primary source attachment, retaining both its stable requirement
+identity and the expression or statement occurrence which owns it. -/
+structure PrimaryRequirementOccurrence where
+  occurrence : NodeId
+  requirement : RequirementId
+  deriving Repr, BEq, DecidableEq
+
+/-- Primary requirement attachments owned by one expression occurrence. -/
+def expressionPrimaryRequirementOccurrences
+    (expression : ExpressionNode) : List PrimaryRequirementOccurrence :=
+  expression.requirements.map fun requirement => {
+    occurrence := .expression expression.id
+    requirement
+  }
+
+/-- Primary requirement attachments owned directly by one statement
+occurrence.  Mirrored match-level and coercion metadata remain excluded by
+the same policy as `statementPrimaryRequirementIds`. -/
+def statementPrimaryRequirementOccurrences
+    (statement : StatementNode) : List PrimaryRequirementOccurrence :=
+  (statementPrimaryRequirementIds statement.form).map fun requirement => {
+    occurrence := .statement statement.id
+    requirement
+  }
+
+/-- Primary requirement attachments retained by one heterogeneous source
+node. -/
+def nodePrimaryRequirementOccurrences : Node → List PrimaryRequirementOccurrence
+  | .expression expression => expressionPrimaryRequirementOccurrences expression
+  | .statement statement => statementPrimaryRequirementOccurrences statement
+
+/-- Every primary requirement attachment in node-table and attachment order,
+with its exact category-safe owning occurrence. -/
+def primaryRequirementOccurrences
+    (source : TypedSource) : List PrimaryRequirementOccurrence :=
+  source.nodes.flatMap nodePrimaryRequirementOccurrences
+
+/-- One stable requirement identity is primarily attached at one exact source
+occurrence. -/
+def PrimaryRequirementOccursAt (source : TypedSource) (occurrence : NodeId)
+    (requirement : RequirementId) : Prop :=
+  { occurrence, requirement } ∈ primaryRequirementOccurrences source
+
 /-- Every primary evidence owner in node-table order. -/
 def primaryRequirementIds (source : TypedSource) : List RequirementId :=
   source.nodes.flatMap fun node =>
     match node with
     | .expression expression => expression.requirements
     | .statement statement => statementPrimaryRequirementIds statement.form
+
+/-- Forgetting occurrence ownership from the detailed inventory recovers the
+original flat primary-requirement identity inventory exactly. -/
+@[simp] theorem primaryRequirementOccurrenceIds_eq
+    (source : TypedSource) :
+    (primaryRequirementOccurrences source).map
+        (fun occurrence => occurrence.requirement) =
+      primaryRequirementIds source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      simp only [primaryRequirementOccurrences, primaryRequirementIds]
+      induction nodes with
+      | nil => rfl
+      | cons node nodes induction =>
+          cases node <;>
+            simp [nodePrimaryRequirementOccurrences,
+              expressionPrimaryRequirementOccurrences,
+              statementPrimaryRequirementOccurrences, Function.comp_def,
+              induction]
+
+theorem primaryRequirementIds_mem_iff_occursAt
+    {source : TypedSource} {requirement : RequirementId} :
+    requirement ∈ primaryRequirementIds source ↔
+      ∃ occurrence, PrimaryRequirementOccursAt source occurrence requirement := by
+  rw [← primaryRequirementOccurrenceIds_eq]
+  constructor
+  · intro member
+    rcases List.mem_map.mp member with ⟨owned, ownedMem, ownedId⟩
+    rcases owned with ⟨occurrence, candidate⟩
+    simp only at ownedId
+    subst candidate
+    exact ⟨occurrence, ownedMem⟩
+  · rintro ⟨occurrence, occurs⟩
+    exact List.mem_map.mpr
+      ⟨{ occurrence, requirement }, occurs, rfl⟩
 
 /-- Every local definition has a globally unique stable identity owned by the
 declaration represented by this source. -/
