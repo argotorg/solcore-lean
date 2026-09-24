@@ -5672,6 +5672,77 @@ theorem Substitution.mem_freeVariables_apply_of_not_mem_domain
       exact induction occurs
   | error => simp [Ty.freeVariables] at occurs
 
+/-- A flexible substitution fixes a type when none of its domain variables
+occur freely in that type.  This form needs no range well-formedness: no
+replacement is inspected because every variable lookup misses. -/
+theorem Ty.apply_eq_self_of_domain_disjoint_freeVariables
+    (substitution : Substitution) (type : Ty)
+    (disjoint : ∀ metavariable,
+      metavariable ∈ substitution.domain →
+        metavariable ∉ type.freeVariables) :
+    substitution.apply type = type := by
+  induction type with
+  | «variable» metavariable =>
+      have absent : metavariable ∉ substitution.domain := by
+        intro member
+        exact disjoint metavariable member (by simp [Ty.freeVariables])
+      simp [TypeSystem.Substitution.apply,
+        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+          absent]
+  | parameter parameter => rfl
+  | constructor constructor => rfl
+  | application left right leftInduction rightInduction =>
+      have leftEq := leftInduction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member
+          (mem_freeVariables_application_iff.mpr (.inl occurs)))
+      have rightEq := rightInduction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member
+          (mem_freeVariables_application_iff.mpr (.inr occurs)))
+      simp [TypeSystem.Substitution.apply, leftEq, rightEq]
+  | function parameter result parameterInduction resultInduction =>
+      have parameterEq := parameterInduction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member
+          (mem_freeVariables_function_iff.mpr (.inl occurs)))
+      have resultEq := resultInduction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member
+          (mem_freeVariables_function_iff.mpr (.inr occurs)))
+      simp [TypeSystem.Substitution.apply, parameterEq, resultEq]
+  | product left right leftInduction rightInduction =>
+      have leftEq := leftInduction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member
+          (mem_freeVariables_product_iff.mpr (.inl occurs)))
+      have rightEq := rightInduction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member
+          (mem_freeVariables_product_iff.mpr (.inr occurs)))
+      simp [TypeSystem.Substitution.apply, leftEq, rightEq]
+  | mapping key value keyInduction valueInduction =>
+      have keyEq := keyInduction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member
+          (mem_freeVariables_mapping_iff.mpr (.inl occurs)))
+      have valueEq := valueInduction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member
+          (mem_freeVariables_mapping_iff.mpr (.inr occurs)))
+      simp [TypeSystem.Substitution.apply, keyEq, valueEq]
+  | proxy inner induction =>
+      have innerEq := induction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member occurs)
+      simp [TypeSystem.Substitution.apply, innerEq]
+  | comptime inner induction =>
+      have innerEq := induction (by
+        intro metavariable member occurs
+        exact disjoint metavariable member occurs)
+      simp [TypeSystem.Substitution.apply, innerEq]
+  | error => rfl
+
 namespace ParameterSubstitution
 
 /-- Apply a flexible substitution to every replacement of a rigid-parameter
@@ -6116,6 +6187,28 @@ theorem domain_without_nodup (substitution : TypeSystem.Substitution)
   exact unique.sublist domainSublist
 
 end Substitution
+
+/-- Capture-avoiding substitution fixes a scheme when its unbound flexible
+variables are disjoint from the substitution domain.  Quantified variables
+need no separate premise because `Scheme.apply` removes them from the
+substitution before entering the body. -/
+theorem Scheme.apply_eq_self_of_domain_disjoint_freeVariables
+    (substitution : Substitution) (scheme : Scheme)
+    (disjoint : ∀ metavariable,
+      metavariable ∈ substitution.domain →
+        metavariable ∉ scheme.freeVariables) :
+    scheme.apply substitution = scheme := by
+  cases scheme with
+  | mk quantified body =>
+      simp only [TypeSystem.Scheme.apply]
+      congr 1
+      apply Ty.apply_eq_self_of_domain_disjoint_freeVariables
+      intro metavariable member occurs
+      have retained :=
+        (Substitution.mem_domain_without_iff substitution quantified
+          metavariable).mp member
+      apply disjoint metavariable retained.1
+      simp [TypeSystem.Scheme.freeVariables, occurs, retained.2]
 
 /-- Capture-avoiding restriction preserves ground range well-formedness. -/
 theorem SubstitutionRangeWellFormed.without
@@ -8318,6 +8411,41 @@ theorem SchemeGeneralizesExcept.quantified_fresh
       GeneralizationBlockedVariablesExcept context exemptRequirements := by
     simpa using selected
   exact notBlocked blocked
+
+/-- Instantiating exactly the variables generalized by a new scheme leaves
+all previously retained lexical schemes unchanged.  Generalization excludes
+the free variables of every older local from the new quantified set, while
+`Scheme.apply` independently protects each older scheme's own binders. -/
+theorem applyLocals_eq_self_of_generalizes
+    {context : Context} {exemptRequirements : List RequirementId}
+    {scheme : Scheme} {substitution : Substitution}
+    (generalizes :
+      SchemeGeneralizesExcept context exemptRequirements scheme)
+    (exact : ExactSubstitution substitution scheme.quantified) :
+    applyLocals substitution context.locals = context.locals := by
+  have schemeFixed : ∀ entry, entry ∈ context.locals →
+      entry.2.apply substitution = entry.2 := by
+    intro entry member
+    apply Scheme.apply_eq_self_of_domain_disjoint_freeVariables
+    intro metavariable domainMember occurs
+    have quantified := (exact.mem_domain_iff metavariable).mp domainMember
+    rw [generalizes] at quantified
+    have notBlocked : metavariable ∉
+        GeneralizationBlockedVariablesExcept context exemptRequirements := by
+      simpa using (List.mem_filter.mp quantified).2
+    apply notBlocked
+    simp only [GeneralizationBlockedVariablesExcept, List.mem_append,
+      List.mem_flatMap]
+    exact .inl (.inr ⟨entry, member, occurs⟩)
+  unfold applyLocals
+  calc
+    _ = context.locals.map id := by
+      apply List.map_congr_left
+      intro entry member
+      rcases entry with ⟨id, retainedScheme⟩
+      simp only [id_eq]
+      rw [schemeFixed (id, retainedScheme) member]
+    _ = context.locals := by simp
 
 private theorem quantified_fresh_for_closure
     {substitution : Substitution} {closedVariables : List TypeVarId}
