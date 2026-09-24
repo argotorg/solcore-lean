@@ -2180,7 +2180,7 @@ theorem preservesWith
     {raw : Value} {rawType finalType : Ty}
     {plan : ExpressionRequirementPlan}
     (graph : OccurrenceGraphWellFormed source)
-    (requirement_ledger : ScopedRequirementLedgerWellFormed context source)
+    (requirement_ledger : RuntimeRequirementLedgerValid context)
     (owner : context.currentDeclaration = some source.owner)
     (closed : context.typeParameters = [])
     (variables_closed : context.typeVariables = [])
@@ -2593,13 +2593,31 @@ theorem scopedRequirementLedger
     refine ⟨row, ?_, idEq⟩
     simpa [fields.solvedRequirements] using rowMember
 
+/-- Execution-facing requirement validity is insensitive to lexical context
+extensions, just like the solved-row and assumption projections it uses. -/
+theorem runtimeRequirementLedger
+    {source target : Context}
+    (fields : RuntimeContextFields source target)
+    (ledger : RuntimeRequirementLedgerValid source) :
+    RuntimeRequirementLedgerValid target := by
+  constructor
+  · simpa [RequirementIdsUnique, fields.solvedRequirements] using
+      ledger.idsUnique
+  · intro row evidence member implementationEq
+    have sourceMember : row ∈ source.solvedRequirements := by
+      simpa [fields.solvedRequirements] using member
+    exact StructuralSubstitution.SolvedRequirementValid.transportContext
+      fields.signatures fields.assumptions
+      (ledger.implementationEntries row evidence sourceMember implementationEq)
+
 end RuntimeContextFields
 
 /-- Static invariants shared by every successful execution rooted in one
 rigidly and lexically closed, residual-open source body.  In particular,
 ledger identity uniqueness is needed to identify the predicate selected
-independently by static typing and dynamic method dispatch.  Entry validity
-remains local to the corresponding typing derivations. -/
+independently by static typing and dynamic method dispatch.  Independent
+validity is retained only for implementation-backed rows; assumption and
+template validity remains local to the corresponding typing derivations. -/
 structure SourceRuntimeValid (program : Program) (context : Context)
     (source : TypedSource) : Prop where
   signatures : context.signatures = program.signatures
@@ -2608,8 +2626,7 @@ structure SourceRuntimeValid (program : Program) (context : Context)
   closed : context.typeParameters = []
   variables_closed : context.typeVariables = []
   residual_variables_open : context.residualTypeVariables = true
-  ledger : RequirementIdsUnique context
-  requirements : ScopedRequirementLedgerWellFormed context source
+  requirements : RuntimeRequirementLedgerValid context
 
 namespace SourceRuntimeValid
 
@@ -2626,10 +2643,8 @@ theorem transport
     variables_closed := fields.typeVariables.trans valid.variables_closed
     residual_variables_open :=
       fields.residualTypeVariables.trans valid.residual_variables_open
-    ledger := ?_
-    requirements := fields.scopedRequirementLedger valid.requirements
+    requirements := fields.runtimeRequirementLedger valid.requirements
   }
-  simpa [RequirementIdsUnique, fields.solvedRequirements] using valid.ledger
 
 end SourceRuntimeValid
 
@@ -3811,8 +3826,7 @@ theorem sourceRuntimeValid
   closed := certificate.type_parameters_empty
   variables_closed := certificate.type_variables_empty
   residual_variables_open := certificate.residual_type_variables_open
-  ledger := certificate.requirement_ledger.idsUnique
-  requirements := certificate.requirement_ledger
+  requirements := certificate.requirement_ledger.toRuntime
 }
 
 end BodyInstanceTypingCertificate

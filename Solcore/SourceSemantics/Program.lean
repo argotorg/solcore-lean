@@ -103,6 +103,18 @@ structure ScopedRequirementLedgerWellFormed (context : Context)
       ∃ row, row ∈ context.solvedRequirements ∧
         row.id = owner.requirement.templateRequirement
 
+/-- The part of a solved-requirement ledger that must survive at runtime.
+Stable identity uniqueness supports dispatch agreement.  Only
+implementation-backed rows need independent semantic validity: assumption
+rows are justified by the evidence environment at their use site, while
+qualified local-scheme templates are validated at the static body boundary. -/
+structure RuntimeRequirementLedgerValid (context : Context) : Prop where
+  idsUnique : RequirementIdsUnique context
+  implementationEntries :
+    ∀ row evidence, row ∈ context.solvedRequirements →
+      row.evidence = .implementation evidence →
+        SolvedRequirementValid context row
+
 namespace ScopedRequirementLedgerWellFormed
 
 /-- A non-template ledger row retains ordinary declaration-context evidence
@@ -169,6 +181,30 @@ theorem ofRequirementLedger
         sourceLocalSchemeTemplateIds source :=
       sourceLocalSchemeTemplateIds_mem_iff.mpr ⟨owner, contains, rfl⟩
     simp [templatesEmpty] at member
+
+/-- Forget source-scoped template bookkeeping after static validation while
+retaining exactly the requirement facts needed by execution and flexible
+closure materialization. -/
+theorem toRuntime
+    {context : Context} {source : TypedSource}
+    (wellFormed : ScopedRequirementLedgerWellFormed context source) :
+    RuntimeRequirementLedgerValid context := by
+  refine {
+    idsUnique := wellFormed.idsUnique
+    implementationEntries := ?_
+  }
+  intro row evidence member implementationEq
+  cases wellFormed.entriesValid row member with
+  | ordinary _ valid => exact valid
+  | template rowScoped =>
+      rcases rowScoped.exact_owner with
+        ⟨owner, occurrence, contains, idEq, predicateEq, evidenceEq,
+          occurs, scope⟩
+      have impossible :
+          PredicateEvidence.assumption owner.requirement.predicate =
+            .implementation evidence :=
+        evidenceEq.symm.trans implementationEq
+      cases impossible
 
 end ScopedRequirementLedgerWellFormed
 

@@ -378,6 +378,31 @@ theorem RequirementLedgerWellFormed.applyParameters
     exact StructuralSubstitution.SolvedRequirementValid.applyParameters
       substitution (wellFormed.entriesValid original originalMem)
 
+/-- Rigid instantiation preserves the execution-facing fragment of a solved
+requirement ledger. -/
+theorem RuntimeRequirementLedgerValid.applyParameters
+    (substitution : ParameterSubstitution)
+    {context : Context}
+    (wellFormed : SourceSemantics.RuntimeRequirementLedgerValid context) :
+    SourceSemantics.RuntimeRequirementLedgerValid
+      (applyContext substitution context) := by
+  constructor
+  · simpa [RequirementIdsUnique, applyContext, applySolvedRequirement,
+      List.map_map, Function.comp_def] using wellFormed.idsUnique
+  · intro requirement evidence member implementationEq
+    change requirement ∈
+      context.solvedRequirements.map (applySolvedRequirement substitution) at member
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    cases originalEvidenceEq : original.evidence with
+    | assumption predicate =>
+        simp [applySolvedRequirement, originalEvidenceEq,
+          applyPredicateEvidence] at implementationEq
+    | implementation retained =>
+        exact StructuralSubstitution.SolvedRequirementValid.applyParameters
+          substitution
+          (wellFormed.implementationEntries original retained originalMem
+            originalEvidenceEq)
+
 theorem ScopedRequirementEntryValid.applyParameters
     (substitution : ParameterSubstitution)
     {context : Context} {source : TypedSource} {row : SolvedRequirement}
@@ -451,6 +476,23 @@ theorem ContextSubstitutionValid.ofRequirementLedger
   implementationRequirements := fun requirement _ member _ =>
     StructuralSubstitution.SolvedRequirementValid.applyParameters
       substitution (ledger.entriesValid requirement member)
+}
+
+/-- The runtime ledger fragment supplies precisely the implementation-backed
+evidence premise of rigid source substitution. -/
+theorem ContextSubstitutionValid.ofRuntimeRequirementLedger
+    {substitution : ParameterSubstitution} {context : Context}
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (ledger : SourceSemantics.RuntimeRequirementLedgerValid context) :
+    ContextSubstitutionValid substitution context := {
+  exact
+  range
+  implementationRequirements := fun requirement evidence member evidenceEq =>
+    StructuralSubstitution.SolvedRequirementValid.applyParameters substitution
+      (ledger.implementationEntries requirement evidence member evidenceEq)
 }
 
 /-- A scoped whole-body ledger supplies every implementation-evidence premise
@@ -906,6 +948,32 @@ theorem RequirementLedgerWellFormed.applySubstitution
     exact SolvedRequirementValid.applySubstitution closes
       (wellFormed.entriesValid original originalMem)
 
+/-- Flexible closure preserves the execution-facing fragment of a solved
+requirement ledger. -/
+theorem RuntimeRequirementLedgerValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (wellFormed : SourceSemantics.RuntimeRequirementLedgerValid source) :
+    SourceSemantics.RuntimeRequirementLedgerValid target := by
+  constructor
+  · rw [← closes.target_eq]
+    simpa [RequirementIdsUnique, applyContext, applySolvedRequirement,
+      List.map_map, Function.comp_def] using wellFormed.idsUnique
+  · intro requirement evidence member implementationEq
+    rw [← closes.target_eq] at member
+    change requirement ∈ source.solvedRequirements.map
+      (applySolvedRequirement substitution) at member
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    cases originalEvidenceEq : original.evidence with
+    | assumption predicate =>
+        simp [applySolvedRequirement, originalEvidenceEq,
+          applyPredicateEvidence] at implementationEq
+    | implementation retained =>
+        exact SolvedRequirementValid.applySubstitution closes
+          (wellFormed.implementationEntries original retained originalMem
+            originalEvidenceEq)
+
 /-- A valid source ledger discharges the evidence component of flexible
 context-substitution validity. -/
 theorem ContextSubstitutionValid.ofRequirementLedger
@@ -921,6 +989,23 @@ theorem ContextSubstitutionValid.ofRequirementLedger
     intro requirement evidence member _
     exact SolvedRequirementValid.applySubstitution closes
       (ledger.entriesValid requirement member)
+}
+
+/-- The runtime ledger fragment constructs a flexible substitution validity
+object without requiring source-scoped template metadata. -/
+theorem ContextSubstitutionValid.ofRuntimeRequirementLedger
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (schemesFresh : LocalSchemesFreshFor source substitution)
+    (ledger : SourceSemantics.RuntimeRequirementLedgerValid source) :
+    ContextSubstitutionValid substitution closedVariables source target := {
+  closes
+  localSchemesFresh := schemesFresh
+  implementationRequirements := by
+    intro requirement evidence member evidenceEq
+    exact SolvedRequirementValid.applySubstitution closes
+      (ledger.implementationEntries requirement evidence member evidenceEq)
 }
 
 /-- A scoped source ledger also constructs flexible substitution validity;

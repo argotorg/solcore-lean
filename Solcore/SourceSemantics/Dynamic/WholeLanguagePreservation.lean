@@ -1071,7 +1071,8 @@ mutual
               ⟨rfl, rfl⟩
             obtain ⟨lexicalContext, facts, certificate, result_eq⟩ :=
               selected.certificateOfProfile program_well_formed
-                runtime.signatures runtime.ledger profile requirements_prove
+                runtime.signatures runtime.requirements.idsUnique profile
+                  requirements_prove
             have signatures_eq :=
               certificate.signatures_eq.trans runtime.signatures.symm
             have body_heap_typed := before_typed.transportClosed signatures_eq
@@ -1149,7 +1150,8 @@ mutual
               ⟨rfl, rfl⟩
             obtain ⟨lexicalContext, facts, certificate, result_eq⟩ :=
               selected.certificateOfProfile program_well_formed
-                runtime.signatures runtime.ledger profile requirements_prove
+                runtime.signatures runtime.requirements.idsUnique profile
+                  requirements_prove
             have signatures_eq :=
               certificate.signatures_eq.trans runtime.signatures.symm
             have body_heap_typed := before_typed.transportClosed signatures_eq
@@ -1200,7 +1202,8 @@ mutual
         | intro profile requirements_prove =>
             obtain ⟨lexicalContext, facts, certificate, result_eq⟩ :=
               selected.coercionCertificateOfProfile program_well_formed
-                runtime.signatures runtime.ledger profile requirements_prove
+                runtime.signatures runtime.requirements.idsUnique profile
+                  requirements_prove
             have signatures_eq :=
               certificate.signatures_eq.trans runtime.signatures.symm
             have body_heap_typed := before_typed.transportClosed signatures_eq
@@ -1382,7 +1385,6 @@ mutual
               closed := code.closed
               variables_closed := code.variables_closed
               residual_variables_open := code.residual_variables_open
-              ledger := frame.requirements
               requirements := code.requirement_ledger
             }
             rcases preserveFunctionStatementsRec program_well_formed
@@ -1465,7 +1467,6 @@ mutual
               closed := code.closed
               variables_closed := code.variables_closed
               residual_variables_open := code.residual_variables_open
-              ledger := frame.requirements
               requirements := code.requirement_ledger
             }
             rcases preserveFunctionStatementsRec program_well_formed
