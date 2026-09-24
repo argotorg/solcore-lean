@@ -522,6 +522,458 @@ theorem BodyDefinitionHasType.instantiate
 
 end Solcore.SourceSemantics.StructuralSubstitution
 
+/-!
+Flexible substitution preserves declarative trait evidence as well.  An
+implementation rule binds every rigid parameter and flexible variable that
+occurs in its head or premises, so applying an outer flexible substitution to
+an instantiated predicate is equivalent to mapping that action over both
+ranges of the rule substitution.
+-/
+
+namespace Solcore.SourceSemantics.FlexibleSubstitution
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+private def mapParameterRange (outer : Substitution)
+    (inner : ParameterSubstitution) : ParameterSubstitution :=
+  inner.map fun entry => (entry.1, outer.apply entry.2)
+
+private theorem ParameterSubstitution.Exact.mapFlexibleRange
+    {inner : ParameterSubstitution} {parameters : List TypeParameterId}
+    (outer : Substitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact inner parameters) :
+    SourceSemantics.ParameterSubstitution.Exact
+      (mapParameterRange outer inner) parameters := by
+  constructor
+  · exact exact.parameters_nodup
+  · have domainEq :
+        SourceSemantics.ParameterSubstitution.domain
+            (mapParameterRange outer inner) =
+          SourceSemantics.ParameterSubstitution.domain inner := by
+      simp [mapParameterRange, SourceSemantics.ParameterSubstitution.domain,
+        List.map_map, Function.comp_def]
+    rw [domainEq]
+    exact exact.domain_permutation
+
+/-- Push an outer flexible substitution through both ranges of an
+implementation-head substitution. -/
+def mapImplSubstitutionRange (outer : Substitution)
+    (inner : SourceSemantics.ImplSubstitution) :
+    SourceSemantics.ImplSubstitution := {
+  parameters := mapParameterRange outer inner.parameters
+  variables := Substitution.mapRange outer inner.variables
+}
+
+theorem ImplSubstitution.ExactFor.mapRange
+    {inner : SourceSemantics.ImplSubstitution} {rule : ProgramImplRule}
+    (outer : Substitution) (exact : inner.ExactFor rule) :
+    (mapImplSubstitutionRange outer inner).ExactFor rule := by
+  constructor
+  · exact ParameterSubstitution.Exact.mapFlexibleRange outer exact.parameters
+  · exact Substitution.ExactSubstitution.mapRange outer exact.variables
+
+private theorem applyType_mapRange_of_covered
+    (outer : Substitution) {inner : SourceSemantics.ImplSubstitution}
+    {rule : ProgramImplRule} (exact : inner.ExactFor rule) {type : Ty}
+    (parametersCovered : ∀ parameter,
+      TypeParameterOccurs parameter type →
+        parameter ∈ implRuleParameters rule)
+    (variablesCovered : ∀ metavariable,
+      metavariable ∈ type.freeVariables →
+        metavariable ∈ implRuleVariables rule) :
+    outer.apply (inner.applyType type) =
+      (mapImplSubstitutionRange outer inner).applyType type := by
+  induction type with
+  | @«variable» metavariable =>
+      obtain ⟨replacement, member, lookup⟩ :=
+        StructuralSubstitution.Substitution.exists_lookup?_eq_some
+          exact.variables
+          (variablesCovered metavariable (by simp [Ty.freeVariables]))
+      have mappedMember :
+          (metavariable, outer.apply replacement) ∈
+            Substitution.mapRange outer inner.variables :=
+        List.mem_map.mpr ⟨(metavariable, replacement), member, rfl⟩
+      have mappedLookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_some_of_mem_of_domain_nodup
+          (Substitution.ExactSubstitution.mapRange outer
+            exact.variables).domain_nodup mappedMember
+      simp [SourceSemantics.ImplSubstitution.applyType,
+        mapImplSubstitutionRange, lookup, mappedLookup]
+  | @«parameter» parameter =>
+      obtain ⟨replacement, member, lookup⟩ :=
+        StructuralSubstitution.ParameterSubstitution.exists_lookup?_eq_some
+          exact.parameters
+          (parametersCovered parameter (by simp [TypeParameterOccurs]))
+      have mappedMember :
+          (parameter, outer.apply replacement) ∈
+            mapParameterRange outer inner.parameters :=
+        List.mem_map.mpr ⟨(parameter, replacement), member, rfl⟩
+      have mappedLookup :=
+        StructuralSubstitution.ParameterSubstitution.lookup?_eq_some_of_mem_of_domain_nodup
+          (ParameterSubstitution.Exact.mapFlexibleRange outer
+            exact.parameters).domain_nodup mappedMember
+      simp [SourceSemantics.ImplSubstitution.applyType,
+        mapImplSubstitutionRange, lookup, mappedLookup]
+  | constructor constructor => rfl
+  | application left right leftInduction rightInduction =>
+      simp only [SourceSemantics.ImplSubstitution.applyType,
+        TypeSystem.Substitution.apply]
+      rw [leftInduction
+          (fun parameter occurs => parametersCovered parameter (Or.inl occurs))
+          (fun metavariable member => variablesCovered metavariable
+            (mem_freeVariables_application_iff.mpr (Or.inl member))),
+        rightInduction
+          (fun parameter occurs => parametersCovered parameter (Or.inr occurs))
+          (fun metavariable member => variablesCovered metavariable
+            (mem_freeVariables_application_iff.mpr (Or.inr member)))]
+  | function domain codomain domainInduction codomainInduction =>
+      simp only [SourceSemantics.ImplSubstitution.applyType,
+        TypeSystem.Substitution.apply]
+      rw [domainInduction
+          (fun parameter occurs => parametersCovered parameter (Or.inl occurs))
+          (fun metavariable member => variablesCovered metavariable
+            (mem_freeVariables_function_iff.mpr (Or.inl member))),
+        codomainInduction
+          (fun parameter occurs => parametersCovered parameter (Or.inr occurs))
+          (fun metavariable member => variablesCovered metavariable
+            (mem_freeVariables_function_iff.mpr (Or.inr member)))]
+  | product left right leftInduction rightInduction =>
+      simp only [SourceSemantics.ImplSubstitution.applyType,
+        TypeSystem.Substitution.apply]
+      rw [leftInduction
+          (fun parameter occurs => parametersCovered parameter (Or.inl occurs))
+          (fun metavariable member => variablesCovered metavariable
+            (mem_freeVariables_product_iff.mpr (Or.inl member))),
+        rightInduction
+          (fun parameter occurs => parametersCovered parameter (Or.inr occurs))
+          (fun metavariable member => variablesCovered metavariable
+            (mem_freeVariables_product_iff.mpr (Or.inr member)))]
+  | mapping key value keyInduction valueInduction =>
+      simp only [SourceSemantics.ImplSubstitution.applyType,
+        TypeSystem.Substitution.apply]
+      rw [keyInduction
+          (fun parameter occurs => parametersCovered parameter (Or.inl occurs))
+          (fun metavariable member => variablesCovered metavariable
+            (mem_freeVariables_mapping_iff.mpr (Or.inl member))),
+        valueInduction
+          (fun parameter occurs => parametersCovered parameter (Or.inr occurs))
+          (fun metavariable member => variablesCovered metavariable
+            (mem_freeVariables_mapping_iff.mpr (Or.inr member)))]
+  | proxy innerType induction =>
+      simp only [SourceSemantics.ImplSubstitution.applyType,
+        TypeSystem.Substitution.apply]
+      rw [induction
+        (fun parameter occurs => parametersCovered parameter occurs)
+        (fun metavariable member => variablesCovered metavariable member)]
+  | comptime innerType induction =>
+      simp only [SourceSemantics.ImplSubstitution.applyType,
+        TypeSystem.Substitution.apply]
+      rw [induction
+        (fun parameter occurs => parametersCovered parameter occurs)
+        (fun metavariable member => variablesCovered metavariable member)]
+  | error => rfl
+
+private theorem applyPredicate_mapRange_of_rule_position
+    (outer : Substitution) {inner : SourceSemantics.ImplSubstitution}
+    {rule : ProgramImplRule} (exact : inner.ExactFor rule)
+    {predicate : ProgramPredicate}
+    (position : predicate = rule.head ∨ predicate ∈ rule.wherePredicates) :
+    TypedTraitResolution.applySubstitution outer
+        (inner.applyPredicate predicate) =
+      (mapImplSubstitutionRange outer inner).applyPredicate predicate := by
+  have parameterCoverage : ∀ type, type = predicate.subject ∨
+      type ∈ predicate.arguments →
+      ∀ parameter, TypeParameterOccurs parameter type →
+        parameter ∈ implRuleParameters rule := by
+    intro type typePosition parameter occurs
+    apply mem_implRuleParameters_iff.mpr
+    rcases position with rfl | predicateMem
+    · apply Or.inl
+      rcases typePosition with rfl | argumentMem
+      · exact Or.inl occurs
+      · exact Or.inr ⟨type, argumentMem, occurs⟩
+    · apply Or.inr
+      refine ⟨predicate, predicateMem, ?_⟩
+      rcases typePosition with rfl | argumentMem
+      · exact Or.inl occurs
+      · exact Or.inr ⟨type, argumentMem, occurs⟩
+  have variableCoverage : ∀ type, type = predicate.subject ∨
+      type ∈ predicate.arguments →
+      ∀ metavariable, metavariable ∈ type.freeVariables →
+        metavariable ∈ implRuleVariables rule := by
+    intro type typePosition metavariable occurs
+    apply mem_implRuleVariables_iff.mpr
+    rcases position with rfl | predicateMem
+    · apply Or.inl
+      rcases typePosition with rfl | argumentMem
+      · exact Or.inl occurs
+      · exact Or.inr ⟨type, argumentMem, occurs⟩
+    · apply Or.inr
+      refine ⟨predicate, predicateMem, ?_⟩
+      rcases typePosition with rfl | argumentMem
+      · exact Or.inl occurs
+      · exact Or.inr ⟨type, argumentMem, occurs⟩
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [TypedTraitResolution.applySubstitution,
+        SourceSemantics.ImplSubstitution.applyPredicate]
+      congr 1
+      · exact applyType_mapRange_of_covered outer exact
+          (parameterCoverage subject (Or.inl rfl))
+          (variableCoverage subject (Or.inl rfl))
+      · simp only [List.map_map]
+        apply List.map_congr_left
+        intro argument argumentMem
+        exact applyType_mapRange_of_covered outer exact
+          (parameterCoverage argument (Or.inr argumentMem))
+          (variableCoverage argument (Or.inr argumentMem))
+
+/-- Flexible substitution preserves declarative implementation-head matching. -/
+theorem ImplHeadInstantiates.applySubstitution
+    (outer : Substitution) {rule : ProgramImplRule}
+    {goal : ProgramPredicate} {premises : List ProgramPredicate}
+    (instantiates : ImplHeadInstantiates rule goal premises) :
+    ImplHeadInstantiates rule
+      (TypedTraitResolution.applySubstitution outer goal)
+      (premises.map (TypedTraitResolution.applySubstitution outer)) := by
+  cases instantiates with
+  | intro inner exact headEq premisesEq =>
+      refine .intro (mapImplSubstitutionRange outer inner)
+        (ImplSubstitution.ExactFor.mapRange outer exact) ?_ ?_
+      · rw [← headEq]
+        exact (applyPredicate_mapRange_of_rule_position outer exact
+          (Or.inl rfl)).symm
+      · rw [← premisesEq, List.map_map]
+        apply List.map_congr_left
+        intro predicate predicateMem
+        exact (applyPredicate_mapRange_of_rule_position outer exact
+          (Or.inr predicateMem)).symm
+
+/-- Structural action of a flexible substitution on a semantic evidence
+tree. -/
+def applyTraitEvidence (substitution : Substitution) :
+    TraitEvidence → TraitEvidence
+  | .assumption goal =>
+      .assumption (TypedTraitResolution.applySubstitution substitution goal)
+  | .implementation goal implId premises =>
+      .implementation
+        (TypedTraitResolution.applySubstitution substitution goal) implId
+        (premises.map (applyTraitEvidence substitution))
+
+@[simp] theorem applyTraitEvidence_goal
+    (substitution : Substitution) (evidence : TraitEvidence) :
+    (applyTraitEvidence substitution evidence).goal =
+      TypedTraitResolution.applySubstitution substitution evidence.goal := by
+  cases evidence <;> simp [applyTraitEvidence, TraitEvidence.goal]
+
+theorem ImplementationEvidenceRepresents.applySubstitution
+    (substitution : Substitution)
+    {retained : TypedTraitResolution.Evidence} {semantic : TraitEvidence}
+    (represents : ImplementationEvidenceRepresents retained semantic) :
+    ImplementationEvidenceRepresents
+      (applyEvidence substitution retained)
+      (applyTraitEvidence substitution semantic) := by
+  refine ImplementationEvidenceRepresents.rec
+    (motive_1 := fun retained semantic _ =>
+      ImplementationEvidenceRepresents
+        (applyEvidence substitution retained)
+        (applyTraitEvidence substitution semantic))
+    (motive_2 := fun retained semantic _ =>
+      Forall₂ ImplementationEvidenceRepresents
+        (applyEvidences substitution retained)
+        (semantic.map (applyTraitEvidence substitution)))
+    ?_ ?_ ?_ represents
+  · intro goal implId retainedPremises semanticPremises premises induction
+    simpa [applyEvidence, applyEvidences, applyTraitEvidence] using
+      (ImplementationEvidenceRepresents.byImpl induction)
+  · exact .nil
+  · intro retained semantic retainedRest semanticRest head tail
+      headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem PredicateEvidenceRepresents.applySubstitution
+    (substitution : Substitution)
+    {retained : PredicateEvidence} {semantic : TraitEvidence}
+    (represents : PredicateEvidenceRepresents retained semantic) :
+    PredicateEvidenceRepresents
+      (applyPredicateEvidence substitution retained)
+      (applyTraitEvidence substitution semantic) := by
+  cases represents with
+  | assumption goal =>
+      simpa [applyPredicateEvidence, applyTraitEvidence] using
+        (PredicateEvidenceRepresents.assumption
+          (TypedTraitResolution.applySubstitution substitution goal))
+  | implementation implementationRepresents =>
+      exact .implementation
+        (ImplementationEvidenceRepresents.applySubstitution substitution
+          implementationRepresents)
+
+theorem EvidenceValid.applySubstitution
+    (substitution : Substitution)
+    {assumptions : List ProgramPredicate} {rules : List ProgramImplRule}
+    {goal : ProgramPredicate} {evidence : TraitEvidence}
+    (valid : EvidenceValid assumptions rules goal evidence) :
+    EvidenceValid
+      (assumptions.map
+        (TypedTraitResolution.applySubstitution substitution)) rules
+      (TypedTraitResolution.applySubstitution substitution goal)
+      (applyTraitEvidence substitution evidence) := by
+  refine EvidenceValid.rec
+    (motive_1 := fun goal evidence _ =>
+      EvidenceValid
+        (assumptions.map
+          (TypedTraitResolution.applySubstitution substitution)) rules
+        (TypedTraitResolution.applySubstitution substitution goal)
+        (applyTraitEvidence substitution evidence))
+    (motive_2 := fun goals evidence _ =>
+      Forall₂
+        (EvidenceValid
+          (assumptions.map
+            (TypedTraitResolution.applySubstitution substitution)) rules)
+        (goals.map (TypedTraitResolution.applySubstitution substitution))
+        (evidence.map (applyTraitEvidence substitution)))
+    ?_ ?_ ?_ ?_ valid
+  · intro goal goalMem
+    simpa [applyTraitEvidence] using
+      (EvidenceValid.assumption
+        (List.mem_map.mpr ⟨goal, goalMem, rfl⟩) :
+        EvidenceValid
+          (assumptions.map
+            (TypedTraitResolution.applySubstitution substitution)) rules
+          (TypedTraitResolution.applySubstitution substitution goal)
+          (.assumption
+            (TypedTraitResolution.applySubstitution substitution goal)))
+  · intro rule goal implId premiseGoals premiseEvidence ruleMem idEq
+      headInstantiates premisesValid premisesInduction
+    simpa [applyTraitEvidence] using
+      (EvidenceValid.implementation ruleMem idEq
+        (ImplHeadInstantiates.applySubstitution substitution headInstantiates)
+        premisesInduction)
+  · exact .nil
+  · intro goal evidence goals evidenceRest head tail headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+theorem RetainedEvidenceValid.applySubstitution
+    (substitution : Substitution)
+    {assumptions : List ProgramPredicate} {rules : List ProgramImplRule}
+    {goal : ProgramPredicate} {retained : PredicateEvidence}
+    (valid : RetainedEvidenceValid assumptions rules goal retained) :
+    RetainedEvidenceValid
+      (assumptions.map
+        (TypedTraitResolution.applySubstitution substitution)) rules
+      (TypedTraitResolution.applySubstitution substitution goal)
+      (applyPredicateEvidence substitution retained) := by
+  cases valid with
+  | intro represents semanticValid =>
+      exact .intro
+        (PredicateEvidenceRepresents.applySubstitution substitution represents)
+        (EvidenceValid.applySubstitution substitution semanticValid)
+
+private theorem SolvedRequirementValid.applyMappedContext
+    (substitution : Substitution) (retainedVariables : List TypeVarId)
+    {context : Context} {requirement : SolvedRequirement}
+    (valid : SourceSemantics.SolvedRequirementValid context requirement) :
+    SourceSemantics.SolvedRequirementValid
+      (applyContext substitution retainedVariables context)
+      (applySolvedRequirement substitution requirement) := by
+  cases valid with
+  | intro evidenceValid =>
+      simpa [applyContext, applySolvedRequirement] using
+        (SourceSemantics.SolvedRequirementValid.intro
+          (RetainedEvidenceValid.applySubstitution substitution evidenceValid))
+
+/-- Flexible context closure preserves one validated solved row. -/
+theorem SolvedRequirementValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {requirement : SolvedRequirement}
+    (closes : ContextCloses substitution closedVariables source target)
+    (valid : SourceSemantics.SolvedRequirementValid source requirement) :
+    SourceSemantics.SolvedRequirementValid target
+      (applySolvedRequirement substitution requirement) := by
+  have mapped := SolvedRequirementValid.applyMappedContext substitution
+    target.typeVariables valid
+  rw [closes.target_eq] at mapped
+  exact mapped
+
+theorem SolvedRequirementsValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {requirements : List SolvedRequirement}
+    (closes : ContextCloses substitution closedVariables source target)
+    (valid : SourceSemantics.SolvedRequirementsValid source requirements) :
+    SourceSemantics.SolvedRequirementsValid target
+      (requirements.map (applySolvedRequirement substitution)) := by
+  intro requirement member
+  rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+  exact SolvedRequirementValid.applySubstitution closes
+    (valid original originalMem)
+
+theorem RequirementLedgerWellFormed.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (wellFormed : SourceSemantics.RequirementLedgerWellFormed source) :
+    SourceSemantics.RequirementLedgerWellFormed target := by
+  constructor
+  · rw [← closes.target_eq]
+    simpa [RequirementIdsUnique, applyContext, applySolvedRequirement,
+      List.map_map, Function.comp_def] using wellFormed.idsUnique
+  · intro requirement member
+    rw [← closes.target_eq] at member
+    change requirement ∈ source.solvedRequirements.map
+      (applySolvedRequirement substitution) at member
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    exact SolvedRequirementValid.applySubstitution closes
+      (wellFormed.entriesValid original originalMem)
+
+/-- A valid source ledger discharges the evidence component of flexible
+context-substitution validity. -/
+theorem ContextSubstitutionValid.ofRequirementLedger
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (schemesFresh : LocalSchemesFreshFor source substitution)
+    (ledger : SourceSemantics.RequirementLedgerWellFormed source) :
+    ContextSubstitutionValid substitution closedVariables source target := {
+  closes
+  localSchemesFresh := schemesFresh
+  implementationRequirements := by
+    intro requirement evidence member _
+    exact SolvedRequirementValid.applySubstitution closes
+      (ledger.entriesValid requirement member)
+}
+
+/-- A scoped source ledger also constructs flexible substitution validity;
+template rows cannot carry implementation evidence by construction. -/
+theorem ContextSubstitutionValid.ofScopedRequirementLedger
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {typedSource : TypedSource}
+    (closes : ContextCloses substitution closedVariables source target)
+    (schemesFresh : LocalSchemesFreshFor source substitution)
+    (ledger : SourceSemantics.ScopedRequirementLedgerWellFormed source
+      typedSource) :
+    ContextSubstitutionValid substitution closedVariables source target := {
+  closes
+  localSchemesFresh := schemesFresh
+  implementationRequirements := by
+    intro requirement evidence member implementationEq
+    cases ledger.entriesValid requirement member with
+    | ordinary _ rowValid =>
+        exact SolvedRequirementValid.applySubstitution closes rowValid
+    | template rowScoped =>
+        rcases rowScoped.exact_owner with
+          ⟨owner, occurrence, contains, idEq, predicateEq, evidenceEq,
+            occurs, scope⟩
+        have impossible :
+            PredicateEvidence.assumption owner.requirement.predicate =
+              .implementation evidence :=
+          evidenceEq.symm.trans implementationEq
+        cases impossible
+}
+
+end Solcore.SourceSemantics.FlexibleSubstitution
+
 namespace Solcore.SourceSemantics.Dynamic
 
 open Frontend
