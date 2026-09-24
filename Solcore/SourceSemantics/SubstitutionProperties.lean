@@ -8407,6 +8407,138 @@ theorem ContextSubstitutionValid.localSchemeFresh
   intro metavariable quantified
   exact valid.localSchemesFresh (id, scheme) lookup.mem metavariable quantified
 
+/-- Extend a valid flexible context substitution with one protected local on
+both sides.  Local extension does not change signatures, assumptions, or the
+solved-requirement ledger. -/
+theorem ContextSubstitutionValid.withLocal
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (valid : ContextSubstitutionValid substitution closedVariables source target)
+    (id : Resolved.LocalId) (scheme : Scheme)
+    (requirements : List LocalSchemeRequirement := [])
+    (fresh : id ∉ source.localSchemeRequirements.map Prod.fst)
+    (schemeProtected : ∀ metavariable,
+      metavariable ∈ scheme.quantified →
+        metavariable ∉ substitution.domain) :
+    ContextSubstitutionValid substitution closedVariables
+      (source.withLocal id scheme requirements)
+      (target.withLocal id (scheme.apply substitution)
+        (requirements.map (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified)))) := {
+  closes := valid.closes.withLocal id scheme requirements fresh
+  localSchemesFresh := valid.localSchemesFresh.withLocal schemeProtected
+  implementationRequirements := by
+    intro requirement evidence member evidenceEq
+    have sourceMember : requirement ∈ source.solvedRequirements := by
+      simpa [Context.withLocal] using member
+    exact StructuralSubstitution.SolvedRequirementValid.transportContext
+      (source := target)
+      (target := target.withLocal id (scheme.apply substitution)
+        (requirements.map (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified))))
+      rfl rfl
+      (valid.implementationRequirements requirement evidence sourceMember
+        evidenceEq)
+}
+
+/-- Thread semantic flexible-substitution validity through one lexical binder
+extension. -/
+theorem ContextSubstitutionValid.afterBinder
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binder : TypedBinder}
+    (valid : ContextSubstitutionValid substitution closedVariables source target)
+    (extension : BinderExtends owner source binder final) :
+    ContextSubstitutionValid substitution closedVariables final
+      (applyContext substitution target.typeVariables final) := by
+  cases extension with
+  | intro wellFormed fresh =>
+      have schemeProtected : ∀ metavariable,
+          metavariable ∈ binder.scheme.quantified →
+            metavariable ∉ substitution.domain := by
+        intro metavariable quantified domainMember
+        have closed :=
+          (valid.closes.exact.mem_domain_iff metavariable).mp domainMember
+        have ambient : metavariable ∈ source.typeVariables := by
+          rw [valid.closes.variables_eq]
+          exact List.mem_append.mpr (Or.inl closed)
+        exact (wellFormed.quantified_fresh metavariable quantified).1 ambient
+      have extended := valid.withLocal binder.id binder.scheme
+        binder.schemeRequirements fresh.2 schemeProtected
+      rw [applyContext_withLocal substitution target.typeVariables source
+        binder.id binder.scheme binder.schemeRequirements fresh.2,
+        valid.closes.target_eq]
+      exact extended
+
+/-- Thread semantic flexible-substitution validity through a source-ordered
+binder sequence. -/
+theorem ContextSubstitutionValid.afterBinders
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binders : List TypedBinder}
+    (valid : ContextSubstitutionValid substitution closedVariables source target)
+    (extension : BindersExtend owner source binders final) :
+    ContextSubstitutionValid substitution closedVariables final
+      (applyContext substitution target.typeVariables final) := by
+  induction extension generalizing target with
+  | nil =>
+      rw [valid.closes.target_eq]
+      exact valid
+  | cons head tail induction =>
+      have middleValid := valid.afterBinder head
+      simpa using induction middleValid
+
+/-- Thread semantic flexible-substitution validity through a monomorphic
+binder sequence. -/
+theorem ContextSubstitutionValid.afterMonoBinders
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binders : List TypedBinder} {types : List Ty}
+    (valid : ContextSubstitutionValid substitution closedVariables source target)
+    (extension : MonoBindersExtend owner source binders types final) :
+    ContextSubstitutionValid substitution closedVariables final
+      (applyContext substitution target.typeVariables final) := by
+  induction extension generalizing target with
+  | nil =>
+      rw [valid.closes.target_eq]
+      exact valid
+  | cons _ head tail induction =>
+      have middleValid := valid.afterBinder head
+      simpa using induction middleValid
+
+/-- Enter a generalized initializer while preserving semantic substitution
+validity.  Its scheme variables stay protected and its qualified predicates
+only enlarge the available assumption set. -/
+theorem ContextSubstitutionValid.localSchemeInitializer
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (valid : ContextSubstitutionValid substitution closedVariables source target)
+    (binder : TypedBinder)
+    (fresh : ∀ metavariable, metavariable ∈ binder.scheme.quantified →
+      metavariable ∉ substitution.domain) :
+    ContextSubstitutionValid substitution closedVariables
+      (localSchemeInitializerContext source binder)
+      (localSchemeInitializerContext target
+        (binder.applySubstitution substitution)) := {
+  closes := valid.closes.localSchemeInitializer binder fresh
+  localSchemesFresh := by
+    simpa [LocalSchemesFreshFor, localSchemeInitializerContext,
+      Context.withTypeVariables, Context.withAssumptions] using
+        valid.localSchemesFresh
+  implementationRequirements := by
+    intro requirement evidence member evidenceEq
+    have sourceMember : requirement ∈ source.solvedRequirements := by
+      simpa [localSchemeInitializerContext, Context.withTypeVariables,
+        Context.withAssumptions] using member
+    cases valid.implementationRequirements requirement evidence sourceMember
+        evidenceEq with
+    | intro evidenceValid =>
+        exact .intro (evidenceValid.weakenAssumptions (by
+          intro predicate predicateMem
+          change predicate ∈ target.assumptions ++ _
+          exact List.mem_append_left _ predicateMem))
+}
+
 /-- The local-reference case of flexible static transport.  The source
 lookup determines one shared mapped binder, and the same composed inner
 substitution validates both its raw type and its qualified requirements. -/
