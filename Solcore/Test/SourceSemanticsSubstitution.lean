@@ -178,6 +178,129 @@ example (substitution : ParameterSubstitution) (source : TypedSource) :
       primaryRequirementOccurrences source :=
   primaryRequirementOccurrences_applyTypedSource substitution source
 
+/-- Flexible closure concretizes an assumption/template row while preserving
+its stable identity. -/
+example (substitution : Substitution) (id : RequirementId)
+    (predicate : ProgramPredicate) :
+    FlexibleSubstitution.applySolvedRequirement substitution {
+        id
+        predicate
+        evidence := .assumption predicate
+      } = {
+        id
+        predicate := TypedTraitResolution.applySubstitution substitution predicate
+        evidence := .assumption
+          (TypedTraitResolution.applySubstitution substitution predicate)
+      } := by
+  rfl
+
+/-- A substitution cannot enter the quantified variables of an existing
+lexical scheme or its parallel qualified-requirement scope when the complete
+context is closed. -/
+example (signatures : ProgramSignatures) (id : Resolved.LocalId)
+    (requirementId : RequirementId)
+    (metavariable : TypeVarId) :
+    let scheme : Scheme := {
+      quantified := [metavariable]
+      body := .variable metavariable
+    }
+    let predicate := ProgramSignatures.builtinIntPredicate
+      (.variable metavariable)
+    let requirement : LocalSchemeRequirement := {
+      templateRequirement := requirementId
+      predicate
+    }
+    let context := (SourceSemantics.Context.ofSignatures signatures).withLocal
+      id scheme [requirement]
+    FlexibleSubstitution.closeContext [(metavariable, .word)] context =
+      context := by
+  simp [FlexibleSubstitution.closeContext, FlexibleSubstitution.applyLocals,
+    FlexibleSubstitution.applyLocalSchemeRequirements,
+    FlexibleSubstitution.forLocal, Resolved.LocalScope.lookup?,
+    SourceSemantics.Context.ofSignatures, SourceSemantics.Context.withLocal,
+    Scheme.apply,
+    TypeSystem.Substitution.without, TypeSystem.Substitution.erase,
+    LocalSchemeRequirement.applySubstitution,
+    TypedTraitResolution.applySubstitution,
+    ProgramSignatures.builtinIntPredicate, TypeSystem.Substitution.apply,
+    TypeSystem.Substitution.lookup?]
+
+/-- Flexible closing concretizes outer assumptions, assumption-backed
+template rows, and every recursively retained implementation premise. -/
+example (signatures : ProgramSignatures)
+    (templateId implementationId : RequirementId)
+    (metavariable : TypeVarId) :
+    let templatePredicate := ProgramSignatures.builtinIntPredicate
+      (.variable metavariable)
+    let implementationPredicate := ProgramSignatures.builtinIntPredicate
+      (.proxy (.variable metavariable))
+    let premisePredicate := ProgramSignatures.builtinIntPredicate
+      (.comptime (.variable metavariable))
+    let implementationEvidence : TypedTraitResolution.Evidence :=
+      .byImpl implementationPredicate (.builtin .intWord)
+        [.byImpl premisePredicate (.builtin .intInteger) []]
+    let context : SourceSemantics.Context := {
+      SourceSemantics.Context.ofSignatures signatures with
+      assumptions := [templatePredicate]
+      solvedRequirements := [
+        {
+          id := templateId
+          predicate := templatePredicate
+          evidence := .assumption templatePredicate
+        },
+        {
+          id := implementationId
+          predicate := implementationPredicate
+          evidence := .implementation implementationEvidence
+        }
+      ]
+    }
+    FlexibleSubstitution.closeContext [(metavariable, .word)] context = {
+      SourceSemantics.Context.ofSignatures signatures with
+      assumptions := [ProgramSignatures.builtinIntPredicate .word]
+      solvedRequirements := [
+        {
+          id := templateId
+          predicate := ProgramSignatures.builtinIntPredicate .word
+          evidence := .assumption
+            (ProgramSignatures.builtinIntPredicate .word)
+        },
+        {
+          id := implementationId
+          predicate := ProgramSignatures.builtinIntPredicate (.proxy .word)
+          evidence := .implementation (.byImpl
+            (ProgramSignatures.builtinIntPredicate (.proxy .word))
+            (.builtin .intWord)
+            [.byImpl
+              (ProgramSignatures.builtinIntPredicate (.comptime .word))
+              (.builtin .intInteger) []])
+        }
+      ]
+    } := by
+  simp [FlexibleSubstitution.closeContext,
+    FlexibleSubstitution.applySolvedRequirement,
+    FlexibleSubstitution.applyPredicateEvidence,
+    FlexibleSubstitution.applyEvidence,
+    FlexibleSubstitution.applyEvidences,
+    FlexibleSubstitution.applyLocals,
+    FlexibleSubstitution.applyLocalSchemeRequirements,
+    SourceSemantics.Context.ofSignatures,
+    TypedTraitResolution.applySubstitution,
+    ProgramSignatures.builtinIntPredicate, TypeSystem.Substitution.apply,
+    TypeSystem.Substitution.lookup?]
+
+/-- Closing an initializer maps its outer and scheme-local assumptions in one
+source-ordered context transformation. -/
+example (substitution : Substitution) (context : SourceSemantics.Context)
+    (binder : TypedBinder) :
+    FlexibleSubstitution.closeContext substitution
+        (localSchemeInitializerContext context binder) =
+      (FlexibleSubstitution.closeContext substitution context).withAssumptions
+        ((FlexibleSubstitution.closeContext substitution context).assumptions ++
+          instantiateLocalSchemePredicates substitution binder) :=
+  FlexibleSubstitution.closeContext_localSchemeInitializerContext
+    substitution context binder
+
 /-- The relational view of an exact primary attachment transports without
 changing either stable identity. -/
 example (substitution : ParameterSubstitution) (source : TypedSource)

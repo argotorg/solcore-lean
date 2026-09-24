@@ -264,3 +264,110 @@ def applySolvedRequirement (substitution : ParameterSubstitution)
 }
 
 end Solcore.SourceSemantics.StructuralSubstitution
+
+/-!
+## Flexible local-scheme substitution
+
+Unlike `StructuralSubstitution`, this namespace acts on flexible inference
+variables.  Its context operation is intended for closing the temporary
+flexible-variable scope of a generalized local initializer.  Exact domain and
+range conditions remain separate propositions in `Instantiation`; the
+functions below are only the total structural action.
+-/
+
+namespace Solcore.SourceSemantics.FlexibleSubstitution
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+mutual
+
+  /-- Apply a flexible substitution throughout retained implementation
+  evidence without changing the selected implementation identities. -/
+  def applyEvidence (substitution : Substitution) :
+      TypedTraitResolution.Evidence → TypedTraitResolution.Evidence
+    | .byImpl goal implementation premises =>
+        .byImpl (TypedTraitResolution.applySubstitution substitution goal)
+          implementation (applyEvidences substitution premises)
+
+  /-- Pointwise flexible substitution of retained implementation premises. -/
+  def applyEvidences (substitution : Substitution) :
+      List TypedTraitResolution.Evidence → List TypedTraitResolution.Evidence
+    | [] => []
+    | evidence :: rest =>
+        applyEvidence substitution evidence :: applyEvidences substitution rest
+
+end
+
+/-- Apply a flexible substitution to either retained evidence representation. -/
+def applyPredicateEvidence (substitution : Substitution) :
+    PredicateEvidence → PredicateEvidence
+  | .assumption predicate =>
+      .assumption (TypedTraitResolution.applySubstitution substitution predicate)
+  | .implementation evidence =>
+      .implementation (applyEvidence substitution evidence)
+
+/-- Close every flexible type position in a solved row while preserving its
+stable requirement identity. -/
+def applySolvedRequirement (substitution : Substitution)
+    (requirement : SolvedRequirement) : SolvedRequirement := {
+  requirement with
+  predicate := TypedTraitResolution.applySubstitution substitution
+    requirement.predicate
+  evidence := applyPredicateEvidence substitution requirement.evidence
+}
+
+/-- Capture-avoiding flexible substitution of a lexical scheme scope. -/
+def applyLocals (substitution : Substitution)
+    (locals : Resolved.LocalScope Scheme) : Resolved.LocalScope Scheme :=
+  locals.map fun entry => (entry.1, entry.2.apply substitution)
+
+/-- Restrict a flexible substitution before entering the scheme associated
+with one stable local identity.  Malformed, unpaired requirement scopes remain
+total by falling back to the original substitution. -/
+def forLocal (substitution : Substitution)
+    (locals : Resolved.LocalScope Scheme) (id : Resolved.LocalId) :
+    Substitution :=
+  match locals.lookup? id with
+  | some scheme => substitution.without scheme.quantified
+  | none => substitution
+
+/-- Substitute qualified-local metadata with the same capture avoidance as
+its corresponding lexical scheme.  First-match lookup deliberately agrees
+with the lookup semantics of `Context.LocalLookup`. -/
+def applyLocalSchemeRequirements (substitution : Substitution)
+    (locals : Resolved.LocalScope Scheme)
+    (requirements : Resolved.LocalScope (List LocalSchemeRequirement)) :
+    Resolved.LocalScope (List LocalSchemeRequirement) :=
+  requirements.map fun entry =>
+    let localSubstitution := forLocal substitution locals entry.1
+    (entry.1,
+      entry.2.map (LocalSchemeRequirement.applySubstitution localSubstitution))
+
+/-- Close the lexical flexible-variable scope of a source-semantics context.
+Rigid declaration binders and the residual-variable policy are independent of
+this operation.  Exactness and admissibility of `substitution` are stated by
+the judgments in `Instantiation`.
+
+This total structural action maps every solved row, including rows in an
+arbitrary malformed `Context`.  Soundness consumers must therefore carry the
+appropriate well-formed-context or requirement-ledger premise; `closeContext`
+alone does not establish that mapped evidence remains valid. -/
+def closeContext (substitution : Substitution) (context : Context) : Context := {
+  signatures := context.signatures
+  currentDeclaration := context.currentDeclaration
+  typeParameters := context.typeParameters
+  typeVariables := []
+  residualTypeVariables := context.residualTypeVariables
+  locals := applyLocals substitution context.locals
+  localSchemeRequirements :=
+    applyLocalSchemeRequirements substitution context.locals
+      context.localSchemeRequirements
+  assumptions := context.assumptions.map
+    (TypedTraitResolution.applySubstitution substitution)
+  solvedRequirements := context.solvedRequirements.map
+    (applySolvedRequirement substitution)
+}
+
+end Solcore.SourceSemantics.FlexibleSubstitution

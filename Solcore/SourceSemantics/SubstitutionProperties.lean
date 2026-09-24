@@ -5257,3 +5257,178 @@ theorem BodyDefinitionHasType.instantiate_of_body
         exact bodyAfter lexicalContext inputsExtend bodyType
 
 end Solcore.SourceSemantics.StructuralSubstitution
+
+namespace Solcore.SourceSemantics.FlexibleSubstitution
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+@[simp] theorem applySolvedRequirement_id (substitution : Substitution)
+    (requirement : SolvedRequirement) :
+    (applySolvedRequirement substitution requirement).id = requirement.id := by
+  rfl
+
+@[simp] theorem applySolvedRequirement_predicate (substitution : Substitution)
+    (requirement : SolvedRequirement) :
+    (applySolvedRequirement substitution requirement).predicate =
+      TypedTraitResolution.applySubstitution substitution
+        requirement.predicate := by
+  rfl
+
+theorem applyPredicateEvidence_goal (substitution : Substitution)
+    (evidence : PredicateEvidence) :
+    (applyPredicateEvidence substitution evidence).goal =
+      TypedTraitResolution.applySubstitution substitution evidence.goal := by
+  cases evidence with
+  | assumption predicate => rfl
+  | implementation evidence =>
+      cases evidence
+      rfl
+
+theorem applySolvedRequirement_goal_alignment (substitution : Substitution)
+    (requirement : SolvedRequirement)
+    (aligned : requirement.evidence.goal = requirement.predicate) :
+    (applySolvedRequirement substitution requirement).evidence.goal =
+      (applySolvedRequirement substitution requirement).predicate := by
+  change (applyPredicateEvidence substitution requirement.evidence).goal =
+    TypedTraitResolution.applySubstitution substitution requirement.predicate
+  rw [applyPredicateEvidence_goal, aligned]
+
+@[simp] theorem closeContext_signatures (substitution : Substitution)
+    (context : Context) :
+    (closeContext substitution context).signatures = context.signatures := by
+  rfl
+
+@[simp] theorem closeContext_currentDeclaration (substitution : Substitution)
+    (context : Context) :
+    (closeContext substitution context).currentDeclaration =
+      context.currentDeclaration := by
+  rfl
+
+@[simp] theorem closeContext_typeParameters (substitution : Substitution)
+    (context : Context) :
+    (closeContext substitution context).typeParameters =
+      context.typeParameters := by
+  rfl
+
+@[simp] theorem closeContext_typeVariables (substitution : Substitution)
+    (context : Context) :
+    (closeContext substitution context).typeVariables = [] := by
+  rfl
+
+@[simp] theorem closeContext_residualTypeVariables
+    (substitution : Substitution) (context : Context) :
+    (closeContext substitution context).residualTypeVariables =
+      context.residualTypeVariables := by
+  rfl
+
+@[simp] theorem closeContext_locals (substitution : Substitution)
+    (context : Context) :
+    (closeContext substitution context).locals =
+      applyLocals substitution context.locals := by
+  rfl
+
+@[simp] theorem closeContext_localSchemeRequirements
+    (substitution : Substitution) (context : Context) :
+    (closeContext substitution context).localSchemeRequirements =
+      applyLocalSchemeRequirements substitution context.locals
+        context.localSchemeRequirements := by
+  rfl
+
+@[simp] theorem closeContext_assumptions (substitution : Substitution)
+    (context : Context) :
+    (closeContext substitution context).assumptions =
+      context.assumptions.map
+        (TypedTraitResolution.applySubstitution substitution) := by
+  rfl
+
+@[simp] theorem closeContext_solvedRequirements (substitution : Substitution)
+    (context : Context) :
+    (closeContext substitution context).solvedRequirements =
+      context.solvedRequirements.map (applySolvedRequirement substitution) := by
+  rfl
+
+/-- Flexible closing changes the predicates and evidence carried by solved
+rows, but never their stable requirement identities or source order. -/
+@[simp] theorem closeContext_solvedRequirementIds
+    (substitution : Substitution) (context : Context) :
+    (closeContext substitution context).solvedRequirements.map
+        (fun requirement => requirement.id) =
+      context.solvedRequirements.map (fun requirement => requirement.id) := by
+  simp [closeContext, List.map_map, Function.comp_def]
+
+@[simp] theorem forLocal_cons_self (substitution : Substitution)
+    (locals : Resolved.LocalScope Scheme) (id : Resolved.LocalId)
+    (scheme : Scheme) :
+    forLocal substitution ((id, scheme) :: locals) id =
+      substitution.without scheme.quantified := by
+  simp [forLocal, Resolved.LocalScope.lookup?]
+
+theorem forLocal_eq_without_of_lookup?
+    {substitution : Substitution} {locals : Resolved.LocalScope Scheme}
+    {id : Resolved.LocalId} {scheme : Scheme}
+    (found : locals.lookup? id = some scheme) :
+    forLocal substitution locals id =
+      substitution.without scheme.quantified := by
+  simp [forLocal, found]
+
+theorem forLocal_eq_without_of_lookup
+    {substitution : Substitution} {locals : Resolved.LocalScope Scheme}
+    {id : Resolved.LocalId} {scheme : Scheme}
+    (found : Resolved.LocalScope.Lookup locals id scheme) :
+    forLocal substitution locals id =
+      substitution.without scheme.quantified := by
+  exact forLocal_eq_without_of_lookup?
+    (Resolved.LocalScope.lookup?_iff.mpr found)
+
+@[simp] theorem closeContext_withTypeVariables (substitution : Substitution)
+    (context : Context) (variables : List TypeVarId) :
+    closeContext substitution (context.withTypeVariables variables) =
+      closeContext substitution context := by
+  rfl
+
+@[simp] theorem closeContext_withResidualTypeVariables
+    (substitution : Substitution) (context : Context) :
+    closeContext substitution context.withResidualTypeVariables =
+      (closeContext substitution context).withResidualTypeVariables := by
+  rfl
+
+@[simp] theorem closeContext_withAssumptions (substitution : Substitution)
+    (context : Context) (predicates : List ProgramPredicate) :
+    closeContext substitution (context.withAssumptions predicates) =
+      (closeContext substitution context).withAssumptions
+        (predicates.map
+          (TypedTraitResolution.applySubstitution substitution)) := by
+  rfl
+
+/-- Closing a generalized initializer removes its temporary flexible binders
+and instantiates its local predicate assumptions with the same substitution.
+The surrounding assumptions undergo the ordinary context action. -/
+@[simp] theorem closeContext_localSchemeInitializerContext
+    (substitution : Substitution) (context : Context)
+    (binder : TypedBinder) :
+    closeContext substitution (localSchemeInitializerContext context binder) =
+      (closeContext substitution context).withAssumptions
+        ((closeContext substitution context).assumptions ++
+          instantiateLocalSchemePredicates substitution binder) := by
+  cases context
+  simp [localSchemeInitializerContext, Context.withTypeVariables,
+    Context.withAssumptions, closeContext, instantiateLocalSchemePredicates,
+    List.map_append]
+
+/-- In a runtime context with no ambient lexical metavariables, an exact
+scheme substitution is exact for the complete generalized-initializer scope. -/
+theorem ExactSubstitution.localSchemeInitializerContext
+    {substitution : Substitution} {context : Context} {binder : TypedBinder}
+    (outerVariablesClosed : context.typeVariables = [])
+    (exact : SourceSemantics.ExactSubstitution substitution
+      binder.scheme.quantified) :
+    SourceSemantics.ExactSubstitution substitution
+      (localSchemeInitializerContext context binder).typeVariables := by
+  change SourceSemantics.ExactSubstitution substitution
+    (context.typeVariables ++ binder.scheme.quantified)
+  rw [outerVariablesClosed]
+  simpa using exact
+
+end Solcore.SourceSemantics.FlexibleSubstitution
