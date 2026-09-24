@@ -772,23 +772,6 @@ theorem ImplHeadInstantiates.applySubstitution
         exact (applyPredicate_mapRange_of_rule_position outer exact
           (Or.inr predicateMem)).symm
 
-/-- Structural action of a flexible substitution on a semantic evidence
-tree. -/
-def applyTraitEvidence (substitution : Substitution) :
-    TraitEvidence → TraitEvidence
-  | .assumption goal =>
-      .assumption (TypedTraitResolution.applySubstitution substitution goal)
-  | .implementation goal implId premises =>
-      .implementation
-        (TypedTraitResolution.applySubstitution substitution goal) implId
-        (premises.map (applyTraitEvidence substitution))
-
-@[simp] theorem applyTraitEvidence_goal
-    (substitution : Substitution) (evidence : TraitEvidence) :
-    (applyTraitEvidence substitution evidence).goal =
-      TypedTraitResolution.applySubstitution substitution evidence.goal := by
-  cases evidence <;> simp [applyTraitEvidence, TraitEvidence.goal]
-
 theorem ImplementationEvidenceRepresents.applySubstitution
     (substitution : Substitution)
     {retained : TypedTraitResolution.Evidence} {semantic : TraitEvidence}

@@ -433,6 +433,29 @@ def goal : TraitEvidence → ProgramPredicate
 
 end TraitEvidence
 
+namespace FlexibleSubstitution
+
+/-- Structural action of a flexible substitution on a semantic evidence
+tree.  This definition lives with the evidence carrier so dynamic evidence
+environments can be instantiated without importing the higher substitution
+proofs. -/
+def applyTraitEvidence (substitution : TypeSystem.Substitution) :
+    TraitEvidence → TraitEvidence
+  | .assumption goal =>
+      .assumption (TypedTraitResolution.applySubstitution substitution goal)
+  | .implementation goal implId premises =>
+      .implementation
+        (TypedTraitResolution.applySubstitution substitution goal) implId
+        (premises.map (applyTraitEvidence substitution))
+
+@[simp] theorem applyTraitEvidence_goal
+    (substitution : TypeSystem.Substitution) (evidence : TraitEvidence) :
+    (applyTraitEvidence substitution evidence).goal =
+      TypedTraitResolution.applySubstitution substitution evidence.goal := by
+  cases evidence <;> simp [applyTraitEvidence, TraitEvidence.goal]
+
+end FlexibleSubstitution
+
 /-- Declarative validity of a semantic evidence tree. -/
 inductive EvidenceValid
     (assumptions : List ProgramPredicate)

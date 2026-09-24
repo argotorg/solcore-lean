@@ -7,6 +7,7 @@ import Solcore.SourceSemantics.Dynamic.Primitive
 import Solcore.SourceSemantics.Dynamic.Pattern
 import Solcore.SourceSemantics.Dynamic.Place
 import Solcore.SourceSemantics.Dynamic.Evidence
+import Solcore.SourceSemantics.Dynamic.EvidenceSubstitutionProperties
 import Solcore.SourceSemantics.Dynamic.LocalSchemes
 import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.Dynamic.Fault

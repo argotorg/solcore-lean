@@ -17,6 +17,40 @@ namespace Solcore.SourceSemantics.Dynamic
 open Frontend
 open Frontend.SourceInference
 
+namespace EvidenceEnvironment
+
+/-- Instantiate every goal and semantic evidence tree in a runtime
+dictionary.  Mapping preserves source order; first-match lookup after mapping
+may nevertheless select an earlier entry when distinct source goals collapse
+to the same instantiated goal. -/
+def applySubstitution (environment : EvidenceEnvironment)
+    (substitution : TypeSystem.Substitution) : EvidenceEnvironment :=
+  environment.map fun entry =>
+    (TypedTraitResolution.applySubstitution substitution entry.1,
+      FlexibleSubstitution.applyTraitEvidence substitution entry.2)
+
+@[simp] theorem applySubstitution_keys
+    (environment : EvidenceEnvironment)
+    (substitution : TypeSystem.Substitution) :
+    (environment.applySubstitution substitution).map Prod.fst =
+      environment.map fun entry =>
+        TypedTraitResolution.applySubstitution substitution entry.1 := by
+  simp [applySubstitution, List.map_map, Function.comp_def]
+
+/-- Every source key contributes its instantiated key to the mapped
+dictionary, independently of collisions with other source keys. -/
+theorem key_mem_applySubstitution
+    {environment : EvidenceEnvironment} {goal : ProgramPredicate}
+    (substitution : TypeSystem.Substitution)
+    (member : goal ∈ environment.map Prod.fst) :
+    TypedTraitResolution.applySubstitution substitution goal ∈
+      (environment.applySubstitution substitution).map Prod.fst := by
+  rw [applySubstitution_keys]
+  rcases List.mem_map.mp member with ⟨entry, entryMem, keyEq⟩
+  exact List.mem_map.mpr ⟨entry, entryMem, by rw [keyEq]⟩
+
+end EvidenceEnvironment
+
 /-- First-match lookup in a runtime evidence environment. -/
 inductive EvidenceEnvironment.LooksUp :
     EvidenceEnvironment → ProgramPredicate → TraitEvidence → Prop where
@@ -124,6 +158,17 @@ theorem exists_of_key_mem
           exact ⟨headEvidence, .head⟩
         · rcases induction member with ⟨evidence, found⟩
           exact ⟨evidence, .tail same found⟩
+
+/-- A successful first-match lookup selects a key that occurs in the
+dictionary's key projection. -/
+theorem key_mem
+    {environment : EvidenceEnvironment} {goal : ProgramPredicate}
+    {evidence : TraitEvidence}
+    (found : environment.LooksUp goal evidence) :
+    goal ∈ environment.map Prod.fst := by
+  induction found with
+  | head => simp
+  | tail _ _ induction => simp [induction]
 
 end EvidenceEnvironment.LooksUp
 
