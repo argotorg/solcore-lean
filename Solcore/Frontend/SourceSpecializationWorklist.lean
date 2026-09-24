@@ -12,12 +12,13 @@ standalone source-declaration function references append requests to the FIFO
 tail.  Open declaration uses inside a supported direct-lambda polymorphic let
 are rescanned once for each distinct ground use of that let; exact duplicate
 edges are removed, while different concrete callees at the same template
-occurrence remain distinct.  A second direct-lambda let whose use becomes
-ground after one such substitution is rescanned with the composed outer-then-
-inner substitution.  Deeper local-template contexts and declaration uses
-depending on more than one local scheme remain explicit unsupported open
-declarations.  Compiler-function calls add no edge, and already-seen canonical
-keys are skipped without consuming budget.
+occurrence remain distinct.  Nested direct-lambda lets are discovered by a
+finite FIFO context worklist: each cumulative substitution may ground further
+local references in that lambda's direct lexical body, whose scheme matches
+are composed outer-first and scanned in turn.  Nested polymorphic lambdas are
+lexical boundaries until a concrete reference makes them reachable.
+Compiler-function calls add no edge, and already-seen canonical keys are skipped
+without consuming budget.
 
 A declaration reference which is the callee child of a direct call is
 represented only by that call edge, so adding first-class function discovery
@@ -129,6 +130,8 @@ inductive Error where
       (scheme : Scheme) (actual : Ty)
   | unsupportedLocalPolymorphicRequirements
       (occurrence : ExpressionId) (predicates : List ProgramPredicate)
+  | localPolymorphicScopeFuelExhausted (pending : NodeId)
+  | localPolymorphicContextFuelExhausted (pending : Nat)
   | invalidExpressionCoercionPath
       (expression : ExpressionId) (source target : Ty)
       (coercions : List CoercionStep)
@@ -285,6 +288,73 @@ private def exactLocalLambdaBinding?
   | [binding] => some binding
   | _ => none
 
+private def appendNodeId (ids : List NodeId) (id : NodeId) : List NodeId :=
+  if ids.contains id then ids else ids ++ [id]
+
+private def appendNodeIds (left right : List NodeId) : List NodeId :=
+  right.foldl appendNodeId left
+
+private def directLexicalChildren (source : TypedSource)
+    (boundaries : List ExpressionId) (id : NodeId) : List NodeId :=
+  match source.lookupNode? id.occurrenceId with
+  | some (.expression node@{ form := .lambda _ _ _, .. }) =>
+      if boundaries.contains node.id then []
+      else SourceSpecialization.expressionChildNodeIds node
+  | some (.expression node) =>
+      SourceSpecialization.expressionChildNodeIds node
+  | some (.statement node) =>
+      SourceSpecialization.statementChildNodeIds source node
+  | none => []
+
+private def directLexicalTraversalFuel (source : TypedSource)
+    (roots : List NodeId) : Nat :=
+  let edges := source.nodes.foldl (fun count node =>
+    count + match node with
+      | .expression expression =>
+          (SourceSpecialization.expressionChildNodeIds expression).length
+      | .statement statement =>
+          (SourceSpecialization.statementChildNodeIds source statement).length) 0
+  roots.length + edges + 1
+
+private def collectDirectLexicalNodeIds (source : TypedSource)
+    (boundaries : List ExpressionId) :
+    Nat → List NodeId → List NodeId → Except Error (List NodeId)
+  | 0, [], seen => pure seen
+  | 0, pending :: _, _ =>
+      throw (.localPolymorphicScopeFuelExhausted pending)
+  | _ + 1, [], seen => pure seen
+  | fuel + 1, pending :: rest, seen =>
+      if seen.contains pending then
+        collectDirectLexicalNodeIds source boundaries fuel rest seen
+      else
+        let nextSeen := seen ++ [pending]
+        let children :=
+          (directLexicalChildren source boundaries pending).filter fun child =>
+            !nextSeen.contains child
+        collectDirectLexicalNodeIds source boundaries fuel
+          (appendNodeIds rest children) nextSeen
+
+private def directLexicalNodeIds (source : TypedSource)
+    (boundaries : List ExpressionId) (roots : List NodeId) :
+    Except Error (List NodeId) :=
+  collectDirectLexicalNodeIds source boundaries
+    (directLexicalTraversalFuel source roots) roots []
+
+private def localLambdaBodyNodeIds (source : TypedSource)
+    (bindings : List LocalLambdaBinding) (binding : LocalLambdaBinding) :
+    Except Error (List NodeId) :=
+  match source.lookupExpression? binding.initializer with
+  | some { form := .lambda _ _ body, .. } =>
+      directLexicalNodeIds source (bindings.map (·.initializer))
+        (body.map NodeId.statement)
+  | _ => pure []
+
+private def selectedNodes (ids : List NodeId) : List Node → List Node
+  | [] => []
+  | node :: rest =>
+      if ids.contains node.id then node :: selectedNodes ids rest
+      else selectedNodes ids rest
+
 private def insertLocalLambdaInstance
     (instances : List LocalLambdaInstance)
     (localInstance : LocalLambdaInstance) : List LocalLambdaInstance :=
@@ -293,11 +363,6 @@ private def insertLocalLambdaInstance
 
 private def variablesBelongTo (variables quantified : List TypeVarId) : Bool :=
   variables.all fun metavariable => quantified.contains metavariable
-
-private def instanceCovers (localInstance : LocalLambdaInstance)
-    (variables : List TypeVarId) : Bool :=
-  variablesBelongTo variables
-    localInstance.binding.binder.scheme.quantified
 
 private def collectGroundLocalLambdaInstances
     (bindings : List LocalLambdaBinding) :
@@ -331,17 +396,20 @@ private def collectGroundLocalLambdaInstances
       | .statement _ =>
           collectGroundLocalLambdaInstances bindings rest instances
 
-private def localLambdaInstances (source : TypedSource) :
-    Except Error (List LocalLambdaInstance) :=
-  collectGroundLocalLambdaInstances (directPolymorphicLambdaBindings source)
-    source.nodes []
+private def rootLocalLambdaInstances (source : TypedSource)
+    (bindings : List LocalLambdaBinding) :
+    Except Error (List LocalLambdaInstance) := do
+  let rootIds ← directLexicalNodeIds source (bindings.map (·.initializer))
+    source.roots
+  collectGroundLocalLambdaInstances bindings
+    (selectedNodes rootIds source.nodes) []
 
-/-- Recover one nested direct-lambda instance whose occurrence is open in the
-original source but becomes ground under one outer local instance.  The child
-substitution is inferred against the outer-substituted scheme and composed as
-`child.compose outer`, which applies the outer substitution first. -/
-private def collectNestedLocalLambdaInstances
-    (bindings : List LocalLambdaBinding) (outer : LocalLambdaInstance) :
+/-- Recover every direct-lambda instance whose open occurrence becomes ground
+under one cumulative local context.  The child substitution is inferred
+against the context-substituted scheme and composed as `child.compose parent`,
+which applies the parent substitution first. -/
+private def collectContextualLocalLambdaInstances
+    (bindings : List LocalLambdaBinding) (parent : LocalLambdaInstance) :
     List Node → List LocalLambdaInstance →
       Except Error (List LocalLambdaInstance)
   | [], instances => pure instances
@@ -350,115 +418,110 @@ private def collectNestedLocalLambdaInstances
       | .expression expression =>
           match expression.form with
           | .reference _ (.local id) =>
-              let variables := expression.rawType.freeVariables
-              if variables.isEmpty || !instanceCovers outer variables then
-                collectNestedLocalLambdaInstances bindings outer rest
-                  instances
-              else
-                match exactLocalLambdaBinding? bindings id with
-                | none =>
-                    collectNestedLocalLambdaInstances bindings outer rest
+              match exactLocalLambdaBinding? bindings id with
+              | none =>
+                  collectContextualLocalLambdaInstances bindings parent rest
+                    instances
+              | some binding => do
+                  let actual := parent.substitution.apply expression.rawType
+                  let remaining := actual.freeVariables
+                  if !remaining.isEmpty then
+                    collectContextualLocalLambdaInstances bindings parent rest
                       instances
-                | some binding => do
-                    let actual := outer.substitution.apply expression.rawType
-                    let remaining := actual.freeVariables
-                    if !remaining.isEmpty then
-                      throw (.unsupportedOpenDeclaration expression.id remaining)
+                  else
                     let contextualScheme :=
-                      Scheme.apply outer.substitution binding.binder.scheme
+                      Scheme.apply parent.substitution binding.binder.scheme
                     let child ← match
                         SourceSpecialization.matchClosedSchemeInstance?
                           contextualScheme actual with
                       | some substitution => pure substitution
                       | none => throw (.localPolymorphicInstanceMismatch
                           expression.id id contextualScheme actual)
-                    let cumulative := child.compose outer.substitution
-                    collectNestedLocalLambdaInstances bindings outer rest
+                    let cumulative := child.compose parent.substitution
+                    collectContextualLocalLambdaInstances bindings parent rest
                       (insertLocalLambdaInstance instances {
                         binding
                         substitution := cumulative
                       })
           | _ =>
-              collectNestedLocalLambdaInstances bindings outer rest
+              collectContextualLocalLambdaInstances bindings parent rest
                 instances
       | .statement _ =>
-          collectNestedLocalLambdaInstances bindings outer rest instances
+          collectContextualLocalLambdaInstances bindings parent rest instances
 
 private def appendLocalLambdaInstances
     (left right : List LocalLambdaInstance) : List LocalLambdaInstance :=
   right.foldl insertLocalLambdaInstance left
 
-/-- Reject a third reachable direct-lambda template without rejecting open
-references inside an unused template.  Only a concrete child instance creates
-a context.  A reference already ground after the outer substitution is a
-direct child (or its peer); one still open there but ground after the child's
-cumulative substitution would enter the unsupported third depth. -/
-private def rejectReachableNestedLocalReferences
-    (bindings : List LocalLambdaBinding) (outer child : LocalLambdaInstance) :
-    List Node → Except Error Unit
-  | [] => pure ()
-  | node :: rest => do
-      match node with
-      | .expression expression =>
-          match expression.form with
-          | .reference _ (.local id) =>
-              let variables := expression.rawType.freeVariables
-              if variables.isEmpty then
-                rejectReachableNestedLocalReferences bindings outer child rest
-              else
-                match exactLocalLambdaBinding? bindings id with
-                | some _ =>
-                    let outerType :=
-                      outer.substitution.apply expression.rawType
-                    let childType :=
-                      child.substitution.apply expression.rawType
-                    if outerType.freeVariables.isEmpty then
-                      rejectReachableNestedLocalReferences bindings outer child
-                        rest
-                    else if childType.freeVariables.isEmpty then
-                      throw (.unsupportedOpenDeclaration expression.id variables)
-                    else
-                      rejectReachableNestedLocalReferences bindings outer child
-                        rest
-                | none =>
-                    rejectReachableNestedLocalReferences bindings outer child
-                      rest
-          | _ =>
-              rejectReachableNestedLocalReferences bindings outer child rest
-      | .statement _ =>
-          rejectReachableNestedLocalReferences bindings outer child rest
+/-- Close the reachable local-template contexts in FIFO order.  `seen`
+contains both processed and queued contexts, so an already-discovered instance
+is never processed twice. -/
+private def closeLocalLambdaInstancesAux (source : TypedSource)
+    (bindings : List LocalLambdaBinding)
+    (seen frontier : List LocalLambdaInstance) :
+    Nat → Except Error (List LocalLambdaInstance)
+  | 0 =>
+      match frontier with
+      | [] => pure seen
+      | pending => throw (.localPolymorphicContextFuelExhausted pending.length)
+  | fuel + 1 =>
+      match frontier with
+      | [] => pure seen
+      | parent :: rest => do
+          let bodyIds ← localLambdaBodyNodeIds source bindings parent.binding
+          let discovered ← collectContextualLocalLambdaInstances bindings parent
+            (selectedNodes bodyIds source.nodes) []
+          let fresh := discovered.filter fun localInstance =>
+            !seen.contains localInstance
+          let nextSeen := appendLocalLambdaInstances seen fresh
+          closeLocalLambdaInstancesAux source bindings nextSeen (rest ++ fresh)
+            fuel
 
-private def depthTwoLocalLambdaInstances (source : TypedSource)
-    (bindings : List LocalLambdaBinding) :
-    List LocalLambdaInstance → Except Error (List LocalLambdaInstance)
-  | [] => pure []
-  | outer :: rest => do
-      let nested ← collectNestedLocalLambdaInstances bindings outer source.nodes []
-      for inner in nested do
-        rejectReachableNestedLocalReferences bindings outer inner source.nodes
-      let remaining ← depthTwoLocalLambdaInstances source bindings rest
-      pure (appendLocalLambdaInstances nested remaining)
+/-- A source with `n` nodes and `b` direct polymorphic lambda bindings has at
+most `n` choices at each strictly growing lexical context.  This deliberately
+loose derived bound keeps worklist termination explicit without exposing a
+second public budget. -/
+private def localLambdaContextFuel (source : TypedSource)
+    (bindings : List LocalLambdaBinding) : Nat :=
+  (source.nodes.length + 1) ^ (bindings.length + 1)
+
+private def closeLocalLambdaInstances (source : TypedSource)
+    (bindings : List LocalLambdaBinding)
+    (initial : List LocalLambdaInstance) :
+    Except Error (List LocalLambdaInstance) :=
+  closeLocalLambdaInstancesAux source bindings initial initial
+    (localLambdaContextFuel source bindings)
+
+private def declarationGroundUnder (substitution : Substitution)
+    (instantiation : DeclarationInstantiation) : Bool :=
+  (declarationInstantiationTypes instantiation).all fun type =>
+    (substitution.apply type).freeVariables.isEmpty
+
+private def declarationVariablesUnder (substitution : Substitution)
+    (instantiation : DeclarationInstantiation) : List TypeVarId :=
+  (declarationInstantiationTypes instantiation).flatMap fun type =>
+    (substitution.apply type).freeVariables
+  |>.eraseDups
 
 private def openDeclarationNodeIdsFor (source : TypedSource)
-    (localInstance : LocalLambdaInstance) : List NodeId :=
-  source.nodes.filterMap fun
+    (bindings : List LocalLambdaBinding)
+    (localInstance : LocalLambdaInstance) : Except Error (List NodeId) := do
+  let bodyIds ← localLambdaBodyNodeIds source bindings localInstance.binding
+  pure <| source.nodes.filterMap fun
     | .expression node =>
-        match declarationInstantiation? node with
+        if !bodyIds.contains (.expression node.id) then
+          none
+        else match declarationInstantiation? node with
         | some instantiation =>
             let variables := declarationInstantiationVariables instantiation
             if !variables.isEmpty &&
-                instanceCovers localInstance variables then
+                declarationGroundUnder localInstance.substitution
+                  instantiation then
               some (.expression node.id)
             else
               none
         | none => none
     | .statement _ => none
-
-private def selectedNodes (ids : List NodeId) : List Node → List Node
-  | [] => []
-  | node :: rest =>
-      if ids.contains node.id then node :: selectedNodes ids rest
-      else selectedNodes ids rest
 
 private def appendCallEdge (edges : List CallEdge) (edge : CallEdge) :
     List CallEdge :=
@@ -616,9 +679,40 @@ private def collectReferences (program : CheckedProgram)
           | _ => collectRest
       | .statement _ => collectRest
 
+private def validateReachableOpenDeclarations (source : TypedSource)
+    (bindings : List LocalLambdaBinding) :
+    List LocalLambdaInstance → Except Error Unit
+  | [] => pure ()
+  | localInstance :: rest => do
+      let bodyIds ← localLambdaBodyNodeIds source bindings localInstance.binding
+      for node in selectedNodes bodyIds source.nodes do
+        match node with
+        | .expression expression =>
+            match declarationInstantiation? expression with
+            | some instantiation =>
+                let variables :=
+                  declarationInstantiationVariables instantiation
+                if variables.isEmpty then
+                  pure ()
+                else
+                  let remaining := declarationVariablesUnder
+                    localInstance.substitution instantiation
+                  if !remaining.isEmpty then
+                    throw (.unsupportedOpenDeclaration expression.id remaining)
+                  else if !instantiation.predicates.isEmpty then
+                    throw (.unsupportedLocalPolymorphicRequirements
+                      expression.id instantiation.predicates)
+                  else
+                    pure ()
+            | none => pure ()
+        | .statement _ => pure ()
+      validateReachableOpenDeclarations source bindings rest
+
 private def validateOpenDeclarationsCovered (source : TypedSource)
     (bindings : List LocalLambdaBinding)
     (instances : List LocalLambdaInstance) : Except Error Unit := do
+  let localVariables :=
+    (bindings.flatMap fun binding => binding.binder.scheme.quantified).eraseDups
   for node in source.nodes do
     match node with
     | .expression expression =>
@@ -627,33 +721,29 @@ private def validateOpenDeclarationsCovered (source : TypedSource)
             let variables := declarationInstantiationVariables instantiation
             if variables.isEmpty then
               pure ()
-            else if !instantiation.predicates.isEmpty &&
-                instances.any fun localInstance =>
-                  instanceCovers localInstance variables then
-              throw (.unsupportedLocalPolymorphicRequirements expression.id
-                instantiation.predicates)
-            else if bindings.any fun binding =>
-                variablesBelongTo variables binding.binder.scheme.quantified then
+            else if variablesBelongTo variables localVariables then
               pure ()
             else
               throw (.unsupportedOpenDeclaration expression.id variables)
         | none => pure ()
     | .statement _ => pure ()
+  validateReachableOpenDeclarations source bindings instances
 
 private def collectInstantiatedReferences (program : CheckedProgram)
     (caller : SourceSpecialization.SpecializationKey)
-    (source : TypedSource) : List LocalLambdaInstance →
+    (source : TypedSource) (bindings : List LocalLambdaBinding) :
+    List LocalLambdaInstance →
       Except Error (List Request × List CallEdge × List ReferenceEdge)
   | [] => pure ([], [], [])
   | localInstance :: rest => do
       let instantiated := source.applySubstitution localInstance.substitution
-      let selected := selectedNodes
-        (openDeclarationNodeIdsFor source localInstance) instantiated.nodes
+      let openIds ← openDeclarationNodeIdsFor source bindings localInstance
+      let selected := selectedNodes openIds instantiated.nodes
       let directCallees := directDeclarationCallees selected
       let (requests, calls, references) ←
         collectReferences program caller instantiated directCallees selected
       let (restRequests, restCalls, restReferences) ←
-        collectInstantiatedReferences program caller source rest
+        collectInstantiatedReferences program caller source bindings rest
       pure (requests ++ restRequests,
         appendCallEdges calls restCalls,
         appendReferenceEdges references restReferences)
@@ -666,13 +756,11 @@ private def collectAllReferences (program : CheckedProgram)
   let (requests, calls, references) ←
     collectReferences program caller source directCallees source.nodes
   let bindings := directPolymorphicLambdaBindings source
-  let outerInstances ← localLambdaInstances source
-  let nestedInstances ←
-    depthTwoLocalLambdaInstances source bindings outerInstances
-  let instances := appendLocalLambdaInstances outerInstances nestedInstances
+  let initialInstances ← rootLocalLambdaInstances source bindings
+  let instances ← closeLocalLambdaInstances source bindings initialInstances
   validateOpenDeclarationsCovered source bindings instances
   let (instantiatedRequests, instantiatedCalls, instantiatedReferences) ←
-    collectInstantiatedReferences program caller source instances
+    collectInstantiatedReferences program caller source bindings instances
   pure (requests ++ instantiatedRequests,
     appendCallEdges calls instantiatedCalls,
     appendReferenceEdges references instantiatedReferences)

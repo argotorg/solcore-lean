@@ -42,6 +42,16 @@ private def workspace : Workspace.RawWorkspace := {
         "    return inner(value);",
         "  };",
         "  return (outer(13), outer(flag));",
+        "}",
+        "function recursiveContextPolymorphicLocal(flag: Bool) returns (Word, Bool) {",
+        "  let outer = lam(value) {",
+        "    let middle = lam(item) {",
+        "      let inner = lam(innerValue) { return globalIdentity(innerValue); };",
+        "      return inner(item);",
+        "    };",
+        "    return middle(value);",
+        "  };",
+        "  return (outer(15), outer(flag));",
         "}"
       ]
     },
@@ -122,13 +132,16 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let polymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
   let nestedPolymorphicLocal ←
     compileNamed checked "main.solc" "nestedPolymorphicLocal"
+  let recursiveContextPolymorphicLocal ←
+    compileNamed checked "main.solc" "recursiveContextPolymorphicLocal"
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
       recursive.backend = .callGraph ∧
       typed.backend = .typedSource ∧
       polymorphicLocal.backend = .typedSource ∧
-      nestedPolymorphicLocal.backend = .typedSource))
+      nestedPolymorphicLocal.backend = .typedSource ∧
+      recursiveContextPolymorphicLocal.backend = .typedSource))
     "automatic backend precedence changed"
   assertTrue (decide (
       direct.key.declaration.moduleId = main ∧
@@ -149,6 +162,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     "local polymorphism did not retain its root and two generic helper instances"
   assertTrue (nestedPolymorphicLocal.specializationCount == 3)
     "depth-2 local polymorphism did not retain its root and two generic helper instances"
+  assertTrue (recursiveContextPolymorphicLocal.specializationCount == 3)
+    "recursive local contexts did not retain their root and two generic helper instances"
   let polymorphicRequest ←
     match SourceProgramExecution.resolveSeed checked
         (Seed.named main "polymorphicLocal") with
@@ -183,6 +198,27 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "depth-2 local polymorphism did not discover two contextual generic calls"
   | result => throw (IO.userError
       s!"depth-2 polymorphic-local plan reconstruction failed: {reprStr result}")
+  let recursiveContextRequest ←
+    match SourceProgramExecution.resolveSeed checked
+        (Seed.named main "recursiveContextPolymorphicLocal") with
+    | .ok request => pure request
+    | .error error => throw (IO.userError
+        s!"recursive-context seed resolution failed: {reprStr error}")
+  match SourceSpecializationWorklist.run checked [recursiveContextRequest]
+      compilerOptions.specializationBudget with
+  | .ok (.complete plan) =>
+      let edges := plan.callEdges.filter fun edge =>
+        decide (edge.caller = recursiveContextPolymorphicLocal.key)
+      assertTrue (decide (
+          plan.specializations.length = 3 ∧
+          plan.callEdges.length = 2 ∧
+          edges.length = 2 ∧
+          (edges.map (·.occurrence)).eraseDups.length = 1 ∧
+          (edges.map (·.callee.arguments)).contains [.word] ∧
+          (edges.map (·.callee.arguments)).contains [.bool]))
+        "recursive local contexts did not discover two contextual generic calls"
+  | result => throw (IO.userError
+      s!"recursive-context plan reconstruction failed: {reprStr result}")
   expectCoreWord "direct Core root" 14 <|
     direct.runCore [.word (word 7)] runtimeOptions
   expectCoreWord "reused direct Core root" 18 <|
@@ -211,6 +247,13 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "runtime depth-2 let-polymorphism did not independently instantiate Word and Bool"
   | result => throw (IO.userError
       s!"runtime depth-2 let-polymorphism returned {reprStr result}")
+  match recursiveContextPolymorphicLocal.runTyped [.bool true] runtimeOptions with
+  | .ok (.typedSource (.done
+      (.product (.word actualWord) (.bool actualBool)) _)) =>
+      assertTrue (actualWord == word 15 && actualBool)
+        "runtime recursive local contexts did not instantiate Word and Bool"
+  | result => throw (IO.userError
+      s!"runtime recursive local contexts returned {reprStr result}")
   pure { checked, direct, recursive, typed }
 
 private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do

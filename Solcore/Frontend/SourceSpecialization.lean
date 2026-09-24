@@ -843,6 +843,18 @@ private def statementChildTasks (source : TypedSource)
   | .breakStmt
   | .continueStmt => []
 
+/-- Immediate occurrence edges of one expression node.  Consumers which treat
+a lambda as a lexical boundary should avoid following the body edges returned
+for its `.lambda` form. -/
+def expressionChildNodeIds (node : ExpressionNode) : List NodeId :=
+  (expressionChildTasks [] node).map (·.node)
+
+/-- Immediate occurrence edges of one statement node, including assignment
+projection expressions and every structured statement body. -/
+def statementChildNodeIds (source : TypedSource)
+    (node : StatementNode) : List NodeId :=
+  (statementChildTasks source [] node).map (·.node)
+
 private def residualChildTasks (source : TypedSource)
     (task : ResidualScopeTask) : List ResidualScopeTask :=
   match source.lookupNode? task.node.occurrenceId with

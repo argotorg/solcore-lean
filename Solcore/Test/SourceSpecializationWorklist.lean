@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceRuntimeLinking
+import Solcore.Frontend.SourceTypedRuntime
 
 /-! End-to-end regressions for finite whole-program specialization discovery. -/
 
@@ -21,6 +22,8 @@ private def workspace : Workspace.RawWorkspace := {
       "trait Eq<T> {}",
       "impl Eq<Word> {}",
       "function identity<T>(value: T) returns (T) { return value; }",
+      "function globalIdentity<T>(value: T) returns (T) { return value; }",
+      "function choose3<A, B, C>(first: A, second: B, third: C) returns (C) { return third; }",
       "function twice<T>(value: T) returns (T) { return identity(identity(value)); }",
       "function contextualLocal(flag: Bool) returns (Word, Bool) {",
       "  let f = lam(value) { return identity(value); };",
@@ -38,6 +41,13 @@ private def workspace : Workspace.RawWorkspace := {
       "  };",
       "  return (outer(1), outer(flag));",
       "}",
+      "function groundInnerUnderPolymorphicOuter(flag: Bool) returns (Word, Word) {",
+      "  let outer = lam(value) {",
+      "    let inner = lam(item) { return globalIdentity(item); };",
+      "    return inner(1);",
+      "  };",
+      "  return (outer(1), outer(flag));",
+      "}",
       "function siblingContextualLocal(flag: Bool) returns (Word, Bool) {",
       "  let outer = lam(value) {",
       "    let left = lam(item) { return identity(item); };",
@@ -52,6 +62,18 @@ private def workspace : Workspace.RawWorkspace := {
       "    let middle = lam(item) {",
       "      let inner = lam(nestedValue) { return identity(nestedValue); };",
       "      return inner(item);",
+      "    };",
+      "    return middle(value);",
+      "  };",
+      "  return (outer(1), outer(flag));",
+      "}",
+      "function scopeAwareRecursiveContextualLocal(flag: Bool) returns (Word, Bool) {",
+      "  let outer = lam(value) {",
+      "    let middle = lam(item) {",
+      "      let inner = lam(nestedValue) {",
+      "        return choose3(value, item, nestedValue);",
+      "      };",
+      "      return inner(value);",
       "    };",
       "    return middle(value);",
       "  };",
@@ -79,6 +101,13 @@ private def workspace : Workspace.RawWorkspace := {
       "  outer(1);",
       "  outer(flag);",
       "  return 9;",
+      "}",
+      "function monomorphicLambdaWrapper() returns (Word) {",
+      "  let outer = lam() {",
+      "    let f = lam(item) { return identity(item); };",
+      "    return f(1);",
+      "  };",
+      "  return outer();",
       "}",
       "function unusedNestedContextualLocal() returns (Word) {",
       "  let outer = lam(value) {",
@@ -547,6 +576,99 @@ private def testDepthTwoContextualLocalPolymorphicCalls
   | outcome => throw (IO.userError
       s!"depth-two budget two: expected exhaustion, found {reprStr outcome}")
 
+private def testGroundInnerUnderPolymorphicOuter
+    (program : CheckedProgram) : IO Unit := do
+  let identity ← signatureNamed program "globalIdentity"
+  let entry ← signatureNamed program "groundInnerUnderPolymorphicOuter"
+  let function ← functionFor program entry
+  let outer ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "outer" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError
+        "ground-inner fixture lost its `outer` binder")
+  let inner ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "inner" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError
+        "ground-inner fixture lost its `inner` binder")
+  let quantified ← match inner.scheme.quantified with
+    | [quantified] => pure quantified
+    | variables => throw (IO.userError
+        s!"ground-inner `inner` retained {variables.length} quantified variables")
+  let declarationParameter ← match identity.scheme.parameters with
+    | [parameter] => pure parameter
+    | parameters => throw (IO.userError
+        s!"globalIdentity retained {parameters.length} parameters")
+  let innerReference ← match function.typedBody.nodes.filterMap fun
+      | .expression node@{ form := .reference _ (.local selected), .. } =>
+          if selected == inner.id then some node else none
+      | _ => none with
+    | [reference] => pure reference
+    | references => throw (IO.userError
+        s!"ground-inner fixture retained {references.length} inner references")
+  let (call, instantiation) ← match
+      function.typedBody.nodes.findSome? fun
+        | .expression node@{
+            form := .call _ _ (.declaration instantiation), .. } =>
+            if instantiation.declaration == identity.id then
+              some (node, instantiation)
+            else
+              none
+        | _ => none with
+    | some selected => pure selected
+    | none => throw (IO.userError
+        "ground-inner fixture lost its globalIdentity call")
+  let residual := Ty.variable quantified
+  assertTrue (decide (
+      outer.scheme.quantified.length = 1 ∧
+      inner.scheme.body = .function residual residual ∧
+      innerReference.rawType = .function .word .word ∧
+      instantiation.parameterSubstitution = [(declarationParameter, residual)] ∧
+      instantiation.type = .function residual residual))
+    "ground-inner fixture lost its ground use or open helper metadata"
+
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.word]
+  }
+  let expectedEdge : SourceSpecializationWorklist.CallEdge := {
+    caller := entryKey
+    occurrence := call.id
+    callee := wordKey
+  }
+  match ← runOrThrow "ground inner under polymorphic outer" program
+      [monomorphicRequest entry] 2 with
+  | .complete plan =>
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey] ∧
+          plan.callEdges = [expectedEdge] ∧
+          plan.callEdges.eraseDups.length = 1 ∧
+          plan.referenceEdges = []))
+        "ground inner use was duplicated or lost across outer contexts"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .error error => throw (IO.userError
+          s!"ground-inner plan failed replay validation: {reprStr error}")
+      | .ok () =>
+          match SourceTypedRuntime.run program.signatures plan entryKey
+              [.bool true] 4096 with
+          | .done (.product (.word left) (.word right)) _ =>
+              let expected := Core.Word.ofNatModulo 1
+              assertTrue (left == expected && right == expected)
+                "ground-inner runtime returned the wrong Word pair"
+          | result => throw (IO.userError
+              s!"ground-inner runtime returned {reprStr result}")
+  | outcome => throw (IO.userError
+      s!"ground-inner worklist expected a complete plan, found {reprStr outcome}")
+
 private def testSiblingContextualLocalPolymorphicCalls
     (program : CheckedProgram) : IO Unit := do
   let identity ← signatureNamed program "identity"
@@ -599,23 +721,126 @@ private def testSiblingContextualLocalPolymorphicCalls
   | outcome => throw (IO.userError
       s!"sibling contextual calls: expected a complete plan, found {reprStr outcome}")
 
-private def testDepthThreeContextualLocalRejected
+private def testDepthThreeContextualLocalPolymorphicCalls
     (program : CheckedProgram) : IO Unit := do
+  let identity ← signatureNamed program "identity"
   let nested ← signatureNamed program "depthThreeContextualLocal"
   let function ← functionFor program nested
-  match SourceSpecializationWorklist.run program
-      [monomorphicRequest nested] 8 with
-  | .error (.unsupportedOpenDeclaration occurrence variables) =>
-      let retainedOccurrence := function.typedBody.nodes.any fun
-        | .expression expression => expression.id == occurrence
-        | .statement _ => false
-      assertTrue (retainedOccurrence && !variables.isEmpty)
-        "depth-three rejection lost its source occurrence or open variables"
-  | result => throw (IO.userError
-      s!"depth-three local polymorphism was not rejected explicitly: {reprStr result}")
+  let call ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{
+          form := .call _ _ (.declaration instantiation), .. } =>
+          if instantiation.declaration == identity.id then some node else none
+      | _ => none with
+    | some call => pure call
+    | none => throw (IO.userError
+        "depth-three fixture lost its declaration call to identity")
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := nested.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.word]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.bool]
+  }
+  let expectedEdges : List SourceSpecializationWorklist.CallEdge := [
+    { caller := entryKey, occurrence := call.id, callee := wordKey },
+    { caller := entryKey, occurrence := call.id, callee := boolKey }
+  ]
+  match ← runOrThrow "depth-three contextual local calls" program
+      [monomorphicRequest nested] 3 with
+  | .complete plan =>
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey, boolKey] ∧
+          plan.callEdges = expectedEdges ∧
+          plan.callEdges.eraseDups.length = 2 ∧
+          plan.referenceEdges = []))
+        "depth-three recursion lost its Word/Bool identity instances"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"depth-three contextual plan failed replay validation: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"depth-three contextual calls: expected complete, found {reprStr outcome}")
 
-private def testMixedScopeDepthThreeContextualLocalRejected
+private def testScopeAwareRecursiveContextualLocalPolymorphicCalls
     (program : CheckedProgram) : IO Unit := do
+  let choose3 ← signatureNamed program "choose3"
+  let nested ← signatureNamed program "scopeAwareRecursiveContextualLocal"
+  let function ← functionFor program nested
+  let inner ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "inner" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError
+        "scope-aware fixture lost its `inner` binder")
+  let innerReference ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{ form := .reference _ (.local selected), .. } =>
+          if selected == inner.id then some node else none
+      | _ => none with
+    | some reference => pure reference
+    | none => throw (IO.userError
+        "scope-aware fixture lost its `inner` reference")
+  let (call, instantiation) ← match
+      function.typedBody.nodes.findSome? fun
+        | .expression node@{
+            form := .call _ _ (.declaration instantiation), .. } =>
+            if instantiation.declaration == choose3.id then
+              some (node, instantiation)
+            else
+              none
+        | _ => none with
+    | some selected => pure selected
+    | none => throw (IO.userError
+        "scope-aware fixture lost its declaration call to choose3")
+  let metadataVariables :=
+    (instantiation.parameterSubstitution.flatMap fun entry =>
+      entry.2.freeVariables).eraseDups
+  assertTrue (decide (
+      innerReference.rawType.freeVariables.length = 1 ∧
+      metadataVariables.length = 3))
+    "scope-aware fixture did not separate its reference type from helper metadata"
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := nested.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := choose3.id
+    arguments := [.word, .word, .word]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := choose3.id
+    arguments := [.bool, .bool, .bool]
+  }
+  let expectedEdges : List SourceSpecializationWorklist.CallEdge := [
+    { caller := entryKey, occurrence := call.id, callee := wordKey },
+    { caller := entryKey, occurrence := call.id, callee := boolKey }
+  ]
+  match ← runOrThrow "scope-aware recursive contextual calls" program
+      [monomorphicRequest nested] 3 with
+  | .complete plan =>
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey, boolKey] ∧
+          plan.callEdges = expectedEdges ∧
+          plan.callEdges.eraseDups.length = 2 ∧
+          plan.referenceEdges = []))
+        "scope-aware recursion lost its triple-ground helper instances"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"scope-aware contextual plan failed replay validation: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"scope-aware calls: expected a complete plan, found {reprStr outcome}")
+
+private def testMixedScopeDepthThreeContextualLocalPolymorphicCalls
+    (program : CheckedProgram) : IO Unit := do
+  let identity ← signatureNamed program "identity"
   let nested ← signatureNamed program "mixedScopeDepthThreeContextualLocal"
   let function ← functionFor program nested
   let inner ← match function.typedBody.nodes.findSome? fun
@@ -636,17 +861,54 @@ private def testMixedScopeDepthThreeContextualLocalRejected
     | none => throw (IO.userError
         "mixed-scope depth-three fixture lost its two-variable inner reference")
   let expectedVariables := openReference.rawType.freeVariables
-  match SourceSpecializationWorklist.run program
-      [monomorphicRequest nested] 8 with
-  | .error (.unsupportedOpenDeclaration occurrence variables) =>
-      assertTrue (decide (occurrence = openReference.id ∧
-          variables = expectedVariables ∧ variables.length = 2))
-        "mixed-scope rejection lost its exact occurrence or variables"
-  | result => throw (IO.userError
-      s!"mixed-scope depth-three polymorphism was not rejected: {reprStr result}")
+  assertTrue (expectedVariables.length == 2)
+    "mixed-scope inner reference did not retain outer and middle variables"
+  let call ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{
+          form := .call _ _ (.declaration instantiation), .. } =>
+          if instantiation.declaration == identity.id then some node else none
+      | _ => none with
+    | some call => pure call
+    | none => throw (IO.userError
+        "mixed-scope depth-three fixture lost its identity call")
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := nested.id
+    arguments := []
+  }
+  let wordProduct := Ty.product .word .word
+  let boolProduct := Ty.product .bool .bool
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [wordProduct]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [boolProduct]
+  }
+  let expectedEdges : List SourceSpecializationWorklist.CallEdge := [
+    { caller := entryKey, occurrence := call.id, callee := wordKey },
+    { caller := entryKey, occurrence := call.id, callee := boolKey }
+  ]
+  match ← runOrThrow "mixed-scope depth-three calls" program
+      [monomorphicRequest nested] 3 with
+  | .complete plan =>
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey, boolKey] ∧
+          plan.callEdges = expectedEdges ∧
+          plan.callEdges.eraseDups.length = 2 ∧
+          plan.referenceEdges = []))
+        "mixed-scope recursion lost its product identity instances"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"mixed-scope contextual plan failed replay validation: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"mixed-scope calls: expected a complete plan, found {reprStr outcome}")
 
-private def testReusedBinderMixedScopeContextualLocalRejected
+private def testReusedBinderMixedScopeContextualLocalPolymorphicCalls
     (program : CheckedProgram) : IO Unit := do
+  let identity ← signatureNamed program "identity"
   let nested ← signatureNamed program "reusedBinderMixedScopeContextualLocal"
   let function ← functionFor program nested
   let adapter ← match function.typedBody.nodes.findSome? fun
@@ -672,15 +934,118 @@ private def testReusedBinderMixedScopeContextualLocalRejected
         "reused-binder fixture lost its mixed-scope adapter reference")
   assertTrue (directReference.id != mixedReference.id)
     "reused-binder fixture collapsed its distinct adapter occurrences"
-  let expectedVariables := mixedReference.rawType.freeVariables
-  match SourceSpecializationWorklist.run program
-      [monomorphicRequest nested] 8 with
-  | .error (.unsupportedOpenDeclaration occurrence variables) =>
-      assertTrue (decide (occurrence = mixedReference.id ∧
-          variables = expectedVariables ∧ variables.length = 2))
-        "reused-binder mixed rejection lost its exact occurrence or variables"
-  | result => throw (IO.userError
-      s!"a reused binder hid its mixed-scope occurrence: {reprStr result}")
+  assertTrue (mixedReference.rawType.freeVariables.length == 2)
+    "reused-binder mixed occurrence lost an enclosing variable"
+  let call ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{
+          form := .call _ _ (.declaration instantiation), .. } =>
+          if instantiation.declaration == identity.id then some node else none
+      | _ => none with
+    | some call => pure call
+    | none => throw (IO.userError
+        "reused-binder fixture lost its identity call")
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := nested.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.word]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.bool]
+  }
+  let wordProductKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.product .word .word]
+  }
+  let boolProductKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.product .bool .bool]
+  }
+  let expectedEdges : List SourceSpecializationWorklist.CallEdge := [
+    { caller := entryKey, occurrence := call.id, callee := wordKey },
+    { caller := entryKey, occurrence := call.id, callee := boolKey },
+    { caller := entryKey, occurrence := call.id, callee := wordProductKey },
+    { caller := entryKey, occurrence := call.id, callee := boolProductKey }
+  ]
+  match ← runOrThrow "reused-binder mixed-scope calls" program
+      [monomorphicRequest nested] 5 with
+  | .complete plan =>
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) =
+            [entryKey, wordKey, boolKey, wordProductKey, boolProductKey] ∧
+          plan.callEdges = expectedEdges ∧
+          plan.callEdges.eraseDups.length = 4 ∧
+          plan.referenceEdges = []))
+        "reused binder lost a direct or mixed product identity instance"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"reused-binder contextual plan failed replay validation: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"reused-binder calls: expected a complete plan, found {reprStr outcome}")
+
+private def testMonomorphicLambdaWrapperContextualLocal
+    (program : CheckedProgram) : IO Unit := do
+  let identity ← signatureNamed program "identity"
+  let wrapper ← signatureNamed program "monomorphicLambdaWrapper"
+  let function ← functionFor program wrapper
+  let outer ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "outer" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError
+        "monomorphic-wrapper fixture lost its `outer` binder")
+  let inner ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "f" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError
+        "monomorphic-wrapper fixture lost its `f` binder")
+  assertTrue (outer.scheme.quantified.isEmpty &&
+      inner.scheme.quantified.length == 1)
+    "monomorphic-wrapper fixture did not retain its intended schemes"
+  let call ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{
+          form := .call _ _ (.declaration instantiation), .. } =>
+          if instantiation.declaration == identity.id then some node else none
+      | _ => none with
+    | some call => pure call
+    | none => throw (IO.userError
+        "monomorphic-wrapper fixture lost its identity call")
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := wrapper.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.word]
+  }
+  let expectedEdge : SourceSpecializationWorklist.CallEdge := {
+    caller := entryKey
+    occurrence := call.id
+    callee := wordKey
+  }
+  match ← runOrThrow "monomorphic lambda wrapper" program
+      [monomorphicRequest wrapper] 2 with
+  | .complete plan =>
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey] ∧
+          plan.callEdges = [expectedEdge] ∧
+          plan.referenceEdges = []))
+        "ground local use under a monomorphic lambda wrapper was not discovered"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"monomorphic-wrapper plan failed replay validation: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"monomorphic wrapper: expected a complete plan, found {reprStr outcome}")
 
 private def testUnusedNestedContextualLocal
     (program : CheckedProgram) : IO Unit := do
@@ -1119,10 +1484,13 @@ def testSourceSpecializationWorklist : IO Unit := do
   testBreadthFirstDiscovery program
   testContextualLocalPolymorphicCalls program
   testDepthTwoContextualLocalPolymorphicCalls program
+  testGroundInnerUnderPolymorphicOuter program
   testSiblingContextualLocalPolymorphicCalls program
-  testDepthThreeContextualLocalRejected program
-  testMixedScopeDepthThreeContextualLocalRejected program
-  testReusedBinderMixedScopeContextualLocalRejected program
+  testDepthThreeContextualLocalPolymorphicCalls program
+  testScopeAwareRecursiveContextualLocalPolymorphicCalls program
+  testMixedScopeDepthThreeContextualLocalPolymorphicCalls program
+  testReusedBinderMixedScopeContextualLocalPolymorphicCalls program
+  testMonomorphicLambdaWrapperContextualLocal program
   testUnusedNestedContextualLocal program
   testDerivedCanonicalization program
   testTypedNodeOrder program

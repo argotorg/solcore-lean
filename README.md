@@ -51,8 +51,8 @@ Leaf files, `*Properties` modules, parser grammar/trace units, and
 ## Priority implementation
 
 - Broaden whole-program execution to cover advanced generic/type cases,
-  coherent unrestricted trait resolution, more deeply nested and constrained
-  let-polymorphic runtime values, general evidence/coercion dispatch, members,
+  coherent unrestricted trait resolution, constrained let-polymorphic runtime
+  values, general evidence/coercion dispatch, members,
   mappings, proxies, mutation, and higher-order or effectful staging.
 - Complete public compiler orchestration: automatic entry and ABI-root
   discovery, multi-root and mixed-backend compilation, backend override, and
