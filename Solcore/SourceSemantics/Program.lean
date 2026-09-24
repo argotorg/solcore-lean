@@ -208,6 +208,37 @@ theorem toRuntime
 
 end ScopedRequirementLedgerWellFormed
 
+namespace RuntimeRequirementLedgerValid
+
+/-- Entering a generalized local initializer preserves the runtime ledger.
+The ledger rows and their stable identities are unchanged, while retained
+implementation evidence remains valid after the initializer's qualified
+predicates are appended to the available assumptions. -/
+theorem localSchemeInitializer
+    {context : Context} {binder : TypedBinder}
+    (valid : RuntimeRequirementLedgerValid context) :
+    RuntimeRequirementLedgerValid
+      (localSchemeInitializerContext context binder) := by
+  refine {
+    idsUnique := ?_
+    implementationEntries := ?_
+  }
+  · simpa [RequirementIdsUnique, localSchemeInitializerContext,
+      Context.withTypeVariables, Context.withAssumptions] using valid.idsUnique
+  · intro row evidence member implementationEq
+    have sourceMember : row ∈ context.solvedRequirements := by
+      simpa [localSchemeInitializerContext, Context.withTypeVariables,
+        Context.withAssumptions] using member
+    cases valid.implementationEntries row evidence sourceMember
+        implementationEq with
+    | intro evidenceValid =>
+        exact .intro (evidenceValid.weakenAssumptions (by
+          intro predicate predicateMember
+          change predicate ∈ context.assumptions ++ _
+          exact List.mem_append_left _ predicateMember))
+
+end RuntimeRequirementLedgerValid
+
 /-- Pointwise closed type well-formedness. -/
 def TypesWellFormed (context : Context) (types : List TypeSystem.Ty) : Prop :=
   ∀ type, type ∈ types → TypeWellFormed context type
