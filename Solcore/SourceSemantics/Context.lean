@@ -37,6 +37,12 @@ structure Context where
   residualTypeVariables : Bool := false
   /-- Lexical bindings, keyed by stable resolved local identities. -/
   locals : Resolved.LocalScope TypeSystem.Scheme
+  /-- Qualified predicates abstracted by each lexical scheme, in source
+  order.  This scope is extended in lockstep with `locals`; keeping the
+  metadata proof-facing avoids changing the executable local-reference
+  carrier, which retains only the stable binder identity. -/
+  localSchemeRequirements :
+    Resolved.LocalScope (List Frontend.SourceInference.LocalSchemeRequirement) := []
   /-- Trait obligations supplied by the surrounding declaration. -/
   assumptions : List Frontend.ProgramPredicate
   /-- Globally solved, stable-ID obligations retained by this typed source. -/
@@ -53,14 +59,20 @@ def ofSignatures (signatures : Frontend.ProgramSignatures) : Context := {
   typeVariables := []
   residualTypeVariables := false
   locals := []
+  localSchemeRequirements := []
   assumptions := []
   solvedRequirements := []
 }
 
 /-- Extend the lexical scope without changing whole-program assumptions. -/
 def withLocal (context : Context) (id : Resolved.LocalId)
-    (scheme : TypeSystem.Scheme) : Context :=
-  { context with locals := (id, scheme) :: context.locals }
+    (scheme : TypeSystem.Scheme)
+    (requirements : List Frontend.SourceInference.LocalSchemeRequirement := []) :
+    Context :=
+  { context with
+    locals := (id, scheme) :: context.locals
+    localSchemeRequirements :=
+      (id, requirements) :: context.localSchemeRequirements }
 
 /-- Enter the flexible-variable scope of a generalized initializer.  The
 new variables are appended so a nested generalized binding retains the
@@ -114,14 +126,29 @@ abbrev LocalLookup (context : Context) (id : Resolved.LocalId)
     (scheme : TypeSystem.Scheme) : Prop :=
   Resolved.LocalScope.Lookup context.locals id scheme
 
+/-- Declarative lookup of the ordered predicates abstracted by one lexical
+scheme.  `withLocal` maintains this scope in lockstep with `locals`. -/
+abbrev LocalSchemeRequirementsLookup (context : Context)
+    (id : Resolved.LocalId)
+    (requirements : List Frontend.SourceInference.LocalSchemeRequirement) : Prop :=
+  Resolved.LocalScope.Lookup context.localSchemeRequirements id requirements
+
 /-- A predicate is available as an explicit hypothesis of the context. -/
 def HasAssumption (context : Context)
     (predicate : Frontend.ProgramPredicate) : Prop :=
   predicate ∈ context.assumptions
 
 theorem localLookup_withLocal_self (context : Context)
-    (id : Resolved.LocalId) (scheme : TypeSystem.Scheme) :
-    (context.withLocal id scheme).LocalLookup id scheme := by
+    (id : Resolved.LocalId) (scheme : TypeSystem.Scheme)
+    (requirements : List Frontend.SourceInference.LocalSchemeRequirement := []) :
+    (context.withLocal id scheme requirements).LocalLookup id scheme := by
+  exact .head
+
+theorem localSchemeRequirementsLookup_withLocal_self (context : Context)
+    (id : Resolved.LocalId) (scheme : TypeSystem.Scheme)
+    (requirements : List Frontend.SourceInference.LocalSchemeRequirement := []) :
+    (context.withLocal id scheme requirements).LocalSchemeRequirementsLookup id
+      requirements := by
   exact .head
 
 theorem hasAssumption_withAssumption_self (context : Context)

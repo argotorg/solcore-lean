@@ -21,6 +21,15 @@ def localSchemeTemplateIds (binder : TypedBinder) : List RequirementId :=
   binder.schemeRequirements.map fun requirement =>
     requirement.templateRequirement
 
+/-- Instantiate every predicate abstracted by one local scheme with the same
+flexible substitution, preserving source order.  Actual requirement IDs are
+checked against this list positionally at each reference occurrence. -/
+def instantiateLocalSchemePredicates (substitution : TypeSystem.Substitution)
+    (binder : TypedBinder) : List Frontend.ProgramPredicate :=
+  binder.schemeRequirements.map fun requirement =>
+    Frontend.TypedTraitResolution.applySubstitution substitution
+      requirement.predicate
+
 /-- Static context of a generalized initializer.  Its quantified variables
 are lexical inference variables, while its qualified predicates are available
 only as hypotheses of the initializer being abstracted. -/
@@ -103,7 +112,7 @@ inductive BinderExtends (owner : Resolved.DeclarationId) :
       (wellFormed : BinderWellFormed context owner binder)
       (fresh : LocalFresh context binder.id) :
       BinderExtends owner context binder
-        (context.withLocal binder.id binder.scheme)
+        (context.withLocal binder.id binder.scheme binder.schemeRequirements)
 
 /-- Source-ordered extension by a list of binders. -/
 inductive BindersExtend (owner : Resolved.DeclarationId) :
@@ -137,6 +146,14 @@ theorem local_self
     {binder : TypedBinder}
     (extension : BinderExtends owner context binder final) :
     final.LocalLookup binder.id binder.scheme := by
+  cases extension
+  exact .head
+
+theorem local_scheme_requirements_self
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binder : TypedBinder}
+    (extension : BinderExtends owner context binder final) :
+    final.LocalSchemeRequirementsLookup binder.id binder.schemeRequirements := by
   cases extension
   exact .head
 

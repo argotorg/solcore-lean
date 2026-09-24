@@ -408,29 +408,29 @@ mutual
             exact ⟨constructs.hasType, before_typed, .refl before⟩
     | evaluated@(.local layout lookup read initialized) => by
         cases typing with
-        | reference reference_type reference_requirements =>
+        | reference reference_use =>
             exact evaluated.referencePreserves environment_agrees before_typed
-              (.reference reference_type reference_requirements)
+              (.reference reference_use)
     | evaluated@(.localEmptyMapping layout lookup read type_eq empty write) => by
         cases typing with
-        | reference reference_type reference_requirements =>
+        | reference reference_use =>
             exact evaluated.referencePreserves environment_agrees before_typed
-              (.reference reference_type reference_requirements)
+              (.reference reference_use)
     | evaluated@(.declaration layout dynamic_valid requirements_close) => by
         cases typing with
-        | reference reference_type reference_requirements =>
+        | reference reference_use =>
             exact evaluated.referencePreserves environment_agrees before_typed
-              (.reference reference_type reference_requirements)
+              (.reference reference_use)
     | evaluated@(.builtinFunction layout) => by
         cases typing with
-        | reference reference_type reference_requirements =>
+        | reference reference_use =>
             exact evaluated.referencePreserves environment_agrees before_typed
-              (.reference reference_type reference_requirements)
+              (.reference reference_use)
     | evaluated@(.builtinBoolean layout) => by
         cases typing with
-        | reference reference_type reference_requirements =>
+        | reference reference_use =>
             exact evaluated.referencePreserves environment_agrees before_typed
-              (.reference reference_type reference_requirements)
+              (.reference reference_use)
     | .group layout inner_evaluates => by
         cases typing with
         | group inner_type =>

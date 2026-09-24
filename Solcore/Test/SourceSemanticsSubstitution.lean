@@ -49,6 +49,20 @@ example (substitution : ParameterSubstitution)
     ContextSubstitutionValid substitution context :=
   ContextSubstitutionValid.ofRequirementLedger exact range ledger
 
+/-- One rigid declaration instantiation preserves the shared local-scheme
+type/predicate witness and its ordered actual requirement identities. -/
+example (substitution : ParameterSubstitution)
+    (context : SourceSemantics.Context)
+    (resolution : ReferenceResolution) (type : Ty)
+    (requirements : List RequirementId)
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid substitution context)
+    (valid : ReferenceUseValid context resolution type requirements) :
+    ReferenceUseValid (applyContext substitution context)
+      (applyReferenceResolution substitution resolution)
+      (substitution.apply type) requirements :=
+  ReferenceUseValid.applyParameters catalog contextValid valid
+
 /-- Rigid substitution cannot change the occurrence graph of a generic body. -/
 example (substitution : ParameterSubstitution) (source : TypedSource)
     (closed : OccurrenceGraphClosed source) :

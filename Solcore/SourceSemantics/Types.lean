@@ -233,8 +233,10 @@ namespace TypeParameterBindersWellFormed
 declaration binders. -/
 theorem withLocal
     {context : Context} (wellFormed : TypeParameterBindersWellFormed context)
-    (id : Resolved.LocalId) (scheme : TypeSystem.Scheme) :
-    TypeParameterBindersWellFormed (context.withLocal id scheme) := by
+    (id : Resolved.LocalId) (scheme : TypeSystem.Scheme)
+    (requirements : List Frontend.SourceInference.LocalSchemeRequirement := []) :
+    TypeParameterBindersWellFormed
+      (context.withLocal id scheme requirements) := by
   simpa [Context.withLocal, TypeParameterBindersWellFormed] using wellFormed
 
 /-- Installing flexible initializer variables does not affect rigid

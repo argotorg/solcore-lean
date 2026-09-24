@@ -2079,7 +2079,8 @@ theorem referencePreserves
     ValueHasType context after value rawType /\
       HeapWellTyped context after /\ HeapTypesExtend before after := by
   cases typing with
-  | reference reference_type requirements_valid =>
+  | reference reference_use =>
+      have reference_type := reference_use.raw_type
       cases reference_type with
       | «local» static_lookup instantiates =>
           have monomorphic :=
@@ -2229,9 +2230,9 @@ theorem preservesWith
       exact evaluation.literalPreserves before_typed
   | integerLiteral valid =>
       exact evaluation.integerLiteralPreserves before_typed
-  | reference reference_type reference_requirements =>
+  | reference reference_use =>
       exact evaluation.referencePreserves environment_agrees before_typed
-        (.reference reference_type reference_requirements)
+        (.reference reference_use)
   | group inner_type =>
       cases evaluation with
       | group layout inner_evaluates =>

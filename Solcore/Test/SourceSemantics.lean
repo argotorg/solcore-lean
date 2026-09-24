@@ -808,6 +808,211 @@ theorem builtinIntWordRetainedEvidenceValid :
   · exact emptyPremiseImplementationValid _ _
       builtinIntWordHeadInstantiates
 
+private def qualifiedLocalActualId :
+    Frontend.SourceInference.RequirementId :=
+  ⟨101⟩
+
+private def qualifiedLocalActualWord :
+    Frontend.SourceInference.SolvedRequirement := {
+  id := qualifiedLocalActualId
+  predicate := ProgramSignatures.builtinIntPredicate .word
+  evidence := .implementation (.byImpl
+    (ProgramSignatures.builtinIntPredicate .word)
+    ProgramSignatures.builtinIntWordRule.id [])
+}
+
+private def qualifiedLocalUseContext
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) : Solcore.SourceSemantics.Context :=
+  ((Context.ofSignatures signatures).withSolvedRequirements
+      [qualifiedLocalTemplate fresh, qualifiedLocalActualWord]).withLocal
+    (qualifiedLocalBinder owner fresh).id
+    (qualifiedLocalBinder owner fresh).scheme
+    (qualifiedLocalBinder owner fresh).schemeRequirements
+
+private theorem qualifiedLocalUseFormation
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    LocalSchemeRequirementsWellFormed
+      (qualifiedLocalUseContext signatures owner fresh)
+      (qualifiedLocalBinder owner fresh) := by
+  constructor
+  · simp [localSchemeTemplateIds, qualifiedLocalBinder,
+      qualifiedLocalRequirement]
+  · intro requirement member
+    simp [qualifiedLocalBinder] at member
+    subst requirement
+    constructor
+    · constructor
+      · constructor
+        · constructor
+          · simp [qualifiedLocalUseContext, localSchemeInitializerContext,
+              qualifiedLocalBinder, Context.ofSignatures,
+              Context.withSolvedRequirements, Context.withLocal,
+              Context.withTypeVariables, Context.withAssumptions]
+          · intro parameter parameterMember
+            simp [qualifiedLocalUseContext, localSchemeInitializerContext,
+              qualifiedLocalBinder, Context.ofSignatures,
+              Context.withSolvedRequirements, Context.withLocal,
+              Context.withTypeVariables, Context.withAssumptions] at parameterMember
+        · apply TypeWellScoped.variable
+          simp [admissibleTypeVariables, qualifiedLocalUseContext,
+            localSchemeInitializerContext, qualifiedLocalBinder,
+            Context.ofSignatures, Context.withSolvedRequirements,
+            Context.withLocal, Context.withTypeVariables,
+            Context.withAssumptions]
+      · intro argument argumentMember
+        simp [qualifiedLocalRequirement, qualifiedLocalPredicate,
+          ProgramSignatures.builtinIntPredicate] at argumentMember
+      · rfl
+    · refine ⟨fresh, by simp [qualifiedLocalBinder], ?_⟩
+      simp [qualifiedLocalRequirement, qualifiedLocalPredicate,
+        ProgramSignatures.builtinIntPredicate,
+        Frontend.TypedTraitResolution.predicateVariables,
+        TypeSystem.Ty.freeVariables]
+    · refine ⟨qualifiedLocalTemplate fresh, ?_, rfl, rfl, rfl⟩
+      change
+        [qualifiedLocalTemplate fresh, qualifiedLocalActualWord].filter
+            (fun candidate => candidate.id ==
+              (qualifiedLocalTemplate fresh).id) =
+          [qualifiedLocalTemplate fresh]
+      rfl
+
+private theorem qualifiedLocalUseSchemeWellFormed
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    SchemeWellFormed (qualifiedLocalUseContext signatures owner fresh)
+      (qualifiedLocalBinder owner fresh).scheme := by
+  constructor
+  · simp [TypeParameterBindersWellFormed, qualifiedLocalUseContext,
+      Context.ofSignatures, Context.withSolvedRequirements, Context.withLocal]
+  · simp [qualifiedLocalBinder]
+  · apply TypeWellScoped.function
+    · apply TypeWellScoped.variable
+      simp [qualifiedLocalBinder, admissibleTypeVariables,
+        qualifiedLocalUseContext, Context.ofSignatures,
+        Context.withSolvedRequirements, Context.withLocal]
+    · apply TypeWellScoped.variable
+      simp [qualifiedLocalBinder, admissibleTypeVariables,
+        qualifiedLocalUseContext, Context.ofSignatures,
+        Context.withSolvedRequirements, Context.withLocal]
+
+private theorem qualifiedLocalActualWordProves
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    RequirementProves (qualifiedLocalUseContext signatures owner fresh)
+      qualifiedLocalActualId
+      (ProgramSignatures.builtinIntPredicate .word) := by
+  refine ⟨qualifiedLocalActualWord, ?_⟩
+  constructor
+  · constructor
+    · simp [qualifiedLocalUseContext, Context.withLocal,
+        Context.withSolvedRequirements]
+    · rfl
+  · constructor
+    · rfl
+    · apply SolvedRequirementValid.intro
+      apply RetainedEvidenceValid.intro
+      · exact .implementation (.byImpl .nil)
+      · exact .implementation
+          (by simp [ProgramSignatures.resolutionRules,
+            ProgramSignatures.builtinResolutionRules])
+          rfl builtinIntWordHeadInstantiates .nil
+
+/-- A qualified local reference uses one substitution for both `α → α` and
+its ordered `Int<α>` predicate, producing `Word → Word` and `Int<Word>` at the
+same occurrence. -/
+theorem qualifiedLocalReferenceUseValid
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    ReferenceUseValid (qualifiedLocalUseContext signatures owner fresh)
+      (.local (qualifiedLocalBinder owner fresh).id)
+      (.function .word .word) [qualifiedLocalActualId] := by
+  apply ReferenceUseValid.local
+  · exact .head
+  · exact .head
+  · refine .intro
+      (qualifiedLocalUseFormation signatures owner fresh)
+      (qualifiedLocalUseSchemeWellFormed signatures owner fresh)
+      [(fresh, .word)] (ExactSubstitution.singleton fresh .word) ?_ ?_ ?_ ?_ ?_
+    · intro metavariable replacement member
+      simp only [List.mem_cons, List.mem_nil_iff, or_false,
+        Prod.mk.injEq] at member
+      rcases member with ⟨rfl, rfl⟩
+      exact {
+        binders := by
+          simp [TypeParameterBindersWellFormed, qualifiedLocalUseContext,
+            Context.ofSignatures, Context.withSolvedRequirements,
+            Context.withLocal]
+        typeWellScoped := .builtin .word
+      }
+    · simp [qualifiedLocalBinder, TypeSystem.Substitution.apply,
+        TypeSystem.Substitution.lookup?]
+    · simp [qualifiedLocalActualId]
+    · intro id actualMember templateMember
+      have actualEq : id = qualifiedLocalActualId := by
+        simpa using actualMember
+      have templateEq : id = qualifiedLocalTemplateId := by
+        simpa [localSchemeTemplateIds, qualifiedLocalBinder,
+          qualifiedLocalRequirement] using templateMember
+      exact (show qualifiedLocalActualId ≠ qualifiedLocalTemplateId by decide)
+        (actualEq.symm.trans templateEq)
+    · exact .cons (by
+        simpa [instantiateLocalSchemePredicates, qualifiedLocalBinder,
+          qualifiedLocalRequirement, qualifiedLocalPredicate,
+          ProgramSignatures.builtinIntPredicate,
+          Frontend.TypedTraitResolution.applySubstitution,
+          TypeSystem.Substitution.apply, TypeSystem.Substitution.lookup?] using
+          (qualifiedLocalActualWordProves signatures owner fresh)) .nil
+
+/-- Repeating one actual requirement identity cannot fabricate a two-item
+qualified evidence spine. -/
+theorem duplicateLocalActualRequirementsRejected
+    (context : Solcore.SourceSemantics.Context)
+    (binder : Frontend.SourceInference.TypedBinder)
+    (type : Ty) (requirement : Frontend.SourceInference.RequirementId) :
+    ¬ LocalSchemeInstantiationValid context binder type
+      [requirement, requirement] := by
+  intro valid
+  simpa using valid.actual_requirements_nodup
+
+/-- An initializer-only template identity cannot be recycled as evidence for
+the corresponding local use. -/
+theorem localTemplateCannotBeActualRequirement
+    (context : Solcore.SourceSemantics.Context)
+    (binder : Frontend.SourceInference.TypedBinder)
+    (type : Ty) (template : Frontend.SourceInference.RequirementId)
+    (templateMember : template ∈ localSchemeTemplateIds binder) :
+    ¬ LocalSchemeInstantiationValid context binder type [template] := by
+  intro valid
+  exact valid.actual_templates_disjoint template (by simp) templateMember
+
+/-- With a unique ledger, reversing two distinct actual evidence IDs cannot
+validate an ordered two-predicate local-scheme instance. -/
+theorem reversedLocalActualRequirementsRejected
+    (context : Solcore.SourceSemantics.Context)
+    (binder : Frontend.SourceInference.TypedBinder) (type : Ty)
+    (firstId secondId : Frontend.SourceInference.RequirementId)
+    (firstPredicate secondPredicate : ProgramPredicate)
+    (ledger : RequirementLedgerWellFormed context)
+    (different : firstPredicate ≠ secondPredicate)
+    (ordered : ∀ substitution,
+      ExactSubstitution substitution binder.scheme.quantified →
+        instantiateLocalSchemePredicates substitution binder =
+          [firstPredicate, secondPredicate])
+    (_firstProves : RequirementProves context firstId firstPredicate)
+    (secondProves : RequirementProves context secondId secondPredicate) :
+    ¬ LocalSchemeInstantiationValid context binder type [secondId, firstId] := by
+  intro valid
+  rcases valid.has_shared_substitution with
+    ⟨substitution, exact, _, _, proves⟩
+  rw [ordered substitution exact] at proves
+  have reversedHead : RequirementProves context secondId firstPredicate :=
+    proves.head
+  have predicatesEq :=
+    ledger.proves_predicate_eq secondProves reversedHead
+  exact different predicatesEq.symm
+
 /-- A contextual assumption can discharge a nested where premise, rather than
 being restricted to the root of the evidence tree. -/
 theorem assumedPremiseImplementationValid

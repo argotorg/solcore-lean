@@ -22,23 +22,144 @@ namespace Solcore.SourceSemantics
 open Frontend
 open Frontend.SourceInference
 
-/-- Requirements introduced by an ordinary declaration reference.  Other
-reference kinds introduce none at the reference occurrence. -/
-inductive ReferenceRequirementsValid (context : Context) :
-    ReferenceResolution → List RequirementId → Prop where
-  | local (binder : Resolved.LocalId) :
-      ReferenceRequirementsValid context (.local binder) []
+/-- One lexical scheme is instantiated by a single substitution shared by its
+result type and every qualified predicate.  Actual requirement identities are
+source-ordered, pairwise distinct, and cannot reuse the initializer's
+assumption-template identities. -/
+inductive LocalSchemeInstantiationValid (context : Context)
+    (binder : TypedBinder) (type : TypeSystem.Ty)
+    (actualRequirements : List RequirementId) : Prop where
+  | intro
+      (formation : LocalSchemeRequirementsWellFormed context binder)
+      (scheme_well_formed : SchemeWellFormed context binder.scheme)
+      (substitution : TypeSystem.Substitution)
+      (exact : ExactSubstitution substitution binder.scheme.quantified)
+      (range : SubstitutionRangeAdmissible context substitution)
+      (result : substitution.apply binder.scheme.body = type)
+      (actual_requirements_unique : actualRequirements.Nodup)
+      (actual_templates_disjoint :
+        ∀ id, id ∈ actualRequirements → id ∉ localSchemeTemplateIds binder)
+      (requirements : RequirementSequenceProves context actualRequirements
+        (instantiateLocalSchemePredicates substitution binder)) :
+      LocalSchemeInstantiationValid context binder type actualRequirements
+
+namespace LocalSchemeInstantiationValid
+
+theorem actual_requirements_nodup
+    {context : Context} {binder : TypedBinder} {type : TypeSystem.Ty}
+    {actualRequirements : List RequirementId}
+    (valid : LocalSchemeInstantiationValid context binder type
+      actualRequirements) :
+    actualRequirements.Nodup := by
+  cases valid with
+  | intro _ _ _ _ _ _ unique _ _ => exact unique
+
+theorem actual_templates_disjoint
+    {context : Context} {binder : TypedBinder} {type : TypeSystem.Ty}
+    {actualRequirements : List RequirementId}
+    (valid : LocalSchemeInstantiationValid context binder type
+      actualRequirements) :
+    ∀ id, id ∈ actualRequirements → id ∉ localSchemeTemplateIds binder := by
+  cases valid with
+  | intro _ _ _ _ _ _ _ disjoint _ => exact disjoint
+
+theorem actual_requirements_valid
+    {context : Context} {binder : TypedBinder} {type : TypeSystem.Ty}
+    {actualRequirements : List RequirementId}
+    (valid : LocalSchemeInstantiationValid context binder type
+      actualRequirements) :
+    RequirementIdsValid context actualRequirements := by
+  cases valid with
+  | intro _ _ _ _ _ _ _ _ requirements =>
+      exact requirements.ids_valid
+
+/-- Expose the one witness which simultaneously determines the result type
+and the complete ordered predicate spine. -/
+theorem has_shared_substitution
+    {context : Context} {binder : TypedBinder} {type : TypeSystem.Ty}
+    {actualRequirements : List RequirementId}
+    (valid : LocalSchemeInstantiationValid context binder type
+      actualRequirements) :
+    ∃ substitution,
+      ExactSubstitution substitution binder.scheme.quantified ∧
+      SubstitutionRangeAdmissible context substitution ∧
+      substitution.apply binder.scheme.body = type ∧
+      RequirementSequenceProves context actualRequirements
+        (instantiateLocalSchemePredicates substitution binder) := by
+  cases valid with
+  | intro _ _ substitution exact range result _ _ requirements =>
+      exact ⟨substitution, exact, range, result, requirements⟩
+
+theorem requirements_length_eq
+    {context : Context} {binder : TypedBinder} {type : TypeSystem.Ty}
+    {actualRequirements : List RequirementId}
+    (valid : LocalSchemeInstantiationValid context binder type
+      actualRequirements) :
+    actualRequirements.length = binder.schemeRequirements.length := by
+  cases valid with
+  | intro _ _ _ _ _ _ _ _ requirements =>
+      rw [requirements.length_eq]
+      simp [instantiateLocalSchemePredicates]
+
+/-- The shared witness in a local use is in particular a valid scheme
+instantiation at its use-site type. -/
+theorem toSchemeInstantiatesAt
+    {context : Context} {binder : TypedBinder} {type : TypeSystem.Ty}
+    {actualRequirements : List RequirementId}
+    (valid : LocalSchemeInstantiationValid context binder type
+      actualRequirements) :
+    SchemeInstantiatesAt context binder.scheme type := by
+  cases valid with
+  | intro _ schemeWellFormed substitution exact range result _ _ _ =>
+      exact .intro schemeWellFormed substitution exact range result
+
+end LocalSchemeInstantiationValid
+
+/-- Complete static validity of one resolved reference occurrence.  For a
+local reference this judgment deliberately owns both raw-type instantiation
+and ordered evidence validation, preventing two independent substitutions
+from justifying the type and its qualified predicates. -/
+inductive ReferenceUseValid (context : Context) :
+    ReferenceResolution → TypeSystem.Ty → List RequirementId → Prop where
+  | local
+      {binder : TypedBinder} {type : TypeSystem.Ty}
+      {actualRequirements : List RequirementId}
+      (scheme_lookup : context.LocalLookup binder.id binder.scheme)
+      (requirements_lookup : context.LocalSchemeRequirementsLookup binder.id
+        binder.schemeRequirements)
+      (instantiation : LocalSchemeInstantiationValid context binder type
+        actualRequirements) :
+      ReferenceUseValid context (.local binder.id) type actualRequirements
   | declaration
       {instantiation : DeclarationInstantiation}
       {requirements : List RequirementId}
+      (valid : SourceSemantics.DeclarationInstantiation.Admissible context
+        instantiation)
       (proves : RequirementSequenceProves context requirements
         instantiation.predicates) :
-      ReferenceRequirementsValid context (.declaration instantiation)
-        requirements
+      ReferenceUseValid context (.declaration instantiation)
+        instantiation.type requirements
   | builtinFunction (function : BuiltinFunctionId) :
-      ReferenceRequirementsValid context (.builtinFunction function) []
+      ReferenceUseValid context (.builtinFunction function) function.type []
   | builtinBoolean (value : Bool) :
-      ReferenceRequirementsValid context (.builtinBoolean value) []
+      ReferenceUseValid context (.builtinBoolean value) .bool []
+
+namespace ReferenceUseValid
+
+/-- Forget requirement ownership while retaining the raw reference type. -/
+theorem raw_type
+    {context : Context} {resolution : ReferenceResolution}
+    {type : TypeSystem.Ty} {requirements : List RequirementId}
+    (valid : ReferenceUseValid context resolution type requirements) :
+    ReferenceHasRawType context resolution type := by
+  cases valid with
+  | «local» schemeLookup _ instantiation =>
+      exact .local schemeLookup instantiation.toSchemeInstantiatesAt
+  | declaration instantiationValid _ => exact .declaration instantiationValid
+  | builtinFunction function => exact .builtinFunction function
+  | builtinBoolean value => exact .builtinBoolean value
+
+end ReferenceUseValid
 
 /-- Shape-specific evidence layout before it is checked against an expression
 node's retained requirement and coercion lists. -/
@@ -169,9 +290,7 @@ mutual
         {context : Context} {name : String}
         {resolution : ReferenceResolution} {type : TypeSystem.Ty}
         {requirements : List RequirementId}
-        (reference_type : ReferenceHasRawType context resolution type)
-        (requirements_valid :
-          ReferenceRequirementsValid context resolution requirements) :
+        (valid : ReferenceUseValid context resolution type requirements) :
         ExpressionFormHasRawType source context (.reference name resolution) type
           (.ordinary requirements)
     | group

@@ -53,6 +53,15 @@ def applyLocals (substitution : ParameterSubstitution)
     (locals : Resolved.LocalScope Scheme) : Resolved.LocalScope Scheme :=
   locals.map fun entry => (entry.1, applyScheme substitution entry.2)
 
+/-- Substitute every predicate retained by the proof-facing qualified-local
+scope while preserving stable binder and template identities. -/
+def applyLocalSchemeRequirements (substitution : ParameterSubstitution)
+    (requirements :
+      Resolved.LocalScope (List LocalSchemeRequirement)) :
+    Resolved.LocalScope (List LocalSchemeRequirement) :=
+  requirements.map fun entry =>
+    (entry.1, entry.2.map (LocalSchemeRequirement.applyParameters substitution))
+
 /-- The rigidly instantiated use-site context corresponding to a generic
 declaration context.  Lexical and residual flexible-variable policy is
 preserved unchanged. -/
@@ -64,6 +73,8 @@ def applyContext (substitution : ParameterSubstitution)
   typeVariables := context.typeVariables
   residualTypeVariables := context.residualTypeVariables
   locals := applyLocals substitution context.locals
+  localSchemeRequirements :=
+    applyLocalSchemeRequirements substitution context.localSchemeRequirements
   assumptions := context.assumptions.map
     (ProgramPredicate.applyParameters substitution)
   solvedRequirements := context.solvedRequirements.map
@@ -1745,6 +1756,39 @@ theorem PredicateAdmissible.applyParameters
         exact ⟨signature, by simpa [applyContext] using member, idEq,
           by simpa [ProgramPredicate.applyParameters] using arity⟩
 
+/-- Rigid declaration instantiation commutes with one shared flexible
+local-scheme instantiation when the predicate is meaningful in the source
+context. -/
+theorem PredicateAdmissible.applyMixed_compose
+    {context : Context} {predicate : ProgramPredicate}
+    {substitutedVariables : List TypeVarId}
+    (outer : ParameterSubstitution) (inner : TypeSystem.Substitution)
+    (outerExact : SourceSemantics.ParameterSubstitution.Exact outer
+      context.typeParameters)
+    (outerRange : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext outer context) outer)
+    (innerExact : ExactSubstitution inner substitutedVariables)
+    (admissible : PredicateAdmissible context predicate) :
+    ProgramPredicate.applyParameters outer
+        (Frontend.TypedTraitResolution.applySubstitution inner predicate) =
+      Frontend.TypedTraitResolution.applySubstitution
+        (Substitution.mapRange outer inner)
+        (ProgramPredicate.applyParameters outer predicate) := by
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [ProgramPredicate.applyParameters,
+        Frontend.TypedTraitResolution.applySubstitution]
+      congr 1
+      · exact StructuralSubstitution.TypeWellScoped.applyMixed_compose outer
+          inner outerExact outerRange innerExact
+          admissible.subject.typeWellScoped
+      · rw [List.map_map, List.map_map]
+        apply List.map_congr_left
+        intro argument member
+        exact StructuralSubstitution.TypeWellScoped.applyMixed_compose outer
+          inner outerExact outerRange innerExact
+          (admissible.arguments argument member).typeWellScoped
+
 theorem PredicatesWellFormed.applyParameters
     {context : Context} {predicates : List ProgramPredicate}
     (substitution : ParameterSubstitution)
@@ -1816,24 +1860,30 @@ theorem atApplyContextOfBase
 theorem underSourceLocal
     {context : Context} {substitution : ParameterSubstitution}
     {id : Resolved.LocalId} {scheme : Scheme}
+    {requirements : List LocalSchemeRequirement}
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
       (applyContext substitution context) substitution) :
     SourceSemantics.ParameterSubstitution.RangeWellFormed
-      (applyContext substitution (context.withLocal id scheme)) substitution := by
+      (applyContext substitution
+        (context.withLocal id scheme requirements)) substitution := by
   intro parameter replacement member
   exact StructuralSubstitution.TypeWellFormed.transportContext
     (source := applyContext substitution context)
-    (target := applyContext substitution (context.withLocal id scheme))
+    (target := applyContext substitution
+      (context.withLocal id scheme requirements))
     rfl rfl rfl (range parameter replacement member)
 
 end ParameterSubstitution.RangeWellFormed
 
 @[simp] theorem applyContext_withLocal
     (substitution : ParameterSubstitution) (context : Context)
-    (id : Resolved.LocalId) (scheme : Scheme) :
-    applyContext substitution (context.withLocal id scheme) =
+    (id : Resolved.LocalId) (scheme : Scheme)
+    (requirements : List LocalSchemeRequirement := []) :
+    applyContext substitution (context.withLocal id scheme requirements) =
       (applyContext substitution context).withLocal id
-        (applyScheme substitution scheme) := by
+        (applyScheme substitution scheme)
+        (requirements.map
+          (LocalSchemeRequirement.applyParameters substitution)) := by
   rfl
 
 @[simp] theorem applyContext_withTypeVariables
@@ -1883,6 +1933,19 @@ private theorem lookup_applyLocals
   | head => exact .head
   | tail different _ induction => exact .tail different induction
 
+private theorem lookup_applyLocalSchemeRequirements
+    {requirements : Resolved.LocalScope (List LocalSchemeRequirement)}
+    {id : Resolved.LocalId} {localRequirements : List LocalSchemeRequirement}
+    (substitution : ParameterSubstitution)
+    (lookup : Resolved.LocalScope.Lookup requirements id localRequirements) :
+    Resolved.LocalScope.Lookup
+      (applyLocalSchemeRequirements substitution requirements) id
+      (localRequirements.map
+        (LocalSchemeRequirement.applyParameters substitution)) := by
+  induction lookup with
+  | head => exact .head
+  | tail different _ induction => exact .tail different induction
+
 theorem LocalLookup.applyParameters
     {context : Context} {id : Resolved.LocalId} {scheme : Scheme}
     (substitution : ParameterSubstitution)
@@ -1890,6 +1953,16 @@ theorem LocalLookup.applyParameters
     (applyContext substitution context).LocalLookup id
       (applyScheme substitution scheme) := by
   exact lookup_applyLocals substitution lookup
+
+theorem LocalSchemeRequirementsLookup.applyParameters
+    {context : Context} {id : Resolved.LocalId}
+    {requirements : List LocalSchemeRequirement}
+    (substitution : ParameterSubstitution)
+    (lookup : context.LocalSchemeRequirementsLookup id requirements) :
+    (applyContext substitution context).LocalSchemeRequirementsLookup id
+      (requirements.map
+        (LocalSchemeRequirement.applyParameters substitution)) := by
+  exact lookup_applyLocalSchemeRequirements substitution lookup
 
 theorem LocalFresh.applyParameters
     {context : Context} {id : Resolved.LocalId}
@@ -1926,8 +1999,10 @@ theorem SolvedRequirementValid.transportContext
 theorem ContextSubstitutionValid.underLocal
     {substitution : ParameterSubstitution} {context : Context}
     {id : Resolved.LocalId} {scheme : Scheme}
+    {requirements : List LocalSchemeRequirement}
     (valid : ContextSubstitutionValid substitution context) :
-    ContextSubstitutionValid substitution (context.withLocal id scheme) := {
+    ContextSubstitutionValid substitution
+      (context.withLocal id scheme requirements) := {
   exact := by simpa [Context.withLocal] using valid.exact
   range := ParameterSubstitution.RangeWellFormed.underSourceLocal valid.range
   requirements := by
@@ -1936,7 +2011,8 @@ theorem ContextSubstitutionValid.underLocal
       simpa [Context.withLocal] using member
     exact StructuralSubstitution.SolvedRequirementValid.transportContext
       (source := applyContext substitution context)
-      (target := applyContext substitution (context.withLocal id scheme))
+      (target := applyContext substitution
+        (context.withLocal id scheme requirements))
       rfl rfl (valid.requirements requirement member')
 }
 
@@ -2373,22 +2449,6 @@ theorem ReferenceHasRawType.applyParameters
       simpa [applyReferenceResolution] using
         (ReferenceHasRawType.builtinBoolean
           (context := applyContext substitution context) value)
-
-theorem ReferenceRequirementsValid.applyParameters
-    {substitution : ParameterSubstitution} {context : Context}
-    {resolution : ReferenceResolution} {requirements : List RequirementId}
-    (contextValid : ContextSubstitutionValid substitution context)
-    (valid : ReferenceRequirementsValid context resolution requirements) :
-    ReferenceRequirementsValid (applyContext substitution context)
-      (applyReferenceResolution substitution resolution) requirements := by
-  cases valid with
-  | «local» binder => exact .local binder
-  | declaration proves =>
-      exact .declaration
-        (StructuralSubstitution.RequirementSequenceProves.applyParameters
-          contextValid proves)
-  | builtinFunction function => exact .builtinFunction function
-  | builtinBoolean value => exact .builtinBoolean value
 
 theorem CoercionProfileInstantiates.applyParameters
     {substitution : ParameterSubstitution} {context : Context}
@@ -3409,6 +3469,108 @@ theorem LocalSchemeRequirementsWellFormed.applyParameters
     exact StructuralSubstitution.LocalSchemeRequirementWellFormed.applyParameters
       substitution exact range (wellFormed.entries original originalMem)
 
+/-- Rigid substitution commutes with the ordered predicate instance generated
+by one shared flexible local-scheme substitution. -/
+theorem instantiateLocalSchemePredicates_applyParameters
+    {context : Context} {binder : TypedBinder}
+    {inner : TypeSystem.Substitution}
+    (outer : ParameterSubstitution)
+    (contextValid : ContextSubstitutionValid outer context)
+    (formation : LocalSchemeRequirementsWellFormed context binder)
+    (innerExact : ExactSubstitution inner binder.scheme.quantified) :
+    (instantiateLocalSchemePredicates inner binder).map
+        (ProgramPredicate.applyParameters outer) =
+      instantiateLocalSchemePredicates (Substitution.mapRange outer inner)
+        (applyBinder outer binder) := by
+  unfold instantiateLocalSchemePredicates
+  simp only [applyBinder, List.map_map]
+  apply List.map_congr_left
+  intro requirement member
+  have initializerValid := contextValid.localSchemeInitializer binder
+  exact StructuralSubstitution.PredicateAdmissible.applyMixed_compose outer
+    inner initializerValid.exact initializerValid.range innerExact
+    (formation.entries requirement member).predicate
+
+theorem LocalSchemeInstantiationValid.applyParameters
+    {context : Context} {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    (outer : ParameterSubstitution)
+    (contextValid : ContextSubstitutionValid outer context)
+    (valid : LocalSchemeInstantiationValid context binder type
+      actualRequirements) :
+    LocalSchemeInstantiationValid (applyContext outer context)
+      (applyBinder outer binder) (outer.apply type) actualRequirements := by
+  cases valid with
+  | intro formation schemeWellFormed inner innerExact innerRange result
+      actualUnique actualDisjoint requirements =>
+      refine .intro
+        (StructuralSubstitution.LocalSchemeRequirementsWellFormed.applyParameters
+          outer contextValid.exact contextValid.range formation)
+        (StructuralSubstitution.SchemeWellFormed.applyParameters outer
+          contextValid.exact contextValid.range schemeWellFormed)
+        (Substitution.mapRange outer inner)
+        (StructuralSubstitution.Substitution.ExactSubstitution.mapRange outer
+          innerExact)
+        ?_ ?_ actualUnique ?_ ?_
+      · intro metavariable replacement member
+        rcases List.mem_map.mp member with ⟨entry, entryMember, entryEq⟩
+        rcases entry with ⟨innerVariable, innerReplacement⟩
+        cases entryEq
+        exact StructuralSubstitution.TypeAdmissible.applyParameters outer
+          contextValid.exact contextValid.range
+          (innerRange innerVariable innerReplacement entryMember)
+      · change (Substitution.mapRange outer inner).apply
+          (outer.apply binder.scheme.body) = outer.apply type
+        rw [← result]
+        exact (StructuralSubstitution.TypeWellScoped.applyMixed_compose outer
+          inner contextValid.exact contextValid.range innerExact
+          schemeWellFormed.body).symm
+      · intro id actualMember templateMember
+        exact actualDisjoint id actualMember (by
+          simpa using templateMember)
+      · have transported :=
+          StructuralSubstitution.RequirementSequenceProves.applyParameters
+            contextValid requirements
+        rw [StructuralSubstitution.instantiateLocalSchemePredicates_applyParameters
+          outer contextValid formation innerExact] at transported
+        exact transported
+
+theorem ReferenceUseValid.applyParameters
+    {outer : ParameterSubstitution} {context : Context}
+    {resolution : ReferenceResolution} {type : Ty}
+    {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (contextValid : ContextSubstitutionValid outer context)
+    (valid : ReferenceUseValid context resolution type requirements) :
+    ReferenceUseValid (applyContext outer context)
+      (applyReferenceResolution outer resolution) (outer.apply type)
+      requirements := by
+  cases valid with
+  | «local» schemeLookup requirementsLookup instantiation =>
+      refine .local (binder := applyBinder outer _) ?_ ?_ ?_
+      · exact
+        (StructuralSubstitution.LocalLookup.applyParameters outer schemeLookup)
+      · exact
+          (StructuralSubstitution.LocalSchemeRequirementsLookup.applyParameters
+          outer requirementsLookup)
+      · exact
+          (StructuralSubstitution.LocalSchemeInstantiationValid.applyParameters
+          outer contextValid instantiation)
+  | declaration instantiationValid proves =>
+      exact .declaration
+        (StructuralSubstitution.DeclarationInstantiation.Admissible.applyParameters
+          catalog contextValid instantiationValid)
+        (StructuralSubstitution.RequirementSequenceProves.applyParameters
+          contextValid proves)
+  | builtinFunction function =>
+      cases function <;> simp [applyReferenceResolution,
+        BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes,
+        BuiltinFunctionId.returnType] <;> exact .builtinFunction _
+  | builtinBoolean value =>
+      simpa [applyReferenceResolution] using
+        (ReferenceUseValid.builtinBoolean
+          (context := applyContext outer context) value)
+
 theorem BinderWellFormed.applyParameters
     {context : Context} {owner : Resolved.DeclarationId}
     {binder : TypedBinder}
@@ -3968,13 +4130,11 @@ theorem StatementsHaveType.applyParameters
     exact .integerLiteral
       (StructuralSubstitution.IntegerLiteralValid.applyParameters contextValid
         valid)
-  · intro context name resolution type requirements referenceType
-      requirementsValid catalog contextValid
+  · intro context name resolution type requirements referenceUse catalog
+      contextValid
     exact .reference
-      (StructuralSubstitution.ReferenceHasRawType.applyParameters catalog
-        contextValid referenceType)
-      (StructuralSubstitution.ReferenceRequirementsValid.applyParameters
-        contextValid requirementsValid)
+      (StructuralSubstitution.ReferenceUseValid.applyParameters catalog
+        contextValid referenceUse)
   · intro context inner type innerType innerInduction catalog contextValid
     exact .group (innerInduction catalog contextValid)
   · intro context elements types elementsType elementsInduction catalog
