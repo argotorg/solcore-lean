@@ -775,6 +775,8 @@ def tryFunctionCandidate (context : Context)
                       state.requirements.map (·.predicate))
                   let (signatureRequirements, state) :=
                     state.addRequirementsWithIds instantiated.predicates
+                  let state :=
+                    state.markDirectCallRequirements signatureRequirements
                   pure (some {
                     instantiation :=
                       DeclarationInstantiation.ofInstantiated signature instantiated

@@ -630,6 +630,90 @@ private def testConstrainedLetDoesNotGeneralizeAwayEvidence : IO Unit := do
         "a constrained let detached its predicate from the instantiated type"
   | .ok _ => throw (IO.userError "Eq<Word> evidence was reused for Bool")
 
+private def testQualifiedLocalSchemeRequirements : IO Unit := do
+  let source := String.intercalate "\n" [
+    "trait Eq<T> {}",
+    "impl Eq<Word> {}",
+    "impl Eq<Bool> {}",
+    "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
+    "function run(flag: Bool) returns (Word, Bool) {",
+    "  let f = lam(value) { return keep(value); };",
+    "  return (f(1), f(flag));",
+    "}"
+  ]
+  let loaded ← load source
+  let checked ← match SourceInference.checkLoadedProgram loaded with
+    | .ok checked => pure checked
+    | .error errors => throw (IO.userError
+        s!"qualified local inference failed: {reprStr errors}")
+  let function ← checkedNamed loaded.environment checked "run"
+  let eq ← match loaded.environment.traitsNamed "Eq" with
+    | [declaration] => pure declaration.id
+    | declarations => throw (IO.userError
+        s!"expected one Eq trait, found {declarations.length}")
+  let binder ← match function.typedBody.nodes.filterMap fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "f" then some binder else none
+      | _ => none with
+    | [binder] => pure binder
+    | binders => throw (IO.userError
+        s!"qualified local fixture retained {binders.length} f binders")
+  let (quantified, template) ←
+    match binder.scheme.quantified, binder.scheme.body,
+        binder.schemeRequirements with
+    | [quantified], .function (.variable parameter) (.variable result),
+        [requirement] =>
+        if quantified == parameter && parameter == result &&
+            requirement.predicate.trait == .declaration eq &&
+            requirement.predicate.subject == .variable quantified &&
+            requirement.predicate.arguments.isEmpty then
+          pure (quantified, requirement)
+        else
+          throw (IO.userError
+            "qualified local scheme did not retain Eq<α> with its shared binder")
+    | _, _, _ => throw (IO.userError
+        "qualified local scheme did not retain one quantified requirement")
+  let templateSolved ← match function.solvedRequirements.find? fun solved =>
+      solved.id == template.templateRequirement with
+    | some solved => pure solved
+    | none => throw (IO.userError
+        "qualified local template requirement was removed from the ledger")
+  assertTrue (match templateSolved.evidence with
+    | .assumption predicate =>
+        predicate == templateSolved.predicate &&
+          predicate.trait == .declaration eq &&
+          predicate.subject == .variable quantified
+    | _ => false)
+    "qualified local template requirement was resolved instead of retained as an assumption"
+  let references := function.typedBody.nodes.filterMap fun
+    | .expression node => match node.form with
+        | .reference _ (.local candidate) =>
+            if candidate == binder.id then some node else none
+        | _ => none
+    | .statement _ => none
+  let validatesReference (expected : TypeSystem.Ty)
+      (node : SourceInference.ExpressionNode) : Bool :=
+    node.rawType == .function expected expected &&
+      match node.requirements with
+      | [requirement] =>
+          requirement != template.templateRequirement &&
+            match function.solvedRequirements.find? fun solved =>
+                solved.id == requirement with
+            | some solved =>
+                solved.predicate.trait == .declaration eq &&
+                  solved.predicate.subject == expected &&
+                  solved.predicate.arguments.isEmpty &&
+                  match solved.evidence with
+                  | .implementation (.byImpl goal _ _) =>
+                      goal == solved.predicate
+                  | _ => false
+            | none => false
+      | _ => false
+  assertTrue (references.length == 2 &&
+      references.any (validatesReference .word) &&
+      references.any (validatesReference .bool))
+    "qualified local references did not freshen type and Eq evidence together"
+
 private def testOperatorMethodPredicates : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {}",
@@ -836,6 +920,7 @@ def testSourceInference : IO Unit := do
   testInconclusiveCoercion
   testUnsolvedCoercionMethodPredicate
   testConstrainedLetDoesNotGeneralizeAwayEvidence
+  testQualifiedLocalSchemeRequirements
   testOperatorMethodPredicates
   testUnsolvedOperatorMethodPredicates
   testOperatorMethodCatalogDiagnostics

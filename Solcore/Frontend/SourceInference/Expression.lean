@@ -58,16 +58,50 @@ def relevantIntegerLiterals (state : State) (start : Nat)
         fun metavariable => arguments.any fun argument =>
           (state.resolve argument.type).freeVariables.contains metavariable
 
-def generalizeValue (state : State) (locals : TypeSystem.Environment)
-    (type : Ty) : Scheme :=
-  let requirementVariables := state.requirements.flatMap fun requirement =>
+structure GeneralizedValue where
+  scheme : Scheme
+  requirements : List LocalSchemeRequirement
+
+private def requirementVariables (state : State)
+    (requirements : List Requirement) : List TypeVarId :=
+  requirements.flatMap fun requirement =>
     TypedTraitResolution.predicateVariables
       (applyPredicate state requirement.predicate)
-  let blockedVariables := locals.freeVariables ++ requirementVariables
+
+/-- Generalize one local value together with the proof-only declaration-call
+requirements introduced while inferring its initializer.  Every older
+requirement, and every new operational requirement, continues to block its
+variables exactly as before. -/
+def generalizeValue (state : State) (locals : TypeSystem.Environment)
+    (requirementStart : Nat) (type : Ty) : GeneralizedValue :=
+  let priorRequirements := state.requirements.take requirementStart
+  let introducedRequirements := state.requirements.drop requirementStart
+  let eligibleRequirements := introducedRequirements.filter fun requirement =>
+    state.directCallRequirements.contains requirement.id
+  let operationalRequirements := introducedRequirements.filter fun requirement =>
+    !state.directCallRequirements.contains requirement.id
+  let blockedVariables := locals.freeVariables ++
+    requirementVariables state (priorRequirements ++ operationalRequirements)
+  let quantified := type.freeVariables.filter fun metavariable =>
+    !(blockedVariables.contains metavariable)
+  let requirements := eligibleRequirements.filterMap fun requirement =>
+    let predicate := applyPredicate state requirement.predicate
+    let dependsOnQuantified :=
+      (TypedTraitResolution.predicateVariables predicate).any fun metavariable =>
+        quantified.contains metavariable
+    if dependsOnQuantified then
+      some {
+        templateRequirement := requirement.id
+        predicate
+      }
+    else
+      none
   {
-    quantified := type.freeVariables.filter fun metavariable =>
-      !(blockedVariables.contains metavariable)
-    body := type
+    scheme := {
+      quantified
+      body := type
+    }
+    requirements
   }
 
 def coercionRequirements (coercions : List CoercionStep) :
@@ -685,10 +719,22 @@ mutual
       | .identifier name =>
           match state.lookupBinder? name.value with
           | some binder =>
-              let (type, inference) := state.inference.instantiate binder.scheme
+              let instantiated :=
+                binder.scheme.instantiateWithSubstitution state.inference.next
+              let inference := {
+                state.inference with next := instantiated.next
+              }
+              let state := { state with inference }
+              let type := state.resolve instantiated.body
+              let predicates := binder.schemeRequirements.map fun requirement =>
+                applyPredicate state
+                  (TypedTraitResolution.applySubstitution
+                    instantiated.substitution requirement.predicate)
+              let (requirements, state) :=
+                state.addRequirementsWithIds predicates
               recordExpressionWithExpected context expression id type
-                (.reference name.value (.local binder.id)) [] expected
-                { state with inference }
+                (.reference name.value (.local binder.id)) requirements expected
+                state
           | none =>
               if name.value == "true" || name.value == "false" then
                 recordExpressionWithExpected context expression id .bool
@@ -1059,6 +1105,7 @@ mutual
     | fuel + 1 =>
         match item.value with
         | .letDecl name sourceType initializer => do
+            let requirementStart := state.nextRequirement
             let (valueType, initializerId, state) ←
               match sourceType, initializer with
               | none, none => throw (.missingInitializer name.value)
@@ -1075,9 +1122,11 @@ mutual
                   pure (initializer.type, some initializer.id, state)
             let locals := state.locals.apply state.inference.substitution
             let valueType := state.resolve valueType
-            let scheme := generalizeValue state locals valueType
+            let generalized :=
+              generalizeValue state locals requirementStart valueType
             let (binder, state) := ({ state with locals }).allocateBinder
-              name.value scheme (some name.span)
+              name.value generalized.scheme (some name.span)
+              (schemeRequirements := generalized.requirements)
             pure (.letDecl binder initializerId, state)
         | .expression expression => do
             let (expression, state) ←
@@ -1145,6 +1194,7 @@ mutual
       let (id, state) := state.allocateStatementId
       match statement.value with
       | .letDecl name sourceType initializer => do
+          let requirementStart := state.nextRequirement
           let (valueType, initializerId, state) ←
             match sourceType, initializer with
             | none, none => throw (.missingInitializer name.value)
@@ -1161,9 +1211,11 @@ mutual
                 pure (initializer.type, some initializer.id, state)
           let locals := state.locals.apply state.inference.substitution
           let valueType := state.resolve valueType
-          let scheme := generalizeValue state locals valueType
+          let generalized :=
+            generalizeValue state locals requirementStart valueType
           let (binder, state) := ({ state with locals }).allocateBinder
-            name.value scheme (some name.span)
+            name.value generalized.scheme (some name.span)
+            (schemeRequirements := generalized.requirements)
           let state := state.recordNode (.statement {
             id
             span := statement.span

@@ -63,8 +63,8 @@ theorem solveRequirements_preserves_ids
       subst solved
       rfl
   | cons requirement rest ih =>
-      cases evidenceResult : solveNormalizedPredicate context state
-          (applyPredicate state requirement.predicate) with
+      cases evidenceResult : solveRequirementEvidence context state
+          requirement with
       | error error =>
           simp [solveRequirements, evidenceResult, bind, Except.bind] at result
       | ok evidence =>

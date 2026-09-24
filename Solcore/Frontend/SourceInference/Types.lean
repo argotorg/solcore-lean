@@ -180,6 +180,15 @@ structure State where
   integerPatterns : List IntegerPatternOrigin := []
   nextRequirement : Nat := 0
   requirements : List Requirement := []
+  /-- Requirement identities introduced by selected direct declaration calls.
+  This provenance lets local generalization abstract only proof-only `where`
+  obligations, while literal, operator, and coercion requirements continue to
+  block generalization. -/
+  directCallRequirements : List RequirementId := []
+  /-- Declaration-local requirements abstracted into qualified local schemes.
+  They stay in the canonical requirement ledger, but finalization retains them
+  as assumptions instead of attempting whole-function class resolution. -/
+  localSchemeAssumptions : List RequirementId := []
   deriving Repr, DecidableEq
 
 /-- Final source-expression result after literal validation and trait search. -/
@@ -305,12 +314,14 @@ def restoreLexicalScope (state : State) (scope : LexicalScope) : State := {
 
 /-- Allocate and enter one stable local binder in the current lexical scope. -/
 def allocateBinder (state : State) (name : String) (scheme : Scheme)
-    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false) :
+    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false)
+    (schemeRequirements : List LocalSchemeRequirement := []) :
     TypedBinder × State :=
   let binder : TypedBinder := {
     id := { owner := state.owner, binderIndex := state.nextLocal }
     name
     scheme
+    schemeRequirements
     comptime
     span
   }
@@ -319,6 +330,8 @@ def allocateBinder (state : State) (name : String) (scheme : Scheme)
     locals := (name, scheme) :: state.locals
     localBinders := binder :: state.localBinders
     nextLocal := state.nextLocal + 1
+    localSchemeAssumptions := state.localSchemeAssumptions ++
+      schemeRequirements.map fun requirement => requirement.templateRequirement
   })
 
 /-- Reserve one stable declaration-owned local identity without making it
@@ -405,6 +418,14 @@ def addRequirementsWithIds : State → List ProgramPredicate →
 def addRequirements (state : State) (predicates : List ProgramPredicate) : State :=
   (state.addRequirementsWithIds predicates).2
 
+/-- Record that these freshly allocated requirements came from the selected
+direct declaration call rather than from an operational language feature. -/
+def markDirectCallRequirements (state : State)
+    (requirements : List RequirementId) : State := {
+  state with
+  directCallRequirements := state.directCallRequirements ++ requirements
+}
+
 end State
 
 namespace Detail
@@ -457,12 +478,22 @@ def solvePredicates (context : Context) (state : State) :
       let (predicates, evidenceRest) ← solvePredicates context state rest
       pure (normalized :: predicates, evidence :: evidenceRest)
 
+/-- Select evidence for one ledger row.  Qualified-local templates are scoped
+assumptions; every other row follows ordinary trait resolution. -/
+def solveRequirementEvidence (context : Context) (state : State)
+    (requirement : Requirement) : Except Error PredicateEvidence :=
+  let predicate := applyPredicate state requirement.predicate
+  if state.localSchemeAssumptions.contains requirement.id then
+    pure (.assumption predicate)
+  else
+    solveNormalizedPredicate context state predicate
+
 def solveRequirements (context : Context) (state : State) :
     List Requirement → Except Error (List SolvedRequirement)
   | [] => .ok []
   | requirement :: rest => do
       let predicate := applyPredicate state requirement.predicate
-      let evidence ← solveNormalizedPredicate context state predicate
+      let evidence ← solveRequirementEvidence context state requirement
       let solved ← solveRequirements context state rest
       pure ({ id := requirement.id, predicate, evidence } :: solved)
 
