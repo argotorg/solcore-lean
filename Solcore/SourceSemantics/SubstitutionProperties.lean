@@ -6727,6 +6727,22 @@ theorem TypesWellScoped.applySubstitution
           (substitution.without binder.scheme.quantified)) := by
   rfl
 
+@[simp] theorem applyDeclarationInstantiation_parameterSubstitution
+    (substitution : Substitution)
+    (instantiation : DeclarationInstantiation) :
+    (instantiation.applySubstitution substitution).parameterSubstitution =
+      ParameterSubstitution.mapRange substitution
+        instantiation.parameterSubstitution := by
+  rfl
+
+@[simp] theorem applyDataConstructorInstantiation_parameterSubstitution
+    (substitution : Substitution)
+    (instantiation : DataConstructorInstantiation) :
+    (instantiation.applySubstitution substitution).parameterSubstitution =
+      ParameterSubstitution.mapRange substitution
+        instantiation.parameterSubstitution := by
+  rfl
+
 /-- Flexible substitution changes qualified predicates but preserves their
 stable template requirement identities. -/
 @[simp] theorem localSchemeTemplateIds_applySubstitution
@@ -7967,6 +7983,209 @@ theorem ParameterSubstitution.RangeAdmissible.applyFlexible
   exact TypeAdmissible.applySubstitution closes
     (range sourceParameter sourceReplacement sourceMember)
 
+/-- Flexible closure preserves a closed declaration instantiation, including
+its shared rigid substitution and predicate spine. -/
+theorem DeclarationInstantiation.Valid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {instantiation : DeclarationInstantiation}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : SourceSemantics.DeclarationInstantiation.Valid source
+      instantiation) :
+    SourceSemantics.DeclarationInstantiation.Valid target
+      (instantiation.applySubstitution substitution) := by
+  cases valid with
+  | intro signature signatureMem declarationEq innerExact innerRange typeEq
+      predicatesEq parameterComptimeEq returnComptimeEq =>
+      have signatureWellFormed :=
+        catalog.functions_semantic signature signatureMem
+      let signatureTypingContext := signatureContext source.signatures
+        signature.id signature.scheme.parameters signature.scheme.predicates
+      have schemeScoped : TypeWellScoped signatureTypingContext []
+          signature.scheme.body := by
+        rw [signatureWellFormed.scheme_body]
+        exact .function
+          (StructuralSubstitution.TypesWellScoped.productMany
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              signatureWellFormed.parameter_types))
+          (StructuralSubstitution.TypesWellScoped.productMany
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              signatureWellFormed.return_types))
+      refine .intro signature ?_ declarationEq ?_ ?_ ?_ ?_
+        parameterComptimeEq returnComptimeEq
+      · rw [← contextValid.closes.target_eq]
+        exact signatureMem
+      · simpa only [applyDeclarationInstantiation_parameterSubstitution] using
+          (ParameterSubstitution.Exact.mapRange substitution innerExact)
+      · simpa only [applyDeclarationInstantiation_parameterSubstitution] using
+          (ParameterSubstitution.RangeWellFormed.applyFlexible
+            contextValid.closes innerRange)
+      · change substitution.apply instantiation.type =
+          (ParameterSubstitution.mapRange substitution
+            instantiation.parameterSubstitution).apply signature.scheme.body
+        rw [typeEq]
+        exact TypeWellScoped.applyFlexible_composeParameters substitution
+          instantiation.parameterSubstitution innerExact schemeScoped
+      · change instantiation.predicates.map
+            (TypedTraitResolution.applySubstitution substitution) =
+          signature.scheme.predicates.map
+            (ProgramPredicate.applyParameters
+              (ParameterSubstitution.mapRange substitution
+                instantiation.parameterSubstitution))
+        rw [predicatesEq]
+        exact PredicatesWellFormed.applyFlexible_composeParameters substitution
+          instantiation.parameterSubstitution innerExact
+          signatureWellFormed.predicates
+
+/-- Flexible closure preserves occurrence-level declaration instantiation,
+whose rigid replacement range may mention retained flexible variables. -/
+theorem DeclarationInstantiation.Admissible.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {instantiation : DeclarationInstantiation}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : SourceSemantics.DeclarationInstantiation.Admissible source
+      instantiation) :
+    SourceSemantics.DeclarationInstantiation.Admissible target
+      (instantiation.applySubstitution substitution) := by
+  cases valid with
+  | intro signature signatureMem declarationEq innerExact innerRange typeEq
+      predicatesEq parameterComptimeEq returnComptimeEq =>
+      have signatureWellFormed :=
+        catalog.functions_semantic signature signatureMem
+      let signatureTypingContext := signatureContext source.signatures
+        signature.id signature.scheme.parameters signature.scheme.predicates
+      have schemeScoped : TypeWellScoped signatureTypingContext []
+          signature.scheme.body := by
+        rw [signatureWellFormed.scheme_body]
+        exact .function
+          (StructuralSubstitution.TypesWellScoped.productMany
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              signatureWellFormed.parameter_types))
+          (StructuralSubstitution.TypesWellScoped.productMany
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              signatureWellFormed.return_types))
+      refine .intro signature ?_ declarationEq ?_ ?_ ?_ ?_
+        parameterComptimeEq returnComptimeEq
+      · rw [← contextValid.closes.target_eq]
+        exact signatureMem
+      · simpa only [applyDeclarationInstantiation_parameterSubstitution] using
+          (ParameterSubstitution.Exact.mapRange substitution innerExact)
+      · simpa only [applyDeclarationInstantiation_parameterSubstitution] using
+          (ParameterSubstitution.RangeAdmissible.applyFlexible
+            contextValid.closes innerRange)
+      · change substitution.apply instantiation.type =
+          (ParameterSubstitution.mapRange substitution
+            instantiation.parameterSubstitution).apply signature.scheme.body
+        rw [typeEq]
+        exact TypeWellScoped.applyFlexible_composeParameters substitution
+          instantiation.parameterSubstitution innerExact schemeScoped
+      · change instantiation.predicates.map
+            (TypedTraitResolution.applySubstitution substitution) =
+          signature.scheme.predicates.map
+            (ProgramPredicate.applyParameters
+              (ParameterSubstitution.mapRange substitution
+                instantiation.parameterSubstitution))
+        rw [predicatesEq]
+        exact PredicatesWellFormed.applyFlexible_composeParameters substitution
+          instantiation.parameterSubstitution innerExact
+          signatureWellFormed.predicates
+
+/-- Flexible closure preserves a closed data-constructor instantiation. -/
+theorem DataConstructorInstantiation.Valid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {instantiation : DataConstructorInstantiation}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : SourceSemantics.DataConstructorInstantiation.Valid source
+      instantiation) :
+    SourceSemantics.DataConstructorInstantiation.Valid target
+      (instantiation.applySubstitution substitution) := by
+  cases valid with
+  | intro dataType constructor dataTypeMem constructorMem constructorOwner
+      constructorEq innerExact innerRange payloadTypesEq resultTypeEq =>
+      have dataWellFormed := catalog.data_semantic dataType dataTypeMem
+      have payloadWellFormed :=
+        dataWellFormed.constructor_payloads constructor constructorMem
+      refine .intro dataType constructor ?_ constructorMem constructorOwner
+        constructorEq ?_ ?_ ?_ ?_
+      · rw [← contextValid.closes.target_eq]
+        exact dataTypeMem
+      · simpa only [applyDataConstructorInstantiation_parameterSubstitution] using
+          (ParameterSubstitution.Exact.mapRange substitution innerExact)
+      · simpa only [applyDataConstructorInstantiation_parameterSubstitution] using
+          (ParameterSubstitution.RangeWellFormed.applyFlexible
+            contextValid.closes innerRange)
+      · change instantiation.payloadTypes.map substitution.apply =
+          constructor.payloadTypes.map
+            (ParameterSubstitution.mapRange substitution
+              instantiation.parameterSubstitution).apply
+        rw [payloadTypesEq]
+        exact TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext source.signatures dataType.id
+            dataType.parameters)
+          substitution instantiation.parameterSubstitution innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            payloadWellFormed)
+      · change substitution.apply instantiation.resultType =
+          Ty.nominal dataType.id
+            (SourceSemantics.ParameterSubstitution.orderedArguments
+              (ParameterSubstitution.mapRange substitution
+                instantiation.parameterSubstitution) dataType.parameters)
+        rw [resultTypeEq, StructuralSubstitution.applyFlexible_nominal,
+          ParameterSubstitution.orderedArguments_mapRange substitution
+            innerExact]
+
+/-- Flexible closure preserves an occurrence-level data-constructor
+instantiation with an admissible rigid replacement range. -/
+theorem DataConstructorInstantiation.Admissible.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {instantiation : DataConstructorInstantiation}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : SourceSemantics.DataConstructorInstantiation.Admissible source
+      instantiation) :
+    SourceSemantics.DataConstructorInstantiation.Admissible target
+      (instantiation.applySubstitution substitution) := by
+  cases valid with
+  | intro dataType constructor dataTypeMem constructorMem constructorOwner
+      constructorEq innerExact innerRange payloadTypesEq resultTypeEq =>
+      have dataWellFormed := catalog.data_semantic dataType dataTypeMem
+      have payloadWellFormed :=
+        dataWellFormed.constructor_payloads constructor constructorMem
+      refine .intro dataType constructor ?_ constructorMem constructorOwner
+        constructorEq ?_ ?_ ?_ ?_
+      · rw [← contextValid.closes.target_eq]
+        exact dataTypeMem
+      · simpa only [applyDataConstructorInstantiation_parameterSubstitution] using
+          (ParameterSubstitution.Exact.mapRange substitution innerExact)
+      · simpa only [applyDataConstructorInstantiation_parameterSubstitution] using
+          (ParameterSubstitution.RangeAdmissible.applyFlexible
+            contextValid.closes innerRange)
+      · change instantiation.payloadTypes.map substitution.apply =
+          constructor.payloadTypes.map
+            (ParameterSubstitution.mapRange substitution
+              instantiation.parameterSubstitution).apply
+        rw [payloadTypesEq]
+        exact TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext source.signatures dataType.id
+            dataType.parameters)
+          substitution instantiation.parameterSubstitution innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            payloadWellFormed)
+      · change substitution.apply instantiation.resultType =
+          Ty.nominal dataType.id
+            (SourceSemantics.ParameterSubstitution.orderedArguments
+              (ParameterSubstitution.mapRange substitution
+                instantiation.parameterSubstitution) dataType.parameters)
+        rw [resultTypeEq, StructuralSubstitution.applyFlexible_nominal,
+          ParameterSubstitution.orderedArguments_mapRange substitution
+            innerExact]
+
 /-- Capture-avoiding flexible substitution preserves rank-1 scheme
 well-formedness across a structural context closure. -/
 theorem SchemeWellFormed.applySubstitution
@@ -8914,6 +9133,40 @@ theorem ReferenceUseValid.applySubstitution_local
       contextValid.closes schemeLookup requirementsLookup
   · exact LocalSchemeInstantiationValid.applySubstitution_of_fresh
       contextValid (contextValid.localSchemeFresh schemeLookup) instantiation
+
+/-- Flexible context closure preserves every resolved reference use.  Local
+uses share the capture-avoiding scheme witness; declaration uses transport
+their rigid instantiation and ordered evidence together. -/
+theorem ReferenceUseValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {resolution : ReferenceResolution} {type : Ty}
+    {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : ReferenceUseValid source resolution type requirements) :
+    ReferenceUseValid target (resolution.applySubstitution substitution)
+      (substitution.apply type) requirements := by
+  cases valid with
+  | «local» schemeLookup requirementsLookup instantiation =>
+      simpa [ReferenceResolution.applySubstitution] using
+        (ReferenceUseValid.applySubstitution_local contextValid schemeLookup
+          requirementsLookup instantiation)
+  | declaration instantiationValid proves =>
+      exact .declaration
+        (DeclarationInstantiation.Admissible.applySubstitution catalog
+          contextValid instantiationValid)
+        (by simpa [DeclarationInstantiation.applySubstitution] using
+          (RequirementSequenceProves.applySubstitution contextValid proves))
+  | builtinFunction function =>
+      cases function <;>
+        simp [ReferenceResolution.applySubstitution, BuiltinFunctionId.type,
+          BuiltinFunctionId.parameterTypes, BuiltinFunctionId.returnType,
+          apply_productMany] <;>
+        exact .builtinFunction _
+  | builtinBoolean value =>
+      simpa [ReferenceResolution.applySubstitution] using
+        (ReferenceUseValid.builtinBoolean (context := target) value)
 
 /-- A direct builtin callee retains its occurrence identity, empty evidence
 spine, and fixed closed function type under flexible substitution. -/
