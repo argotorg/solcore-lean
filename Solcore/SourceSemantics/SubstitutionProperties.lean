@@ -9788,6 +9788,163 @@ theorem UniformMemberProjection.applySubstitution
               rw [payloadTypesEq, payloadMapsEq]
               exact mappedUniform constructor constructorMem)
 
+/-- A runtime pattern binder remains monomorphic at the substituted matched
+type and retains its declaration ownership. -/
+theorem PatternBinderValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {type : Ty} {binder : TypedBinder}
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : PatternBinderValid source type binder) :
+    PatternBinderValid target (substitution.apply type)
+      (binder.applySubstitution substitution) := by
+  refine ⟨?_, ?_, ?_⟩
+  · simp [applyTypedBinder_scheme, valid.scheme_eq, Scheme.mono,
+      TypeSystem.Scheme.apply, TypeSystem.Substitution.without]
+  · simpa [TypedBinder.applySubstitution] using valid.runtime
+  · intro declaration declarationEq
+    have sourceDeclarationEq :
+        source.currentDeclaration = some declaration := by
+      rw [← contextValid.closes.target_eq] at declarationEq
+      exact declarationEq
+    exact BinderWellFormed.applySubstitution contextValid.closes
+      (valid.wellFormed declaration sourceDeclarationEq)
+
+/-- Flexible substitution changes only binder type metadata, so pattern-local
+identity and spelling distinctness are unchanged. -/
+theorem PatternBindersDistinct.applySubstitution
+    {substitution : Substitution} {binders : List TypedBinder}
+    (distinct : PatternBindersDistinct binders) :
+    PatternBindersDistinct
+      (binders.map (TypedBinder.applySubstitution substitution)) := by
+  constructor
+  · simpa [List.map_map, Function.comp_def,
+      TypedBinder.applySubstitution] using distinct.ids
+  · simpa [List.map_map, Function.comp_def,
+      TypedBinder.applySubstitution] using distinct.names
+
+/-- Flexible substitution preserves one typed prefix-pattern instruction and
+the exact suffix, evidence IDs, and binders it returns. -/
+theorem PatternInstructionHasType.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    {instructions rest : List MatchPatternInstruction} {type : Ty}
+    {requirements : List RequirementId} {binders : List TypedBinder}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (typing : PatternInstructionHasType source instructions type requirements
+      binders rest) :
+    PatternInstructionHasType target
+      (instructions.map (MatchPatternInstruction.applySubstitution substitution))
+      (substitution.apply type) requirements
+      (binders.map (TypedBinder.applySubstitution substitution))
+      (rest.map (MatchPatternInstruction.applySubstitution substitution)) := by
+  refine PatternInstructionHasType.rec
+    (motive_1 := fun instructions type requirements binders rest _ =>
+      PatternInstructionHasType target
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution))
+        (substitution.apply type) requirements
+        (binders.map (TypedBinder.applySubstitution substitution))
+        (rest.map (MatchPatternInstruction.applySubstitution substitution)))
+    (motive_2 := fun instructions types requirements binders rest _ =>
+      PatternInstructionsHaveTypes target
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution))
+        (types.map substitution.apply) requirements
+        (binders.map (TypedBinder.applySubstitution substitution))
+        (rest.map (MatchPatternInstruction.applySubstitution substitution)))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+  · intro rest type
+    exact .wildcard
+  · intro rest literal resolution valid
+    exact .integerLiteral
+      (IntegerLiteralValid.applySubstitution contextValid valid)
+  · intro rest binder type valid
+    exact .binder
+      (PatternBinderValid.applySubstitution contextValid valid)
+  · intro instructions rest instantiation argumentCount requirements binders
+      valid arity arguments argumentsInduction
+    exact .constructor
+      (DataConstructorInstantiation.Admissible.applySubstitution catalog
+        contextValid valid)
+      (by simp [DataConstructorInstantiation.applySubstitution, arity])
+      argumentsInduction
+  · intro instructions rest elementCount elementTypes requirements binders
+      arity elements elementsInduction
+    simpa [apply_productMany, MatchPatternInstruction.applySubstitution] using
+      (PatternInstructionHasType.tuple (context := target)
+        (by simp [arity]) elementsInduction)
+  · intro instructions
+    exact .nil
+  · intro instructions afterHead rest type types headRequirements
+      tailRequirements headBinders tailBinders head tail headInduction
+      tailInduction
+    simpa [List.map_append] using
+      (PatternInstructionsHaveTypes.cons headInduction tailInduction)
+
+/-- Flexible substitution preserves a source-ordered sequence of typed prefix
+pattern instructions. -/
+theorem PatternInstructionsHaveTypes.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    {instructions rest : List MatchPatternInstruction} {types : List Ty}
+    {requirements : List RequirementId} {binders : List TypedBinder}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (typing : PatternInstructionsHaveTypes source instructions types
+      requirements binders rest) :
+    PatternInstructionsHaveTypes target
+      (instructions.map (MatchPatternInstruction.applySubstitution substitution))
+      (types.map substitution.apply) requirements
+      (binders.map (TypedBinder.applySubstitution substitution))
+      (rest.map (MatchPatternInstruction.applySubstitution substitution)) := by
+  refine PatternInstructionsHaveTypes.rec
+    (motive_1 := fun instructions type requirements binders rest _ =>
+      PatternInstructionHasType target
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution))
+        (substitution.apply type) requirements
+        (binders.map (TypedBinder.applySubstitution substitution))
+        (rest.map (MatchPatternInstruction.applySubstitution substitution)))
+    (motive_2 := fun instructions types requirements binders rest _ =>
+      PatternInstructionsHaveTypes target
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution))
+        (types.map substitution.apply) requirements
+        (binders.map (TypedBinder.applySubstitution substitution))
+        (rest.map (MatchPatternInstruction.applySubstitution substitution)))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+  · intro rest type
+    exact .wildcard
+  · intro rest literal resolution valid
+    exact .integerLiteral
+      (IntegerLiteralValid.applySubstitution contextValid valid)
+  · intro rest binder type valid
+    exact .binder
+      (PatternBinderValid.applySubstitution contextValid valid)
+  · intro instructions rest instantiation argumentCount requirements binders
+      valid arity arguments argumentsInduction
+    exact .constructor
+      (DataConstructorInstantiation.Admissible.applySubstitution catalog
+        contextValid valid)
+      (by simp [DataConstructorInstantiation.applySubstitution, arity])
+      argumentsInduction
+  · intro instructions rest elementCount elementTypes requirements binders
+      arity elements elementsInduction
+    simpa [apply_productMany, MatchPatternInstruction.applySubstitution] using
+      (PatternInstructionHasType.tuple (context := target)
+        (by simp [arity]) elementsInduction)
+  · intro instructions
+    exact .nil
+  · intro instructions afterHead rest type types headRequirements
+      tailRequirements headBinders tailBinders head tail headInduction
+      tailInduction
+    simpa [List.map_append] using
+      (PatternInstructionsHaveTypes.cons headInduction tailInduction)
+
 @[simp] theorem closeContext_withTypeVariables (substitution : Substitution)
     (context : Context) (variables : List TypeVarId) :
     closeContext substitution (context.withTypeVariables variables) =
