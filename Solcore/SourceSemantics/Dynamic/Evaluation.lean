@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.Program
 import Solcore.SourceSemantics.Substitution
 import Solcore.SourceSemantics.Dynamic.Default
 import Solcore.SourceSemantics.Dynamic.Evidence
+import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.Dynamic.Pattern
 import Solcore.SourceSemantics.Dynamic.Place
 import Solcore.SourceSemantics.Dynamic.Primitive
@@ -842,10 +843,10 @@ mutual
           outcome = .fallthrough finalEnvironment) :
         BodyInvokes program bodyInstance evidence before arguments .unit after
 
-  /-- Execute one statement occurrence.  Local allocation is deliberately
-  monomorphic: generalized binders remain part of the source typing relation,
-  but cannot execute successfully until the runtime represents scheme
-  instantiation rather than storing one value at the scheme body type. -/
+  /-- Execute one statement occurrence.  Ordinary binders store an optional
+  value at the monomorphic scheme body.  A canonical generalized direct-lambda
+  initializer instead stores its principal closure descriptor without first
+  evaluating the initializer at any one instantiation. -/
   inductive StatementExecutes (program : Program) :
       Context → EvidenceEnvironment → TypedSource → Environment →
         Heap → StatementId → Context → ControlOutcome → Heap → Prop where
@@ -870,6 +871,18 @@ mutual
         (extension : BinderExtends source.owner context binder finalContext)
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location
           after) :
+        StatementExecutes program context evidence source environment before id
+          finalContext (.fallthrough ((binder.id, location) :: environment)) after
+    | letInitializedGeneralized
+        {context finalContext evidence source environment before after id node binder
+          initializer function location}
+        (contains : ContainsStatement source id node)
+        (form_eq : node.form = .letDecl binder (some initializer))
+        (captures : GeneralizedClosureCaptures context source environment binder
+          initializer function)
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (extension : BinderExtends source.owner context binder finalContext)
+        (allocate : Heap.AllocatesGeneralized before function location after) :
         StatementExecutes program context evidence source environment before id
           finalContext (.fallthrough ((binder.id, location) :: environment)) after
     | returnUnit
@@ -1115,8 +1128,8 @@ mutual
         FunctionStatementsExecute program context evidence source environment before
           (statement :: next :: rest) finalContext outcome after
 
-  /-- Execute one canonical `for` header item, with the same monomorphic local
-  allocation boundary as ordinary statements. -/
+  /-- Execute one canonical `for` header item, using the same ordinary-value or
+  generalized-closure allocation boundary as statements. -/
   inductive ForItemExecutes (program : Program) :
       Context → EvidenceEnvironment → TypedSource → Environment →
         Heap → ForItemForm → Context → Environment → Heap → Prop where
@@ -1137,6 +1150,17 @@ mutual
         (extension : BinderExtends source.owner context binder finalContext)
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location
           after) :
+        ForItemExecutes program context evidence source environment before
+          (.letDecl binder (some initializer)) finalContext
+          ((binder.id, location) :: environment) after
+    | letInitializedGeneralized
+        {context finalContext evidence source environment before after binder
+          initializer function location}
+        (captures : GeneralizedClosureCaptures context source environment binder
+          initializer function)
+        (polymorphic : binder.scheme.quantified ≠ [])
+        (extension : BinderExtends source.owner context binder finalContext)
+        (allocate : Heap.AllocatesGeneralized before function location after) :
         ForItemExecutes program context evidence source environment before
           (.letDecl binder (some initializer)) finalContext
           ((binder.id, location) :: environment) after

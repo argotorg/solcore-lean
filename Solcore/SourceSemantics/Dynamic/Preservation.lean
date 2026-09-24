@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.Dynamic.Default
+import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.Dynamic.Pattern
 import Solcore.SourceSemantics.Dynamic.Place
 import Solcore.SourceSemantics.Dynamic.Evaluation
@@ -2601,6 +2602,87 @@ theorem transport
 
 end SourceRuntimeValid
 
+private theorem expressionHasType_details
+    {source : TypedSource} {context : Context}
+    {initializer : ExpressionId} {type : Ty}
+    (typing : ExpressionHasType source context initializer type) :
+    ∃ node rawType plan,
+      ContainsExpression source initializer node ∧
+      node.type = type ∧
+      ExpressionFormHasRawType source context node.form rawType plan ∧
+      node.rawType = rawType := by
+  cases typing with
+  | intro contains form_type raw_type_eq raw_well_formed type_well_formed
+      requirements =>
+      exact ⟨_, _, _, contains, rfl, form_type, raw_type_eq⟩
+
+namespace GeneralizedClosureCaptures
+
+/-- A canonical generalized direct-lambda capture inherits deep runtime
+typing from its static initializer, lexical binder formation, and the current
+environment/heap agreement. -/
+theorem wellTyped
+    {program : Program} {context finalContext : Context}
+    {source : TypedSource} {environment : Environment} {heap : Heap}
+    {binder : TypedBinder} {initializer : ExpressionId}
+    {function : GeneralizedClosure}
+    (captures : GeneralizedClosureCaptures context source environment binder
+      initializer function)
+    (runtime : SourceRuntimeValid program context source)
+    (environment_agrees :
+      EnvironmentAgrees heap context.locals environment)
+    (polymorphic : binder.scheme.quantified ≠ [])
+    (requirements_well_formed :
+      LocalSchemeRequirementsWellFormed context binder)
+    (generalizes : SchemeGeneralizesExcept context
+      (localSchemeTemplateIds binder) binder.scheme)
+    (initializer_type : ExpressionHasType source
+      (localSchemeInitializerContext context binder) initializer
+      binder.scheme.body)
+    (extension : BinderExtends source.owner context binder finalContext) :
+    GeneralizedClosureWellTyped context heap function := by
+  cases extension with
+  | intro binder_well_formed fresh =>
+      cases captures with
+      | @directLambda node parameters resultType body contains form_eq
+          raw_type_eq type_eq requirements_empty coercions_empty =>
+          rcases expressionHasType_details initializer_type with
+            ⟨typedNode, rawType, plan, typed_contains, stored_type_eq,
+              form_type, typed_raw_type_eq⟩
+          have node_eq := containsExpression_unique
+            runtime.graph.nodeOccurrencesUnique typed_contains contains
+          subst typedNode
+          have retained_raw_type_eq : rawType = binder.scheme.body :=
+            typed_raw_type_eq.symm.trans raw_type_eq
+          rw [form_eq] at form_type
+          cases form_type with
+          | lambda names_unique parameters_extend body_type body_completes =>
+              refine {
+                same_signatures := rfl
+                code := {
+                  owner := runtime.owner
+                  closed := runtime.closed
+                  variables_closed := runtime.variables_closed
+                  residual_variables_open := runtime.residual_variables_open
+                  polymorphic := polymorphic
+                  binder_well_formed := binder_well_formed
+                  requirements_well_formed := requirements_well_formed
+                  generalizes := generalizes
+                  graph := runtime.graph
+                  occurrence := ⟨node, contains, form_eq, raw_type_eq,
+                    type_eq, requirements_empty, coercions_empty, ?_⟩
+                }
+                captures := environment_agrees
+              }
+              change ExpressionFormHasRawType source
+                (localSchemeInitializerContext context binder) node.form
+                binder.scheme.body (.ordinary [])
+              rw [form_eq, ← retained_raw_type_eq]
+              exact .lambda names_unique parameters_extend body_type
+                body_completes
+
+end GeneralizedClosureCaptures
+
 namespace BindersExtend
 
 theorem functional
@@ -3153,6 +3235,41 @@ theorem preservesWith
       | letInitializedGeneralized polymorphic _requirements_well_formed
           _generalizes initializer_type static_extension =>
           exact (polymorphic runtime_monomorphic).elim
+  | letInitializedGeneralized contains form_eq captures runtime_polymorphic
+      extension allocate =>
+      have node_eq := containsStatement_unique graph.nodeOccurrencesUnique
+        typed_contains contains
+      subst typedNode
+      rw [form_eq] at form_typing
+      cases form_typing with
+      | letInitialized initializer_type static_monomorphic static_extension =>
+          exact (runtime_polymorphic static_monomorphic).elim
+      | letInitializedGeneralized static_polymorphic
+          requirements_well_formed generalizes initializer_type
+          static_extension =>
+          have function_typed := captures.wellTyped runtime
+            environment_agrees static_polymorphic requirements_well_formed
+            generalizes initializer_type static_extension
+          have allocation_extension :=
+            HeapTypesExtend.of_generalized_allocation allocate
+          have after_typed := before_typed.allocateGeneralized function_typed
+            allocate
+          cases static_extension
+          exact {
+            heap_typed := after_typed
+            heap_extends := allocation_extension
+            outcome_typed := .fallthrough
+              (.cons allocate.reads_new
+                (by simpa only using (congrArg
+                  (fun retained : TypedBinder => retained.scheme.body)
+                  captures.binder_eq))
+                (.generalized rfl
+                  (by simpa only using (congrArg TypedBinder.id
+                    captures.binder_eq))
+                  (by simpa only using (congrArg TypedBinder.scheme
+                    captures.binder_eq)))
+                (environment_agrees.mono allocation_extension))
+          }
   | returnUnit contains form_eq =>
       have node_eq := containsStatement_unique graph.nodeOccurrencesUnique
         typed_contains contains

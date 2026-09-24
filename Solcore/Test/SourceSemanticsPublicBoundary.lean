@@ -233,6 +233,7 @@ example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure.instantiate
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure.instantiate_context
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure.instantiate_evidence
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosureCaptures
+example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosureCaptures.wellTyped
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedInitializerMalformed
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedInitializerUnsupported
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedInitializerUnsupported.captures_or_unsupported
@@ -322,9 +323,13 @@ example := @Solcore.SourceSemantics.Dynamic.CoercionPathExecutes
 example := @Solcore.SourceSemantics.Dynamic.CallableApplies
 example := @Solcore.SourceSemantics.Dynamic.BodyInvokes
 example := @Solcore.SourceSemantics.Dynamic.StatementExecutes
+example :=
+  @Solcore.SourceSemantics.Dynamic.StatementExecutes.letInitializedGeneralized
 example := @Solcore.SourceSemantics.Dynamic.StatementsExecute
 example := @Solcore.SourceSemantics.Dynamic.FunctionStatementsExecute
 example := @Solcore.SourceSemantics.Dynamic.ForItemExecutes
+example :=
+  @Solcore.SourceSemantics.Dynamic.ForItemExecutes.letInitializedGeneralized
 example := @Solcore.SourceSemantics.Dynamic.ForItemsExecute
 example := @Solcore.SourceSemantics.Dynamic.WhileExecutes
 example := @Solcore.SourceSemantics.Dynamic.ForLoopExecutes

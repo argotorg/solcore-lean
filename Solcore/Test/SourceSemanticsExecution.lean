@@ -36,6 +36,51 @@ theorem generalizedLetFormTypingRetainsFormation
   | letInitializedGeneralized _ requirements_well_formed generalizes _ _ =>
       exact ⟨requirements_well_formed, generalizes⟩
 
+/-- The statement dynamics allocates a canonical generalized direct lambda as
+one principal descriptor, without evaluating it at a monomorphic type. -/
+theorem generalizedStatementAllocatesDirectLambda
+    {program : SourceSemantics.Program} {context final : SourceSemantics.Context}
+    {evidence : SourceSemantics.Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : SourceSemantics.Dynamic.Environment}
+    {before after : SourceSemantics.Dynamic.Heap} {statement : StatementId}
+    {node : StatementNode} {binder : TypedBinder} {initializer : ExpressionId}
+    {function : SourceSemantics.Dynamic.GeneralizedClosure}
+    {location : SourceSemantics.Dynamic.Location}
+    (contains : ContainsStatement source statement node)
+    (form_eq : node.form = .letDecl binder (some initializer))
+    (captures : SourceSemantics.Dynamic.GeneralizedClosureCaptures context source
+      environment binder initializer function)
+    (polymorphic : binder.scheme.quantified ≠ [])
+    (extension : BinderExtends source.owner context binder final)
+    (allocate : SourceSemantics.Dynamic.Heap.AllocatesGeneralized before function
+      location after) :
+    SourceSemantics.Dynamic.StatementExecutes program context evidence source
+      environment before statement final
+      (.fallthrough ((binder.id, location) :: environment)) after := by
+  exact .letInitializedGeneralized contains form_eq captures polymorphic extension
+    allocate
+
+/-- The equivalent generalized `for` header rule uses the same descriptor
+allocation and lexical-context extension. -/
+theorem generalizedForItemAllocatesDirectLambda
+    {program : SourceSemantics.Program} {context final : SourceSemantics.Context}
+    {evidence : SourceSemantics.Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : SourceSemantics.Dynamic.Environment}
+    {before after : SourceSemantics.Dynamic.Heap} {binder : TypedBinder}
+    {initializer : ExpressionId}
+    {function : SourceSemantics.Dynamic.GeneralizedClosure}
+    {location : SourceSemantics.Dynamic.Location}
+    (captures : SourceSemantics.Dynamic.GeneralizedClosureCaptures context source
+      environment binder initializer function)
+    (polymorphic : binder.scheme.quantified ≠ [])
+    (extension : BinderExtends source.owner context binder final)
+    (allocate : SourceSemantics.Dynamic.Heap.AllocatesGeneralized before function
+      location after) :
+    SourceSemantics.Dynamic.ForItemExecutes program context evidence source
+      environment before (.letDecl binder (some initializer)) final
+      ((binder.id, location) :: environment) after := by
+  exact .letInitializedGeneralized captures polymorphic extension allocate
+
 /-- A concrete product materialization has exactly one frontend staged-value
 representation. -/
 theorem productMaterializationHasUniqueFrontend :

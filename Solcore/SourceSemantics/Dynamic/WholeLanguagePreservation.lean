@@ -119,6 +119,20 @@ private theorem statementFinalContext_eq
       | letInitializedGeneralized polymorphic _requirements_well_formed
           _generalizes initializer_type static_extension =>
           exact (polymorphic runtime_monomorphic).elim
+  | letInitializedGeneralized contains form_eq captures runtime_polymorphic
+      extension allocate =>
+      have node_eq := containsStatement_unique
+        graph.nodeOccurrencesUnique typed_contains contains
+      subst typedNode
+      rw [form_eq] at form_typing
+      cases form_typing with
+      | letInitialized initializer_type static_monomorphic static_extension =>
+          exact (runtime_polymorphic static_monomorphic).elim
+      | letInitializedGeneralized static_polymorphic
+          requirements_well_formed generalizes initializer_type
+          static_extension =>
+          exact Solcore.SourceSemantics.Dynamic.BinderExtends.functional
+            extension static_extension
   | returnUnit contains form_eq | returnValue contains form_eq evaluate
     | expression contains form_eq evaluate
     | assignValue contains form_eq assignment_executes
@@ -1682,6 +1696,44 @@ mutual
         | letInitializedGeneralized polymorphic _requirements_well_formed
             _generalizes initializer_type static_extension =>
             exact (polymorphic runtime_monomorphic).elim
+    | .letInitializedGeneralized contains form_eq captures runtime_polymorphic
+        extension allocate => by
+        rcases
+            Solcore.SourceSemantics.Dynamic.StatementHasType.formTyping typing with
+          ⟨typedNode, typed_contains, form_typing⟩
+        have node_eq := containsStatement_unique
+          runtime.graph.nodeOccurrencesUnique typed_contains contains
+        subst typedNode
+        rw [form_eq] at form_typing
+        cases form_typing with
+        | letInitialized initializer_type static_monomorphic static_extension =>
+            exact (runtime_polymorphic static_monomorphic).elim
+        | letInitializedGeneralized static_polymorphic
+            requirements_well_formed generalizes initializer_type
+            static_extension =>
+            have function_typed := captures.wellTyped runtime
+              environment_agrees static_polymorphic requirements_well_formed
+              generalizes initializer_type static_extension
+            have allocation_extension :=
+              HeapTypesExtend.of_generalized_allocation allocate
+            have after_typed := before_typed.allocateGeneralized function_typed
+              allocate
+            cases static_extension
+            exact {
+              heap_typed := after_typed
+              heap_extends := allocation_extension
+              outcome_typed := .fallthrough
+                (.cons allocate.reads_new
+                  (by simpa only using (congrArg
+                    (fun retained : TypedBinder => retained.scheme.body)
+                    captures.binder_eq))
+                  (.generalized rfl
+                    (by simpa only using (congrArg TypedBinder.id
+                      captures.binder_eq))
+                    (by simpa only using (congrArg TypedBinder.scheme
+                      captures.binder_eq)))
+                  (environment_agrees.mono allocation_extension))
+            }
     | .returnUnit contains form_eq => by
         have graph : OccurrenceGraphWellFormed source := runtime.graph
         have owner : context.currentDeclaration = some source.owner := runtime.owner
@@ -2404,6 +2456,12 @@ mutual
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
         exact fun _ => rfl
+    | .letInitializedGeneralized contains form_eq captures runtime_polymorphic
+        extension allocate => by
+        have control_typing := statementControlFormTyping
+          runtime.graph.nodeOccurrencesUnique typing contains form_eq
+        cases control_typing
+        exact fun _ => rfl
     | .returnUnit contains form_eq => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
@@ -2964,6 +3022,35 @@ mutual
         | letInitializedGeneralized polymorphic _generalizes initializer_type
             static_extension =>
             exact (polymorphic runtime_monomorphic).elim
+    | .letInitializedGeneralized captures runtime_polymorphic extension
+        allocate => by
+        cases typing with
+        | letInitialized initializer_type static_monomorphic _generalizes
+            static_extension =>
+            exact (runtime_polymorphic static_monomorphic).elim
+        | letInitializedGeneralized static_polymorphic
+            requirements_well_formed generalizes initializer_type
+            static_extension =>
+            have function_typed := captures.wellTyped runtime
+              environment_agrees static_polymorphic requirements_well_formed
+              generalizes initializer_type static_extension
+            have allocation_extension :=
+              HeapTypesExtend.of_generalized_allocation allocate
+            have after_typed := before_typed.allocateGeneralized function_typed
+              allocate
+            cases static_extension
+            cases extension
+            exact ⟨rfl, after_typed, allocation_extension,
+              .cons allocate.reads_new
+                (by simpa only using (congrArg
+                  (fun retained : TypedBinder => retained.scheme.body)
+                  captures.binder_eq))
+                (.generalized rfl
+                  (by simpa only using (congrArg TypedBinder.id
+                    captures.binder_eq))
+                  (by simpa only using (congrArg TypedBinder.scheme
+                    captures.binder_eq)))
+                (environment_agrees.mono allocation_extension)⟩
     | .expression evaluate => by
         cases typing with
         | expression expression_type =>
