@@ -7,5 +7,5 @@ import Solcore.Frontend.Current
 /-!
 Compatibility facade for the complete frontend. New whole-program clients may
 import `Solcore.Frontend.Current`; historical adapters are grouped under
-`Solcore.Frontend.Fragments`. See `docs/ARCHITECTURE.md` for architecture.
+`Solcore.Frontend.Fragments`.
 -/
