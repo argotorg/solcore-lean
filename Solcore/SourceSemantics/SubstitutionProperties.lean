@@ -9798,10 +9798,8 @@ theorem PatternBinderValid.applySubstitution
     (valid : PatternBinderValid source type binder) :
     PatternBinderValid target (substitution.apply type)
       (binder.applySubstitution substitution) := by
-  refine ⟨?_, ?_, ?_⟩
-  · simp [applyTypedBinder_scheme, valid.scheme_eq, Scheme.mono,
-      TypeSystem.Scheme.apply, TypeSystem.Substitution.without]
-  · simpa [TypedBinder.applySubstitution] using valid.runtime
+  refine ⟨?_, valid.runtime, ?_⟩
+  · simp [valid.scheme_eq]
   · intro declaration declarationEq
     have sourceDeclarationEq :
         source.currentDeclaration = some declaration := by
@@ -9944,6 +9942,236 @@ theorem PatternInstructionsHaveTypes.applySubstitution
       tailInduction
     simpa [List.map_append] using
       (PatternInstructionsHaveTypes.cons headInduction tailInduction)
+
+/-- Reconstituting a pattern prefix program commutes with flexible
+substitution of every retained instruction. -/
+@[simp] theorem matchPatternResolutionInstructions_applySubstitution
+    (substitution : Substitution) (resolution : MatchPatternResolution)
+    (rootArity : Nat) :
+    matchPatternResolutionInstructions
+        (resolution.applySubstitution substitution) rootArity =
+      (matchPatternResolutionInstructions resolution rootArity).map
+        (MatchPatternInstruction.applySubstitution substitution) := by
+  cases resolution <;> simp [MatchPatternResolution.applySubstitution,
+    matchPatternResolutionInstructions,
+    MatchPatternInstruction.applySubstitution]
+
+/-- Flexible substitution retains the catalog constructor selected by a
+source spelling. -/
+theorem ConstructorPatternSpellingValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {name : String}
+    {instantiation : DataConstructorInstantiation}
+    (closes : ContextCloses substitution closedVariables source target)
+    (valid : ConstructorPatternSpellingValid source name instantiation) :
+    ConstructorPatternSpellingValid target name
+      (instantiation.applySubstitution substitution) := by
+  rcases valid with ⟨signature, signatureMem, constructor, constructorMem,
+    constructorEq, nameEq⟩
+  exact ⟨signature, by
+      rw [← closes.target_eq]
+      exact signatureMem,
+    constructor, constructorMem, by
+      simpa [DataConstructorInstantiation.applySubstitution] using
+        constructorEq,
+    nameEq⟩
+
+/-- Flexible substitution preserves correspondence between the compact source
+pattern and its semantic root resolution. -/
+theorem MatchPatternSourceRepresents.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext : Context}
+    {source : MatchPatternSource} {resolution : MatchPatternResolution}
+    {rootArity : Nat}
+    (closes : ContextCloses substitution closedVariables sourceContext
+      targetContext)
+    (represents : MatchPatternSourceRepresents sourceContext source resolution
+      rootArity) :
+    MatchPatternSourceRepresents targetContext source
+      (resolution.applySubstitution substitution) rootArity := by
+  induction represents with
+  | wildcard => exact .wildcard
+  | integerLiteral sourceEq => exact .integerLiteral sourceEq
+  | binder nameEq => exact .binder nameEq
+  | constructor spelling =>
+      exact .constructor
+        (ConstructorPatternSpellingValid.applySubstitution closes spelling)
+  | tuple => exact .tuple
+  | group inner induction => exact .group induction
+
+/-- Flexible substitution preserves declarative irrefutability of one prefix
+pattern instruction. -/
+theorem PatternInstructionIrrefutable.applySubstitution
+    {substitution : Substitution}
+    {instructions rest : List MatchPatternInstruction}
+    (irrefutable : PatternInstructionIrrefutable instructions rest) :
+    PatternInstructionIrrefutable
+      (instructions.map (MatchPatternInstruction.applySubstitution substitution))
+      (rest.map (MatchPatternInstruction.applySubstitution substitution)) := by
+  refine PatternInstructionIrrefutable.rec
+    (motive_1 := fun instructions rest _ =>
+      PatternInstructionIrrefutable
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution))
+        (rest.map (MatchPatternInstruction.applySubstitution substitution)))
+    (motive_2 := fun instructions count rest _ =>
+      PatternInstructionsIrrefutable
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution)) count
+        (rest.map (MatchPatternInstruction.applySubstitution substitution)))
+    ?_ ?_ ?_ ?_ ?_ irrefutable
+  · intro rest
+    exact .wildcard
+  · intro rest binder
+    exact .binder
+  · intro instructions rest elementCount elements elementsInduction
+    exact .tuple elementsInduction
+  · intro instructions
+    exact .zero
+  · intro instructions afterHead rest count head tail headInduction
+      tailInduction
+    exact .succ headInduction tailInduction
+
+/-- Flexible substitution preserves irrefutability of a fixed-length sequence
+of prefix pattern instructions. -/
+theorem PatternInstructionsIrrefutable.applySubstitution
+    {substitution : Substitution}
+    {instructions rest : List MatchPatternInstruction} {count : Nat}
+    (irrefutable : PatternInstructionsIrrefutable instructions count rest) :
+    PatternInstructionsIrrefutable
+      (instructions.map (MatchPatternInstruction.applySubstitution substitution))
+      count
+      (rest.map (MatchPatternInstruction.applySubstitution substitution)) := by
+  refine PatternInstructionsIrrefutable.rec
+    (motive_1 := fun instructions rest _ =>
+      PatternInstructionIrrefutable
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution))
+        (rest.map (MatchPatternInstruction.applySubstitution substitution)))
+    (motive_2 := fun instructions count rest _ =>
+      PatternInstructionsIrrefutable
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution)) count
+        (rest.map (MatchPatternInstruction.applySubstitution substitution)))
+    ?_ ?_ ?_ ?_ ?_ irrefutable
+  · intro rest
+    exact .wildcard
+  · intro rest binder
+    exact .binder
+  · intro instructions rest elementCount elements elementsInduction
+    exact .tuple elementsInduction
+  · intro instructions
+    exact .zero
+  · intro instructions afterHead rest count head tail headInduction
+      tailInduction
+    exact .succ headInduction tailInduction
+
+/-- A source-connected irrefutable pattern remains irrefutable after flexible
+substitution. -/
+theorem TypedMatchPatternIrrefutable.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {pattern : TypedMatchPattern}
+    (closes : ContextCloses substitution closedVariables source target)
+    (irrefutable : TypedMatchPatternIrrefutable source pattern) :
+    TypedMatchPatternIrrefutable target
+      (pattern.applySubstitution substitution) := by
+  rcases irrefutable with ⟨rootArity, represents, resolution⟩
+  refine ⟨rootArity,
+    MatchPatternSourceRepresents.applySubstitution closes represents, ?_⟩
+  unfold MatchPatternResolutionIrrefutable at resolution ⊢
+  change PatternInstructionIrrefutable
+    (matchPatternResolutionInstructions
+      (pattern.resolution.applySubstitution substitution) rootArity) []
+  rw [matchPatternResolutionInstructions_applySubstitution]
+  exact PatternInstructionIrrefutable.applySubstitution resolution
+
+/-- Flexible substitution preserves complete source-level pattern typing,
+including the exact binder sequence. -/
+theorem TypedMatchPatternHasType.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {pattern : TypedMatchPattern} {type : Ty}
+    {binders : List TypedBinder} {rootArity : Nat}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (typing : TypedMatchPatternHasType source pattern type binders rootArity) :
+    TypedMatchPatternHasType target (pattern.applySubstitution substitution)
+      (substitution.apply type)
+      (binders.map (TypedBinder.applySubstitution substitution)) rootArity := by
+  refine ⟨by simp [TypedMatchPattern.applySubstitution, typing.type_eq],
+    MatchPatternSourceRepresents.applySubstitution contextValid.closes
+      typing.source_represents,
+    ?_,
+    PatternBindersDistinct.applySubstitution typing.binders_distinct⟩
+  have resolutionTyping := typing.resolution_type
+  unfold MatchPatternResolutionHasType at resolutionTyping ⊢
+  change PatternInstructionHasType target
+    (matchPatternResolutionInstructions
+      (pattern.resolution.applySubstitution substitution) rootArity)
+    (substitution.apply type) pattern.requirements
+    (binders.map (TypedBinder.applySubstitution substitution)) []
+  rw [matchPatternResolutionInstructions_applySubstitution]
+  simpa [TypedMatchPattern.applySubstitution] using
+    (PatternInstructionHasType.applySubstitution catalog contextValid
+      resolutionTyping)
+
+/-- Constructor coverage depends only on the stable constructor identity and
+irrefutable payload instructions, both preserved by flexible substitution. -/
+theorem PatternCoversConstructor.applySubstitution
+    {substitution : Substitution} {pattern : TypedMatchPattern}
+    {constructor : ProgramDataConstructorId}
+    (covers : PatternCoversConstructor pattern constructor) :
+    PatternCoversConstructor (pattern.applySubstitution substitution)
+      constructor := by
+  rcases covers with ⟨instantiation, instructions, resolutionEq,
+    constructorEq, irrefutable⟩
+  refine ⟨instantiation.applySubstitution substitution,
+    instructions.map (MatchPatternInstruction.applySubstitution substitution),
+    ?_, ?_, ?_⟩
+  · change pattern.resolution.applySubstitution substitution =
+      .constructor (instantiation.applySubstitution substitution)
+        (instructions.map
+          (MatchPatternInstruction.applySubstitution substitution))
+    rw [resolutionEq]
+    rfl
+  · simpa [DataConstructorInstantiation.applySubstitution] using
+      constructorEq
+  · simpa [DataConstructorInstantiation.applySubstitution] using
+      (PatternInstructionsIrrefutable.applySubstitution irrefutable)
+
+/-- Flexible substitution preserves all three exhaustiveness witnesses:
+default, catch-all, and complete constructor coverage. -/
+theorem MatchExhaustive.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {scrutineeType : Ty}
+    {cases : List TypedMatchCase}
+    {defaultBody : Option (List StatementId)}
+    (closes : ContextCloses substitution closedVariables source target)
+    (exhaustive : MatchExhaustive source scrutineeType cases defaultBody) :
+    MatchExhaustive target (substitution.apply scrutineeType)
+      (cases.map (TypedMatchCase.applySubstitution substitution))
+      defaultBody := by
+  cases exhaustive with
+  | default body => exact .default body
+  | catchall member irrefutable =>
+      exact .catchall (List.mem_map.mpr ⟨_, member, rfl⟩)
+        (TypedMatchPatternIrrefutable.applySubstitution closes irrefutable)
+  | constructors dataTypeMem exactInner scrutineeEq covered =>
+      rename_i dataType inner
+      refine .constructors
+        (by
+          rw [← closes.target_eq]
+          exact dataTypeMem)
+        (ParameterSubstitution.Exact.mapRange substitution exactInner) ?_ ?_
+      · rw [scrutineeEq, StructuralSubstitution.applyFlexible_nominal,
+          ParameterSubstitution.orderedArguments_mapRange substitution
+            exactInner]
+      · intro constructor constructorMem
+        rcases covered constructor constructorMem with
+          ⟨matchCase, matchCaseMem, covers⟩
+        exact ⟨matchCase.applySubstitution substitution,
+          List.mem_map.mpr ⟨matchCase, matchCaseMem, rfl⟩,
+          PatternCoversConstructor.applySubstitution covers⟩
 
 @[simp] theorem closeContext_withTypeVariables (substitution : Substitution)
     (context : Context) (variables : List TypeVarId) :
