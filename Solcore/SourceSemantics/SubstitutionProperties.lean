@@ -9168,6 +9168,273 @@ theorem ReferenceUseValid.applySubstitution
       simpa [ReferenceResolution.applySubstitution] using
         (ReferenceUseValid.builtinBoolean (context := target) value)
 
+/-- Instantiating ambient flexible variables preserves the cataloged
+`Coerce` method profile and maps its primary and method predicates. -/
+theorem CoercionProfileInstantiates.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext : Context}
+    {sourceType targetType : Ty} {primary : ProgramPredicate}
+    {methodPredicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : ContextSubstitutionValid substitution closedVariables
+      sourceContext targetContext)
+    (profile : CoercionProfileInstantiates sourceContext sourceType targetType
+      primary methodPredicates) :
+    CoercionProfileInstantiates targetContext
+      (substitution.apply sourceType) (substitution.apply targetType)
+      (TypedTraitResolution.applySubstitution substitution primary)
+      (methodPredicates.map
+        (TypedTraitResolution.applySubstitution substitution)) := by
+  cases profile with
+  | @intro signature method fromParameter toParameter signatureMem nameEq
+      parametersEq methodUnique parameterTypesEq returnTypesEq =>
+      have signatureWellFormed := catalog.traits_semantic signature signatureMem
+      have methodFiltered : method ∈
+          signature.methods.filter
+            (fun candidate => candidate.name == "coerce") := by
+        rw [methodUnique]
+        simp
+      have methodMem : method ∈ signature.methods :=
+        (List.mem_filter.mp methodFiltered).1
+      have methodWellFormed := signatureWellFormed.methods method methodMem
+      have innerExact : SourceSemantics.ParameterSubstitution.Exact
+          [(fromParameter, sourceType), (toParameter, targetType)]
+          signature.parameters := by
+        constructor
+        · exact signatureWellFormed.parameters_nodup
+        · rw [parametersEq]
+          simp [SourceSemantics.ParameterSubstitution.domain]
+      have parameterCompose :=
+        TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext sourceContext.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution
+          [(fromParameter, sourceType), (toParameter, targetType)] innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            methodWellFormed.parameter_types)
+      have returnCompose :=
+        TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext sourceContext.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution
+          [(fromParameter, sourceType), (toParameter, targetType)] innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            methodWellFormed.return_types)
+      have predicateCompose :=
+        PredicatesWellFormed.applyFlexible_composeParameters
+          (context := signatureContext sourceContext.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution
+          [(fromParameter, sourceType), (toParameter, targetType)] innerExact
+          methodWellFormed.predicates
+      change CoercionProfileInstantiates targetContext
+        (substitution.apply sourceType) (substitution.apply targetType)
+        { trait := .declaration signature.id
+          subject := substitution.apply sourceType
+          arguments := [substitution.apply targetType] }
+        ((method.wherePredicates.map
+          (ProgramPredicate.applyParameters
+            [(fromParameter, sourceType), (toParameter, targetType)])).map
+              (TypedTraitResolution.applySubstitution substitution))
+      rw [predicateCompose]
+      exact .intro
+        (by
+          rw [← contextValid.closes.target_eq]
+          exact signatureMem)
+        nameEq parametersEq methodUnique
+        (by
+          change method.parameterTypes.map
+              (ParameterSubstitution.mapRange substitution
+                [(fromParameter, sourceType),
+                  (toParameter, targetType)]).apply =
+            [substitution.apply sourceType]
+          rw [← parameterCompose, parameterTypesEq]
+          rfl)
+        (by
+          change method.returnTypes.map
+              (ParameterSubstitution.mapRange substitution
+                [(fromParameter, sourceType),
+                  (toParameter, targetType)]).apply =
+            [substitution.apply targetType]
+          rw [← returnCompose, returnTypesEq]
+          rfl)
+
+/-- Flexible substitution preserves one retained coercion edge and its exact
+ordered evidence sequence. -/
+theorem CoercionStepValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {step : CoercionStep}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : CoercionStepValid source step) :
+    CoercionStepValid target (step.applySubstitution substitution) := by
+  cases valid with
+  | intro profile requirements =>
+      exact .intro
+        (CoercionProfileInstantiates.applySubstitution catalog contextValid
+          profile)
+        (by simpa [CoercionStep.applySubstitution] using
+          (RequirementSequenceProves.applySubstitution contextValid
+            requirements))
+
+/-- Flexible substitution maps every edge in a valid coercion path while
+preserving its endpoints and adjacency. -/
+theorem CoercionPathValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext : Context}
+    {sourceType targetType : Ty} {steps : List CoercionStep}
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : ContextSubstitutionValid substitution closedVariables
+      sourceContext targetContext)
+    (valid : CoercionPathValid sourceContext sourceType targetType steps) :
+    CoercionPathValid targetContext (substitution.apply sourceType)
+      (substitution.apply targetType)
+      (steps.map (CoercionStep.applySubstitution substitution)) := by
+  induction valid with
+  | nil type => exact .nil _
+  | cons head tail induction =>
+      exact .cons
+        (CoercionStepValid.applySubstitution catalog contextValid head)
+        induction
+
+/-- Instantiating ambient flexible variables preserves the selected operator
+method profile and maps its ordered predicate spine. -/
+theorem OperatorProfileInstantiates.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {traitName methodName : String}
+    {operand : Ty} {parameterTypes returnTypes : List Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (profile : OperatorProfileInstantiates source traitName methodName operand
+      parameterTypes returnTypes predicates) :
+    OperatorProfileInstantiates target traitName methodName
+      (substitution.apply operand) (parameterTypes.map substitution.apply)
+      (returnTypes.map substitution.apply)
+      (predicates.map
+        (TypedTraitResolution.applySubstitution substitution)) := by
+  cases profile with
+  | @intro signature method parameter signatureMem traitNameEq parametersEq
+      methodUnique parameterTypesEq returnTypesEq =>
+      have signatureWellFormed := catalog.traits_semantic signature signatureMem
+      have methodFiltered : method ∈
+          signature.methods.filter
+            (fun candidate => candidate.name == methodName) := by
+        rw [methodUnique]
+        simp
+      have methodMem : method ∈ signature.methods :=
+        (List.mem_filter.mp methodFiltered).1
+      have methodWellFormed := signatureWellFormed.methods method methodMem
+      have innerExact : SourceSemantics.ParameterSubstitution.Exact
+          [(parameter, operand)] signature.parameters := by
+        constructor
+        · exact signatureWellFormed.parameters_nodup
+        · rw [parametersEq]
+          simp [SourceSemantics.ParameterSubstitution.domain]
+      have parameterCompose :=
+        TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext source.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution [(parameter, operand)] innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            methodWellFormed.parameter_types)
+      have returnCompose :=
+        TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext source.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution [(parameter, operand)] innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            methodWellFormed.return_types)
+      have predicateCompose :=
+        PredicatesWellFormed.applyFlexible_composeParameters
+          (context := signatureContext source.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution [(parameter, operand)] innerExact
+          methodWellFormed.predicates
+      change OperatorProfileInstantiates target traitName methodName
+        (substitution.apply operand) (parameterTypes.map substitution.apply)
+        (returnTypes.map substitution.apply)
+        ({ trait := .declaration signature.id
+           subject := substitution.apply operand
+           arguments := [] } ::
+          (method.wherePredicates.map
+            (ProgramPredicate.applyParameters [(parameter, operand)])).map
+              (TypedTraitResolution.applySubstitution substitution))
+      rw [predicateCompose]
+      exact .intro
+        (by
+          rw [← contextValid.closes.target_eq]
+          exact signatureMem)
+        traitNameEq parametersEq methodUnique
+        (by
+          change method.parameterTypes.map
+              (ParameterSubstitution.mapRange substitution
+                [(parameter, operand)]).apply =
+            parameterTypes.map substitution.apply
+          rw [← parameterCompose, parameterTypesEq])
+        (by
+          change method.returnTypes.map
+              (ParameterSubstitution.mapRange substitution
+                [(parameter, operand)]).apply =
+            returnTypes.map substitution.apply
+          rw [← returnCompose, returnTypesEq])
+
+/-- Flexible substitution preserves unary primitive and trait-dispatched
+operator typing. -/
+theorem UnaryOperatorHasType.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {operator : Syntax.UnaryOp}
+    {operand result : Ty} {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (typing : UnaryOperatorHasType source operator operand result requirements) :
+    UnaryOperatorHasType target operator (substitution.apply operand)
+      (substitution.apply result) requirements := by
+  cases typing with
+  | logicalNot => exact .logicalNot
+  | wordBitNot => exact .wordBitNot
+  | integerBitNot => exact .integerBitNot
+  | trait dispatch profile evidence =>
+      exact .trait dispatch
+        (OperatorProfileInstantiates.applySubstitution catalog contextValid
+          profile)
+        (RequirementSequenceProves.applySubstitution contextValid evidence)
+
+/-- Flexible substitution preserves binary primitive and trait-dispatched
+operator typing. -/
+theorem BinaryOperatorHasType.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {operator : Syntax.BinaryOp}
+    {left right result : Ty} {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (typing : BinaryOperatorHasType source operator left right result
+      requirements) :
+    BinaryOperatorHasType target operator (substitution.apply left)
+      (substitution.apply right) (substitution.apply result) requirements := by
+  cases typing with
+  | wordArithmetic kind => exact .wordArithmetic kind
+  | integerArithmetic kind => exact .integerArithmetic kind
+  | wordComparison kind => exact .wordComparison kind
+  | integerComparison kind => exact .integerComparison kind
+  | booleanAnd => exact .booleanAnd
+  | booleanOr => exact .booleanOr
+  | trait dispatch profile evidence =>
+      exact .trait dispatch
+        (OperatorProfileInstantiates.applySubstitution catalog contextValid
+          profile)
+        (RequirementSequenceProves.applySubstitution contextValid evidence)
+
 /-- A declaration application remains admissible when its ambient flexible
 variables are instantiated.  The occurrence's rigid substitution is mapped
 pointwise, while the declaration signature itself remains unchanged. -/
