@@ -51,6 +51,80 @@ theorem functional
       | head => exact False.elim (different rfl)
       | tail _ found => exact induction found
 
+/-- A first-match result in a prefix remains selected after appending a
+suffix. -/
+theorem append_left
+    {left right : EvidenceEnvironment} {goal : ProgramPredicate}
+    {evidence : TraitEvidence}
+    (found : left.LooksUp goal evidence) :
+    (left ++ right).LooksUp goal evidence := by
+  induction found with
+  | head => exact .head
+  | tail different _ induction => exact .tail different induction
+
+/-- A lookup through an appended dictionary either selected the prefix, or
+reached the suffix after proving that the goal is absent from the prefix.
+This exposes the first-match side condition used by dictionary assembly. -/
+theorem split_append
+    {left right : EvidenceEnvironment} {goal : ProgramPredicate}
+    {evidence : TraitEvidence}
+    (found : (left ++ right).LooksUp goal evidence) :
+    left.LooksUp goal evidence ∨
+      (goal ∉ left.map Prod.fst ∧ right.LooksUp goal evidence) := by
+  induction left with
+  | nil => exact .inr ⟨by simp, by simpa using found⟩
+  | cons entry rest induction =>
+      rcases entry with ⟨headGoal, headEvidence⟩
+      cases found with
+      | head => exact .inl .head
+      | tail different tailFound =>
+          rcases induction tailFound with found | ⟨absent, found⟩
+          · exact .inl (.tail different found)
+          · exact .inr ⟨by
+              simp only [List.map_cons, List.mem_cons, not_or]
+              exact ⟨Ne.symm different, absent⟩, found⟩
+
+/-- A suffix lookup remains selected precisely when the prefix contains no
+entry for the same goal. -/
+theorem append_right
+    {left right : EvidenceEnvironment} {goal : ProgramPredicate}
+    {evidence : TraitEvidence}
+    (absent : goal ∉ left.map Prod.fst)
+    (found : right.LooksUp goal evidence) :
+    (left ++ right).LooksUp goal evidence := by
+  induction left with
+  | nil => simpa using found
+  | cons entry rest induction =>
+      rcases entry with ⟨headGoal, headEvidence⟩
+      apply LooksUp.tail
+      · intro same
+        apply absent
+        simp [same]
+      · apply induction
+        intro member
+        apply absent
+        simp [member]
+
+/-- Every key occurring in a dictionary has one selected first-match
+evidence, even if later entries repeat that key. -/
+theorem exists_of_key_mem
+    {environment : EvidenceEnvironment} {goal : ProgramPredicate}
+    (member : goal ∈ environment.map Prod.fst) :
+    ∃ evidence, environment.LooksUp goal evidence := by
+  induction environment with
+  | nil => simp at member
+  | cons entry rest induction =>
+      rcases entry with ⟨headGoal, headEvidence⟩
+      simp only [List.map_cons, List.mem_cons] at member
+      rcases member with same | member
+      · subst goal
+        exact ⟨headEvidence, .head⟩
+      · by_cases same : headGoal = goal
+        · subst goal
+          exact ⟨headEvidence, .head⟩
+        · rcases induction member with ⟨evidence, found⟩
+          exact ⟨evidence, .tail same found⟩
+
 end EvidenceEnvironment.LooksUp
 
 /-- Reflexive containment in a semantic evidence tree.  Implementation
@@ -164,6 +238,22 @@ def EvidenceEnvironment.Valid (rules : List ProgramImplRule)
   ∀ goal evidence, environment.LooksUp goal evidence →
     EvidenceValid [] rules goal evidence
 
+namespace EvidenceEnvironment.Valid
+
+/-- Appending closed dictionaries preserves validity.  No disjointness is
+needed for validity itself: `split_append` records whether first-match lookup
+stopped in the prefix or reached the suffix. -/
+theorem append
+    {rules : List ProgramImplRule} {left right : EvidenceEnvironment}
+    (leftValid : left.Valid rules) (rightValid : right.Valid rules) :
+    (left ++ right).Valid rules := by
+  intro goal evidence found
+  rcases found.split_append with found | ⟨_, found⟩
+  · exact leftValid goal evidence found
+  · exact rightValid goal evidence found
+
+end EvidenceEnvironment.Valid
+
 /-- A runtime dictionary is closed and supplies every generic assumption of
 the body whose code is about to execute. -/
 def EvidenceEnvironment.Covers (context : Context)
@@ -171,6 +261,70 @@ def EvidenceEnvironment.Covers (context : Context)
   environment.Valid context.signatures.resolutionRules ∧
     ∀ predicate, predicate ∈ context.assumptions →
       ∃ evidence, environment.LooksUp predicate evidence
+
+/-- A dictionary supplies every predicate in a source-ordered assumption
+spine.  Evidence selection remains the first-match `LooksUp` relation; this
+property deliberately does not erase overlap between dictionaries. -/
+def EvidenceEnvironment.Supplies (environment : EvidenceEnvironment)
+    (predicates : List ProgramPredicate) : Prop :=
+  ∀ predicate, predicate ∈ predicates →
+    ∃ evidence, environment.LooksUp predicate evidence
+
+namespace EvidenceEnvironment.Supplies
+
+/-- Prefix-supplied assumptions remain supplied after dictionary append. -/
+theorem append_left
+    {left right : EvidenceEnvironment} {predicates : List ProgramPredicate}
+    (supplies : left.Supplies predicates) :
+    (left ++ right).Supplies predicates := by
+  intro predicate member
+  rcases supplies predicate member with ⟨evidence, found⟩
+  exact ⟨evidence, found.append_left⟩
+
+/-- A suffix supplies its assumption spine through a prefix when none of the
+prefix goals can shadow those assumptions.  This is the strict form which
+preserves the suffix's selected evidence. -/
+theorem append_right_of_disjoint
+    {left right : EvidenceEnvironment} {predicates : List ProgramPredicate}
+    (disjoint : ∀ predicate, predicate ∈ predicates →
+      predicate ∉ left.map Prod.fst)
+    (supplies : right.Supplies predicates) :
+    (left ++ right).Supplies predicates := by
+  intro predicate member
+  rcases supplies predicate member with ⟨evidence, found⟩
+  exact ⟨evidence, found.append_right (disjoint predicate member)⟩
+
+/-- Assemble two assumption spines.  When a suffix goal also occurs in the
+prefix, the prefix entry supplies it; otherwise lookup reaches the
+suffix.  Exact preservation of suffix evidence requires the stronger
+`append_right_of_disjoint` lemma above. -/
+theorem append
+    {left right : EvidenceEnvironment}
+    {leftPredicates rightPredicates : List ProgramPredicate}
+    (leftSupplies : left.Supplies leftPredicates)
+    (rightSupplies : right.Supplies rightPredicates) :
+    (left ++ right).Supplies (leftPredicates ++ rightPredicates) := by
+  intro predicate member
+  rcases List.mem_append.mp member with member | member
+  · exact leftSupplies.append_left predicate member
+  · by_cases present : predicate ∈ left.map Prod.fst
+    · rcases LooksUp.exists_of_key_mem (environment := left) present with
+        ⟨evidence, found⟩
+      exact ⟨evidence, found.append_left⟩
+    · rcases rightSupplies predicate member with ⟨evidence, found⟩
+      exact ⟨evidence, found.append_right present⟩
+
+/-- Supplying predicates is contravariant in the requested assumption list. -/
+theorem of_subset
+    {environment : EvidenceEnvironment}
+    {available requested : List ProgramPredicate}
+    (supplies : environment.Supplies available)
+    (subset : ∀ predicate, predicate ∈ requested → predicate ∈ available) :
+    environment.Supplies requested := by
+  intro predicate member
+  exact supplies predicate (subset predicate member)
+
+end EvidenceEnvironment.Supplies
 
 /-- Replace every assumption leaf in retained semantic evidence with the
 concrete evidence supplied by the invocation environment. -/
@@ -310,6 +464,33 @@ theorem valid
       cases found with
       | head => exact head.closed_valid
       | tail _ tailFound => exact induction _ _ tailFound
+
+/-- Every predicate in the source-ordered output list has a first-match
+runtime dictionary entry.  Duplicate goals are handled by the head entry. -/
+theorem supplies
+    {context : Context} {caller : EvidenceEnvironment}
+    {requirements : List RequirementId} {predicates : List ProgramPredicate}
+    {environment : EvidenceEnvironment}
+    (produces : RequirementsProduceEnvironment context caller requirements
+      predicates environment) :
+    environment.Supplies predicates := by
+  induction produces with
+  | nil =>
+      intro predicate member
+      cases member
+  | @cons id ids headPredicate tailPredicates headEvidence tailEnvironment
+      head tail inductionHypothesis =>
+      intro predicate member
+      simp only [List.mem_cons] at member
+      rcases member with equal | tailMember
+      · subst predicate
+        exact ⟨headEvidence, .head⟩
+      · by_cases same : headPredicate = predicate
+        · subst predicate
+          exact ⟨headEvidence, .head⟩
+        · rcases inductionHypothesis predicate tailMember with
+            ⟨evidence, lookup⟩
+          exact ⟨evidence, .tail same lookup⟩
 
 end RequirementsProduceEnvironment
 

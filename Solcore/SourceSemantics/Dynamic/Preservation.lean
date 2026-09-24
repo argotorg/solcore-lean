@@ -560,34 +560,6 @@ end DefaultValue
 
 namespace RequirementsProduceEnvironment
 
-/-- Every predicate in the source-ordered output list has a first-match
-runtime dictionary entry.  Duplicate goals are handled by the head entry. -/
-theorem supplies
-    {context : Context} {caller : EvidenceEnvironment}
-    {requirements : List RequirementId} {predicates : List ProgramPredicate}
-    {environment : EvidenceEnvironment}
-    (produces : RequirementsProduceEnvironment context caller requirements
-      predicates environment) :
-    forall predicate, predicate ∈ predicates ->
-      exists evidence, environment.LooksUp predicate evidence := by
-  induction produces with
-  | nil =>
-      intro predicate member
-      cases member
-  | @cons id ids headPredicate tailPredicates headEvidence tailEnvironment
-      head tail inductionHypothesis =>
-      intro predicate member
-      simp only [List.mem_cons] at member
-      rcases member with equal | tailMember
-      · subst predicate
-        exact ⟨headEvidence, .head⟩
-      · by_cases same : headPredicate = predicate
-        · subst predicate
-          exact ⟨headEvidence, .head⟩
-        · rcases inductionHypothesis predicate tailMember with
-            ⟨evidence, lookup⟩
-          exact ⟨evidence, .tail same lookup⟩
-
 /-- Producing exactly the assumptions of a lexical context yields a closed,
 complete runtime evidence environment for that context. -/
 theorem covers

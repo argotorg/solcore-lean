@@ -123,6 +123,32 @@ theorem produced_evidence_valid
     producedEvidence.Valid context.signatures.resolutionRules :=
   instantiation.produces.valid
 
+/-- Assemble the use-site evidence with the lexical caller dictionary for a
+generalized local initializer.  Local evidence is kept first.  If an outer
+assumption has the same goal, its valid local entry safely supplies that goal;
+the stronger claim that the exact caller entry survives first-match lookup is
+available only through `Supplies.append_right_of_disjoint` and its explicit
+disjointness premise. -/
+theorem combined_evidence_covers
+    {context : Context} {callerEvidence producedEvidence : EvidenceEnvironment}
+    {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    {substitution : Substitution}
+    (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
+      binder type actualRequirements substitution producedEvidence)
+    (caller_covers : callerEvidence.Covers context) :
+    (producedEvidence ++ callerEvidence).Covers
+      (context.withAssumptions
+        (context.assumptions ++
+          instantiateLocalSchemePredicates substitution binder)) := by
+  constructor
+  · exact instantiation.produced_evidence_valid.append caller_covers.1
+  · apply (instantiation.produces.supplies.append caller_covers.2).of_subset
+    intro predicate member
+    rcases List.mem_append.mp member with member | member
+    · exact List.mem_append.mpr (.inr member)
+    · exact List.mem_append.mpr (.inl member)
+
 end LocalSchemeRuntimeInstantiation
 
 end Solcore.SourceSemantics.Dynamic

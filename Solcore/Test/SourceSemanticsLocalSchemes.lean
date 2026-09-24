@@ -196,6 +196,21 @@ private theorem runtimeInstantiation (signatures : ProgramSignatures)
       TypeSystem.Substitution.lookup?] using
       (producesEvidence signatures owner fresh)
 
+private theorem callerCovers (signatures : ProgramSignatures)
+    (owner : Resolved.DeclarationId) (fresh : TypeVarId) :
+    callerEvidence.Covers (useContext signatures owner fresh) := by
+  constructor
+  · intro goal evidence found
+    cases found with
+    | head => exact closedEvidenceValid signatures
+    | tail _ found => cases found
+  · intro predicate member
+    have same : predicate = actualPredicate := by
+      simpa [useContext, Context.withLocal, Context.withSolvedRequirements,
+        Context.withAssumptions] using member
+    subst predicate
+    exact ⟨_, .head⟩
+
 /-- The dynamic witness projects back to the established static judgment. -/
 example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
     (fresh : TypeVarId) :
@@ -216,5 +231,18 @@ example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
     instantiated.actual_requirements_nodup,
     instantiated.actual_requirement_templates_disjoint actualId (by simp),
     instantiated.produced_evidence_valid⟩
+
+/-- Local evidence is prepended to caller evidence.  This fixture deliberately
+uses the same goal in both dictionaries, exercising the overlap fallback rather
+than relying on a hidden disjointness premise. -/
+example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
+    (callerEvidence ++ callerEvidence).Covers
+      ((useContext signatures owner fresh).withAssumptions
+        ((useContext signatures owner fresh).assumptions ++
+          instantiateLocalSchemePredicates [(fresh, .word)]
+            (binder owner fresh))) :=
+  (runtimeInstantiation signatures owner fresh).combined_evidence_covers
+    (callerCovers signatures owner fresh)
 
 end Solcore.Test.SourceSemanticsLocalSchemes
