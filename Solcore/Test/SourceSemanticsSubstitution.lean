@@ -368,6 +368,77 @@ example (signatures : ProgramSignatures) :
       (FlexibleSubstitution.TypeAdmissible.applySubstitution closes
         sourceAdmissible)
 
+/-- A ground substitution removes exactly its domain from the stable
+free-variable order, including when the same survivor occurs in both sides. -/
+example (context : SourceSemantics.Context) (substitution : Substitution)
+    (range : SubstitutionRangeWellFormed context substitution)
+    (left right : Ty) :
+    (substitution.apply (Ty.product left right)).freeVariables =
+      (Ty.product left right).freeVariables.filter fun metavariable =>
+        !(substitution.domain.contains metavariable) :=
+  FlexibleSubstitution.Substitution.freeVariables_apply range
+    (Ty.product left right)
+
+/-- Capture avoidance removes quantified lookup keys, retains all other
+lookups, and preserves the duplicate-free domain invariant. -/
+example (substitution : Substitution) (variables : List TypeVarId)
+    (removed retained : TypeVarId) (removedMem : removed ∈ variables)
+    (retainedAbsent : retained ∉ variables)
+    (unique : substitution.domain.Nodup) :
+    (substitution.without variables).lookup? removed = none ∧
+      (substitution.without variables).lookup? retained =
+        substitution.lookup? retained ∧
+      (substitution.without variables).domain.Nodup := by
+  exact ⟨TypeSystem.Substitution.lookup?_without_of_mem substitution removedMem,
+    FlexibleSubstitution.Substitution.lookup?_without_of_not_mem substitution
+      retainedAbsent,
+    FlexibleSubstitution.Substitution.domain_without_nodup substitution variables
+      unique⟩
+
+/-- Closed type transport remains valid when residual inference is enabled;
+`TypeWellFormed` itself still contributes no residual free variables. -/
+example (signatures : ProgramSignatures) :
+    let outer : TypeVarId := ⟨0⟩
+    let target := (SourceSemantics.Context.ofSignatures signatures)
+      |>.withResidualTypeVariables
+    TypeWellFormed target
+      (TypeSystem.Substitution.apply [(outer, .word)] .word) := by
+  dsimp
+  let outer : TypeVarId := ⟨0⟩
+  let source := (SourceSemantics.Context.ofSignatures signatures)
+    |>.withResidualTypeVariables
+    |>.withTypeVariables [outer]
+  let target := (SourceSemantics.Context.ofSignatures signatures)
+    |>.withResidualTypeVariables
+  have sourceWellFormed : TypeWellFormed source .word := {
+    binders :=
+      ((TypeParameterBindersWellFormed.ofSignatures signatures)
+        |>.withResidualTypeVariables)
+        |>.withTypeVariables [outer]
+    typeWellScoped := .builtin .word
+  }
+  have closes : FlexibleSubstitution.ContextCloses
+      [(outer, .word)] [outer] source target := {
+    variables_eq := rfl
+    exact := ExactSubstitution.singleton outer .word
+    retained_fresh := by simp [target, Context.withResidualTypeVariables,
+      Context.ofSignatures]
+    range := by
+      intro metavariable replacement member
+      simp only [List.mem_singleton] at member
+      cases member
+      exact {
+        binders :=
+          (TypeParameterBindersWellFormed.ofSignatures signatures)
+            |>.withResidualTypeVariables
+        typeWellScoped := .builtin .word
+      }
+    target_eq := rfl
+  }
+  simpa [outer, source, target, TypeSystem.Substitution.apply] using
+    (FlexibleSubstitution.TypeWellFormed.applySubstitution closes
+      sourceWellFormed)
+
 /-- Fresh inner binders extend a structural outer closure without being
 captured by its exact substitution. -/
 example (substitution : Substitution) (closedVariables variables : List TypeVarId)

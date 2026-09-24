@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.Substitution
 import Solcore.SourceSemantics.Static
 import Solcore.SourceSemantics.Program
 import Solcore.SourceSemantics.Dynamic.Evaluation
+import Solcore.TypeSystem.Properties
 
 /-!
 Static preservation properties for structural rigid-parameter substitution.
@@ -5341,6 +5342,361 @@ theorem Substitution.mem_freeVariables_apply_of_not_mem_domain
   | comptime inner induction =>
       exact induction occurs
   | error => simp [Ty.freeVariables] at occurs
+
+namespace Substitution
+
+private theorem mem_of_lookup?_eq_some
+    {substitution : TypeSystem.Substitution}
+    {metavariable : TypeVarId} {replacement : Ty}
+    (found : substitution.lookup? metavariable = some replacement) :
+    (metavariable, replacement) ∈ substitution := by
+  induction substitution with
+  | nil => simp [TypeSystem.Substitution.lookup?] at found
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, candidateReplacement⟩
+      by_cases same : candidate = metavariable
+      · subst candidate
+        simp [TypeSystem.Substitution.lookup?] at found
+        cases found
+        simp
+      · have tailFound :
+            TypeSystem.Substitution.lookup? rest metavariable =
+              some replacement := by
+          simpa [TypeSystem.Substitution.lookup?, same] using found
+        exact List.mem_cons_of_mem _ (induction tailFound)
+
+private theorem exists_lookup?_eq_some_of_mem_domain
+    {substitution : TypeSystem.Substitution} {metavariable : TypeVarId}
+    (member : metavariable ∈ substitution.domain) :
+    ∃ replacement, substitution.lookup? metavariable = some replacement := by
+  induction substitution with
+  | nil => simp [TypeSystem.Substitution.domain] at member
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, candidateReplacement⟩
+      simp only [TypeSystem.Substitution.domain, List.map_cons,
+        List.mem_cons] at member
+      by_cases same : candidate = metavariable
+      · exact ⟨candidateReplacement, by
+          simp [TypeSystem.Substitution.lookup?, same]⟩
+      · rcases member with member | member
+        · exact (same member.symm).elim
+        · rcases induction member with ⟨replacement, found⟩
+          exact ⟨replacement, by
+            simpa [TypeSystem.Substitution.lookup?, same] using found⟩
+
+private theorem lookup?_eq_none_iff_not_mem_domain
+    (substitution : TypeSystem.Substitution) (metavariable : TypeVarId) :
+    substitution.lookup? metavariable = none ↔
+      metavariable ∉ substitution.domain := by
+  constructor
+  · intro missing member
+    rcases exists_lookup?_eq_some_of_mem_domain member with ⟨actual, present⟩
+    rw [missing] at present
+    cases present
+  · exact StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+
+private def mergeVariables (left right : List TypeVarId) : List TypeVarId :=
+  right.foldl (fun variables metavariable =>
+    if metavariable ∈ variables then variables
+    else variables ++ [metavariable]) left
+
+private theorem filter_mergeVariables (keep : TypeVarId → Bool)
+    (left right : List TypeVarId) :
+    (mergeVariables left right).filter keep =
+      mergeVariables (left.filter keep) (right.filter keep) := by
+  induction right generalizing left with
+  | nil => simp [mergeVariables]
+  | cons head tail induction =>
+      change (mergeVariables
+          (if head ∈ left then left else left ++ [head]) tail).filter keep =
+        mergeVariables (left.filter keep) ((head :: tail).filter keep)
+      rw [induction]
+      by_cases kept : keep head
+      · by_cases present : head ∈ left
+        · simp [mergeVariables, kept, present, List.mem_filter.mpr ⟨present, kept⟩]
+        · have absent : head ∉ left.filter keep := by
+            simp [present]
+          simp [mergeVariables, kept, present, absent, List.filter_append]
+      · have absent : head ∉ left.filter keep := by
+          simp [kept]
+        by_cases present : head ∈ left
+        · simp [mergeVariables, kept, present]
+        · simp [mergeVariables, kept, present, List.filter_append]
+
+/-- A ground flexible substitution removes exactly its domain variables from
+the free-variable membership of a type; it cannot create fresh occurrences. -/
+theorem mem_freeVariables_apply_iff
+    {context : Context} {substitution : TypeSystem.Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (metavariable : TypeVarId) (type : Ty) :
+    metavariable ∈ (substitution.apply type).freeVariables ↔
+      metavariable ∈ type.freeVariables ∧
+        metavariable ∉ substitution.domain := by
+  induction type with
+  | «variable» candidate =>
+      cases found : substitution.lookup? candidate with
+      | none =>
+          have absent :=
+            (lookup?_eq_none_iff_not_mem_domain substitution candidate).mp found
+          simp only [TypeSystem.Substitution.apply, found, Option.getD_none,
+            Ty.freeVariables, List.mem_singleton]
+          constructor
+          · intro same
+            subst metavariable
+            exact ⟨rfl, absent⟩
+          · exact fun result => result.1
+      | some replacement =>
+          have member := mem_of_lookup?_eq_some found
+          have closed :=
+            StructuralSubstitution.TypeWellFormed.freeVariables_eq_nil
+              (range candidate replacement member)
+          have present : candidate ∈ substitution.domain :=
+            List.mem_map.mpr ⟨(candidate, replacement), member, rfl⟩
+          simp only [TypeSystem.Substitution.apply, found, Option.getD_some,
+            closed, List.not_mem_nil, Ty.freeVariables, List.mem_singleton,
+            false_iff]
+          rintro ⟨same, absent⟩
+          subst metavariable
+          exact absent present
+  | parameter parameter => simp [TypeSystem.Substitution.apply, Ty.freeVariables]
+  | constructor constructor =>
+      simp [TypeSystem.Substitution.apply, Ty.freeVariables]
+  | application left right leftInduction rightInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [SourceSemantics.mem_freeVariables_application_iff,
+        SourceSemantics.mem_freeVariables_application_iff,
+        leftInduction, rightInduction]
+      constructor
+      · rintro (⟨leftMember, absent⟩ | ⟨rightMember, absent⟩)
+        · exact ⟨Or.inl leftMember, absent⟩
+        · exact ⟨Or.inr rightMember, absent⟩
+      · rintro ⟨leftMember | rightMember, absent⟩
+        · exact Or.inl ⟨leftMember, absent⟩
+        · exact Or.inr ⟨rightMember, absent⟩
+  | function parameter result parameterInduction resultInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [SourceSemantics.mem_freeVariables_function_iff,
+        SourceSemantics.mem_freeVariables_function_iff,
+        parameterInduction, resultInduction]
+      constructor
+      · rintro (⟨parameterMember, absent⟩ | ⟨resultMember, absent⟩)
+        · exact ⟨Or.inl parameterMember, absent⟩
+        · exact ⟨Or.inr resultMember, absent⟩
+      · rintro ⟨parameterMember | resultMember, absent⟩
+        · exact Or.inl ⟨parameterMember, absent⟩
+        · exact Or.inr ⟨resultMember, absent⟩
+  | product left right leftInduction rightInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [SourceSemantics.mem_freeVariables_product_iff,
+        SourceSemantics.mem_freeVariables_product_iff,
+        leftInduction, rightInduction]
+      constructor
+      · rintro (⟨leftMember, absent⟩ | ⟨rightMember, absent⟩)
+        · exact ⟨Or.inl leftMember, absent⟩
+        · exact ⟨Or.inr rightMember, absent⟩
+      · rintro ⟨leftMember | rightMember, absent⟩
+        · exact Or.inl ⟨leftMember, absent⟩
+        · exact Or.inr ⟨rightMember, absent⟩
+  | mapping key value keyInduction valueInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [SourceSemantics.mem_freeVariables_mapping_iff,
+        SourceSemantics.mem_freeVariables_mapping_iff,
+        keyInduction, valueInduction]
+      constructor
+      · rintro (⟨keyMember, absent⟩ | ⟨valueMember, absent⟩)
+        · exact ⟨Or.inl keyMember, absent⟩
+        · exact ⟨Or.inr valueMember, absent⟩
+      · rintro ⟨keyMember | valueMember, absent⟩
+        · exact Or.inl ⟨keyMember, absent⟩
+        · exact Or.inr ⟨valueMember, absent⟩
+  | proxy inner induction => exact induction
+  | comptime inner induction => exact induction
+  | error => simp [TypeSystem.Substitution.apply, Ty.freeVariables]
+
+/-- List-level form of `mem_freeVariables_apply_iff`, retaining the stable
+left-to-right order of the surviving source variables. -/
+theorem freeVariables_apply
+    {context : Context} {substitution : TypeSystem.Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (type : Ty) :
+    (substitution.apply type).freeVariables =
+      type.freeVariables.filter fun metavariable =>
+        !(substitution.domain.contains metavariable) := by
+  let keep := fun metavariable : TypeVarId =>
+    !(substitution.domain.contains metavariable)
+  induction type with
+  | «variable» candidate =>
+      cases found : substitution.lookup? candidate with
+      | none =>
+          have absent :=
+            (lookup?_eq_none_iff_not_mem_domain substitution candidate).mp found
+          simp [TypeSystem.Substitution.apply, found, Ty.freeVariables, absent]
+      | some replacement =>
+          have member := mem_of_lookup?_eq_some found
+          have closed :=
+            StructuralSubstitution.TypeWellFormed.freeVariables_eq_nil
+              (range candidate replacement member)
+          have present : candidate ∈ substitution.domain :=
+            List.mem_map.mpr ⟨(candidate, replacement), member, rfl⟩
+          simp [TypeSystem.Substitution.apply, found, closed, Ty.freeVariables,
+            present]
+  | parameter parameter => simp [TypeSystem.Substitution.apply, Ty.freeVariables]
+  | constructor constructor =>
+      simp [TypeSystem.Substitution.apply, Ty.freeVariables]
+  | application left right leftInduction rightInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      change mergeVariables
+          (substitution.apply left).freeVariables
+          (substitution.apply right).freeVariables =
+        (mergeVariables left.freeVariables right.freeVariables).filter keep
+      rw [leftInduction, rightInduction, filter_mergeVariables]
+  | function parameter result parameterInduction resultInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      change mergeVariables
+          (substitution.apply parameter).freeVariables
+          (substitution.apply result).freeVariables =
+        (mergeVariables parameter.freeVariables result.freeVariables).filter keep
+      rw [parameterInduction, resultInduction, filter_mergeVariables]
+  | product left right leftInduction rightInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      change mergeVariables
+          (substitution.apply left).freeVariables
+          (substitution.apply right).freeVariables =
+        (mergeVariables left.freeVariables right.freeVariables).filter keep
+      rw [leftInduction, rightInduction, filter_mergeVariables]
+  | mapping key value keyInduction valueInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      change mergeVariables
+          (substitution.apply key).freeVariables
+          (substitution.apply value).freeVariables =
+        (mergeVariables key.freeVariables value.freeVariables).filter keep
+      rw [keyInduction, valueInduction, filter_mergeVariables]
+  | proxy inner induction => exact induction
+  | comptime inner induction => exact induction
+  | error => rfl
+
+private theorem without_sublist (substitution : TypeSystem.Substitution)
+    (variables : List TypeVarId) :
+    List.Sublist (substitution.without variables) substitution := by
+  induction variables generalizing substitution with
+  | nil => simp [TypeSystem.Substitution.without]
+  | cons erasedVariable restVariables ih =>
+      change List.Sublist
+        ((substitution.erase erasedVariable).without restVariables)
+          substitution
+      have tailSublist := ih (substitution.erase erasedVariable)
+      have erasedSublist :
+          List.Sublist (substitution.erase erasedVariable) substitution := by
+        change List.Sublist
+          (substitution.filter fun entry => entry.1 != erasedVariable)
+          substitution
+        exact List.filter_sublist
+      exact tailSublist.trans erasedSublist
+
+/-- Removing binders preserves lookup at every variable not being removed. -/
+theorem lookup?_without_of_not_mem (substitution : TypeSystem.Substitution)
+    {variables : List TypeVarId} {metavariable : TypeVarId}
+    (absent : metavariable ∉ variables) :
+    (substitution.without variables).lookup? metavariable =
+      substitution.lookup? metavariable := by
+  induction variables generalizing substitution with
+  | nil => simp [TypeSystem.Substitution.without]
+  | cons erasedVariable restVariables ih =>
+      simp only [List.mem_cons, not_or] at absent
+      change ((substitution.erase erasedVariable).without restVariables).lookup?
+          metavariable = substitution.lookup? metavariable
+      rw [ih (substitution.erase erasedVariable) absent.2,
+        TypeSystem.Substitution.lookup?_erase_of_ne substitution absent.1]
+
+private theorem erase_eq_self_of_not_mem_domain
+    (substitution : TypeSystem.Substitution) (metavariable : TypeVarId)
+    (absent : metavariable ∉ substitution.domain) :
+    substitution.erase metavariable = substitution := by
+  induction substitution with
+  | nil => rfl
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, replacement⟩
+      simp only [TypeSystem.Substitution.domain, List.map_cons,
+        List.mem_cons, not_or] at absent
+      have different : candidate ≠ metavariable := fun same =>
+        absent.1 same.symm
+      have tailEq := induction absent.2
+      unfold TypeSystem.Substitution.erase at tailEq ⊢
+      simp [different, tailEq]
+
+/-- Restriction by variables disjoint from the domain is the identity. -/
+theorem without_eq_self_of_disjoint_domain
+    (substitution : TypeSystem.Substitution) (variables : List TypeVarId)
+    (disjoint : ∀ metavariable, metavariable ∈ variables →
+      metavariable ∉ substitution.domain) :
+    substitution.without variables = substitution := by
+  induction variables generalizing substitution with
+  | nil => rfl
+  | cons erasedVariable restVariables ih =>
+      have variableAbsent := disjoint erasedVariable (by simp)
+      rw [TypeSystem.Substitution.without, List.foldl_cons,
+        erase_eq_self_of_not_mem_domain substitution erasedVariable
+          variableAbsent]
+      apply ih
+      intro metavariable member
+      exact disjoint metavariable
+        (List.mem_cons_of_mem erasedVariable member)
+
+/-- Removing binders filters exactly those binders from the substitution
+domain, independently of replacement types and substitution order. -/
+theorem mem_domain_without_iff (substitution : TypeSystem.Substitution)
+    (variables : List TypeVarId) (metavariable : TypeVarId) :
+    metavariable ∈ (substitution.without variables).domain ↔
+      metavariable ∈ substitution.domain ∧ metavariable ∉ variables := by
+  constructor
+  · intro member
+    have originalSublist := without_sublist substitution variables
+    have domainSublist :
+        List.Sublist (substitution.without variables).domain
+          substitution.domain := by
+      simpa [TypeSystem.Substitution.domain] using
+        originalSublist.map Prod.fst
+    refine ⟨domainSublist.subset member, ?_⟩
+    intro removed
+    have lookupMissing :=
+      TypeSystem.Substitution.lookup?_without_of_mem substitution removed
+    exact ((lookup?_eq_none_iff_not_mem_domain
+      (substitution.without variables) metavariable).mp lookupMissing) member
+  · rintro ⟨member, absent⟩
+    rcases exists_lookup?_eq_some_of_mem_domain member with
+      ⟨replacement, found⟩
+    have restrictedFound :
+        (substitution.without variables).lookup? metavariable =
+          some replacement := by
+      rw [lookup?_without_of_not_mem substitution absent]
+      exact found
+    have restrictedMember := mem_of_lookup?_eq_some restrictedFound
+    exact List.mem_map.mpr
+      ⟨(metavariable, replacement), restrictedMember, rfl⟩
+
+/-- Restriction cannot introduce duplicate substitution-domain binders. -/
+theorem domain_without_nodup (substitution : TypeSystem.Substitution)
+    (variables : List TypeVarId) (unique : substitution.domain.Nodup) :
+    (substitution.without variables).domain.Nodup := by
+  have substitutionSublist := without_sublist substitution variables
+  have domainSublist :
+      List.Sublist (substitution.without variables).domain
+        substitution.domain := by
+    simpa [TypeSystem.Substitution.domain] using
+      substitutionSublist.map Prod.fst
+  exact unique.sublist domainSublist
+
+end Substitution
+
+/-- Capture-avoiding restriction preserves ground range well-formedness. -/
+theorem SubstitutionRangeWellFormed.without
+    {context : Context} {substitution : TypeSystem.Substitution}
+    (range : SubstitutionRangeWellFormed context substitution)
+    (variables : List TypeVarId) :
+    SubstitutionRangeWellFormed context (substitution.without variables) := by
+  intro metavariable replacement member
+  apply range metavariable replacement
+  exact (Substitution.without_sublist substitution variables).subset member
 
 /-- Simultaneous flexible substitution transports a scoped type when every
 replacement is closed in the target context and every untouched source
