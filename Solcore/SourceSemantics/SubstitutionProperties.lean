@@ -5265,6 +5265,221 @@ open Frontend
 open Frontend.SourceInference
 open TypeSystem
 
+/-- Flexible substitution on the proof-only control summary retained by the
+source typing judgment. -/
+def applyControlSummary (substitution : Substitution)
+    (summary : ControlSummary) : ControlSummary := {
+  fallthrough := summary.fallthrough.map substitution.apply
+  mayReturn := summary.mayReturn
+  mayBreak := summary.mayBreak
+  mayContinue := summary.mayContinue
+}
+
+/-- Flexible substitution on the ambient return type of a control context. -/
+def applyControlContext (substitution : Substitution)
+    (control : ControlContext) : ControlContext := {
+  returnType := substitution.apply control.returnType
+  loopDepth := control.loopDepth
+}
+
+/-- Flexible substitution on the facts produced by one statement. -/
+def applyStatementFacts (substitution : Substitution)
+    (facts : StatementFacts) : StatementFacts := {
+  type := substitution.apply facts.type
+  hasValue := facts.hasValue
+  sawReturn := facts.sawReturn
+  control := applyControlSummary substitution facts.control
+}
+
+/-- Flexible substitution on the facts accumulated by a statement body. -/
+def applyBodyFacts (substitution : Substitution)
+    (facts : BodyFacts) : BodyFacts := {
+  type := substitution.apply facts.type
+  sawReturn := facts.sawReturn
+  control := applyControlSummary substitution facts.control
+}
+
+/-- Flexible substitution on the proof-facing expression requirement plan. -/
+def applyExpressionRequirementPlan (substitution : Substitution) :
+    ExpressionRequirementPlan → ExpressionRequirementPlan
+  | .ordinary owned => .ordinary owned
+  | .directCall predicates =>
+      .directCall (predicates.map
+        (TypedTraitResolution.applySubstitution substitution))
+  | .indirectCall coercions =>
+      .indirectCall (coercions.map
+        (CoercionStep.applySubstitution substitution))
+
+@[simp] theorem apply_builtin (substitution : Substitution)
+    (builtin : BuiltinType) :
+    substitution.apply (.constructor (.builtin builtin)) =
+      .constructor (.builtin builtin) := rfl
+
+@[simp] theorem apply_word (substitution : Substitution) :
+    substitution.apply Ty.word = Ty.word := rfl
+
+@[simp] theorem apply_integer (substitution : Substitution) :
+    substitution.apply Ty.integer = Ty.integer := rfl
+
+@[simp] theorem apply_bool (substitution : Substitution) :
+    substitution.apply Ty.bool = Ty.bool := rfl
+
+@[simp] theorem apply_unit (substitution : Substitution) :
+    substitution.apply Ty.unit = Ty.unit := rfl
+
+@[simp] theorem apply_ite (substitution : Substitution)
+    (condition : Prop) [Decidable condition] (thenType elseType : Ty) :
+    substitution.apply (if condition then thenType else elseType) =
+      if condition then substitution.apply thenType
+      else substitution.apply elseType := by
+  split <;> rfl
+
+@[simp] theorem applyControlContext_enterLoop
+    (substitution : Substitution) (control : ControlContext) :
+    applyControlContext substitution control.enterLoop =
+      (applyControlContext substitution control).enterLoop := by
+  cases control
+  rfl
+
+@[simp] theorem applyControlSummary_ordinary
+    (substitution : Substitution) (type : Ty) :
+    applyControlSummary substitution (.ordinary type) =
+      .ordinary (substitution.apply type) := by
+  rfl
+
+@[simp] theorem applyControlSummary_returned
+    (substitution : Substitution) :
+    applyControlSummary substitution .returned = .returned := by
+  rfl
+
+@[simp] theorem applyControlSummary_breaking
+    (substitution : Substitution) :
+    applyControlSummary substitution .breaking = .breaking := by
+  rfl
+
+@[simp] theorem applyControlSummary_continuing
+    (substitution : Substitution) :
+    applyControlSummary substitution .continuing = .continuing := by
+  rfl
+
+@[simp] theorem applyControlSummary_sequence
+    (substitution : Substitution) (head tail : ControlSummary) :
+    applyControlSummary substitution (head.sequence tail) =
+      (applyControlSummary substitution head).sequence
+        (applyControlSummary substitution tail) := by
+  cases head with
+  | mk fallthrough mayReturn mayBreak mayContinue =>
+      cases fallthrough <;>
+        simp [applyControlSummary, ControlSummary.sequence,
+          ControlSummary.canFallthrough]
+
+@[simp] theorem applyControlSummary_branches
+    (substitution : Substitution) (left right : ControlSummary) :
+    applyControlSummary substitution (left.branches right) =
+      (applyControlSummary substitution left).branches
+        (applyControlSummary substitution right) := by
+  cases left with
+  | mk leftFallthrough leftReturn leftBreak leftContinue =>
+      cases right with
+      | mk rightFallthrough rightReturn rightBreak rightContinue =>
+          cases leftFallthrough <;> cases rightFallthrough <;>
+            simp [applyControlSummary, ControlSummary.branches,
+              ControlSummary.canFallthrough]
+
+@[simp] theorem applyControlSummary_eraseValue
+    (substitution : Substitution) (summary : ControlSummary) :
+    applyControlSummary substitution summary.eraseValue =
+      (applyControlSummary substitution summary).eraseValue := by
+  cases summary with
+  | mk fallthrough mayReturn mayBreak mayContinue =>
+      cases fallthrough <;>
+        simp [applyControlSummary, ControlSummary.eraseValue]
+
+@[simp] theorem applyControlSummary_loop
+    (substitution : Substitution) (summary : ControlSummary) :
+    applyControlSummary substitution summary.loop =
+      (applyControlSummary substitution summary).loop := by
+  cases summary
+  rfl
+
+@[simp] theorem applyStatementFacts_singleton
+    (substitution : Substitution) (facts : StatementFacts) :
+    applyBodyFacts substitution (.singleton facts) =
+      .singleton (applyStatementFacts substitution facts) := by
+  rcases facts with ⟨type, hasValue, sawReturn, control⟩
+  cases hasValue <;> cases sawReturn <;>
+    simp [applyBodyFacts, applyStatementFacts, BodyFacts.singleton]
+
+@[simp] theorem applyBodyFacts_empty (substitution : Substitution) :
+    applyBodyFacts substitution .empty = .empty := by
+  rfl
+
+@[simp] theorem applyBodyFacts_cons
+    (substitution : Substitution)
+    (head : StatementFacts) (tail : BodyFacts) :
+    applyBodyFacts substitution (.cons head tail) =
+      .cons (applyStatementFacts substitution head)
+        (applyBodyFacts substitution tail) := by
+  rcases head with ⟨headType, hasValue, headSawReturn, headControl⟩
+  rcases tail with ⟨tailType, tailSawReturn, tailControl⟩
+  cases headSawReturn <;> cases tailSawReturn <;>
+    simp [applyBodyFacts, applyStatementFacts, BodyFacts.cons]
+
+@[simp] theorem allBodiesSawReturn_applyBodyFacts
+    (substitution : Substitution) (facts : List BodyFacts) :
+    allBodiesSawReturn (facts.map (applyBodyFacts substitution)) =
+      allBodiesSawReturn facts := by
+  induction facts with
+  | nil => rfl
+  | cons head tail induction =>
+      unfold allBodiesSawReturn at induction ⊢
+      simp only [List.map_cons, List.all_cons, applyBodyFacts]
+      rw [induction]
+
+theorem mergeBodyControls_applyBodyFacts
+    (substitution : Substitution) (facts : List BodyFacts)
+    (fallback : Option BodyFacts) :
+    mergeBodyControls (facts.map (applyBodyFacts substitution))
+        (fallback.map (applyBodyFacts substitution)) =
+      (mergeBodyControls facts fallback).map
+        (applyControlSummary substitution) := by
+  induction facts with
+  | nil =>
+      cases fallback <;> rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, mergeBodyControls]
+      rw [induction]
+      cases merged : mergeBodyControls tail fallback with
+      | none => rfl
+      | some summary =>
+          simp [applyBodyFacts]
+
+theorem BodyCompletes.applySubstitution
+    {expected : Ty} {facts : BodyFacts}
+    (substitution : Substitution)
+    (completes : BodyCompletes expected facts) :
+    BodyCompletes (substitution.apply expected)
+      (applyBodyFacts substitution facts) := by
+  rcases completes with ⟨noBreak, noContinue, completion⟩
+  refine ⟨noBreak, noContinue, ?_⟩
+  rcases completion with ⟨fallthrough, returned⟩ | fallthrough
+  · left
+    exact ⟨by simp [applyBodyFacts, applyControlSummary, fallthrough],
+      returned⟩
+  · right
+    simp [applyBodyFacts, applyControlSummary, fallthrough]
+
+@[simp] theorem flatMap_patternRequirements_applySubstitution
+    (substitution : Substitution) (cases : List TypedMatchCase) :
+    (cases.map (TypedMatchCase.applySubstitution substitution)).flatMap
+        (fun matchCase => matchCase.pattern.requirements) =
+      cases.flatMap (fun matchCase => matchCase.pattern.requirements) := by
+  induction cases with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [TypedMatchCase.applySubstitution,
+        TypedMatchPattern.applySubstitution, induction]
+
 @[simp] theorem applySolvedRequirement_id (substitution : Substitution)
     (requirement : SolvedRequirement) :
     (applySolvedRequirement substitution requirement).id = requirement.id := by
@@ -6876,6 +7091,56 @@ theorem localSchemeInitializer {substitution : Substitution}
     TypedBinder.applySubstitution, LocalSchemeRequirement.applySubstitution,
     List.map_append, List.map_map, Function.comp_def] using extended
 
+/-- Thread a flexible context closure through one lexical binder extension. -/
+theorem afterBinder {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target final : Context}
+    {owner : Resolved.DeclarationId} {binder : TypedBinder}
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : BinderExtends owner source binder final) :
+    ContextCloses substitution closedVariables final
+      (applyContext substitution target.typeVariables final) := by
+  cases extension with
+  | intro wellFormed fresh =>
+      have extended := closes.withLocal binder.id binder.scheme
+        binder.schemeRequirements fresh.2
+      rw [applyContext_withLocal substitution target.typeVariables source
+        binder.id binder.scheme binder.schemeRequirements fresh.2,
+        closes.target_eq]
+      exact extended
+
+/-- Thread a flexible context closure through a source-ordered binder list. -/
+theorem afterBinders {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target final : Context}
+    {owner : Resolved.DeclarationId} {binders : List TypedBinder}
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : BindersExtend owner source binders final) :
+    ContextCloses substitution closedVariables final
+      (applyContext substitution target.typeVariables final) := by
+  induction extension generalizing target with
+  | nil =>
+      rw [closes.target_eq]
+      exact closes
+  | cons head tail induction =>
+      have middleCloses := closes.afterBinder head
+      simpa using induction middleCloses
+
+/-- Thread a flexible context closure through a monomorphic binder list. -/
+theorem afterMonoBinders {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target final : Context}
+    {owner : Resolved.DeclarationId} {binders : List TypedBinder}
+    {types : List Ty}
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : MonoBindersExtend owner source binders types final) :
+    ContextCloses substitution closedVariables final
+      (applyContext substitution target.typeVariables final) := by
+  induction extension generalizing target with
+  | nil =>
+      rw [closes.target_eq]
+      exact closes
+  | cons _ head tail induction =>
+      have middleCloses := closes.afterBinder head
+      simpa using induction middleCloses
+
 end ContextCloses
 
 /-- Structural context closure transports every admissible retained type.
@@ -7369,6 +7634,106 @@ theorem MonoBindersExtend.applySubstitution
           refine .cons ?_ transportedHead ?_
           · simp [schemeEq]
           · simpa [Context.withLocal] using transportedTail
+
+/-- A typed statement changes its lexical context only through the binder
+extensions already recorded by its typing constructor. -/
+theorem StatementHasType.contextCloses
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext final : Context}
+    {source : TypedSource} {control : ControlContext}
+    {id : StatementId} {facts : StatementFacts}
+    (closes : ContextCloses substitution closedVariables sourceContext
+      targetContext)
+    (typing : StatementHasType source control sourceContext id final facts) :
+    ContextCloses substitution closedVariables final
+      (applyContext substitution targetContext.typeVariables final) := by
+  cases typing with
+  | letUninitialized _ _ _ _ extension _ => exact closes.afterBinder extension
+  | letInitialized _ _ _ _ _ extension _ => exact closes.afterBinder extension
+  | letInitializedGeneralized _ _ _ _ _ _ extension _ =>
+      exact closes.afterBinder extension
+  | returnUnit | returnValue | expressionValue | expressionDiscard |
+      assignValue | assignBitNot | ifWithoutElse | ifWithElse | block |
+      matchWithoutDefault | matchWithDefault | forLoop | whileLoop |
+      breakStmt | continueStmt =>
+      rw [closes.target_eq]
+      exact closes
+
+/-- A typed statement sequence threads flexible context closure through every
+statement-local extension. -/
+theorem StatementsHaveType.contextCloses
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext final : Context}
+    {source : TypedSource} {control : ControlContext}
+    {statements : List StatementId} {facts : BodyFacts}
+    (closes : ContextCloses substitution closedVariables sourceContext
+      targetContext)
+    (typing : StatementsHaveType source control sourceContext statements final
+      facts) :
+    ContextCloses substitution closedVariables final
+      (applyContext substitution targetContext.typeVariables final) := by
+  induction statements generalizing sourceContext targetContext final facts with
+  | nil =>
+      cases typing
+      rw [closes.target_eq]
+      exact closes
+  | cons statement statements induction =>
+      cases statements with
+      | nil =>
+          cases typing with
+          | singleton head =>
+              exact FlexibleSubstitution.StatementHasType.contextCloses
+                closes head
+      | cons next rest =>
+          cases typing with
+          | cons head tail =>
+              have middleCloses :=
+                FlexibleSubstitution.StatementHasType.contextCloses closes head
+              simpa using induction middleCloses tail
+
+/-- A typed `for` item changes its lexical context only through its recorded
+binder extension. -/
+theorem ForItemHasType.contextCloses
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext final : Context}
+    {source : TypedSource} {control : ControlContext} {item : ForItemForm}
+    (closes : ContextCloses substitution closedVariables sourceContext
+      targetContext)
+    (typing : ForItemHasType source control sourceContext item final) :
+    ContextCloses substitution closedVariables final
+      (applyContext substitution targetContext.typeVariables final) := by
+  cases typing with
+  | letUninitialized _ _ extension => exact closes.afterBinder extension
+  | letInitialized _ _ _ extension => exact closes.afterBinder extension
+  | letInitializedGeneralized _ _ _ _ extension =>
+      exact closes.afterBinder extension
+  | expression | assignValue | assignBitNot =>
+      rw [closes.target_eq]
+      exact closes
+
+/-- A typed `for` item sequence threads flexible context closure through every
+item-local extension. -/
+theorem ForItemsHaveType.contextCloses
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext final : Context}
+    {source : TypedSource} {control : ControlContext}
+    {items : List ForItemForm}
+    (closes : ContextCloses substitution closedVariables sourceContext
+      targetContext)
+    (typing : ForItemsHaveType source control sourceContext items final) :
+    ContextCloses substitution closedVariables final
+      (applyContext substitution targetContext.typeVariables final) := by
+  induction items generalizing sourceContext targetContext final with
+  | nil =>
+      cases typing
+      rw [closes.target_eq]
+      exact closes
+  | cons item items induction =>
+      cases typing with
+      | cons head tail =>
+          have middleCloses :=
+            FlexibleSubstitution.ForItemHasType.contextCloses closes head
+          simpa using induction middleCloses tail
 
 @[simp] theorem closeContext_signatures (substitution : Substitution)
     (context : Context) :
