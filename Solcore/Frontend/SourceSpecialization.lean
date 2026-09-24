@@ -50,6 +50,23 @@ inductive Error where
   | nonConcreteArgument
       (parameter : TypeParameterId) (reason : NonConcreteType)
   | polymorphicBinder (binder : Resolved.LocalId) (variables : List TypeVarId)
+  | qualifiedBinderPosition (binder : Resolved.LocalId)
+  | duplicateLocalSchemeRequirement (requirement : RequirementId)
+  | missingLocalSchemeRequirement
+      (binder : Resolved.LocalId) (requirement : RequirementId)
+  | duplicateSolvedLocalSchemeRequirement
+      (binder : Resolved.LocalId) (requirement : RequirementId) (count : Nat)
+  | localSchemeRequirementPredicateMismatch
+      (binder : Resolved.LocalId) (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | localSchemeRequirementEvidenceMismatch
+      (binder : Resolved.LocalId) (requirement : RequirementId)
+      (predicate : ProgramPredicate)
+  | localSchemeRequirementNotGeneralized
+      (binder : Resolved.LocalId) (requirement : RequirementId)
+      (predicate : ProgramPredicate)
+  | orphanOpenLocalSchemeAssumption
+      (requirement : RequirementId) (predicate : ProgramPredicate)
   | conflictingResidualScope
       (node : NodeId) (first second : List TypeVarId)
   | residualScopeTraversalLimit (node : NodeId)
@@ -510,7 +527,9 @@ private def checkedFunctionTypes (function : CheckedFunction) : List Ty :=
 
 private def checkedFunctionParameterTypes (function : CheckedFunction) : List Ty :=
   checkedFunctionTypes function ++
-    (typedSourceBinders function.typedBody).map (·.scheme.body)
+    (typedSourceBinders function.typedBody).flatMap fun binder =>
+      binder.scheme.body :: binder.schemeRequirements.flatMap fun requirement =>
+        predicateTypes requirement.predicate
 
 private def insertParameter (parameters : List TypeParameterId)
     (parameter : TypeParameterId) : List TypeParameterId :=
@@ -617,15 +636,18 @@ private def validateLexicalTypes (lexical : List TypeVarId)
   | some reason => .error (.residualType reason)
   | none => pure ()
 
-private def validateLexicalScheme (lexical : List TypeVarId)
-    (scheme : Scheme) : Except Error Unit :=
-  validateLexicalTypes (appendVariables lexical scheme.quantified) [scheme.body]
+private def validateLexicalBinder (lexical : List TypeVarId)
+    (binder : TypedBinder) : Except Error Unit :=
+  let binderLexical := appendVariables lexical binder.scheme.quantified
+  validateLexicalTypes binderLexical
+    (binder.scheme.body :: binder.schemeRequirements.flatMap fun requirement =>
+      predicateTypes requirement.predicate)
 
 private def validateLexicalBinderSchemes (lexical : List TypeVarId) :
     List TypedBinder → Except Error Unit
   | [] => .ok ()
   | binder :: rest => do
-      validateLexicalScheme lexical binder.scheme
+      validateLexicalBinder lexical binder
       validateLexicalBinderSchemes lexical rest
 
 /-- Whether an initializer edge points directly to a lambda node.  Grouping,
@@ -750,6 +772,77 @@ private def validatePolymorphicBinderPositions (source : TypedSource) :
   | some binder =>
       throw (.polymorphicBinder binder.id binder.scheme.quantified)
   | none => pure ()
+
+private def qualifiedLocalBinders (source : TypedSource) : List TypedBinder :=
+  source.nodes.filterMap fun
+    | .statement { form := .letDecl binder initializer, .. } =>
+        if polymorphicLetAllowed source binder initializer then some binder
+        else none
+    | _ => none
+
+private def validateQualifiedBinderPositions (source : TypedSource) :
+    Except Error Unit := do
+  let allowed := (qualifiedLocalBinders source).map (·.id)
+  match (typedSourceBinders source).find? fun binder =>
+      !binder.schemeRequirements.isEmpty && !allowed.contains binder.id with
+  | some binder => throw (.qualifiedBinderPosition binder.id)
+  | none => pure ()
+
+private def firstDuplicateRequirement :
+    List RequirementId → Option RequirementId
+  | [] => none
+  | requirement :: rest =>
+      if rest.contains requirement then some requirement
+      else firstDuplicateRequirement rest
+
+private def localSchemeRequirements
+    (source : TypedSource) : List (TypedBinder × LocalSchemeRequirement) :=
+  (qualifiedLocalBinders source).flatMap fun binder =>
+    binder.schemeRequirements.map fun requirement => (binder, requirement)
+
+private def validateLocalSchemeRequirements (function : CheckedFunction) :
+    Except Error (List RequirementId) := do
+  validateQualifiedBinderPositions function.typedBody
+  let owned := localSchemeRequirements function.typedBody
+  let ownedIds := owned.map fun entry => entry.2.templateRequirement
+  match firstDuplicateRequirement ownedIds with
+  | some requirement => throw (.duplicateLocalSchemeRequirement requirement)
+  | none => pure ()
+  for (binder, requirement) in owned do
+    let variables :=
+      TypedTraitResolution.predicateVariables requirement.predicate
+    if !(variables.any fun metavariable =>
+        binder.scheme.quantified.contains metavariable) then
+      throw (.localSchemeRequirementNotGeneralized binder.id
+        requirement.templateRequirement requirement.predicate)
+    let matchingRequirements := function.solvedRequirements.filter fun solved =>
+      solved.id == requirement.templateRequirement
+    let solved ← match matchingRequirements with
+      | [] => throw (.missingLocalSchemeRequirement binder.id
+          requirement.templateRequirement)
+      | [solved] => pure solved
+      | matchingRequirements =>
+          throw (.duplicateSolvedLocalSchemeRequirement binder.id
+            requirement.templateRequirement matchingRequirements.length)
+    if solved.predicate != requirement.predicate then
+      throw (.localSchemeRequirementPredicateMismatch binder.id
+        requirement.templateRequirement requirement.predicate solved.predicate)
+    match solved.evidence with
+    | .assumption predicate =>
+        if predicate != requirement.predicate then
+          throw (.localSchemeRequirementEvidenceMismatch binder.id
+            requirement.templateRequirement requirement.predicate)
+    | .implementation _ =>
+        throw (.localSchemeRequirementEvidenceMismatch binder.id
+          requirement.templateRequirement requirement.predicate)
+  for solved in function.solvedRequirements do
+    let variables := TypedTraitResolution.predicateVariables solved.predicate
+    if !variables.isEmpty && !ownedIds.contains solved.id then
+      match solved.evidence with
+      | .assumption _ =>
+          throw (.orphanOpenLocalSchemeAssumption solved.id solved.predicate)
+      | .implementation _ => pure ()
+  pure ownedIds
 
 private structure ResidualScopeTask where
   node : NodeId
@@ -911,7 +1004,7 @@ private def residualVariablesFor (scopes : List ResidualScope)
   ((scopes.find? fun scope => decide (scope.node = node)).map
     (·.variables)).getD []
 
-private def validateNodeBinderSchemes (source : TypedSource)
+private def validateNodeBinderSchemes (_source : TypedSource)
     (lexical : List TypeVarId) : Node → Except Error Unit
   | .expression node =>
       match node.form with
@@ -920,13 +1013,8 @@ private def validateNodeBinderSchemes (source : TypedSource)
       | _ => pure ()
   | .statement node =>
       match node.form with
-      | .letDecl binder initializer =>
-          let binderLexical :=
-            if polymorphicLetAllowed source binder initializer then
-              appendVariables lexical binder.scheme.quantified
-            else
-              lexical
-          validateLexicalScheme binderLexical binder.scheme
+      | .letDecl binder _ =>
+          validateLexicalBinder lexical binder
       | _ =>
           validateLexicalBinderSchemes lexical
             (statementFormBinders node.form)
@@ -943,6 +1031,7 @@ private def validateScopedNodes (source : TypedSource)
 private def validateTypedSourceResiduals (source : TypedSource) :
     Except Error Unit := do
   validatePolymorphicBinderPositions source
+  validateQualifiedBinderPositions source
   validateLexicalBinderSchemes [] source.inputs
   validateScopedNodes source (← residualScopes source) source.nodes
 
@@ -998,11 +1087,13 @@ def specializeFunction (signature : ProgramFunctionSignature)
     (ProgramPredicate.applyParameters canonical)
   let specialized := applyCheckedFunction canonical function
   validateTypedSourceResiduals specialized.typedBody
+  let localSchemeRequirements ← validateLocalSchemeRequirements specialized
   let lexicalVariables :=
     supportedPolymorphicVariables specialized.typedBody
   validateConcreteTypes (assumptions.flatMap predicateTypes ++
     [specialized.type, specialized.inferredBodyType] ++
-    specialized.solvedRequirements.flatMap requirementTypes)
+    (specialized.solvedRequirements.filter fun requirement =>
+      !localSchemeRequirements.contains requirement.id).flatMap requirementTypes)
   validateLexicalTypes lexicalVariables
     (specialized.substitution.map Prod.snd)
   let stagesAfter ← match SourceStageAnalysis.analyzeFunction specialized with

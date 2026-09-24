@@ -21,6 +21,7 @@ private def workspace : Workspace.RawWorkspace := {
     content := String.intercalate "\n" [
       "trait Eq<T> {}",
       "impl Eq<Word> {}",
+      "impl Eq<Bool> {}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function globalIdentity<T>(value: T) returns (T) { return value; }",
       "function choose3<A, B, C>(first: A, second: B, third: C) returns (C) { return third; }",
@@ -126,6 +127,10 @@ private def workspace : Workspace.RawWorkspace := {
       "function cycleRight<U>(value: U) returns (U) { return cycleLeft(value); }",
       "function grow<T>(value: T) { grow((value, value)); return; }",
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
+      "function qualifiedLocal(flag: Bool) returns (Word, Bool) {",
+      "  let f = lam(value) { return keep(value); };",
+      "  return (f(1), f(flag));",
+      "}",
       "function constrained(value: Word) returns (Word) { return keep(value); }",
       "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
       "function localProof(flag: Bool) returns (Word, Bool) {",
@@ -219,6 +224,34 @@ private def setLocalBinderScheme (nodes : List Node)
             node
       | _ => node
   | .expression _ => node
+
+private def setLocalBinderRequirements (nodes : List Node)
+    (target : Resolved.LocalId)
+    (requirements : List LocalSchemeRequirement) : List Node :=
+  nodes.map fun node => match node with
+  | .statement statement =>
+      match statement.form with
+      | .letDecl binder initializer =>
+          if binder.id == target then
+            .statement {
+              statement with
+              form := .letDecl { binder with schemeRequirements := requirements }
+                initializer
+            }
+          else
+            node
+      | _ => node
+  | .expression _ => node
+
+private def setExpressionRequirements (nodes : List Node)
+    (target : ExpressionId) (requirements : List RequirementId) : List Node :=
+  nodes.map fun node => match node with
+  | .expression expression =>
+      if expression.id == target then
+        .expression { expression with requirements }
+      else
+        node
+  | .statement _ => node
 
 private def setExpressionCoercions (nodes : List Node) (target : ExpressionId)
     (coercions : List CoercionStep) : List Node :=
@@ -1256,6 +1289,122 @@ private def testContextualLocalProofCalls
   | outcome => throw (IO.userError
       s!"contextual local proof calls expected complete, found {reprStr outcome}")
 
+private def testQualifiedLocalSchemeCalls
+    (program : CheckedProgram) : IO Unit := do
+  let keep ← signatureNamed program "keep"
+  let qualifiedLocal ← signatureNamed program "qualifiedLocal"
+  let function ← functionFor program qualifiedLocal
+  let binder ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "f" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError "qualifiedLocal lost its f binder")
+  let template ← match binder.schemeRequirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"qualifiedLocal retained {requirements.length} scheme requirements")
+  let (call, instantiation) ← match
+      function.typedBody.nodes.findSome? fun
+        | .expression node@{
+            form := .call _ _ (.declaration instantiation), .. } =>
+            if instantiation.declaration == keep.id then
+              some (node, instantiation)
+            else
+              none
+        | _ => none with
+    | some selected => pure selected
+    | none => throw (IO.userError "qualifiedLocal lost its keep call")
+  assertTrue (decide (instantiation.predicates = [template.predicate] ∧
+      call.requirements.contains template.templateRequirement))
+    "qualifiedLocal detached its template predicate from the keep call"
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := qualifiedLocal.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := keep.id
+    arguments := [.word]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := keep.id
+    arguments := [.bool]
+  }
+  let expectedEdges : List SourceSpecializationWorklist.CallEdge := [
+    { caller := entryKey, occurrence := call.id, callee := wordKey },
+    { caller := entryKey, occurrence := call.id, callee := boolKey }
+  ]
+  match ← runOrThrow "qualified local scheme calls" program
+      [monomorphicRequest qualifiedLocal] 3 with
+  | .complete plan =>
+      let caller ← match plan.specializations.filter fun specialized =>
+          decide (specialized.key = entryKey) with
+        | [specialized] => pure specialized
+        | specialized => throw (IO.userError
+            s!"qualifiedLocal retained {specialized.length} entry specializations")
+      let templateSolved ← match caller.function.solvedRequirements.filter
+          fun solved => solved.id == template.templateRequirement with
+        | [solved] => pure solved
+        | solved => throw (IO.userError
+            s!"qualifiedLocal retained {solved.length} template solutions")
+      let templateAssumption := match templateSolved.evidence with
+        | .assumption predicate => predicate == template.predicate
+        | .implementation _ => false
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey, boolKey] ∧
+          plan.callEdges = expectedEdges ∧
+          plan.referenceEdges = [] ∧
+          templateSolved.predicate = template.predicate) && templateAssumption)
+        "qualified local scheme calls lost template evidence, keys, or edges"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"qualified local plan failed canonical replay: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"qualified local scheme calls expected complete, found {reprStr outcome}")
+
+  let wrongPredicate := {
+    template.predicate with arguments := [.word]
+  }
+  let malformedBinderFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setLocalBinderRequirements function.typedBody.nodes binder.id [{
+        template with predicate := wrongPredicate
+      }]
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program malformedBinderFunction)
+      [monomorphicRequest qualifiedLocal] 3 with
+  | .error (.specialization declaration
+      (.localSchemeRequirementPredicateMismatch actualBinder actualRequirement
+        _ _)) =>
+      assertTrue (decide (declaration = qualifiedLocal.id ∧
+          actualBinder = binder.id ∧
+          actualRequirement = template.templateRequirement))
+        "qualified binder predicate tamper lost its owner or template identity"
+  | result => throw (IO.userError
+      s!"tampered qualified binder predicate was accepted: {reprStr result}")
+
+  let detachedCallFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setExpressionRequirements function.typedBody.nodes call.id []
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program detachedCallFunction)
+      [monomorphicRequest qualifiedLocal] 3 with
+  | .error (.localSchemeRequirementIdMultiplicity _ actualRequirement 0) =>
+      assertTrue (actualRequirement == template.templateRequirement)
+        "detached qualified requirement lost its template identity"
+  | result => throw (IO.userError
+      s!"detached qualified call requirement was accepted: {reprStr result}")
+
 private def testFunctionValueReference (program : CheckedProgram) : IO Unit := do
   let identity ← signatureNamed program "identity"
   let asValue ← signatureNamed program "asValue"
@@ -1591,6 +1740,7 @@ def testSourceSpecializationWorklist : IO Unit := do
   testRecursiveKeys program
   testAssumptionPreservation program
   testContextualLocalProofCalls program
+  testQualifiedLocalSchemeCalls program
   testFunctionValueReference program
   testIndirectCallBoundary program
   testIndirectArgumentCounts program

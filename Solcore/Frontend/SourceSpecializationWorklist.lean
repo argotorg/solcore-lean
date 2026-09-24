@@ -130,6 +130,15 @@ inductive Error where
       (scheme : Scheme) (actual : Ty)
   | unsupportedLocalPolymorphicRequirements
       (occurrence : ExpressionId) (predicates : List ProgramPredicate)
+  | localSchemeRequirementIdMultiplicity
+      (occurrence : ExpressionId) (requirement : RequirementId) (count : Nat)
+  | localSchemeRequirementPredicatesMismatch
+      (occurrence : ExpressionId)
+      (expected actual : List ProgramPredicate)
+  | localSchemeCallRequirementCountMismatch
+      (occurrence : ExpressionId) (expected actual : Nat)
+  | foreignLocalSchemeRequirement
+      (occurrence : ExpressionId) (requirement : RequirementId)
   | localPolymorphicScopeFuelExhausted (pending : NodeId)
   | localPolymorphicContextFuelExhausted (pending : Nat)
   | invalidExpressionCoercionPath
@@ -685,6 +694,74 @@ private def collectReferences (program : CheckedProgram)
           | _ => collectRest
       | .statement _ => collectRest
 
+private def hasFlexiblePredicateVariables
+    (predicate : ProgramPredicate) : Bool :=
+  !(TypedTraitResolution.predicateVariables predicate).isEmpty
+
+private def firstDuplicateRequirement :
+    List RequirementId → Option RequirementId
+  | [] => none
+  | requirement :: rest =>
+      if rest.contains requirement then some requirement
+      else firstDuplicateRequirement rest
+
+private def validateQualifiedLocalDirectCall
+    (localInstance : LocalLambdaInstance) (expression : ExpressionNode)
+    (instantiation : DeclarationInstantiation) : Except Error Unit := do
+  if expression.requirements.length != instantiation.predicates.length then
+    throw (.localSchemeCallRequirementCountMismatch expression.id
+      instantiation.predicates.length expression.requirements.length)
+  match firstDuplicateRequirement expression.requirements with
+  | some requirement =>
+      let count := (expression.requirements.filter fun candidate =>
+        candidate == requirement).length
+      throw (.localSchemeRequirementIdMultiplicity expression.id requirement count)
+  | none => pure ()
+  let owned := localInstance.binding.binder.schemeRequirements.filter fun owned =>
+    expression.requirements.contains owned.templateRequirement
+  for requirement in owned do
+    let count := (expression.requirements.filter fun candidate =>
+      candidate == requirement.templateRequirement).length
+    if count != 1 then
+      throw (.localSchemeRequirementIdMultiplicity expression.id
+        requirement.templateRequirement count)
+  let expected := owned.map (·.predicate)
+  let actual := instantiation.predicates.filter hasFlexiblePredicateVariables
+  if expected != actual then
+    throw (.localSchemeRequirementPredicatesMismatch expression.id
+      expected actual)
+  let concreteExpected := owned.map fun requirement =>
+    (requirement.applySubstitution localInstance.substitution).predicate
+  let concreteActual := actual.map
+    (TypedTraitResolution.applySubstitution localInstance.substitution)
+  if concreteExpected != concreteActual then
+    throw (.localSchemeRequirementPredicatesMismatch expression.id
+      concreteExpected concreteActual)
+
+private def validateLocalSchemeTemplateUses
+    (bindings : List LocalLambdaBinding) (localInstance : LocalLambdaInstance)
+    (nodes : List Node) : Except Error Unit := do
+  let own := localInstance.binding.binder.schemeRequirements.map
+    (·.templateRequirement)
+  let all := bindings.flatMap fun binding =>
+    binding.binder.schemeRequirements.map (·.templateRequirement)
+  let calls := nodes.filterMap fun
+    | .expression node@{ form := .call _ _ (.declaration _), .. } => some node
+    | _ => none
+  for requirement in own do
+    let count := calls.foldl (fun count call =>
+      count + (call.requirements.filter fun candidate =>
+        candidate == requirement).length) 0
+    if count != 1 then
+      throw (.localSchemeRequirementIdMultiplicity
+        localInstance.binding.initializer requirement count)
+  for call in calls do
+    match call.requirements.find? fun requirement =>
+        all.contains requirement && !own.contains requirement with
+    | some requirement =>
+        throw (.foreignLocalSchemeRequirement call.id requirement)
+    | none => pure ()
+
 private def validateReachableOpenDeclarations (source : TypedSource)
     (bindings : List LocalLambdaBinding) :
     List LocalLambdaInstance → Except Error Unit
@@ -693,6 +770,7 @@ private def validateReachableOpenDeclarations (source : TypedSource)
       let bodyIds ← localLambdaBodyNodeIds source bindings localInstance.binding
       let selected := selectedNodes bodyIds source.nodes
       let directCallees := directDeclarationCallees selected
+      validateLocalSchemeTemplateUses bindings localInstance selected
       for node in selected do
         match node with
         | .expression expression =>
@@ -708,13 +786,10 @@ private def validateReachableOpenDeclarations (source : TypedSource)
                   if !remaining.isEmpty then
                     throw (.unsupportedOpenDeclaration expression.id remaining)
                   else if !instantiation.predicates.isEmpty then
-                    let predicateVariables :=
-                      declarationPredicateVariables instantiation
-                    if !predicateVariables.isEmpty then
-                      throw (.unsupportedLocalPolymorphicRequirements
-                        expression.id instantiation.predicates)
-                    else match expression.form with
-                    | .call _ _ (.declaration _) => pure ()
+                    match expression.form with
+                    | .call _ _ (.declaration _) =>
+                        validateQualifiedLocalDirectCall localInstance expression
+                          instantiation
                     | .reference _ (.declaration _) =>
                         if directCallees.contains expression.id then
                           pure ()
