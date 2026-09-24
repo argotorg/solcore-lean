@@ -12,6 +12,15 @@ structure Scheme where
 
 namespace Scheme
 
+/-- The shared fresh-variable mapping produced when instantiating a scheme.
+Consumers with metadata indexed by the quantified variables can reuse
+`substitution` so the metadata and `body` stay in lockstep. -/
+structure Instantiation where
+  substitution : Substitution
+  body : Ty
+  next : Nat
+  deriving Repr, DecidableEq
+
 def mono (type : Ty) : Scheme :=
   { quantified := [], body := type }
 
@@ -37,10 +46,15 @@ private def freshSubstitution :
           freshSubstitution variables (next + 1)
             ((metavariable, .variable ⟨next⟩) :: substitution)
 
+/-- Instantiate every quantified variable and expose the shared substitution. -/
+def instantiateWithSubstitution (scheme : Scheme) (next : Nat) : Instantiation :=
+  let (substitution, next) := freshSubstitution scheme.quantified next []
+  { substitution, body := substitution.apply scheme.body, next }
+
 /-- Instantiate every quantified variable with a distinct fresh metavariable. -/
 def instantiate (scheme : Scheme) (next : Nat) : Ty × Nat :=
-  let (substitution, next) := freshSubstitution scheme.quantified next []
-  (substitution.apply scheme.body, next)
+  let instantiated := scheme.instantiateWithSubstitution next
+  (instantiated.body, instantiated.next)
 
 end Scheme
 

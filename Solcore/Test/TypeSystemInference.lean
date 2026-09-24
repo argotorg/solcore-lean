@@ -75,4 +75,14 @@ example :
       (.function (.variable ⟨10⟩) (.variable ⟨10⟩), 11) := by
   rfl
 
+example :
+    let scheme : Scheme :=
+      { quantified := [⟨7⟩, ⟨9⟩]
+        body := .function (.variable ⟨7⟩) (.variable ⟨9⟩) }
+    scheme.instantiateWithSubstitution 10 =
+      { substitution := [(⟨9⟩, .variable ⟨11⟩), (⟨7⟩, .variable ⟨10⟩)]
+        body := .function (.variable ⟨10⟩) (.variable ⟨11⟩)
+        next := 12 } := by
+  rfl
+
 end Solcore.Test.TypeSystemInference
