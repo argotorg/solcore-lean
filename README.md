@@ -50,9 +50,6 @@ Leaf files, `*Properties` modules, parser grammar/trace units, and
 
 ## Priority implementation
 
-- Finish integrating the generic grouped-conditional spine: add its independent
-  consumer, register it in the frontend, and provide the generic-first selecting
-  wrapper.
 - Broaden whole-program execution to cover advanced generic/type cases,
   coherent unrestricted trait resolution, let-polymorphic runtime values,
   general evidence/coercion dispatch, members, mappings, proxies, mutation, and
