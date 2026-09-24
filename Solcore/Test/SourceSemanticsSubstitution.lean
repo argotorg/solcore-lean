@@ -312,6 +312,62 @@ example (signatures : ProgramSignatures) (outer inner : TypeVarId) :
         [inner] := by
   rfl
 
+/-- Type-scope transport closes a concrete outer metavariable while retaining
+the nested generalized initializer's concrete inner metavariable. -/
+example (signatures : ProgramSignatures) :
+    let inner : TypeVarId := ⟨1⟩
+    let target := (SourceSemantics.Context.ofSignatures signatures)
+      |>.withTypeVariables [inner]
+    TypeAdmissible target (.product .word (.variable inner)) := by
+  dsimp
+  let outer : TypeVarId := ⟨0⟩
+  let inner : TypeVarId := ⟨1⟩
+  let source := (SourceSemantics.Context.ofSignatures signatures)
+    |>.withTypeVariables [outer, inner]
+  let target := (SourceSemantics.Context.ofSignatures signatures)
+    |>.withTypeVariables [inner]
+  have sourceAdmissible :
+      TypeAdmissible source
+        (.product (.variable outer) (.variable inner)) := {
+    binders :=
+      (TypeParameterBindersWellFormed.ofSignatures signatures)
+        |>.withTypeVariables [outer, inner]
+    typeWellScoped := .product
+      (.variable (by
+        simp [admissibleTypeVariables, source, Context.withTypeVariables,
+          Context.ofSignatures]))
+      (.variable (by
+        simp [admissibleTypeVariables, source, Context.withTypeVariables,
+          Context.ofSignatures]))
+  }
+  have closes : FlexibleSubstitution.ContextCloses
+      [(outer, .word)] [outer] source target := {
+    variables_eq := rfl
+    exact := ExactSubstitution.singleton outer .word
+    retained_fresh := by
+      intro metavariable member
+      change metavariable ∈ [inner] at member
+      change metavariable ∉ [outer]
+      simp only [List.mem_singleton] at member ⊢
+      subst metavariable
+      decide
+    range := by
+      intro metavariable replacement member
+      simp only [List.mem_singleton] at member
+      cases member
+      exact {
+        binders :=
+          (TypeParameterBindersWellFormed.ofSignatures signatures)
+            |>.withTypeVariables [inner]
+        typeWellScoped := .builtin .word
+      }
+    target_eq := rfl
+  }
+  simpa [outer, inner, source, target, TypeSystem.Substitution.apply,
+    TypeSystem.Substitution.lookup?] using
+      (FlexibleSubstitution.TypeAdmissible.applySubstitution closes
+        sourceAdmissible)
+
 /-- Fresh inner binders extend a structural outer closure without being
 captured by its exact substitution. -/
 example (substitution : Substitution) (closedVariables variables : List TypeVarId)

@@ -5295,6 +5295,147 @@ theorem applySolvedRequirement_goal_alignment (substitution : Substitution)
     TypedTraitResolution.applySubstitution substitution requirement.predicate
   rw [applyPredicateEvidence_goal, aligned]
 
+/-- A flexible variable outside the substitution domain remains free after
+simultaneous substitution. -/
+theorem Substitution.mem_freeVariables_apply_of_not_mem_domain
+    (substitution : Substitution) {metavariable : TypeVarId} {type : Ty}
+    (absent : metavariable ∉ substitution.domain)
+    (occurs : metavariable ∈ type.freeVariables) :
+    metavariable ∈ (substitution.apply type).freeVariables := by
+  induction type with
+  | «variable» candidate =>
+      simp only [Ty.freeVariables, List.mem_singleton] at occurs
+      subst candidate
+      have lookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+          absent
+      simp [TypeSystem.Substitution.apply, lookup, Ty.freeVariables]
+  | parameter parameter => simp [Ty.freeVariables] at occurs
+  | constructor constructor => simp [Ty.freeVariables] at occurs
+  | application left right leftInduction rightInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [mem_freeVariables_application_iff] at occurs ⊢
+      rcases occurs with occurs | occurs
+      · exact Or.inl (leftInduction occurs)
+      · exact Or.inr (rightInduction occurs)
+  | function parameter result parameterInduction resultInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [mem_freeVariables_function_iff] at occurs ⊢
+      rcases occurs with occurs | occurs
+      · exact Or.inl (parameterInduction occurs)
+      · exact Or.inr (resultInduction occurs)
+  | product left right leftInduction rightInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [mem_freeVariables_product_iff] at occurs ⊢
+      rcases occurs with occurs | occurs
+      · exact Or.inl (leftInduction occurs)
+      · exact Or.inr (rightInduction occurs)
+  | mapping key value keyInduction valueInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [mem_freeVariables_mapping_iff] at occurs ⊢
+      rcases occurs with occurs | occurs
+      · exact Or.inl (keyInduction occurs)
+      · exact Or.inr (valueInduction occurs)
+  | proxy inner induction =>
+      exact induction occurs
+  | comptime inner induction =>
+      exact induction occurs
+  | error => simp [Ty.freeVariables] at occurs
+
+/-- Simultaneous flexible substitution transports a scoped type when every
+replacement is closed in the target context and every untouched source
+variable remains in the target scope. -/
+theorem TypeWellScoped.applySubstitution
+    {substitution : Substitution} {source target : Context}
+    {sourceVariables targetVariables : List TypeVarId} {type : Ty}
+    (domain_nodup : substitution.domain.Nodup)
+    (range : SubstitutionRangeWellFormed target substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq :
+      target.currentDeclaration = source.currentDeclaration)
+    (kept : ∀ metavariable, metavariable ∈ sourceVariables →
+      metavariable ∉ substitution.domain →
+        metavariable ∈ targetVariables)
+    (wellScoped : TypeWellScoped source sourceVariables type) :
+    TypeWellScoped target targetVariables (substitution.apply type) := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ =>
+      TypeWellScoped target targetVariables (substitution.apply type))
+    (motive_2 := fun types _ =>
+      TypesWellScoped target targetVariables
+        (types.map substitution.apply))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    by_cases member : metavariable ∈ substitution.domain
+    · rcases List.mem_map.mp member with ⟨entry, entryMember, keyEq⟩
+      rcases entry with ⟨candidate, replacement⟩
+      simp only at keyEq
+      subst candidate
+      have lookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_some_of_mem_of_domain_nodup
+          domain_nodup entryMember
+      simp only [TypeSystem.Substitution.apply, lookup, Option.getD_some]
+      exact StructuralSubstitution.TypeWellScoped.weakenFlexible
+        (fun candidateVariable impossible => by simp at impossible)
+        (range metavariable replacement entryMember).typeWellScoped
+    · have lookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+          member
+      simp only [TypeSystem.Substitution.apply, lookup, Option.getD_none]
+      exact .variable (kept metavariable bound member)
+  · intro parameter bound owned
+    exact .parameter (by simpa [parameters_eq] using bound)
+      (by simpa [declaration_eq] using owned)
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    rw [StructuralSubstitution.applyFlexible_nominal]
+    exact .nominal dataType (arguments.map substitution.apply)
+      (by simpa [signatures_eq] using cataloged)
+      (by simpa using arity) argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+/-- List-valued companion to `TypeWellScoped.applySubstitution`. -/
+theorem TypesWellScoped.applySubstitution
+    {substitution : Substitution} {source target : Context}
+    {sourceVariables targetVariables : List TypeVarId} {types : List Ty}
+    (domain_nodup : substitution.domain.Nodup)
+    (range : SubstitutionRangeWellFormed target substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq :
+      target.currentDeclaration = source.currentDeclaration)
+    (kept : ∀ metavariable, metavariable ∈ sourceVariables →
+      metavariable ∉ substitution.domain →
+        metavariable ∈ targetVariables)
+    (wellScoped : TypesWellScoped source sourceVariables types) :
+    TypesWellScoped target targetVariables (types.map substitution.apply) := by
+  let rec go {types : List Ty}
+      (wellScoped : TypesWellScoped source sourceVariables types) :
+      TypesWellScoped target targetVariables
+        (types.map substitution.apply) :=
+    match wellScoped with
+    | .nil => .nil
+    | .cons headWellScoped tailWellScoped =>
+        .cons
+          (TypeWellScoped.applySubstitution domain_nodup range signatures_eq
+            parameters_eq declaration_eq kept headWellScoped)
+          (go tailWellScoped)
+  exact go wellScoped
+
 @[simp] theorem applyTypedBinder_id (substitution : Substitution)
     (binder : TypedBinder) :
     (binder.applySubstitution substitution).id = binder.id := by
@@ -6135,6 +6276,93 @@ theorem withTypeVariables {substitution : Substitution}
 }
 
 end ContextCloses
+
+/-- Structural context closure transports every admissible retained type.
+Variables in the closed prefix are replaced by the ground range, while fresh
+variables in the retained suffix and residual body variables remain scoped. -/
+theorem TypeAdmissible.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {type : Ty}
+    (closes : ContextCloses substitution closedVariables source target)
+    (admissible : TypeAdmissible source type) :
+    TypeAdmissible target (substitution.apply type) := by
+  have signatures_eq : target.signatures = source.signatures := by
+    rw [← closes.target_eq]
+    rfl
+  have parameters_eq : target.typeParameters = source.typeParameters := by
+    rw [← closes.target_eq]
+    rfl
+  have declaration_eq :
+      target.currentDeclaration = source.currentDeclaration := by
+    rw [← closes.target_eq]
+    rfl
+  have residual_eq :
+      target.residualTypeVariables = source.residualTypeVariables := by
+    rw [← closes.target_eq]
+    rfl
+  refine {
+    binders :=
+      StructuralSubstitution.TypeParameterBindersWellFormed.transportContext
+        parameters_eq declaration_eq admissible.binders
+    typeWellScoped := ?_
+  }
+  apply TypeWellScoped.applySubstitution
+    (sourceVariables := admissibleTypeVariables source type)
+    (targetVariables :=
+      admissibleTypeVariables target (substitution.apply type))
+    closes.exact.domain_nodup closes.range signatures_eq parameters_eq
+    declaration_eq
+  · intro metavariable member absent
+    unfold admissibleTypeVariables at member ⊢
+    rw [residual_eq]
+    rcases List.mem_append.mp member with lexical | residual
+    · rw [closes.variables_eq] at lexical
+      rcases List.mem_append.mp lexical with closed | retained
+      · exact (absent ((closes.exact.mem_domain_iff metavariable).mpr
+          closed)).elim
+      · exact List.mem_append.mpr (Or.inl retained)
+    · cases openVariables : source.residualTypeVariables with
+      | false => simp [openVariables] at residual
+      | true =>
+          apply List.mem_append.mpr
+          apply Or.inr
+          apply Substitution.mem_freeVariables_apply_of_not_mem_domain
+            substitution absent
+          simpa [openVariables] using residual
+  · exact admissible.typeWellScoped
+
+/-- The ground special case of flexible context closure.  A source type with
+no flexible variables remains well formed after any structurally valid
+closure. -/
+theorem TypeWellFormed.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {type : Ty}
+    (closes : ContextCloses substitution closedVariables source target)
+    (wellFormed : TypeWellFormed source type) :
+    TypeWellFormed target (substitution.apply type) := by
+  have signatures_eq : target.signatures = source.signatures := by
+    rw [← closes.target_eq]
+    rfl
+  have parameters_eq : target.typeParameters = source.typeParameters := by
+    rw [← closes.target_eq]
+    rfl
+  have declaration_eq :
+      target.currentDeclaration = source.currentDeclaration := by
+    rw [← closes.target_eq]
+    rfl
+  refine {
+    binders :=
+      StructuralSubstitution.TypeParameterBindersWellFormed.transportContext
+        parameters_eq declaration_eq wellFormed.binders
+    typeWellScoped := ?_
+  }
+  apply TypeWellScoped.applySubstitution
+    (sourceVariables := []) (targetVariables := [])
+    closes.exact.domain_nodup closes.range signatures_eq parameters_eq
+    declaration_eq
+  · intro metavariable member
+    simp at member
+  · exact wellFormed.typeWellScoped
 
 @[simp] theorem closeContext_signatures (substitution : Substitution)
     (context : Context) :
