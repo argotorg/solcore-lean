@@ -54,6 +54,11 @@ inductive Value where
       (source : TypedSource)
       (owner : Key)
       (captured : Environment)
+  /-- A runtime-only view of a principal value at one concrete occurrence.
+  The wrapper keeps the stored closure and its plan provenance unchanged;
+  callable execution applies the substitution to the closure's checked source
+  graph just before entering its body. -/
+  | instantiated (substitution : Substitution) (principal : Value)
   | global (key : Key)
   | builtin (function : BuiltinFunctionId)
   deriving Repr
@@ -130,6 +135,8 @@ mutual
     | .mapping keyType valueType _ => some (.mapping keyType valueType)
     | .closure parameters resultType _ _ _ _ =>
         some (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType)
+    | .instantiated substitution principal =>
+        substitution.apply <$> principal.type? plan
     | .global key => do
         let specialized ← findSpecialization? plan key
         pure specialized.function.type
@@ -1276,6 +1283,80 @@ private def modifyLeafBitNot (plan : Plan) :
   | some actual => throw (.invalidUnaryOperand .bitNot (actual.type? plan))
   | none => throw (.invalidUnaryOperand .bitNot none)
 
+/-- Recover the principal scheme only for the executable let-polymorphism
+profile: an initialized ordinary let whose initializer is syntactically a
+lambda node.  Specialization validates the corresponding residual-type scope;
+the runtime repeats the shape check so no other polymorphic cell is adapted. -/
+private def directLambdaLetScheme? (source : TypedSource)
+    (id : Resolved.LocalId) : Option Scheme :=
+  source.nodes.findSome? fun
+    | .statement { form := .letDecl binder (some initializer), .. } =>
+        if binder.id != id || binder.scheme.quantified.isEmpty then
+          none
+        else if SourceSpecialization.isDirectLambdaInitializer source
+            initializer then
+          some binder.scheme
+        else
+          none
+    | _ => none
+
+/-- Match a principal type against one concrete occurrence.  Only variables
+quantified by the recovered let scheme may be assigned; every other type
+constructor and variable must agree exactly. -/
+private def matchSchemeType? (quantified : List TypeVarId) :
+    Ty → Ty → Substitution → Option Substitution
+  | .variable metavariable, actual, substitution =>
+      if quantified.contains metavariable then
+        match substitution.lookup? metavariable with
+        | some previous =>
+            if previous = actual then some substitution else none
+        | none => some ((metavariable, actual) :: substitution)
+      else if Ty.variable metavariable = actual then some substitution else none
+  | .parameter expected, .parameter actual, substitution =>
+      if expected = actual then some substitution else none
+  | .constructor expected, .constructor actual, substitution =>
+      if expected = actual then some substitution else none
+  | .application expectedFunction expectedArgument,
+      .application actualFunction actualArgument, substitution => do
+      let substitution ← matchSchemeType? quantified expectedFunction
+        actualFunction substitution
+      matchSchemeType? quantified expectedArgument actualArgument substitution
+  | .function expectedParameter expectedResult,
+      .function actualParameter actualResult, substitution => do
+      let substitution ← matchSchemeType? quantified expectedParameter
+        actualParameter substitution
+      matchSchemeType? quantified expectedResult actualResult substitution
+  | .product expectedLeft expectedRight,
+      .product actualLeft actualRight, substitution => do
+      let substitution ← matchSchemeType? quantified expectedLeft actualLeft
+        substitution
+      matchSchemeType? quantified expectedRight actualRight substitution
+  | .mapping expectedKey expectedValue,
+      .mapping actualKey actualValue, substitution => do
+      let substitution ← matchSchemeType? quantified expectedKey actualKey
+        substitution
+      matchSchemeType? quantified expectedValue actualValue substitution
+  | .proxy expected, .proxy actual, substitution =>
+      matchSchemeType? quantified expected actual substitution
+  | .comptime expected, .comptime actual, substitution =>
+      matchSchemeType? quantified expected actual substitution
+  | .error, .error, substitution => some substitution
+  | _, _, _ => none
+
+/-- Produce a concrete occurrence view without rewriting the principal value
+stored in the heap.  The occurrence must be closed and every quantified
+variable must have been determined by matching the scheme body. -/
+private def instantiateDirectLambdaLet? (plan : Plan) (source : TypedSource)
+    (id : Resolved.LocalId) (expected : Ty) (value : Value) : Option Value := do
+  if !expected.freeVariables.isEmpty then none else pure ()
+  let scheme ← directLambdaLetScheme? source id
+  if value.type? plan != some scheme.body then none else pure ()
+  let substitution ← matchSchemeType? scheme.quantified scheme.body expected []
+  if substitution.domain.length != scheme.quantified.length then none else pure ()
+  match value with
+  | .closure _ _ _ _ _ _ => some (.instantiated substitution value)
+  | _ => none
+
 mutual
 
   private def evaluate (fuel : Nat) (plan : Plan) (owner : Key)
@@ -1321,7 +1402,11 @@ mutual
                       | none => .fault (.danglingLocation location) state
                   | some { value := none, .. } =>
                       .fault (.uninitializedLocal binder) state
-                  | some { value := some value, .. } => .done value state
+                  | some { value := some value, .. } =>
+                      match instantiateDirectLambdaLet? plan source binder
+                          node.rawType value with
+                      | some instantiated => .done instantiated state
+                      | none => .done value state
           | .reference _ (.builtinBoolean value) =>
               .done (.bool value) state
           | .reference _ (.builtinFunction function) =>
@@ -1460,6 +1545,21 @@ mutual
       | .global key =>
           expressionOfRunResult (invokeSpecialization fuel plan key arguments state)
       | .closure parameters expected body source owner captured =>
+          if parameters.length != arguments.length then
+            .fault (.argumentArityMismatch parameters.length arguments.length) state
+          else
+            match bindValues plan captured state (List.zip parameters arguments) with
+            | .error error => .fault error state
+            | .ok (environment, bodyState) =>
+                let flow := executeFunctionSequence fuel plan owner source
+                  environment bodyState body
+                expressionOfRunResult (finishFunctionFlow plan expected flow)
+      | .instantiated substitution
+          (.closure parameters expected body source owner captured) =>
+          let parameters := parameters.map
+            (TypedBinder.applySubstitution substitution)
+          let expected := substitution.apply expected
+          let source := source.applySubstitution substitution
           if parameters.length != arguments.length then
             .fault (.argumentArityMismatch parameters.length arguments.length) state
           else
@@ -2000,6 +2100,11 @@ def Value.HasDeepTypeFuel :
                 ∃ cell, state.read? binding.2 = some cell ∧
                   ∀ capturedValue, cell.value = some capturedValue →
                     capturedValue.HasDeepTypeFuel fuel signatures plan state cell.type
+        | .instantiated _ principal =>
+            match principal.type? plan with
+            | some principalType =>
+                principal.HasDeepTypeFuel fuel signatures plan state principalType
+            | none => False
         | .global key =>
             ∃ specialized, exactSpecialization plan key = .ok specialized ∧
               specialized.function.type = expected
@@ -2010,6 +2115,31 @@ certify closure code or the runtime evaluator. -/
 def Value.HasDeepType (value : Value) (signatures : ProgramSignatures)
     (plan : Plan) (state : RuntimeState) (expected : Ty) : Prop :=
   ∀ fuel, value.HasDeepTypeFuel fuel signatures plan state expected
+
+/-- A concrete occurrence wrapper preserves the principal value's structural
+heap typing while exposing the substituted outer type. -/
+theorem Value.HasDeepType.instantiated
+    {signatures : ProgramSignatures} {plan : Plan} {state : RuntimeState}
+    {principalType : Ty} {principal : Value}
+    (substitution : Substitution)
+    (principalShape : principal.type? plan = some principalType)
+    (typed : principal.HasDeepType signatures plan state principalType) :
+    (Value.instantiated substitution principal).HasDeepType signatures plan
+      state (substitution.apply principalType) := by
+  intro fuel
+  cases fuel with
+  | zero => trivial
+  | succ fuel =>
+      change (Value.instantiated substitution principal).type? plan =
+          some (substitution.apply principalType) ∧
+        (match principal.type? plan with
+        | some innerType => principal.HasDeepTypeFuel fuel signatures plan
+            state innerType
+        | none => False)
+      constructor
+      · simp [Value.type?, principalShape]
+      · rw [principalShape]
+        exact typed fuel
 
 /-- Static provenance of executable code carried by a value.  A closure must
 point at a lambda node in the unique checked specialization for its owner;
@@ -2036,6 +2166,7 @@ def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
                 node.form = .lambda parameters resultType body ∧
                 node.type = .function
                   (Ty.productMany (parameters.map (·.scheme.body))) resultType
+      | .instantiated _ principal => principal.HasPlanCodeFuel fuel plan
       | .global key =>
           validateExecutablePlan plan = .ok () ∧
             ∃ specialized, exactSpecialization plan key = .ok specialized
@@ -2043,6 +2174,17 @@ def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
 
 def Value.HasPlanCode (value : Value) (plan : Plan) : Prop :=
   ∀ fuel, value.HasPlanCodeFuel fuel plan
+
+/-- Runtime occurrence instantiation changes only types, never the principal
+closure's checked-code provenance. -/
+theorem Value.HasPlanCode.instantiated
+    {plan : Plan} {principal : Value} (substitution : Substitution)
+    (code : principal.HasPlanCode plan) :
+    (Value.instantiated substitution principal).HasPlanCode plan := by
+  intro fuel
+  cases fuel with
+  | zero => trivial
+  | succ fuel => exact code fuel
 
 namespace RuntimeState
 
@@ -2498,6 +2640,21 @@ theorem Value.HasDeepTypeFuel.down
                 fun capturedValue initialized =>
                   inductionHypothesis cell.type capturedValue
                     (cellTyped capturedValue initialized)⟩⟩
+      | instantiated substitution principal =>
+          change _ ∧ (match principal.type? plan with
+            | some principalType => principal.HasDeepTypeFuel (fuel + 1)
+                signatures plan state principalType
+            | none => False) at typed
+          change _ ∧ (match principal.type? plan with
+            | some principalType => principal.HasDeepTypeFuel fuel
+                signatures plan state principalType
+            | none => False)
+          cases h : principal.type? plan with
+          | none => rw [h] at typed; exact False.elim typed.2
+          | some principalType =>
+              rw [h] at typed
+              exact ⟨typed.1,
+                inductionHypothesis principalType principal typed.2⟩
       | unit => exact typed
       | bool _ => exact typed
       | word _ => exact typed
@@ -2577,6 +2734,21 @@ theorem Value.HasDeepTypeFuel.transport_world
                 fun capturedValue initialized =>
                   inductionHypothesis cell.type capturedValue
                     (cellTyped capturedValue initialized)⟩⟩
+      | instantiated substitution principal =>
+          change _ ∧ (match principal.type? plan with
+            | some principalType => principal.HasDeepTypeFuel fuel
+                signatures plan oldWorld principalType
+            | none => False) at typed
+          change _ ∧ (match principal.type? plan with
+            | some principalType => principal.HasDeepTypeFuel fuel
+                signatures plan newWorld principalType
+            | none => False)
+          cases h : principal.type? plan with
+          | none => rw [h] at typed; exact False.elim typed.2
+          | some principalType =>
+              rw [h] at typed
+              exact ⟨typed.1,
+                inductionHypothesis principalType principal typed.2⟩
       | unit => exact typed
       | bool _ => exact typed
       | word _ => exact typed
@@ -2623,6 +2795,7 @@ theorem Value.HasDeepTypeFuel.transport_typed_world
               obtain ⟨newCell, newFound, _⟩ :=
                 preservedTypes binding.2 oldCell found
               exact ⟨newCell, newFound, fun _ _ => trivial⟩⟩
+      | instantiated _ _ => exact typed
       | product _ _ => exact typed
       | mapping _ _ _ => exact typed
       | constructed _ _ => exact typed
@@ -2667,6 +2840,22 @@ theorem Value.HasDeepTypeFuel.transport_typed_world
                     signatures plan newWorld newCell.type :=
                   newTyping.read_value newFound initialized
                 exact sameType ▸ typedNew⟩⟩
+      | instantiated substitution principal =>
+          change _ ∧ (match principal.type? plan with
+            | some principalType => principal.HasDeepTypeFuel (fuel + 1)
+                signatures plan oldWorld principalType
+            | none => False) at typed
+          change _ ∧ (match principal.type? plan with
+            | some principalType => principal.HasDeepTypeFuel (fuel + 1)
+                signatures plan newWorld principalType
+            | none => False)
+          cases h : principal.type? plan with
+          | none => rw [h] at typed; exact False.elim typed.2
+          | some principalType =>
+              rw [h] at typed
+              exact ⟨typed.1,
+                inductionHypothesis principalType principal newTyping.down
+                  typed.2⟩
       | unit => exact typed
       | bool _ => exact typed
       | word _ => exact typed

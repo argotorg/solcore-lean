@@ -7,8 +7,9 @@ Closing specialization for checked generic source functions.
 The resolved signature supplies the authoritative declaration-parameter order,
 including parameters which do not occur in the function type or body.  The
 result keeps source/declaration identities intact while closing every semantic
-type retained by source inference.  This initial profile produces fully ground
-top-level functions and deliberately defers local let-polymorphism.
+type retained by source inference.  Top-level types are fully ground; a
+generalized initialized `let` may retain its quantified variables only inside
+a direct lambda initializer, where they have an explicit lexical scope.
 -/
 
 set_option autoImplicit false
@@ -62,11 +63,11 @@ structure SpecializationKey where
   arguments : List Ty
   deriving Repr, BEq, DecidableEq
 
-/-- A declaration-order specialization together with the fully closed checked
-source carrier.  `assumptions` are the signature's specialized where
-predicates; the checked function retains all original owner and occurrence
-identities.  The initial profile rejects quantified local binders explicitly;
-support for local let-polymorphism belongs to a later specialization slice. -/
+/-- A declaration-order specialization together with the checked source
+carrier.  `assumptions` are the signature's specialized where predicates; the
+checked function retains all original owner and occurrence identities.
+Top-level types are closed, while a direct generalized lambda initializer may
+retain the variables quantified by its owning local scheme. -/
 structure SpecializedFunction where
   key : SpecializationKey
   declaration : Resolved.DeclarationId
@@ -582,43 +583,283 @@ private def validateConcreteTypes (types : List Ty) : Except Error Unit :=
   | some reason => .error (.residualType reason)
   | none => .ok ()
 
-private def firstRigidOrError : Ty → Option NonConcreteType
-  | .variable _
+private def firstNonLexical
+    (lexical : List TypeVarId) : Ty → Option NonConcreteType
+  | .variable id =>
+      if lexical.contains id then none else some (.flexible id)
   | .constructor _ => none
   | .parameter id => some (.rigid id)
   | .application left right
   | .function left right
   | .product left right
   | .mapping left right =>
-      (firstRigidOrError left).orElse fun _ => firstRigidOrError right
+      (firstNonLexical lexical left).orElse fun _ =>
+        firstNonLexical lexical right
   | .proxy inner
-  | .comptime inner => firstRigidOrError inner
+  | .comptime inner => firstNonLexical lexical inner
   | .error => some .error
 
-private def validateConcreteScheme (scheme : Scheme) : Except Error Unit := do
-  match scheme.freeVariables with
-  | metavariable :: _ => throw (.residualType (.flexible metavariable))
-  | [] => pure ()
-  match firstRigidOrError scheme.body with
-  | some reason => throw (.residualType reason)
+private def appendVariables (left right : List TypeVarId) : List TypeVarId :=
+  right.foldl (fun variables metavariable =>
+    if variables.contains metavariable then variables
+    else variables ++ [metavariable])
+    left
+
+private def validateLexicalTypes (lexical : List TypeVarId)
+    (types : List Ty) : Except Error Unit :=
+  match types.findSome? (firstNonLexical lexical) with
+  | some reason => .error (.residualType reason)
   | none => pure ()
 
-private def validateConcreteBinderSchemes :
+private def validateLexicalScheme (lexical : List TypeVarId)
+    (scheme : Scheme) : Except Error Unit :=
+  validateLexicalTypes (appendVariables lexical scheme.quantified) [scheme.body]
+
+private def validateLexicalBinderSchemes (lexical : List TypeVarId) :
     List TypedBinder → Except Error Unit
   | [] => .ok ()
   | binder :: rest => do
-      validateConcreteScheme binder.scheme
-      validateConcreteBinderSchemes rest
+      validateLexicalScheme lexical binder.scheme
+      validateLexicalBinderSchemes lexical rest
 
-/-- Quantified locals are a profile-level rejection and therefore take
-precedence over incidental open types in any earlier monomorphic binder. -/
-private def validateConcreteBinders (binders : List TypedBinder) :
+/-- Whether an initializer edge points directly to a lambda node.  Grouping,
+proxying, or calling a lambda does not satisfy the restricted polymorphic-let
+profile. -/
+def isDirectLambdaInitializer (source : TypedSource)
+    (initializer : ExpressionId) : Bool :=
+  match source.lookupExpression? initializer with
+  | some { form := .lambda _ _ _, .. } => true
+  | _ => false
+
+private def polymorphicLetAllowed (source : TypedSource)
+    (binder : TypedBinder) (initializer : Option ExpressionId) : Bool :=
+  !binder.scheme.quantified.isEmpty &&
+    initializer.any (isDirectLambdaInitializer source)
+
+private def patternInstructionBinders :
+    MatchPatternInstruction → List TypedBinder
+  | .binder binder => [binder]
+  | _ => []
+
+private def patternResolutionBinders :
+    MatchPatternResolution → List TypedBinder
+  | .binder binder => [binder]
+  | .constructor _ instructions
+  | .tuple instructions => instructions.flatMap patternInstructionBinders
+  | _ => []
+
+private def unsupportedPolymorphicBindersInNode
+    (source : TypedSource) : Node → List TypedBinder
+  | .expression node =>
+      match node.form with
+      | .lambda parameters _ _ =>
+          parameters.filter fun binder => !binder.scheme.quantified.isEmpty
+      | _ => []
+  | .statement node =>
+      match node.form with
+      | .letDecl binder initializer =>
+          if binder.scheme.quantified.isEmpty ||
+              polymorphicLetAllowed source binder initializer then
+            []
+          else
+            [binder]
+      | .forLoop initializer _ post _ =>
+          (initializer ++ post).filterMap fun
+            | .letDecl binder _ =>
+                if binder.scheme.quantified.isEmpty then none else some binder
+            | _ => none
+      | .matchWith resolution =>
+          resolution.cases.flatMap fun arm =>
+            (patternResolutionBinders arm.pattern.resolution).filter fun binder =>
+              !binder.scheme.quantified.isEmpty
+      | _ => []
+
+/-- Only ordinary initialized lets whose initializer node is directly a lambda
+may remain quantified.  This positional rejection runs before residual-type
+checking so unsupported quantified binders retain the precise legacy error. -/
+private def validatePolymorphicBinderPositions (source : TypedSource) :
     Except Error Unit := do
-  match binders.find? fun binder => !binder.scheme.quantified.isEmpty with
+  let unsupportedInputs := source.inputs.filter fun binder =>
+    !binder.scheme.quantified.isEmpty
+  let unsupportedNodes := source.nodes.flatMap
+    (unsupportedPolymorphicBindersInNode source)
+  match (unsupportedInputs ++ unsupportedNodes).head? with
   | some binder =>
       throw (.polymorphicBinder binder.id binder.scheme.quantified)
   | none => pure ()
-  validateConcreteBinderSchemes binders
+
+private structure ResidualScopeTask where
+  node : NodeId
+  variables : List TypeVarId
+
+private structure ResidualScope where
+  node : NodeId
+  variables : List TypeVarId
+
+private def expressionTasks (variables : List TypeVarId)
+    (expressions : List ExpressionId) : List ResidualScopeTask :=
+  expressions.map fun expression => { node := .expression expression, variables }
+
+private def statementTasks (variables : List TypeVarId)
+    (statements : List StatementId) : List ResidualScopeTask :=
+  statements.map fun statement => { node := .statement statement, variables }
+
+private def projectionTasks (variables : List TypeVarId)
+    (projections : List PlaceProjection) : List ResidualScopeTask :=
+  projections.filterMap fun
+    | .index key => some { node := .expression key, variables }
+    | .member _ _ => none
+
+private def assignmentTasks (variables : List TypeVarId)
+    (assignment : AssignmentResolution) : List ResidualScopeTask :=
+  projectionTasks variables assignment.target.projections
+
+private def forItemTasks (variables : List TypeVarId) :
+    ForItemForm → List ResidualScopeTask
+  | .letDecl _ initializer =>
+      initializer.toList.map fun expression =>
+        { node := .expression expression, variables }
+  | .expression expression =>
+      [{ node := .expression expression, variables }]
+  | .assignValue assignment _ value =>
+      assignmentTasks variables assignment ++
+        [{ node := .expression value, variables }]
+  | .assignBitNot assignment => assignmentTasks variables assignment
+
+private def expressionChildTasks (variables : List TypeVarId)
+    (node : ExpressionNode) : List ResidualScopeTask :=
+  match node.form with
+  | .literal _
+  | .integerLiteral _ _
+  | .reference _ _
+  | .proxy _ => []
+  | .group inner
+  | .unary _ inner
+  | .member inner _ _ => expressionTasks variables [inner]
+  | .tuple elements => expressionTasks variables elements
+  | .binary left _ right
+  | .index left right => expressionTasks variables [left, right]
+  | .conditional condition thenBranch elseBranch =>
+      expressionTasks variables [condition, thenBranch, elseBranch]
+  | .lambda _ _ body => statementTasks variables body
+  | .call callee arguments _ =>
+      expressionTasks variables (callee :: arguments)
+  | .constructor _ arguments => expressionTasks variables arguments
+
+private def statementChildTasks (source : TypedSource)
+    (variables : List TypeVarId) (node : StatementNode) :
+    List ResidualScopeTask :=
+  match node.form with
+  | .letDecl binder initializer =>
+      let initializerVariables :=
+        if polymorphicLetAllowed source binder initializer then
+          appendVariables variables binder.scheme.quantified
+        else
+          variables
+      initializer.toList.map fun expression =>
+        { node := .expression expression, variables := initializerVariables }
+  | .returnStmt value => expressionTasks variables value.toList
+  | .expression expression _ => expressionTasks variables [expression]
+  | .assignValue assignment _ value =>
+      assignmentTasks variables assignment ++ expressionTasks variables [value]
+  | .assignBitNot assignment => assignmentTasks variables assignment
+  | .ifThen condition thenBody elseBody =>
+      expressionTasks variables [condition] ++
+        statementTasks variables thenBody ++
+        statementTasks variables (elseBody.getD [])
+  | .block body => statementTasks variables body
+  | .matchWith resolution =>
+      expressionTasks variables [resolution.scrutinee] ++
+        (resolution.cases.flatMap fun arm =>
+          statementTasks variables arm.body) ++
+        statementTasks variables (resolution.defaultBody.getD [])
+  | .forLoop initializer condition post body =>
+      initializer.flatMap (forItemTasks variables) ++
+        expressionTasks variables [condition] ++
+        statementTasks variables body ++
+        post.flatMap (forItemTasks variables)
+  | .whileLoop condition body =>
+      expressionTasks variables [condition] ++ statementTasks variables body
+  | .breakStmt
+  | .continueStmt => []
+
+private def residualChildTasks (source : TypedSource)
+    (task : ResidualScopeTask) : List ResidualScopeTask :=
+  match source.lookupNode? task.node.occurrenceId with
+  | some (.expression node) => expressionChildTasks task.variables node
+  | some (.statement node) => statementChildTasks source task.variables node
+  | none => []
+
+private def collectResidualScopes (source : TypedSource) :
+    Nat → List ResidualScopeTask → List ResidualScope → List ResidualScope
+  | 0, _, scopes => scopes
+  | _ + 1, [], scopes => scopes
+  | fuel + 1, task :: rest, scopes =>
+      if scopes.any fun scope => decide (scope.node = task.node) then
+        collectResidualScopes source fuel rest scopes
+      else
+        let scopes := scopes ++ [{
+          node := task.node
+          variables := task.variables
+        }]
+        collectResidualScopes source fuel
+          (residualChildTasks source task ++ rest) scopes
+
+private def residualScopes (source : TypedSource) : List ResidualScope :=
+  let roots := source.roots.map fun node =>
+    { node, variables := [] : ResidualScopeTask }
+  collectResidualScopes source (source.nodes.length + 1) roots []
+
+private def residualVariablesFor (scopes : List ResidualScope)
+    (node : NodeId) : List TypeVarId :=
+  ((scopes.find? fun scope => decide (scope.node = node)).map
+    (·.variables)).getD []
+
+private def validateNodeBinderSchemes (source : TypedSource)
+    (lexical : List TypeVarId) : Node → Except Error Unit
+  | .expression node =>
+      match node.form with
+      | .lambda parameters _ _ =>
+          validateLexicalBinderSchemes lexical parameters
+      | _ => pure ()
+  | .statement node =>
+      match node.form with
+      | .letDecl binder initializer =>
+          let binderLexical :=
+            if polymorphicLetAllowed source binder initializer then
+              appendVariables lexical binder.scheme.quantified
+            else
+              lexical
+          validateLexicalScheme binderLexical binder.scheme
+      | _ =>
+          validateLexicalBinderSchemes lexical
+            (statementFormBinders node.form)
+
+private def validateScopedNodes (source : TypedSource)
+    (scopes : List ResidualScope) : List Node → Except Error Unit
+  | [] => pure ()
+  | node :: rest => do
+      let lexical := residualVariablesFor scopes node.id
+      validateLexicalTypes lexical (nodeTypes node)
+      validateNodeBinderSchemes source lexical node
+      validateScopedNodes source scopes rest
+
+private def validateTypedSourceResiduals (source : TypedSource) :
+    Except Error Unit := do
+  validatePolymorphicBinderPositions source
+  validateLexicalBinderSchemes [] source.inputs
+  validateScopedNodes source (residualScopes source) source.nodes
+
+private def supportedPolymorphicVariables
+    (source : TypedSource) : List TypeVarId :=
+  source.nodes.foldl (fun variables node =>
+    match node with
+    | .statement { form := .letDecl binder initializer, .. } =>
+        if polymorphicLetAllowed source binder initializer then
+          appendVariables variables binder.scheme.quantified
+        else
+          variables
+    | _ => variables) []
 
 private def validateEvidenceGoals :
     List SolvedRequirement → Except Error Unit
@@ -660,9 +901,14 @@ def specializeFunction (signature : ProgramFunctionSignature)
   let assumptions := signature.scheme.predicates.map
     (ProgramPredicate.applyParameters canonical)
   let specialized := applyCheckedFunction canonical function
-  validateConcreteBinders (typedSourceBinders specialized.typedBody)
+  validateTypedSourceResiduals specialized.typedBody
+  let lexicalVariables :=
+    supportedPolymorphicVariables specialized.typedBody
   validateConcreteTypes (assumptions.flatMap predicateTypes ++
-    checkedFunctionTypes specialized)
+    [specialized.type, specialized.inferredBodyType] ++
+    specialized.solvedRequirements.flatMap requirementTypes)
+  validateLexicalTypes lexicalVariables
+    (specialized.substitution.map Prod.snd)
   let stagesAfter ← match SourceStageAnalysis.analyzeFunction specialized with
     | .ok analysis => pure analysis
     | .error error => throw (.stageAnalysis error)

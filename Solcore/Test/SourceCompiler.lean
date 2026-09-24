@@ -30,6 +30,10 @@ private def workspace : Workspace.RawWorkspace := {
         "    }",
         "    default { return 0; }",
         "  }",
+        "}",
+        "function polymorphicLocal(flag: Bool) returns (Word, Bool) {",
+        "  let id = lam(value) { return value; };",
+        "  return (id(11), id(flag));",
         "}"
       ]
     },
@@ -107,11 +111,13 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let direct ← compileNamed checked "main.solc" "direct"
   let recursive ← compileNamed checked "main.solc" "recurse"
   let typed ← compileNamed checked "main.solc" "visibleAlias"
+  let polymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
       recursive.backend = .callGraph ∧
-      typed.backend = .typedSource))
+      typed.backend = .typedSource ∧
+      polymorphicLocal.backend = .typedSource))
     "automatic backend precedence changed"
   assertTrue (decide (
       direct.key.declaration.moduleId = main ∧
@@ -142,6 +148,13 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     recursive.runCore [.word (word 3)] runtimeOptions
   expectTypedWord "imported alias typed root" 12 <|
     typed.runTyped [.product (.word (word 7)) (.word (word 8))] runtimeOptions
+  match polymorphicLocal.runTyped [.bool true] runtimeOptions with
+  | .ok (.typedSource (.done
+      (.product (.word actualWord) (.bool actualBool)) _)) =>
+      assertTrue (actualWord == word 11 && actualBool)
+        "runtime let-polymorphism did not independently instantiate Word and Bool"
+  | result => throw (IO.userError
+      s!"runtime let-polymorphism returned {reprStr result}")
   pure { checked, direct, recursive, typed }
 
 private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do

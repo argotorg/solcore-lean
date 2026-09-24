@@ -265,6 +265,10 @@ private def source : String := String.intercalate "\n" [
   "  let f = lam(value: Word) -> Word { return value + 1; };",
   "  return f(41);",
   "}",
+  "function localPolymorphism(flag: Bool) returns (Word, Bool) {",
+  "  let identity = lam(value) { return flag ? value : value; };",
+  "  return (identity(41), identity(flag));",
+  "}",
   "function spin(value: Word) returns (Word) { return spin(value); }"
 ]
 
@@ -330,6 +334,17 @@ private def testClosuresOrderProxyAndFuel
   | .outOfFuel _ => pure ()
   | result => throw (IO.userError
       s!"recursive low-fuel call did not exhaust: {reprStr result}")
+
+private def testLocalLetPolymorphism (program : CheckedProgram) : IO Unit := do
+  let prepared ← prepareNamed program "localPolymorphism"
+  let result := runPrepared prepared [.bool true]
+  match result with
+  | .done (.product (.word actual) (.bool selected)) _ =>
+      assertTrue (actual == word 41 && selected)
+        "one principal local lambda was not instantiated at Word and Bool"
+  | other => throw (IO.userError
+      s!"local let-polymorphism returned {reprStr other}")
+  expectShallowHeap "local let-polymorphism" prepared.plan result
 
 private def treeData (program : CheckedProgram) : IO ProgramDataSignature :=
   match program.signatures.dataTypes.filter fun dataType =>
@@ -529,6 +544,7 @@ private def testAll : IO Unit := do
   testNestedMatchingAndCalls program
   testAssignmentsMappingsAndControl program
   testClosuresOrderProxyAndFuel program
+  testLocalLetPolymorphism program
   testNominalInputValidation program
   testTamperedExecutableMetadata program
   testIndirectArgumentCountMetadata program

@@ -29,7 +29,11 @@ private def checkedProgram : IO CheckedProgram := do
     "function identity<T>(value: T) returns (T) { return value; }",
     "function stagedIdentity<T>(comptime value: T) returns (comptime<T>) { return value; }",
     "function phantom<T, U>(value: T) returns (T) { return value; }",
-    "function apply<T>(f: function(T) returns (T), value: T) returns (T) { return f(value); }"
+    "function apply<T>(f: function(T) returns (T), value: T) returns (T) { return f(value); }",
+    "function localPoly(flag: Bool) returns (Word, Bool) {",
+    "  let id = lam(value) { return value; };",
+    "  return (id(1), id(flag));",
+    "}"
   ]
   match checkProgram (workspace content) with
   | .ok checked => pure checked
@@ -214,16 +218,6 @@ private def testIndirectMetadataSpecialization
   | _ => throw (IO.userError
       s!"expected one specialized indirect call, found {calls.length}")
 
-private def returnedExpression (function : CheckedFunction) : IO ExpressionId :=
-  match function.typedBody.roots with
-  | [.statement statement] =>
-      match function.typedBody.lookupStatement? statement with
-      | some { form := .returnStmt (some expression), .. } => pure expression
-      | _ => throw (IO.userError
-          "integer-specialization fixture root is not a valued return")
-  | _ => throw (IO.userError
-      "integer-specialization fixture does not have one statement root")
-
 private def replaceExpression (function : CheckedFunction)
     (id : ExpressionId) (change : ExpressionNode → ExpressionNode) :
     CheckedFunction := {
@@ -236,6 +230,172 @@ private def replaceExpression (function : CheckedFunction)
       | .statement node => .statement node
   }
 }
+
+private def replaceStatement (function : CheckedFunction)
+    (id : StatementId) (change : StatementNode → StatementNode) :
+    CheckedFunction := {
+  function with typedBody := {
+    function.typedBody with
+    nodes := function.typedBody.nodes.map fun
+      | .expression node => .expression node
+      | .statement node =>
+          if node.id = id then .statement { change node with id }
+          else .statement node
+  }
+}
+
+private def testLocalPolymorphicLambda
+    (program : CheckedProgram) : IO Unit := do
+  let (signature, function) ← checkedNamed program "localPoly"
+  let bindings := function.typedBody.nodes.filterMap fun
+    | .statement node@{ form := .letDecl binder (some initializer), .. } =>
+        if binder.name == "id" then some (node, binder, initializer) else none
+    | _ => none
+  let (statement, binder, initializer) ← match bindings with
+    | [binding] => pure binding
+    | _ => throw (IO.userError
+        "localPoly lost its unique initialized id binder")
+  let quantified ← match binder.scheme.quantified with
+    | [quantified] => pure quantified
+    | variables => throw (IO.userError
+        s!"localPoly id has the wrong quantified variables: {reprStr variables}")
+  let lambdaNode ← match function.typedBody.lookupExpression? initializer with
+    | some node@{ form := .lambda [_] _ _, .. } => pure node
+    | _ => throw (IO.userError
+        "localPoly id initializer is not a direct unary lambda")
+  let specialized ← specializeOrThrow "local polymorphic lambda"
+    signature function []
+  let specializedBinder ← match specialized.function.typedBody.lookupStatement?
+      statement.id with
+    | some { form := .letDecl selected (some selectedInitializer), .. } =>
+        if selectedInitializer = initializer then pure selected
+        else throw (IO.userError
+          "specialization changed the polymorphic initializer identity")
+    | _ => throw (IO.userError
+        "specialization changed the polymorphic let shape")
+  let (specializedLambda, specializedParameter, specializedReturnType) ← match
+      specialized.function.typedBody.lookupExpression? initializer with
+    | some node@{ form := .lambda [parameter] returnType _, .. } =>
+        pure (node, parameter, returnType)
+    | _ => throw (IO.userError
+        "specialization changed the direct lambda initializer")
+  assertTrue (Solcore.Frontend.SourceSpecialization.isDirectLambdaInitializer
+      specialized.function.typedBody initializer)
+    "specialization no longer recognizes the direct lambda initializer"
+  assertTrue (decide (specializedBinder.scheme = binder.scheme ∧
+      specializedLambda.type = lambdaNode.type ∧
+      specializedParameter.scheme.quantified = [] ∧
+      specializedParameter.scheme.body = Ty.variable quantified ∧
+      specializedReturnType = Ty.variable quantified ∧
+      specialized.function.substitution.any fun entry =>
+        entry.2 = .variable quantified))
+    "specialization did not retain the principal lambda scheme and lexical residual"
+  let instantiatedReferenceTypes := specialized.function.typedBody.nodes.filterMap fun
+    | .expression node =>
+        match node.form with
+        | .reference _ (.local selected) =>
+            if selected = binder.id then some node.type else none
+        | _ => none
+    | .statement _ => none
+  assertTrue (instantiatedReferenceTypes.length == 2 &&
+      instantiatedReferenceTypes.any (· == .function .word .word) &&
+      instantiatedReferenceTypes.any (· == .function .bool .bool))
+    "polymorphic references outside the initializer did not remain ground"
+
+  let fresh : TypeVarId := ⟨991⟩
+  let quantifiedParameter : TypedBinder := {
+    specializedParameter with
+    scheme := {
+      quantified := [fresh]
+      body := specializedParameter.scheme.body
+    }
+  }
+  let badLambdaParameter := replaceExpression function initializer fun node =>
+    match node.form with
+    | .lambda _ returnType body => {
+        node with form := .lambda [quantifiedParameter] returnType body
+      }
+    | _ => node
+  expectError "quantified lambda parameter"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature
+      badLambdaParameter [])
+    (.polymorphicBinder quantifiedParameter.id [fresh])
+
+  let uninitialized := replaceStatement function statement.id fun node => {
+    node with form := .letDecl binder none
+  }
+  expectError "uninitialized polymorphic let"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature
+      uninitialized [])
+    (.polymorphicBinder binder.id [quantified])
+
+  let indirectInitializer := replaceExpression function initializer fun node => {
+    node with form := .proxy node.type
+  }
+  expectError "non-lambda polymorphic initializer"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature
+      indirectInitializer [])
+    (.polymorphicBinder binder.id [quantified])
+
+  let forItem : ForItemForm := .letDecl binder (some initializer)
+  let forBinder := replaceStatement function statement.id fun node => {
+    node with form := .forLoop [forItem] initializer [] []
+  }
+  expectError "polymorphic for binder"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature
+      forBinder [])
+    (.polymorphicBinder binder.id [quantified])
+
+  let pattern : TypedMatchPattern := {
+    source := .binder statement.span binder.name
+    type := binder.scheme.body
+    resolution := .binder binder
+  }
+  let patternBinder := replaceStatement function statement.id fun node => {
+    node with form := .matchWith {
+      scrutinee := initializer
+      hiddenScrutinee := binder.id
+      cases := [{ span := statement.span, pattern, body := [] }]
+      defaultBody := none
+    }
+  }
+  expectError "polymorphic pattern binder"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature
+      patternBinder [])
+    (.polymorphicBinder binder.id [quantified])
+
+  let leakedInput ← match function.typedBody.inputs with
+    | [input] => pure { input with scheme := .mono (Ty.variable quantified) }
+    | inputs => throw (IO.userError
+        s!"localPoly retained {inputs.length} inputs")
+  let leaked : CheckedFunction := {
+    function with typedBody := {
+      function.typedBody with inputs := [leakedInput]
+    }
+  }
+  expectError "lexically escaped quantified variable"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature leaked [])
+    (.residualType (.flexible quantified))
+
+  let unboundVariable : TypeVarId := ⟨992⟩
+  let unbound : CheckedFunction := {
+    function with substitution :=
+      function.substitution ++
+        [(unboundVariable, Ty.variable unboundVariable)]
+  }
+  expectError "unbound substitution residual"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature unbound [])
+    (.residualType (.flexible unboundVariable))
+
+private def returnedExpression (function : CheckedFunction) : IO ExpressionId :=
+  match function.typedBody.roots with
+  | [.statement statement] =>
+      match function.typedBody.lookupStatement? statement with
+      | some { form := .returnStmt (some expression), .. } => pure expression
+      | _ => throw (IO.userError
+          "integer-specialization fixture root is not a valued return")
+  | _ => throw (IO.userError
+      "integer-specialization fixture does not have one statement root")
 
 private def testIntegerLiteralMetadataSpecialization
     (program : CheckedProgram) : IO Unit := do
@@ -400,6 +560,7 @@ def testSourceSpecialization : IO Unit := do
   testStagedIdentityMarkers program
   testPhantomParameter program
   testIndirectMetadataSpecialization program
+  testLocalPolymorphicLambda program
   testIntegerLiteralMetadataSpecialization program
   testValidationErrors program
 
