@@ -377,6 +377,17 @@ private def testLocalPolymorphicLambda
     (Solcore.Frontend.SourceSpecialization.specializeFunction signature leaked [])
     (.residualType (.flexible quantified))
 
+  let sharedAcrossScopes : CheckedFunction := {
+    function with typedBody := {
+      function.typedBody with
+      roots := function.typedBody.roots ++ [.expression initializer]
+    }
+  }
+  expectError "polymorphic initializer shared across lexical scopes"
+    (Solcore.Frontend.SourceSpecialization.specializeFunction signature
+      sharedAcrossScopes [])
+    (.conflictingResidualScope (.expression initializer) [quantified] [])
+
   let unboundVariable : TypeVarId := ⟨992⟩
   let unbound : CheckedFunction := {
     function with substitution :=

@@ -50,6 +50,9 @@ inductive Error where
   | nonConcreteArgument
       (parameter : TypeParameterId) (reason : NonConcreteType)
   | polymorphicBinder (binder : Resolved.LocalId) (variables : List TypeVarId)
+  | conflictingResidualScope
+      (node : NodeId) (first second : List TypeVarId)
+  | residualScopeTraversalLimit (node : NodeId)
   | evidenceGoalMismatch (id : RequirementId)
       (predicate goal : ProgramPredicate)
   | stageAnalysis (error : SourceStageAnalysis.Error)
@@ -790,25 +793,46 @@ private def residualChildTasks (source : TypedSource)
   | some (.statement node) => statementChildTasks source task.variables node
   | none => []
 
-private def collectResidualScopes (source : TypedSource) :
-    Nat → List ResidualScopeTask → List ResidualScope → List ResidualScope
-  | 0, _, scopes => scopes
-  | _ + 1, [], scopes => scopes
-  | fuel + 1, task :: rest, scopes =>
-      if scopes.any fun scope => decide (scope.node = task.node) then
-        collectResidualScopes source fuel rest scopes
-      else
-        let scopes := scopes ++ [{
-          node := task.node
-          variables := task.variables
-        }]
-        collectResidualScopes source fuel
-          (residualChildTasks source task ++ rest) scopes
+private def residualTraversalFuel (source : TypedSource) : Nat :=
+  let edges := source.nodes.foldl (fun count node =>
+    count + match node with
+      | .expression expression =>
+          (expressionChildTasks [] expression).length
+      | .statement statement =>
+          (statementChildTasks source [] statement).length) 0
+  /- A malformed edge may use the opposite node category with the same
+  occurrence identity, causing the first table entry to be traversed once for
+  each `NodeId` constructor.  Twice the stored edge count therefore remains a
+  conservative bound even before staging performs its stricter table checks. -/
+  source.roots.length + 2 * edges + 1
 
-private def residualScopes (source : TypedSource) : List ResidualScope :=
+private def collectResidualScopes (source : TypedSource) :
+    Nat → List ResidualScopeTask → List ResidualScope →
+      Except Error (List ResidualScope)
+  | 0, [], scopes => .ok scopes
+  | 0, task :: _, _ => .error (.residualScopeTraversalLimit task.node)
+  | _ + 1, [], scopes => .ok scopes
+  | fuel + 1, task :: rest, scopes =>
+      match scopes.find? fun scope => decide (scope.node = task.node) with
+      | some scope =>
+          if scope.variables = task.variables then
+            collectResidualScopes source fuel rest scopes
+          else
+            .error (.conflictingResidualScope task.node
+              scope.variables task.variables)
+      | none =>
+          let scopes := scopes ++ [{
+            node := task.node
+            variables := task.variables
+          }]
+          collectResidualScopes source fuel
+            (residualChildTasks source task ++ rest) scopes
+
+private def residualScopes (source : TypedSource) :
+    Except Error (List ResidualScope) :=
   let roots := source.roots.map fun node =>
     { node, variables := [] : ResidualScopeTask }
-  collectResidualScopes source (source.nodes.length + 1) roots []
+  collectResidualScopes source (residualTraversalFuel source) roots []
 
 private def residualVariablesFor (scopes : List ResidualScope)
     (node : NodeId) : List TypeVarId :=
@@ -848,7 +872,7 @@ private def validateTypedSourceResiduals (source : TypedSource) :
     Except Error Unit := do
   validatePolymorphicBinderPositions source
   validateLexicalBinderSchemes [] source.inputs
-  validateScopedNodes source (residualScopes source) source.nodes
+  validateScopedNodes source (← residualScopes source) source.nodes
 
 private def supportedPolymorphicVariables
     (source : TypedSource) : List TypeVarId :=

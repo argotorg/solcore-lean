@@ -17,6 +17,33 @@ namespace Runtime
 
 open Solcore.Frontend.SourceTypedRuntime
 
+/-- A forged occurrence view of a non-callable value cannot claim executable
+plan provenance merely because its principal value has trivial provenance. -/
+private theorem nonClosureInstantiationHasNoPlanCode
+    (plan : SourceSpecializationWorklist.Plan)
+    (substitution : TypeSystem.Substitution) :
+    ¬ (Value.instantiated substitution .unit).HasPlanCode plan := by
+  intro code
+  exact (Value.HasPlanCode.instantiated_origin code).2
+
+/-- The public constructor theorem for an occurrence view also exposes the
+exact substituted-source provenance required by indirect execution. -/
+private theorem closureInstantiationExposesSubstitutedOrigin
+    (plan : SourceSpecializationWorklist.Plan)
+    (parameters : List SourceInference.TypedBinder) (resultType : Ty)
+    (body : List SourceInference.StatementId)
+    (source : SourceInference.TypedSource)
+    (owner : SourceSpecialization.SpecializationKey)
+    (captured : SourceTypedRuntime.Environment)
+    (substitution : TypeSystem.Substitution)
+    (code : Value.HasPlanCode
+      (.closure parameters resultType body source owner captured) plan) :
+    Value.HasInstantiatedPlanCode
+      (.closure parameters resultType body source owner captured)
+      substitution plan := by
+  exact (Value.HasPlanCode.instantiated_origin
+    (Value.HasPlanCode.instantiated substitution code)).2
+
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 

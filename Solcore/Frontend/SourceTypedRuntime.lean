@@ -2141,6 +2141,58 @@ theorem Value.HasDeepType.instantiated
       · rw [principalShape]
         exact typed fuel
 
+/-- Type substitution changes an expression node's annotations, but preserves
+its stable occurrence identity and its position in the typed-source table. -/
+theorem TypedSource.lookupExpression?_applySubstitution
+    (source : TypedSource) (substitution : Substitution)
+    (id : ExpressionId) (node : ExpressionNode)
+    (found : source.lookupExpression? id = some node) :
+    (source.applySubstitution substitution).lookupExpression? id =
+      some (node.applySubstitution substitution) := by
+  unfold TypedSource.lookupExpression? TypedSource.lookupNode? at found ⊢
+  simp only [TypedSource.applySubstitution, List.find?_map]
+  have samePredicate :
+      ((fun candidate => decide (candidate.occurrenceId = id.occurrence)) ∘
+        Node.applySubstitution substitution) =
+      (fun candidate => decide (candidate.occurrenceId = id.occurrence)) := by
+    funext candidate
+    cases candidate <;> rfl
+  rw [samePredicate]
+  cases selected : List.find?
+      (fun candidate => decide (candidate.occurrenceId = id.occurrence))
+      source.nodes with
+  | none => simp [selected] at found
+  | some candidate =>
+      cases candidate with
+      | expression selectedNode =>
+          simp [selected] at found ⊢
+          cases found
+          rfl
+      | statement selectedNode => simp [selected] at found
+
+/-- Provenance for the concrete source graph executed by an instantiated
+closure.  Besides retaining the principal closure's checked-plan origin, this
+relation records that the lambda occurrence survives in the exact
+`TypedSource.applySubstitution` image used by `applyCallable`, with the
+parameters and result type transformed by the same substitution. -/
+def Value.HasInstantiatedPlanCode (principal : Value)
+    (substitution : Substitution) (plan : Plan) : Prop :=
+  match principal with
+  | .closure parameters resultType body source owner _ =>
+      validateExecutablePlan plan = .ok () ∧
+        ∃ specialized, exactSpecialization plan owner = .ok specialized ∧
+          specialized.function.typedBody = source ∧
+          ∃ id node, source.lookupExpression? id = some node ∧
+            node.form = .lambda parameters resultType body ∧
+            node.type = .function
+              (Ty.productMany (parameters.map (·.scheme.body))) resultType ∧
+            (source.applySubstitution substitution).lookupExpression? id =
+              some (node.applySubstitution substitution) ∧
+            (node.applySubstitution substitution).form = .lambda
+              (parameters.map (TypedBinder.applySubstitution substitution))
+              (substitution.apply resultType) body
+  | _ => False
+
 /-- Static provenance of executable code carried by a value.  A closure must
 point at a lambda node in the unique checked specialization for its owner;
 a global must resolve to a unique specialization.  This relation is separate
@@ -2166,7 +2218,9 @@ def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
                 node.form = .lambda parameters resultType body ∧
                 node.type = .function
                   (Ty.productMany (parameters.map (·.scheme.body))) resultType
-      | .instantiated _ principal => principal.HasPlanCodeFuel fuel plan
+      | .instantiated substitution principal =>
+          principal.HasPlanCodeFuel fuel plan ∧
+            principal.HasInstantiatedPlanCode substitution plan
       | .global key =>
           validateExecutablePlan plan = .ok () ∧
             ∃ specialized, exactSpecialization plan key = .ok specialized
@@ -2175,16 +2229,56 @@ def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
 def Value.HasPlanCode (value : Value) (plan : Plan) : Prop :=
   ∀ fuel, value.HasPlanCodeFuel fuel plan
 
-/-- Runtime occurrence instantiation changes only types, never the principal
-closure's checked-code provenance. -/
+/-- Runtime occurrence instantiation preserves the principal closure's
+checked-code provenance and explicitly relates the source graph executed by
+`applyCallable` to its pointwise substitution image. -/
 theorem Value.HasPlanCode.instantiated
-    {plan : Plan} {principal : Value} (substitution : Substitution)
-    (code : principal.HasPlanCode plan) :
-    (Value.instantiated substitution principal).HasPlanCode plan := by
+    {plan : Plan} {parameters : List TypedBinder} {resultType : Ty}
+    {body : List StatementId} {source : TypedSource} {owner : Key}
+    {captured : Environment} (substitution : Substitution)
+    (code : (Value.closure parameters resultType body source owner
+      captured).HasPlanCode plan) :
+    (Value.instantiated substitution
+      (.closure parameters resultType body source owner captured)).HasPlanCode
+        plan := by
+  have origin := code 1
+  change validateExecutablePlan plan = .ok () ∧
+    ∃ specialized, exactSpecialization plan owner = .ok specialized ∧
+      specialized.function.typedBody = source ∧
+      ∃ id node, source.lookupExpression? id = some node ∧
+        node.form = .lambda parameters resultType body ∧
+        node.type = .function
+          (Ty.productMany (parameters.map (·.scheme.body))) resultType at origin
+  rcases origin with
+    ⟨validated, specialized, specializedAt, sameSource,
+      id, node, found, shape, nodeType⟩
+  have instantiatedOrigin :
+      (Value.closure parameters resultType body source owner captured).HasInstantiatedPlanCode
+        substitution plan := by
+    exact ⟨validated, specialized, specializedAt, sameSource,
+      id, node, found, shape, nodeType,
+      TypedSource.lookupExpression?_applySubstitution source substitution id
+        node found,
+      by simp [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution,
+        shape]⟩
   intro fuel
   cases fuel with
   | zero => trivial
-  | succ fuel => exact code fuel
+  | succ fuel => exact ⟨code fuel, instantiatedOrigin⟩
+
+/-- Positive instantiated-code provenance exposes both the checked principal
+closure and the exact substituted source/lambda relation used by execution. -/
+theorem Value.HasPlanCode.instantiated_origin
+    {plan : Plan} {substitution : Substitution} {principal : Value}
+    (code : (Value.instantiated substitution principal).HasPlanCode plan) :
+    principal.HasPlanCode plan ∧
+      principal.HasInstantiatedPlanCode substitution plan := by
+  constructor
+  · intro fuel
+    cases fuel with
+    | zero => trivial
+    | succ fuel => exact (code (fuel + 2)).1
+  · exact (code 1).2
 
 namespace RuntimeState
 
