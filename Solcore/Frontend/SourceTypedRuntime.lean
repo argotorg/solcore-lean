@@ -350,6 +350,13 @@ theorem mappingInsert_member
 inductive RuntimeError where
   | missingSpecialization (key : Key)
   | duplicateSpecialization (key : Key) (count : Nat)
+  | specializationOwnershipMismatch
+      (key : Key) (declaration functionDeclaration typedBodyOwner :
+        Resolved.DeclarationId)
+  | missingInstantiationTarget
+      (declaration : Resolved.DeclarationId) (type : Ty)
+  | duplicateInstantiationTargets
+      (declaration : Resolved.DeclarationId) (type : Ty) (count : Nat)
   | invalidFunctionType (key : Key) (type : Ty)
   | inferredResultTypeMismatch (key : Key) (declared inferred : Ty)
   | unresolvedAssumptions (key : Key) (predicates : List ProgramPredicate)
@@ -372,6 +379,7 @@ inductive RuntimeError where
   | missingCallEdge (caller : Key) (id : ExpressionId)
   | duplicateReferenceEdge (caller : Key) (id : ExpressionId) (count : Nat)
   | missingReferenceEdge (caller : Key) (id : ExpressionId)
+  | declarationMetadataMismatch (call callee : ExpressionId)
   | malformedLiteral (id : ExpressionId)
   | literalMetadataMismatch (id : ExpressionId)
   | expectedBool (actual : Option Ty)
@@ -435,18 +443,66 @@ def exactSpecialization (plan : Plan) (key : Key) :
   | [specialized] => .ok specialized
   | candidates => .error (.duplicateSpecialization key candidates.length)
 
-private def exactCallKey (plan : Plan) (caller : Key) (id : ExpressionId) :
+private def exactParameterBinding? (substitution : ParameterSubstitution)
+    (parameter : TypeParameterId) : Option Ty :=
+  match substitution.filter fun entry => entry.1 == parameter with
+  | [entry] => some entry.2
+  | _ => none
+
+private def parameterSubstitutionsEquivalent
+    (left right : ParameterSubstitution) : Bool :=
+  left.length == right.length &&
+    left.all (fun entry =>
+      exactParameterBinding? right entry.1 == some entry.2) &&
+    right.all fun entry =>
+      exactParameterBinding? left entry.1 == some entry.2
+
+private def specializationOwnershipCoherent
+    (specialized : SourceSpecialization.SpecializedFunction) : Bool :=
+  decide (specialized.key.declaration = specialized.declaration ∧
+    specialized.function.declaration = specialized.declaration ∧
+    specialized.function.typedBody.owner = specialized.declaration)
+
+private def specializationMatchesInstantiation
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (instantiation : DeclarationInstantiation) : Bool :=
+  specializationOwnershipCoherent specialized &&
+    specialized.key.arguments ==
+      specialized.parameterSubstitution.map Prod.snd &&
+    specialized.declaration == instantiation.declaration &&
+    parameterSubstitutionsEquivalent specialized.parameterSubstitution
+      instantiation.parameterSubstitution &&
+    specialized.function.type == instantiation.type &&
+    specialized.assumptions == instantiation.predicates &&
+    specialized.function.typedBody.inputs.map (·.comptime) ==
+      instantiation.parameterComptime &&
+    specialized.function.returnComptime == instantiation.returnComptime
+
+private def exactInstantiationKey (plan : Plan)
+    (instantiation : DeclarationInstantiation) : Except RuntimeError Key :=
+  match plan.specializations.filter fun specialized =>
+      specializationMatchesInstantiation specialized instantiation with
+  | [] => .error (.missingInstantiationTarget instantiation.declaration
+      instantiation.type)
+  | [specialized] => .ok specialized.key
+  | candidates => .error (.duplicateInstantiationTargets
+      instantiation.declaration instantiation.type candidates.length)
+
+private def exactCallKey (plan : Plan) (caller : Key) (id : ExpressionId)
+    (callee : Key) :
     Except RuntimeError Key :=
   match plan.callEdges.filter fun edge =>
-      decide (edge.caller = caller) && decide (edge.occurrence = id) with
+      decide (edge.caller = caller) && decide (edge.occurrence = id) &&
+        decide (edge.callee = callee) with
   | [] => .error (.missingCallEdge caller id)
   | [edge] => .ok edge.callee
   | edges => .error (.duplicateCallEdge caller id edges.length)
 
 private def exactReferenceKey (plan : Plan) (caller : Key)
-    (id : ExpressionId) : Except RuntimeError Key :=
+    (id : ExpressionId) (callee : Key) : Except RuntimeError Key :=
   match plan.referenceEdges.filter fun edge =>
-      decide (edge.caller = caller) && decide (edge.occurrence = id) with
+      decide (edge.caller = caller) && decide (edge.occurrence = id) &&
+        decide (edge.callee = callee) with
   | [] => .error (.missingReferenceEdge caller id)
   | [edge] => .ok edge.callee
   | edges => .error (.duplicateReferenceEdge caller id edges.length)
@@ -462,6 +518,17 @@ private def exactStatement (source : TypedSource) (id : StatementId) :
   match source.lookupStatement? id with
   | some node => .ok node
   | none => .error (.missingStatement id)
+
+private def validateDirectDeclarationCallee (source : TypedSource)
+    (call callee : ExpressionId)
+    (instantiation : DeclarationInstantiation) : Except RuntimeError Unit :=
+  match source.lookupExpression? callee with
+  | some { type, form := .reference _ (.declaration reference), .. } =>
+      if reference = instantiation && type = instantiation.type then
+        pure ()
+      else
+        throw (.declarationMetadataMismatch call callee)
+  | _ => throw (.declarationMetadataMismatch call callee)
 
 private def exactSolvedRequirement? (function : CheckedFunction)
     (id : RequirementId) : Option SolvedRequirement :=
@@ -632,6 +699,10 @@ private def validateRuntimeBinders (function : CheckedFunction) :
 private def validateSpecializationMetadata
     (specialized : SourceSpecialization.SpecializedFunction) :
     Except RuntimeError Unit := do
+  unless specializationOwnershipCoherent specialized do
+    throw (.specializationOwnershipMismatch specialized.key
+      specialized.declaration specialized.function.declaration
+      specialized.function.typedBody.owner)
   unless specialized.assumptions.isEmpty do
     throw (.unresolvedAssumptions specialized.key specialized.assumptions)
   let parameterComptime :=
@@ -1300,59 +1371,15 @@ private def directLambdaLetScheme? (source : TypedSource)
           none
     | _ => none
 
-/-- Match a principal type against one concrete occurrence.  Only variables
-quantified by the recovered let scheme may be assigned; every other type
-constructor and variable must agree exactly. -/
-private def matchSchemeType? (quantified : List TypeVarId) :
-    Ty → Ty → Substitution → Option Substitution
-  | .variable metavariable, actual, substitution =>
-      if quantified.contains metavariable then
-        match substitution.lookup? metavariable with
-        | some previous =>
-            if previous = actual then some substitution else none
-        | none => some ((metavariable, actual) :: substitution)
-      else if Ty.variable metavariable = actual then some substitution else none
-  | .parameter expected, .parameter actual, substitution =>
-      if expected = actual then some substitution else none
-  | .constructor expected, .constructor actual, substitution =>
-      if expected = actual then some substitution else none
-  | .application expectedFunction expectedArgument,
-      .application actualFunction actualArgument, substitution => do
-      let substitution ← matchSchemeType? quantified expectedFunction
-        actualFunction substitution
-      matchSchemeType? quantified expectedArgument actualArgument substitution
-  | .function expectedParameter expectedResult,
-      .function actualParameter actualResult, substitution => do
-      let substitution ← matchSchemeType? quantified expectedParameter
-        actualParameter substitution
-      matchSchemeType? quantified expectedResult actualResult substitution
-  | .product expectedLeft expectedRight,
-      .product actualLeft actualRight, substitution => do
-      let substitution ← matchSchemeType? quantified expectedLeft actualLeft
-        substitution
-      matchSchemeType? quantified expectedRight actualRight substitution
-  | .mapping expectedKey expectedValue,
-      .mapping actualKey actualValue, substitution => do
-      let substitution ← matchSchemeType? quantified expectedKey actualKey
-        substitution
-      matchSchemeType? quantified expectedValue actualValue substitution
-  | .proxy expected, .proxy actual, substitution =>
-      matchSchemeType? quantified expected actual substitution
-  | .comptime expected, .comptime actual, substitution =>
-      matchSchemeType? quantified expected actual substitution
-  | .error, .error, substitution => some substitution
-  | _, _, _ => none
-
 /-- Produce a concrete occurrence view without rewriting the principal value
 stored in the heap.  The occurrence must be closed and every quantified
 variable must have been determined by matching the scheme body. -/
 private def instantiateDirectLambdaLet? (plan : Plan) (source : TypedSource)
     (id : Resolved.LocalId) (expected : Ty) (value : Value) : Option Value := do
-  if !expected.freeVariables.isEmpty then none else pure ()
   let scheme ← directLambdaLetScheme? source id
   if value.type? plan != some scheme.body then none else pure ()
-  let substitution ← matchSchemeType? scheme.quantified scheme.body expected []
-  if substitution.domain.length != scheme.quantified.length then none else pure ()
+  let substitution ←
+    SourceSpecialization.matchClosedSchemeInstance? scheme expected
   match value with
   | .closure _ _ _ _ _ _ => some (.instantiated substitution value)
   | _ => none
@@ -1411,10 +1438,13 @@ mutual
               .done (.bool value) state
           | .reference _ (.builtinFunction function) =>
               .done (.builtin function) state
-          | .reference _ (.declaration _) =>
-              match exactReferenceKey plan owner id with
-              | .ok key => .done (.global key) state
+          | .reference _ (.declaration instantiation) =>
+              match exactInstantiationKey plan instantiation with
               | .error error => .fault error state
+              | .ok target =>
+                  match exactReferenceKey plan owner id target with
+                  | .ok key => .done (.global key) state
+                  | .error error => .fault error state
           | .group inner => descend state inner
           | .tuple elements =>
               match evaluateList descend state elements with
@@ -1457,12 +1487,20 @@ mutual
           | .lambda parameters resultType body =>
               .done (.closure parameters resultType body source owner environment)
                 state
-          | .call _ arguments (.declaration _) =>
+          | .call callee arguments (.declaration instantiation) =>
               match evaluateList descend state arguments with
               | .done values finalState =>
-                  match exactCallKey plan owner id with
-                  | .ok key => applyCallable fuel plan (.global key) values finalState
+                  match validateDirectDeclarationCallee source id callee
+                      instantiation with
                   | .error error => .fault error finalState
+                  | .ok () =>
+                      match exactInstantiationKey plan instantiation with
+                      | .error error => .fault error finalState
+                      | .ok target =>
+                          match exactCallKey plan owner id target with
+                          | .ok key =>
+                              applyCallable fuel plan (.global key) values finalState
+                          | .error error => .fault error finalState
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
           | .call _ arguments (.builtinFunction function) =>

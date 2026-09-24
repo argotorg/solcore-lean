@@ -22,6 +22,22 @@ private def workspace : Workspace.RawWorkspace := {
       "impl Eq<Word> {}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function twice<T>(value: T) returns (T) { return identity(identity(value)); }",
+      "function contextualLocal(flag: Bool) returns (Word, Bool) {",
+      "  let f = lam(value) { return identity(value); };",
+      "  f(2);",
+      "  return (f(1), f(flag));",
+      "}",
+      "function unusedContextualLocal() returns (Word) {",
+      "  let f = lam(value) { return identity(value); };",
+      "  return 9;",
+      "}",
+      "function nestedContextualLocal(flag: Bool) returns (Word, Bool) {",
+      "  let outer = lam(value) {",
+      "    let inner = lam(nestedValue) { return identity(nestedValue); };",
+      "    return inner(value);",
+      "  };",
+      "  return (outer(1), outer(flag));",
+      "}",
       "function first<T>(value: T) returns (T) { return value; }",
       "function second<T>(value: T) returns (T) { return value; }",
       "function nested(value: Word) returns (Word) { return first(second(value)); }",
@@ -96,6 +112,22 @@ private def setExpressionType (nodes : List Node) (target : ExpressionId)
       else
         node
   | .statement _ => node
+
+private def setLocalBinderScheme (nodes : List Node)
+    (target : Resolved.LocalId) (scheme : Scheme) : List Node :=
+  nodes.map fun node => match node with
+  | .statement statement =>
+      match statement.form with
+      | .letDecl binder initializer =>
+          if binder.id == target then
+            .statement {
+              statement with
+              form := .letDecl { binder with scheme } initializer
+            }
+          else
+            node
+      | _ => node
+  | .expression _ => node
 
 private def setExpressionCoercions (nodes : List Node) (target : ExpressionId)
     (coercions : List CoercionStep) : List Node :=
@@ -232,6 +264,193 @@ private def testBreadthFirstDiscovery (program : CheckedProgram) : IO Unit := do
           s!"duplicate canonical roots failed replay validation: {reprStr error}")
   | outcome => throw (IO.userError
       s!"duplicate roots: expected a complete plan, found {reprStr outcome}")
+
+private def testContextualLocalPolymorphicCalls
+    (program : CheckedProgram) : IO Unit := do
+  let identity ← signatureNamed program "identity"
+  let contextual ← signatureNamed program "contextualLocal"
+  let function ← functionFor program contextual
+  let (binder, initializer) ← match function.typedBody.nodes.filterMap fun
+      | .statement { form := .letDecl binder (some initializer), .. } =>
+          if binder.name == "f" then some (binder, initializer) else none
+      | _ => none with
+    | [(binder, initializer)] => pure (binder, initializer)
+    | bindings => throw (IO.userError
+        s!"contextualLocal retained {bindings.length} binders named `f`")
+  let quantified ← match binder.scheme.quantified with
+    | [quantified] => pure quantified
+    | variables => throw (IO.userError
+        s!"contextualLocal `f` retained {variables.length} quantified variables")
+  let declarationParameter ← match identity.scheme.parameters with
+    | [parameter] => pure parameter
+    | parameters => throw (IO.userError
+        s!"identity retained {parameters.length} declaration parameters")
+  let (call, callee, callInstantiation) ← match
+      function.typedBody.nodes.findSome? fun
+        | .expression node@{
+            form := .call callee _ (.declaration instantiation), .. } =>
+            if instantiation.declaration == identity.id then
+              some (node, callee, instantiation)
+            else
+              none
+        | _ => none with
+    | some selected => pure selected
+    | none => throw (IO.userError
+        "contextualLocal lost its declaration call to identity")
+  let calleeNode ← match function.typedBody.lookupExpression? callee with
+    | some node@{ form := .reference _ (.declaration _), .. } => pure node
+    | _ => throw (IO.userError
+        "contextualLocal identity call lost its declaration-reference child")
+  let localReferenceTypes := function.typedBody.nodes.filterMap fun
+    | .expression node@{ form := .reference _ (.local selected), .. } =>
+        if selected == binder.id then some node.rawType else none
+    | _ => none
+  let residual := Ty.variable quantified
+  assertTrue (SourceSpecialization.isDirectLambdaInitializer
+      function.typedBody initializer && decide (
+        binder.scheme.body = .function residual residual ∧
+        call.rawType = residual ∧ call.type = residual ∧
+        callInstantiation.parameterSubstitution =
+          [(declarationParameter, residual)] ∧
+        callInstantiation.type = .function residual residual ∧
+        callInstantiation.predicates = [] ∧
+        calleeNode.rawType = .function residual residual ∧
+        localReferenceTypes = [
+          Ty.function .word .word,
+          Ty.function .word .word,
+          Ty.function .bool .bool]))
+    "contextualLocal did not retain its principal template and three concrete uses"
+
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := contextual.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.word]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.bool]
+  }
+  let request := monomorphicRequest contextual
+  match ← runOrThrow "contextual local calls" program [request] 3 with
+  | .complete plan =>
+      let expectedEdges : List SourceSpecializationWorklist.CallEdge := [{
+        caller := entryKey
+        occurrence := call.id
+        callee := wordKey
+      }, {
+        caller := entryKey
+        occurrence := call.id
+        callee := boolKey
+      }]
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey, boolKey] ∧
+          plan.callEdges = expectedEdges ∧
+          plan.callEdges.eraseDups.length = 2 ∧
+          plan.referenceEdges = []))
+        "contextual local calls lost canonical keys or exact deduplicated edges"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"contextual local plan failed replay validation: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"contextual local calls: expected a complete plan, found {reprStr outcome}")
+
+  match ← runOrThrow "contextual local budget one" program [request] 1 with
+  | .budgetExhausted plan next pending =>
+      assertTrue (decide (
+          plan.specializations.map (·.key) = [entryKey] ∧
+          plan.callEdges.length = 2 ∧
+          plan.callEdges.map (·.occurrence) = [call.id, call.id] ∧
+          next = wordKey ∧ pending.length = 2))
+        "contextual local budget one lost its concrete frontier or edge ledger"
+  | outcome => throw (IO.userError
+      s!"contextual local budget one: expected exhaustion, found {reprStr outcome}")
+
+  match ← runOrThrow "contextual local budget two" program [request] 2 with
+  | .budgetExhausted plan next pending =>
+      assertTrue (decide (
+          plan.specializations.map (·.key) = [entryKey, wordKey] ∧
+          plan.callEdges.length = 2 ∧ next = boolKey ∧
+          pending.length = 1))
+        "contextual local budget two lost its second concrete frontier"
+  | outcome => throw (IO.userError
+      s!"contextual local budget two: expected exhaustion, found {reprStr outcome}")
+
+  let unused ← signatureNamed program "unusedContextualLocal"
+  match ← runOrThrow "unused contextual local" program
+      [monomorphicRequest unused] 1 with
+  | .complete plan =>
+      assertTrue (decide (plan.specializations.map (·.key.declaration) =
+          [unused.id] ∧ plan.callEdges = [] ∧ plan.referenceEdges = []))
+        "an unused polymorphic lambda unnecessarily specialized its open body"
+  | outcome => throw (IO.userError
+      s!"unused contextual local: expected a complete plan, found {reprStr outcome}")
+
+  let wordReference ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{ form := .reference _ (.local selected), .. } =>
+          if selected == binder.id &&
+              node.rawType == Ty.function .word .word then
+            some node
+          else
+            none
+      | _ => none with
+    | some reference => pure reference
+    | none => throw (IO.userError
+        "contextualLocal lost its concrete Word reference to `f`")
+  let mismatchedScheme : Scheme := {
+    binder.scheme with body := .function residual .bool
+  }
+  let mismatchedFunction : CheckedFunction := {
+    function with
+    typedBody := {
+      function.typedBody with
+      nodes := setLocalBinderScheme function.typedBody.nodes
+        binder.id mismatchedScheme
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction program mismatchedFunction) [request] 3 with
+  | .error (.localPolymorphicInstanceMismatch occurrence binderId scheme
+      (.function .word .word)) =>
+      assertTrue (decide (occurrence = wordReference.id ∧ binderId = binder.id ∧
+          scheme = mismatchedScheme))
+        "local scheme-instance mismatch lost its occurrence or binder"
+  | result => throw (IO.userError
+      s!"a malformed ground local scheme instance was accepted: {reprStr result}")
+
+private def testNestedContextualLocalRejected
+    (program : CheckedProgram) : IO Unit := do
+  let nested ← signatureNamed program "nestedContextualLocal"
+  let function ← functionFor program nested
+  let inner ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "inner" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError
+        "nestedContextualLocal lost its `inner` binder")
+  let openReference ← match function.typedBody.nodes.findSome? fun
+      | .expression node@{ form := .reference _ (.local selected), .. } =>
+          if selected == inner.id && !node.rawType.freeVariables.isEmpty then
+            some node
+          else
+            none
+      | _ => none with
+    | some reference => pure reference
+    | none => throw (IO.userError
+        "nestedContextualLocal lost its open inner-lambda reference")
+  match SourceSpecializationWorklist.run program
+      [monomorphicRequest nested] 4 with
+  | .error (.unsupportedOpenDeclaration occurrence variables) =>
+      assertTrue (decide (occurrence = openReference.id ∧
+          variables = openReference.rawType.freeVariables))
+        "nested local-template rejection lost its occurrence or variables"
+  | result => throw (IO.userError
+      s!"nested local polymorphism was not rejected explicitly: {reprStr result}")
 
 private def testDerivedCanonicalization (program : CheckedProgram) : IO Unit := do
   let pick ← signatureNamed program "pick"
@@ -646,6 +865,8 @@ validation from one checked raw workspace. -/
 def testSourceSpecializationWorklist : IO Unit := do
   let program ← checkedProgram
   testBreadthFirstDiscovery program
+  testContextualLocalPolymorphicCalls program
+  testNestedContextualLocalRejected program
   testDerivedCanonicalization program
   testTypedNodeOrder program
   testRecursiveKeys program

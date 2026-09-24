@@ -31,8 +31,9 @@ private def workspace : Workspace.RawWorkspace := {
         "    default { return 0; }",
         "  }",
         "}",
+        "function globalIdentity<T>(value: T) returns (T) { return value; }",
         "function polymorphicLocal(flag: Bool) returns (Word, Bool) {",
-        "  let id = lam(value) { return value; };",
+        "  let id = lam(value) { return globalIdentity(value); };",
         "  return (id(11), id(flag));",
         "}"
       ]
@@ -134,6 +135,21 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   assertTrue (direct.specializationCount == 1 &&
       recursive.specializationCount == 1 && typed.specializationCount == 1)
     "a single-function fixture retained an unexpected specialization plan"
+  assertTrue (polymorphicLocal.specializationCount == 3)
+    "local polymorphism did not retain its root and two generic helper instances"
+  let polymorphicRequest ←
+    match SourceProgramExecution.resolveSeed checked
+        (Seed.named main "polymorphicLocal") with
+    | .ok request => pure request
+    | .error error => throw (IO.userError
+        s!"polymorphic-local seed resolution failed: {reprStr error}")
+  match SourceSpecializationWorklist.run checked [polymorphicRequest]
+      compilerOptions.specializationBudget with
+  | .ok (.complete plan) =>
+      assertTrue (plan.specializations.length == 3 && plan.callEdges.length == 2)
+        "local polymorphism did not discover both contextual generic calls"
+  | result => throw (IO.userError
+      s!"polymorphic-local plan reconstruction failed: {reprStr result}")
   expectCoreWord "direct Core root" 14 <|
     direct.runCore [.word (word 7)] runtimeOptions
   expectCoreWord "reused direct Core root" 18 <|

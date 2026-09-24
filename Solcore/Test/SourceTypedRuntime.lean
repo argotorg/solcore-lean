@@ -296,6 +296,17 @@ private def source : String := String.intercalate "\n" [
   "  let identity = lam(value) { return flag ? value : value; };",
   "  return (identity(41), identity(flag));",
   "}",
+  "function genericIdentity<T>(value: T) returns (T) { return value; }",
+  "function localGenericCalls(flag: Bool) returns (Word, Bool) {",
+  "  let applyIdentity = lam(value) { return genericIdentity(value); };",
+  "  return (applyIdentity(43), applyIdentity(flag));",
+  "}",
+  "function localGenericAliasEscape(flag: Bool) returns (Word, Bool) {",
+  "  let applyIdentity = lam(value) { return genericIdentity(value); };",
+  "  let asWord: function(Word) returns(Word) = applyIdentity;",
+  "  let asBool: function(Bool) returns(Bool) = applyIdentity;",
+  "  return (asWord(47), asBool(flag));",
+  "}",
   "function spin(value: Word) returns (Word) { return spin(value); }"
 ]
 
@@ -372,6 +383,92 @@ private def testLocalLetPolymorphism (program : CheckedProgram) : IO Unit := do
   | other => throw (IO.userError
       s!"local let-polymorphism returned {reprStr other}")
   expectShallowHeap "local let-polymorphism" prepared.plan result
+
+private def expectWordBool (label : String) (expectedWord : Nat)
+    (expectedBool : Bool) : RunResult → IO Unit
+  | .done (.product (.word actualWord) (.bool actualBool)) _ =>
+      assertTrue (actualWord == word expectedWord && actualBool == expectedBool)
+        s!"{label} returned the wrong Word/Bool pair"
+  | result => throw (IO.userError s!"{label} returned {reprStr result}")
+
+private def assertContextualGenericPlan (label : String)
+    (prepared : Prepared) : IO Unit := do
+  assertTrue (prepared.plan.specializations.length == 3)
+    s!"{label} did not retain entry plus two identity specializations"
+  let edges := prepared.plan.callEdges.filter fun edge =>
+    decide (edge.caller = prepared.key)
+  assertTrue (edges.length == 2)
+    s!"{label} did not retain two concrete edges for the local lambda call"
+  match edges with
+  | [wordEdge, boolEdge] =>
+      assertTrue (wordEdge.occurrence == boolEdge.occurrence)
+        s!"{label} split one contextual call across different occurrences"
+      assertTrue (wordEdge.callee != boolEdge.callee)
+        s!"{label} collapsed Word and Bool calls to one specialization"
+      let arguments := edges.map (fun edge => edge.callee.arguments)
+      assertTrue (arguments.contains [.word] && arguments.contains [.bool])
+        s!"{label} did not retain Word and Bool specialization keys"
+  | _ => throw (IO.userError s!"{label} retained an impossible edge shape")
+
+private def expectRuntimeFault (label : String)
+    (accept : RuntimeError → Bool) : RunResult → IO Unit
+  | .fault error _ =>
+      assertTrue (accept error) s!"{label} reported {reprStr error}"
+  | result => throw (IO.userError
+      s!"{label} did not reject tampered metadata: {reprStr result}")
+
+private def testContextualGenericEdgeTampering
+    (prepared : Prepared) : IO Unit := do
+  let wordEdges := prepared.plan.callEdges.filter fun edge =>
+    decide (edge.caller = prepared.key ∧ edge.callee.arguments = [.word])
+  let wordEdge ← match wordEdges with
+    | [edge] => pure edge
+    | edges => throw (IO.userError
+        s!"contextual generic plan retained {edges.length} Word edges")
+
+  let duplicate := {
+    prepared with
+    plan := {
+      prepared.plan with
+      callEdges := wordEdge :: prepared.plan.callEdges
+    }
+  }
+  expectRuntimeFault "duplicate contextual generic edge"
+    (fun error => match error with
+      | .duplicateCallEdge caller occurrence 2 =>
+          decide (caller = prepared.key ∧ occurrence = wordEdge.occurrence)
+      | _ => false)
+    (runPrepared duplicate [.bool true])
+
+  let missing := {
+    prepared with
+    plan := {
+      prepared.plan with
+      callEdges := prepared.plan.callEdges.filter fun edge =>
+        decide (edge != wordEdge)
+    }
+  }
+  expectRuntimeFault "missing contextual generic edge"
+    (fun error => match error with
+      | .missingCallEdge caller occurrence =>
+          decide (caller = prepared.key ∧ occurrence = wordEdge.occurrence)
+      | _ => false)
+    (runPrepared missing [.bool true])
+
+private def testContextualLocalGenericCalls
+    (program : CheckedProgram) : IO Unit := do
+  let direct ← prepareNamed program "localGenericCalls"
+  assertContextualGenericPlan "contextual local generic call" direct
+  let directResult := runPrepared direct [.bool true]
+  expectWordBool "contextual local generic call" 43 true directResult
+  expectShallowHeap "contextual local generic call" direct.plan directResult
+  testContextualGenericEdgeTampering direct
+
+  let escaped ← prepareNamed program "localGenericAliasEscape"
+  assertContextualGenericPlan "ground alias escape" escaped
+  let escapedResult := runPrepared escaped [.bool false]
+  expectWordBool "ground alias escape" 47 false escapedResult
+  expectShallowHeap "ground alias escape" escaped.plan escapedResult
 
 private def treeData (program : CheckedProgram) : IO ProgramDataSignature :=
   match program.signatures.dataTypes.filter fun dataType =>
@@ -467,6 +564,27 @@ private def expectPreExecutionFault (label : String)
 
 private def testTamperedExecutableMetadata
     (program : CheckedProgram) : IO Unit := do
+  let original ← prepareNamed program "implicitTail"
+  let impostor ← prepareNamed program "loops"
+  let impostorFunction ←
+    match impostor.plan.specializations.filter fun specialized =>
+        decide (specialized.key = impostor.key) with
+    | [specialized] => pure specialized.function
+    | specializations => throw (IO.userError
+        s!"impostor plan retained {specializations.length} entry specializations")
+  let withImpostorBody := rewriteEntryFunction original fun _ =>
+    impostorFunction
+  expectPreExecutionFault "specialization ownership mismatch"
+    (fun error => match error with
+      | .specializationOwnershipMismatch key declaration
+          functionDeclaration typedBodyOwner =>
+          decide (key = original.key ∧
+            declaration = original.key.declaration ∧
+            functionDeclaration = impostor.key.declaration ∧
+            typedBodyOwner = impostor.key.declaration)
+      | _ => false)
+    (runPrepared withImpostorBody)
+
   let fakeRequirement : SourceInference.RequirementId := { index := 1000000 }
   let proxy ← prepareNamed program "proxyValue"
   let withRequirement := rewriteEntryNodes proxy <| rewriteFirstExpression
@@ -572,6 +690,7 @@ private def testAll : IO Unit := do
   testAssignmentsMappingsAndControl program
   testClosuresOrderProxyAndFuel program
   testLocalLetPolymorphism program
+  testContextualLocalGenericCalls program
   testNominalInputValidation program
   testTamperedExecutableMetadata program
   testIndirectArgumentCountMetadata program

@@ -7,13 +7,19 @@ Finite whole-program specialization planning.
 Requests may present declaration parameters in any order.  The checked
 program's exact signature/body pair and `SourceSpecialization.specializeFunction`
 are the sole canonicalization boundary.  Each newly admitted specialization is
-scanned in typed-source node order; direct source-declaration calls and
+scanned in typed-source node order.  Ground direct source-declaration calls and
 standalone source-declaration function references append requests to the FIFO
-tail, compiler-function calls add no edge, and already-seen canonical keys are
-skipped without consuming budget.  A declaration reference which is the callee
-child of a direct call is represented only by that call edge, so adding
-first-class function discovery does not perturb the established direct-call
-frontier.
+tail.  Open declaration uses inside a supported direct-lambda polymorphic let
+are rescanned once for each distinct ground use of that let; exact duplicate
+edges are removed, while different concrete callees at the same template
+occurrence remain distinct.  This first contextual slice handles variables
+owned by one local scheme; nested local-template contexts remain explicit
+unsupported open declarations.  Compiler-function calls add no edge, and
+already-seen canonical keys are skipped without consuming budget.
+
+A declaration reference which is the callee child of a direct call is
+represented only by that call edge, so adding first-class function discovery
+does not perturb the established direct-call frontier.
 
 The budget counts distinct specializations admitted to the plan.  Exhaustion
 is an ordinary outcome rather than a malformed-program error, which makes
@@ -35,17 +41,20 @@ structure Request where
   parameterSubstitution : ParameterSubstitution
   deriving Repr, BEq, DecidableEq
 
-/-- One syntactic direct-call occurrence in one specialized caller.  Edges are
-not deduplicated: two calls to the same callee key remain two edges. -/
+/-- One concrete target of a syntactic direct-call occurrence in one
+specialized caller.  Different source occurrences remain distinct; one local
+polymorphic template occurrence may have several concrete callees, while an
+exact duplicate `(caller, occurrence, callee)` is retained only once. -/
 structure CallEdge where
   caller : SourceSpecialization.SpecializationKey
   occurrence : ExpressionId
   callee : SourceSpecialization.SpecializationKey
   deriving Repr, BEq, DecidableEq
 
-/-- One declaration reference used as a first-class function value.  Direct
-call callee children are excluded because their occurrence is already retained
-by `CallEdge`. -/
+/-- One concrete target of a declaration reference used as a first-class
+function value.  Direct-call callee children are excluded because their
+occurrence is already retained by `CallEdge`; contextual exact duplicates are
+removed under the same policy as call edges. -/
 structure ReferenceEdge where
   caller : SourceSpecialization.SpecializationKey
   occurrence : ExpressionId
@@ -111,6 +120,13 @@ inductive Error where
   | specializedCalleeReturnComptimeMismatch
       (call : ExpressionId)
       (instantiation specialized : Bool)
+  | unsupportedOpenDeclaration
+      (occurrence : ExpressionId) (variables : List TypeVarId)
+  | localPolymorphicInstanceMismatch
+      (occurrence : ExpressionId) (binder : Resolved.LocalId)
+      (scheme : Scheme) (actual : Ty)
+  | unsupportedLocalPolymorphicRequirements
+      (occurrence : ExpressionId) (predicates : List ProgramPredicate)
   | invalidExpressionCoercionPath
       (expression : ExpressionId) (source target : Ty)
       (coercions : List CoercionStep)
@@ -214,11 +230,145 @@ private def canonicalReference (program : CheckedProgram)
       instantiation.returnComptime specialized.function.returnComptime)
   pure (request, specialized)
 
-private def directCall (program : CheckedProgram)
-    (caller : SourceSpecialization.SpecializationKey)
-    (source : TypedSource) (node : ExpressionNode)
-    (callee : ExpressionId) (instantiation : DeclarationInstantiation) :
-    Except Error (Request × CallEdge) := do
+private def declarationInstantiationTypes
+    (instantiation : DeclarationInstantiation) : List Ty :=
+  instantiation.type ::
+    instantiation.parameterSubstitution.map Prod.snd ++
+    instantiation.predicates.flatMap fun predicate =>
+      predicate.subject :: predicate.arguments
+
+private def declarationInstantiationVariables
+    (instantiation : DeclarationInstantiation) : List TypeVarId :=
+  (declarationInstantiationTypes instantiation).flatMap Ty.freeVariables
+    |>.eraseDups
+
+private def declarationInstantiation? (node : ExpressionNode) :
+    Option DeclarationInstantiation :=
+  match node.form with
+  | .call _ _ (.declaration instantiation)
+  | .reference _ (.declaration instantiation) => some instantiation
+  | _ => none
+
+private def hasOpenDeclarationInstantiation (node : ExpressionNode) : Bool :=
+  match declarationInstantiation? node with
+  | some instantiation =>
+      !(declarationInstantiationVariables instantiation).isEmpty
+  | none => false
+
+private structure LocalLambdaBinding where
+  binder : TypedBinder
+  initializer : ExpressionId
+  deriving Repr, BEq, DecidableEq
+
+private structure LocalLambdaInstance where
+  binding : LocalLambdaBinding
+  substitution : Substitution
+  deriving Repr, BEq, DecidableEq
+
+private def directPolymorphicLambdaBindings
+    (source : TypedSource) : List LocalLambdaBinding :=
+  source.nodes.filterMap fun
+    | .statement { form := .letDecl binder (some initializer), .. } =>
+        if binder.scheme.quantified.isEmpty ||
+            !SourceSpecialization.isDirectLambdaInitializer source initializer then
+          none
+        else
+          some { binder, initializer }
+    | _ => none
+
+private def exactLocalLambdaBinding?
+    (bindings : List LocalLambdaBinding) (id : Resolved.LocalId) :
+    Option LocalLambdaBinding :=
+  match bindings.filter fun binding => binding.binder.id == id with
+  | [binding] => some binding
+  | _ => none
+
+private def insertLocalLambdaInstance
+    (instances : List LocalLambdaInstance)
+    (localInstance : LocalLambdaInstance) : List LocalLambdaInstance :=
+  if instances.contains localInstance then instances
+  else instances ++ [localInstance]
+
+private def collectLocalLambdaInstances (bindings : List LocalLambdaBinding) :
+    List Node → List LocalLambdaInstance → Except Error (List LocalLambdaInstance)
+  | [], instances => pure instances
+  | node :: rest, instances =>
+      match node with
+      | .expression expression =>
+          match expression.form with
+          | .reference _ (.local id) =>
+              match exactLocalLambdaBinding? bindings id with
+              | some binding => do
+                  let variables := expression.rawType.freeVariables
+                  if !variables.isEmpty then
+                    throw (.unsupportedOpenDeclaration expression.id variables)
+                  let substitution ← match
+                      SourceSpecialization.matchClosedSchemeInstance?
+                        binding.binder.scheme expression.rawType with
+                    | some substitution => pure substitution
+                    | none => throw (.localPolymorphicInstanceMismatch
+                        expression.id id binding.binder.scheme
+                        expression.rawType)
+                  collectLocalLambdaInstances bindings rest
+                    (insertLocalLambdaInstance instances {
+                      binding, substitution
+                    })
+              | none => collectLocalLambdaInstances bindings rest instances
+          | _ => collectLocalLambdaInstances bindings rest instances
+      | .statement _ => collectLocalLambdaInstances bindings rest instances
+
+private def localLambdaInstances (source : TypedSource) :
+    Except Error (List LocalLambdaInstance) :=
+  collectLocalLambdaInstances (directPolymorphicLambdaBindings source)
+    source.nodes []
+
+private def variablesBelongTo (variables quantified : List TypeVarId) : Bool :=
+  variables.all fun metavariable => quantified.contains metavariable
+
+private def instanceCovers (localInstance : LocalLambdaInstance)
+    (variables : List TypeVarId) : Bool :=
+  variablesBelongTo variables
+    localInstance.binding.binder.scheme.quantified
+
+private def openDeclarationNodeIdsFor (source : TypedSource)
+    (localInstance : LocalLambdaInstance) : List NodeId :=
+  source.nodes.filterMap fun
+    | .expression node =>
+        match declarationInstantiation? node with
+        | some instantiation =>
+            let variables := declarationInstantiationVariables instantiation
+            if !variables.isEmpty &&
+                instanceCovers localInstance variables then
+              some (.expression node.id)
+            else
+              none
+        | none => none
+    | .statement _ => none
+
+private def selectedNodes (ids : List NodeId) : List Node → List Node
+  | [] => []
+  | node :: rest =>
+      if ids.contains node.id then node :: selectedNodes ids rest
+      else selectedNodes ids rest
+
+private def appendCallEdge (edges : List CallEdge) (edge : CallEdge) :
+    List CallEdge :=
+  if edges.contains edge then edges else edges ++ [edge]
+
+private def appendReferenceEdge (edges : List ReferenceEdge)
+    (edge : ReferenceEdge) : List ReferenceEdge :=
+  if edges.contains edge then edges else edges ++ [edge]
+
+private def appendCallEdges (left right : List CallEdge) : List CallEdge :=
+  right.foldl appendCallEdge left
+
+private def appendReferenceEdges (left right : List ReferenceEdge) :
+    List ReferenceEdge :=
+  right.foldl appendReferenceEdge left
+
+private def validateDirectCallShape (source : TypedSource)
+    (node : ExpressionNode) (callee : ExpressionId)
+    (instantiation : DeclarationInstantiation) : Except Error Ty := do
   let (reference, calleeType) ← match source.lookupExpression? callee with
     | none => throw (.missingCalleeNode node.id callee)
     | some { type, form := .reference _ (.declaration reference), .. } =>
@@ -231,6 +381,16 @@ private def directCall (program : CheckedProgram)
   if instantiation != reference then
     throw (.calleeInstantiationMetadataMismatch node.id
       instantiation reference)
+  if calleeType != instantiation.type then
+    throw (.calleeNodeTypeMismatch node.id calleeType instantiation.type)
+  pure calleeType
+
+private def directCall (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializationKey)
+    (source : TypedSource) (node : ExpressionNode)
+    (callee : ExpressionId) (instantiation : DeclarationInstantiation) :
+    Except Error (Request × CallEdge) := do
+  let calleeType ← validateDirectCallShape source node callee instantiation
   let (request, specialized) ←
     canonicalReference program node.id calleeType instantiation
   pure (request, {
@@ -317,13 +477,24 @@ private def collectReferences (program : CheckedProgram)
               validateIndirectCall source expression callee arguments metadata
               collectRest
           | .call callee _ (.declaration instantiation) =>
-              let (request, edge) ←
-                directCall program caller source expression callee instantiation
-              let (requests, callEdges, referenceEdges) ← collectRest
-              pure (request :: requests, edge :: callEdges, referenceEdges)
+              if hasOpenDeclarationInstantiation expression then
+                let _ ← validateDirectCallShape source expression callee
+                  instantiation
+                collectRest
+              else
+                let (request, edge) ←
+                  directCall program caller source expression callee instantiation
+                let (requests, callEdges, referenceEdges) ← collectRest
+                pure (request :: requests, edge :: callEdges, referenceEdges)
           | .reference _ (.declaration instantiation) =>
               if directCallees.contains expression.id then
                 collectRest
+              else if hasOpenDeclarationInstantiation expression then
+                if expression.type = instantiation.type then
+                  collectRest
+                else
+                  throw (.calleeNodeTypeMismatch expression.id
+                    expression.type instantiation.type)
               else
                 let (request, specialized) ← canonicalReference program
                   expression.id expression.type instantiation
@@ -335,6 +506,64 @@ private def collectReferences (program : CheckedProgram)
                 } :: referenceEdges)
           | _ => collectRest
       | .statement _ => collectRest
+
+private def validateOpenDeclarationsCovered (source : TypedSource)
+    (bindings : List LocalLambdaBinding)
+    (instances : List LocalLambdaInstance) : Except Error Unit := do
+  for node in source.nodes do
+    match node with
+    | .expression expression =>
+        match declarationInstantiation? expression with
+        | some instantiation =>
+            let variables := declarationInstantiationVariables instantiation
+            if variables.isEmpty then
+              pure ()
+            else if !instantiation.predicates.isEmpty &&
+                instances.any fun localInstance =>
+                  instanceCovers localInstance variables then
+              throw (.unsupportedLocalPolymorphicRequirements expression.id
+                instantiation.predicates)
+            else if bindings.any fun binding =>
+                variablesBelongTo variables binding.binder.scheme.quantified then
+              pure ()
+            else
+              throw (.unsupportedOpenDeclaration expression.id variables)
+        | none => pure ()
+    | .statement _ => pure ()
+
+private def collectInstantiatedReferences (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializationKey)
+    (source : TypedSource) : List LocalLambdaInstance →
+      Except Error (List Request × List CallEdge × List ReferenceEdge)
+  | [] => pure ([], [], [])
+  | localInstance :: rest => do
+      let instantiated := source.applySubstitution localInstance.substitution
+      let selected := selectedNodes
+        (openDeclarationNodeIdsFor source localInstance) instantiated.nodes
+      let directCallees := directDeclarationCallees selected
+      let (requests, calls, references) ←
+        collectReferences program caller instantiated directCallees selected
+      let (restRequests, restCalls, restReferences) ←
+        collectInstantiatedReferences program caller source rest
+      pure (requests ++ restRequests,
+        appendCallEdges calls restCalls,
+        appendReferenceEdges references restReferences)
+
+private def collectAllReferences (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializationKey)
+    (source : TypedSource) :
+    Except Error (List Request × List CallEdge × List ReferenceEdge) := do
+  let directCallees := directDeclarationCallees source.nodes
+  let (requests, calls, references) ←
+    collectReferences program caller source directCallees source.nodes
+  let bindings := directPolymorphicLambdaBindings source
+  let instances ← localLambdaInstances source
+  validateOpenDeclarationsCovered source bindings instances
+  let (instantiatedRequests, instantiatedCalls, instantiatedReferences) ←
+    collectInstantiatedReferences program caller source instances
+  pure (requests ++ instantiatedRequests,
+    appendCallEdges calls instantiatedCalls,
+    appendReferenceEdges references instantiatedReferences)
 
 /-- Discard canonical keys already present in `seen` without consuming a
 distinct-key budget unit, returning the first new specialization. -/
@@ -376,10 +605,8 @@ def runAux (program : CheckedProgram)
           seedKeys, specializations, callEdges, referenceEdges })
       | some (_, specialized, rest) =>
           let source := specialized.function.typedBody
-          let directCallees := directDeclarationCallees source.nodes
-          let (requests, edges, references) ← collectReferences program
-            specialized.key source directCallees
-            specialized.function.typedBody.nodes
+          let (requests, edges, references) ←
+            collectAllReferences program specialized.key source
           runAux program seedKeys (rest ++ requests) (specialized.key :: seen)
             (specializations ++ [specialized]) (callEdges ++ edges)
             (referenceEdges ++ references) remaining
