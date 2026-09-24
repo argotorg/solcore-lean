@@ -378,6 +378,63 @@ theorem RequirementLedgerWellFormed.applyParameters
     exact StructuralSubstitution.SolvedRequirementValid.applyParameters
       substitution (wellFormed.entriesValid original originalMem)
 
+theorem ScopedRequirementEntryValid.applyParameters
+    (substitution : ParameterSubstitution)
+    {context : Context} {source : TypedSource} {row : SolvedRequirement}
+    (valid : SourceSemantics.ScopedRequirementEntryValid context source row) :
+    SourceSemantics.ScopedRequirementEntryValid
+      (applyContext substitution context)
+      (applyTypedSource substitution source)
+      (applySolvedRequirement substitution row) := by
+  cases valid with
+  | ordinary notTemplate rowValid =>
+      exact .ordinary
+        (by simpa [applySolvedRequirement] using notTemplate)
+        (StructuralSubstitution.SolvedRequirementValid.applyParameters
+          substitution rowValid)
+  | template rowScoped =>
+      exact .template
+        (StructuralSubstitution.LocalSchemeTemplateRowScoped.applyParameters
+          substitution rowScoped)
+
+theorem ScopedRequirementLedgerWellFormed.applyParameters
+    (substitution : ParameterSubstitution)
+    {context : Context} {source : TypedSource}
+    (wellFormed :
+      SourceSemantics.ScopedRequirementLedgerWellFormed context source) :
+    SourceSemantics.ScopedRequirementLedgerWellFormed
+      (applyContext substitution context)
+      (applyTypedSource substitution source) := by
+  refine {
+    idsUnique := ?_
+    templateOwnership :=
+      StructuralSubstitution.LocalSchemeTemplateOwnership.applyParameters
+        substitution wellFormed.templateOwnership
+    entriesValid := ?_
+    templatesComplete := ?_
+  }
+  · simpa [RequirementIdsUnique, applyContext, applySolvedRequirement,
+      List.map_map, Function.comp_def] using wellFormed.idsUnique
+  · intro row member
+    change row ∈ context.solvedRequirements.map
+      (applySolvedRequirement substitution) at member
+    rcases List.mem_map.mp member with ⟨original, originalMem, rfl⟩
+    exact StructuralSubstitution.ScopedRequirementEntryValid.applyParameters
+      substitution (wellFormed.entriesValid original originalMem)
+  · intro owner contains
+    unfold ContainsLocalSchemeTemplate at contains
+    rw [StructuralSubstitution.localSchemeTemplateOwners_applyTypedSource]
+      at contains
+    rcases List.mem_map.mp contains with
+      ⟨originalOwner, originalContains, ownerEq⟩
+    subst owner
+    rcases wellFormed.templatesComplete originalOwner originalContains with
+      ⟨row, rowMem, idEq⟩
+    refine ⟨applySolvedRequirement substitution row, ?_, ?_⟩
+    · exact List.mem_map.mpr ⟨row, rowMem, rfl⟩
+    · simpa [applySolvedRequirement, applyLocalSchemeTemplateOwner,
+        LocalSchemeRequirement.applyParameters] using idEq
+
 /-- Exact/range-valid rigid substitutions automatically satisfy the evidence
 premise needed by the structural source-typing transport whenever the source
 ledger itself is well formed. -/
@@ -394,6 +451,37 @@ theorem ContextSubstitutionValid.ofRequirementLedger
   implementationRequirements := fun requirement _ member _ =>
     StructuralSubstitution.SolvedRequirementValid.applyParameters
       substitution (ledger.entriesValid requirement member)
+}
+
+/-- A scoped whole-body ledger supplies every implementation-evidence premise
+needed by rigid source substitution.  Template rows cannot enter this branch
+because their retained evidence is exactly an initializer-local assumption. -/
+theorem ContextSubstitutionValid.ofScopedRequirementLedger
+    {substitution : ParameterSubstitution} {context : Context}
+    {source : TypedSource}
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (ledger : SourceSemantics.ScopedRequirementLedgerWellFormed context source) :
+    ContextSubstitutionValid substitution context := {
+  exact
+  range
+  implementationRequirements := by
+    intro requirement evidence member implementationEq
+    cases ledger.entriesValid requirement member with
+    | ordinary _ valid =>
+        exact StructuralSubstitution.SolvedRequirementValid.applyParameters
+          substitution valid
+    | template rowScoped =>
+        rcases rowScoped.exact_owner with
+          ⟨owner, occurrence, contains, idEq, predicateEq, evidenceEq,
+            occurs, scope⟩
+        have impossible :
+            PredicateEvidence.assumption owner.requirement.predicate =
+              .implementation evidence :=
+          evidenceEq.symm.trans implementationEq
+        cases impossible
 }
 
 /-- Instantiate a well-typed generic body without exposing the internal
@@ -428,7 +516,7 @@ theorem BodyDefinitionHasType.instantiate
         (applyBodyFacts substitution facts) := by
   exact StructuralSubstitution.BodyDefinitionHasType.instantiate_with_context
     substitution catalog
-    (ContextSubstitutionValid.ofRequirementLedger exact range
+    (ContextSubstitutionValid.ofScopedRequirementLedger exact range
       (StructuralSubstitution.BodyDefinitionHasType.requirementLedger typing))
     typing
 
@@ -448,7 +536,8 @@ structure BodyInstanceTypingCertificate (program : Program)
     inputTypes lexicalContext facts
   graph_closed : OccurrenceGraphClosed bodyInstance.source
   local_identity_ownership : LocalIdentityOwnership bodyInstance.source
-  requirement_ledger : RequirementLedgerWellFormed bodyInstance.context
+  requirement_ledger : ScopedRequirementLedgerWellFormed bodyInstance.context
+    bodyInstance.source
   requirement_ownership : RequirementOwnership bodyInstance.context
     bodyInstance.source
   owner : bodyInstance.context.currentDeclaration = some bodyInstance.source.owner
@@ -556,8 +645,8 @@ theorem FunctionInstantiates.certificate
                     instantiation.parameterSubstitution
                     (StructuralSubstitution.BodyDefinitionHasType.localIdentityOwnership
                       bodyValid))
-              · simpa [contextEq, predicatesEq] using
-                  (StructuralSubstitution.RequirementLedgerWellFormed.applyParameters
+              · simpa [sourceEq, contextEq, predicatesEq] using
+                  (StructuralSubstitution.ScopedRequirementLedgerWellFormed.applyParameters
                     instantiation.parameterSubstitution
                     (StructuralSubstitution.BodyDefinitionHasType.requirementLedger
                       bodyValid))
@@ -726,8 +815,8 @@ theorem TraitMethodInstantiates.certificate
                 substitution
                 (StructuralSubstitution.BodyDefinitionHasType.localIdentityOwnership
                   bodyValid))
-          · simpa [contextEq] using
-              (StructuralSubstitution.RequirementLedgerWellFormed.applyParameters
+          · simpa [sourceEq, contextEq] using
+              (StructuralSubstitution.ScopedRequirementLedgerWellFormed.applyParameters
                 substitution
                 (StructuralSubstitution.BodyDefinitionHasType.requirementLedger
                   bodyValid))

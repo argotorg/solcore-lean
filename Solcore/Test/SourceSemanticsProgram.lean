@@ -224,16 +224,19 @@ theorem unitBodyHasType :
   · exact .nil _
   · exact unitOccurrenceGraphClosed
   · exact unitLocalIdentityOwnership
-  · constructor
-    · simp [RequirementIdsUnique, unitBody, declarationContext,
-        Context.withSolvedRequirements, Context.withAssumptions,
-        Context.withResidualTypeVariables, Context.forDeclaration,
-        Context.ofSignatures]
-    · intro requirement member
-      simp [unitBody, declarationContext, Context.withSolvedRequirements,
-        Context.withAssumptions, Context.withResidualTypeVariables,
-        Context.forDeclaration,
-        Context.ofSignatures] at member
+  · apply ScopedRequirementLedgerWellFormed.ofRequirementLedger
+    · constructor
+      · simp [RequirementIdsUnique, unitBody, declarationContext,
+          Context.withSolvedRequirements, Context.withAssumptions,
+          Context.withResidualTypeVariables, Context.forDeclaration,
+          Context.ofSignatures]
+      · intro requirement member
+        simp [unitBody, declarationContext, Context.withSolvedRequirements,
+          Context.withAssumptions, Context.withResidualTypeVariables,
+          Context.forDeclaration,
+          Context.ofSignatures] at member
+    · simp [sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+        initializedLetBindings, unitBody, unitSource]
   · constructor <;>
       simp [primaryRequirementIds, unitBody, unitSource, declarationContext,
         Context.withSolvedRequirements, Context.withAssumptions,

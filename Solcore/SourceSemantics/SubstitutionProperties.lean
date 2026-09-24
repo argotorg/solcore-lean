@@ -5062,9 +5062,9 @@ theorem BodyDefinitionHasType.requirementLedger
     (typing : BodyDefinitionHasType signatures parameters assumptions
       parameterNames parameterTypes parameterComptime returnTypes returnComptime
       definition facts) :
-    RequirementLedgerWellFormed
+    ScopedRequirementLedgerWellFormed
       (declarationContext signatures definition.owner parameters assumptions
-        definition.solvedRequirements) := by
+        definition.solvedRequirements) definition.source := by
   cases typing
   assumption
 

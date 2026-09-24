@@ -49,6 +49,27 @@ example (substitution : ParameterSubstitution)
     ContextSubstitutionValid substitution context :=
   ContextSubstitutionValid.ofRequirementLedger exact range ledger
 
+/-- A scoped whole-body ledger likewise supplies the implementation-only
+evidence premise without treating initializer templates as global assumptions. -/
+example (substitution : ParameterSubstitution)
+    (context : SourceSemantics.Context) (source : TypedSource)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (ledger : ScopedRequirementLedgerWellFormed context source) :
+    ContextSubstitutionValid substitution context :=
+  ContextSubstitutionValid.ofScopedRequirementLedger exact range ledger
+
+/-- Rigid declaration instantiation transports both ordinary rows and
+initializer-scoped template rows of the whole-body ledger. -/
+example (substitution : ParameterSubstitution)
+    (context : SourceSemantics.Context) (source : TypedSource)
+    (ledger : ScopedRequirementLedgerWellFormed context source) :
+    ScopedRequirementLedgerWellFormed (applyContext substitution context)
+      (applyTypedSource substitution source) :=
+  ScopedRequirementLedgerWellFormed.applyParameters substitution ledger
+
 /-- The external substitution premise is needed only for implementation
 evidence.  Assumption evidence is transported from its lexical validity by
 `RequirementProves.applyParameters`. -/

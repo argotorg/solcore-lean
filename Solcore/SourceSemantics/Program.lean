@@ -394,9 +394,9 @@ inductive BodyDefinitionHasType
         definition.source.inputs parameterTypes lexicalContext)
       (graph_closed : OccurrenceGraphClosed definition.source)
       (local_ownership : LocalIdentityOwnership definition.source)
-      (requirement_ledger : RequirementLedgerWellFormed
+      (requirement_ledger : ScopedRequirementLedgerWellFormed
         (declarationContext signatures definition.owner parameters assumptions
-          definition.solvedRequirements))
+          definition.solvedRequirements) definition.source)
       (requirement_ownership : RequirementOwnership
         (declarationContext signatures definition.owner parameters assumptions
           definition.solvedRequirements) definition.source)
