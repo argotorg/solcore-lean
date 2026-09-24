@@ -664,6 +664,7 @@ theorem generalizedInitializedLetHasType
     · refine {
         owned := by simp [binder, generalizedLetBinder]
         scheme := ?_
+        quantified_fresh := ?_
         monomorphic_requirements_empty := ?_
       }
       · refine {
@@ -675,6 +676,8 @@ theorem generalizedInitializedLetHasType
         apply TypeWellScoped.variable
         simp [admissibleTypeVariables, context, Context.ofSignatures, binder,
           generalizedLetBinder]
+      · intro metavariable quantified
+        simp [context, Context.ofSignatures] at quantified ⊢
       · intro quantifiedEmpty
         simp [binder, generalizedLetBinder] at quantifiedEmpty
     · simp [LocalFresh, context, Context.ofSignatures]

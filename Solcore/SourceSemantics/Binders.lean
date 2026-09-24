@@ -96,12 +96,24 @@ theorem empty (context : Context) (binder : TypedBinder)
 
 end LocalSchemeRequirementsWellFormed
 
+/-- Scheme-bound flexible variables are fresh for both the ambient inference
+scope and every scheme already retained in the lexical context.  The latter
+condition is stated over the complete local table, rather than only visible
+first-match lookups, so malformed duplicate tables cannot hide a capture. -/
+def SchemeQuantifiersFresh (context : Context) (scheme : TypeSystem.Scheme) :
+    Prop :=
+  ∀ metavariable, metavariable ∈ scheme.quantified →
+    metavariable ∉ context.typeVariables ∧
+      ∀ entry, entry ∈ context.locals →
+        metavariable ∉ entry.2.quantified
+
 /-- A retained binder is owned by the surrounding declaration and carries a
 well-formed rank-1 scheme. -/
 structure BinderWellFormed (context : Context)
     (owner : Resolved.DeclarationId) (binder : TypedBinder) : Prop where
   owned : binder.id.owner = owner
   scheme : SchemeWellFormed context binder.scheme
+  quantified_fresh : SchemeQuantifiersFresh context binder.scheme
   /-- Qualified requirements belong only to genuinely generalized local
   schemes.  Keeping this condition on the common binder judgment excludes
   inert or misleading metadata from parameters, patterns, and monomorphic

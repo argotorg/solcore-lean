@@ -3353,6 +3353,9 @@ theorem PatternBinderValid.applyParameters
       owned := original.owned
       scheme := StructuralSubstitution.SchemeWellFormed.applyParameters
         substitution contextValid.exact contextValid.range original.scheme
+      quantified_fresh := by
+        intro metavariable quantified
+        simp [applyBinder, applyScheme, valid.scheme_eq, Scheme.mono] at quantified
       monomorphic_requirements_empty := by
         intro quantifiedEmpty
         have originalQuantifiedEmpty : binder.scheme.quantified = [] := by
@@ -3888,6 +3891,20 @@ theorem BinderWellFormed.applyParameters
   owned := wellFormed.owned
   scheme := StructuralSubstitution.SchemeWellFormed.applyParameters substitution
     exact range wellFormed.scheme
+  quantified_fresh := by
+    intro metavariable quantified
+    have sourceQuantified : metavariable ∈ binder.scheme.quantified := by
+      simpa [applyBinder, applyScheme] using quantified
+    rcases wellFormed.quantified_fresh metavariable sourceQuantified with
+      ⟨ambientFresh, localsFresh⟩
+    constructor
+    · simpa [applyContext] using ambientFresh
+    · intro entry member localQuantified
+      rcases List.mem_map.mp member with
+        ⟨⟨id, scheme⟩, sourceMember, localEq⟩
+      subst entry
+      exact localsFresh (id, scheme) sourceMember (by
+        simpa [applyScheme] using localQuantified)
   monomorphic_requirements_empty := by
     intro quantifiedEmpty
     have originalQuantifiedEmpty : binder.scheme.quantified = [] := by
@@ -5309,6 +5326,36 @@ def applyExpressionRequirementPlan (substitution : Substitution) :
   | .indirectCall coercions =>
       .indirectCall (coercions.map
         (CoercionStep.applySubstitution substitution))
+
+/-- Every scheme already retained in a lexical context protects its bound
+variables from an outer flexible substitution.  Quantifying over the complete
+table keeps the property robust for malformed duplicate scopes as well. -/
+def LocalSchemesFreshFor (context : Context)
+    (substitution : Substitution) : Prop :=
+  ∀ entry, entry ∈ context.locals →
+    ∀ metavariable, metavariable ∈ entry.2.quantified →
+      metavariable ∉ substitution.domain
+
+namespace LocalSchemesFreshFor
+
+/-- Extend a protected local scope with one more protected scheme. -/
+theorem withLocal
+    {context : Context} {substitution : Substitution}
+    {id : Resolved.LocalId} {scheme : Scheme}
+    {requirements : List LocalSchemeRequirement}
+    (fresh : LocalSchemesFreshFor context substitution)
+    (schemeProtected : ∀ metavariable,
+      metavariable ∈ scheme.quantified →
+        metavariable ∉ substitution.domain) :
+    LocalSchemesFreshFor
+      (context.withLocal id scheme requirements) substitution := by
+  intro entry member metavariable quantified
+  change entry ∈ (id, scheme) :: context.locals at member
+  rcases List.mem_cons.mp member with rfl | member
+  · exact schemeProtected metavariable quantified
+  · exact fresh entry member metavariable quantified
+
+end LocalSchemesFreshFor
 
 @[simp] theorem apply_builtin (substitution : Substitution)
     (builtin : BuiltinType) :
@@ -7143,6 +7190,92 @@ theorem afterMonoBinders {substitution : Substitution}
 
 end ContextCloses
 
+namespace LocalSchemesFreshFor
+
+/-- The mapped target local scope retains the source schemes' protected
+quantifiers because flexible substitution never changes a scheme's binder
+list. -/
+theorem target
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (fresh : LocalSchemesFreshFor source substitution) :
+    LocalSchemesFreshFor target substitution := by
+  intro entry member metavariable quantified
+  rw [← closes.target_eq] at member
+  change entry ∈ applyLocals substitution source.locals at member
+  rcases List.mem_map.mp member with
+    ⟨⟨id, scheme⟩, sourceMember, entryEq⟩
+  subst entry
+  exact fresh (id, scheme) sourceMember metavariable (by
+    simpa using quantified)
+
+/-- The schemes preceding a well-formed binder are protected from an exact
+instantiation of that binder's own quantified variables. -/
+theorem ofBinderWellFormed
+    {context : Context} {owner : Resolved.DeclarationId}
+    {binder : TypedBinder} {substitution : Substitution}
+    (wellFormed : BinderWellFormed context owner binder)
+    (exact : ExactSubstitution substitution binder.scheme.quantified) :
+    LocalSchemesFreshFor context substitution := by
+  intro entry member metavariable quantified domainMember
+  have binderQuantified :=
+    (exact.mem_domain_iff metavariable).mp domainMember
+  exact (wellFormed.quantified_fresh metavariable binderQuantified).2
+    entry member quantified
+
+/-- A well-formed binder added under a context closure remains protected from
+the closing substitution, and preserves protection of every older scheme. -/
+theorem afterBinder
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binder : TypedBinder}
+    (schemesFresh : LocalSchemesFreshFor source substitution)
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : BinderExtends owner source binder final) :
+    LocalSchemesFreshFor final substitution := by
+  cases extension with
+  | intro wellFormed fresh =>
+      apply schemesFresh.withLocal
+      intro metavariable quantified domainMember
+      have closed := (closes.exact.mem_domain_iff metavariable).mp domainMember
+      have ambient : metavariable ∈ source.typeVariables := by
+        rw [closes.variables_eq]
+        exact List.mem_append.mpr (Or.inl closed)
+      exact (wellFormed.quantified_fresh metavariable quantified).1 ambient
+
+/-- Thread local-scheme protection through a binder sequence. -/
+theorem afterBinders
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binders : List TypedBinder}
+    (schemesFresh : LocalSchemesFreshFor source substitution)
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : BindersExtend owner source binders final) :
+    LocalSchemesFreshFor final substitution := by
+  induction extension generalizing target with
+  | nil => exact schemesFresh
+  | cons head tail induction =>
+      exact induction (schemesFresh.afterBinder closes head)
+        (closes.afterBinder head)
+
+/-- Thread local-scheme protection through a monomorphic binder sequence. -/
+theorem afterMonoBinders
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binders : List TypedBinder} {types : List Ty}
+    (schemesFresh : LocalSchemesFreshFor source substitution)
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : MonoBindersExtend owner source binders types final) :
+    LocalSchemesFreshFor final substitution := by
+  induction extension generalizing target with
+  | nil => exact schemesFresh
+  | cons _ head tail induction =>
+      exact induction (schemesFresh.afterBinder closes head)
+        (closes.afterBinder head)
+
+end LocalSchemesFreshFor
+
 /-- Structural context closure transports every admissible retained type.
 Variables in the closed prefix are replaced by the ground range, while fresh
 variables in the retained suffix and residual body variables remain scoped. -/
@@ -7526,6 +7659,25 @@ theorem BinderWellFormed.applySubstitution
   owned := by simpa using wellFormed.owned
   scheme := by
     simpa using SchemeWellFormed.applySubstitution closes wellFormed.scheme
+  quantified_fresh := by
+    intro metavariable quantified
+    have sourceQuantified : metavariable ∈ binder.scheme.quantified := by
+      simpa using quantified
+    rcases wellFormed.quantified_fresh metavariable sourceQuantified with
+      ⟨ambientFresh, localsFresh⟩
+    constructor
+    · intro targetMember
+      apply ambientFresh
+      rw [closes.variables_eq]
+      exact List.mem_append.mpr (Or.inr targetMember)
+    · intro entry member localQuantified
+      rw [← closes.target_eq] at member
+      change entry ∈ applyLocals substitution source.locals at member
+      rcases List.mem_map.mp member with
+        ⟨⟨id, scheme⟩, sourceMember, localEq⟩
+      subst entry
+      exact localsFresh (id, scheme) sourceMember (by
+        simpa using localQuantified)
   monomorphic_requirements_empty := by
     intro quantifiedEmpty
     have originalQuantifiedEmpty : binder.scheme.quantified = [] := by
