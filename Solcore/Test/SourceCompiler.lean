@@ -32,6 +32,13 @@ private def workspace : Workspace.RawWorkspace := {
         "  }",
         "}",
         "function globalIdentity<T>(value: T) returns (T) { return value; }",
+        "trait Eq<T> {}",
+        "impl Eq<Word> {}",
+        "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
+        "function localProof(flag: Bool) returns (Word, Bool) {",
+        "  let f = lam(value) { return keepAs(1, value); };",
+        "  return (f(2), f(flag));",
+        "}",
         "function polymorphicLocal(flag: Bool) returns (Word, Bool) {",
         "  let id = lam(value) { return globalIdentity(value); };",
         "  return (id(11), id(flag));",
@@ -134,6 +141,7 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     compileNamed checked "main.solc" "nestedPolymorphicLocal"
   let recursiveContextPolymorphicLocal ←
     compileNamed checked "main.solc" "recursiveContextPolymorphicLocal"
+  let localProof ← compileNamed checked "main.solc" "localProof"
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
@@ -141,7 +149,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       typed.backend = .typedSource ∧
       polymorphicLocal.backend = .typedSource ∧
       nestedPolymorphicLocal.backend = .typedSource ∧
-      recursiveContextPolymorphicLocal.backend = .typedSource))
+      recursiveContextPolymorphicLocal.backend = .typedSource ∧
+      localProof.backend = .typedSource))
     "automatic backend precedence changed"
   assertTrue (decide (
       direct.key.declaration.moduleId = main ∧
@@ -164,6 +173,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     "depth-2 local polymorphism did not retain its root and two generic helper instances"
   assertTrue (recursiveContextPolymorphicLocal.specializationCount == 3)
     "recursive local contexts did not retain their root and two generic helper instances"
+  assertTrue (localProof.specializationCount == 3)
+    "local proof calls did not retain their root and two constrained helper instances"
   let polymorphicRequest ←
     match SourceProgramExecution.resolveSeed checked
         (Seed.named main "polymorphicLocal") with
@@ -254,6 +265,13 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "runtime recursive local contexts did not instantiate Word and Bool"
   | result => throw (IO.userError
       s!"runtime recursive local contexts returned {reprStr result}")
+  match localProof.runTyped [.bool true] runtimeOptions with
+  | .ok (.typedSource (.done
+      (.product (.word actualWord) (.bool actualBool)) _)) =>
+      assertTrue (actualWord == word 2 && actualBool)
+        "runtime local proof calls did not retain Word/Bool results"
+  | result => throw (IO.userError
+      s!"runtime local proof calls returned {reprStr result}")
   pure { checked, direct, recursive, typed }
 
 private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do

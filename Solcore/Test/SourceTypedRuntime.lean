@@ -297,6 +297,15 @@ private def source : String := String.intercalate "\n" [
   "  return (identity(41), identity(flag));",
   "}",
   "function genericIdentity<T>(value: T) returns (T) { return value; }",
+  "trait Proof<T> {}",
+  "impl Proof<Word> {}",
+  "trait Eq<T> {}",
+  "impl Eq<Word> where Word: Proof {}",
+  "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
+  "function localProof(flag: Bool) returns (Word, Bool) {",
+  "  let f = lam(value) { return keepAs(1, value); };",
+  "  return (f(2), f(flag));",
+  "}",
   "function localGenericCalls(flag: Bool) returns (Word, Bool) {",
   "  let applyIdentity = lam(value) { return genericIdentity(value); };",
   "  return (applyIdentity(43), applyIdentity(flag));",
@@ -562,6 +571,13 @@ private def expectPreExecutionFault (label : String)
   | result => throw (IO.userError
       s!"{label} did not reject tampered metadata: {reprStr result}")
 
+private def expectPlanValidationFault (label : String)
+    (accept : RuntimeError → Bool) : Except RuntimeError Unit → IO Unit
+  | .error error =>
+      assertTrue (accept error) s!"{label} reported {reprStr error}"
+  | .ok () => throw (IO.userError
+      s!"{label} did not reject tampered plan metadata")
+
 private def testTamperedExecutableMetadata
     (program : CheckedProgram) : IO Unit := do
   let original ← prepareNamed program "implicitTail"
@@ -665,6 +681,332 @@ private def entrySpecialization (prepared : Prepared) :
   | specializations => throw (IO.userError
       s!"entry retained {specializations.length} specializations")
 
+private def rewriteEntryExpressionAt (prepared : Prepared)
+    (target : SourceInference.ExpressionId)
+    (rewrite : SourceInference.ExpressionNode →
+      SourceInference.ExpressionNode) : Prepared :=
+  rewriteEntryNodes prepared fun nodes => nodes.map fun node =>
+    match node with
+    | .expression expression =>
+        if expression.id == target then .expression (rewrite expression)
+        else node
+    | _ => node
+
+private structure ConstrainedCallFixture where
+  prepared : Prepared
+  occurrence : SourceInference.ExpressionId
+  requirement : SourceInference.RequirementId
+  predicate : ProgramPredicate
+  solved : SourceInference.SolvedRequirement
+  callee : SourceSpecialization.SpecializationKey
+
+private def constrainedCallFixture
+    (program : CheckedProgram) : IO ConstrainedCallFixture := do
+  let prepared ← prepareNamed program "localProof"
+  let specialized ← entrySpecialization prepared
+  let edges := prepared.plan.callEdges.filter fun edge =>
+    decide (edge.caller = prepared.key)
+  let (firstEdge, secondEdge) ← match edges with
+    | [first, second] => pure (first, second)
+    | edges => throw (IO.userError
+        s!"localProof retained {edges.length} contextual call edges")
+  assertTrue (firstEdge.occurrence == secondEdge.occurrence &&
+      firstEdge.callee != secondEdge.callee &&
+      edges.eraseDups.length == 2)
+    "localProof did not retain two distinct edges for one call occurrence"
+  let arguments := edges.map (fun edge => edge.callee.arguments)
+  assertTrue (arguments.contains [.word, .word] &&
+      arguments.contains [.word, .bool])
+    "localProof lost its keepAs<Word, Word/Bool> specializations"
+  let occurrence := firstEdge.occurrence
+  let (node, instantiation) ← match
+      specialized.function.typedBody.lookupExpression? occurrence with
+    | some node@{ form := .call _ _ (.declaration instantiation), .. } =>
+        pure (node, instantiation)
+    | some node => throw (IO.userError
+        s!"localProof contextual occurrence changed form: {reprStr node.form}")
+    | none => throw (IO.userError
+        "localProof contextual call occurrence was absent")
+  let requirement ← match node.requirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"localProof call retained {requirements.length} requirements")
+  let predicate ← match instantiation.predicates with
+    | [predicate] => pure predicate
+    | predicates => throw (IO.userError
+        s!"localProof call retained {predicates.length} predicates")
+  let solved ← match specialized.function.solvedRequirements.filter fun row =>
+      row.id == requirement with
+    | [solved] => pure solved
+    | rows => throw (IO.userError
+        s!"localProof retained {rows.length} solved rows for its call")
+  let implementationEvidence := match solved.evidence with
+    | .implementation _ => true
+    | .assumption _ => false
+  assertTrue (decide (solved.predicate = predicate) && implementationEvidence)
+    "localProof did not retain solved implementation evidence"
+  for edge in edges do
+    let callee ← match prepared.plan.specializations.filter fun candidate =>
+        decide (candidate.key = edge.callee) with
+      | [callee] => pure callee
+      | callees => throw (IO.userError
+          s!"localProof retained {callees.length} copies of a constrained callee")
+    assertTrue (decide (callee.assumptions = [predicate]))
+      "localProof constrained callee lost its Eq<Word> assumption"
+  pure {
+    prepared
+    occurrence
+    requirement
+    predicate
+    solved
+    callee := firstEdge.callee
+  }
+
+private def rewriteEntrySolvedEvidence (prepared : Prepared)
+    (requirement : SourceInference.RequirementId)
+    (evidence : SourceInference.PredicateEvidence) : Prepared :=
+  rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := function.solvedRequirements.map fun solved =>
+      if solved.id == requirement then { solved with evidence }
+      else solved
+  }
+
+private def testContextualCallRequirementValidation
+    (program : CheckedProgram) : IO Unit := do
+  let fixture ← constrainedCallFixture program
+  let prepared := fixture.prepared
+  let result := runPrepared prepared [.bool true]
+  expectWordBool "contextual constrained local call" 2 true result
+  expectShallowHeap "contextual constrained local call" prepared.plan result
+
+  let missingCallRequirement := rewriteEntryExpressionAt prepared
+    fixture.occurrence fun node => { node with requirements := [] }
+  expectPreExecutionFault "missing direct-call requirement"
+    (fun error => match error with
+      | .callRequirementCountMismatch caller occurrence 1 0 =>
+          decide (caller = prepared.key ∧ occurrence = fixture.occurrence)
+      | _ => false)
+    (runPrepared missingCallRequirement [.bool true])
+
+  let duplicateCallRequirement := rewriteEntryExpressionAt prepared
+    fixture.occurrence fun node =>
+      match node.form with
+      | .call callee arguments (.declaration instantiation) => {
+          node with
+          requirements := [fixture.requirement, fixture.requirement]
+          form := .call callee arguments (.declaration {
+            instantiation with
+            predicates := [fixture.predicate, fixture.predicate]
+          })
+        }
+      | _ => node
+  expectPreExecutionFault "duplicate direct-call requirement"
+    (fun error => match error with
+      | .duplicateCallRequirement caller occurrence requirement =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement)
+      | _ => false)
+    (runPrepared duplicateCallRequirement [.bool true])
+
+  let missingSolved := rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := function.solvedRequirements.filter fun solved =>
+      solved.id != fixture.requirement
+  }
+  expectPreExecutionFault "missing direct-call solution"
+    (fun error => match error with
+      | .missingSolvedRequirement caller occurrence requirement =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement)
+      | _ => false)
+    (runPrepared missingSolved [.bool true])
+
+  let duplicateSolved := rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := fixture.solved :: function.solvedRequirements
+  }
+  expectPreExecutionFault "duplicate direct-call solutions"
+    (fun error => match error with
+      | .duplicateSolvedRequirements caller occurrence requirement 2 =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement)
+      | _ => false)
+    (runPrepared duplicateSolved [.bool true])
+
+  let wrongPredicate : ProgramPredicate := {
+    fixture.predicate with subject := .bool
+  }
+  let predicateMismatch := rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := function.solvedRequirements.map fun solved =>
+      if solved.id == fixture.requirement then
+        { solved with predicate := wrongPredicate }
+      else
+        solved
+  }
+  expectPreExecutionFault "direct-call predicate mismatch"
+    (fun error => match error with
+      | .callRequirementPredicateMismatch caller occurrence requirement
+          expected actual =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement ∧
+            expected = fixture.predicate ∧ actual = wrongPredicate)
+      | _ => false)
+    (runPrepared predicateMismatch [.bool true])
+
+  let goalMismatch := rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := function.solvedRequirements.map fun solved =>
+      if solved.id == fixture.requirement then
+        { solved with evidence := .assumption wrongPredicate }
+      else
+        solved
+  }
+  expectPreExecutionFault "direct-call evidence-goal mismatch"
+    (fun error => match error with
+      | .callRequirementEvidenceGoalMismatch caller occurrence requirement
+          expected actual =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement ∧
+            expected = fixture.predicate ∧ actual = wrongPredicate)
+      | _ => false)
+    (runPrepared goalMismatch [.bool true])
+
+  let assumptionEvidence := rewriteEntryFunction prepared fun function => {
+    function with
+    solvedRequirements := function.solvedRequirements.map fun solved =>
+      if solved.id == fixture.requirement then
+        { solved with evidence := .assumption fixture.predicate }
+      else
+        solved
+  }
+  expectPreExecutionFault "direct-call assumption evidence"
+    (fun error => match error with
+      | .unsupportedCallAssumptionEvidence caller occurrence requirement
+          predicate =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement ∧
+            predicate = fixture.predicate)
+      | _ => false)
+    (runPrepared assumptionEvidence [.bool true])
+
+  let (implementation, premise) ← match fixture.solved.evidence with
+    | .implementation (.byImpl goal implementation [premise]) => do
+        assertTrue (decide (goal = fixture.predicate))
+          "localProof outer evidence lost its Eq<Word> goal"
+        pure (implementation, premise)
+    | evidence => throw (IO.userError
+        s!"localProof expected one nested implementation premise, found {reprStr evidence}")
+  let (premiseGoal, premiseImplementation) ← match premise with
+    | .byImpl goal implementation [] => pure (goal, implementation)
+    | premise => throw (IO.userError
+        s!"localProof expected one premise-free Proof<Word> evidence, found {reprStr premise}")
+  assertTrue (implementation != premiseImplementation &&
+      decide (premiseGoal != fixture.predicate))
+    "localProof did not retain distinct Eq and Proof implementation evidence"
+
+  let wrongImplementationEvidence : SourceInference.PredicateEvidence :=
+    .implementation (.byImpl fixture.predicate premiseImplementation [premise])
+  let wrongImplementation := rewriteEntrySolvedEvidence prepared
+    fixture.requirement wrongImplementationEvidence
+  expectPreExecutionFault "unselected direct-call implementation"
+    (fun error => match error with
+      | .callEvidenceNotSelected caller occurrence requirement goal actual =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement ∧
+            goal = fixture.predicate ∧ actual = premiseImplementation)
+      | _ => false)
+    (runPrepared wrongImplementation [.bool true])
+
+  let missingPremiseEvidence : SourceInference.PredicateEvidence :=
+    .implementation (.byImpl fixture.predicate implementation [])
+  let missingPremise := rewriteEntrySolvedEvidence prepared
+    fixture.requirement missingPremiseEvidence
+  expectPreExecutionFault "missing direct-call evidence premise"
+    (fun error => match error with
+      | .callEvidenceNotSelected caller occurrence requirement goal actual =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement ∧
+            goal = fixture.predicate ∧ actual = implementation)
+      | _ => false)
+    (runPrepared missingPremise [.bool true])
+
+  let wrongPremiseGoal : TypedTraitResolution.Evidence :=
+    .byImpl fixture.predicate premiseImplementation []
+  let wrongPremiseGoalEvidence : SourceInference.PredicateEvidence :=
+    .implementation (.byImpl fixture.predicate implementation
+      [wrongPremiseGoal])
+  let wrongPremiseGoal := rewriteEntrySolvedEvidence prepared
+    fixture.requirement wrongPremiseGoalEvidence
+  expectPreExecutionFault "direct-call evidence premise goal"
+    (fun error => match error with
+      | .callEvidenceNotSelected caller occurrence requirement goal actual =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement ∧
+            goal = fixture.predicate ∧ actual = implementation)
+      | _ => false)
+    (runPrepared wrongPremiseGoal [.bool true])
+
+  let wrongPremiseImplementation : TypedTraitResolution.Evidence :=
+    .byImpl premiseGoal implementation []
+  let wrongPremiseImplementationEvidence :
+      SourceInference.PredicateEvidence :=
+    .implementation (.byImpl fixture.predicate implementation
+      [wrongPremiseImplementation])
+  let wrongPremiseImplementation := rewriteEntrySolvedEvidence prepared
+    fixture.requirement wrongPremiseImplementationEvidence
+  expectPreExecutionFault "direct-call evidence premise implementation"
+    (fun error => match error with
+      | .callEvidenceNotSelected caller occurrence requirement goal actual =>
+          decide (caller = prepared.key ∧
+            occurrence = fixture.occurrence ∧
+            requirement = fixture.requirement ∧
+            goal = fixture.predicate ∧ actual = implementation)
+      | _ => false)
+    (runPrepared wrongPremiseImplementation [.bool true])
+
+  let constrainedSeed : Prepared := {
+    prepared with
+    plan := {
+      prepared.plan with
+      seedKeys := fixture.callee :: prepared.plan.seedKeys
+    }
+  }
+  expectPlanValidationFault "constrained public seed"
+    (fun error => match error with
+      | .unresolvedAssumptions key assumptions =>
+          decide (key = fixture.callee ∧ assumptions = [fixture.predicate])
+      | _ => false)
+    (SourceTypedRuntime.validateExecutablePlan constrainedSeed.plan)
+
+  let constrainedReference : Prepared := {
+    prepared with
+    plan := {
+      prepared.plan with
+      referenceEdges := {
+        caller := prepared.key
+        occurrence := fixture.occurrence
+        callee := fixture.callee
+      } :: prepared.plan.referenceEdges
+    }
+  }
+  expectPlanValidationFault "constrained first-class reference"
+    (fun error => match error with
+      | .unresolvedAssumptions key assumptions =>
+          decide (key = fixture.callee ∧ assumptions = [fixture.predicate])
+      | _ => false)
+    (SourceTypedRuntime.validateExecutablePlan constrainedReference.plan)
+
 private def testAssignmentRootsAreDeferred
     (program : CheckedProgram) : IO Unit := do
   let assignments ← prepareNamed program "assignments"
@@ -691,6 +1033,7 @@ private def testAll : IO Unit := do
   testClosuresOrderProxyAndFuel program
   testLocalLetPolymorphism program
   testContextualLocalGenericCalls program
+  testContextualCallRequirementValidation program
   testNominalInputValidation program
   testTamperedExecutableMetadata program
   testIndirectArgumentCountMetadata program

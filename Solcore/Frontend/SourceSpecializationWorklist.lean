@@ -247,6 +247,12 @@ private def declarationInstantiationVariables
   (declarationInstantiationTypes instantiation).flatMap Ty.freeVariables
     |>.eraseDups
 
+private def declarationPredicateVariables
+    (instantiation : DeclarationInstantiation) : List TypeVarId :=
+  (instantiation.predicates.flatMap fun predicate =>
+    predicate.subject :: predicate.arguments).flatMap Ty.freeVariables
+    |>.eraseDups
+
 private def declarationInstantiation? (node : ExpressionNode) :
     Option DeclarationInstantiation :=
   match node.form with
@@ -685,7 +691,9 @@ private def validateReachableOpenDeclarations (source : TypedSource)
   | [] => pure ()
   | localInstance :: rest => do
       let bodyIds ← localLambdaBodyNodeIds source bindings localInstance.binding
-      for node in selectedNodes bodyIds source.nodes do
+      let selected := selectedNodes bodyIds source.nodes
+      let directCallees := directDeclarationCallees selected
+      for node in selected do
         match node with
         | .expression expression =>
             match declarationInstantiation? expression with
@@ -700,8 +708,20 @@ private def validateReachableOpenDeclarations (source : TypedSource)
                   if !remaining.isEmpty then
                     throw (.unsupportedOpenDeclaration expression.id remaining)
                   else if !instantiation.predicates.isEmpty then
-                    throw (.unsupportedLocalPolymorphicRequirements
-                      expression.id instantiation.predicates)
+                    let predicateVariables :=
+                      declarationPredicateVariables instantiation
+                    if !predicateVariables.isEmpty then
+                      throw (.unsupportedLocalPolymorphicRequirements
+                        expression.id instantiation.predicates)
+                    else match expression.form with
+                    | .call _ _ (.declaration _) => pure ()
+                    | .reference _ (.declaration _) =>
+                        if directCallees.contains expression.id then
+                          pure ()
+                        else
+                          throw (.unsupportedLocalPolymorphicRequirements
+                            expression.id instantiation.predicates)
+                    | _ => pure ()
                   else
                     pure ()
             | none => pure ()

@@ -127,6 +127,11 @@ private def workspace : Workspace.RawWorkspace := {
       "function grow<T>(value: T) { grow((value, value)); return; }",
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
       "function constrained(value: Word) returns (Word) { return keep(value); }",
+      "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
+      "function localProof(flag: Bool) returns (Word, Bool) {",
+      "  let f = lam(value) { return keepAs(1, value); };",
+      "  return (f(2), f(flag));",
+      "}",
       "function asValue() returns (function(Word) returns (Word)) { return identity; }",
       "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
       "function applyProduct(f: function((Word, Bool)) returns (Word), pair: (Word, Bool)) returns (Word) { return f(pair); }",
@@ -149,6 +154,14 @@ private def signatureNamed (program : CheckedProgram) (name : String) :
   | [signature] => pure signature
   | signatures => throw (IO.userError
       s!"expected one signature named `{name}`, found {signatures.length}")
+
+private def traitNamed (program : CheckedProgram) (name : String) :
+    IO ProgramTraitSignature := do
+  match program.signatures.traits.filter fun signature =>
+      signature.name == name with
+  | [signature] => pure signature
+  | signatures => throw (IO.userError
+      s!"expected one trait named `{name}`, found {signatures.length}")
 
 private def functionFor (program : CheckedProgram)
     (signature : ProgramFunctionSignature) : IO CheckedFunction := do
@@ -1162,6 +1175,87 @@ private def testAssumptionPreservation (program : CheckedProgram) : IO Unit := d
   | outcome => throw (IO.userError
       s!"constrained: expected a complete plan, found {reprStr outcome}")
 
+private def testContextualLocalProofCalls
+    (program : CheckedProgram) : IO Unit := do
+  let eq ← traitNamed program "Eq"
+  let keepAs ← signatureNamed program "keepAs"
+  let localProof ← signatureNamed program "localProof"
+  let function ← functionFor program localProof
+  let (call, instantiation) ← match
+      function.typedBody.nodes.findSome? fun
+        | .expression node@{
+            form := .call _ _ (.declaration instantiation), .. } =>
+            if instantiation.declaration == keepAs.id then
+              some (node, instantiation)
+            else
+              none
+        | _ => none with
+    | some selected => pure selected
+    | none => throw (IO.userError
+        "localProof lost its declaration call to keepAs")
+  let requirement ← match call.requirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"localProof keepAs call retained {requirements.length} requirements")
+  let predicate : ProgramPredicate := {
+    trait := eq.id
+    subject := .word
+    arguments := []
+  }
+  assertTrue (decide (instantiation.predicates = [predicate]))
+    "localProof keepAs metadata lost its ground Eq<Word> predicate"
+
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := localProof.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := keepAs.id
+    arguments := [.word, .word]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := keepAs.id
+    arguments := [.word, .bool]
+  }
+  let expectedEdges : List SourceSpecializationWorklist.CallEdge := [
+    { caller := entryKey, occurrence := call.id, callee := wordKey },
+    { caller := entryKey, occurrence := call.id, callee := boolKey }
+  ]
+  match ← runOrThrow "contextual local proof calls" program
+      [monomorphicRequest localProof] 3 with
+  | .complete plan =>
+      let caller ← match plan.specializations.filter fun specialized =>
+          decide (specialized.key = entryKey) with
+        | [specialized] => pure specialized
+        | specializations => throw (IO.userError
+            s!"localProof retained {specializations.length} entry specializations")
+      let callees := plan.specializations.filter fun specialized =>
+        specialized.declaration == keepAs.id
+      let solved ← match caller.function.solvedRequirements.filter fun solved =>
+          solved.id == requirement with
+        | [solved] => pure solved
+        | solved => throw (IO.userError
+            s!"localProof retained {solved.length} solutions for its Eq requirement")
+      let implementationEvidence := match solved.evidence with
+        | .implementation _ => true
+        | .assumption _ => false
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey, boolKey] ∧
+          plan.callEdges = expectedEdges ∧
+          plan.callEdges.eraseDups.length = 2 ∧
+          plan.referenceEdges = [] ∧
+          callees.length = 2 ∧
+          (callees.all fun callee => callee.assumptions = [predicate]) ∧
+          solved.predicate = predicate) && implementationEvidence)
+        "local proof calls lost their assumptions, evidence, keys, or edges"
+      match SourceCoreDirectLinking.validatePlan program plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"contextual local proof plan failed replay validation: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"contextual local proof calls expected complete, found {reprStr outcome}")
+
 private def testFunctionValueReference (program : CheckedProgram) : IO Unit := do
   let identity ← signatureNamed program "identity"
   let asValue ← signatureNamed program "asValue"
@@ -1496,6 +1590,7 @@ def testSourceSpecializationWorklist : IO Unit := do
   testTypedNodeOrder program
   testRecursiveKeys program
   testAssumptionPreservation program
+  testContextualLocalProofCalls program
   testFunctionValueReference program
   testIndirectCallBoundary program
   testIndirectArgumentCounts program

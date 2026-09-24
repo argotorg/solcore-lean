@@ -377,6 +377,34 @@ inductive RuntimeError where
   | uninitializedLocal (id : Resolved.LocalId)
   | duplicateCallEdge (caller : Key) (id : ExpressionId) (count : Nat)
   | missingCallEdge (caller : Key) (id : ExpressionId)
+  | callRequirementCountMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : Nat)
+  | duplicateCallRequirement
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+  | missingSolvedRequirement
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+  | duplicateSolvedRequirements
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (count : Nat)
+  | callRequirementPredicateMismatch
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | callRequirementEvidenceGoalMismatch
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | unsupportedCallAssumptionEvidence
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (predicate : ProgramPredicate)
+  | callEvidenceResolutionNoSolution
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (goal : ProgramPredicate)
+  | callEvidenceResolutionInconclusive
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (reason : TraitResolution.InconclusiveReason
+        ProgramTraitId Ty ProgramImplId)
+  | callEvidenceNotSelected
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (goal : ProgramPredicate) (implementation : ProgramImplId)
   | duplicateReferenceEdge (caller : Key) (id : ExpressionId) (count : Nat)
   | missingReferenceEdge (caller : Key) (id : ExpressionId)
   | declarationMetadataMismatch (call callee : ExpressionId)
@@ -536,6 +564,121 @@ private def exactSolvedRequirement? (function : CheckedFunction)
   | [solved] => some solved
   | _ => none
 
+private def firstDuplicateRequirement :
+    List RequirementId → Option RequirementId
+  | [] => none
+  | requirement :: rest =>
+      if rest.contains requirement then some requirement
+      else firstDuplicateRequirement rest
+
+private def exactCallSolvedRequirement
+    (caller : SourceSpecialization.SpecializedFunction)
+    (occurrence : ExpressionId) (requirement : RequirementId) :
+    Except RuntimeError SolvedRequirement :=
+  let candidates := caller.function.solvedRequirements.filter fun solved =>
+    decide (solved.id = requirement)
+  match candidates with
+  | [] => .error (.missingSolvedRequirement caller.key occurrence requirement)
+  | [solved] => .ok solved
+  | solved => .error (.duplicateSolvedRequirements caller.key occurrence
+      requirement solved.length)
+
+private def validateCallRequirementEvidence
+    (caller : SourceSpecialization.SpecializedFunction)
+    (occurrence : ExpressionId) :
+    List RequirementId → List ProgramPredicate → Except RuntimeError Unit
+  | [], [] => pure ()
+  | requirement :: requirements, predicate :: predicates => do
+      let solved ← exactCallSolvedRequirement caller occurrence requirement
+      if solved.predicate != predicate then
+        throw (.callRequirementPredicateMismatch caller.key occurrence
+          requirement predicate solved.predicate)
+      let goal := solved.evidence.goal
+      if goal != solved.predicate then
+        throw (.callRequirementEvidenceGoalMismatch caller.key occurrence
+          requirement solved.predicate goal)
+      match solved.evidence with
+      | .assumption assumption =>
+          throw (.unsupportedCallAssumptionEvidence caller.key occurrence
+            requirement assumption)
+      | .implementation _ =>
+          validateCallRequirementEvidence caller occurrence requirements
+            predicates
+  | requirements, predicates =>
+      throw (.callRequirementCountMismatch caller.key occurrence
+        predicates.length requirements.length)
+
+/-- Validate the exact, ordered proof obligations carried by a direct
+declaration call.  This runtime slice accepts only already-selected
+implementation evidence; forwarding a caller assumption remains unsupported. -/
+private def validateDirectCallRequirements
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    Except RuntimeError Unit := do
+  if node.requirements.length != instantiation.predicates.length then
+    throw (.callRequirementCountMismatch caller.key node.id
+      instantiation.predicates.length node.requirements.length)
+  match firstDuplicateRequirement node.requirements with
+  | some requirement =>
+      throw (.duplicateCallRequirement caller.key node.id requirement)
+  | none =>
+      validateCallRequirementEvidence caller node.id node.requirements
+        instantiation.predicates
+
+private def validateSelectedCallImplementationEvidence
+    (signatures : ProgramSignatures)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (occurrence : ExpressionId) (requirement : RequirementId)
+    (goal : ProgramPredicate) (evidence : TypedTraitResolution.Evidence) :
+    Except RuntimeError Unit :=
+  match (TypedTraitResolution.resolve signatures.resolutionRules 32 goal).outcome with
+  | .noSolution =>
+      .error (.callEvidenceResolutionNoSolution caller.key occurrence
+        requirement goal)
+  | .inconclusive reason =>
+      .error (.callEvidenceResolutionInconclusive caller.key occurrence
+        requirement reason)
+  | .success selected =>
+      if selected == evidence then
+        .ok ()
+      else
+        let .byImpl _ implementation _ := evidence
+        .error (.callEvidenceNotSelected caller.key occurrence requirement
+          goal implementation)
+
+private def validateCallImplementationEvidence
+    (signatures : ProgramSignatures)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (occurrence : ExpressionId) :
+    List RequirementId → List ProgramPredicate → Except RuntimeError Unit
+  | [], [] => pure ()
+  | requirement :: requirements, predicate :: predicates => do
+      let solved ← exactCallSolvedRequirement caller occurrence requirement
+      match solved.evidence with
+      | .assumption assumption =>
+          throw (.unsupportedCallAssumptionEvidence caller.key occurrence
+            requirement assumption)
+      | .implementation evidence =>
+          validateSelectedCallImplementationEvidence signatures caller
+            occurrence requirement predicate evidence
+          validateCallImplementationEvidence signatures caller occurrence
+            requirements predicates
+  | requirements, predicates =>
+      throw (.callRequirementCountMismatch caller.key occurrence
+        predicates.length requirements.length)
+
+/-- Re-resolve a direct call's implementation witnesses against the supplied
+signature authority.  Equality with the selected evidence checks the complete
+recursive premise tree, not only its outer goal and implementation identity. -/
+private def validateDirectCallImplementationEvidence
+    (signatures : ProgramSignatures)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    Except RuntimeError Unit := do
+  validateDirectCallRequirements caller node instantiation
+  validateCallImplementationEvidence signatures caller node.id
+    node.requirements instantiation.predicates
+
 private def literalEvidenceIsBuiltin (function : CheckedFunction)
     (resolution : IntegerLiteralResolution) : Bool :=
   match exactSolvedRequirement? function resolution.requirement with
@@ -595,8 +738,10 @@ private def validateForItemMetadata : ForItemForm → Except RuntimeError Unit
   | .assignBitNot assignment => validateAssignmentMetadata assignment
   | .letDecl _ _ | .expression _ => pure ()
 
-private def validateExpressionMetadata (function : CheckedFunction)
+private def validateExpressionMetadata
+    (specialized : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) : Except RuntimeError Unit := do
+  let function := specialized.function
   unless node.coercions.isEmpty do
     throw (.unsupportedExpressionCoercions node.id)
   match node.form with
@@ -611,6 +756,8 @@ private def validateExpressionMetadata (function : CheckedFunction)
         throw (.unsupportedIndirectCoercions node.id)
       unless node.requirements.isEmpty do
         throw (.unsupportedRequirements node.requirements)
+  | .call _ _ (.declaration instantiation) =>
+      validateDirectCallRequirements specialized node instantiation
   | _ =>
       unless node.requirements.isEmpty do
         throw (.unsupportedRequirements node.requirements)
@@ -633,11 +780,14 @@ private def validateStatementMetadata (function : CheckedFunction) :
 
 /-- The effectful runtime implements builtin operations directly, but does not
 silently reinterpret user-selected trait methods or coercions as builtins. -/
-private def validateExecutableMetadata (function : CheckedFunction) :
+private def validateExecutableMetadata
+    (specialized : SourceSpecialization.SpecializedFunction) :
     Except RuntimeError Unit :=
+  let function := specialized.function
   for node in function.typedBody.nodes do
     match node with
-    | .expression expression => validateExpressionMetadata function expression
+    | .expression expression =>
+        validateExpressionMetadata specialized expression
     | .statement statement => validateStatementMetadata function statement.form
 
 private def typeContainsStaged : Ty → Bool
@@ -696,14 +846,15 @@ private def validateRuntimeBinders (function : CheckedFunction) :
         for arm in resolution.cases do validatePatternBinders arm.pattern
     | _ => pure ()
 
-private def validateSpecializationMetadata
+private def validateSpecializationMetadataWith
+    (allowAssumptions : Bool)
     (specialized : SourceSpecialization.SpecializedFunction) :
     Except RuntimeError Unit := do
   unless specializationOwnershipCoherent specialized do
     throw (.specializationOwnershipMismatch specialized.key
       specialized.declaration specialized.function.declaration
       specialized.function.typedBody.owner)
-  unless specialized.assumptions.isEmpty do
+  unless allowAssumptions || specialized.assumptions.isEmpty do
     throw (.unresolvedAssumptions specialized.key specialized.assumptions)
   let parameterComptime :=
     specialized.function.typedBody.inputs.map (·.comptime)
@@ -718,7 +869,7 @@ private def validateSpecializationMetadata
   for binder in specialized.function.typedBody.inputs do
     validateRuntimeBinder binder
   validateRuntimeBinders specialized.function
-  validateExecutableMetadata specialized.function
+  validateExecutableMetadata specialized
   let declaredResult ← match resultType? specialized.function with
     | some result => pure result
     | none => throw (.invalidFunctionType specialized.key
@@ -727,13 +878,45 @@ private def validateSpecializationMetadata
     throw (.inferredResultTypeMismatch specialized.key declaredResult
       specialized.function.inferredBodyType)
 
+private def validateSpecializationMetadata
+    (specialized : SourceSpecialization.SpecializedFunction) :
+    Except RuntimeError Unit :=
+  validateSpecializationMetadataWith false specialized
+
+/-- Assumptions are executable only for a specialization reached exclusively
+as a direct-call target.  Public seeds and first-class declaration references
+continue to use the closed-specialization contract. -/
+private def allowsDirectAssumptionInvocation (plan : Plan) (key : Key) : Bool :=
+  plan.callEdges.any (fun edge => edge.callee == key) &&
+    !plan.seedKeys.contains key &&
+    !plan.referenceEdges.any fun edge => edge.callee == key
+
 /-- Preflight every reachable specialization before selecting this runtime as
 an executable backend.  The canonical worklist has already fixed the finite
 call graph; this pass rejects metadata which the typed runtime deliberately
 does not dispatch instead of postponing that rejection until a call happens. -/
 def validateExecutablePlan (plan : Plan) : Except RuntimeError Unit := do
   for specialized in plan.specializations do
-    validateSpecializationMetadata specialized
+    validateSpecializationMetadataWith
+      (allowsDirectAssumptionInvocation plan specialized.key) specialized
+
+/-- Signature-aware safe-boundary validation.  The structural pass retains
+its existing diagnostics and ordering; the second pass authenticates every
+implementation witness used by a direct declaration call against the
+authoritative resolution catalog. -/
+def validateExecutablePlanEvidence (signatures : ProgramSignatures)
+    (plan : Plan) : Except RuntimeError Unit := do
+  validateExecutablePlan plan
+  for specialized in plan.specializations do
+    for sourceNode in specialized.function.typedBody.nodes do
+      match sourceNode with
+      | .expression node =>
+          match node.form with
+          | .call _ _ (.declaration instantiation) =>
+              validateDirectCallImplementationEvidence signatures specialized
+                node instantiation
+          | _ => pure ()
+      | .statement _ => pure ()
 
 private def applyCoercion (plan : Plan) (step : CoercionStep)
     (value : Value) : Except RuntimeError Value := do
@@ -1499,7 +1682,16 @@ mutual
                       | .ok target =>
                           match exactCallKey plan owner id target with
                           | .ok key =>
-                              applyCallable fuel plan (.global key) values finalState
+                              match exactSpecialization plan owner with
+                              | .error error => .fault error finalState
+                              | .ok caller =>
+                                  match validateDirectCallRequirements caller
+                                      node instantiation with
+                                  | .error error => .fault error finalState
+                                  | .ok () =>
+                                      expressionOfRunResult
+                                        (invokeDirectSpecialization fuel plan key
+                                          values finalState)
                           | .error error => .fault error finalState
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
@@ -1619,6 +1811,39 @@ mutual
       | .ok specialized =>
           let function := specialized.function
           match validateSpecializationMetadata specialized with
+          | .error error => .fault error state
+          | .ok () =>
+              let expected := function.inferredBodyType
+              let parameters := function.typedBody.inputs
+              if parameters.length != arguments.length then
+                .fault (.argumentArityMismatch parameters.length
+                  arguments.length) state
+              else
+                match bindValues plan [] state
+                    (List.zip parameters arguments) with
+                | .error error => .fault error state
+                | .ok (environment, bodyState) =>
+                    match statementIds function.typedBody.roots with
+                    | .error error => .fault error bodyState
+                    | .ok roots =>
+                        let flow := executeFunctionSequence fuel plan key
+                          function.typedBody environment bodyState roots
+                        finishFunctionFlow plan expected flow
+
+  /-- Enter a specialization whose where-predicates were discharged by the
+  immediately enclosing, validated direct declaration call.  This entry point
+  is deliberately absent from `Value.global`, roots, and indirect calls. -/
+  private def invokeDirectSpecialization (fuel : Nat) (plan : Plan) (key : Key)
+      (arguments : List Value) (state : RuntimeState) : RunResult :=
+    match fuel with
+    | 0 => .outOfFuel state
+    | fuel + 1 =>
+      match exactSpecialization plan key with
+      | .error error => .fault error state
+      | .ok specialized =>
+          let function := specialized.function
+          match validateSpecializationMetadataWith
+              (allowsDirectAssumptionInvocation plan key) specialized with
           | .error error => .fault error state
           | .ok () =>
               let expected := function.inferredBodyType
@@ -2483,7 +2708,10 @@ def runWithValidationFuel (signatures : ProgramSignatures) (plan : Plan)
         (·.scheme.body)
       match validateInputs signatures plan validationFuel expected arguments with
       | some error => .fault error state
-      | none => runTrusted plan entry arguments executionFuel state
+      | none =>
+          match validateExecutablePlanEvidence signatures plan with
+          | .error error => .fault error state
+          | .ok () => runTrusted plan entry arguments executionFuel state
 
 /-- Successful safe-boundary execution has the same inferred-result guarantee
 as the trusted evaluator reached after input validation. -/
@@ -2502,8 +2730,10 @@ theorem runWithValidationFuel_done_has_inferredBodyType
   simp only at done
   split at done
   · cases done
-  · exact runTrusted_done_has_inferredBodyType plan entry arguments
-      executionFuel initial finalState value specialized exact done
+  · split at done
+    · cases done
+    · exact runTrusted_done_has_inferredBodyType plan entry arguments
+        executionFuel initial finalState value specialized exact done
 
 /-- Compatibility boundary using the same structural fuel for validation and
 execution.  New compiler clients can use `runWithValidationFuel` to keep the
