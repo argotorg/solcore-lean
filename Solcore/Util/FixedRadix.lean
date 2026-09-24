@@ -2,7 +2,7 @@ import Std
 
 set_option autoImplicit false
 
-namespace Solcore.Foundation.FixedRadix
+namespace Solcore.Util.FixedRadix
 
 /-- Exactly `width` big-endian digits in the given base. -/
 abbrev Digits (base width : Nat) := Vector (Fin base) width
@@ -104,7 +104,11 @@ private theorem decodeList_encodeList
     decodeList base (encodeList base basePositive width value) = value.val := by
   induction width with
   | zero =>
-      simp [encodeList, decodeList]
+      have valueZero : value.val = 0 := by
+        have valueBound := value.isLt
+        simp only [Nat.pow_zero] at valueBound
+        omega
+      simp [encodeList, decodeList, valueZero]
   | succ width ih =>
       simp [encodeList, decodeList, ih, Nat.div_add_mod']
 
@@ -227,7 +231,10 @@ theorem encode_get
     (value : Value base width) (index : Fin width) :
     ((encode base width basePositive value).get index).val =
       (value.val / base ^ (width - 1 - index.val)) % base := by
-  simp [encode, encodeNat, Vector.get, encodeList_getElem,
+  change
+    ((encode base width basePositive value)[index.val]'index.isLt).val =
+      (value.val / base ^ (width - 1 - index.val)) % base
+  simp [encode, encodeNat, encodeList_getElem,
     Nat.mod_eq_of_lt value.isLt]
 
 /-- Decode into an intrinsically range-checked value. -/
@@ -247,4 +254,4 @@ def decode {base width : Nat} (digits : Digits base width) : Value base width :=
     encode base width basePositive (decode digits) = digits := by
   simp [encode, decode]
 
-end Solcore.Foundation.FixedRadix
+end Solcore.Util.FixedRadix

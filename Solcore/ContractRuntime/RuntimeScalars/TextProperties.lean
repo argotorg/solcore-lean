@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 namespace Solcore.ContractRuntime
 
-open Solcore.Foundation
+open Solcore.Util
 open RuntimeScalar.Internal
 
 @[simp] private theorem encodeByteDigits_length (byte : UInt8) :

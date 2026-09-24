@@ -1,6 +1,6 @@
 import Solcore.Core.Syntax
-import Solcore.Foundation.FixedHex
-import Solcore.Foundation.FixedRadix
+import Solcore.Util.FixedHex
+import Solcore.Util.FixedRadix
 
 set_option autoImplicit false
 
@@ -17,7 +17,7 @@ abbrev Address := Fin addressModulus
 
 namespace RuntimeScalar.Internal
 
-open Solcore.Foundation
+open Solcore.Util
 
 private theorem addressHexModulus : addressModulus = 16 ^ 40 := by decide
 
@@ -80,7 +80,7 @@ def wordDigitsOfBytes? (bytes : ByteArray) :
 
 end RuntimeScalar.Internal
 
-open Solcore.Foundation
+open Solcore.Util
 
 /-- Encode bytes with a strict `0x` prefix and two lowercase digits per byte. -/
 def encodeBytesText (value : Bytes) : String :=

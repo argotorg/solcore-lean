@@ -258,7 +258,7 @@ set_option autoImplicit false
 
 namespace Solcore.Abi.V1
 
-open Solcore.Foundation
+open Solcore.Util
 open Solcore.ContractRuntime
 
 /-- A decoded `uint256 -> uint256` call, before selector admission. -/

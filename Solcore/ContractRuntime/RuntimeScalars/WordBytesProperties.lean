@@ -5,7 +5,7 @@ set_option autoImplicit false
 
 namespace Solcore.ContractRuntime
 
-open Solcore.Foundation
+open Solcore.Util
 
 private theorem bytesOfWordDigits_size
     (digits : FixedRadix.Digits 256 32) :

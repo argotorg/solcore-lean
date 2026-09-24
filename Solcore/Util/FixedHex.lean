@@ -1,8 +1,8 @@
-import Solcore.Foundation.FixedRadix
+import Solcore.Util.FixedRadix
 
 set_option autoImplicit false
 
-namespace Solcore.Foundation.FixedHex
+namespace Solcore.Util.FixedHex
 
 abbrev Digit := Fin 16
 
@@ -200,4 +200,4 @@ theorem encodeText_injective (width : Nat) :
   have decoded := congrArg (decodeText? width) equal
   simpa using decoded
 
-end Solcore.Foundation.FixedHex
+end Solcore.Util.FixedHex

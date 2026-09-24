@@ -8,7 +8,7 @@ set_option autoImplicit false
 
 namespace Solcore.ContractRuntime
 
-open Solcore.Foundation
+open Solcore.Util
 
 private theorem addressByteModulus : addressModulus = 256 ^ 20 := by
   decide
@@ -40,7 +40,7 @@ set_option autoImplicit false
 
 namespace Solcore.ContractRuntime
 
-open Solcore.Foundation
+open Solcore.Util
 
 private theorem addressByteModulusProperties : addressModulus = 256 ^ 20 := by
   decide

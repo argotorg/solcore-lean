@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 namespace Solcore.ContractRuntime
 
-open Solcore.Foundation
+open Solcore.Util
 open RuntimeScalar.Internal
 
 @[simp] private theorem addressEncodeByteDigits_length (byte : UInt8) :
@@ -26,8 +26,10 @@ private theorem addressEncodeByteDigits_get
     (byte : UInt8) (index : Fin 2) :
     ((encodeByteDigits byte)[index.val]'(by simp)).val =
       (byte.toNat / 16 ^ (1 - index.val)) % 16 := by
-  simpa [encodeByteDigits, Vector.get, byteHexValue] using
-    FixedRadix.encode_get 16 2 (by decide) (byteHexValue byte) index
+  change
+    ((FixedRadix.encode 16 2 (by decide) (byteHexValue byte)).get index).val = _
+  rw [FixedRadix.encode_get]
+  simp [byteHexValue]
 
 private theorem addressEncodeBytesDigits_get_even
     (bytes : List UInt8) (index : Nat) (indexLt : index < bytes.length) :
