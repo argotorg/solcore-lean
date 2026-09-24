@@ -2244,8 +2244,8 @@ theorem LocalFresh.applyParameters
     (substitution : ParameterSubstitution)
     (fresh : LocalFresh context id) :
     LocalFresh (applyContext substitution context) id := by
-  simpa [LocalFresh, applyContext, applyLocals, List.map_map,
-    Function.comp_def] using fresh
+  simpa [LocalFresh, applyContext, applyLocals,
+    applyLocalSchemeRequirements, List.map_map, Function.comp_def] using fresh
 
 /-- The one semantic premise not supplied by purely structural substitution:
 retained implementation evidence remains valid after its predicates and types
@@ -7268,6 +7268,107 @@ theorem BinderWellFormed.applySubstitution
     simp [TypedBinder.applySubstitution,
       wellFormed.monomorphic_requirements_empty originalQuantifiedEmpty]
 }
+
+/-- Flexible context closure preserves freshness in both paired local scopes;
+the substitution changes only schemes and predicates, never stable local
+identities. -/
+theorem LocalFresh.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {id : Resolved.LocalId}
+    (closes : ContextCloses substitution closedVariables source target)
+    (fresh : LocalFresh source id) :
+    LocalFresh target id := by
+  rw [← closes.target_eq]
+  simpa [LocalFresh, applyContext, applyLocals,
+    applyLocalSchemeRequirements, List.map_map, Function.comp_def] using fresh
+
+/-- Closing an outer flexible scope commutes with one retained lexical-binder
+extension, including its paired qualified-requirement metadata. -/
+theorem BinderExtends.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binder : TypedBinder}
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : BinderExtends owner source binder final) :
+    BinderExtends owner target (binder.applySubstitution substitution)
+      (applyContext substitution target.typeVariables final) := by
+  cases extension with
+  | intro wellFormed fresh =>
+      rw [applyContext_withLocal substitution target.typeVariables source
+        binder.id binder.scheme binder.schemeRequirements fresh.2,
+        closes.target_eq]
+      simpa using BinderExtends.intro
+        (BinderWellFormed.applySubstitution closes wellFormed)
+        (LocalFresh.applySubstitution closes fresh)
+
+/-- Flexible context closure transports a source-ordered binder extension and
+threads the resulting context closure through every newly installed binder. -/
+theorem BindersExtend.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binders : List TypedBinder}
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : BindersExtend owner source binders final) :
+    BindersExtend owner target
+      (binders.map (TypedBinder.applySubstitution substitution))
+      (applyContext substitution target.typeVariables final) := by
+  induction extension generalizing target with
+  | nil =>
+      rw [closes.target_eq]
+      exact .nil _
+  | @cons context middle final binder binders head tail induction =>
+      cases head with
+      | intro wellFormed fresh =>
+          have middleCloses := closes.withLocal binder.id binder.scheme
+            binder.schemeRequirements fresh.2
+          have transportedHead : BinderExtends owner target
+              (binder.applySubstitution substitution)
+              (target.withLocal binder.id (binder.scheme.apply substitution)
+                (binder.schemeRequirements.map
+                  (LocalSchemeRequirement.applySubstitution
+                    (substitution.without binder.scheme.quantified)))) := by
+            simpa using BinderExtends.intro
+              (BinderWellFormed.applySubstitution closes wellFormed)
+              (LocalFresh.applySubstitution closes fresh)
+          have transportedTail := induction middleCloses
+          refine .cons transportedHead ?_
+          simpa [Context.withLocal] using transportedTail
+
+/-- The monomorphic specialization of flexible binder transport preserves the
+source-order type spine alongside the transported binders. -/
+theorem MonoBindersExtend.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target final : Context} {owner : Resolved.DeclarationId}
+    {binders : List TypedBinder} {types : List Ty}
+    (closes : ContextCloses substitution closedVariables source target)
+    (extension : MonoBindersExtend owner source binders types final) :
+    MonoBindersExtend owner target
+      (binders.map (TypedBinder.applySubstitution substitution))
+      (types.map substitution.apply)
+      (applyContext substitution target.typeVariables final) := by
+  induction extension generalizing target with
+  | nil =>
+      rw [closes.target_eq]
+      exact .nil _
+  | @cons context middle final binder binders type types schemeEq head tail
+      induction =>
+      cases head with
+      | intro wellFormed fresh =>
+          have middleCloses := closes.withLocal binder.id binder.scheme
+            binder.schemeRequirements fresh.2
+          have transportedHead : BinderExtends owner target
+              (binder.applySubstitution substitution)
+              (target.withLocal binder.id (binder.scheme.apply substitution)
+                (binder.schemeRequirements.map
+                  (LocalSchemeRequirement.applySubstitution
+                    (substitution.without binder.scheme.quantified)))) := by
+            simpa using BinderExtends.intro
+              (BinderWellFormed.applySubstitution closes wellFormed)
+              (LocalFresh.applySubstitution closes fresh)
+          have transportedTail := induction middleCloses
+          refine .cons ?_ transportedHead ?_
+          · simp [schemeEq]
+          · simpa [Context.withLocal] using transportedTail
 
 @[simp] theorem closeContext_signatures (substitution : Substitution)
     (context : Context) :

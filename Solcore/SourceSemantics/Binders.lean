@@ -11,9 +11,14 @@ namespace Solcore.SourceSemantics
 
 open Frontend.SourceInference
 
-/-- A stable local identity is not already defined in the lexical context. -/
+/-- A stable local identity is absent from both paired lexical scopes.
+
+Keeping the value and qualified-requirement scopes fresh together prevents a
+new binder from shadowing stale scheme metadata in an otherwise malformed
+context. -/
 def LocalFresh (context : Context) (id : Resolved.LocalId) : Prop :=
-  id ∉ context.locals.map Prod.fst
+  id ∉ context.locals.map Prod.fst ∧
+    id ∉ context.localSchemeRequirements.map Prod.fst
 
 /-- Stable identities of the proof obligations abstracted by one local
 scheme, in predicate order. -/
@@ -140,6 +145,28 @@ inductive MonoBindersExtend (owner : Resolved.DeclarationId) :
       MonoBindersExtend owner context (binder :: binders) (type :: types) final
 
 namespace BinderExtends
+
+theorem fresh
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binder : TypedBinder}
+    (extension : BinderExtends owner context binder final) :
+    LocalFresh context binder.id := by
+  cases extension
+  assumption
+
+theorem local_fresh
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binder : TypedBinder}
+    (extension : BinderExtends owner context binder final) :
+    binder.id ∉ context.locals.map Prod.fst :=
+  extension.fresh.1
+
+theorem local_scheme_requirements_fresh
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binder : TypedBinder}
+    (extension : BinderExtends owner context binder final) :
+    binder.id ∉ context.localSchemeRequirements.map Prod.fst :=
+  extension.fresh.2
 
 theorem local_self
     {owner : Resolved.DeclarationId} {context final : Context}
