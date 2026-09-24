@@ -49,6 +49,45 @@ example (substitution : ParameterSubstitution)
     ContextSubstitutionValid substitution context :=
   ContextSubstitutionValid.ofRequirementLedger exact range ledger
 
+/-- The external substitution premise is needed only for implementation
+evidence.  Assumption evidence is transported from its lexical validity by
+`RequirementProves.applyParameters`. -/
+example (substitution : ParameterSubstitution)
+    (context : SourceSemantics.Context)
+    (valid : ContextSubstitutionValid substitution context)
+    (requirement : SolvedRequirement)
+    (evidence : TypedTraitResolution.Evidence)
+    (member : requirement ∈ context.solvedRequirements)
+    (implementation : requirement.evidence = .implementation evidence) :
+    SolvedRequirementValid (applyContext substitution context)
+      (applySolvedRequirement substitution requirement) :=
+  valid.implementationRequirements requirement evidence member implementation
+
+/-- A ledger consisting only of assumption rows needs no evidence-transport
+premise beyond exactness and range well-formedness.  The local proof supplies
+the assumption membership used by rigid substitution. -/
+example (substitution : ParameterSubstitution)
+    (context : SourceSemantics.Context)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (assumptionRows : ∀ requirement,
+      requirement ∈ context.solvedRequirements →
+        ∃ predicate, requirement.evidence = .assumption predicate)
+    (id : RequirementId) (predicate : ProgramPredicate)
+    (proves : RequirementProves context id predicate) :
+    RequirementProves (applyContext substitution context) id
+      (ProgramPredicate.applyParameters substitution predicate) := by
+  apply RequirementProves.applyParameters
+      ({ exact, range, implementationRequirements := ?_ } :
+        ContextSubstitutionValid substitution context)
+    proves
+  intro requirement evidence member implementation
+  rcases assumptionRows requirement member with ⟨assumption, assumptionEq⟩
+  rw [assumptionEq] at implementation
+  cases implementation
+
 /-- One rigid declaration instantiation preserves the shared local-scheme
 type/predicate witness and its ordered actual requirement identities. -/
 example (substitution : ParameterSubstitution)
@@ -69,6 +108,31 @@ example (substitution : ParameterSubstitution) (source : TypedSource)
     OccurrenceGraphClosed (applyTypedSource substitution source) :=
   StructuralSubstitution.OccurrenceGraphClosed.applyParameters substitution
     closed
+
+/-- Template-owner uniqueness is invariant under rigid declaration
+instantiation. -/
+example (substitution : ParameterSubstitution) (source : TypedSource)
+    (ownership : LocalSchemeTemplateOwnership source) :
+    LocalSchemeTemplateOwnership (applyTypedSource substitution source) :=
+  LocalSchemeTemplateOwnership.applyParameters substitution ownership
+
+/-- Exact template-row ownership maps its predicate while retaining the
+stable template identity. -/
+example (substitution : ParameterSubstitution) (source : TypedSource)
+    (row : SolvedRequirement)
+    (owned : LocalSchemeTemplateRowOwned source row) :
+    LocalSchemeTemplateRowOwned (applyTypedSource substitution source)
+      (applySolvedRequirement substitution row) :=
+  LocalSchemeTemplateRowOwned.applyParameters substitution owned
+
+/-- Rigid instantiation preserves the initializer subtree in which a template
+owner may be used. -/
+example (substitution : ParameterSubstitution) (source : TypedSource)
+    (owner : LocalSchemeTemplateOwner) (occurrence : NodeId)
+    (scope : owner.Scopes source occurrence) :
+    (applyLocalSchemeTemplateOwner substitution owner).Scopes
+      (applyTypedSource substitution source) occurrence :=
+  LocalSchemeTemplateOwner.Scopes.applyParameters substitution scope
 
 /-- The declaration-level API closes the evidence side condition internally:
 an exact, range-valid rigid substitution transports both input binders and the

@@ -326,6 +326,208 @@ theorem LocalIdentityOwnership.applyParameters
   · intro id member
     simpa [applyTypedSource] using ownership.owned id (by simpa using member)
 
+/-- Rigid substitution acts on the retained type and predicate data of an
+initialized let without changing its initializer occurrence. -/
+def applyInitializedLetBinding (substitution : ParameterSubstitution)
+    (binding : InitializedLetBinding) : InitializedLetBinding := {
+  binder := applyBinder substitution binding.binder
+  initializer := binding.initializer
+}
+
+/-- Rigid substitution acts pointwise on one exact local-template owner. -/
+def applyLocalSchemeTemplateOwner (substitution : ParameterSubstitution)
+    (owner : LocalSchemeTemplateOwner) : LocalSchemeTemplateOwner := {
+  binder := applyBinder substitution owner.binder
+  initializer := owner.initializer
+  requirement := owner.requirement.applyParameters substitution
+}
+
+@[simp] theorem forItemInitializedLetBindings_applyForItemForm
+    (substitution : ParameterSubstitution) (item : ForItemForm) :
+    forItemInitializedLetBindings (applyForItemForm substitution item) =
+      (forItemInitializedLetBindings item).map
+        (applyInitializedLetBinding substitution) := by
+  cases item with
+  | letDecl binder initializer => cases initializer <;> rfl
+  | expression expression => rfl
+  | assignValue assignment operator value => rfl
+  | assignBitNot assignment => rfl
+
+@[simp] theorem statementInitializedLetBindings_applyStatementForm
+    (substitution : ParameterSubstitution) (form : StatementForm) :
+    statementInitializedLetBindings (applyStatementForm substitution form) =
+      (statementInitializedLetBindings form).map
+        (applyInitializedLetBinding substitution) := by
+  cases form with
+  | letDecl binder initializer => cases initializer <;> rfl
+  | returnStmt value => rfl
+  | expression expression trailingSemicolon => rfl
+  | assignValue assignment operator value => rfl
+  | assignBitNot assignment => rfl
+  | ifThen condition thenBody elseBody => rfl
+  | block body => rfl
+  | matchWith resolution => rfl
+  | forLoop initializer condition post body =>
+      simp [statementInitializedLetBindings, applyStatementForm,
+        List.flatMap_map, List.map_flatMap]
+  | whileLoop condition body => rfl
+  | breakStmt => rfl
+  | continueStmt => rfl
+
+@[simp] theorem nodeInitializedLetBindings_applyNode
+    (substitution : ParameterSubstitution) (node : Node) :
+    (match applyNode substitution node with
+      | .expression _ => []
+      | .statement statement =>
+          statementInitializedLetBindings statement.form) =
+    (match node with
+      | .expression _ => []
+      | .statement statement =>
+          statementInitializedLetBindings statement.form).map
+        (applyInitializedLetBinding substitution) := by
+  cases node <;> simp [applyNode, applyStatementNode]
+
+@[simp] theorem initializedLetBindings_applyTypedSource
+    (substitution : ParameterSubstitution) (source : TypedSource) :
+    initializedLetBindings (applyTypedSource substitution source) =
+      (initializedLetBindings source).map
+        (applyInitializedLetBinding substitution) := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      simp only [initializedLetBindings, applyTypedSource, List.flatMap_map,
+        List.map_flatMap]
+      induction nodes with
+      | nil => rfl
+      | cons node nodes induction =>
+          simp only [List.flatMap_cons]
+          calc
+            _ = (match node with
+                  | .expression _ => []
+                  | .statement statement =>
+                      statementInitializedLetBindings statement.form).map
+                    (applyInitializedLetBinding substitution) ++
+                List.flatMap
+                  (fun node =>
+                    match applyNode substitution node with
+                    | .expression _ => []
+                    | .statement statement =>
+                        statementInitializedLetBindings statement.form)
+                  nodes := congrArg
+                    (fun head => head ++ List.flatMap
+                      (fun node =>
+                        match applyNode substitution node with
+                        | .expression _ => []
+                        | .statement statement =>
+                            statementInitializedLetBindings statement.form)
+                      nodes)
+                    (nodeInitializedLetBindings_applyNode substitution node)
+            _ = _ := congrArg
+              (fun tail =>
+                (match node with
+                  | .expression _ => []
+                  | .statement statement =>
+                      statementInitializedLetBindings statement.form).map
+                    (applyInitializedLetBinding substitution) ++ tail)
+              induction
+
+@[simp] theorem templateOwners_applyInitializedLetBinding
+    (substitution : ParameterSubstitution) (binding : InitializedLetBinding) :
+    InitializedLetBinding.templateOwners
+        (applyInitializedLetBinding substitution binding) =
+      binding.templateOwners.map
+        (applyLocalSchemeTemplateOwner substitution) := by
+  simp [InitializedLetBinding.templateOwners, applyInitializedLetBinding,
+    applyLocalSchemeTemplateOwner, applyBinder, List.map_map,
+    Function.comp_def]
+
+@[simp] theorem localSchemeTemplateOwners_applyTypedSource
+    (substitution : ParameterSubstitution) (source : TypedSource) :
+    localSchemeTemplateOwners (applyTypedSource substitution source) =
+      (localSchemeTemplateOwners source).map
+        (applyLocalSchemeTemplateOwner substitution) := by
+  simp [localSchemeTemplateOwners, List.flatMap_map, List.map_flatMap]
+
+@[simp] theorem applyLocalSchemeTemplateOwner_templateRequirement
+    (substitution : ParameterSubstitution) (owner : LocalSchemeTemplateOwner) :
+    (applyLocalSchemeTemplateOwner substitution owner).requirement.templateRequirement =
+      owner.requirement.templateRequirement := by
+  rfl
+
+@[simp] theorem sourceLocalSchemeTemplateIds_applyTypedSource
+    (substitution : ParameterSubstitution) (source : TypedSource) :
+    sourceLocalSchemeTemplateIds (applyTypedSource substitution source) =
+      sourceLocalSchemeTemplateIds source := by
+  simp [sourceLocalSchemeTemplateIds, List.map_map, Function.comp_def]
+
+theorem ContainsLocalSchemeTemplate.applyParameters
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    (substitution : ParameterSubstitution)
+    (contains : ContainsLocalSchemeTemplate source owner) :
+    ContainsLocalSchemeTemplate (applyTypedSource substitution source)
+      (applyLocalSchemeTemplateOwner substitution owner) := by
+  unfold ContainsLocalSchemeTemplate at contains ⊢
+  rw [localSchemeTemplateOwners_applyTypedSource]
+  exact List.mem_map.mpr ⟨owner, contains, rfl⟩
+
+theorem LocalSchemeTemplateOwnership.applyParameters
+    (substitution : ParameterSubstitution) {source : TypedSource}
+    (ownership : LocalSchemeTemplateOwnership source) :
+    LocalSchemeTemplateOwnership (applyTypedSource substitution source) := by
+  constructor
+  simpa using ownership.ids_unique
+
+theorem InReflexiveSubtree.applyParameters
+    {source : TypedSource} {root occurrence : NodeId}
+    (substitution : ParameterSubstitution)
+    (scope : InReflexiveSubtree source root occurrence) :
+    InReflexiveSubtree (applyTypedSource substitution source) root occurrence := by
+  rcases scope with rootEq | descends
+  · exact Or.inl rootEq
+  · exact Or.inr
+      (StructuralSubstitution.descends_applyParameters substitution descends)
+
+theorem InInitializedLetSubtree.applyParameters
+    {source : TypedSource} {binding : InitializedLetBinding}
+    {occurrence : NodeId} (substitution : ParameterSubstitution)
+    (scope : InInitializedLetSubtree source binding occurrence) :
+    InInitializedLetSubtree (applyTypedSource substitution source)
+      (applyInitializedLetBinding substitution binding) occurrence := by
+  exact ⟨by
+    rw [initializedLetBindings_applyTypedSource]
+    exact List.mem_map.mpr ⟨binding, scope.1, rfl⟩,
+    StructuralSubstitution.InReflexiveSubtree.applyParameters substitution
+      scope.2⟩
+
+theorem LocalSchemeTemplateOwner.Scopes.applyParameters
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    {occurrence : NodeId} (substitution : ParameterSubstitution)
+    (scope : owner.Scopes source occurrence) :
+    (applyLocalSchemeTemplateOwner substitution owner).Scopes
+      (applyTypedSource substitution source) occurrence := by
+  exact ⟨StructuralSubstitution.ContainsLocalSchemeTemplate.applyParameters
+      substitution scope.1,
+    StructuralSubstitution.InReflexiveSubtree.applyParameters substitution
+      scope.2⟩
+
+theorem LocalSchemeTemplateRowOwned.applyParameters
+    {source : TypedSource} {row : SolvedRequirement}
+    (substitution : ParameterSubstitution)
+    (owned : LocalSchemeTemplateRowOwned source row) :
+    LocalSchemeTemplateRowOwned (applyTypedSource substitution source)
+      (applySolvedRequirement substitution row) := by
+  cases owned with
+  | intro owner contains idEq predicateEq evidenceEq =>
+      refine .intro (applyLocalSchemeTemplateOwner substitution owner)
+        (StructuralSubstitution.ContainsLocalSchemeTemplate.applyParameters
+          substitution contains) ?_ ?_ ?_
+      · simpa [applySolvedRequirement] using idEq
+      · simpa [applySolvedRequirement, applyLocalSchemeTemplateOwner,
+          LocalSchemeRequirement.applyParameters] using congrArg
+            (ProgramPredicate.applyParameters substitution) predicateEq
+      · simpa [applySolvedRequirement, applyLocalSchemeTemplateOwner,
+          LocalSchemeRequirement.applyParameters, applyPredicateEvidence] using
+            congrArg (applyPredicateEvidence substitution) evidenceEq
+
 @[simp] theorem forItemPrimaryRequirementIds_applyForItemForm
     (substitution : ParameterSubstitution) (item : ForItemForm) :
     forItemPrimaryRequirementIds (applyForItemForm substitution item) =
@@ -1973,18 +2175,23 @@ theorem LocalFresh.applyParameters
     Function.comp_def] using fresh
 
 /-- The one semantic premise not supplied by purely structural substitution:
-every retained evidence tree remains valid after its predicates and types are
-instantiated.  `EvidenceValid.applyParameters` discharges this premise once
-impl-head matching closure is available. -/
+retained implementation evidence remains valid after its predicates and types
+are instantiated.  Assumption evidence needs no global premise: its local
+validity already records membership in the current assumption scope, which is
+mapped structurally by `applyContext`.  `EvidenceValid.applyParameters`
+discharges the implementation premise once impl-head matching closure is
+available. -/
 structure ContextSubstitutionValid (substitution : ParameterSubstitution)
     (context : Context) : Prop where
   exact : SourceSemantics.ParameterSubstitution.Exact substitution
     context.typeParameters
   range : SourceSemantics.ParameterSubstitution.RangeWellFormed
     (applyContext substitution context) substitution
-  requirements : ∀ requirement, requirement ∈ context.solvedRequirements →
-    SolvedRequirementValid (applyContext substitution context)
-      (applySolvedRequirement substitution requirement)
+  implementationRequirements : ∀ requirement evidence,
+    requirement ∈ context.solvedRequirements →
+    requirement.evidence = .implementation evidence →
+      SolvedRequirementValid (applyContext substitution context)
+        (applySolvedRequirement substitution requirement)
 
 theorem SolvedRequirementValid.transportContext
     {source target : Context} {requirement : SolvedRequirement}
@@ -2005,15 +2212,16 @@ theorem ContextSubstitutionValid.underLocal
       (context.withLocal id scheme requirements) := {
   exact := by simpa [Context.withLocal] using valid.exact
   range := ParameterSubstitution.RangeWellFormed.underSourceLocal valid.range
-  requirements := by
-    intro requirement member
+  implementationRequirements := by
+    intro requirement evidence member evidenceEq
     have member' : requirement ∈ context.solvedRequirements := by
       simpa [Context.withLocal] using member
     exact StructuralSubstitution.SolvedRequirementValid.transportContext
       (source := applyContext substitution context)
       (target := applyContext substitution
         (context.withLocal id scheme requirements))
-      rfl rfl (valid.requirements requirement member')
+      rfl rfl
+        (valid.implementationRequirements requirement evidence member' evidenceEq)
 }
 
 /-- Rigid declaration instantiation is insensitive to an ambient flexible
@@ -2033,15 +2241,17 @@ theorem ContextSubstitutionValid.withTypeVariables
       (target := applyContext substitution
         (context.withTypeVariables variables))
       rfl rfl rfl original
-  requirements := by
-    intro requirement member
+  implementationRequirements := by
+    intro requirement evidence member evidenceEq
     have originalMember : requirement ∈ context.solvedRequirements := by
       simpa [Context.withTypeVariables] using member
     exact StructuralSubstitution.SolvedRequirementValid.transportContext
       (source := applyContext substitution context)
       (target := applyContext substitution
         (context.withTypeVariables variables))
-      rfl rfl (valid.requirements requirement originalMember)
+      rfl rfl
+        (valid.implementationRequirements requirement evidence originalMember
+          evidenceEq)
 }
 
 /-- Rigid substitution remains valid while the predicates abstracted by a
@@ -2062,12 +2272,13 @@ theorem ContextSubstitutionValid.localSchemeInitializer
       (target := applyContext substitution
         (localSchemeInitializerContext context binder))
       rfl rfl rfl (valid.range parameter replacement member)
-  requirements := by
-    intro requirement member
+  implementationRequirements := by
+    intro requirement evidence member evidenceEq
     have originalMember : requirement ∈ context.solvedRequirements := by
       simpa [localSchemeInitializerContext, Context.withTypeVariables,
         Context.withAssumptions] using member
-    cases valid.requirements requirement originalMember with
+    cases valid.implementationRequirements requirement evidence originalMember
+        evidenceEq with
     | intro evidenceValid =>
         exact .intro (evidenceValid.weakenAssumptions (by
           intro predicate predicateMem
@@ -2088,14 +2299,33 @@ theorem RequirementProves.applyParameters
       (ProgramPredicate.applyParameters substitution predicate) := by
   rcases proves with ⟨requirement, contains, predicateEq, evidenceValid⟩
   rcases contains with ⟨member, idEq⟩
-  refine ⟨applySolvedRequirement substitution requirement, ?_, ?_,
-    valid.requirements requirement member⟩
+  refine ⟨applySolvedRequirement substitution requirement, ?_, ?_, ?_⟩
   · constructor
     · change applySolvedRequirement substitution requirement ∈
         context.solvedRequirements.map (applySolvedRequirement substitution)
       exact List.mem_map.mpr ⟨requirement, member, rfl⟩
     · exact idEq
   · simp [applySolvedRequirement, predicateEq]
+  · cases evidenceEq : requirement.evidence with
+    | assumption assumption =>
+        cases evidenceValid with
+        | intro retainedValid =>
+            rw [evidenceEq] at retainedValid
+            cases retainedValid with
+            | intro represents semanticValid =>
+                cases represents with
+                | assumption =>
+                    cases semanticValid with
+                    | assumption goalMem =>
+                        apply SolvedRequirementValid.intro
+                        simp only [applyContext, applySolvedRequirement,
+                          evidenceEq, applyPredicateEvidence]
+                        exact .intro (.assumption _) (.assumption (by
+                          exact List.mem_map.mpr
+                            ⟨requirement.predicate, goalMem, rfl⟩))
+    | implementation evidence =>
+        exact valid.implementationRequirements requirement evidence member
+          evidenceEq
 
 theorem RequirementValid.applyParameters
     {substitution : ParameterSubstitution} {context : Context}
@@ -4853,10 +5083,11 @@ theorem BodyDefinitionHasType.requirementOwnership
   cases typing
   assumption
 
-/-- Conditional declaration-boundary transport.  The only semantic premise is
-that every retained solved requirement remains valid after substitution; the
-whole-program bridge derives that premise from the declaration's validated
-requirement ledger. -/
+/-- Conditional declaration-boundary transport.  The only semantic evidence
+premise concerns implementation-backed solved requirements; assumption-backed
+requirements are transported from their lexical validity at each use.  The
+whole-program bridge derives the implementation premise from the declaration's
+validated requirement ledger. -/
 theorem BodyDefinitionHasType.instantiate_with_context
     {signatures : ProgramSignatures}
     {parameters : List TypeParameterId}

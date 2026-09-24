@@ -391,7 +391,7 @@ theorem ContextSubstitutionValid.ofRequirementLedger
     ContextSubstitutionValid substitution context := {
   exact
   range
-  requirements := fun requirement member =>
+  implementationRequirements := fun requirement _ member _ =>
     StructuralSubstitution.SolvedRequirementValid.applyParameters
       substitution (ledger.entriesValid requirement member)
 }

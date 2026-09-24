@@ -68,6 +68,163 @@ def definedLocalIds (source : TypedSource) : List Resolved.LocalId :=
     | .expression expression => expressionDefinedLocalIds expression.form
     | .statement statement => statementDefinedLocalIds statement.form
 
+/-- One initialized lexical `let`, retaining both the complete binder metadata
+and the root of its initializer subtree.  Lambda parameters, declaration
+inputs, patterns, and uninitialized lets deliberately do not inhabit this
+inventory because none of them owns a generalized initializer. -/
+structure InitializedLetBinding where
+  binder : TypedBinder
+  initializer : NodeId
+  deriving Repr, BEq, DecidableEq
+
+/-- Initialized lets retained by one `for` initializer or post item. -/
+def forItemInitializedLetBindings : ForItemForm → List InitializedLetBinding
+  | .letDecl binder (some initializer) =>
+      [{ binder, initializer := .expression initializer }]
+  | .letDecl _ none | .expression _ | .assignValue .. | .assignBitNot _ => []
+
+/-- Initialized lets retained directly by one statement form.  For-loop header
+items are included in source order; lets nested under child statement or
+expression occurrences are enumerated when those table nodes are visited. -/
+def statementInitializedLetBindings : StatementForm → List InitializedLetBinding
+  | .letDecl binder (some initializer) =>
+      [{ binder, initializer := .expression initializer }]
+  | .forLoop initializer _ post _ =>
+      initializer.flatMap forItemInitializedLetBindings ++
+        post.flatMap forItemInitializedLetBindings
+  | .letDecl _ none | .returnStmt _ | .expression .. | .assignValue .. |
+      .assignBitNot _ | .ifThen .. | .block _ | .matchWith _ | .whileLoop .. |
+      .breakStmt | .continueStmt => []
+
+/-- Every initialized lexical let in node-table order. -/
+def initializedLetBindings (source : TypedSource) : List InitializedLetBinding :=
+  source.nodes.flatMap fun node =>
+    match node with
+    | .expression _ => []
+    | .statement statement => statementInitializedLetBindings statement.form
+
+/-- One source-level owner of one qualified local-scheme template row. -/
+structure LocalSchemeTemplateOwner where
+  binder : TypedBinder
+  initializer : NodeId
+  requirement : LocalSchemeRequirement
+  deriving Repr, BEq, DecidableEq
+
+namespace InitializedLetBinding
+
+/-- Flatten the qualified requirements owned by this initialized binder while
+retaining their common initializer root. -/
+def templateOwners (binding : InitializedLetBinding) :
+    List LocalSchemeTemplateOwner :=
+  binding.binder.schemeRequirements.map fun requirement => {
+    binder := binding.binder
+    initializer := binding.initializer
+    requirement
+  }
+
+end InitializedLetBinding
+
+/-- Every qualified local-scheme template owner in source and predicate order. -/
+def localSchemeTemplateOwners (source : TypedSource) :
+    List LocalSchemeTemplateOwner :=
+  (initializedLetBindings source).flatMap InitializedLetBinding.templateOwners
+
+/-- Stable identities of every qualified local-scheme template in the source. -/
+def sourceLocalSchemeTemplateIds (source : TypedSource) : List RequirementId :=
+  (localSchemeTemplateOwners source).map fun owner =>
+    owner.requirement.templateRequirement
+
+/-- Exact source ownership of one qualified local-scheme template. -/
+def ContainsLocalSchemeTemplate (source : TypedSource)
+    (owner : LocalSchemeTemplateOwner) : Prop :=
+  owner ∈ localSchemeTemplateOwners source
+
+theorem sourceLocalSchemeTemplateIds_mem_iff
+    {source : TypedSource} {id : RequirementId} :
+    id ∈ sourceLocalSchemeTemplateIds source ↔
+      ∃ owner, ContainsLocalSchemeTemplate source owner ∧
+        owner.requirement.templateRequirement = id := by
+  simp [sourceLocalSchemeTemplateIds, ContainsLocalSchemeTemplate]
+
+/-- One retained solved row is exactly the assumption-template row named by a
+source-owned qualified local scheme.  Ledger membership remains a separate
+whole-body condition, so this relation can be reused by that later layer. -/
+inductive LocalSchemeTemplateRowOwned (source : TypedSource)
+    (row : SolvedRequirement) : Prop where
+  | intro
+      (owner : LocalSchemeTemplateOwner)
+      (contains : ContainsLocalSchemeTemplate source owner)
+      (id_eq : row.id = owner.requirement.templateRequirement)
+      (predicate_eq : row.predicate = owner.requirement.predicate)
+      (evidence_eq : row.evidence = .assumption owner.requirement.predicate) :
+      LocalSchemeTemplateRowOwned source row
+
+/-- Template identities are globally unique across every initialized local
+scheme in one typed source. -/
+structure LocalSchemeTemplateOwnership (source : TypedSource) : Prop where
+  ids_unique : (sourceLocalSchemeTemplateIds source).Nodup
+
+namespace LocalSchemeTemplateOwner
+
+theorem binding_mem
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    (contains : ContainsLocalSchemeTemplate source owner) :
+    { binder := owner.binder, initializer := owner.initializer } ∈
+      initializedLetBindings source := by
+  unfold ContainsLocalSchemeTemplate localSchemeTemplateOwners at contains
+  rcases List.mem_flatMap.mp contains with ⟨binding, bindingMem, ownerMem⟩
+  simp only [InitializedLetBinding.templateOwners, List.mem_map] at ownerMem
+  rcases ownerMem with ⟨requirement, _, ownerEq⟩
+  subst owner
+  simpa using bindingMem
+
+theorem requirement_mem
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    (contains : ContainsLocalSchemeTemplate source owner) :
+    owner.requirement ∈ owner.binder.schemeRequirements := by
+  unfold ContainsLocalSchemeTemplate localSchemeTemplateOwners at contains
+  rcases List.mem_flatMap.mp contains with ⟨binding, _, ownerMem⟩
+  simp only [InitializedLetBinding.templateOwners, List.mem_map] at ownerMem
+  rcases ownerMem with ⟨requirement, requirementMem, ownerEq⟩
+  subst owner
+  simpa using requirementMem
+
+end LocalSchemeTemplateOwner
+
+namespace LocalSchemeTemplateRowOwned
+
+theorem template_id_mem
+    {source : TypedSource} {row : SolvedRequirement}
+    (owned : LocalSchemeTemplateRowOwned source row) :
+    row.id ∈ sourceLocalSchemeTemplateIds source := by
+  cases owned with
+  | intro owner contains idEq _ _ =>
+      exact sourceLocalSchemeTemplateIds_mem_iff.mpr
+        ⟨owner, contains, idEq.symm⟩
+
+theorem exact_owner
+    {source : TypedSource} {row : SolvedRequirement}
+    (owned : LocalSchemeTemplateRowOwned source row) :
+    ∃ owner, ContainsLocalSchemeTemplate source owner ∧
+      row.id = owner.requirement.templateRequirement ∧
+      row.predicate = owner.requirement.predicate ∧
+      row.evidence = .assumption owner.requirement.predicate := by
+  cases owned with
+  | intro owner contains idEq predicateEq evidenceEq =>
+      exact ⟨owner, contains, idEq, predicateEq, evidenceEq⟩
+
+end LocalSchemeTemplateRowOwned
+
+namespace LocalSchemeTemplateOwnership
+
+theorem owner_ids_unique
+    {source : TypedSource} (ownership : LocalSchemeTemplateOwnership source) :
+    ((localSchemeTemplateOwners source).map fun owner =>
+      owner.requirement.templateRequirement).Nodup :=
+  ownership.ids_unique
+
+end LocalSchemeTemplateOwnership
+
 /-- Primary evidence owners retained directly by one statement form. -/
 def statementPrimaryRequirementIds : StatementForm → List RequirementId
   | .assignValue assignment _ _ | .assignBitNot assignment =>

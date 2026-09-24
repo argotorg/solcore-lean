@@ -106,7 +106,7 @@ theorem head
 
 end RequirementSequenceProves
 
-namespace RequirementLedgerWellFormed
+namespace RequirementIdsUnique
 
 private theorem entry_unique_of_ids_nodup
     {requirements : List SolvedRequirement}
@@ -134,9 +134,14 @@ private theorem entry_unique_of_ids_nodup
           exact List.mem_map.mpr ⟨left, leftMem, id_eq⟩
         · exact induction restUnique leftMem rightMem id_eq
 
+/-- Identity uniqueness alone is sufficient to show that two retained rows
+selected by the same stable requirement identity are the same row.  Evidence
+validity is deliberately absent: scoped local-scheme assumptions still need
+this extensional fact even though they are not valid in the declaration's
+outer assumption context. -/
 theorem contains_unique
     {context : Context}
-    (wellFormed : RequirementLedgerWellFormed context)
+    (unique : RequirementIdsUnique context)
     {id : RequirementId}
     {left right : SolvedRequirement}
     (leftContains : ContainsRequirement context id left)
@@ -144,8 +149,39 @@ theorem contains_unique
     left = right := by
   rcases leftContains with ⟨leftMem, leftId⟩
   rcases rightContains with ⟨rightMem, rightId⟩
-  apply entry_unique_of_ids_nodup wellFormed.idsUnique leftMem rightMem
-  exact leftId.trans rightId.symm
+  exact entry_unique_of_ids_nodup unique leftMem rightMem
+    (leftId.trans rightId.symm)
+
+/-- An identity-unique ledger cannot assign two different predicates to one
+stable requirement identity. -/
+theorem proves_predicate_eq
+    {context : Context}
+    (unique : RequirementIdsUnique context)
+    {id : RequirementId} {left right : ProgramPredicate}
+    (leftProves : RequirementProves context id left)
+    (rightProves : RequirementProves context id right) :
+    left = right := by
+  rcases leftProves with
+    ⟨leftRequirement, leftContains, leftPredicate, _⟩
+  rcases rightProves with
+    ⟨rightRequirement, rightContains, rightPredicate, _⟩
+  have requirementEq := unique.contains_unique leftContains rightContains
+  subst rightRequirement
+  exact leftPredicate.symm.trans rightPredicate
+
+end RequirementIdsUnique
+
+namespace RequirementLedgerWellFormed
+
+theorem contains_unique
+    {context : Context}
+    (wellFormed : RequirementLedgerWellFormed context)
+    {id : RequirementId}
+    {left right : SolvedRequirement}
+    (leftContains : ContainsRequirement context id left)
+    (rightContains : ContainsRequirement context id right) :
+    left = right :=
+  wellFormed.idsUnique.contains_unique leftContains rightContains
 
 /-- An identity-unique ledger cannot assign two different predicates to the
 same retained requirement identity.  This is the bridge used when static
@@ -157,14 +193,8 @@ theorem proves_predicate_eq
     {id : RequirementId} {left right : ProgramPredicate}
     (leftProves : RequirementProves context id left)
     (rightProves : RequirementProves context id right) :
-    left = right := by
-  rcases leftProves with
-    ⟨leftRequirement, leftContains, leftPredicate, _⟩
-  rcases rightProves with
-    ⟨rightRequirement, rightContains, rightPredicate, _⟩
-  have requirementEq := wellFormed.contains_unique leftContains rightContains
-  subst rightRequirement
-  exact leftPredicate.symm.trans rightPredicate
+    left = right :=
+  wellFormed.idsUnique.proves_predicate_eq leftProves rightProves
 
 /-- Ledger validity is insensitive to lexical locals and rigid-binder
 bookkeeping.  It transports across contexts which retain the signature,

@@ -30,6 +30,35 @@ inductive Descends (source : TypedSource) : NodeId → NodeId → Prop where
       (tail : Descends source middle child) :
       Descends source parent child
 
+/-- Reflexive containment below one occurrence root, defined from the single
+proper-descendant relation used by the occurrence graph. -/
+def InReflexiveSubtree (source : TypedSource) (root occurrence : NodeId) : Prop :=
+  occurrence = root ∨ Descends source root occurrence
+
+/-- One occurrence lies in the initializer subtree of a retained initialized
+local binding. -/
+def InInitializedLetSubtree (source : TypedSource)
+    (binding : InitializedLetBinding) (occurrence : NodeId) : Prop :=
+  binding ∈ initializedLetBindings source ∧
+    InReflexiveSubtree source binding.initializer occurrence
+
+/-- One occurrence lies in the initializer scope of this exact qualified
+template owner. -/
+def LocalSchemeTemplateOwner.Scopes (source : TypedSource)
+    (owner : LocalSchemeTemplateOwner) (occurrence : NodeId) : Prop :=
+  ContainsLocalSchemeTemplate source owner ∧
+    InReflexiveSubtree source owner.initializer occurrence
+
+namespace LocalSchemeTemplateOwner
+
+theorem scopes_initializer
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    (contains : ContainsLocalSchemeTemplate source owner) :
+    owner.Scopes source owner.initializer :=
+  ⟨contains, Or.inl rfl⟩
+
+end LocalSchemeTemplateOwner
+
 /-- An occurrence is reachable from one of the declaration roots. -/
 inductive Reachable (source : TypedSource) : NodeId → Prop where
   | root {id : NodeId} (member : id ∈ source.roots) : Reachable source id
