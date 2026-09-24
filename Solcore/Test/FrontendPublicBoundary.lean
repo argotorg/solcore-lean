@@ -4,6 +4,9 @@ set_option autoImplicit false
 
 namespace Tests
 
+example :=
+  @Solcore.Frontend.SourceInference.Detail.solveRequirements_ids_nodup
+
 example := @Solcore.Frontend.LocalNameTable
 example := @Solcore.Frontend.LocalNameTable.lookup?
 example := @Solcore.Frontend.LocalNameTable.Lookup

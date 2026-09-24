@@ -52,6 +52,20 @@ end State
 
 namespace Detail
 
+/-- Requirement identities are injective whenever their numeric projections
+are injective.  `RequirementId` deliberately exposes only this stable index. -/
+private theorem requirementIds_nodup_of_indices_nodup
+    (ids : List RequirementId)
+    (indices : (ids.map (fun id => id.index)).Nodup) : ids.Nodup := by
+  induction ids with
+  | nil => exact .nil
+  | cons head tail induction =>
+      simp only [List.map_cons] at indices
+      rw [List.nodup_cons] at indices ⊢
+      refine ⟨?_, induction indices.2⟩
+      intro member
+      exact indices.1 (List.mem_map.mpr ⟨_, member, rfl⟩)
+
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)
     (solved : List SolvedRequirement)
@@ -78,6 +92,31 @@ theorem solveRequirements_preserves_ids
               injection result with result
               subst solved
               simp only [List.map_cons, ih tail tailResult]
+
+/-- Solving a canonical inference ledger preserves its global requirement-ID
+uniqueness.  This is the executable-to-declarative bridge needed by the source
+semantics requirement ledger. -/
+theorem solveRequirements_ids_nodup
+    (context : Context) (state : State) (solved : List SolvedRequirement)
+    (wellFormed : state.RequirementsWellFormed)
+    (result : solveRequirements context state state.requirements = .ok solved) :
+    (solved.map (fun requirement => requirement.id)).Nodup := by
+  apply requirementIds_nodup_of_indices_nodup
+  have ids := solveRequirements_preserves_ids context state state.requirements
+    solved result
+  have indices :
+      solved.map (fun requirement => requirement.id.index) =
+        List.range state.nextRequirement := by
+    calc
+      solved.map (fun requirement => requirement.id.index) =
+          (solved.map (fun requirement => requirement.id)).map
+            (fun id => id.index) := by simp
+      _ = (state.requirements.map (fun requirement => requirement.id)).map
+            (fun id => id.index) := by rw [ids]
+      _ = state.requirements.map (fun requirement => requirement.id.index) := by
+            simp
+      _ = List.range state.nextRequirement := wellFormed
+  simpa [List.map_map] using (indices ▸ List.nodup_range)
 
 end Detail
 
