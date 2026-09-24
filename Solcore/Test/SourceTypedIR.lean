@@ -1,5 +1,7 @@
 import Solcore.Frontend.SourceInference.Types
 import Solcore.Frontend.SourceInference.TypedIRProperties
+import Solcore.Frontend.SourceSpecialization
+import Solcore.SourceSemantics.Substitution
 
 /-! Executable coverage for the additive occurrence-addressed typed IR carrier. -/
 
@@ -37,6 +39,7 @@ private def expressionId : ExpressionId :=
   ⟨⟨owner, 0⟩⟩
 
 private def requirementId : RequirementId := ⟨4⟩
+private def schemeRequirementId : RequirementId := ⟨7⟩
 private def methodRequirement0 : RequirementId := ⟨5⟩
 private def methodRequirement1 : RequirementId := ⟨6⟩
 private def variable0 : TypeSystem.Ty := .variable ⟨0⟩
@@ -69,6 +72,10 @@ private def source : TypedSource := {
     id := { owner, binderIndex := 0 }
     name := "input"
     scheme := { quantified := [⟨0⟩], body := .product variable0 variable1 }
+    schemeRequirements := [{
+      templateRequirement := schemeRequirementId
+      predicate := { trait, subject := variable0, arguments := [variable1] }
+    }]
     span := some span
   }]
   roots := [.expression expressionId]
@@ -84,8 +91,12 @@ private def testFinalSubstitutionPreservesIdentity : IO Unit := do
     "final substitution changed typed-source identities"
   match closed.inputs with
   | [input] =>
-      assertTrue (decide (input.scheme.body = .product variable0 .bool))
-        "final substitution entered a quantified binder or missed a free type"
+      assertTrue (decide (input.scheme.body = .product variable0 .bool ∧
+          input.schemeRequirements = [{
+            templateRequirement := schemeRequirementId
+            predicate := { trait, subject := variable0, arguments := [.bool] }
+          }]))
+        "final substitution entered a quantified binder, missed a free type, or changed requirement identity"
   | _ => throw (IO.userError "typed-source inputs changed shape")
   match closed.lookupExpression? expressionId with
   | none => throw (IO.userError "typed expression lookup lost its node")
@@ -197,6 +208,46 @@ private def testIntegerLiteralFlexibleSubstitution : IO Unit := do
   | _ => throw (IO.userError
       "flexible substitution changed the integer-literal expression form")
 
+private def testRigidSchemeRequirementSubstitution : IO Unit := do
+  let parameter : TypeSystem.TypeParameterId := ⟨declaration 2, 0⟩
+  let binder : TypedBinder := {
+    id := { owner, binderIndex := 1 }
+    name := "qualified"
+    scheme := {
+      quantified := [⟨0⟩]
+      body := .product (.parameter parameter) variable0
+    }
+    schemeRequirements := [{
+      templateRequirement := schemeRequirementId
+      predicate := {
+        trait
+        subject := .parameter parameter
+        arguments := [variable0]
+      }
+    }]
+    span := some span
+  }
+  let substitution : TypeSystem.ParameterSubstitution := [(parameter, .word)]
+  let expected : TypedBinder := {
+    binder with
+    scheme := {
+      quantified := [⟨0⟩]
+      body := .product .word variable0
+    }
+    schemeRequirements := [{
+      templateRequirement := schemeRequirementId
+      predicate := { trait, subject := .word, arguments := [variable0] }
+    }]
+  }
+  assertTrue (decide
+      (Solcore.Frontend.SourceSpecialization.applyBinder substitution binder =
+        expected))
+    "executable rigid substitution missed a qualified local requirement"
+  assertTrue (decide
+      (Solcore.SourceSemantics.StructuralSubstitution.applyBinder substitution
+        binder = expected))
+    "structural rigid substitution disagreed on a qualified local requirement"
+
 private def testInferenceStateScaffolding : IO Unit := do
   let locals : TypeSystem.Environment :=
     [("first", .mono .word), ("second", .mono .bool)]
@@ -259,6 +310,7 @@ def testSourceTypedIR : IO Unit := do
   testFinalSubstitutionPreservesIdentity
   testCoercionPathValidation
   testIntegerLiteralFlexibleSubstitution
+  testRigidSchemeRequirementSubstitution
   testInferenceStateScaffolding
 
 end Tests.SourceTypedIR

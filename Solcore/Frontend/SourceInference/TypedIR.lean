@@ -17,11 +17,43 @@ namespace Solcore.Frontend.SourceInference
 
 open TypeSystem
 
+/-- One predicate owned by a generalized local scheme.  The stable template
+requirement identifies the assumption used inside the initializer body; the
+predicate records how that assumption depends on the scheme's quantified
+variables. -/
+structure LocalSchemeRequirement where
+  templateRequirement : RequirementId
+  predicate : ProgramPredicate
+  deriving Repr, BEq, DecidableEq
+
+namespace LocalSchemeRequirement
+
+/-- Apply a flexible inference substitution to the predicate while preserving
+the template requirement identity. -/
+def applySubstitution (substitution : Substitution)
+    (requirement : LocalSchemeRequirement) : LocalSchemeRequirement :=
+  { requirement with
+    predicate := TypedTraitResolution.applySubstitution substitution
+      requirement.predicate }
+
+/-- Apply a rigid declaration-parameter substitution to the predicate while
+preserving the template requirement identity. -/
+def applyParameters (substitution : ParameterSubstitution)
+    (requirement : LocalSchemeRequirement) : LocalSchemeRequirement :=
+  { requirement with
+    predicate := ProgramPredicate.applyParameters substitution
+      requirement.predicate }
+
+end LocalSchemeRequirement
+
 /-- One typed local binding, retaining its stable lexical identity. -/
 structure TypedBinder where
   id : Resolved.LocalId
   name : String
   scheme : Scheme
+  /-- Trait assumptions abstracted together with this local scheme.  Empty
+  until qualified local generalization is enabled by source inference. -/
+  schemeRequirements : List LocalSchemeRequirement := []
   /-- Whether this parameter is required during staged evaluation.  Named
   function inputs and explicitly marked lambda parameters retain the bit;
   ordinary lexical binders leave it false. -/
@@ -356,7 +388,11 @@ namespace TypedBinder
 variables. -/
 def applySubstitution (substitution : Substitution)
     (binder : TypedBinder) : TypedBinder :=
-  { binder with scheme := Scheme.apply substitution binder.scheme }
+  let substitution := substitution.without binder.scheme.quantified
+  { binder with
+    scheme := Scheme.apply substitution binder.scheme
+    schemeRequirements := binder.schemeRequirements.map
+      (LocalSchemeRequirement.applySubstitution substitution) }
 
 end TypedBinder
 

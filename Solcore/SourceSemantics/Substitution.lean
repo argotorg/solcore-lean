@@ -24,7 +24,10 @@ def applyScheme (substitution : ParameterSubstitution) (scheme : Scheme) : Schem
 
 def applyBinder (substitution : ParameterSubstitution)
     (binder : TypedBinder) : TypedBinder :=
-  { binder with scheme := applyScheme substitution binder.scheme }
+  { binder with
+    scheme := applyScheme substitution binder.scheme
+    schemeRequirements := binder.schemeRequirements.map
+      (LocalSchemeRequirement.applyParameters substitution) }
 
 def applyDeclarationInstantiation (substitution : ParameterSubstitution)
     (instantiation : DeclarationInstantiation) : DeclarationInstantiation :=
