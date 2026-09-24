@@ -55,7 +55,7 @@ private theorem mutationBeforeWellTyped (context : SourceSemantics.Context) :
   intro cell member
   simp only [mutationBefore, List.mem_singleton] at member
   subst cell
-  exact ⟨.some (.bool false)⟩
+  exact ⟨.some (.bool false), .none .bool⟩
 
 private theorem concretePlaceWrite :
     SourceSemantics.Dynamic.ResolvedPlaceWrites

@@ -6,6 +6,7 @@ import Solcore.Test.SourceSemanticsScopedRequirements
 import Solcore.Test.SourceSemanticsFault
 import Solcore.Test.SourceSemanticsLocalSchemes
 import Solcore.Test.SourceSemanticsGeneralizedClosure
+import Solcore.Test.SourceSemanticsGeneralizedClosureTyping
 import Solcore.Test.SourceSemanticsExecution
 import Solcore.Test.SourceSemanticsPublicBoundary
 import Solcore.Test.ResolvedPublicBoundary

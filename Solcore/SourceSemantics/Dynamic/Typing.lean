@@ -46,6 +46,41 @@ structure ClosureCodeValid (context : Context) (function : Closure) : Prop where
             (function.parameters.map (fun binder => binder.scheme.body)))
           function.resultType) (.ordinary [])
 
+/-- Principal code for a generalized direct-lambda local is tied to the exact
+initializer occurrence and to the context in which its scheme was formed.
+The empty retained requirement and coercion lists are intentional: runtime
+materialization produces the lambda closure directly rather than replaying
+initializer-level evidence or coercion evaluation. -/
+structure GeneralizedClosureCodeValid
+    (function : GeneralizedClosure) : Prop where
+  owner : function.definitionContext.currentDeclaration =
+    some function.source.owner
+  closed : function.definitionContext.typeParameters = []
+  variables_closed : function.definitionContext.typeVariables = []
+  residual_variables_open :
+    function.definitionContext.residualTypeVariables = true
+  polymorphic : function.binder.scheme.quantified ≠ []
+  binder_well_formed : BinderWellFormed function.definitionContext
+    function.source.owner function.binder
+  requirements_well_formed : LocalSchemeRequirementsWellFormed
+    function.definitionContext function.binder
+  generalizes : SchemeGeneralizesExcept function.definitionContext
+    (localSchemeTemplateIds function.binder) function.binder.scheme
+  graph : OccurrenceGraphWellFormed function.source
+  occurrence :
+    ∃ node,
+      ContainsExpression function.source function.initializer node ∧
+      node.form = .lambda function.parameters function.resultType
+        function.body ∧
+      node.rawType = function.binder.scheme.body ∧
+      node.type = function.binder.scheme.body ∧
+      node.requirements = [] ∧
+      node.coercions = [] ∧
+      ExpressionFormHasRawType function.source
+        (localSchemeInitializerContext function.definitionContext
+          function.binder)
+        node.form function.binder.scheme.body (.ordinary [])
+
 /-- Exact agreement between a lexical type scope, its location environment,
 and the declared types of those locations.  Initialized values are checked by
 `HeapWellTyped`; keeping the two concerns separate permits cyclic closures. -/
@@ -62,6 +97,18 @@ inductive EnvironmentAgrees (heap : Heap) :
       (tail : EnvironmentAgrees heap scope environment) :
       EnvironmentAgrees heap ((id, scheme) :: scope)
         ((id, location) :: environment)
+
+/-- A stored generalized closure has valid principal code and its captured
+locations agree with the lexical scope of its definition.  The ambient heap
+context contributes only the whole-program signature catalog: cells remain in
+the global heap while evaluation crosses function contexts. -/
+structure GeneralizedClosureWellTyped (context : Context) (heap : Heap)
+    (function : GeneralizedClosure) : Prop where
+  same_signatures :
+    function.definitionContext.signatures = context.signatures
+  code : GeneralizedClosureCodeValid function
+  captures : EnvironmentAgrees heap function.definitionContext.locals
+    function.captured
 
 mutual
 
@@ -205,9 +252,23 @@ inductive OptionalValueHasType (context : Context) (heap : Heap) :
       (typed : ValueHasType context heap value type) :
       OptionalValueHasType context heap (some value) type
 
+/-- Optional generalized-cell metadata agrees with the cell's principal type.
+The `none` case covers every ordinary mutable cell. -/
+inductive OptionalGeneralizedClosureWellTyped
+    (context : Context) (heap : Heap) :
+    Option GeneralizedClosure → Ty → Prop where
+  | none (type : Ty) :
+      OptionalGeneralizedClosureWellTyped context heap none type
+  | some {function : GeneralizedClosure}
+      (typed : GeneralizedClosureWellTyped context heap function) :
+      OptionalGeneralizedClosureWellTyped context heap (some function)
+        function.binder.scheme.body
+
 /-- One cell agrees with its retained annotation in the current heap world. -/
 structure CellWellTyped (context : Context) (heap : Heap) (cell : Cell) : Prop where
   value : OptionalValueHasType context heap cell.value cell.type
+  generalized : OptionalGeneralizedClosureWellTyped context heap
+    cell.generalized cell.type
 
 /-- Every cell is deeply typed in the same heap world. -/
 def HeapWellTyped (context : Context) (heap : Heap) : Prop :=
@@ -219,6 +280,20 @@ def HeapTypesExtend (before after : Heap) : Prop :=
   ∀ location cell, Heap.Reads before location cell →
     ∃ updatedCell,
       Heap.Reads after location updatedCell ∧ updatedCell.type = cell.type
+
+namespace HeapMetadataExtend
+
+/-- Forget generalized-cell metadata preservation while retaining the type
+extension interface consumed by existing value-typing proofs. -/
+theorem toTypes {before after : Heap}
+    (extension : HeapMetadataExtend before after) :
+    HeapTypesExtend before after := by
+  intro location cell read
+  rcases extension location cell read with
+    ⟨updatedCell, updatedRead, updatedType, _⟩
+  exact ⟨updatedCell, updatedRead, updatedType⟩
+
+end HeapMetadataExtend
 
 /-- A directional inclusion between the type worlds of two source contexts.
 Lexical locals, trait assumptions, and solved requirements are deliberately
@@ -554,6 +629,13 @@ theorem of_allocation
   intro oldLocation cell read
   exact ⟨cell, allocation.preserves_read read, rfl⟩
 
+theorem of_generalized_allocation
+    {before after : Heap} {function : GeneralizedClosure}
+    {location : Location}
+    (allocation : Heap.AllocatesGeneralized before function location after) :
+    HeapTypesExtend before after :=
+  (HeapMetadataExtend.of_generalized_allocation allocation).toTypes
+
 theorem of_write
     {before after : Heap} {writtenLocation : Location}
     {value : Option Value}
@@ -569,6 +651,37 @@ theorem of_write
   · exact ⟨cell, write.preserves_other same read, rfl⟩
 
 end HeapTypesExtend
+
+namespace GeneralizedClosureWellTyped
+
+/-- Principal closure typing is stable under a supported change of the
+ambient static type world.  Its definition context and captured scope remain
+unchanged. -/
+theorem transportContext
+    {source target : Context} {heap : Heap}
+    {function : GeneralizedClosure}
+    (supports : TypeContextSupports source target)
+    (typed : GeneralizedClosureWellTyped source heap function) :
+    GeneralizedClosureWellTyped target heap function := {
+  same_signatures := typed.same_signatures.trans supports.signatures.symm
+  code := typed.code
+  captures := typed.captures
+}
+
+/-- Generalized closure typing depends on captured cell types, so it is
+monotone under the same heap extension as ordinary closure typing. -/
+theorem mono
+    {context : Context} {before after : Heap}
+    {function : GeneralizedClosure}
+    (extension : HeapTypesExtend before after)
+    (typed : GeneralizedClosureWellTyped context before function) :
+    GeneralizedClosureWellTyped context after function := {
+  same_signatures := typed.same_signatures
+  code := typed.code
+  captures := typed.captures.mono extension
+}
+
+end GeneralizedClosureWellTyped
 
 mutual
 
@@ -782,6 +895,42 @@ theorem mono
 
 end OptionalValueHasType
 
+namespace OptionalGeneralizedClosureWellTyped
+
+theorem transportContext
+    {source target : Context} {heap : Heap}
+    {function : Option GeneralizedClosure} {type : Ty}
+    (supports : TypeContextSupports source target)
+    (typed : OptionalGeneralizedClosureWellTyped source heap function type) :
+    OptionalGeneralizedClosureWellTyped target heap function type := by
+  cases typed with
+  | none type => exact .none type
+  | some typed => exact .some (typed.transportContext supports)
+
+theorem mono
+    {context : Context} {before after : Heap}
+    {function : Option GeneralizedClosure} {type : Ty}
+    (extension : HeapTypesExtend before after)
+    (typed : OptionalGeneralizedClosureWellTyped context before function type) :
+    OptionalGeneralizedClosureWellTyped context after function type := by
+  cases typed with
+  | none type => exact .none type
+  | some typed => exact .some (typed.mono extension)
+
+/-- A present descriptor exposes both its principal cell type and its deep
+typing witness. -/
+theorem some_inv
+    {context : Context} {heap : Heap}
+    {function : GeneralizedClosure} {type : Ty}
+    (typed : OptionalGeneralizedClosureWellTyped context heap
+      (Option.some function) type) :
+    type = function.binder.scheme.body ∧
+      GeneralizedClosureWellTyped context heap function := by
+  cases typed with
+  | some functionTyped => exact ⟨rfl, functionTyped⟩
+
+end OptionalGeneralizedClosureWellTyped
+
 namespace CellWellTyped
 
 theorem transportContext
@@ -789,14 +938,29 @@ theorem transportContext
     (supports : TypeContextSupports source target)
     (typed : CellWellTyped source heap cell) :
     CellWellTyped target heap cell :=
-  ⟨typed.value.transportContext supports⟩
+  ⟨typed.value.transportContext supports,
+    typed.generalized.transportContext supports⟩
 
 theorem mono
     {context : Context} {before after : Heap} {cell : Cell}
     (extension : HeapTypesExtend before after)
     (typed : CellWellTyped context before cell) :
     CellWellTyped context after cell :=
-  ⟨typed.value.mono extension⟩
+  ⟨typed.value.mono extension, typed.generalized.mono extension⟩
+
+/-- Reading present generalized metadata from a typed cell recovers its
+principal type and deep descriptor typing. -/
+theorem generalized_inv
+    {context : Context} {heap : Heap} {cell : Cell}
+    {function : GeneralizedClosure}
+    (typed : CellWellTyped context heap cell)
+    (present : cell.generalized = Option.some function) :
+    cell.type = function.binder.scheme.body ∧
+      GeneralizedClosureWellTyped context heap function := by
+  have metadata : OptionalGeneralizedClosureWellTyped context heap
+      (Option.some function) cell.type := by
+    simpa [present] using typed.generalized
+  exact metadata.some_inv
 
 end CellWellTyped
 
@@ -1016,6 +1180,20 @@ end Heap.CellsWrite
 
 namespace HeapWellTyped
 
+private theorem cellAt_mem
+    {cells : List Cell} {index : Nat} {cell : Cell}
+    (selected : Heap.CellAt cells index cell) : cell ∈ cells := by
+  induction selected with
+  | head => simp
+  | tail _ induction => exact List.mem_cons_of_mem _ induction
+
+private theorem read_mem
+    {heap : Heap} {location : Location} {cell : Cell}
+    (read : Heap.Reads heap location cell) : cell ∈ heap.cells := by
+  cases read with
+  | intro selected =>
+      exact cellAt_mem selected
+
 theorem transportContext
     {source target : Context} {heap : Heap}
     (supports : TypeContextSupports source target)
@@ -1063,7 +1241,26 @@ theorem allocate
   rcases member with old | fresh
   · exact (heap_typed cell old).mono extension
   · subst cell
-    exact ⟨value_typed.mono extension⟩
+    exact ⟨value_typed.mono extension, .none type⟩
+
+/-- Allocating a typed principal generalized closure preserves deep heap
+typing.  The new cell has no ordinary value and retains the scheme body as its
+principal type. -/
+theorem allocateGeneralized
+    {context : Context} {before after : Heap}
+    {location : Location} {function : GeneralizedClosure}
+    (heap_typed : HeapWellTyped context before)
+    (function_typed : GeneralizedClosureWellTyped context before function)
+    (allocation : Heap.AllocatesGeneralized before function location after) :
+    HeapWellTyped context after := by
+  have extension := HeapTypesExtend.of_generalized_allocation allocation
+  cases allocation
+  intro cell member
+  simp only [List.mem_append, List.mem_singleton] at member
+  rcases member with old | fresh
+  · exact (heap_typed cell old).mono extension
+  · subst cell
+    exact ⟨.none _, .some (function_typed.mono extension)⟩
 
 /-- Replacing one cell by a value of its retained type preserves deep heap
 typing. -/
@@ -1085,7 +1282,9 @@ theorem write
       intro cell member
       by_cases replacement : cell = { writePrevious with value := value }
       · subst cell
-        exact ⟨replacement_typed.mono extension⟩
+        exact ⟨replacement_typed.mono extension,
+          (heap_typed writePrevious (read_mem writeRead)).generalized.mono
+            extension⟩
       · rcases cellsWrite.member_updated member with same | oldMember
         · exact (replacement same).elim
         · exact (heap_typed cell oldMember).mono extension
