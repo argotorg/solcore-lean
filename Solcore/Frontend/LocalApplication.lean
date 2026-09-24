@@ -11,6 +11,7 @@ import Solcore.Frontend.FourLevelGroupedConditionalExpectedLambdaArgumentApplica
 import Solcore.Frontend.FiveLevelGroupedConditionalExpectedLambdaArgumentApplication
 import Solcore.Frontend.SixLevelGroupedConditionalExpectedLambdaArgumentApplication
 import Solcore.Frontend.SevenLevelGroupedConditionalExpectedLambdaArgumentApplication
+import Solcore.Frontend.EightOrMoreGroupedConditionalExpectedLambdaArgumentApplication
 
 /-! Local applications and expected-lambda application forms. -/
 
@@ -2102,6 +2103,163 @@ theorem LocalApplicationWithSevenLevelGroupedConditionalExpectedLambdaElaborates
         types owner inputs source core type) := by
   cases elaboration with
   | sevenLevelGroupedConditional boundary child => exact .inl ⟨boundary, child⟩
+  | existing boundary child => exact .inr ⟨boundary, child⟩
+
+end Solcore.Frontend
+
+/-!
+## Consolidated module: `Solcore.Frontend.LocalApplicationWithGenericGroupedConditionalExpectedLambda`
+-/
+
+/-!
+Selects every depth-eight-or-more grouped conditional application before the
+complete unchanged seven-level-first local-application result.
+-/
+
+set_option autoImplicit false
+
+namespace Solcore.Frontend
+
+/-- Source-disjoint evidence retains either the generic grouped-conditional
+child or the complete unchanged depth-zero-through-seven child. -/
+inductive LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates
+    (types : TypeNameTable) (owner : Resolved.DeclarationId) (inputs : LocalTypeInputs) :
+    Syntax.Expr → Core.Expr → Core.Ty → Prop where
+  | eightOrMoreGroupedConditional
+      {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
+      (boundary :
+        isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source = true)
+      (elaboration :
+        EightOrMoreGroupedConditionalExpectedLambdaArgumentApplicationElaborates
+          types owner inputs source core type) :
+      LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates
+        types owner inputs source core type
+  | existing {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
+      (boundary :
+        isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source = false)
+      (elaboration : LocalApplicationWithSevenLevelGroupedConditionalExpectedLambdaElaborates
+        types owner inputs source core type) :
+      LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates
+        types owner inputs source core type
+
+/-- Dispatch once on the generic classifier. Classifier-selected failure is final. -/
+def elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?
+    (types : TypeNameTable) (owner : Resolved.DeclarationId) (inputs : LocalTypeInputs)
+    (source : Syntax.Expr) : Option (Core.Expr × Core.Ty) :=
+  if isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source then
+    elaborateEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication?
+      types owner inputs source
+  else elaborateLocalApplicationWithSevenLevelGroupedConditionalExpectedLambda?
+    types owner inputs source
+
+/-- A recognized depth-eight-or-more grouped conditional invokes exactly the
+generic adapter. -/
+theorem elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?_of_eightOrMoreGroupedConditional
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {source : Syntax.Expr}
+    (boundary :
+      isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source = true) :
+    elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?
+        types owner inputs source =
+      elaborateEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication?
+        types owner inputs source := by
+  simp [elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?, boundary]
+
+/-- Every other source has exactly the complete depth-zero-through-seven result. -/
+theorem elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?_of_existing
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {source : Syntax.Expr}
+    (boundary :
+      isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source = false) :
+    elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?
+        types owner inputs source =
+      elaborateLocalApplicationWithSevenLevelGroupedConditionalExpectedLambda?
+        types owner inputs source := by
+  simp [elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?, boundary]
+
+/-- Exact executable/declarative correspondence for generic-first dispatch. -/
+theorem elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?_iff
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty} :
+    elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?
+        types owner inputs source = some (core, type) ↔
+      LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates
+        types owner inputs source core type := by
+  constructor
+  · intro accepted
+    unfold elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda? at accepted
+    split at accepted
+    · rename_i boundary
+      exact .eightOrMoreGroupedConditional boundary
+        (elaborateEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication?_iff.mp
+          accepted)
+    · rename_i boundaryNot
+      have boundary :
+          isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source = false := by
+        cases equality :
+            isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source <;> simp_all
+      exact .existing boundary
+        (elaborateLocalApplicationWithSevenLevelGroupedConditionalExpectedLambda?_iff.mp accepted)
+  · intro elaboration
+    cases elaboration with
+    | eightOrMoreGroupedConditional boundary child =>
+        simp [elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?, boundary,
+          elaborateEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication?_iff.mpr child]
+    | existing boundary child =>
+        simp [elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?, boundary,
+          elaborateLocalApplicationWithSevenLevelGroupedConditionalExpectedLambda?_iff.mpr child]
+
+/-- Rejection is exact absence of evidence in the selected source branch. -/
+theorem elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?_eq_none_iff
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {source : Syntax.Expr} :
+    elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?
+        types owner inputs source = none ↔
+      ¬ ∃ core type,
+        LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates
+          types owner inputs source core type := by
+  constructor
+  · intro rejected ⟨core, type, elaboration⟩
+    have accepted :=
+      elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?_iff.mpr
+        elaboration
+    rw [rejected] at accepted
+    cases accepted
+  · intro absent
+    cases accepted : elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?
+        types owner inputs source with
+    | none => rfl
+    | some result =>
+      rcases result with ⟨core, type⟩
+      exact False.elim (absent ⟨core, type,
+        elaborateLocalApplicationWithGenericGroupedConditionalExpectedLambda?_iff.mp
+          accepted⟩)
+
+/-- Either complete selected child preserves the exact inferred Core type. -/
+theorem LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates.core_hasType
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
+    (elaboration : LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates
+      types owner inputs source core type) :
+    Core.HasType inputs.context.values core type := by
+  cases elaboration with
+  | eightOrMoreGroupedConditional _ child => exact child.core_hasType
+  | existing _ child => exact child.core_hasType
+
+/-- Inversion exposes the classifier equation and the complete selected child. -/
+theorem LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates.provenance
+    {types : TypeNameTable} {owner : Resolved.DeclarationId} {inputs : LocalTypeInputs}
+    {source : Syntax.Expr} {core : Core.Expr} {type : Core.Ty}
+    (elaboration : LocalApplicationWithGenericGroupedConditionalExpectedLambdaElaborates
+      types owner inputs source core type) :
+    (isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source = true ∧
+      EightOrMoreGroupedConditionalExpectedLambdaArgumentApplicationElaborates
+        types owner inputs source core type) ∨
+    (isEightOrMoreGroupedConditionalExpectedLambdaArgumentApplication source = false ∧
+      LocalApplicationWithSevenLevelGroupedConditionalExpectedLambdaElaborates
+        types owner inputs source core type) := by
+  cases elaboration with
+  | eightOrMoreGroupedConditional boundary child => exact .inl ⟨boundary, child⟩
   | existing boundary child => exact .inr ⟨boundary, child⟩
 
 end Solcore.Frontend

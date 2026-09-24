@@ -19,5 +19,6 @@ import Solcore.Frontend.FourLevelGroupedConditionalExpectedLambdaArgumentApplica
 import Solcore.Frontend.FiveLevelGroupedConditionalExpectedLambdaArgumentApplication
 import Solcore.Frontend.SixLevelGroupedConditionalExpectedLambdaArgumentApplication
 import Solcore.Frontend.SevenLevelGroupedConditionalExpectedLambdaArgumentApplication
+import Solcore.Frontend.EightOrMoreGroupedConditionalExpectedLambdaArgumentApplication
 
 /-! Type names, runtime adapter inputs, functions, and expected lambdas. -/
