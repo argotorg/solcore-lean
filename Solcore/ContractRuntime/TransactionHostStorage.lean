@@ -245,7 +245,7 @@ theorem handleRequest_eq_generic_of_not_emitLogWord
       ∀ topic payload, request ≠ .emitLogWord topic payload) :
     handleRequest inputs context request =
       HostStorageDriver.handleRequest inputs context request := by
-  cases request <;> simp_all [handleRequest]
+  cases request <;> simp_all [handleRequest] <;> rfl
 
 @[simp] theorem handleRequest_emitLogWord
     (inputs : HostStorageDriver.ExecutionInputs)
@@ -576,7 +576,7 @@ theorem run_of_suspended_emitLogWord
       (if observedAddress = context.context.storageAddress
         then none
         else context.context.values.working.1.account? observedAddress) := by
-    simpa only [run] using
+    exact
       HostDriver.run_observe (handler inputs)
         (fun current =>
           if observedAddress = current.context.storageAddress
@@ -593,31 +593,31 @@ theorem run_of_suspended_emitLogWord
               · simp [handler, handleRequest,
                   HostStorageDriver.handleRequest, same]
           | storageRead slot =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | storageAddress =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | codeAddress =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | callValue =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | callerAddress =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | inputDataByte? offset =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | inputDataSize =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | inputDataWordBE? offset =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | currentAddress =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | callContractWord target input =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | callContractWordWithValue target value input =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | createContractWord templateId value input =>
-              simp [handler, handleRequest, HostStorageDriver.handleRequest]
+              simp [handler, handleRequest, HostStorageDriver.handleRequest] <;> rfl
           | emitLogWord topic payload =>
-              simp [handler, handleRequest])
+              simp [handler, handleRequest] <;> rfl)
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved
 

@@ -229,7 +229,17 @@ def frontendParsedStructuralParameterTests : IO Unit := do
   assertTrue (decide ((declareRuntimeParameters? ((["Word"],.unit) :: table) owner known.elements).map
     (fun i => i.context.values) = some [.product .unit .bool])) "first-match override was treated as extension"
   have sameLookup (key : List String) : table.lookup? key = (table ++ table).lookup? key := by
-    simp (config := { contextual := true }) [table, TypeNameTable.lookup?]
+    cases result : table.lookup? key with
+    | none =>
+        symm
+        apply TypeNameTable.lookup?_eq_none_iff.mpr
+        simpa only [List.map_append, List.mem_append, not_or] using
+          And.intro (TypeNameTable.lookup?_eq_none_iff.mp result)
+            (TypeNameTable.lookup?_eq_none_iff.mp result)
+    | some type =>
+        exact (TypeNameTable.lookup?_iff.mpr
+          (TypeNameTable.Extends.append_right table table
+            (TypeNameTable.lookup?_iff.mp result))).symm
   have backward : TypeNameTable.Extends (table ++ table) table := by
     intro key type found
     apply TypeNameTable.lookup?_iff.mp

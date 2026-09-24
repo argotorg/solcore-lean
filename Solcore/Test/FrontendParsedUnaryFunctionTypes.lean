@@ -143,7 +143,17 @@ def frontendParsedUnaryFunctionTypeTests : IO Unit := do
   let _ ← checked "function(Word) returns(New)" (table++[(["New"],.bool)]) (.function .word .bool)
   let _ ← checked "function(Word) returns(Bool)" ((["Word"],.unit)::table) (.function .unit .bool)
   have sameLookup (key : List String) : table.lookup? key=(table++table).lookup? key := by
-    simp (config := {contextual := true}) [table,TypeNameTable.lookup?]
+    cases result : table.lookup? key with
+    | none =>
+        symm
+        apply TypeNameTable.lookup?_eq_none_iff.mpr
+        simpa only [List.map_append, List.mem_append, not_or] using
+          And.intro (TypeNameTable.lookup?_eq_none_iff.mp result)
+            (TypeNameTable.lookup?_eq_none_iff.mp result)
+    | some type =>
+        exact (TypeNameTable.lookup?_iff.mpr
+          (TypeNameTable.Extends.append_right table table
+            (TypeNameTable.lookup?_iff.mp result))).symm
   for text in ["function(Word)","function(Word) returns(Bool)","function(Word) returns(Unknown)","function() returns(Bool)"] do
     let source ← parsed text
     have _ := interpretStructuralType?_congr_lookup table (table++table) sameLookup source

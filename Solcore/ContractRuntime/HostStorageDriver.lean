@@ -531,7 +531,7 @@ theorem run_of_suspended_emitLogWord
       (if observedAddress = context.context.storageAddress
         then none
         else context.context.values.working.1.account? observedAddress) := by
-    simpa only [run] using
+    exact
       HostDriver.run_observe
         (@handler RollbackState TraceState inputs)
         (fun current =>
@@ -542,36 +542,36 @@ theorem run_of_suspended_emitLogWord
           intro current request
           cases request with
           | storageRead slot =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | storageWrite slot value =>
               by_cases same :
                   observedAddress = current.context.storageAddress
               · simp [handler, handleRequest, same]
               · simp [handler, handleRequest, same]
           | storageAddress =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | codeAddress =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | callValue =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | callerAddress =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | currentAddress =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | inputDataByte? offset =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | inputDataSize =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | inputDataWordBE? offset =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | callContractWord target input =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | callContractWordWithValue target value input =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | createContractWord templateId value input =>
-              simp [handler, handleRequest]
+              simp [handler, handleRequest] <;> rfl
           | emitLogWord topic payload =>
-              simp [handler, handleRequest])
+              simp [handler, handleRequest] <;> rfl)
         context fuel state
   simpa only [run_storageAddress, if_neg different] using preserved
 

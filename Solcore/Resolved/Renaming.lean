@@ -107,10 +107,8 @@ theorem Expr.lower?_renameIds (mapping : LocalId → LocalId)
   | binary op left right leftIH rightIH => simp only [renameIds, lower?, leftIH, rightIH]
   | wordLt left right leftIH rightIH => simp only [renameIds, lower?, leftIH, rightIH]
   | letE binder value body valueIH bodyIH =>
-      simpa only [renameIds, lower?, List.map_cons, valueIH] using
-        congrArg (fun loweredBody => do
-          return Core.Expr.letE (← value.lower? scope) (← loweredBody))
-          (bodyIH (binder :: scope))
+      simp only [renameIds, lower?, valueIH]
+      rw [← List.map_cons, bodyIH (binder :: scope)]
   | ifE condition thenBranch elseBranch conditionIH thenIH elseIH =>
       simp only [renameIds, lower?, conditionIH, thenIH, elseIH]
 

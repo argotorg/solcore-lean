@@ -109,6 +109,11 @@ universe u v w x y
     mapTrapReason second (mapTrapReason first context) =
       mapTrapReason (fun reason => second (first reason)) context := by
   cases context with
-  | mk context tracePrefix => simp
+  | mk context tracePrefix =>
+      cases context with
+      | mk stateCheckpoint effectCheckpoint effectWorking result =>
+          cases result with
+          | mk working outcome =>
+              cases outcome <;> rfl
 
 end Solcore.ContractRuntime.FrameContinuationContextWithTracePrefix
