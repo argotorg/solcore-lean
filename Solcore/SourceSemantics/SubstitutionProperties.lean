@@ -9575,6 +9575,103 @@ theorem DirectBuiltinCalleeValid.applySubstitution
       rw [apply_function, apply_productMany]
       cases function <;> rfl
 
+/-- Flexible substitution preserves the semantic split between selected-result
+and contextual coercions, together with signature evidence in source order. -/
+theorem DirectCallRequirementsValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {rawResult finalResult : Ty}
+    {predicates : List ProgramPredicate}
+    {requirements : List RequirementId} {coercions : List CoercionStep}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : DirectCallRequirementsValid source rawResult finalResult
+      predicates requirements coercions) :
+    DirectCallRequirementsValid target (substitution.apply rawResult)
+      (substitution.apply finalResult)
+      (predicates.map
+        (TypedTraitResolution.applySubstitution substitution))
+      requirements
+      (coercions.map (CoercionStep.applySubstitution substitution)) := by
+  cases valid with
+  | @intro selectedResult contextual selectedPath contextualPath
+      signatureRequirements requirements coercions selectedValid contextualValid
+      signatureValid coercionsEq requirementsEq =>
+      exact .intro (contextual := substitution.apply contextual)
+        (CoercionPathValid.applySubstitution catalog contextValid selectedValid)
+        (CoercionPathValid.applySubstitution catalog contextValid contextualValid)
+        (RequirementSequenceProves.applySubstitution contextValid
+          signatureValid)
+        (by simp [coercionsEq, List.map_append])
+        (by simp [requirementsEq,
+          coercionRequirementIds_applySubstitution])
+
+/-- Flexible substitution maps the argument product and its retained coercion
+path in an indirect-call resolution. -/
+theorem IndirectApplicationValid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {metadata : IndirectCallResolution}
+    {argumentTypes : List Ty} {parameterType : Ty}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : IndirectApplicationValid source metadata argumentTypes
+      parameterType) :
+    IndirectApplicationValid target
+      (metadata.applySubstitution substitution)
+      (argumentTypes.map substitution.apply)
+      (substitution.apply parameterType) := by
+  cases valid with
+  | intro countEq beforeEq afterEq pathValid =>
+      exact .intro
+        (by simp [IndirectCallResolution.applySubstitution, countEq])
+        (by simp [IndirectCallResolution.applySubstitution, beforeEq,
+          apply_productMany])
+        (by simp [IndirectCallResolution.applySubstitution, afterEq])
+        (by
+          change CoercionPathValid target
+            (substitution.apply metadata.argumentTypeBeforeCoercion)
+            (substitution.apply parameterType)
+            (metadata.argumentCoercions.map
+              (CoercionStep.applySubstitution substitution))
+          exact CoercionPathValid.applySubstitution catalog contextValid
+            pathValid)
+
+/-- Flexible substitution preserves exact requirement ownership for ordinary,
+direct-call, and indirect-call expression plans. -/
+theorem ExpressionRequirementPlan.Valid.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {rawType finalType : Ty}
+    {plan : ExpressionRequirementPlan}
+    {requirements : List RequirementId} {coercions : List CoercionStep}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (valid : ExpressionRequirementPlan.Valid source rawType finalType plan
+      requirements coercions) :
+    ExpressionRequirementPlan.Valid target (substitution.apply rawType)
+      (substitution.apply finalType)
+      (applyExpressionRequirementPlan substitution plan) requirements
+      (coercions.map (CoercionStep.applySubstitution substitution)) := by
+  cases valid with
+  | ordinary ownedValid pathValid requirementsEq =>
+      exact .ordinary
+        (RequirementIdsValid.applySubstitution contextValid ownedValid)
+        (CoercionPathValid.applySubstitution catalog contextValid pathValid)
+        (by simp [requirementsEq,
+          coercionRequirementIds_applySubstitution])
+  | directCall valid =>
+      exact .directCall
+        (DirectCallRequirementsValid.applySubstitution catalog contextValid
+          valid)
+  | indirectCall argumentsValid outputValid requirementsEq =>
+      exact .indirectCall
+        (by simpa [coercionRequirementIds_applySubstitution] using
+          (RequirementIdsValid.applySubstitution contextValid argumentsValid))
+        (CoercionPathValid.applySubstitution catalog contextValid outputValid)
+        (by simp [requirementsEq,
+          coercionRequirementIds_applySubstitution])
+
 @[simp] theorem closeContext_withTypeVariables (substitution : Substitution)
     (context : Context) (variables : List TypeVarId) :
     closeContext substitution (context.withTypeVariables variables) =
