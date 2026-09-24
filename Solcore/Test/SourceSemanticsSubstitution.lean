@@ -214,7 +214,8 @@ example (signatures : ProgramSignatures) (id : Resolved.LocalId)
       id scheme [requirement]
     FlexibleSubstitution.closeContext [(metavariable, .word)] context =
       context := by
-  simp [FlexibleSubstitution.closeContext, FlexibleSubstitution.applyLocals,
+  simp [FlexibleSubstitution.closeContext, FlexibleSubstitution.applyContext,
+    FlexibleSubstitution.applyLocals,
     FlexibleSubstitution.applyLocalSchemeRequirements,
     FlexibleSubstitution.forLocal, Resolved.LocalScope.lookup?,
     SourceSemantics.Context.ofSignatures, SourceSemantics.Context.withLocal,
@@ -277,7 +278,7 @@ example (signatures : ProgramSignatures)
         }
       ]
     } := by
-  simp [FlexibleSubstitution.closeContext,
+  simp [FlexibleSubstitution.closeContext, FlexibleSubstitution.applyContext,
     FlexibleSubstitution.applySolvedRequirement,
     FlexibleSubstitution.applyPredicateEvidence,
     FlexibleSubstitution.applyEvidence,
@@ -300,6 +301,45 @@ example (substitution : Substitution) (context : SourceSemantics.Context)
           instantiateLocalSchemePredicates substitution binder) :=
   FlexibleSubstitution.closeContext_localSchemeInitializerContext
     substitution context binder
+
+/-- A nested generalized initializer can close an outer metavariable while
+retaining the inner initializer's lexical metavariable. -/
+example (signatures : ProgramSignatures) (outer inner : TypeVarId) :
+    FlexibleSubstitution.applyContext [(outer, .word)] [inner]
+        ((SourceSemantics.Context.ofSignatures signatures).withTypeVariables
+          [outer, inner]) =
+      (SourceSemantics.Context.ofSignatures signatures).withTypeVariables
+        [inner] := by
+  rfl
+
+/-- Fresh inner binders extend a structural outer closure without being
+captured by its exact substitution. -/
+example (substitution : Substitution) (closedVariables variables : List TypeVarId)
+    (source target : SourceSemantics.Context)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (fresh : ∀ metavariable, metavariable ∈ variables →
+      metavariable ∉ substitution.domain) :
+    FlexibleSubstitution.ContextCloses substitution closedVariables
+      (source.withTypeVariables variables)
+      (target.withTypeVariables variables) :=
+  closes.withTypeVariables variables fresh
+
+/-- Fresh local extension preserves the same outer context-closing relation
+and installs the capture-avoiding image of the local scheme metadata. -/
+example (substitution : Substitution) (closedVariables : List TypeVarId)
+    (source target : SourceSemantics.Context)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (id : Resolved.LocalId) (scheme : Scheme)
+    (requirements : List LocalSchemeRequirement)
+    (fresh : id ∉ source.localSchemeRequirements.map Prod.fst) :
+    FlexibleSubstitution.ContextCloses substitution closedVariables
+      (source.withLocal id scheme requirements)
+      (target.withLocal id (scheme.apply substitution)
+        (requirements.map (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified)))) :=
+  closes.withLocal id scheme requirements fresh
 
 /-- Flexible closing preserves globally unique, declaration-owned local
 identities. -/

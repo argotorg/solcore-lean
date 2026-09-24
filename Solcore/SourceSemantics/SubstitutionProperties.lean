@@ -5818,8 +5818,323 @@ theorem RequirementOwnership.applySubstitution
       (source.applySubstitution substitution) := by
   constructor
   · simpa using ownership.primary_unique
-  · simpa [closeContext, applySolvedRequirement, List.map_map,
+  · simpa [closeContext, applyContext, applySolvedRequirement, List.map_map,
       Function.comp_def] using ownership.ledger_exact
+
+@[simp] theorem applyContext_signatures (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context) :
+    (applyContext substitution retainedVariables context).signatures =
+      context.signatures := by
+  rfl
+
+@[simp] theorem applyContext_currentDeclaration (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context) :
+    (applyContext substitution retainedVariables context).currentDeclaration =
+      context.currentDeclaration := by
+  rfl
+
+@[simp] theorem applyContext_typeParameters (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context) :
+    (applyContext substitution retainedVariables context).typeParameters =
+      context.typeParameters := by
+  rfl
+
+@[simp] theorem applyContext_typeVariables (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context) :
+    (applyContext substitution retainedVariables context).typeVariables =
+      retainedVariables := by
+  rfl
+
+@[simp] theorem applyContext_residualTypeVariables
+    (substitution : Substitution) (retainedVariables : List TypeVarId)
+    (context : Context) :
+    (applyContext substitution retainedVariables context).residualTypeVariables =
+      context.residualTypeVariables := by
+  rfl
+
+@[simp] theorem applyContext_locals (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context) :
+    (applyContext substitution retainedVariables context).locals =
+      applyLocals substitution context.locals := by
+  rfl
+
+@[simp] theorem applyContext_localSchemeRequirements
+    (substitution : Substitution) (retainedVariables : List TypeVarId)
+    (context : Context) :
+    (applyContext substitution retainedVariables context).localSchemeRequirements =
+      applyLocalSchemeRequirements substitution context.locals
+        context.localSchemeRequirements := by
+  rfl
+
+@[simp] theorem applyContext_assumptions (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context) :
+    (applyContext substitution retainedVariables context).assumptions =
+      context.assumptions.map
+        (TypedTraitResolution.applySubstitution substitution) := by
+  rfl
+
+@[simp] theorem applyContext_solvedRequirements (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context) :
+    (applyContext substitution retainedVariables context).solvedRequirements =
+      context.solvedRequirements.map (applySolvedRequirement substitution) := by
+  rfl
+
+/-- Extending a paired local scope commutes with capture-avoiding flexible
+substitution when the stable local identity is fresh for the old metadata
+scope. -/
+@[simp] theorem applyLocalSchemeRequirements_cons
+    (substitution : Substitution) (locals : Resolved.LocalScope Scheme)
+    (metadata : Resolved.LocalScope (List LocalSchemeRequirement))
+    (id : Resolved.LocalId) (scheme : Scheme)
+    (requirements : List LocalSchemeRequirement)
+    (fresh : id ∉ metadata.map Prod.fst) :
+    applyLocalSchemeRequirements substitution ((id, scheme) :: locals)
+        ((id, requirements) :: metadata) =
+      (id, requirements.map (LocalSchemeRequirement.applySubstitution
+        (substitution.without scheme.quantified))) ::
+        applyLocalSchemeRequirements substitution locals metadata := by
+  simp only [applyLocalSchemeRequirements, List.map_cons]
+  congr 1
+  · simp [forLocal, Resolved.LocalScope.lookup?]
+  · apply List.map_congr_left
+    intro entry member
+    rcases entry with ⟨candidate, predicates⟩
+    have different : id ≠ candidate := by
+      intro same
+      apply fresh
+      rw [same]
+      exact List.mem_map.mpr ⟨(candidate, predicates), member, rfl⟩
+    simp [forLocal, Resolved.LocalScope.lookup?, different]
+
+@[simp] theorem applyContext_withLocal
+    (substitution : Substitution) (retainedVariables : List TypeVarId)
+    (context : Context) (id : Resolved.LocalId) (scheme : Scheme)
+    (requirements : List LocalSchemeRequirement := [])
+    (fresh : id ∉ context.localSchemeRequirements.map Prod.fst) :
+    applyContext substitution retainedVariables
+        (context.withLocal id scheme requirements) =
+      (applyContext substitution retainedVariables context).withLocal id
+        (scheme.apply substitution)
+        (requirements.map (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified))) := by
+  cases context
+  simp [Context.withLocal, applyContext, applyLocals, fresh]
+
+@[simp] theorem applyContext_withTypeVariables (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context)
+    (variables : List TypeVarId) :
+    applyContext substitution retainedVariables
+        (context.withTypeVariables variables) =
+      applyContext substitution retainedVariables context := by
+  rfl
+
+@[simp] theorem applyContext_withTypeVariables_append
+    (substitution : Substitution) (retainedVariables : List TypeVarId)
+    (context : Context) (variables : List TypeVarId) :
+    applyContext substitution (retainedVariables ++ variables)
+        (context.withTypeVariables variables) =
+      (applyContext substitution retainedVariables context).withTypeVariables
+        variables := by
+  rfl
+
+@[simp] theorem applyContext_withResidualTypeVariables
+    (substitution : Substitution) (retainedVariables : List TypeVarId)
+    (context : Context) :
+    applyContext substitution retainedVariables
+        context.withResidualTypeVariables =
+      (applyContext substitution retainedVariables context).withResidualTypeVariables := by
+  rfl
+
+@[simp] theorem applyContext_withAssumptions (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context)
+    (predicates : List ProgramPredicate) :
+    applyContext substitution retainedVariables
+        (context.withAssumptions predicates) =
+      (applyContext substitution retainedVariables context).withAssumptions
+        (predicates.map
+          (TypedTraitResolution.applySubstitution substitution)) := by
+  rfl
+
+@[simp] theorem applyContext_withSolvedRequirements
+    (substitution : Substitution) (retainedVariables : List TypeVarId)
+    (context : Context) (requirements : List SolvedRequirement) :
+    applyContext substitution retainedVariables
+        (context.withSolvedRequirements requirements) =
+      (applyContext substitution retainedVariables context).withSolvedRequirements
+        (requirements.map (applySolvedRequirement substitution)) := by
+  rfl
+
+namespace ContextCloses
+
+/-- Closing the complete lexical metavariable scope is the empty-suffix case
+of structural context closure. -/
+theorem close {substitution : Substitution} {context : Context}
+    (exact : SourceSemantics.ExactSubstitution substitution
+      context.typeVariables)
+    (range : SourceSemantics.SubstitutionRangeWellFormed
+      (closeContext substitution context) substitution) :
+    ContextCloses substitution context.typeVariables context
+      (closeContext substitution context) := {
+  variables_eq := by
+    change context.typeVariables = context.typeVariables ++ []
+    simp
+  exact := exact
+  retained_fresh := by
+    intro metavariable member
+    change metavariable ∈ ([] : List TypeVarId) at member
+    simp at member
+  range := range
+  target_eq := rfl
+}
+
+/-- Extend both sides with one fresh stable local identity.  The installed
+target scheme and qualified requirements are the capture-avoiding images of
+their source counterparts. -/
+theorem withLocal {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (id : Resolved.LocalId) (scheme : Scheme)
+    (requirements : List LocalSchemeRequirement := [])
+    (fresh : id ∉ source.localSchemeRequirements.map Prod.fst) :
+    ContextCloses substitution closedVariables
+      (source.withLocal id scheme requirements)
+      (target.withLocal id (scheme.apply substitution)
+        (requirements.map (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified)))) := {
+  variables_eq := closes.variables_eq
+  exact := closes.exact
+  retained_fresh := closes.retained_fresh
+  range := by
+    intro metavariable replacement member
+    exact StructuralSubstitution.TypeWellFormed.transportContext
+      (source := target)
+      (target := target.withLocal id (scheme.apply substitution)
+        (requirements.map (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified))))
+      rfl rfl rfl (closes.range metavariable replacement member)
+  target_eq := by
+    change applyContext substitution target.typeVariables
+        (source.withLocal id scheme requirements) =
+      target.withLocal id (scheme.apply substitution)
+        (requirements.map (LocalSchemeRequirement.applySubstitution
+          (substitution.without scheme.quantified)))
+    rw [applyContext_withLocal substitution target.typeVariables source id
+      scheme requirements fresh, closes.target_eq]
+}
+
+/-- Replacing the available predicate assumptions commutes with structural
+context closure. -/
+theorem withAssumptions {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (predicates : List ProgramPredicate) :
+    ContextCloses substitution closedVariables
+      (source.withAssumptions predicates)
+      (target.withAssumptions (predicates.map
+        (TypedTraitResolution.applySubstitution substitution))) := {
+  variables_eq := closes.variables_eq
+  exact := closes.exact
+  retained_fresh := closes.retained_fresh
+  range := by
+    intro metavariable replacement member
+    exact StructuralSubstitution.TypeWellFormed.transportContext
+      (source := target)
+      (target := target.withAssumptions (predicates.map
+        (TypedTraitResolution.applySubstitution substitution)))
+      rfl rfl rfl (closes.range metavariable replacement member)
+  target_eq := by
+    change applyContext substitution target.typeVariables
+        (source.withAssumptions predicates) =
+      target.withAssumptions (predicates.map
+        (TypedTraitResolution.applySubstitution substitution))
+    rw [applyContext_withAssumptions, closes.target_eq]
+}
+
+/-- Replacing the solved-requirement ledger commutes with structural context
+closure.  This is only a structural statement; it does not assert evidence
+validity for the replacement rows. -/
+theorem withSolvedRequirements {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (requirements : List SolvedRequirement) :
+    ContextCloses substitution closedVariables
+      (source.withSolvedRequirements requirements)
+      (target.withSolvedRequirements
+        (requirements.map (applySolvedRequirement substitution))) := {
+  variables_eq := closes.variables_eq
+  exact := closes.exact
+  retained_fresh := closes.retained_fresh
+  range := by
+    intro metavariable replacement member
+    exact StructuralSubstitution.TypeWellFormed.transportContext
+      (source := target)
+      (target := target.withSolvedRequirements
+        (requirements.map (applySolvedRequirement substitution)))
+      rfl rfl rfl (closes.range metavariable replacement member)
+  target_eq := by
+    change applyContext substitution target.typeVariables
+        (source.withSolvedRequirements requirements) =
+      target.withSolvedRequirements
+        (requirements.map (applySolvedRequirement substitution))
+    rw [applyContext_withSolvedRequirements, closes.target_eq]
+}
+
+/-- Residual-variable admission is independent of lexical-variable closure. -/
+theorem withResidualTypeVariables {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target) :
+    ContextCloses substitution closedVariables
+      source.withResidualTypeVariables target.withResidualTypeVariables := {
+  variables_eq := closes.variables_eq
+  exact := closes.exact
+  retained_fresh := closes.retained_fresh
+  range := by
+    intro metavariable replacement member
+    exact StructuralSubstitution.TypeWellFormed.transportContext
+      (source := target) (target := target.withResidualTypeVariables)
+      rfl rfl rfl (closes.range metavariable replacement member)
+  target_eq := by
+    change applyContext substitution target.typeVariables
+        source.withResidualTypeVariables =
+      target.withResidualTypeVariables
+    rw [applyContext_withResidualTypeVariables, closes.target_eq]
+}
+
+/-- A fresh inner metavariable suffix remains available on both sides of an
+outer context closure. -/
+theorem withTypeVariables {substitution : Substitution}
+    {closedVariables : List TypeVarId} {source target : Context}
+    (closes : ContextCloses substitution closedVariables source target)
+    (variables : List TypeVarId)
+    (fresh : ∀ metavariable, metavariable ∈ variables →
+      metavariable ∉ substitution.domain) :
+    ContextCloses substitution closedVariables
+      (source.withTypeVariables variables)
+      (target.withTypeVariables variables) := {
+  variables_eq := by
+    change source.typeVariables ++ variables =
+      closedVariables ++ (target.typeVariables ++ variables)
+    rw [closes.variables_eq, List.append_assoc]
+  exact := closes.exact
+  retained_fresh := by
+    intro metavariable member
+    change metavariable ∈ target.typeVariables ++ variables at member
+    rcases List.mem_append.mp member with member | member
+    · exact closes.retained_fresh metavariable member
+    · exact fresh metavariable member
+  range := by
+    intro metavariable replacement member
+    exact StructuralSubstitution.TypeWellFormed.transportContext
+      (source := target) (target := target.withTypeVariables variables)
+      rfl rfl rfl (closes.range metavariable replacement member)
+  target_eq := by
+    change applyContext substitution (target.typeVariables ++ variables)
+        (source.withTypeVariables variables) =
+      target.withTypeVariables variables
+    rw [applyContext_withTypeVariables_append, closes.target_eq]
+}
+
+end ContextCloses
 
 @[simp] theorem closeContext_signatures (substitution : Substitution)
     (context : Context) :
@@ -5940,8 +6255,8 @@ The surrounding assumptions undergo the ordinary context action. -/
           instantiateLocalSchemePredicates substitution binder) := by
   cases context
   simp [localSchemeInitializerContext, Context.withTypeVariables,
-    Context.withAssumptions, closeContext, instantiateLocalSchemePredicates,
-    List.map_append]
+    Context.withAssumptions, closeContext, applyContext,
+    instantiateLocalSchemePredicates]
 
 /-- In a runtime context with no ambient lexical metavariables, an exact
 scheme substitution is exact for the complete generalized-initializer scope. -/

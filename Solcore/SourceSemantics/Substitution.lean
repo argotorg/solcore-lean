@@ -345,20 +345,21 @@ def applyLocalSchemeRequirements (substitution : Substitution)
     (entry.1,
       entry.2.map (LocalSchemeRequirement.applySubstitution localSubstitution))
 
-/-- Close the lexical flexible-variable scope of a source-semantics context.
-Rigid declaration binders and the residual-variable policy are independent of
-this operation.  Exactness and admissibility of `substitution` are stated by
-the judgments in `Instantiation`.
+/-- Apply a flexible substitution to a source-semantics context while retaining
+the indicated inner lexical variables.  Rigid declaration binders and the
+residual-variable policy are independent of this operation.  Exactness and
+range well-formedness are stated separately by `ContextCloses`.
 
 This total structural action maps every solved row, including rows in an
 arbitrary malformed `Context`.  Soundness consumers must therefore carry the
 appropriate well-formed-context or requirement-ledger premise; `closeContext`
 alone does not establish that mapped evidence remains valid. -/
-def closeContext (substitution : Substitution) (context : Context) : Context := {
+def applyContext (substitution : Substitution)
+    (retainedVariables : List TypeVarId) (context : Context) : Context := {
   signatures := context.signatures
   currentDeclaration := context.currentDeclaration
   typeParameters := context.typeParameters
-  typeVariables := []
+  typeVariables := retainedVariables
   residualTypeVariables := context.residualTypeVariables
   locals := applyLocals substitution context.locals
   localSchemeRequirements :=
@@ -369,5 +370,22 @@ def closeContext (substitution : Substitution) (context : Context) : Context := 
   solvedRequirements := context.solvedRequirements.map
     (applySolvedRequirement substitution)
 }
+
+/-- Close every lexical flexible variable in a source-semantics context. -/
+def closeContext (substitution : Substitution) (context : Context) : Context :=
+  applyContext substitution [] context
+
+/-- A structural flexible substitution closes exactly an outer prefix of the
+lexical metavariable scope while leaving a fresh inner suffix available. -/
+structure ContextCloses (substitution : Substitution)
+    (closedVariables : List TypeVarId) (source target : Context) : Prop where
+  variables_eq :
+    source.typeVariables = closedVariables ++ target.typeVariables
+  exact : SourceSemantics.ExactSubstitution substitution closedVariables
+  retained_fresh :
+    ∀ metavariable, metavariable ∈ target.typeVariables →
+      metavariable ∉ substitution.domain
+  range : SourceSemantics.SubstitutionRangeWellFormed target substitution
+  target_eq : applyContext substitution target.typeVariables source = target
 
 end Solcore.SourceSemantics.FlexibleSubstitution
