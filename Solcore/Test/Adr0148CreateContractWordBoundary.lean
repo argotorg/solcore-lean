@@ -1,6 +1,4 @@
 import Solcore.Core.HostProgress
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 import Solcore.ContractRuntime.ContractCallFailure
 import Solcore.ContractRuntime.ContractWordCallInput
 import Solcore.ContractRuntime.HostStorageHandler
@@ -122,21 +120,8 @@ private theorem flatHandlerExact :
     flatHandled = (context, ContractCallFailure.depthExceeded.result) := by
   rfl
 
-private def frozenWireBoundaryExact : Bool :=
-  (Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .createContractWord)).isNone &&
-    (Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .createContractWord)).isNone &&
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (Solcore.Core.Wire.V1.Value.word input).toCore ==
-        some (.word input) &&
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (Solcore.Core.Wire.V2.Value.word input).toCore ==
-        some (.word input)
-
 private theorem compileTimeBoundaryExact :
-    checkedCreationEmitsAndResumes && failureCodesExactAndDistinct &&
-      frozenWireBoundaryExact = true := by
+    checkedCreationEmitsAndResumes && failureCodesExactAndDistinct = true := by
   native_decide
 
 def testAdr0148CreateContractWordBoundary : IO Unit := do
@@ -146,7 +131,5 @@ def testAdr0148CreateContractWordBoundary : IO Unit := do
     "creation failure codes changed or collided with existing codes"
   assertTrue (flatHandled.2 == ContractCallFailure.depthExceeded.result)
     "flat execution unexpectedly handled contract creation"
-  assertTrue frozenWireBoundaryExact
-    "frozen Wire accepted creation capability or changed old round-trips"
 
 end Tests.Adr0148CreateContractWordBoundary

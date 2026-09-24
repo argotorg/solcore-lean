@@ -1,7 +1,5 @@
 import Solcore.Core.Check
 import Solcore.Core.Machine
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 
 /-! Executable regressions for internal binary sums and exhaustive case analysis. -/
 
@@ -316,59 +314,8 @@ private def testCaseWeakening : IO Unit := do
   assertTrue (expression.weakenAt 0 == expected)
     "weakening must cross the scrutinee but preserve each branch payload binder"
 
-private def testFrozenSumWireBoundary : IO Unit := do
-  let sumType : Ty := .sum .unit (.sum .bool .word)
-  let leftValue : Value := .inLeft .bool .unit
-  let rightValue : Value := .inRight .unit (.bool true)
-  let nestedValue : Value :=
-    .inRight .unit (.inLeft .word (.bool false))
-  let leftExpr : Expr := .inLeft .bool .unit
-  let rightExpr : Expr := .inRight .unit (.bool true)
-  let caseExpr : Expr := .caseE leftExpr .unit .unit
-
-  assertTrue (Solcore.Core.Wire.V1.Ty.ofCore? sumType).isNone
-    "Semantic Core v1 must reject sum types"
-  assertTrue (Solcore.Core.Wire.V2.Ty.ofCore? sumType).isNone
-    "Semantic Core v2 must reject sum types"
-  for value in [leftValue, rightValue, nestedValue] do
-    assertTrue (Solcore.Core.Wire.V1.Value.ofCore? value).isNone
-      s!"Semantic Core v1 encoded an internal sum value: {reprStr value}"
-    assertTrue (Solcore.Core.Wire.V2.Value.ofCore? value).isNone
-      s!"Semantic Core v2 encoded an internal sum value: {reprStr value}"
-
-  for expression in [leftExpr, rightExpr, caseExpr] do
-    assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? expression).isNone
-      s!"Semantic Core v1 encoded an internal sum expression: {reprStr expression}"
-    assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? expression).isNone
-      s!"Semantic Core v2 encoded an internal sum expression: {reprStr expression}"
-
-  let nestedInV1Shape : Expr := .letE .unit leftExpr
-  let nestedInV2Shape : Expr := .unary .boolNot caseExpr
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? nestedInV1Shape).isNone
-    "Semantic Core v1 must reject an injection nested under an old expression"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? nestedInV2Shape).isNone
-    "Semantic Core v2 must reject a case nested under an old expression"
-
-  let sumResultProgram : Program := {
-    resultType := .sum .unit .bool
-    body := leftExpr
-  }
-  assertTrue (Solcore.Core.Wire.V1.Program.ofCore? sumResultProgram).isNone
-    "Semantic Core v1 must reject programs with sum result types"
-  assertTrue (Solcore.Core.Wire.V2.Program.ofCore? sumResultProgram).isNone
-    "Semantic Core v2 must reject programs with sum result types"
-
-  let oldResultProgram : Program := {
-    resultType := .unit
-    body := caseExpr
-  }
-  assertTrue (Solcore.Core.Wire.V1.Program.ofCore? oldResultProgram).isNone
-    "Semantic Core v1 must reject sum expressions under old result types"
-  assertTrue (Solcore.Core.Wire.V2.Program.ofCore? oldResultProgram).isNone
-    "Semantic Core v2 must reject sum expressions under old result types"
-
 /-- Cover injections, case binders, execution order, diagnostics, weakening,
-interactions, exact fuel, faults, and frozen-wire isolation. -/
+interactions, exact fuel, and faults. -/
 def testCoreSums : IO Unit := do
   testInjectionsAndExactFuel
   testCaseSelectionAndBinders
@@ -376,6 +323,5 @@ def testCoreSums : IO Unit := do
   testDetailedSumErrors
   testSumInteractions
   testCaseWeakening
-  testFrozenSumWireBoundary
 
 end Tests

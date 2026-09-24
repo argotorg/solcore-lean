@@ -1,7 +1,5 @@
 import Solcore.Core.Check
 import Solcore.Core.Machine
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 
 /-! Executable regressions for the first internal Semantic Core vNext slice. -/
 
@@ -152,58 +150,10 @@ private def testProductFaultsAndOrder : IO Unit := do
     (rightAfterLeft.run 3 == .fault (.unboundVariable 22))
     "pair construction must evaluate the right component after the left finishes"
 
-private def testFrozenProductWireBoundary : IO Unit := do
-  let productType : Ty := .product .bool (.product .unit .word)
-  let pairValue : Value := .pair (.bool true) (.pair .unit (.word Word.zero))
-  let pairExpr : Expr := .pair (.bool true) (.word Word.zero)
-  let firstExpr : Expr := .first pairExpr
-  let secondExpr : Expr := .second pairExpr
-
-  assertTrue (Solcore.Core.Wire.V1.Ty.ofCore? productType).isNone
-    "Semantic Core v1 must reject product types"
-  assertTrue (Solcore.Core.Wire.V2.Ty.ofCore? productType).isNone
-    "Semantic Core v2 must reject product types"
-  assertTrue (Solcore.Core.Wire.V1.Value.ofCore? pairValue).isNone
-    "Semantic Core v1 must reject pair values"
-  assertTrue (Solcore.Core.Wire.V2.Value.ofCore? pairValue).isNone
-    "Semantic Core v2 must reject pair values"
-
-  for expression in [pairExpr, firstExpr, secondExpr] do
-    assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? expression).isNone
-      s!"Semantic Core v1 encoded an internal product expression: {reprStr expression}"
-    assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? expression).isNone
-      s!"Semantic Core v2 encoded an internal product expression: {reprStr expression}"
-
-  let nestedInV1Shape : Expr := .letE .unit (.pair (.var 0) .unit)
-  let nestedInV2Shape : Expr := .unary .boolNot (.first (.pair (.bool true) .unit))
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? nestedInV1Shape).isNone
-    "Semantic Core v1 must reject a pair nested under an old expression"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? nestedInV2Shape).isNone
-    "Semantic Core v2 must reject a projection nested under an old expression"
-
-  let productResultProgram : Program := {
-    resultType := productType
-    body := .pair (.bool true) (.pair .unit (.word Word.zero))
-  }
-  assertTrue (Solcore.Core.Wire.V1.Program.ofCore? productResultProgram).isNone
-    "Semantic Core v1 must reject programs with product result types"
-  assertTrue (Solcore.Core.Wire.V2.Program.ofCore? productResultProgram).isNone
-    "Semantic Core v2 must reject programs with product result types"
-
-  let oldResultProgram : Program := {
-    resultType := .bool
-    body := .first (.pair (.bool true) .unit)
-  }
-  assertTrue (Solcore.Core.Wire.V1.Program.ofCore? oldResultProgram).isNone
-    "Semantic Core v1 must reject product expressions under an old result type"
-  assertTrue (Solcore.Core.Wire.V2.Program.ofCore? oldResultProgram).isNone
-    "Semantic Core v2 must reject product expressions under an old result type"
-
-/-- Cover product typing, execution order, projection faults, and frozen-wire
-isolation as one focused semantic-slice regression. -/
+/-- Cover product typing, execution order, and projection faults as one focused
+semantic-slice regression. -/
 def testCoreProducts : IO Unit := do
   testProductTypingAndExecution
   testProductFaultsAndOrder
-  testFrozenProductWireBoundary
 
 end Tests

@@ -1,8 +1,6 @@
 import Solcore.Core.Check
 import Solcore.Core.Machine
 import Solcore.Core.ShortCircuit
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 
 /-! Executable regressions for the derived short-circuit boolean connectives. -/
 
@@ -214,38 +212,12 @@ private def testWeakening : IO Unit := do
   assertTrue (orExpr.weakenAt 1 == weakenedOr)
     "boolOr weakening must not capture either free-variable reference"
 
-private def testFrozenWireProjection : IO Unit := do
-  let andExpr := Expr.boolAnd (.var 0) (.var 1)
-  let andExpansion : Expr :=
-    .ifE (.var 0) (.var 1) (.bool false)
-  let orExpr := Expr.boolOr (.var 0) (.var 1)
-  let orExpansion : Expr :=
-    .ifE (.var 0) (.bool true) (.var 1)
-
-  assertTrue
-    (Solcore.Core.Wire.V1.Expr.ofCore? andExpr ==
-      Solcore.Core.Wire.V1.Expr.ofCore? andExpansion)
-    "boolAnd must project through v1 exactly like its handwritten expansion"
-  assertTrue
-    (Solcore.Core.Wire.V2.Expr.ofCore? andExpr ==
-      Solcore.Core.Wire.V2.Expr.ofCore? andExpansion)
-    "boolAnd must project through v2 exactly like its handwritten expansion"
-  assertTrue
-    (Solcore.Core.Wire.V1.Expr.ofCore? orExpr ==
-      Solcore.Core.Wire.V1.Expr.ofCore? orExpansion)
-    "boolOr must project through v1 exactly like its handwritten expansion"
-  assertTrue
-    (Solcore.Core.Wire.V2.Expr.ofCore? orExpr ==
-      Solcore.Core.Wire.V2.Expr.ofCore? orExpansion)
-    "boolOr must project through v2 exactly like its handwritten expansion"
-
-/-- Cover truth tables, faults, short-circuited effects, exact fuel, weakening,
-and frozen-wire projection for the derived boolean connectives. -/
+/-- Cover truth tables, faults, short-circuited effects, exact fuel, and weakening
+for the derived boolean connectives. -/
 def testCoreBooleanConnectives : IO Unit := do
   testTruthTables
   testTypesAndRawFaults
   testEffectsAndExactFuel
   testWeakening
-  testFrozenWireProjection
 
 end Tests

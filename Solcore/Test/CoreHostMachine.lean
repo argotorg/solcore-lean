@@ -1,8 +1,6 @@
 import Solcore.Core.Check
 import Solcore.Core.HostMachine
 import Solcore.Core.HostRunner
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 import Solcore.ContractRuntime.CheckedHostCoreProgram
 
 /-! Focused admission and runtime regressions for the Core host boundary. -/
@@ -900,102 +898,6 @@ private theorem compileTimeCheckedInputDataWordBENeverFaults
   CheckedHostCoreProgram.runStateful_ne_fault
     checkedInputDataWordBEProgram fuel error faultState
 
-private theorem compileTimeWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead) = none :=
-  rfl
-
-private theorem compileTimeWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageRead) = none :=
-  rfl
-
-private theorem compileTimeWriteWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageWrite) = none :=
-  rfl
-
-private theorem compileTimeWriteWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageWrite) = none :=
-  rfl
-
-private theorem compileTimeAddressWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .storageAddress) = none :=
-  rfl
-
-private theorem compileTimeAddressWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .storageAddress) = none :=
-  rfl
-
-private theorem compileTimeCodeAddressWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .codeAddress) = none :=
-  rfl
-
-private theorem compileTimeCodeAddressWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .codeAddress) = none :=
-  rfl
-
-private theorem compileTimeCallValueWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .callValue) = none :=
-  rfl
-
-private theorem compileTimeCallValueWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .callValue) = none :=
-  rfl
-
-private theorem compileTimeCallerAddressWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .callerAddress) = none :=
-  rfl
-
-private theorem compileTimeCallerAddressWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .callerAddress) = none :=
-  rfl
-
-private theorem compileTimeInputDataByteWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .inputDataByte?) = none :=
-  rfl
-
-private theorem compileTimeInputDataByteWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .inputDataByte?) = none :=
-  rfl
-
-private theorem compileTimeInputDataSizeWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .inputDataSize) = none :=
-  rfl
-
-private theorem compileTimeInputDataSizeWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .inputDataSize) = none :=
-  rfl
-
-private theorem compileTimeInputDataWordBEWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .inputDataWordBE?) = none :=
-  rfl
-
-private theorem compileTimeInputDataWordBEWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .inputDataWordBE?) = none :=
-  rfl
-
-private theorem compileTimeCurrentAddressWireV1RejectionRegression :
-    Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .currentAddress) = none :=
-  rfl
-
-private theorem compileTimeCurrentAddressWireV2RejectionRegression :
-    Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .currentAddress) = none :=
-  rfl
-
 private def cellStorageReadProgram : Program := {
   resultType := .word
   body :=
@@ -1514,68 +1416,5 @@ def testCoreHostMachine : IO Unit := do
   | result =>
       throw (IO.userError
         s!"the repeated-read program did not emit its first request: {reprStr result}")
-
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageRead)).isNone
-    "Core wire v1 encoded an internal host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageRead)).isNone
-    "Core wire v2 encoded an internal host value"
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .storageWrite)).isNone
-    "Core wire v1 encoded the storage-write host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .storageWrite)).isNone
-    "Core wire v2 encoded the storage-write host value"
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .codeAddress)).isNone
-    "Core wire v1 encoded the code-address host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .codeAddress)).isNone
-    "Core wire v2 encoded the code-address host value"
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .callValue)).isNone
-    "Core wire v1 encoded the call-value host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .callValue)).isNone
-    "Core wire v2 encoded the call-value host value"
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore? (.hostFunction .callerAddress)).isNone
-    "Core wire v1 encoded the caller-address host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore? (.hostFunction .callerAddress)).isNone
-    "Core wire v2 encoded the caller-address host value"
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .inputDataByte?)).isNone
-    "Core wire v1 encoded the optional input-byte host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .inputDataByte?)).isNone
-    "Core wire v2 encoded the optional input-byte host value"
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .inputDataSize)).isNone
-    "Core wire v1 encoded the input-size host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .inputDataSize)).isNone
-    "Core wire v2 encoded the input-size host value"
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .inputDataWordBE?)).isNone
-    "Core wire v1 encoded the optional input-word host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .inputDataWordBE?)).isNone
-    "Core wire v2 encoded the optional input-word host value"
-  assertTrue
-    (Solcore.Core.Wire.V1.Value.ofCore?
-      (.hostFunction .currentAddress)).isNone
-    "Core wire v1 encoded the current-address host value"
-  assertTrue
-    (Solcore.Core.Wire.V2.Value.ofCore?
-      (.hostFunction .currentAddress)).isNone
-    "Core wire v2 encoded the current-address host value"
 
 end Tests

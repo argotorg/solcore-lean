@@ -1,5 +1,3 @@
-import Solcore.Feature
-import Solcore.Profile
 import Solcore.Core
 import Solcore.ContractRuntime
 import Solcore.Syntax

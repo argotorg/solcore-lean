@@ -1,6 +1,4 @@
 import Solcore.Core.Primitive
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 import Solcore.ContractRuntime.RuntimeScalars
 
 /-! Executable boundary tests for canonical runtime scalar encodings. -/
@@ -158,22 +156,10 @@ private def testWordBytesBE : IO Unit := do
   assertTrue (wrongWidths.all fun value => (decodeWordBytesBE? value).isNone)
     "big-endian word decoding must reject both thirty-one and thirty-three bytes"
 
-private def testFrozenWireCompatibility : IO Unit := do
-  let values := [Word.zero, word 1, word 0x1122, Word.maximum]
-  assertTrue
-    (values.all fun value =>
-      Solcore.Core.Wire.V1.encodeWordText value == encodeWordText value)
-    "runtime word text must match frozen Wire V1 for zero, one, 0x1122, and maximum"
-  assertTrue
-    (values.all fun value =>
-      Solcore.Core.Wire.V2.encodeWordText value == encodeWordText value)
-    "runtime word text must match frozen Wire V2 for zero, one, 0x1122, and maximum"
-
 def testRuntimeScalars : IO Unit := do
   testBytesText
   testAddressText
   testWordText
   testWordBytesBE
-  testFrozenWireCompatibility
 
 end Tests

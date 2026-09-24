@@ -1,3 +1,3 @@
-import Solcore.Synthesis.CoreV3
+import Solcore.Synthesis.Core
 
 /-! Public umbrella for syntax-independent Solcore program synthesis. -/

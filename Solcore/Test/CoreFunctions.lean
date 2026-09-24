@@ -1,7 +1,5 @@
 import Solcore.Core.Check
 import Solcore.Core.Machine
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 
 /-! Executable regressions for non-recursive Core functions and lexical closures. -/
 
@@ -236,59 +234,8 @@ private def testApplicationFaultOrder : IO Unit := do
     (nonFunction.run 2 == .fault (.expectedFunction (.bool true)))
     "the unchecked machine must fault before evaluating a non-function argument"
 
-private def testFrozenFunctionWireBoundary : IO Unit := do
-  let functionType : Ty := .function .unit (.function .bool .unit)
-  let lambdaExpr : Expr := .lambda .unit .unit (.var 0)
-  let applyExpr : Expr := .apply lambdaExpr .unit
-  let closureValue : Value := .closure .unit .unit (.var 0) []
-  let nestedClosure : Value := .pair .unit closureValue
-
-  assertTrue (Solcore.Core.Wire.V1.Ty.ofCore? functionType).isNone
-    "Semantic Core v1 must reject function types"
-  assertTrue (Solcore.Core.Wire.V2.Ty.ofCore? functionType).isNone
-    "Semantic Core v2 must reject function types"
-  assertTrue (Solcore.Core.Wire.V1.Value.ofCore? closureValue).isNone
-    "Semantic Core v1 must reject closure values"
-  assertTrue (Solcore.Core.Wire.V2.Value.ofCore? closureValue).isNone
-    "Semantic Core v2 must reject closure values"
-  assertTrue (Solcore.Core.Wire.V1.Value.ofCore? nestedClosure).isNone
-    "Semantic Core v1 must reject closures nested in internal values"
-  assertTrue (Solcore.Core.Wire.V2.Value.ofCore? nestedClosure).isNone
-    "Semantic Core v2 must reject closures nested in internal values"
-
-  for expression in [lambdaExpr, applyExpr] do
-    assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? expression).isNone
-      s!"Semantic Core v1 encoded an internal function expression: {reprStr expression}"
-    assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? expression).isNone
-      s!"Semantic Core v2 encoded an internal function expression: {reprStr expression}"
-
-  let nestedInV1Shape : Expr := .letE .unit lambdaExpr
-  let nestedInV2Shape : Expr := .unary .boolNot applyExpr
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? nestedInV1Shape).isNone
-    "Semantic Core v1 must reject a lambda nested under an old expression"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? nestedInV2Shape).isNone
-    "Semantic Core v2 must reject an application nested under an old expression"
-
-  let functionResultProgram : Program := {
-    resultType := .function .unit .unit
-    body := lambdaExpr
-  }
-  assertTrue (Solcore.Core.Wire.V1.Program.ofCore? functionResultProgram).isNone
-    "Semantic Core v1 must reject programs with function result types"
-  assertTrue (Solcore.Core.Wire.V2.Program.ofCore? functionResultProgram).isNone
-    "Semantic Core v2 must reject programs with function result types"
-
-  let oldResultProgram : Program := {
-    resultType := .unit
-    body := applyExpr
-  }
-  assertTrue (Solcore.Core.Wire.V1.Program.ofCore? oldResultProgram).isNone
-    "Semantic Core v1 must reject function expressions under old result types"
-  assertTrue (Solcore.Core.Wire.V2.Program.ofCore? oldResultProgram).isNone
-    "Semantic Core v2 must reject function expressions under old result types"
-
 /-- Cover function typing, lexical closures, evaluation order, diagnostics,
-machine faults, exact fuel, and frozen-wire isolation. -/
+machine faults, and exact fuel. -/
 def testCoreFunctions : IO Unit := do
   testIdentityAndExactFuel
   testLexicalCaptureAndShadowing
@@ -296,6 +243,5 @@ def testCoreFunctions : IO Unit := do
   testFunctionWeakening
   testDetailedFunctionErrors
   testApplicationFaultOrder
-  testFrozenFunctionWireBoundary
 
 end Tests

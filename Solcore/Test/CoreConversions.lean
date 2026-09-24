@@ -1,7 +1,5 @@
 import Solcore.Core.Check
 import Solcore.Core.Machine
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 
 /-! Executable regressions for the derived boolean/word conversions. -/
 
@@ -126,19 +124,6 @@ private def testExactFuelAndSingleEvaluation : IO Unit := do
     (effectfulWord.runStateful 12 == .done (.bool true) [.unit])
     "wordToBool must evaluate its operand exactly once before comparison"
 
-private def testFrozenWireProjection : IO Unit := do
-  let boolConversion := Expr.boolToWord (.bool true)
-  let wordConversion := Expr.wordToBool (.word Word.maximum)
-
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? boolConversion).isSome
-    "boolToWord must remain a normal v1 if/word expression"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? boolConversion).isSome
-    "boolToWord must project through the existing v2 expression forms"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? wordConversion).isSome
-    "wordToBool must project through the existing v2 primitive expression forms"
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? wordConversion).isNone
-    "v1 must continue rejecting the M1c primitives used by wordToBool"
-
 private def testWordIsZero : IO Unit := do
   let one := Word.ofNatModulo 1
   let two := Word.ofNatModulo 2
@@ -214,19 +199,6 @@ private def testWordIsZero : IO Unit := do
   }
   assertTrue (!wrongDeclaredType.check)
     "wordIsZero must not be confused with the boolean-valued wordToBool helper"
-
-  let projection := Expr.wordIsZero (.word Word.zero)
-  let handwritten :=
-    Expr.boolToWord
-      (.binary .wordEq (.word Word.zero) (.word Word.zero))
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? projection).isNone
-    "v1 must reject the word equality used by wordIsZero"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? projection).isSome
-    "wordIsZero must project through existing v2 conditional and primitive forms"
-  assertTrue
-    (Solcore.Core.Wire.V2.Expr.ofCore? projection ==
-      Solcore.Core.Wire.V2.Expr.ofCore? handwritten)
-    "wordIsZero must project exactly like its handwritten expansion"
 
 private def testWordIsNonzero : IO Unit := do
   let one := Word.ofNatModulo 1
@@ -315,24 +287,11 @@ private def testWordIsNonzero : IO Unit := do
   assertTrue (oneProgram.run 10 == .done (.word one))
     "wordIsNonzero must remain distinct from wordToBool and wordIsZero"
 
-  let projection := Expr.wordIsNonzero (.word Word.maximum)
-  let handwritten :=
-    Expr.boolToWord (Expr.wordToBool (.word Word.maximum))
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? projection).isNone
-    "v1 must reject the primitives used by wordIsNonzero"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? projection).isSome
-    "wordIsNonzero must project through existing v2 forms"
-  assertTrue
-    (Solcore.Core.Wire.V2.Expr.ofCore? projection ==
-      Solcore.Core.Wire.V2.Expr.ofCore? handwritten)
-    "wordIsNonzero must project exactly like its canonical expansion"
-
 /-- Cover truth conversion and the word-valued zero/nonzero predicates, including
-typing, raw faults, evaluation order, exact fuel, and frozen-wire boundaries. -/
+typing, raw faults, evaluation order, and exact fuel. -/
 def testCoreConversions : IO Unit := do
   testConversionValuesAndTypes
   testExactFuelAndSingleEvaluation
-  testFrozenWireProjection
   testWordIsZero
   testWordIsNonzero
 

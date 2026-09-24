@@ -1,7 +1,5 @@
 import Solcore.Core.Check
 import Solcore.Core.Machine
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 
 /-! Executable regressions for program-local named algebraic data. -/
 
@@ -634,47 +632,8 @@ private def testNamedDataWeakening : IO Unit := do
   assertTrue (expression.weakenAt 0 == expected)
     "weakening must cross constructor payloads and preserve every match payload binder"
 
-private def testFrozenNamedDataWireBoundary : IO Unit := do
-  let namedType : Ty := .namedData (dataType 0)
-  let namedValue : Value :=
-    .constructed (constructor 0 1) (.bool true)
-  let constructExpr : Expr :=
-    .construct (constructor 0 1) (.bool true)
-  let matchExpr : Expr :=
-    .matchData (dataType 0) .bool constructExpr [.bool false, .var 0]
-
-  assertTrue (Solcore.Core.Wire.V1.Ty.ofCore? namedType).isNone
-    "Semantic Core v1 must reject named-data types"
-  assertTrue (Solcore.Core.Wire.V2.Ty.ofCore? namedType).isNone
-    "Semantic Core v2 must reject named-data types"
-  assertTrue (Solcore.Core.Wire.V1.Value.ofCore? namedValue).isNone
-    "Semantic Core v1 must reject named-data values"
-  assertTrue (Solcore.Core.Wire.V2.Value.ofCore? namedValue).isNone
-    "Semantic Core v2 must reject named-data values"
-  for expression in [constructExpr, matchExpr] do
-    assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? expression).isNone
-      s!"Semantic Core v1 encoded an internal named-data form: {reprStr expression}"
-    assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? expression).isNone
-      s!"Semantic Core v2 encoded an internal named-data form: {reprStr expression}"
-
-  let nestedOldShape : Expr := .letE .unit matchExpr
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? nestedOldShape).isNone
-    "Semantic Core v1 must reject named data nested under an old expression"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? nestedOldShape).isNone
-    "Semantic Core v2 must reject named data nested under an old expression"
-
-  let unusedDefinitions : Program := {
-    resultType := .bool
-    body := .bool true
-    dataDefinitions := optionBoolDefinitions
-  }
-  assertTrue (Solcore.Core.Wire.V1.Program.ofCore? unusedDefinitions).isNone
-    "Semantic Core v1 must reject every nonempty internal definition table"
-  assertTrue (Solcore.Core.Wire.V2.Program.ofCore? unusedDefinitions).isNone
-    "Semantic Core v2 must reject every nonempty internal definition table"
-
 /-- Cover nominal identity, recursive and empty definitions, exhaustive matching,
-effects, cells, unchecked faults, weakening, exact fuel, and frozen-wire isolation. -/
+effects, cells, unchecked faults, weakening, and exact fuel. -/
 def testCoreNamedData : IO Unit := do
   testConstructionMatchingAndExactFuel
   testNominalIdentity
@@ -685,6 +644,5 @@ def testCoreNamedData : IO Unit := do
   testEffectsAndCellReferences
   testUncheckedMachineFaults
   testNamedDataWeakening
-  testFrozenNamedDataWireBoundary
 
 end Tests

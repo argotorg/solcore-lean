@@ -505,8 +505,6 @@ import Solcore.Test.FrontendParsedOwnerExpectedDataLambdaInvocations
 import Solcore.Test.FrontendOwnerCheckedDataExpressionProperties
 import Solcore.Test.FrontendOwnerCheckedBinaryDataExpressionProperties
 import Solcore.Test.FrontendParsedOwnerCheckedDataExpression
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 import Solcore.Test.SyntaxCallableDeclarationValidity
 import Solcore.Test.SyntaxContractDeclarationValidity
 import Solcore.Test.SyntaxCoreTermValidity
@@ -993,57 +991,37 @@ import Solcore.Test.AbiStaticWordContract
 import Solcore.Test.AbiStaticWordEndToEndFixture
 import Solcore.Test.AbiStaticWordEndToEnd
 import Solcore.Test.CoreArithmeticShift
-import Solcore.Test.CoreArithmeticShiftWire
 import Solcore.Test.CoreBooleanConnectives
 import Solcore.Test.CoreBitwiseLogic
-import Solcore.Test.CoreBitwiseLogicWire
 import Solcore.Test.CoreByteSelection
-import Solcore.Test.CoreByteSelectionWire
 import Solcore.Test.CoreCells
 import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
 import Solcore.Test.CoreCountLeadingZeros
-import Solcore.Test.CoreCountLeadingZerosWire
 import Solcore.Test.CoreDerivedComparisonFlags
-import Solcore.Test.CoreDerivedComparisonFlagWire
-import Solcore.Test.CoreDerivedComparisonWire
 import Solcore.Test.CoreDerivedComparisons
 import Solcore.Test.CoreDerivedRenamingLaws
 import Solcore.Test.CoreDerivedSignedComparison
-import Solcore.Test.CoreDerivedSignedComparisonWire
 import Solcore.Test.CoreDerivedSignedNonStrictComparisonFlags
-import Solcore.Test.CoreDerivedSignedNonStrictComparisonFlagWire
 import Solcore.Test.CoreDerivedSignedNonStrictComparisons
-import Solcore.Test.CoreDerivedSignedNonStrictComparisonWire
-import Solcore.Test.CoreDirectWordComparisonWire
 import Solcore.Test.CoreDirectWordComparisons
 import Solcore.Test.CoreFunctions
 import Solcore.Test.CoreHostMachine
-import Solcore.Test.CoreLogicalShiftWire
 import Solcore.Test.CoreLogicalShifts
 import Solcore.Test.CoreModularArithmetic
-import Solcore.Test.CoreModularArithmeticWire
 import Solcore.Test.CoreModularExponentiation
-import Solcore.Test.CoreModularExponentiationWire
 import Solcore.Test.CoreTernaryModularArithmetic
-import Solcore.Test.CoreTernaryModularArithmeticWire
 import Solcore.Test.CoreNamedData
 import Solcore.Test.CoreRenaming
 import Solcore.Test.CoreRenamingRuntime
 import Solcore.Test.CoreProducts
 import Solcore.Test.CoreSignExtension
-import Solcore.Test.CoreSignExtensionWire
 import Solcore.Test.CoreSignedComparison
 import Solcore.Test.CoreSignedComparisonFlags
-import Solcore.Test.CoreSignedComparisonFlagWire
-import Solcore.Test.CoreSignedComparisonWire
 import Solcore.Test.CoreSignedDivision
-import Solcore.Test.CoreSignedDivisionWire
 import Solcore.Test.CoreSums
-import Solcore.Test.CoreUnaryPrimitiveWire
 import Solcore.Test.CoreUnaryPrimitives
 import Solcore.Test.CoreUnsignedDivision
-import Solcore.Test.CoreUnsignedDivisionWire
 import Solcore.Test.AddressBytesBE
 import Solcore.Test.AddressCodecCoherence
 import Solcore.Test.AddressWordBridge
@@ -1196,15 +1174,15 @@ import Solcore.Test.WorldStateStorageRead
 import Solcore.Test.WorldStateStorageReadWrite
 import Solcore.Test.WorldStateStorageWriteAlgebra
 import Solcore.Test.WorldStateUpdateAlgebra
-import Solcore.Test.CoreWireV3Codec
-import Solcore.Test.CoreWireV3CodecFoundation
-import Solcore.Test.CoreWireV3Conversions
-import Solcore.Test.CoreWireV3Host
-import Solcore.Test.CoreWireV3Public
-import Solcore.Test.CoreV3SynthesisFragment
-import Solcore.Test.CoreV3SynthesisGenerator
-import Solcore.Test.CoreV3SynthesisSeed
-import Solcore.Test.CoreV3SynthesisShrink
+import Solcore.Test.CoreWireCodec
+import Solcore.Test.CoreWireCodecFoundation
+import Solcore.Test.CoreWireConversions
+import Solcore.Test.CoreWireHost
+import Solcore.Test.CoreWirePublic
+import Solcore.Test.CoreSynthesisFragment
+import Solcore.Test.CoreSynthesisGenerator
+import Solcore.Test.CoreSynthesisSeed
+import Solcore.Test.CoreSynthesisShrink
 import Solcore.Test.TypeSystemInference
 import Solcore.Test.ProgramEnvironmentAndTypeResolution
 import Solcore.Test.ProgramModuleResolution
@@ -1267,36 +1245,9 @@ def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do
     throw (IO.userError message)
 
-def assertJsonRoundTrip {α : Type} [Lean.ToJson α] [Lean.FromJson α]
-    (name : String) (value : α) : IO Unit := do
-  let encoded := Lean.toJson value
-  match (Lean.fromJson? encoded : Except String α) with
-  | .error error =>
-      throw (IO.userError s!"{name} did not decode: {error}")
-  | .ok decoded =>
-      assertTrue (Lean.toJson decoded == encoded) s!"{name} changed during JSON round-trip"
-
 def isError {ε α : Type} : Except ε α → Bool
   | .error _ => true
   | .ok _ => false
-
-def testProfile : IO Unit := do
-  assertTrue draftCoreProfile.validationErrors.isEmpty
-    s!"draft profile is invalid: {draftCoreProfile.validationErrors}"
-  assertJsonRoundTrip "draft profile" draftCoreProfile
-  let profileText ← IO.FS.readFile "profiles/solcore-0.1.0-draft.1-core.json"
-  let profileJson ←
-    match Lean.Json.parse profileText with
-    | .ok value => pure value
-    | .error error => throw (IO.userError s!"profile JSON is invalid: {error}")
-  assertTrue (profileJson == Lean.toJson draftCoreProfile)
-    "checked-in profile JSON differs from the Lean profile"
-
-def testFeatureMatrix : IO Unit := do
-  assertTrue featureMatrixIsComplete
-    "feature matrix must contain every feature exactly once"
-  assertTrue (featureMatrixRespectsProfile draftCoreProfile)
-    "implemented features must be enabled and normative"
 
 def coreConditionalProgram : Program := {
   resultType := .bool
@@ -1535,375 +1486,6 @@ def testM1cKernel : IO Unit := do
   assertTrue
     (invalidUnary.run 2 == .fault (.invalidUnaryOperand .boolNot .unit))
     "the unchecked machine must expose an invalid unary operand"
-  assertTrue (Core.Wire.V1.Program.ofCore? addWrap).isNone
-    "Semantic Core v1 must not encode M1c primitive expressions"
-
-def assertCoreWireError {α : Type}
-    (name : String)
-    (result : Except Core.Wire.V1.DecodeError α)
-    (code : Core.Wire.V1.DecodeErrorCode)
-    (path : String) :
-    IO Unit := do
-  match result with
-  | .ok _ =>
-      throw (IO.userError s!"{name} unexpectedly decoded")
-  | .error error =>
-      assertTrue (error.code == code)
-        s!"{name} returned {error.code.wireName}, expected {code.wireName}"
-      assertTrue (error.path.toPointer == path)
-        s!"{name} failed at {error.path.toPointer}, expected {path}"
-
-def testM1bProfile : IO Unit := do
-  assertTrue m1aCoreProfile.validationErrors.isEmpty
-    s!"draft.2 Core profile is invalid: {m1aCoreProfile.validationErrors}"
-  assertTrue m1aFeatureMatrixIsComplete
-    "M1a feature matrix must contain every draft.2 feature exactly once"
-  assertTrue (m1aFeatureMatrixRespectsProfile m1aCoreProfile)
-    "implemented M1a features must be normative and enabled"
-  assertTrue (m1aLanguage.id == "solcore/0.1.0-draft.2")
-    "M1a must be published as draft.2"
-  assertTrue (m1aCoreProfile.enabledFeatures.size == 5)
-    "the M1a profile must enable exactly the five normative Core features"
-  assertTrue
-    (m1aCoreProfile.enabledFeatures.all fun feature =>
-      feature.specMaturity == .normative)
-    "every M1a profile feature must be normative"
-  assertJsonRoundTrip "draft.2 Core profile" m1aCoreProfile
-  assertJsonRoundTrip "M1a feature matrix" m1aFeatureMatrix
-  let profileText ←
-    IO.FS.readFile "profiles/solcore-0.1.0-draft.2-core-m1a.json"
-  let profileJson ←
-    match Lean.Json.parse profileText with
-    | .ok value => pure value
-    | .error error =>
-        throw (IO.userError s!"draft.2 profile JSON is invalid: {error}")
-  assertTrue (profileJson == Lean.toJson m1aCoreProfile)
-    "checked-in draft.2 profile differs from the Lean profile"
-
-def testM1cProfile : IO Unit := do
-  assertTrue m1cCoreProfile.validationErrors.isEmpty
-    s!"draft.3 Core profile is invalid: {m1cCoreProfile.validationErrors}"
-  assertTrue m1cFeatureMatrixIsComplete
-    "M1c feature matrix must contain every draft.3 feature exactly once"
-  assertTrue (m1cFeatureMatrixRespectsProfile m1cCoreProfile)
-    "implemented M1c features must be normative and enabled"
-  assertTrue (m1cLanguage.id == "solcore/0.1.0-draft.3")
-    "M1c must be published as draft.3"
-  assertTrue
-    (m1cLanguage.staticSemanticsVersion == some 2 &&
-      m1cLanguage.dynamicSemanticsVersion == some 2)
-    "M1c must publish static and dynamic semantics version 2"
-  assertTrue (m1cCoreProfile.enabledFeatures.size == 9)
-    "the M1c profile must enable exactly nine normative Core features"
-  assertTrue
-    (m1cCoreProfile.enabledFeatures.all fun feature =>
-      feature.specMaturity == .normative)
-    "every M1c profile feature must be normative"
-  assertJsonRoundTrip "draft.3 Core profile" m1cCoreProfile
-  assertJsonRoundTrip "M1c feature matrix" m1cFeatureMatrix
-  let profileText ←
-    IO.FS.readFile "profiles/solcore-0.1.0-draft.3-core-m1c.json"
-  let profileJson ←
-    match Lean.Json.parse profileText with
-    | .ok value => pure value
-    | .error error =>
-        throw (IO.userError s!"draft.3 profile JSON is invalid: {error}")
-  assertTrue (profileJson == Lean.toJson m1cCoreProfile)
-    "checked-in draft.3 profile differs from the Lean profile"
-
-def testCoreWire : IO Unit := do
-  let types : Array Core.Wire.V1.Ty := #[.unit, .bool, .word]
-  for type in types do
-    match Core.Wire.V1.decodeType (Core.Wire.V1.encodeType type) with
-    | .ok decoded =>
-        assertTrue (decoded == type) s!"Core type failed to round-trip: {reprStr type}"
-    | .error error =>
-        throw (IO.userError
-          s!"encoded Core type did not decode: {(Lean.toJson error).compress}")
-    assertTrue (Core.Wire.V1.Ty.ofCore? type.toCore == some type)
-      "the Semantic Core v1 type embedding must have a partial inverse"
-  let word42 ←
-    match Word.ofNat? 42 with
-    | some value => pure value
-    | none => throw (IO.userError "42 must be an in-range Core word")
-  let values : Array Core.Wire.V1.Value := #[
-    .unit,
-    .bool false,
-    .bool true,
-    .word Word.zero,
-    .word word42
-  ]
-  for value in values do
-    match Core.Wire.V1.decodeValue (Core.Wire.V1.encodeValue value) with
-    | .ok decoded =>
-        assertTrue (decoded == value) s!"Core value failed to round-trip: {reprStr value}"
-    | .error error =>
-        throw (IO.userError
-          s!"encoded Core value did not decode: {(Lean.toJson error).compress}")
-    assertTrue (Core.Wire.V1.Value.ofCore? value.toCore == some value)
-      "the Semantic Core v1 value embedding must have a partial inverse"
-  let expressions : Array Core.Wire.V1.Expr := #[
-    .unit,
-    .bool false,
-    .word word42,
-    .var 3,
-    .letE (.bool true) (.var 0),
-    .ifE (.bool false) (.word Word.zero) (.word word42)
-  ]
-  for expr in expressions do
-    match Core.Wire.V1.decodeExpr (Core.Wire.V1.encodeExpr expr) with
-    | .ok decoded =>
-        assertTrue (decoded == expr) s!"Core expression failed to round-trip: {reprStr expr}"
-    | .error error =>
-        throw (IO.userError
-          s!"encoded Core expression did not decode: {(Lean.toJson error).compress}")
-  let wireProgram : Core.Wire.V1.Program := {
-    resultType := .bool
-    body :=
-      .letE
-        (.bool true)
-        (.ifE (.var 0) (.bool false) (.bool true))
-  }
-  assertTrue (wireProgram.toCore == coreConditionalProgram)
-    "the Semantic Core v1 AST embedding changed the represented Core program"
-  assertTrue
-    (Core.Wire.V1.Program.ofCore? coreConditionalProgram == some wireProgram)
-    "the M1a Core witness must remain representable in Semantic Core v1"
-  match Core.Wire.V1.decodeProgram (Core.Wire.V1.encodeProgram wireProgram) with
-  | .ok decoded =>
-      assertTrue (decoded == wireProgram)
-        "Semantic Core v1 Program failed to round-trip"
-  | .error error =>
-      throw (IO.userError
-        s!"encoded Core Program did not decode: {(Lean.toJson error).compress}")
-  let zeroText := "0x" ++ String.ofList (List.replicate 64 '0')
-  let maximumText := "0x" ++ String.ofList (List.replicate 64 'f')
-  let uppercaseText := "0x" ++ String.ofList (List.replicate 64 'F')
-  assertTrue (Core.Wire.V1.encodeWordText Word.zero == zeroText)
-    "Core word zero must use fixed-width lowercase hexadecimal"
-  match Core.Wire.V1.decodeWordText maximumText with
-  | .ok value =>
-      assertTrue (value.val + 1 == wordModulus)
-        "the maximum 256-bit Core word decoded incorrectly"
-  | .error error =>
-      throw (IO.userError
-        s!"the maximum Core word did not decode: {(Lean.toJson error).compress}")
-  assertCoreWireError "uppercase Core word"
-    (Core.Wire.V1.decodeWordText uppercaseText) .invalidWord ""
-  assertCoreWireError "short Core word"
-    (Core.Wire.V1.decodeWordText "0x00") .invalidWord ""
-  assertCoreWireError "missing Core word prefix"
-    (Core.Wire.V1.decodeWordText (String.ofList (List.replicate 64 '0')))
-    .invalidWord ""
-  let unitWithUnknownField : Lean.Json :=
-    .mkObj [("tag", "unit"), ("surprise", true)]
-  assertCoreWireError "unknown expression field"
-    (Core.Wire.V1.decodeExpr unitWithUnknownField) .unknownField "/surprise"
-  let boolWithVariantField : Lean.Json :=
-    .mkObj [("tag", "bool"), ("value", true), ("index", 0)]
-  assertCoreWireError "field from another expression variant"
-    (Core.Wire.V1.decodeExpr boolWithVariantField) .unknownField "/index"
-  let missingBoolValue : Lean.Json := .mkObj [("tag", "bool")]
-  assertCoreWireError "missing expression field"
-    (Core.Wire.V1.decodeExpr missingBoolValue) .missingField "/value"
-  let unknownTag : Lean.Json := .mkObj [("tag", "call")]
-  assertCoreWireError "unknown expression tag"
-    (Core.Wire.V1.decodeExpr unknownTag) .invalidTag "/tag"
-  let postV1PrimitiveTag : Lean.Json := .mkObj [("tag", "unary")]
-  assertCoreWireError "post-v1 primitive expression tag"
-    (Core.Wire.V1.decodeExpr postV1PrimitiveTag) .invalidTag "/tag"
-  let nonNaturalIndex : Lean.Json :=
-    .mkObj [("tag", "var"), ("index", "zero")]
-  assertCoreWireError "non-natural de Bruijn index"
-    (Core.Wire.V1.decodeExpr nonNaturalIndex) .expectedNatural "/index"
-  let decimalIntegralIndex ←
-    match Lean.Json.parse "{\"tag\":\"var\",\"index\":1.0}" with
-    | .ok value => pure value
-    | .error error =>
-        throw (IO.userError s!"integral decimal Core fixture did not parse: {error}")
-  match Core.Wire.V1.decodeExpr decimalIntegralIndex with
-  | .ok (.var 1) => pure ()
-  | .ok value =>
-      throw (IO.userError
-        s!"integral decimal index decoded unexpectedly: {reprStr value}")
-  | .error error =>
-      throw (IO.userError
-        s!"integral decimal index did not decode: {(Lean.toJson error).compress}")
-  let fractionalIndex ←
-    match Lean.Json.parse "{\"tag\":\"var\",\"index\":1.5}" with
-    | .ok value => pure value
-    | .error error =>
-        throw (IO.userError s!"fractional Core fixture did not parse: {error}")
-  assertCoreWireError "fractional de Bruijn index"
-    (Core.Wire.V1.decodeExpr fractionalIndex) .expectedNatural "/index"
-  let negativeIndex ←
-    match Lean.Json.parse "{\"tag\":\"var\",\"index\":-1}" with
-    | .ok value => pure value
-    | .error error =>
-        throw (IO.userError s!"negative Core fixture did not parse: {error}")
-  assertCoreWireError "negative de Bruijn index"
-    (Core.Wire.V1.decodeExpr negativeIndex) .expectedNatural "/index"
-  let wrongSchema :=
-    (Core.Wire.V1.encodeProgram wireProgram).setObjVal!
-      "schema" "solcore-semantic-core/v999"
-  assertCoreWireError "unknown Core schema"
-    (Core.Wire.V1.decodeProgram wrongSchema) .invalidSchema "/schema"
-  let wrongResultType :=
-    (Core.Wire.V1.encodeProgram wireProgram).setObjVal!
-      "resultType" "boolean"
-  assertCoreWireError "unknown Core result type"
-    (Core.Wire.V1.decodeProgram wrongResultType) .invalidType "/resultType"
-  let uppercaseWordProgram : Lean.Json :=
-    .mkObj [
-      ("schema", Core.Wire.V1.schemaVersion),
-      ("resultType", "word"),
-      ("body", .mkObj [("tag", "word"), ("value", uppercaseText)])
-    ]
-  assertCoreWireError "uppercase word in Program"
-    (Core.Wire.V1.decodeProgram uppercaseWordProgram) .invalidWord "/body/value"
-  assertCoreWireError "Core expression depth limit"
-    (Core.Wire.V1.decodeExprWith { maxDepth := 0, maxNodes := 10 } (.mkObj [("tag", "unit")]))
-    .depthLimitExceeded ""
-  assertCoreWireError "Core expression node limit"
-    (Core.Wire.V1.decodeExprWith { maxDepth := 10, maxNodes := 0 } (.mkObj [("tag", "unit")]))
-    .nodeLimitExceeded ""
-
-def assertCoreWireV2Error {α : Type}
-    (name : String)
-    (result : Except Core.Wire.V2.DecodeError α)
-    (code : Core.Wire.V2.DecodeErrorCode)
-    (path : String) :
-    IO Unit := do
-  match result with
-  | .ok _ =>
-      throw (IO.userError s!"{name} unexpectedly decoded")
-  | .error error =>
-      assertTrue (error.code == code)
-        s!"{name} returned {error.code.wireName}, expected {code.wireName}"
-      assertTrue (error.path.toPointer == path)
-        s!"{name} failed at {error.path.toPointer}, expected {path}"
-
-def testCoreWireV2 : IO Unit := do
-  let types : Array Core.Wire.V2.Ty := #[.unit, .bool, .word]
-  for type in types do
-    match Core.Wire.V2.decodeType (Core.Wire.V2.encodeType type) with
-    | .ok decoded =>
-        assertTrue (decoded == type)
-          s!"Semantic Core v2 type failed to round-trip: {reprStr type}"
-    | .error error =>
-        throw (IO.userError
-          s!"encoded v2 type did not decode: {(Lean.toJson error).compress}")
-    assertTrue (Core.Wire.V2.Ty.ofCore? type.toCore == some type)
-      "the Semantic Core v2 type embedding must have a partial inverse"
-  let word42 ←
-    match Word.ofNat? 42 with
-    | some value => pure value
-    | none => throw (IO.userError "42 must be an in-range Core word")
-  let values : Array Core.Wire.V2.Value := #[
-    .unit,
-    .bool false,
-    .bool true,
-    .word Word.zero,
-    .word word42
-  ]
-  for value in values do
-    match Core.Wire.V2.decodeValue (Core.Wire.V2.encodeValue value) with
-    | .ok decoded =>
-        assertTrue (decoded == value)
-          s!"Semantic Core v2 value failed to round-trip: {reprStr value}"
-    | .error error =>
-        throw (IO.userError
-          s!"encoded v2 value did not decode: {(Lean.toJson error).compress}")
-    assertTrue (Core.Wire.V2.Value.ofCore? value.toCore == some value)
-      "the Semantic Core v2 value embedding must have a partial inverse"
-  let unaryOps : Array Core.Wire.V2.UnaryOp := #[
-    .boolNot,
-    .wordNot
-  ]
-  for op in unaryOps do
-    match Core.Wire.V2.decodeUnaryOp (Core.Wire.V2.encodeUnaryOp op) with
-    | .ok decoded =>
-        assertTrue (decoded == op)
-          s!"Semantic Core v2 unary op failed to round-trip: {reprStr op}"
-    | .error error =>
-        throw (IO.userError
-          s!"encoded v2 unary op did not decode: {(Lean.toJson error).compress}")
-  let binaryOps : Array Core.Wire.V2.BinaryOp := #[
-    .wordAdd,
-    .wordSub,
-    .wordMul,
-    .wordDiv,
-    .wordMod,
-    .wordEq,
-    .wordGt,
-    .wordAnd,
-    .wordOr,
-    .wordXor,
-    .wordShl,
-    .wordShr
-  ]
-  for op in binaryOps do
-    match Core.Wire.V2.decodeBinaryOp (Core.Wire.V2.encodeBinaryOp op) with
-    | .ok decoded =>
-        assertTrue (decoded == op)
-          s!"Semantic Core v2 binary op failed to round-trip: {reprStr op}"
-    | .error error =>
-        throw (IO.userError
-          s!"encoded v2 binary op did not decode: {(Lean.toJson error).compress}")
-  let wireProgram : Core.Wire.V2.Program := {
-    resultType := .word
-    body :=
-      .binary .wordAdd
-        (.unary .wordNot (.word Word.zero))
-        (.word (Word.ofNatModulo 1))
-  }
-  match Core.Wire.V2.decodeProgram (Core.Wire.V2.encodeProgram wireProgram) with
-  | .ok decoded =>
-      assertTrue (decoded == wireProgram)
-        "Semantic Core v2 Program failed to round-trip"
-  | .error error =>
-      throw (IO.userError
-        s!"encoded v2 Program did not decode: {(Lean.toJson error).compress}")
-  assertTrue
-    (Core.Wire.V2.Program.ofCore? wireProgram.toCore == some wireProgram)
-    "the Semantic Core v2 embedding must have a partial inverse"
-  assertTrue (wireProgram.toCore.run 8 == .done (.word Word.zero))
-    "the decoded v2 primitive program must use the M1c evaluator"
-  let encoded := Core.Wire.V2.encodeProgram wireProgram
-  assertCoreWireError "Semantic Core v1 rejects a v2 program"
-    (Core.Wire.V1.decodeProgram encoded) .invalidSchema "/schema"
-  let v1Program : Core.Wire.V1.Program := {
-    resultType := .bool
-    body := .bool true
-  }
-  assertCoreWireV2Error "Semantic Core v2 rejects a v1 program"
-    (Core.Wire.V2.decodeProgram (Core.Wire.V1.encodeProgram v1Program))
-    .invalidSchema "/schema"
-  let invalidOperator : Lean.Json :=
-    .mkObj [
-      ("schema", Core.Wire.V2.schemaVersion),
-      ("resultType", "word"),
-      ("body", .mkObj [
-        ("tag", "binary"),
-        ("op", "wordPow"),
-        ("left", .mkObj [("tag", "word"), ("value", Core.Wire.V2.encodeWord Word.zero)]),
-        ("right", .mkObj [("tag", "word"), ("value", Core.Wire.V2.encodeWord Word.zero)])
-      ])
-    ]
-  assertCoreWireV2Error "unknown Semantic Core v2 operator"
-    (Core.Wire.V2.decodeProgram invalidOperator) .invalidTag "/body/op"
-  let binaryExpr : Core.Wire.V2.Expr :=
-    .binary .wordAdd (.word Word.zero) (.word Word.zero)
-  assertCoreWireV2Error "Semantic Core v2 expression depth limit"
-    (Core.Wire.V2.decodeExprWith
-      { maxDepth := 1, maxNodes := 10 }
-      (Core.Wire.V2.encodeExpr binaryExpr))
-    .depthLimitExceeded "/left"
-  assertCoreWireV2Error "Semantic Core v2 expression node limit"
-    (Core.Wire.V2.decodeExprWith
-      { maxDepth := 10, maxNodes := 2 }
-      (Core.Wire.V2.encodeExpr binaryExpr))
-    .nodeLimitExceeded "/right"
 
 def assertCheckError
     (name : String)
@@ -1991,21 +1573,6 @@ def testDetailedCoreChecker : IO Unit := do
   assertTrue
     (binaryRightError.data == .primitiveOperandTypeMismatch .word .bool)
     "binary-right primitive diagnostic arguments changed"
-
-def testSchemaJson : IO Unit := do
-  for path in
-      ["schema/semantic-core-v1.schema.json",
-        "schema/semantic-core-v2.schema.json",
-        "metadata/baselines.json",
-        "profiles/manifest.json",
-        "profiles/solcore-0.1.0-draft.1-core.json",
-        "profiles/solcore-0.1.0-draft.2-core-m1a.json",
-        "profiles/solcore-0.1.0-draft.3-core-m1c.json",
-        "profiles/solcore-0.1.0-draft.5-contract-m3a.json"] do
-    let text ← IO.FS.readFile path
-    match Lean.Json.parse text with
-    | .ok _ => pure ()
-    | .error error => throw (IO.userError s!"{path} is invalid JSON: {error}")
 
 def expectCanonicalWorkspacePath
     (text : String) : IO Solcore.Workspace.CanonicalSourcePath :=
@@ -2768,8 +2335,6 @@ def run : IO Unit := do
   testSyntaxParserUpstreamDiagnosticPolicy
   testSyntaxParserUpstreamFixtures
   testSyntaxPublicBoundary
-  testProfile
-  testFeatureMatrix
   testAbiKeccak256
   testAbiStaticWordMetadata
   testAbiStaticWordMetadataProperties
@@ -2783,7 +2348,6 @@ def run : IO Unit := do
   testPrimitiveAlgebra
   testM1cKernel
   testCoreArithmeticShift
-  testCoreArithmeticShiftWire
   testCoreProducts
   testCoreFunctions
   testCoreHostMachine
@@ -2791,49 +2355,30 @@ def run : IO Unit := do
   testCoreCells
   testCoreBooleanConnectives
   testCoreBitwiseLogic
-  testCoreBitwiseLogicWire
   testCoreByteSelection
-  testCoreByteSelectionWire
   testCoreComparisonFlags
   testCoreConversions
   testCoreCountLeadingZeros
-  testCoreCountLeadingZerosWire
   testCoreDerivedComparisonFlags
-  testCoreDerivedComparisonFlagWire
-  testCoreDerivedComparisonWire
   testCoreDerivedComparisons
   testCoreDerivedRenamingLaws
   testCoreDerivedSignedComparison
-  testCoreDerivedSignedComparisonWire
   testCoreDerivedSignedNonStrictComparisonFlags
-  testCoreDerivedSignedNonStrictComparisonFlagWire
   testCoreDerivedSignedNonStrictComparisons
-  testCoreDerivedSignedNonStrictComparisonWire
-  testCoreDirectWordComparisonWire
   testCoreDirectWordComparisons
-  testCoreLogicalShiftWire
   testCoreLogicalShifts
   testCoreModularArithmetic
-  testCoreModularArithmeticWire
   testCoreModularExponentiation
-  testCoreModularExponentiationWire
   testCoreTernaryModularArithmetic
-  testCoreTernaryModularArithmeticWire
   testCoreNamedData
   testCoreRenaming
   testCoreRenamingRuntime
   testCoreSignExtension
-  testCoreSignExtensionWire
   testCoreSignedComparison
   testCoreSignedComparisonFlags
-  testCoreSignedComparisonFlagWire
-  testCoreSignedComparisonWire
   testCoreSignedDivision
-  testCoreSignedDivisionWire
-  testCoreUnaryPrimitiveWire
   testCoreUnaryPrimitives
   testCoreUnsignedDivision
-  testCoreUnsignedDivisionWire
   testAddressBytesBE
   testAddressCodecCoherence
   testAddressWordBridge
@@ -2930,21 +2475,16 @@ def run : IO Unit := do
   testWorldStateStorageRead
   testWorldStateStorageWriteAlgebra
   testWorldStateUpdateAlgebra
-  testM1bProfile
-  testM1cProfile
-  testCoreWire
-  testCoreWireV2
-  testCoreWireV3Codec
-  testCoreWireV3CodecFoundation
-  testCoreWireV3Conversions
-  testCoreWireV3Host
-  CoreWireV3Public.testCoreWireV3Public
-  CoreV3SynthesisSeed.testCoreV3SynthesisSeed
-  testCoreV3SynthesisFragment
-  CoreV3SynthesisGenerator.testCoreV3SynthesisGenerator
-  CoreV3SynthesisShrink.testCoreV3SynthesisShrink
+  testCoreWireCodec
+  testCoreWireCodecFoundation
+  testCoreWireConversions
+  testCoreWireHost
+  CoreWirePublic.testCoreWirePublic
+  CoreSynthesisSeed.testCoreSynthesisSeed
+  testCoreSynthesisFragment
+  CoreSynthesisGenerator.testCoreSynthesisGenerator
+  CoreSynthesisShrink.testCoreSynthesisShrink
   testDetailedCoreChecker
-  testSchemaJson
   testWorkspacePathIdentity
   testWorkspaceCanonicalValidation
   testWorkspaceEqualContentIdentity

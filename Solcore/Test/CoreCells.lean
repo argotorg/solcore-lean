@@ -1,8 +1,6 @@
 import Solcore.Core.Check
 import Solcore.Core.Machine
 import Solcore.Core.Safety
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 
 /-! Executable regressions for first-order local cells and explicit stores. -/
 
@@ -317,43 +315,8 @@ private def testCellWeakening : IO Unit := do
   assertTrue (expression.weakenAt 0 == expected)
     "weakening must traverse every cell-operation operand"
 
-private def testFrozenCellWireBoundary : IO Unit := do
-  let cellType : Ty := .cell (.product .unit .bool)
-  let cellValue : Value := .cellRef .bool 0
-  let nestedValue : Value := .pair .unit cellValue
-  let newExpr : Expr := .newCell .bool (.bool false)
-  let loadExpr : Expr := .loadCell newExpr
-  let storeExpr : Expr := .storeCell newExpr (.bool true)
-
-  assertTrue (Solcore.Core.Wire.V1.Ty.ofCore? cellType).isNone
-    "Semantic Core v1 must reject cell types"
-  assertTrue (Solcore.Core.Wire.V2.Ty.ofCore? cellType).isNone
-    "Semantic Core v2 must reject cell types"
-  for value in [cellValue, nestedValue] do
-    assertTrue (Solcore.Core.Wire.V1.Value.ofCore? value).isNone
-      s!"Semantic Core v1 encoded an internal cell value: {reprStr value}"
-    assertTrue (Solcore.Core.Wire.V2.Value.ofCore? value).isNone
-      s!"Semantic Core v2 encoded an internal cell value: {reprStr value}"
-  for expression in [newExpr, loadExpr, storeExpr] do
-    assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? expression).isNone
-      s!"Semantic Core v1 encoded an internal cell expression: {reprStr expression}"
-    assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? expression).isNone
-      s!"Semantic Core v2 encoded an internal cell expression: {reprStr expression}"
-
-  let nestedOldShape : Expr := .letE .unit loadExpr
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? nestedOldShape).isNone
-    "Semantic Core v1 must reject cells nested under an old expression"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? nestedOldShape).isNone
-    "Semantic Core v2 must reject cells nested under an old expression"
-
-  let program : Program := { resultType := .bool, body := loadExpr }
-  assertTrue (Solcore.Core.Wire.V1.Program.ofCore? program).isNone
-    "Semantic Core v1 must reject programs containing cell operations"
-  assertTrue (Solcore.Core.Wire.V2.Program.ofCore? program).isNone
-    "Semantic Core v2 must reject programs containing cell operations"
-
 /-- Cover typed first-order cells, explicit-store order and identity, closure
-sharing, detailed diagnostics, faults, exact fuel, and frozen-wire isolation. -/
+sharing, detailed diagnostics, faults, and exact fuel. -/
 def testCoreCells : IO Unit := do
   testAllocationAndExactFuel
   testLoadStoreAndAliases
@@ -363,6 +326,5 @@ def testCoreCells : IO Unit := do
   testFaultOrder
   testDetailedCellErrors
   testCellWeakening
-  testFrozenCellWireBoundary
 
 end Tests

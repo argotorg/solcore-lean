@@ -1,8 +1,6 @@
 import Solcore.Core.Check
 import Solcore.Core.Derived
 import Solcore.Core.Machine
-import Solcore.Core.Wire
-import Solcore.Core.Wire.V2
 
 /-! Executable regressions for derived word-valued comparison flags. -/
 
@@ -188,7 +186,7 @@ private def testEffectsAndExactFuel : IO Unit := do
       .done (.word one) [.word one, .word two])
     "wordGtFlag must evaluate left then right exactly once and preserve the store"
 
-private def testBooleanAndWireBoundaries : IO Unit := do
+private def testBooleanCompatibility : IO Unit := do
   let boolEq : Program := {
     resultType := .bool
     body := .binary .wordEq (.word Word.maximum) (.word Word.maximum)
@@ -206,37 +204,12 @@ private def testBooleanAndWireBoundaries : IO Unit := do
   assertTrue (boolGt.run 5 == .done (.bool true))
     "wordGt must retain its boolean result"
 
-  let eqFlag := Expr.wordEqFlag (.word Word.maximum) (.word Word.zero)
-  let eqExpansion :=
-    Expr.boolToWord
-      (.binary .wordEq (.word Word.maximum) (.word Word.zero))
-  let gtFlag := Expr.wordGtFlag (.word Word.maximum) (.word Word.zero)
-  let gtExpansion :=
-    Expr.boolToWord
-      (.binary .wordGt (.word Word.maximum) (.word Word.zero))
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? eqFlag).isNone
-    "v1 must reject the primitive used by wordEqFlag"
-  assertTrue (Solcore.Core.Wire.V1.Expr.ofCore? gtFlag).isNone
-    "v1 must reject the primitive used by wordGtFlag"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? eqFlag).isSome
-    "wordEqFlag must project through existing v2 forms"
-  assertTrue (Solcore.Core.Wire.V2.Expr.ofCore? gtFlag).isSome
-    "wordGtFlag must project through existing v2 forms"
-  assertTrue
-    (Solcore.Core.Wire.V2.Expr.ofCore? eqFlag ==
-      Solcore.Core.Wire.V2.Expr.ofCore? eqExpansion)
-    "wordEqFlag must project exactly like its handwritten expansion"
-  assertTrue
-    (Solcore.Core.Wire.V2.Expr.ofCore? gtFlag ==
-      Solcore.Core.Wire.V2.Expr.ofCore? gtExpansion)
-    "wordGtFlag must project exactly like its handwritten expansion"
-
-/-- Cover values, types, fault order, effects, fuel, and frozen-wire boundaries
-for the derived word-valued comparison flags. -/
+/-- Cover values, types, fault order, effects, fuel, and compatibility with the
+boolean-valued comparison primitives. -/
 def testCoreComparisonFlags : IO Unit := do
   testValuesAndTypes
   testRawFaultOrder
   testEffectsAndExactFuel
-  testBooleanAndWireBoundaries
+  testBooleanCompatibility
 
 end Tests
