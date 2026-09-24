@@ -23,6 +23,19 @@ def defaultIntegerPatternTargets :
       let state ← defaultIntegerPatternTarget state origin
       defaultIntegerPatternTargets rest state
 
+def defaultIntegerLiteralTarget (state : State)
+    (origin : IntegerLiteralOrigin) : Except Error State :=
+  match state.resolve (.variable origin.metavariable) with
+  | .variable _ => unify state (.variable origin.metavariable) .word
+  | _ => pure state
+
+def defaultIntegerLiteralTargets :
+    List IntegerLiteralOrigin → State → Except Error State
+  | [], state => .ok state
+  | origin :: rest, state => do
+      let state ← defaultIntegerLiteralTarget state origin
+      defaultIntegerLiteralTargets rest state
+
 def validateIntegerLiteralTarget (origin : IntegerLiteralOrigin)
     (state : State) : Except Error Unit := do
   let type := state.resolve (.variable origin.metavariable)
@@ -40,6 +53,7 @@ def finalize (context : Context) (type : Ty) (state : State)
     (roots : List NodeId) :
     Except Error Result := do
   let state ← defaultIntegerPatternTargets state.integerPatterns state
+  let state ← defaultIntegerLiteralTargets state.integerLiterals state
   validateIntegerLiteralTargets state state.integerLiterals
   let solvedRequirements ← solveRequirements context state state.requirements
   let substitution := state.inference.substitution

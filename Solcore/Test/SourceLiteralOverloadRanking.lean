@@ -159,20 +159,24 @@ private def testLetBoundLiteralParticipatesInRanking : IO Unit := do
   assertTrue (hasBuiltinIntEvidence run .word .intWord)
     "a let-bound flexible literal made a generic overload look ground"
 
-private def testSoleDeferredCandidateFailsAtFinalization : IO Unit := do
-  let lines := [
+private def testSoleDeferredCandidateDefaultsToWord : IO Unit := do
+  let run ← expectLastChecked [
     "function keep<T>(value: T) returns (T) { return value; }",
     "function bad() { keep(1); return; }"
   ]
-  match SourceInference.loadAndCheckProgram (rawWorkspace lines) with
-  | .error errors =>
-      assertTrue (errors.any fun error => match error with
-        | .body { error := .unresolvedIntegerLiteralTarget _ (.variable _),
-            .. } => true
-        | _ => false)
-        "a sole deferred generic candidate did not reach final literal validation"
-  | .ok _ => throw (IO.userError
-      "a sole generic overload left an unconstrained literal target accepted")
+  assertTrue (decide (run.inferredBodyType = TypeSystem.Ty.unit))
+    "a defaulted discarded generic call changed the function result type"
+  assertTrue (hasBuiltinIntEvidence run .word .intWord)
+    "a sole deferred generic candidate did not default its literal to Word"
+  let calls := run.typedBody.nodes.filterMap fun
+    | .expression node => match node.form with
+        | .call _ _ (.declaration instantiation) => some instantiation
+        | _ => none
+    | .statement _ => none
+  assertTrue (calls.any fun instantiation =>
+      decide (instantiation.parameterSubstitution.map Prod.snd = [.word] ∧
+        instantiation.type = .function .word .word))
+    "literal defaulting did not close the selected generic instantiation"
 
 /-- Exercise builtin-Int overload viability, equal-cost ambiguity, contextual
 selection, and nonblocking unsupported candidates. -/
@@ -184,6 +188,6 @@ def testSourceLiteralOverloadRanking : IO Unit := do
   testGroundCandidateOutranksCheaperDeferredCandidate
   testNestedGenericDefersUntilOuterCandidate
   testLetBoundLiteralParticipatesInRanking
-  testSoleDeferredCandidateFailsAtFinalization
+  testSoleDeferredCandidateDefaultsToWord
 
 end Tests.SourceLiteralOverloadRanking

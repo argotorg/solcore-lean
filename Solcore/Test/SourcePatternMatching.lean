@@ -192,10 +192,58 @@ private def testPatternDefaultAndLateConstraint : IO Unit := do
       specializedWildcard.requirements = []))
     "specialization did not substitute a rigid wildcard pattern type"
 
+private def testWildcardOnlyLiteralDefault : IO Unit := do
+  let source :=
+    "function wildcardOnly() { match (1) { case _ { return; } } }"
+  let program ← checkedProgram source
+  let checked ← checkedNamed program "wildcardOnly"
+  let resolution ← match matchResolutions checked with
+    | [resolution] => pure resolution
+    | resolutions => throw (IO.userError
+        s!"wildcard-only fixture retained {resolutions.length} match nodes")
+  let pattern ← match resolution.cases with
+    | [arm] => pure arm.pattern
+    | cases => throw (IO.userError
+        s!"wildcard-only fixture retained {cases.length} match cases")
+  let literal ← match checked.typedBody.lookupExpression? resolution.scrutinee with
+    | some node =>
+        match node.form, node.requirements with
+        | .integerLiteral (.decimal "1") literal, [requirement] =>
+            if node.type = Ty.word && literal.targetType = Ty.word &&
+                literal.requirement = requirement then
+              pure literal
+            else
+              throw (IO.userError
+                "wildcard-only scrutinee lost its Word literal metadata")
+        | _, _ => throw (IO.userError
+            s!"wildcard-only scrutinee retained the wrong node: {reprStr node}")
+    | other => throw (IO.userError
+        s!"wildcard-only scrutinee retained the wrong node: {reprStr other}")
+  assertTrue (decide (pattern.type = Ty.word ∧
+      pattern.resolution = .wildcard ∧
+      pattern.requirements = [] ∧
+      resolution.requirements = [] ∧
+      checked.inferredBodyType = Ty.unit ∧
+      checked.solvedRequirements.map (·.id) = [literal.requirement]) ∧
+      checked.solvedRequirements.all (solvedByBuiltinInt .word))
+    "expression defaulting did not close a wildcard-only match as Word"
+  let limits : Limits := {
+    checkingFuel := 1024
+    specializationBudget := 16
+    executionFuel := 4096
+  }
+  let moduleId ← mainModule
+  let prepared ← match prepare (workspace source)
+      (Seed.named moduleId "wildcardOnly") limits with
+    | .ok prepared => pure prepared
+    | .error error => throw (IO.userError
+        s!"wildcard-only match preparation failed: {reprStr error}")
+  match prepared.run? [] limits.executionFuel with
+  | some (.done .unit []) => pure ()
+  | result => throw (IO.userError
+      s!"wildcard-only match had runtime result {reprStr result}")
+
 private def testPatternInferenceRejections : IO Unit := do
-  expectInferenceError "wildcard-only unresolved scrutinee"
-    "function unresolved() { match (1) { case _ { return; } } }"
-    fun error => error matches .unresolvedIntegerLiteralTarget _ (.variable _)
   expectInferenceError "unreachable arm static checking"
     (String.intercalate "\n" [
       "function bad(tag: Word) returns (Word) {",
@@ -379,6 +427,7 @@ private def testDiscardedTailStillLowers : IO Unit := do
 defensive rejection, modulo lowering, ordered selection, linking, and execution. -/
 def testSourcePatternMatching : IO Unit := do
   testPatternDefaultAndLateConstraint
+  testWildcardOnlyLiteralDefault
   testPatternInferenceRejections
   testModuloOrderingAndPublicExecution
   testDirectCallHiddenLocalCollision

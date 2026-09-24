@@ -137,6 +137,17 @@ private def testDeferredIntegerOperators : IO Unit := do
   | .error error => throw (IO.userError
       s!"public deferred complement failed: {reprStr error}")
 
+private def testDefaultedIntegerLiterals : IO Unit := do
+  let moduleId ← mainModule "main.solc"
+  let workspace := rawWorkspace "main.solc" [("main.solc",
+    "function defaulted() returns (Word) { let unused = 1; return 9; }")]
+  match run workspace (Seed.named moduleId "defaulted") [] generousLimits with
+  | .ok result =>
+      assertTrue (decide (result = .done (.word (word 9)) []))
+        "public execution did not default unconstrained integer literals to Word"
+  | .error error => throw (IO.userError
+      s!"public defaulted integer literal failed: {reprStr error}")
+
 private def testSeedErrors : IO Unit := do
   let moduleId ← mainModule "main.solc"
   let missingModule ← mainModule "missing.solc"
@@ -292,6 +303,7 @@ def testSourceProgramExecution : IO Unit := do
   testDeclarationSeedAndStore
   testModuleQualifiedName
   testDeferredIntegerOperators
+  testDefaultedIntegerLiterals
   testSeedErrors
   testAmbiguousAndNonFunctionSeeds
   testStageErrors

@@ -46,6 +46,38 @@ private def traitNameOf (environment : ProgramEnvironment)
   let declaration ← environment.declaration? trait
   declaration.name
 
+private def hasBuiltinIntWordEvidence
+    (solved : SourceInference.SolvedRequirement) : Bool :=
+  solved.predicate == ProgramSignatures.builtinIntPredicate .word &&
+    match solved.evidence with
+    | .implementation (.byImpl goal (.builtin .intWord) premises) =>
+        goal == solved.predicate && premises.isEmpty
+    | _ => false
+
+private def integerLiteralRows
+    (function : SourceInference.CheckedFunction) :
+    List (SourceInference.ExpressionNode ×
+      SourceInference.IntegerLiteralResolution) :=
+  function.typedBody.nodes.filterMap fun
+    | .expression node =>
+        match node.form with
+        | .integerLiteral _ resolution => some (node, resolution)
+        | _ => none
+    | .statement _ => none
+
+private def hasExactDefaultedWordEvidence
+    (function : SourceInference.CheckedFunction)
+    (row : SourceInference.ExpressionNode ×
+      SourceInference.IntegerLiteralResolution) : Bool :=
+  let node := row.1
+  let resolution := row.2
+  node.type == TypeSystem.Ty.word &&
+    resolution.targetType == TypeSystem.Ty.word &&
+    node.requirements == [resolution.requirement] &&
+    node.coercions.isEmpty &&
+    function.solvedRequirements.any fun solved =>
+      solved.id == resolution.requirement && hasBuiltinIntWordEvidence solved
+
 private def testLambdaLetTupleConditional : IO Unit := do
   let checked ← check (String.intercalate "\n" [
     "function polymorphic(flag: Bool) returns (Word, Bool) {",
@@ -182,17 +214,18 @@ private def testSourceNamedLiteralTraitsDoNotAuthorize : IO Unit := do
   | .ok _ => throw (IO.userError
       "source traits named Int/FromLiteral/Numeric authorized a nominal literal")
 
-private def testUnconstrainedIntegerLiteralRejected : IO Unit := do
-  let source := "function bad() { 1; return; }"
-  match SourceInference.loadAndCheckProgram (workspace source) with
-  | .error errors =>
-      assertTrue (errors.any fun error => match error with
-        | .body { error := .unresolvedIntegerLiteralTarget _ type, .. } =>
-            !type.freeVariables.isEmpty
-        | _ => false)
-        "an unconstrained integer literal did not retain its flexible target"
-  | .ok _ => throw (IO.userError
-      "an unconstrained integer literal defaulted to Word")
+private def testUnconstrainedIntegerLiteralDefaultsToWord : IO Unit := do
+  let checked ← check "function defaulted() { 1; return; }"
+  let function ← match checked with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"unconstrained literal fixture checked {functions.length} functions")
+  let literals := integerLiteralRows function
+  assertTrue (decide (function.inferredBodyType = TypeSystem.Ty.unit) &&
+      literals.length == 1 && literals.all (hasExactDefaultedWordEvidence function) &&
+      function.solvedRequirements.length == 1 &&
+      function.solvedRequirements.all hasBuiltinIntWordEvidence)
+    "an unconstrained integer literal did not default exactly to builtin Int<Word>"
 
 private def testLetBoundIntegerLiteralClosesLater : IO Unit := do
   let checked ← check
@@ -205,6 +238,28 @@ private def testLetBoundIntegerLiteralClosesLater : IO Unit := do
       function.solvedRequirements.all fun solved =>
         solved.predicate == ProgramSignatures.builtinIntPredicate .word)
     "a later return context did not close the let-bound literal as Word"
+
+private def testUnusedLetIntegerLiteralDefaultsIndependently : IO Unit := do
+  let checked ← check
+    "function unused() returns (Word) { let value = 1; return 9; }"
+  let function ← match checked with
+    | [function] => pure function
+    | functions => throw (IO.userError
+        s!"unused literal fixture checked {functions.length} functions")
+  let binder ← match function.typedBody.nodes.filterMap fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "value" then some binder else none
+      | _ => none with
+    | [binder] => pure binder
+    | binders => throw (IO.userError
+        s!"unused literal fixture retained {binders.length} value binders")
+  let literals := integerLiteralRows function
+  assertTrue (decide (binder.scheme = .mono .word) &&
+      literals.map (fun row => row.2.rawValue) == [1, 9] &&
+      literals.all (hasExactDefaultedWordEvidence function) &&
+      function.solvedRequirements.length == 2 &&
+      function.solvedRequirements.all hasBuiltinIntWordEvidence)
+    "an unused let literal and returned literal did not retain independent Int<Word> evidence"
 
 private def testLiteralRequirementPreservesIndependentPolymorphism : IO Unit := do
   let checked ← check (String.intercalate "\n" [
@@ -290,22 +345,41 @@ private def testNestedIntegerLiteralOperatorsCloseLater : IO Unit := do
   | functions => throw (IO.userError
       s!"nested operator fixture checked {functions.length} functions")
 
-private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
+private def testUnconstrainedIntegerLiteralOperatorsDefaultToWord : IO Unit := do
   let unconstrained := String.intercalate "\n" [
     "function add() { 1 + 1; return; }",
     "function invert() { ~1; return; }",
     "function compare() returns (Bool) { return 1 == 1; }"
   ]
-  match SourceInference.loadAndCheckProgram (workspace unconstrained) with
-  | .error errors =>
-      let unresolved := errors.filter fun error => match error with
-        | .body { error := .unresolvedIntegerLiteralTarget _ (.variable _),
-            .. } => true
-        | _ => false
-      assertTrue (unresolved.length == 3)
-        "an unconstrained deferred operator avoided final literal validation"
-  | .ok _ => throw (IO.userError
-      "unconstrained deferred integer-literal operators were accepted")
+  let checked ← check unconstrained
+  let validate (label : String) (expectedBody expectedOperator : TypeSystem.Ty)
+      (literalCount : Nat)
+      (acceptsOperator : SourceInference.ExpressionForm → Bool)
+      (function : SourceInference.CheckedFunction) : IO Unit := do
+    let literals := integerLiteralRows function
+    let hasOperator := function.typedBody.nodes.any fun
+      | .expression node =>
+          node.type == expectedOperator && node.requirements.isEmpty &&
+            node.coercions.isEmpty && acceptsOperator node.form
+      | .statement _ => false
+    assertTrue (function.inferredBodyType == expectedBody &&
+        literals.length == literalCount &&
+        literals.all (hasExactDefaultedWordEvidence function) &&
+        function.solvedRequirements.length == literalCount &&
+        function.solvedRequirements.all hasBuiltinIntWordEvidence && hasOperator)
+      s!"{label} did not default its operands to the builtin Word operator"
+  match checked with
+  | [addition, complement, comparison] =>
+      validate "unconstrained addition" .unit .word 2
+        (fun form => form matches .binary _ .add _) addition
+      validate "unconstrained complement" .unit .word 1
+        (fun form => form matches .unary .bitNot _) complement
+      validate "unconstrained equality" .bool .bool 2
+        (fun form => form matches .binary _ .equal _) comparison
+  | functions => throw (IO.userError
+      s!"unconstrained operator fixture checked {functions.length} functions")
+
+private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
   let unsupported := String.intercalate "\n" [
     "enum Box { Only }",
     "function acceptBox(value: Box) returns (Box) { return value; }",
@@ -332,14 +406,20 @@ private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
     "function accept(value: Word) returns (Word) { return value; }",
     "function rejected() returns (Word) { return accept(1 + 1); }"
   ]
-  match SourceInference.loadAndCheckProgram (workspace traitOwned) with
+  let loaded ← load traitOwned
+  let add ← match loaded.environment.traitsNamed "Add" with
+    | [declaration] => pure declaration.id
+    | declarations => throw (IO.userError
+        s!"expected one Add trait, found {declarations.length}")
+  match SourceInference.checkLoadedProgram loaded with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
         | .body { error := .noTraitImplementation predicate, .. } =>
-            predicate.trait != ProgramTraitId.builtin .int &&
-              predicate.subject == TypeSystem.Ty.word
+            decide (predicate.trait = add) &&
+              predicate.subject == TypeSystem.Ty.word &&
+              predicate.arguments.isEmpty
         | _ => false)
-        "a deferred builtin operator bypassed an available Add catalog"
+        "a defaulted Word operator bypassed its source Add<Word> obligation"
   | .ok _ => throw (IO.userError
       "an available Add catalog was bypassed by direct builtin deferral")
   let logical := String.intercalate "\n" [
@@ -386,22 +466,39 @@ private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
   | .ok _ => throw (IO.userError
       "an unrelated literal authorized an integer operator on nonliteral inputs")
 
-private def testBooleanOperatorResultDoesNotTypeOperands : IO Unit := do
+private def testDefaultedIntegerLiteralOperatorsRespectSourceTraits : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {",
     "  function eq(left: T, right: T) returns (Bool);",
     "}",
-    "function compare() returns (Bool) { return 1 == 1; }"
+    "trait BitNot<T> {",
+    "  function bnot(value: T) returns (T);",
+    "}",
+    "function compare() returns (Bool) { return 1 == 1; }",
+    "function invert() { ~1; return; }"
   ]
-  match SourceInference.loadAndCheckProgram (workspace source) with
+  let loaded ← load source
+  let eq ← match loaded.environment.traitsNamed "Eq" with
+    | [declaration] => pure declaration.id
+    | declarations => throw (IO.userError
+        s!"expected one Eq trait, found {declarations.length}")
+  let bitNot ← match loaded.environment.traitsNamed "BitNot" with
+    | [declaration] => pure declaration.id
+    | declarations => throw (IO.userError
+        s!"expected one BitNot trait, found {declarations.length}")
+  match SourceInference.checkLoadedProgram loaded with
   | .error errors =>
-      assertTrue (errors.any fun error => match error with
-        | .body { error := .unresolvedIntegerLiteralTarget _ (.variable _),
-            .. } => true
-        | _ => false)
-        "a Bool-valued comparison forced its integer operands to Bool"
+      let misses (trait : Resolved.DeclarationId) := errors.any fun error =>
+        match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            decide (predicate.trait = trait) &&
+              predicate.subject == TypeSystem.Ty.word &&
+              predicate.arguments.isEmpty
+        | _ => false
+      assertTrue (errors.length == 2 && misses eq && misses bitNot)
+        "defaulted literal operators lost their exact Eq<Word> or BitNot<Word> obligation"
   | .ok _ => throw (IO.userError
-      "an unconstrained integer comparison acquired an operand type")
+      "source Eq/BitNot catalogs without Word implementations were bypassed")
 
 private def testGroundOperatorResultKeepsCoercion : IO Unit := do
   let checked ← check (String.intercalate "\n" [
@@ -723,13 +820,15 @@ def testSourceInference : IO Unit := do
   testAmbiguousOverload
   testIntegerLiteralExpectedType
   testSourceNamedLiteralTraitsDoNotAuthorize
-  testUnconstrainedIntegerLiteralRejected
+  testUnconstrainedIntegerLiteralDefaultsToWord
   testLetBoundIntegerLiteralClosesLater
+  testUnusedLetIntegerLiteralDefaultsIndependently
   testLiteralRequirementPreservesIndependentPolymorphism
   testContextualIntegerLiteralOperators
   testNestedIntegerLiteralOperatorsCloseLater
+  testUnconstrainedIntegerLiteralOperatorsDefaultToWord
   testDeferredIntegerLiteralOperatorRejections
-  testBooleanOperatorResultDoesNotTypeOperands
+  testDefaultedIntegerLiteralOperatorsRespectSourceTraits
   testGroundOperatorResultKeepsCoercion
   testUnsupportedStatement
   testTraitBackedCoercion
