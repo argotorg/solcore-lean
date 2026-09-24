@@ -14,6 +14,49 @@ private def ordinaryHeap : Heap := {
   cells := [{ type := .bool, value := some (.bool false) }]
 }
 
+/-- Descriptor-free storage is the ordinary monomorphic branch. -/
+example {id : Resolved.LocalId} {scheme : Scheme} {cell : Cell}
+    (monomorphic : scheme.quantified = [])
+    (descriptor_empty : cell.generalized = none) :
+    LocalCellStorage id scheme cell :=
+  .ordinary monomorphic descriptor_empty
+
+/-- Principal descriptors retain the stable local identity and scheme used by
+the lexical environment. -/
+example {cell : Cell} {function : GeneralizedClosure}
+    (descriptor : cell.generalized = some function) :
+    LocalCellStorage function.binder.id function.binder.scheme cell :=
+  .generalized descriptor rfl rfl
+
+/-- A descriptor-free runtime lookup can only select the monomorphic storage
+branch of an agreeing environment. -/
+example {heap : Heap} {scope : Resolved.LocalScope Scheme}
+    {environment : SourceSemantics.Dynamic.Environment}
+    {id : Resolved.LocalId} {scheme : Scheme}
+    {location : Location} {cell : Cell}
+    (agrees : EnvironmentAgrees heap scope environment)
+    (staticLookup : Resolved.LocalScope.Lookup scope id scheme)
+    (dynamicLookup : Environment.LooksUp environment id location)
+    (read : Heap.Reads heap location cell)
+    (descriptor_empty : cell.generalized = none) :
+    scheme.quantified = [] :=
+  agrees.lookup_monomorphic_of_descriptor_empty staticLookup dynamicLookup read
+    descriptor_empty
+
+/-- A present principal descriptor is aligned with the lexical local selected
+at the same runtime location. -/
+example {heap : Heap} {scope : Resolved.LocalScope Scheme}
+    {environment : SourceSemantics.Dynamic.Environment}
+    {id : Resolved.LocalId} {scheme : Scheme}
+    {location : Location} {cell : Cell} {function : GeneralizedClosure}
+    (agrees : EnvironmentAgrees heap scope environment)
+    (staticLookup : Resolved.LocalScope.Lookup scope id scheme)
+    (dynamicLookup : Environment.LooksUp environment id location)
+    (read : Heap.Reads heap location cell)
+    (descriptor : cell.generalized = some function) :
+    function.binder.id = id ∧ function.binder.scheme = scheme :=
+  agrees.lookup_generalized staticLookup dynamicLookup read descriptor
+
 /-- Adding generalized metadata to `CellWellTyped` leaves ordinary cells on
 the existing value-typing path. -/
 example (context : Context) : HeapWellTyped context ordinaryHeap := by

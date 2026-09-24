@@ -406,12 +406,13 @@ mutual
         cases typing with
         | integerLiteral valid =>
             exact ⟨constructs.hasType, before_typed, .refl before⟩
-    | evaluated@(.local layout lookup read initialized) => by
+    | evaluated@(.local layout lookup read descriptor_empty initialized) => by
         cases typing with
         | reference reference_use =>
             exact evaluated.referencePreserves environment_agrees before_typed
               (.reference reference_use)
-    | evaluated@(.localEmptyMapping layout lookup read type_eq empty write) => by
+    | evaluated@(.localEmptyMapping layout lookup read descriptor_empty type_eq
+        empty write) => by
         cases typing with
         | reference reference_use =>
             exact evaluated.referencePreserves environment_agrees before_typed
@@ -823,7 +824,7 @@ mutual
           ⟨evaluated_typed, after_typed, extension⟩
         rcases environment_agrees.lookup static_lookup with
           ⟨staticLocation, staticCell, static_lookup_runtime, static_read,
-            static_cell_type⟩
+            static_cell_type, _storage⟩
         have location_eq := dynamic_lookup.functional static_lookup_runtime
         subst staticLocation
         have initial_cell_eq := initial_read.functional static_read
@@ -1644,7 +1645,8 @@ mutual
               heap_typed := after_typed
               heap_extends := allocation_extension
               outcome_typed := .fallthrough
-                (.cons allocate.reads_new rfl runtime_monomorphic
+                (.cons allocate.reads_new rfl
+                  (.ordinary runtime_monomorphic rfl)
                   (environment_agrees.mono allocation_extension))
             }
     | .letInitialized contains form_eq evaluate runtime_monomorphic extension allocate => by
@@ -1671,7 +1673,8 @@ mutual
               heap_typed := after_typed
               heap_extends := evaluation_extension.trans allocation_extension
               outcome_typed := .fallthrough
-                (.cons allocate.reads_new rfl runtime_monomorphic
+                (.cons allocate.reads_new rfl
+                  (.ordinary runtime_monomorphic rfl)
                   ((environment_agrees.mono evaluation_extension).mono
                     allocation_extension))
             }
@@ -2938,7 +2941,7 @@ mutual
             cases extension
             have heap_extension := HeapTypesExtend.of_allocation allocate
             exact ⟨rfl, before_typed.allocate (.none _) allocate, heap_extension,
-              .cons allocate.reads_new rfl runtime_monomorphic
+              .cons allocate.reads_new rfl (.ordinary runtime_monomorphic rfl)
                 (environment_agrees.mono heap_extension)⟩
     | .letInitialized evaluate runtime_monomorphic extension allocate => by
         cases typing with
@@ -2953,7 +2956,7 @@ mutual
             have allocation_extension := HeapTypesExtend.of_allocation allocate
             exact ⟨rfl, middle_typed.allocate (.some value_typed) allocate,
               evaluation_extension.trans allocation_extension,
-              .cons allocate.reads_new rfl runtime_monomorphic
+              .cons allocate.reads_new rfl (.ordinary runtime_monomorphic rfl)
                 ((environment_agrees.mono evaluation_extension).mono
                   allocation_extension)⟩
         | letInitializedGeneralized polymorphic _generalizes initializer_type

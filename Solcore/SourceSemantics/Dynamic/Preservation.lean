@@ -596,7 +596,7 @@ theorem preservesEnvironmentAgreement
   | intro wellFormed fresh =>
       cases bound with
       | intro allocation =>
-          exact .cons allocation.reads_new rfl monomorphic
+          exact .cons allocation.reads_new rfl (.ordinary monomorphic rfl)
             (agrees.mono (HeapTypesExtend.of_allocation allocation))
 
 end Binds
@@ -1421,7 +1421,8 @@ theorem preservesEnvironmentAgreement
           cases headExtension
           exact inductionHypothesis tailExtension
             (fun binder member => monomorphic binder (by simp [member]))
-            (.cons allocation.reads_new rfl (monomorphic _ (by simp))
+            (.cons allocation.reads_new rfl
+              (.ordinary (monomorphic _ (by simp)) rfl)
               (agrees.mono (HeapTypesExtend.of_allocation allocation)))
 
 end BindersAllocate
@@ -1717,7 +1718,7 @@ theorem preserves
             ⟨evaluated_typed, after_typed, extension⟩
           rcases environment_agrees.lookup static_lookup with
             ⟨staticLocation, staticCell, static_lookup_runtime, static_read,
-              static_cell_type⟩
+              static_cell_type, _storage⟩
           have location_eq := dynamic_lookup.functional static_lookup_runtime
           subst staticLocation
           have initial_cell_eq := initial_read.functional static_read
@@ -2055,13 +2056,15 @@ theorem referencePreserves
       have reference_type := reference_use.raw_type
       cases reference_type with
       | «local» static_lookup instantiates =>
-          have monomorphic :=
-            environment_agrees.lookup_monomorphic static_lookup
-          have raw_eq := monomorphicInstance_eq_body monomorphic instantiates
           cases evaluation with
-          | «local» layout dynamic_lookup read initialized =>
+          | «local» layout dynamic_lookup read descriptor_empty initialized =>
+              have monomorphic :=
+                environment_agrees.lookup_monomorphic_of_descriptor_empty
+                  static_lookup dynamic_lookup read descriptor_empty
+              have raw_eq := monomorphicInstance_eq_body monomorphic instantiates
               rcases environment_agrees.lookup static_lookup with
-                ⟨typedLocation, typedCell, typed_lookup, typed_read, cell_type⟩
+                ⟨typedLocation, typedCell, typed_lookup, typed_read, cell_type,
+                  _storage⟩
               have location_eq := dynamic_lookup.functional typed_lookup
               subst typedLocation
               have cell_eq := read.functional typed_read
@@ -2076,9 +2079,15 @@ theorem referencePreserves
                     exact value_typed
                   exact ⟨result_typed, before_typed, .refl before⟩
           | @localEmptyMapping _ _ _ _ _ _ _ _ _ _ location cell keyType
-              valueType layout dynamic_lookup read type_eq empty write =>
+              valueType layout dynamic_lookup read descriptor_empty type_eq empty
+              write =>
+              have monomorphic :=
+                environment_agrees.lookup_monomorphic_of_descriptor_empty
+                  static_lookup dynamic_lookup read descriptor_empty
+              have raw_eq := monomorphicInstance_eq_body monomorphic instantiates
               rcases environment_agrees.lookup static_lookup with
-                ⟨typedLocation, typedCell, typed_lookup, typed_read, cell_type⟩
+                ⟨typedLocation, typedCell, typed_lookup, typed_read, cell_type,
+                  _storage⟩
               have location_eq := dynamic_lookup.functional typed_lookup
               subst typedLocation
               have cell_eq := read.functional typed_read
@@ -3110,7 +3119,8 @@ theorem preservesWith
             heap_typed := after_typed
             heap_extends := allocation_extension
             outcome_typed := .fallthrough
-              (.cons allocate.reads_new rfl runtime_monomorphic
+              (.cons allocate.reads_new rfl
+                (.ordinary runtime_monomorphic rfl)
                 (environment_agrees.mono allocation_extension))
           }
   | letInitialized contains form_eq evaluate runtime_monomorphic extension allocate =>
@@ -3130,7 +3140,8 @@ theorem preservesWith
             heap_typed := after_typed
             heap_extends := evaluation_extension.trans allocation_extension
             outcome_typed := .fallthrough
-              (.cons allocate.reads_new rfl runtime_monomorphic
+              (.cons allocate.reads_new rfl
+                (.ordinary runtime_monomorphic rfl)
                 ((environment_agrees.mono evaluation_extension).mono
                   allocation_extension))
           }

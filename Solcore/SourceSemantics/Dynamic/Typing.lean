@@ -81,9 +81,27 @@ structure GeneralizedClosureCodeValid
           function.binder)
         node.form function.binder.scheme.body (.ordinary [])
 
+/-- Runtime storage associated with one lexical local.  Ordinary cells carry
+no principal descriptor and therefore require a monomorphic scheme.  A
+generalized cell instead retains a descriptor whose stable identity and
+principal scheme agree with the lexical entry. -/
+inductive LocalCellStorage (id : Resolved.LocalId) (scheme : Scheme) :
+    Cell → Prop where
+  | ordinary
+      {cell : Cell}
+      (monomorphic : scheme.quantified = [])
+      (descriptor_empty : cell.generalized = none) :
+      LocalCellStorage id scheme cell
+  | generalized
+      {cell : Cell} {function : GeneralizedClosure}
+      (descriptor : cell.generalized = some function)
+      (binder_id : function.binder.id = id)
+      (binder_scheme : function.binder.scheme = scheme) :
+      LocalCellStorage id scheme cell
+
 /-- Exact agreement between a lexical type scope, its location environment,
-and the declared types of those locations.  Initialized values are checked by
-`HeapWellTyped`; keeping the two concerns separate permits cyclic closures. -/
+and the declared storage of those locations.  Initialized values are checked
+by `HeapWellTyped`; keeping the two concerns separate permits cyclic closures. -/
 inductive EnvironmentAgrees (heap : Heap) :
     Resolved.LocalScope Scheme → Environment → Prop where
   | nil : EnvironmentAgrees heap [] []
@@ -93,7 +111,7 @@ inductive EnvironmentAgrees (heap : Heap) :
       {cell : Cell}
       (read : Heap.Reads heap location cell)
       (cell_type : cell.type = scheme.body)
-      (monomorphic : scheme.quantified = [])
+      (storage : LocalCellStorage id scheme cell)
       (tail : EnvironmentAgrees heap scope environment) :
       EnvironmentAgrees heap ((id, scheme) :: scope)
         ((id, location) :: environment)
@@ -561,31 +579,71 @@ theorem lookup
     ∃ location cell,
       Environment.LooksUp environment id location ∧
       Heap.Reads heap location cell ∧
-      cell.type = scheme.body := by
+      cell.type = scheme.body ∧
+      LocalCellStorage id scheme cell := by
   induction agrees with
   | nil => cases staticLookup
   | @cons scope environment headId headScheme location cell read cell_type
-      monomorphic tail ih =>
+      storage tail ih =>
       cases staticLookup with
-      | head => exact ⟨location, cell, .head, read, cell_type⟩
+      | head => exact ⟨location, cell, .head, read, cell_type, storage⟩
       | tail different found =>
-          rcases ih found with ⟨foundLocation, foundCell, envLookup, heapRead, typeEq⟩
-          exact ⟨foundLocation, foundCell, .tail different envLookup, heapRead, typeEq⟩
+          rcases ih found with
+            ⟨foundLocation, foundCell, envLookup, heapRead, typeEq, storage⟩
+          exact ⟨foundLocation, foundCell, .tail different envLookup, heapRead,
+            typeEq, storage⟩
 
-/-- Every reachable runtime local is backed by a monomorphic lexical scheme. -/
-theorem lookup_monomorphic
+/-- Reading a descriptor-free local recovers the monomorphic lexical branch. -/
+theorem lookup_monomorphic_of_descriptor_empty
     {heap : Heap} {scope : Resolved.LocalScope Scheme}
     {environment : Environment}
     (agrees : EnvironmentAgrees heap scope environment)
     {id : Resolved.LocalId} {scheme : Scheme}
-    (staticLookup : Resolved.LocalScope.Lookup scope id scheme) :
+    {location : Location} {cell : Cell}
+    (staticLookup : Resolved.LocalScope.Lookup scope id scheme)
+    (dynamicLookup : Environment.LooksUp environment id location)
+    (read : Heap.Reads heap location cell)
+    (descriptor_empty : cell.generalized = none) :
     scheme.quantified = [] := by
-  induction agrees with
-  | nil => cases staticLookup
-  | cons _ _ monomorphic _ inductionHypothesis =>
-      cases staticLookup with
-      | head => exact monomorphic
-      | tail _ found => exact inductionHypothesis found
+  rcases agrees.lookup staticLookup with
+    ⟨typedLocation, typedCell, typedLookup, typedRead, _cellType, storage⟩
+  have location_eq := dynamicLookup.functional typedLookup
+  subst typedLocation
+  have cell_eq := read.functional typedRead
+  subst typedCell
+  cases storage with
+  | ordinary monomorphic _ => exact monomorphic
+  | generalized descriptor _ _ =>
+      rw [descriptor_empty] at descriptor
+      cases descriptor
+
+/-- Reading a generalized descriptor recovers its lexical identity and
+principal scheme. -/
+theorem lookup_generalized
+    {heap : Heap} {scope : Resolved.LocalScope Scheme}
+    {environment : Environment}
+    (agrees : EnvironmentAgrees heap scope environment)
+    {id : Resolved.LocalId} {scheme : Scheme}
+    {location : Location} {cell : Cell} {function : GeneralizedClosure}
+    (staticLookup : Resolved.LocalScope.Lookup scope id scheme)
+    (dynamicLookup : Environment.LooksUp environment id location)
+    (read : Heap.Reads heap location cell)
+    (descriptor : cell.generalized = some function) :
+    function.binder.id = id ∧ function.binder.scheme = scheme := by
+  rcases agrees.lookup staticLookup with
+    ⟨typedLocation, typedCell, typedLookup, typedRead, _cellType, storage⟩
+  have location_eq := dynamicLookup.functional typedLookup
+  subst typedLocation
+  have cell_eq := read.functional typedRead
+  subst typedCell
+  cases storage with
+  | ordinary _ descriptor_empty =>
+      rw [descriptor_empty] at descriptor
+      cases descriptor
+  | generalized stored storedId storedScheme =>
+      have function_eq : _ = function := Option.some.inj (stored.symm.trans descriptor)
+      subst function
+      exact ⟨storedId, storedScheme⟩
 
 /-- Preserving location types preserves lexical/heap agreement. -/
 theorem mono
@@ -596,10 +654,18 @@ theorem mono
     EnvironmentAgrees after scope environment := by
   induction agrees with
   | nil => exact .nil
-  | cons read cell_type monomorphic _ ih =>
+  | @cons scope environment id scheme location cell read cell_type storage _ ih =>
       rcases extension _ _ read with
-        ⟨updatedCell, updatedRead, updatedType, _⟩
-      exact .cons updatedRead (updatedType.trans cell_type) monomorphic ih
+        ⟨updatedCell, updatedRead, updatedType, updatedDescriptor⟩
+      have updatedStorage : LocalCellStorage id scheme updatedCell := by
+        cases storage with
+        | ordinary monomorphic descriptor_empty =>
+            exact .ordinary monomorphic
+              (updatedDescriptor.trans descriptor_empty)
+        | generalized descriptor binder_id binder_scheme =>
+            exact .generalized (updatedDescriptor.trans descriptor) binder_id
+              binder_scheme
+      exact .cons updatedRead (updatedType.trans cell_type) updatedStorage ih
 
 end EnvironmentAgrees
 

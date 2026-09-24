@@ -1042,7 +1042,8 @@ theorem control_preservesEnvironmentAgreement
           cases headExtension
           exact induction tailExtension
             (fun binder member => monomorphic binder (by simp [member]))
-            (.cons allocation.reads_new rfl (monomorphic _ (by simp))
+            (.cons allocation.reads_new rfl
+              (.ordinary (monomorphic _ (by simp)) rfl)
               (agrees.mono (HeapTypesExtend.of_allocation allocation)))
 
 end BindersAllocate

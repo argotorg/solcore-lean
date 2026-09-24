@@ -768,6 +768,7 @@ mutual
         (layout : OrdinaryRequirementLayout requirements coercions [])
         (lookup : Environment.LooksUp environment binder location)
         (read : Heap.Reads heap location cell)
+        (descriptor_empty : cell.generalized = none)
         (empty : cell.value = none)
         (not_mapping : ¬ ∃ keyType valueType, cell.type = .mapping keyType valueType) :
         ExpressionFormFaults program context evidence source environment heap

@@ -345,6 +345,7 @@ mutual
         (layout : OrdinaryRequirementLayout requirements coercions [])
         (lookup : Environment.LooksUp environment binder location)
         (read : Heap.Reads heap location cell)
+        (descriptor_empty : cell.generalized = none)
         (initialized : cell.value = some value) :
         ExpressionFormEvaluates program context evidence source environment heap
           (.reference name (.local binder)) requirements coercions value heap
@@ -354,6 +355,7 @@ mutual
         (layout : OrdinaryRequirementLayout requirements coercions [])
         (lookup : Environment.LooksUp environment binder location)
         (read : Heap.Reads before location cell)
+        (descriptor_empty : cell.generalized = none)
         (type_eq : cell.type = .mapping keyType valueType)
         (empty : cell.value = none)
         (write : Heap.Writes before location
