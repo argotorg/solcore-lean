@@ -2586,9 +2586,9 @@ end RuntimeContextFields
 
 /-- Static invariants shared by every successful execution rooted in one
 rigidly and lexically closed, residual-open source body.  In particular,
-ledger uniqueness is needed to identify
-the predicate selected independently by static typing and dynamic method
-dispatch. -/
+ledger identity uniqueness is needed to identify the predicate selected
+independently by static typing and dynamic method dispatch.  Entry validity
+remains local to the corresponding typing derivations. -/
 structure SourceRuntimeValid (program : Program) (context : Context)
     (source : TypedSource) : Prop where
   signatures : context.signatures = program.signatures
@@ -2597,7 +2597,7 @@ structure SourceRuntimeValid (program : Program) (context : Context)
   closed : context.typeParameters = []
   variables_closed : context.typeVariables = []
   residual_variables_open : context.residualTypeVariables = true
-  ledger : RequirementLedgerWellFormed context
+  ledger : RequirementIdsUnique context
 
 namespace SourceRuntimeValid
 
@@ -2616,16 +2616,7 @@ theorem transport
       fields.residualTypeVariables.trans valid.residual_variables_open
     ledger := ?_
   }
-  rcases valid.ledger with ⟨idsUnique, entriesValid⟩
-  constructor
-  · simpa [RequirementIdsUnique, fields.solvedRequirements] using idsUnique
-  · intro requirement member
-    have sourceMember : requirement ∈ source.solvedRequirements := by
-      simpa [fields.solvedRequirements] using member
-    cases entriesValid requirement sourceMember with
-    | intro evidenceValid =>
-        exact .intro (by
-          simpa [fields.assumptions, fields.signatures] using evidenceValid)
+  simpa [RequirementIdsUnique, fields.solvedRequirements] using valid.ledger
 
 end SourceRuntimeValid
 
@@ -3682,7 +3673,7 @@ theorem sourceRuntimeValid
   closed := certificate.type_parameters_empty
   variables_closed := certificate.type_variables_empty
   residual_variables_open := certificate.residual_type_variables_open
-  ledger := certificate.requirement_ledger
+  ledger := certificate.requirement_ledger.idsUnique
 }
 
 end BodyInstanceTypingCertificate

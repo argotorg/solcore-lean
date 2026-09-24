@@ -800,7 +800,7 @@ theorem OperatorMethodSelected.certificateOfProfile
     {requirements : List RequirementId} {bodyInstance : BodyInstance}
     (programWellFormed : ProgramWellFormed program)
     (signatures_eq : context.signatures = program.signatures)
-    (ledger : RequirementLedgerWellFormed context)
+    (ledger : RequirementIdsUnique context)
     (profile : OperatorProfileInstantiates context traitName methodName operand
       parameterTypes returnTypes predicates)
     (requirementsProve : RequirementSequenceProves context requirements
@@ -957,7 +957,7 @@ theorem OperatorMethodSelected.coercionCertificateOfProfile
     {requirements : List RequirementId} {bodyInstance : BodyInstance}
     (programWellFormed : ProgramWellFormed program)
     (signatures_eq : context.signatures = program.signatures)
-    (ledger : RequirementLedgerWellFormed context)
+    (ledger : RequirementIdsUnique context)
     (profile : CoercionProfileInstantiates context source target primary
       methodPredicates)
     (requirementsProve : RequirementSequenceProves context requirements

@@ -259,12 +259,14 @@ inductive DirectCallProducesEvidence (context : Context)
         predicates calleeEvidence
 
 /-- A closure invocation frame recovers the static source context needed to
-interpret retained requirements and closes all of its generic assumptions. -/
+interpret retained requirement identities and closes all of its generic
+assumptions.  Dynamic dispatch only needs identity uniqueness here; evidence
+validity is supplied by the typing derivation at each use site. -/
 structure ClosureFrame (program : Program) (function : Closure) : Prop where
   signatures : function.context.signatures = program.signatures
   owner : function.context.currentDeclaration = some function.source.owner
   code : ClosureCodeValid function.context function
-  requirements : RequirementLedgerWellFormed function.context
+  requirements : RequirementIdsUnique function.context
   evidence_covers : function.evidence.Covers function.context
 
 /-- A selected match branch after its pattern bindings have been allocated. -/
