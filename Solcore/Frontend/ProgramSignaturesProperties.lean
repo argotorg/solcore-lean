@@ -242,6 +242,17 @@ theorem buildProgramSignatures_success_implementation_head_validated
   buildProgramSignatures_success_implementation_head_validated_state success
     signature member
 
+/-- Successful collection establishes exact trait-method correspondence and
+selected-trait method completeness for every implementation. -/
+theorem buildProgramSignatures_success_implementation_method_catalog_validated
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ signatures.implementations) :
+    ImplementationSignatureMethodCatalogValidated signatures.traits signature :=
+  buildProgramSignatures_success_implementation_method_catalog_state success
+    signature member
+
 /-- Successful collection rejects duplicate method names within every
 implementation. -/
 theorem buildProgramSignatures_success_implementation_method_names_nodup

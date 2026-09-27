@@ -392,6 +392,20 @@ theorem checkLoadedProgram_success_implementation_head_validated
   buildProgramSignatures_success_implementation_head_validated
     (checkLoadedProgram_success_signatures success) member
 
+/-- A successful loaded-program check retains exact method correspondence and
+completeness for each implementation's selected trait. -/
+theorem checkLoadedProgram_success_implementation_method_catalog_validated
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ checked.signatures.implementations) :
+    ImplementationSignatureMethodCatalogValidated checked.signatures.traits
+      signature :=
+  buildProgramSignatures_success_implementation_method_catalog_validated
+    (checkLoadedProgram_success_signatures success) member
+
 /-- A successful loaded-program check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkLoadedProgram_success_ids
@@ -584,6 +598,21 @@ theorem checkProgram_success_implementation_head_validated
     ImplementationSignatureHeadValidated checked.signatures.traits signature := by
   obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
   exact checkLoadedProgram_success_implementation_head_validated
+    checkedSuccess member
+
+/-- End-to-end checker success establishes exact trait-method correspondence
+and selected-trait method completeness for every implementation. -/
+theorem checkProgram_success_implementation_method_catalog_validated
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ checked.signatures.implementations) :
+    ImplementationSignatureMethodCatalogValidated checked.signatures.traits
+      signature := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_implementation_method_catalog_validated
     checkedSuccess member
 
 /-- End-to-end checker success assigns globally unique constructor identities

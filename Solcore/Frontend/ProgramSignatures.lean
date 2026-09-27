@@ -307,6 +307,38 @@ structure ImplementationSignatureHeadValidated
       (ProgramPredicate.applyParameters substitution) →
       predicate ∈ signature.wherePredicates
 
+/-- Method-to-trait correspondence fixed by required-method validation and
+trait-method attachment.  Completeness is stated for the exact trait selected
+while collecting the implementation; catalog-wide trait identity uniqueness
+allows later semantic consumers to transport it to any equal-headed entry. -/
+structure ImplementationSignatureMethodCatalogValidated
+    (traits : List ProgramTraitSignature)
+    (signature : ProgramImplementationSignature) : Prop where
+  trait_catalog : ∃ trait ∈ traits,
+    signature.head.trait = .declaration trait.id ∧
+    (∀ method, method ∈ signature.methods →
+      ∃ traitMethod, traitMethod ∈ trait.methods ∧
+        traitMethod.id = method.traitMethod ∧
+        traitMethod.name = method.name ∧
+        let substitution : TypeSystem.ParameterSubstitution :=
+          trait.parameters.zip
+            (signature.head.subject :: signature.head.arguments)
+        method.parameterTypes =
+          traitMethod.parameterTypes.map substitution.apply ∧
+        method.returnTypes =
+          traitMethod.returnTypes.map substitution.apply ∧
+        method.parameterComptime = traitMethod.parameterComptime ∧
+        method.returnComptime = traitMethod.returnComptime ∧
+        method.wherePredicates = traitMethod.wherePredicates.map
+          (ProgramPredicate.applyParameters substitution)) ∧
+    (∀ traitMethod, traitMethod ∈ trait.methods →
+      ∃ method ∈ signature.methods, method.traitMethod = traitMethod.id)
+
+private def TraitSignaturesStructurallyWellFormed
+    (traits : List ProgramTraitSignature) : Prop :=
+  ∀ signature, signature ∈ traits →
+    TraitSignatureStructuralWellFormed signature
+
 /-- Stable source identity of one constructor within an algebraic data
 declaration.  Constructor order is semantic because Core data values retain
 the same zero-based tag. -/
@@ -1293,6 +1325,51 @@ private def parameterComptime
 
 end UnmatchedProgramImplMethod
 
+/-- The exact signature comparison performed before an implementation method
+is attached to its selected trait method identity. -/
+private structure UnmatchedImplMethodMatchesTrait
+    (substitution : TypeSystem.ParameterSubstitution)
+    (traitMethod : ProgramTraitMethodSignature)
+    (implMethod : UnmatchedProgramImplMethod) : Prop where
+  name : traitMethod.name = implMethod.name
+  parameter_types : implMethod.parameterTypes =
+    traitMethod.parameterTypes.map substitution.apply
+  return_types : implMethod.returnTypes =
+    traitMethod.returnTypes.map substitution.apply
+  parameter_comptime : implMethod.parameterComptime =
+    traitMethod.parameterComptime
+  return_comptime : implMethod.returnComptime = traitMethod.returnComptime
+  predicates : implMethod.wherePredicates = traitMethod.wherePredicates.map
+    (ProgramPredicate.applyParameters substitution)
+
+/-- Two members of a list with duplicate-free projected keys and the same key
+are the same retained value. -/
+private theorem eq_of_mem_of_projected_nodup
+    {value key : Type} (project : value → key)
+    {values : List value} {left right : value}
+    (unique : (values.map project).Nodup)
+    (leftMember : left ∈ values) (rightMember : right ∈ values)
+    (keysEqual : project left = project right) : left = right := by
+  induction values generalizing left right with
+  | nil => simp at leftMember
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at unique
+      rcases unique with ⟨headAbsent, tailUnique⟩
+      simp only [List.mem_cons] at leftMember rightMember
+      rcases leftMember with rfl | leftMember
+      · rcases rightMember with rfl | rightMember
+        · rfl
+        · exfalso
+          apply headAbsent
+          rw [keysEqual]
+          exact List.mem_map.mpr ⟨right, rightMember, rfl⟩
+      · rcases rightMember with rfl | rightMember
+        · exfalso
+          apply headAbsent
+          rw [← keysEqual]
+          exact List.mem_map.mpr ⟨left, leftMember, rfl⟩
+        · exact induction tailUnique leftMember rightMember keysEqual
+
 private structure UnmatchedImplMethodsStructural
     (owner : Resolved.DeclarationId) (index : Nat)
     (seen : List (String × Nat))
@@ -1474,6 +1551,74 @@ private def validateRequiredImplMethods
           expectedParameters implMethod.parameterTypes
           expectedReturns implMethod.returnTypes)
 
+/-- Successful required-method validation supplies one exactly matching source
+implementation method for every trait method. -/
+private theorem validateRequiredImplMethods_success_matches
+    {implementation : Resolved.DeclarationId}
+    {substitution : TypeSystem.ParameterSubstitution}
+    {traitMethods : List ProgramTraitMethodSignature}
+    {implMethods : List UnmatchedProgramImplMethod}
+    (success : validateRequiredImplMethods implementation substitution
+      traitMethods implMethods = .ok ()) :
+    ∀ traitMethod, traitMethod ∈ traitMethods →
+      ∃ implMethod, implMethod ∈ implMethods ∧
+        UnmatchedImplMethodMatchesTrait substitution traitMethod implMethod := by
+  induction traitMethods with
+  | nil => simp
+  | cons traitMethod rest induction =>
+      simp only [validateRequiredImplMethods] at success
+      cases foundEq : implMethods.find? fun method =>
+          method.name == traitMethod.name with
+      | none => simp [foundEq] at success
+      | some implMethod =>
+          simp only [foundEq] at success
+          by_cases parameterTypesEq :
+              traitMethod.parameterTypes.map substitution.apply =
+                implMethod.parameterTypes
+          · by_cases returnTypesEq :
+                traitMethod.returnTypes.map substitution.apply =
+                  implMethod.returnTypes
+            · by_cases parameterComptimeEq :
+                  traitMethod.parameterComptime = implMethod.parameterComptime
+              · by_cases returnComptimeEq :
+                    traitMethod.returnComptime = implMethod.returnComptime
+                · by_cases predicatesEq :
+                      traitMethod.wherePredicates.map
+                          (ProgramPredicate.applyParameters substitution) =
+                        implMethod.wherePredicates
+                  · have restSuccess :
+                        validateRequiredImplMethods implementation substitution
+                            rest implMethods = .ok () := by
+                      simpa [parameterTypesEq, returnTypesEq,
+                        parameterComptimeEq, returnComptimeEq, predicatesEq]
+                        using success
+                    intro candidate member
+                    simp only [List.mem_cons] at member
+                    rcases member with rfl | member
+                    · have implMember : implMethod ∈ implMethods :=
+                        List.mem_of_find?_eq_some foundEq
+                      have nameEq : implMethod.name = candidate.name := by
+                        have accepted := List.find?_some foundEq
+                        simpa using accepted
+                      exact ⟨implMethod, implMember, {
+                        name := nameEq.symm
+                        parameter_types := parameterTypesEq.symm
+                        return_types := returnTypesEq.symm
+                        parameter_comptime := parameterComptimeEq.symm
+                        return_comptime := returnComptimeEq.symm
+                        predicates := predicatesEq.symm
+                      }⟩
+                    · exact induction restSuccess candidate member
+                  · simp [parameterTypesEq, returnTypesEq,
+                      parameterComptimeEq, returnComptimeEq, predicatesEq]
+                      at success
+                · simp [parameterTypesEq, returnTypesEq,
+                    parameterComptimeEq, returnComptimeEq] at success
+              · simp [parameterTypesEq, returnTypesEq, parameterComptimeEq]
+                  at success
+            · simp [parameterTypesEq, returnTypesEq] at success
+          · simp [parameterTypesEq] at success
+
 private def attachTraitMethods
     (traitMethods : List ProgramTraitMethodSignature) :
     List UnmatchedProgramImplMethod →
@@ -1494,6 +1639,90 @@ private def attachTraitMethods
         wherePredicates := implMethod.wherePredicates
         source := implMethod.source
       } :: methods)
+
+/-- One output method is the field-for-field attachment of a retained source
+method to the trait method selected by its name. -/
+private def AttachedImplMethod
+    (traitMethods : List ProgramTraitMethodSignature)
+    (unmatched : UnmatchedProgramImplMethod)
+    (method : ProgramImplMethodSignature) : Prop :=
+  ∃ traitMethod, traitMethod ∈ traitMethods ∧
+    traitMethod.name = unmatched.name ∧
+    method.id = unmatched.id ∧
+    method.traitMethod = traitMethod.id ∧
+    method.name = unmatched.name ∧
+    method.parameters = unmatched.parameters ∧
+    method.returnTypes = unmatched.returnTypes ∧
+    method.returnComptime = unmatched.returnComptime ∧
+    method.wherePredicates = unmatched.wherePredicates ∧
+    method.source = unmatched.source
+
+/-- Successful attachment is a bidirectional correspondence between input and
+output method rows; no source method is dropped or duplicated. -/
+private theorem attachTraitMethods_success_correspondence
+    {traitMethods : List ProgramTraitMethodSignature}
+    {unmatchedMethods : List UnmatchedProgramImplMethod}
+    {methods : List ProgramImplMethodSignature}
+    (success : attachTraitMethods traitMethods unmatchedMethods = .ok methods) :
+    (∀ method, method ∈ methods →
+      ∃ unmatched, unmatched ∈ unmatchedMethods ∧
+        AttachedImplMethod traitMethods unmatched method) ∧
+    (∀ unmatched, unmatched ∈ unmatchedMethods →
+      ∃ method, method ∈ methods ∧
+        AttachedImplMethod traitMethods unmatched method) := by
+  induction unmatchedMethods generalizing methods with
+  | nil =>
+      change Except.ok [] = Except.ok methods at success
+      injection success with methodsEq
+      subst methods
+      simp
+  | cons implMethod rest induction =>
+      simp only [attachTraitMethods] at success
+      cases traitMethodEq : traitMethods.find? fun method =>
+          method.name == implMethod.name with
+      | none => simp [traitMethodEq] at success
+      | some traitMethod =>
+          simp only [traitMethodEq] at success
+          cases restEq : attachTraitMethods traitMethods rest with
+          | error error => simp [restEq, bind, Except.bind] at success
+          | ok restMethods =>
+              simp only [restEq, bind, Except.bind, pure, Pure.pure, Except.pure,
+                Except.ok.injEq] at success
+              subst methods
+              have traitMember : traitMethod ∈ traitMethods :=
+                List.mem_of_find?_eq_some traitMethodEq
+              have traitName : traitMethod.name = implMethod.name := by
+                have accepted := List.find?_some traitMethodEq
+                simpa using accepted
+              have restResult := induction restEq
+              constructor
+              · intro method member
+                simp only [List.mem_cons] at member
+                rcases member with rfl | member
+                · refine ⟨implMethod, by simp, ?_⟩
+                  exact ⟨traitMethod, traitMember, traitName, rfl, rfl, rfl,
+                    rfl, rfl, rfl, rfl, rfl⟩
+                · obtain ⟨unmatched, unmatchedMember, attached⟩ :=
+                    restResult.1 method member
+                  exact ⟨unmatched, by simp [unmatchedMember], attached⟩
+              · intro unmatched member
+                simp only [List.mem_cons] at member
+                rcases member with rfl | member
+                · let method : ProgramImplMethodSignature := {
+                    id := unmatched.id
+                    traitMethod := traitMethod.id
+                    name := unmatched.name
+                    parameters := unmatched.parameters
+                    returnTypes := unmatched.returnTypes
+                    returnComptime := unmatched.returnComptime
+                    wherePredicates := unmatched.wherePredicates
+                    source := unmatched.source
+                  }
+                  refine ⟨method, by simp [method], ?_⟩
+                  exact ⟨traitMethod, traitMember, traitName, by simp [method]⟩
+                · obtain ⟨method, methodMember, attached⟩ :=
+                    restResult.2 unmatched member
+                  exact ⟨method, by simp [methodMember], attached⟩
 
 /-- Attaching trait identities does not change implementation-method order or
 any of the structural projections established by source collection. -/
@@ -1582,6 +1811,92 @@ private theorem attachTraitMethods_success_structure
                     unmatched.method_parameter_names_nodup implMethod (by simp)
                 · exact restStructure.method_parameter_names_nodup method member
               · simp [restResult.2]
+
+/-- Exact method correspondence and completeness for one selected trait after
+required-method validation and identity attachment. -/
+private structure ImplMethodCatalogMatchesTrait
+    (substitution : TypeSystem.ParameterSubstitution)
+    (trait : ProgramTraitSignature)
+    (resolvedMethods : List ProgramImplMethodSignature) : Prop where
+  method_correspondence : ∀ method, method ∈ resolvedMethods →
+    ∃ traitMethod, traitMethod ∈ trait.methods ∧
+      traitMethod.id = method.traitMethod ∧
+      traitMethod.name = method.name ∧
+      method.parameterTypes =
+        traitMethod.parameterTypes.map substitution.apply ∧
+      method.returnTypes =
+        traitMethod.returnTypes.map substitution.apply ∧
+      method.parameterComptime = traitMethod.parameterComptime ∧
+      method.returnComptime = traitMethod.returnComptime ∧
+      method.wherePredicates = traitMethod.wherePredicates.map
+        (ProgramPredicate.applyParameters substitution)
+  complete : ∀ traitMethod, traitMethod ∈ trait.methods →
+    ∃ method ∈ resolvedMethods, method.traitMethod = traitMethod.id
+
+/-- The two executable method passes jointly establish exact correspondence.
+The two duplicate-name witnesses are essential: validation and attachment use
+independent name lookups in opposite directions. -/
+private theorem validatedAndAttachedImplMethods_matchTrait
+    {implementation : Resolved.DeclarationId}
+    {substitution : TypeSystem.ParameterSubstitution}
+    {trait : ProgramTraitSignature}
+    {unmatchedMethods : List UnmatchedProgramImplMethod}
+    {methods : List ProgramImplMethodSignature}
+    (traitStructure : TraitSignatureStructuralWellFormed trait)
+    (unmatchedStructure : UnmatchedImplMethodsStructural implementation 0 []
+      unmatchedMethods)
+    (validated : validateRequiredImplMethods implementation substitution
+      trait.methods unmatchedMethods = .ok ())
+    (attached : attachTraitMethods trait.methods unmatchedMethods = .ok methods) :
+    ImplMethodCatalogMatchesTrait substitution trait methods := by
+  have required := validateRequiredImplMethods_success_matches validated
+  have correspondence := attachTraitMethods_success_correspondence attached
+  constructor
+  · intro method methodMember
+    obtain ⟨unmatched, unmatchedMember, attachedMethod⟩ :=
+      correspondence.1 method methodMember
+    rcases attachedMethod with
+      ⟨traitMethod, traitMethodMember, traitName, methodId, traitMethodId,
+        methodName, methodParameters, methodReturns, methodReturnComptime,
+        methodPredicates, methodSource⟩
+    obtain ⟨validatedMethod, validatedMember, methodMatch⟩ :=
+      required traitMethod traitMethodMember
+    have validatedEq : validatedMethod = unmatched :=
+      eq_of_mem_of_projected_nodup UnmatchedProgramImplMethod.name
+        unmatchedStructure.method_names_nodup validatedMember unmatchedMember
+        (methodMatch.name.symm.trans traitName)
+    subst validatedMethod
+    refine ⟨traitMethod, traitMethodMember, traitMethodId.symm,
+      traitName.trans methodName.symm, ?_, ?_, ?_, ?_, ?_⟩
+    · calc
+        method.parameterTypes = unmatched.parameterTypes := by
+          simp [ProgramImplMethodSignature.parameterTypes,
+            UnmatchedProgramImplMethod.parameterTypes, methodParameters]
+        _ = traitMethod.parameterTypes.map substitution.apply :=
+          methodMatch.parameter_types
+    · exact methodReturns.trans methodMatch.return_types
+    · calc
+        method.parameterComptime = unmatched.parameterComptime := by
+          simp [ProgramImplMethodSignature.parameterComptime,
+            UnmatchedProgramImplMethod.parameterComptime, methodParameters]
+        _ = traitMethod.parameterComptime := methodMatch.parameter_comptime
+    · exact methodReturnComptime.trans methodMatch.return_comptime
+    · exact methodPredicates.trans methodMatch.predicates
+  · intro traitMethod traitMethodMember
+    obtain ⟨unmatched, unmatchedMember, methodMatch⟩ :=
+      required traitMethod traitMethodMember
+    obtain ⟨method, methodMember, attachedMethod⟩ :=
+      correspondence.2 unmatched unmatchedMember
+    rcases attachedMethod with
+      ⟨selected, selectedMember, selectedName, methodId, selectedId,
+        methodName, methodParameters, methodReturns, methodReturnComptime,
+        methodPredicates, methodSource⟩
+    have selectedEq : selected = traitMethod :=
+      eq_of_mem_of_projected_nodup ProgramTraitMethodSignature.name
+        traitStructure.method_names_nodup selectedMember traitMethodMember
+        (selectedName.trans methodMatch.name.symm)
+    subst selected
+    exact ⟨method, methodMember, selectedId⟩
 
 /-- Check a source-ordered list of required values against an available list,
 returning the caller-provided error for the first missing value. -/
@@ -2231,6 +2546,104 @@ private theorem implementationSignatureOfDeclaration_success_header
                 }
   simpa [success, Except.SuccessSatisfies] using satisfies
 
+/-- Successful implementation collection validates every attached method
+against the exact selected trait and retains every required trait method.  The
+trait structural premise is used only here to connect the two opposite name
+lookups performed by validation and attachment. -/
+private theorem implementationSignatureOfDeclaration_success_method_catalog
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
+    {signature : ProgramImplementationSignature}
+    (traitStructures : TraitSignaturesStructurallyWellFormed traits)
+    (success : implementationSignatureOfDeclaration environment declaration
+      traits source = .ok signature) :
+    ImplementationSignatureMethodCatalogValidated traits signature := by
+  have satisfies : Except.SuccessSatisfies
+      (ImplementationSignatureMethodCatalogValidated traits)
+      (implementationSignatureOfDeclaration environment declaration traits
+        source) := by
+    cases scopeEq : validateProgramTypeScope
+        (ProgramTypeScope.ofDeclaration declaration) with
+    | error error =>
+        simp only [implementationSignatureOfDeclaration, scopeEq]
+        change True
+        trivial
+    | ok scopeUnit =>
+        cases scopeUnit
+        simp only [implementationSignatureOfDeclaration, scopeEq]
+        apply Except.SuccessSatisfies.bind
+        intro headTypes
+        cases headTypes with
+        | nil =>
+            change True
+            trivial
+        | cons subject arguments =>
+            apply Except.SuccessSatisfies.bind
+            intro head
+            rcases head with ⟨resolvedSubject, resolvedArguments⟩
+            apply Except.SuccessSatisfies.bind
+            intro trait
+            apply Except.SuccessSatisfies.bind
+            intro parametersChecked
+            apply Except.SuccessSatisfies.bind
+            intro wherePredicates
+            cases traitEq : traits.find? fun candidate =>
+                decide (candidate.id = trait) with
+            | none =>
+                change True
+                trivial
+            | some traitSignature =>
+                let substitution : TypeSystem.ParameterSubstitution :=
+                  traitSignature.parameters.zip
+                    (resolvedSubject :: resolvedArguments)
+                let requiredPredicates := traitSignature.wherePredicates.map
+                  (ProgramPredicate.applyParameters substitution)
+                have traitMember : traitSignature ∈ traits :=
+                  List.mem_of_find?_eq_some traitEq
+                have traitId : traitSignature.id = trait := by
+                  have traitMatches : decide (traitSignature.id = trait) = true :=
+                    List.find?_some (p := fun candidate : ProgramTraitSignature =>
+                      decide (candidate.id = trait)) traitEq
+                  exact of_decide_eq_true traitMatches
+                have traitStructure := traitStructures traitSignature traitMember
+                apply Except.SuccessSatisfies.bind
+                intro predicatesChecked
+                apply Except.SuccessSatisfies.bind_property
+                  (unmatchedImplMethodsOfDeclaration environment declaration
+                    (ProgramTypeScope.ofDeclaration declaration)
+                    source.value.methods 0 []) _
+                  (Except.SuccessSatisfies.of_success _ (fun result resultEq =>
+                    unmatchedImplMethodsOfDeclaration_success_structure resultEq))
+                intro unmatchedMethods unmatchedStructure
+                have validationFacts : Except.SuccessSatisfies
+                    (fun _ : Unit =>
+                      validateRequiredImplMethods declaration.id substitution
+                        traitSignature.methods unmatchedMethods = .ok ())
+                    (validateRequiredImplMethods declaration.id substitution
+                      traitSignature.methods unmatchedMethods) :=
+                  Except.SuccessSatisfies.of_success _ (fun result resultEq => by
+                    cases result
+                    exact resultEq)
+                apply Except.SuccessSatisfies.bind_property
+                  (validateRequiredImplMethods declaration.id substitution
+                    traitSignature.methods unmatchedMethods) _
+                  validationFacts
+                intro methodsChecked validationSuccess
+                cases methodsChecked
+                apply Except.SuccessSatisfies.bind_property
+                  (attachTraitMethods traitSignature.methods unmatchedMethods) _
+                  (Except.SuccessSatisfies.of_success _ (fun methods attached =>
+                    validatedAndAttachedImplMethods_matchTrait traitStructure
+                      unmatchedStructure validationSuccess attached))
+                intro methods methodCatalog
+                exact {
+                  trait_catalog := ⟨traitSignature, traitMember, by
+                    simp [traitId], by
+                    simpa [substitution] using
+                      methodCatalog.method_correspondence, methodCatalog.complete⟩
+                }
+  simpa [success, Except.SuccessSatisfies] using satisfies
+
 private theorem implementationSignatureOfDeclaration_success_id
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
     {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
@@ -2310,11 +2723,6 @@ private theorem collectProgramTraits_parameters_wellFormed
           simp only [collectProgramTraits, sourceEq]
           exact induction _ initial
 
-private def TraitSignaturesStructurallyWellFormed
-    (traits : List ProgramTraitSignature) : Prop :=
-  ∀ signature, signature ∈ traits →
-    TraitSignatureStructuralWellFormed signature
-
 private theorem collectProgramTraits_structurally_wellFormed
     (environment : ProgramEnvironment)
     (declarations : List ProgramDeclaration)
@@ -2340,7 +2748,16 @@ private theorem collectProgramTraits_structurally_wellFormed
           simp only [collectProgramTraits, sourceEq]
           exact induction _ initial
 
-private structure ProgramSignatureBuildParametersWellFormed
+private theorem collectedProgramTraits_structurally_wellFormed
+    (environment : ProgramEnvironment) :
+    TraitSignaturesStructurallyWellFormed
+      (collectProgramTraits environment environment.declarations {}).traits := by
+  apply collectProgramTraits_structurally_wellFormed environment
+    environment.declarations ({} : ProgramTraitBuildState)
+  intro signature member
+  simp at member
+
+private structure ProgramSignatureBuildFacts
     (traits : List ProgramTraitSignature)
     (state : ProgramSignatureBuildState) : Prop where
   functions : ∀ signature, signature ∈ state.functions →
@@ -2360,14 +2777,16 @@ private structure ProgramSignatureBuildParametersWellFormed
     ImplementationSignatureStructuralWellFormed signature
   implementationHeads : ∀ signature, signature ∈ state.implementations →
     ImplementationSignatureHeadValidated traits signature
+  implementationMethods : ∀ signature, signature ∈ state.implementations →
+    ImplementationSignatureMethodCatalogValidated traits signature
   contracts : ∀ signature, signature ∈ state.contracts →
     SignatureParametersWellFormed signature.id signature.parameters
 
-private theorem ProgramSignatureBuildParametersWellFormed.withErrors
+private theorem ProgramSignatureBuildFacts.withErrors
     {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed traits state)
+    (initial : ProgramSignatureBuildFacts traits state)
     (errors : List ProgramSignatureError) :
-    ProgramSignatureBuildParametersWellFormed traits
+    ProgramSignatureBuildFacts traits
       { state with errors } := {
   functions := initial.functions
   functionShapes := initial.functionShapes
@@ -2376,12 +2795,13 @@ private theorem ProgramSignatureBuildParametersWellFormed.withErrors
   implementations := initial.implementations
   implementationShapes := initial.implementationShapes
   implementationHeads := initial.implementationHeads
+  implementationMethods := initial.implementationMethods
   contracts := initial.contracts
 }
 
-private theorem ProgramSignatureBuildParametersWellFormed.addFunction
+private theorem ProgramSignatureBuildFacts.addFunction
     {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed traits state)
+    (initial : ProgramSignatureBuildFacts traits state)
     {signature : ProgramFunctionSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
       signature.scheme.parameters)
@@ -2389,36 +2809,37 @@ private theorem ProgramSignatureBuildParametersWellFormed.addFunction
       signature.scheme.body = .function
         (TypeSystem.Ty.productMany signature.parameterTypes)
         (TypeSystem.Ty.productMany signature.returnTypes)) :
-    ProgramSignatureBuildParametersWellFormed traits
+    ProgramSignatureBuildFacts traits
       { state with functions := state.functions ++ [signature] } := {
   initial with
   functions := all_mem_append_singleton initial.functions wellFormed
   functionShapes := all_mem_append_singleton initial.functionShapes shape
 }
 
-private theorem ProgramSignatureBuildParametersWellFormed.addDataType
+private theorem ProgramSignatureBuildFacts.addDataType
     {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed traits state)
+    (initial : ProgramSignatureBuildFacts traits state)
     {signature : ProgramDataSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
       signature.parameters)
     (shape : DataSignatureStructuralWellFormed signature) :
-    ProgramSignatureBuildParametersWellFormed traits
+    ProgramSignatureBuildFacts traits
       { state with dataTypes := state.dataTypes ++ [signature] } := {
   initial with
   dataTypes := all_mem_append_singleton initial.dataTypes wellFormed
   dataShapes := all_mem_append_singleton initial.dataShapes shape
 }
 
-private theorem ProgramSignatureBuildParametersWellFormed.addImplementation
+private theorem ProgramSignatureBuildFacts.addImplementation
     {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed traits state)
+    (initial : ProgramSignatureBuildFacts traits state)
     {signature : ProgramImplementationSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
       signature.parameters)
     (shape : ImplementationSignatureStructuralWellFormed signature)
-    (head : ImplementationSignatureHeadValidated traits signature) :
-    ProgramSignatureBuildParametersWellFormed traits
+    (head : ImplementationSignatureHeadValidated traits signature)
+    (methods : ImplementationSignatureMethodCatalogValidated traits signature) :
+    ProgramSignatureBuildFacts traits
       { state with
         implementations := state.implementations ++ [signature]
       } := {
@@ -2428,26 +2849,29 @@ private theorem ProgramSignatureBuildParametersWellFormed.addImplementation
     all_mem_append_singleton initial.implementationShapes shape
   implementationHeads :=
     all_mem_append_singleton initial.implementationHeads head
+  implementationMethods :=
+    all_mem_append_singleton initial.implementationMethods methods
 }
 
-private theorem ProgramSignatureBuildParametersWellFormed.addContract
+private theorem ProgramSignatureBuildFacts.addContract
     {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed traits state)
+    (initial : ProgramSignatureBuildFacts traits state)
     {signature : ProgramContractSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
       signature.parameters) :
-    ProgramSignatureBuildParametersWellFormed traits
+    ProgramSignatureBuildFacts traits
       { state with contracts := state.contracts ++ [signature] } := {
   initial with
   contracts := all_mem_append_singleton initial.contracts wellFormed
 }
 
-private theorem collectProgramSignatures_parameters_wellFormed
+private theorem collectProgramSignatures_facts
     (environment : ProgramEnvironment) (traits : List ProgramTraitSignature)
     (declarations : List ProgramDeclaration)
     (state : ProgramSignatureBuildState)
-    (initial : ProgramSignatureBuildParametersWellFormed traits state) :
-    ProgramSignatureBuildParametersWellFormed traits
+    (traitStructures : TraitSignaturesStructurallyWellFormed traits)
+    (initial : ProgramSignatureBuildFacts traits state) :
+    ProgramSignatureBuildFacts traits
       (collectProgramSignatures environment traits declarations state) := by
   induction declarations generalizing state with
   | nil => simpa [collectProgramSignatures] using initial
@@ -2521,7 +2945,9 @@ private theorem collectProgramSignatures_parameters_wellFormed
                   (implementationSignatureOfDeclaration_success_parameters signatureEq)
                   (implementationSignatureOfDeclaration_success_structure signatureEq)
                   (implementationSignatureOfDeclaration_success_head_validated
-                    signatureEq))
+                    signatureEq)
+                  (implementationSignatureOfDeclaration_success_method_catalog
+                    traitStructures signatureEq))
       | importDecl _ | exportDecl _ | pragmaDecl _ | trait _ | error =>
           simp only [collectProgramSignatures, sourceEq,
             signatureItemOfDeclaration]
@@ -3029,10 +3455,12 @@ theorem buildProgramSignatures_success_parameter_state
     intro signature member
     simp at member
   have signatureParameters :
-      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
-    apply collectProgramSignatures_parameters_wellFormed environment
+      ProgramSignatureBuildFacts traitState.traits state := by
+    apply collectProgramSignatures_facts environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
+      (by simpa [traitState] using
+        collectedProgramTraits_structurally_wellFormed environment)
     constructor <;> intro signature member <;> simp at member
   simp only [buildProgramSignatures] at success
   split at success
@@ -3062,10 +3490,12 @@ theorem buildProgramSignatures_success_function_shape_state
   let state := collectProgramSignatures environment traitState.traits
     environment.declarations {}
   have signatureFacts :
-      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
-    apply collectProgramSignatures_parameters_wellFormed environment
+      ProgramSignatureBuildFacts traitState.traits state := by
+    apply collectProgramSignatures_facts environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
+      (by simpa [traitState] using
+        collectedProgramTraits_structurally_wellFormed environment)
     constructor <;> intro signature member <;> simp at member
   simp only [buildProgramSignatures] at success
   split at success
@@ -3086,10 +3516,12 @@ theorem buildProgramSignatures_success_data_structure_state
   let state := collectProgramSignatures environment traitState.traits
     environment.declarations {}
   have signatureFacts :
-      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
-    apply collectProgramSignatures_parameters_wellFormed environment
+      ProgramSignatureBuildFacts traitState.traits state := by
+    apply collectProgramSignatures_facts environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
+      (by simpa [traitState] using
+        collectedProgramTraits_structurally_wellFormed environment)
     constructor <;> intro signature member <;> simp at member
   simp only [buildProgramSignatures] at success
   split at success
@@ -3110,10 +3542,12 @@ theorem buildProgramSignatures_success_implementation_structure_state
   let state := collectProgramSignatures environment traitState.traits
     environment.declarations {}
   have signatureFacts :
-      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
-    apply collectProgramSignatures_parameters_wellFormed environment
+      ProgramSignatureBuildFacts traitState.traits state := by
+    apply collectProgramSignatures_facts environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
+      (by simpa [traitState] using
+        collectedProgramTraits_structurally_wellFormed environment)
     constructor <;> intro signature member <;> simp at member
   simp only [buildProgramSignatures] at success
   split at success
@@ -3134,16 +3568,45 @@ theorem buildProgramSignatures_success_implementation_head_validated_state
   let state := collectProgramSignatures environment traitState.traits
     environment.declarations {}
   have signatureFacts :
-      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
-    apply collectProgramSignatures_parameters_wellFormed environment
+      ProgramSignatureBuildFacts traitState.traits state := by
+    apply collectProgramSignatures_facts environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
+      (by simpa [traitState] using
+        collectedProgramTraits_structurally_wellFormed environment)
     constructor <;> intro signature member <;> simp at member
   simp only [buildProgramSignatures] at success
   split at success
   · injection success with signaturesEq
     subst signatures
     exact signatureFacts.implementationHeads
+  · simp at success
+
+/-- Internal collector boundary used by `ProgramSignaturesProperties`: every
+successfully collected implementation retains exact method correspondence and
+completeness for the trait selected by its resolved head. -/
+theorem buildProgramSignatures_success_implementation_method_catalog_state
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures) :
+    ∀ signature, signature ∈ signatures.implementations →
+      ImplementationSignatureMethodCatalogValidated signatures.traits
+        signature := by
+  let traitState := collectProgramTraits environment environment.declarations {}
+  let state := collectProgramSignatures environment traitState.traits
+    environment.declarations {}
+  have signatureFacts :
+      ProgramSignatureBuildFacts traitState.traits state := by
+    apply collectProgramSignatures_facts environment
+      traitState.traits environment.declarations
+      ({} : ProgramSignatureBuildState)
+      (by simpa [traitState] using
+        collectedProgramTraits_structurally_wellFormed environment)
+    constructor <;> intro signature member <;> simp at member
+  simp only [buildProgramSignatures] at success
+  split at success
+  · injection success with signaturesEq
+    subst signatures
+    exact signatureFacts.implementationMethods
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every

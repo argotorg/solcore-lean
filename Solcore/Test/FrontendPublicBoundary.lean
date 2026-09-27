@@ -65,11 +65,14 @@ example :=
   @Solcore.Frontend.buildProgramSignatures_success_trait_method_parameter_names_nodup
 example := @Solcore.Frontend.ImplementationSignatureStructuralWellFormed
 example := @Solcore.Frontend.ImplementationSignatureHeadValidated
+example := @Solcore.Frontend.ImplementationSignatureMethodCatalogValidated
 example :=
   @Solcore.Frontend.ImplementationSignatureStructuralWellFormed.method_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_implementation_structure
 example :=
   @Solcore.Frontend.buildProgramSignatures_success_implementation_head_validated
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_implementation_method_catalog_validated
 example :=
   @Solcore.Frontend.buildProgramSignatures_success_implementation_method_names_nodup
 example :=
@@ -155,6 +158,8 @@ example :=
   @Solcore.Frontend.checkLoadedProgram_success_implementation_signature_structure
 example :=
   @Solcore.Frontend.checkLoadedProgram_success_implementation_head_validated
+example :=
+  @Solcore.Frontend.checkLoadedProgram_success_implementation_method_catalog_validated
 example := @Solcore.Frontend.checkLoadedProgram_success_ids
 example := @Solcore.Frontend.checkProgram_success_load
 example := @Solcore.Frontend.checkProgram_success_ids
@@ -170,6 +175,8 @@ example := @Solcore.Frontend.checkProgram_success_trait_method_ids_nodup
 example :=
   @Solcore.Frontend.checkProgram_success_implementation_signature_structure
 example := @Solcore.Frontend.checkProgram_success_implementation_head_validated
+example :=
+  @Solcore.Frontend.checkProgram_success_implementation_method_catalog_validated
 example := @Solcore.Frontend.checkProgram_success_implementation_method_ids_nodup
 example := @Solcore.Frontend.ProgramCheckError.methodInference
 example := @Solcore.Frontend.ProgramCheckError.methodNoSolution
