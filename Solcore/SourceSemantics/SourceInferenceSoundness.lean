@@ -203,6 +203,39 @@ theorem solveRequirements_corresponds
               exact .cons (by simp [evidenceResult])
                 (induction tailResult)
 
+/-- Every solved row classified as a qualified-local template by the input
+state retains the canonical assumption evidence for its normalized
+predicate. -/
+theorem solveRequirements_template_evidence
+    {context : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    (success : Detail.solveRequirements context state requirements =
+      .ok solved) :
+    ∀ row, row ∈ solved → row.id ∈ state.localSchemeAssumptions →
+      row.evidence = .assumption row.predicate := by
+  have corresponds := solveRequirements_corresponds success
+  clear success
+  induction corresponds with
+  | nil =>
+      intro row member
+      simp at member
+  | @cons requirement row requirements rows head tail induction =>
+      intro candidate member template
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · rcases head with ⟨id_eq, predicate_eq, evidence_success⟩
+        have requirement_template :
+            requirement.id ∈ state.localSchemeAssumptions := by
+          rw [← id_eq]
+          exact template
+        have evidence_eq := solveRequirementEvidence_template_eq
+          requirement_template evidence_success
+        rw [predicate_eq]
+        exact evidence_eq
+      · exact induction candidate member template
+
 /-- When no input row is a qualified-local template, successful ledger
 solving validates every output row in a declarative context with the same
 catalog and normalized declaration assumptions. -/
@@ -383,6 +416,86 @@ theorem solveRequirements_scoped_ledger_sound
       exact inputMember
     rcases List.mem_map.mp outputMember with ⟨row, member, id_eq⟩
     exact ⟨row, member, id_eq⟩
+
+/-- The source-owned qualified-local template identities materialized from a
+state agree exactly with the state's executable template classification. -/
+def TemplateIdsAligned (state : Frontend.SourceInference.State)
+    (roots : List NodeId) : Prop :=
+  ∀ id, id ∈ sourceLocalSchemeTemplateIds (state.toTypedSource roots) ↔
+    id ∈ state.localSchemeAssumptions
+
+/-- Final substitution preserves source template identities, so an alignment
+established before finalization remains visible in the emitted typed source. -/
+theorem finalize_templateIdsAligned
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (aligned : TemplateIdsAligned state roots)
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    ∀ id, id ∈ sourceLocalSchemeTemplateIds result.typedSource ↔
+      id ∈ state.localSchemeAssumptions := by
+  intro id
+  rw [Detail.finalize_typedSource success]
+  simp only [FlexibleSubstitution.sourceLocalSchemeTemplateIds_applySubstitution]
+  exact aligned id
+
+/-- A template row in a successfully finalized source retains canonical
+assumption evidence whenever the input state's executable classification is
+aligned with the source-owned template identities. -/
+theorem finalize_template_evidence
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (aligned : TemplateIdsAligned state roots)
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    ∀ row, row ∈ result.solvedRequirements →
+      row.id ∈ sourceLocalSchemeTemplateIds result.typedSource →
+      row.evidence = .assumption row.predicate := by
+  intro row member template
+  have initialTemplate : row.id ∈ state.localSchemeAssumptions :=
+    (finalize_templateIdsAligned aligned success row.id).mp template
+  unfold Detail.finalize at success
+  cases patternResult :
+      Detail.defaultIntegerPatternTargets state.integerPatterns state with
+  | error error =>
+      simp [patternResult, bind, Except.bind] at success
+  | ok patternState =>
+      cases literalResult :
+          Detail.defaultIntegerLiteralTargets patternState.integerLiterals
+            patternState with
+      | error error =>
+          simp [patternResult, literalResult, bind, Except.bind] at success
+      | ok finalState =>
+          have finalTemplate : row.id ∈
+              finalState.localSchemeAssumptions := by
+            rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
+              literalResult,
+              Detail.defaultIntegerPatternTargets_localSchemeAssumptions
+                patternResult]
+            exact initialTemplate
+          cases validationResult :
+              Detail.validateIntegerLiteralTargets finalState
+                finalState.integerLiterals with
+          | error error =>
+              simp [patternResult, literalResult, validationResult, bind,
+                Except.bind] at success
+          | ok validation =>
+              cases requirementsResult :
+                  Detail.solveRequirements inferenceContext finalState
+                    finalState.requirements with
+              | error error =>
+                  simp [patternResult, literalResult, validationResult,
+                    requirementsResult, bind, Except.bind] at success
+              | ok requirements =>
+                  simp [patternResult, literalResult, validationResult,
+                    requirementsResult, bind, Except.bind] at success
+                  cases success
+                  exact solveRequirements_template_evidence requirementsResult
+                    row member finalTemplate
 
 /-- Proof-facing context for the requirement ledger emitted by finalization.
 Both declaration assumptions and solved predicates use the final inference

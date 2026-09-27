@@ -196,6 +196,52 @@ private def templateSolverState : SourceInference.State := {
   localSchemeAssumptions := [templateId]
 }
 
+private def templateFinalizeState : SourceInference.State := {
+  templateSolverState with
+  nodes := scopedTemplateSource.nodes
+}
+
+private def templateFinalizedResult : SourceInference.Result := {
+  type := .variable templateVariable
+  substitution := templateFinalizeState.inference.substitution
+  solvedRequirements := [templateRow]
+  typedSource := scopedTemplateSource.applySubstitution
+    templateFinalizeState.inference.substitution
+}
+
+private theorem templateFinalizeStateAligned :
+    SourceInferenceSoundness.TemplateIdsAligned templateFinalizeState
+      scopedTemplateSource.roots := by
+  intro id
+  change id ∈ sourceLocalSchemeTemplateIds scopedTemplateSource ↔
+    id ∈ [templateId]
+  simp [sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+    initializedLetBindings, statementInitializedLetBindings,
+    InitializedLetBinding.templateOwners, scopedTemplateSource, letNode,
+    templateBinder, templateRequirement]
+
+private theorem templateFinalizeSuccess :
+    SourceInference.Detail.finalize templateInferenceContext
+      (.variable templateVariable) templateFinalizeState
+      scopedTemplateSource.roots = .ok templateFinalizedResult := by
+  rfl
+
+/-- Finalization preserves the exact source/state template-ID alignment of a
+nonempty qualified-local fixture. -/
+example : ∀ id,
+    id ∈ sourceLocalSchemeTemplateIds templateFinalizedResult.typedSource ↔
+      id ∈ templateFinalizeState.localSchemeAssumptions := by
+  exact SourceInferenceSoundness.finalize_templateIdsAligned
+    templateFinalizeStateAligned templateFinalizeSuccess
+
+/-- A source-classified template emitted by finalization retains canonical
+assumption evidence for its normalized predicate. -/
+example : ∀ row, row ∈ templateFinalizedResult.solvedRequirements →
+    row.id ∈ sourceLocalSchemeTemplateIds templateFinalizedResult.typedSource →
+    row.evidence = .assumption row.predicate := by
+  exact SourceInferenceSoundness.finalize_template_evidence
+    templateFinalizeStateAligned templateFinalizeSuccess
+
 private theorem templateOwnerContained :
     ContainsLocalSchemeTemplate scopedTemplateSource scopedTemplateOwner := by
   simp [ContainsLocalSchemeTemplate, localSchemeTemplateOwners,
