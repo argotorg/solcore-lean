@@ -519,6 +519,10 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralTarget_success_supported
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralTargets_success_supported
+example :=
+  @Solcore.Frontend.SourceInference.Detail.defaultIntegerPatternTargets_requirements
+example :=
+  @Solcore.Frontend.SourceInference.Detail.defaultIntegerLiteralTargets_requirements
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_integerPatternTarget_supported
