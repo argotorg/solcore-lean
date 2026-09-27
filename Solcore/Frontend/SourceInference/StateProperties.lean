@@ -78,6 +78,19 @@ private theorem map_mapIdx {α β γ : Type} (items : List α)
       (initial owner locals inputComptime).localBinders := by
   rfl
 
+/-- Stable input binders reconstruct the complete initial inference
+environment, including schemes and source order. -/
+@[simp] theorem initial_binderEnvironment
+    (owner : Resolved.DeclarationId) (locals : TypeSystem.Environment)
+    (inputComptime : List Bool) :
+    (initial owner locals inputComptime).binderEnvironment = locals := by
+  rw [binderEnvironment, ← initial_inputs_eq_localBinders,
+    initial_inputs_definition, map_mapIdx]
+  induction locals with
+  | nil => rfl
+  | cons entry rest induction =>
+      simp [List.mapIdx_cons, induction]
+
 /-- Initial input names are exactly the source parameter names, in order. -/
 theorem initial_input_names (owner : Resolved.DeclarationId)
     (locals : TypeSystem.Environment) (inputComptime : List Bool) :
@@ -150,6 +163,13 @@ theorem fresh_preserves_nodesBelowNextOccurrence
     (state.withLocals locals).header = state.header := by
   rfl
 
+/-- Compatibility-environment replacement cannot affect the stable binder
+environment used by local generalization. -/
+@[simp] theorem withLocals_binderEnvironment (state : State)
+    (locals : TypeSystem.Environment) :
+    (state.withLocals locals).binderEnvironment = state.binderEnvironment := by
+  rfl
+
 /-- Replacing the compatibility-only local environment does not affect
 occurrence allocation. -/
 theorem withLocals_preserves_nodesBelowNextOccurrence
@@ -162,6 +182,14 @@ theorem withLocals_preserves_nodesBelowNextOccurrence
 @[simp] theorem restoreLexicalScope_header (state : State)
     (scope : LexicalScope) :
     (state.restoreLexicalScope scope).header = state.header := by
+  rfl
+
+/-- Restoring a lexical scope reconstructs its binder environment, regardless
+of the compatibility environment carried by the current inner state. -/
+@[simp] theorem restoreLexicalScope_binderEnvironment (state : State)
+    (scope : LexicalScope) :
+    (state.restoreLexicalScope scope).binderEnvironment =
+      scope.binders.map fun binder => (binder.name, binder.scheme) := by
   rfl
 
 /-- Restoring lexical names preserves all globally allocated occurrences. -/
@@ -177,6 +205,17 @@ theorem restoreLexicalScope_preserves_nodesBelowNextOccurrence
     (comptime : Bool) (schemeRequirements : List LocalSchemeRequirement) :
     (state.allocateBinder name scheme span comptime schemeRequirements).2.header =
       state.header := by
+  rfl
+
+/-- Visible allocation extends the stable binder environment at its
+first-match head. -/
+@[simp] theorem allocateBinder_binderEnvironment
+    (state : State) (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement) :
+    (state.allocateBinder name scheme span comptime
+      schemeRequirements).2.binderEnvironment =
+      (name, scheme) :: state.binderEnvironment := by
   rfl
 
 /-- Allocating a visible local binder does not affect occurrence allocation. -/

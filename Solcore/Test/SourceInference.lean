@@ -164,6 +164,29 @@ private def generalizationSideConditionState : SourceInference.State := {
   directCallRequirements := [solverRegressionRequirement.id]
 }
 
+private def stableGeneralizationVariable : TypeSystem.TypeVarId := ⟨0⟩
+
+private def stableGeneralizationState : SourceInference.State :=
+  SourceInference.State.initial solverRegressionOwner [
+    ("captured", .mono (.variable stableGeneralizationVariable))
+  ]
+
+/-- Generalization derives its lexical barrier from stable binders.  Replacing
+the legacy environment cache with a stale closed scheme therefore cannot make
+the captured variable polymorphic; using that stale cache directly would. -/
+example :
+    let stale : SourceInference.State := {
+      stableGeneralizationState with locals := [("captured", .mono .word)]
+    }
+    (SourceInference.Detail.generalizeValue stale
+      (stale.binderEnvironment.apply stale.inference.substitution) 0
+      (.variable stableGeneralizationVariable)).scheme.quantified = [] ∧
+    (SourceInference.Detail.generalizeValue stale
+      (stale.locals.apply stale.inference.substitution) 0
+      (.variable stableGeneralizationVariable)).scheme.quantified =
+        [stableGeneralizationVariable] := by
+  decide
+
 private theorem generalizationSideConditionIds :
     (SourceInference.Detail.generalizeValue generalizationSideConditionState []
       0 (.variable solverRegressionFirst)).requirements.map

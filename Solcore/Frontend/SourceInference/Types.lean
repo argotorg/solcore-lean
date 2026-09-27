@@ -327,6 +327,13 @@ theorem initial_inputs_definition (owner : Resolved.DeclarationId)
       } := by
   rfl
 
+/-- Reconstruct the canonical inference environment from stable lexical
+binders.  `State.locals` remains as a compatibility cache, but generalization
+uses this projection so stale cached schemes cannot change which variables
+are quantified. -/
+def binderEnvironment (state : State) : TypeSystem.Environment :=
+  state.localBinders.map fun binder => (binder.name, binder.scheme)
+
 def resolve (state : State) (type : Ty) : Ty :=
   state.inference.resolve type
 

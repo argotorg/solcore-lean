@@ -156,7 +156,16 @@ example := @Solcore.Frontend.SourceInference.FunctionBodiesChecked
 example :=
   @Solcore.Frontend.SourceInference.FunctionBodiesChecked.exists_signature_of_function_mem
 example := @Solcore.Frontend.SourceInference.State.Header
+example := @Solcore.Frontend.SourceInference.State.binderEnvironment
 example := @Solcore.Frontend.SourceInference.State.NodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.initial_binderEnvironment
+example :=
+  @Solcore.Frontend.SourceInference.State.withLocals_binderEnvironment
+example :=
+  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_binderEnvironment
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateBinder_binderEnvironment
 example :=
   @Solcore.Frontend.SourceInference.State.initial_nodesBelowNextOccurrence
 example :=

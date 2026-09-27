@@ -1371,7 +1371,8 @@ mutual
                   let (initializer, state) ← inferExprFuel fuel context
                     initializer (some type) state
                   pure (initializer.type, some initializer.id, state)
-            let locals := state.locals.apply state.inference.substitution
+            let locals :=
+              state.binderEnvironment.apply state.inference.substitution
             let valueType := state.resolve valueType
             let generalized :=
               generalizeValue state locals requirementStart valueType
@@ -1460,7 +1461,8 @@ mutual
                 let (initializer, state) ← inferExprFuel fuel context initializer
                   (some type) state
                 pure (initializer.type, some initializer.id, state)
-          let locals := state.locals.apply state.inference.substitution
+          let locals :=
+            state.binderEnvironment.apply state.inference.substitution
           let valueType := state.resolve valueType
           let generalized :=
             generalizeValue state locals requirementStart valueType
