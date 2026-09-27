@@ -442,6 +442,12 @@ example :=
 example :=
   @Solcore.SourceSemantics.SignatureTypeFormationValidated.typeWellFormed
 example :=
+  @Solcore.SourceSemantics.resolveSourceType_success_typeWellFormed
+example :=
+  @Solcore.SourceSemantics.resolveSourceType_success_signatureTypeWellFormed
+example :=
+  @Solcore.SourceSemantics.resolveSourceType_success_declarationTypeWellFormed
+example :=
   @Solcore.SourceSemantics.SignatureTypesFormationValidated.typesWellFormed
 example :=
   @Solcore.SourceSemantics.SignatureTypesFormationValidated.declarationTypesWellFormed

@@ -74,6 +74,8 @@ example := @Solcore.Frontend.SignaturePredicatesFormationValidated
 example := @Solcore.Frontend.ProgramSignatureFormationValidated
 example := @Solcore.Frontend.validateProgramSignatureFormation
 example := @Solcore.Frontend.validateProgramSignatureFormation_success
+example := @Solcore.Frontend.validateResolvedTypeFormation
+example := @Solcore.Frontend.validateResolvedTypeFormation_success
 example := @Solcore.Frontend.SignatureTypeFormationValidated.apply_eq_self
 example := @Solcore.Frontend.SignatureTypesFormationValidated.apply_eq_self
 example :=
@@ -145,6 +147,10 @@ example := @Solcore.Frontend.SourceInference.State.Header
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_state_header
 example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
+example :=
+  @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_formation
+example :=
+  @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_apply_eq_self
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
 example :=

@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceInference.Expression
 import Solcore.Frontend.SourceInference.StateProperties
+import Solcore.Frontend.ProgramSignatureFormationProperties
 import Solcore.TypeSystem.InferenceProperties
 
 /-! Declaration-scoped state preservation for source inference traversals. -/
@@ -10,6 +11,15 @@ set_option linter.unusedSimpArgs false
 namespace Solcore.Frontend.SourceInference.Detail
 
 open TypeSystem
+
+/-- A successfully resolved source annotation contains no flexible
+metavariables, so every inference substitution fixes it. -/
+theorem resolveSourceType_success_apply_eq_self
+    {context : Context} {source : Syntax.TypeExpr} {type : Ty}
+    (substitution : Substitution)
+    (success : resolveSourceType context source = .ok type) :
+    substitution.apply type = type :=
+  (resolveSourceType_success_formation success).apply_eq_self substitution
 
 @[simp] private theorem except_pure_eq_ok {ε α : Type}
     (value result : α) :

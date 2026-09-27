@@ -308,6 +308,16 @@ private def validateSignatureType
   validateSignatureTypeFuel signatures owner parameters
     (signatureTypeFuel type + 1) type
 
+/-- Validate one already-resolved type against a completed signature catalog
+and an explicit rigid-parameter scope.  Source-body annotation checking uses
+this public boundary after name resolution. -/
+def validateResolvedTypeFormation
+    (signatures : ProgramSignatures)
+    (owner : Resolved.DeclarationId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (type : TypeSystem.Ty) : Except ProgramSignatureFormationError Unit :=
+  validateSignatureType signatures owner parameters type
+
 private def validateSignatureTypes
     (signatures : ProgramSignatures)
     (owner : Resolved.DeclarationId)
@@ -743,6 +753,18 @@ private theorem validateSignatureType_success
     (success : validateSignatureType signatures owner parameters type = .ok ()) :
     SignatureTypeFormationValidated signatures owner parameters type :=
   validateSignatureTypeFuel_success success
+
+/-- The public single-type validator returns only semantically formed resolved
+types. -/
+theorem validateResolvedTypeFormation_success
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {type : TypeSystem.Ty}
+    (success : validateResolvedTypeFormation signatures owner parameters type =
+      .ok ()) :
+    SignatureTypeFormationValidated signatures owner parameters type :=
+  validateSignatureType_success success
 
 private theorem validateSignatureTypes_success
     {signatures : ProgramSignatures}

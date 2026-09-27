@@ -1,5 +1,5 @@
 import Solcore.Frontend.ProgramLoading
-import Solcore.Frontend.ProgramSignatures
+import Solcore.Frontend.ProgramSignatureFormation
 import Solcore.Frontend.SourceInference.TypedIR
 import Solcore.Frontend.TypedTraitResolution
 import Solcore.TypeSystem.Inference
@@ -54,6 +54,7 @@ inductive Error where
   | duplicateLambdaParameter (name : String)
   | missingInitializer (name : String)
   | typeResolution (error : ProgramTypeResolutionError)
+  | typeFormation (error : ProgramSignatureFormationError)
   | unification (error : Unification.Error)
   | noTraitImplementation (predicate : ProgramPredicate)
   | inconclusiveTrait
@@ -125,6 +126,9 @@ structure Context where
   environment : ProgramEnvironment
   signatures : ProgramSignatures
   scope : ProgramTypeScope
+  /-- Canonical rigid parameters available to source-level type annotations in
+  the current declaration. -/
+  typeParameters : List TypeSystem.TypeParameterId := []
   assumptions : List ProgramPredicate := []
   traitDepth : Nat := 32
   coercionDepth : Nat := 4
@@ -524,8 +528,36 @@ def solveRequirements (context : Context) (state : State) :
 def resolveSourceType (context : Context)
     (source : Syntax.TypeExpr) : Except Error Ty :=
   match resolveProgramTypeExpr context.environment context.scope source with
-  | .ok type => .ok type
+  | .ok type =>
+      match validateResolvedTypeFormation context.signatures
+          context.scope.genericOwner context.typeParameters type with
+      | .ok () => .ok type
+      | .error error => .error (.typeFormation error)
   | .error error => .error (.typeResolution error)
+
+/-- Successful source-type resolution now certifies rigid scope, nominal
+catalog membership and arity, structural formation, and absence of recovery
+or flexible inference types. -/
+theorem resolveSourceType_success_formation
+    {context : Context} {source : Syntax.TypeExpr} {type : Ty}
+    (success : resolveSourceType context source = .ok type) :
+    SignatureTypeFormationValidated context.signatures
+      context.scope.genericOwner context.typeParameters type := by
+  unfold resolveSourceType at success
+  cases resolution : resolveProgramTypeExpr context.environment context.scope
+      source with
+  | error error =>
+      simp [resolution] at success
+  | ok resolved =>
+      cases formation : validateResolvedTypeFormation context.signatures
+          context.scope.genericOwner context.typeParameters resolved with
+      | error error =>
+          simp [resolution, formation] at success
+      | ok formationUnit =>
+          cases formationUnit
+          simp [resolution, formation] at success
+          subst type
+          exact validateResolvedTypeFormation_success formation
 
 end Detail
 

@@ -228,6 +228,69 @@ theorem typeWellFormed
 
 end SignatureTypeFormationValidated
 
+/-- A successfully resolved source annotation is well formed in any semantic
+context carrying the same catalog, rigid parameter row, and declaration
+owner.  Lexical locals, assumptions, solved requirements, and residual
+inference scope may differ. -/
+theorem resolveSourceType_success_typeWellFormed
+    {frontendContext : Frontend.SourceInference.Context}
+    {semanticContext : Context}
+    {source : Syntax.TypeExpr} {type : TypeSystem.Ty}
+    (canonical : SignatureParametersWellFormed
+      frontendContext.scope.genericOwner frontendContext.typeParameters)
+    (signatures_eq : semanticContext.signatures =
+      frontendContext.signatures)
+    (parameters_eq : semanticContext.typeParameters =
+      frontendContext.typeParameters)
+    (owner_eq : semanticContext.currentDeclaration =
+      some frontendContext.scope.genericOwner)
+    (success : Frontend.SourceInference.Detail.resolveSourceType
+      frontendContext source = .ok type) :
+    TypeWellFormed semanticContext type := by
+  have base := SignatureTypeFormationValidated.typeWellFormed
+    (Frontend.SourceInference.Detail.resolveSourceType_success_formation success)
+    canonical frontendContext.assumptions
+  exact StructuralSubstitution.TypeWellFormed.transportContext
+    (source := signatureContext frontendContext.signatures
+      frontendContext.scope.genericOwner frontendContext.typeParameters
+      frontendContext.assumptions)
+    (target := semanticContext)
+    signatures_eq parameters_eq
+    (by
+      simpa [signatureContext, Context.withAssumptions,
+        Context.forDeclaration] using owner_eq)
+    base
+
+/-- Exact signature-context specialization of resolved annotation formation. -/
+theorem resolveSourceType_success_signatureTypeWellFormed
+    {frontendContext : Frontend.SourceInference.Context}
+    {source : Syntax.TypeExpr} {type : TypeSystem.Ty}
+    (canonical : SignatureParametersWellFormed
+      frontendContext.scope.genericOwner frontendContext.typeParameters)
+    (success : Frontend.SourceInference.Detail.resolveSourceType
+      frontendContext source = .ok type) :
+    TypeWellFormed
+      (signatureContext frontendContext.signatures
+        frontendContext.scope.genericOwner frontendContext.typeParameters
+        frontendContext.assumptions) type := by
+  exact resolveSourceType_success_typeWellFormed canonical rfl rfl rfl success
+
+/-- Resolved annotations remain well formed after the checker installs the
+declaration's solved requirement ledger and residual inference scope. -/
+theorem resolveSourceType_success_declarationTypeWellFormed
+    {frontendContext : Frontend.SourceInference.Context}
+    {source : Syntax.TypeExpr} {type : TypeSystem.Ty}
+    (canonical : SignatureParametersWellFormed
+      frontendContext.scope.genericOwner frontendContext.typeParameters)
+    (requirements : List SolvedRequirement)
+    (success : Frontend.SourceInference.Detail.resolveSourceType
+      frontendContext source = .ok type) :
+    TypeWellFormed
+      (declarationContext frontendContext.signatures
+        frontendContext.scope.genericOwner frontendContext.typeParameters
+        frontendContext.assumptions requirements) type := by
+  exact resolveSourceType_success_typeWellFormed canonical rfl rfl rfl success
+
 namespace SignatureTypesFormationValidated
 
 /-- Pointwise closed formation for a validated source-order type row. -/

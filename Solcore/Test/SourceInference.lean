@@ -85,6 +85,29 @@ private def solverRegressionContext : SourceInference.Context := {
   assumptions := [solverRegressionSource]
 }
 
+private def solverRegressionSpan : Syntax.SourceSpan :=
+  ⟨⟨.main, "source_inference_solver.sol"⟩, 0, 0⟩
+
+private def solverRegressionRecoveryType : Syntax.TypeExpr := {
+  span := solverRegressionSpan
+  value := .error
+}
+
+/-- Formation validation rejects the recovery sentinel independently of how
+the resolved type was produced. -/
+example : validateResolvedTypeFormation solverRegressionContext.signatures
+    solverRegressionOwner [] .error =
+    .error (.recoveryType solverRegressionOwner) := by
+  rfl
+
+/-- Formation validation also rejects constructor application syntax whose
+head is not a cataloged nominal declaration. -/
+example : validateResolvedTypeFormation solverRegressionContext.signatures
+    solverRegressionOwner [] (.application .word .bool) =
+    .error (.invalidApplication solverRegressionOwner
+      (.application .word .bool)) := by
+  rfl
+
 private def solverRegressionState : SourceInference.State := {
   SourceInference.State.initial solverRegressionOwner with
   inference := {
@@ -1150,9 +1173,32 @@ private def testAmbiguousCoercionTrait : IO Unit := do
         | _ => false) "ambiguous Coerce declarations lost their diagnostic"
   | .ok _ => throw (IO.userError "ambiguous Coerce declaration was selected")
 
+private def testGenericBodyAnnotationFormation : IO Unit := do
+  let checked ← check (String.intercalate "\n" [
+    "function keep<T>(value: T) returns (T) {",
+    "  let local: T = value;",
+    "  return local;",
+    "}"
+  ])
+  assertTrue (checked.length == 1)
+    "a declaration-owned generic body annotation failed formation validation"
+
+private def testRecoveryBodyAnnotationFormation : IO Unit := do
+  match SourceInference.Detail.resolveSourceType solverRegressionContext
+      solverRegressionRecoveryType with
+  | .error (.typeFormation (.recoveryType owner)) =>
+      assertTrue (owner == solverRegressionOwner)
+        "a recovery body annotation lost its declaration owner"
+  | .error error => throw (IO.userError
+      s!"a recovery body annotation produced the wrong error: {reprStr error}")
+  | .ok type => throw (IO.userError
+      s!"a recovery body annotation was accepted as {reprStr type}")
+
 /-- Exercise parsed lambdas, local schemes, tuples, grouping, conditionals,
 operators, contextual integer literals, and explicit deferrals. -/
 def testSourceInference : IO Unit := do
+  testGenericBodyAnnotationFormation
+  testRecoveryBodyAnnotationFormation
   testLambdaLetTupleConditional
   testDiscardedPolymorphicReferenceResidual
   testAmbiguousOverload

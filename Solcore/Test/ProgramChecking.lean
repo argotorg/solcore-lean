@@ -34,6 +34,7 @@ example
               environment
               signatures
               scope := .ofDeclaration declaration
+              typeParameters := signature.scheme.parameters
               assumptions := signature.scheme.predicates
             }
             signature.source.value.body.value
@@ -51,6 +52,7 @@ example
                   environment
                   signatures
                   scope := .ofDeclaration declaration
+                  typeParameters := signature.scheme.parameters
                   assumptions := signature.scheme.predicates
                 }
                 (TypeSystem.Ty.productMany signature.returnTypes) finalState

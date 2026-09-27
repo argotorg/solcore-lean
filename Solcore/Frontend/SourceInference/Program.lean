@@ -103,6 +103,7 @@ private def checkFunctionBodyResult (environment : ProgramEnvironment)
     environment
     signatures
     scope := .ofDeclaration declaration
+    typeParameters := signature.scheme.parameters
     assumptions := signature.scheme.predicates
   }
   let expected := Ty.productMany signature.returnTypes
@@ -171,6 +172,7 @@ theorem checkFunctionBody_success_witness
               environment
               signatures
               scope := .ofDeclaration declaration
+              typeParameters := signature.scheme.parameters
               assumptions := signature.scheme.predicates
             }
             signature.source.value.body.value
@@ -186,6 +188,7 @@ theorem checkFunctionBody_success_witness
                   environment
                   signatures
                   scope := .ofDeclaration declaration
+                  typeParameters := signature.scheme.parameters
                   assumptions := signature.scheme.predicates
                 }
                 (Ty.productMany signature.returnTypes) finalState
@@ -219,6 +222,7 @@ theorem checkFunctionBody_success_witness
                   environment
                   signatures
                   scope := .ofDeclaration declaration
+                  typeParameters := signature.scheme.parameters
                   assumptions := signature.scheme.predicates
                 }
                 signature.source.value.body.value
@@ -248,6 +252,7 @@ theorem checkFunctionBody_success_witness
                           environment
                           signatures
                           scope := .ofDeclaration declaration
+                          typeParameters := signature.scheme.parameters
                           assumptions := signature.scheme.predicates
                         }
                         (Ty.productMany signature.returnTypes) finalState
