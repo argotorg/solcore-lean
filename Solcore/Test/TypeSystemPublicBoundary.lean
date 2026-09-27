@@ -19,6 +19,8 @@ example := @Solcore.TypeSystem.Ty.containsVariable_eq_false_iff
 example := @Solcore.TypeSystem.Ty.variablesBelow_nextVariable
 example := @Solcore.TypeSystem.Substitution.lookup?_eq_none_iff_not_mem_domain
 example := @Solcore.TypeSystem.Substitution.lookup?_eq_some_mem
+example := @Solcore.TypeSystem.Substitution.lookup?_compose
+example := @Solcore.TypeSystem.Substitution.compose_apply
 example := @Solcore.TypeSystem.Substitution.apply_applyMany
 example := @Solcore.TypeSystem.Substitution.apply_productMany
 example := @Solcore.TypeSystem.Substitution.apply_variables_below_of_range
@@ -29,6 +31,7 @@ example := @Solcore.TypeSystem.Substitution.mem_domain_compose_iff
 example := @Solcore.TypeSystem.Substitution.domain_compose_nodup
 example := @Solcore.TypeSystem.Substitution.mem_compose_iff
 example := @Solcore.TypeSystem.Substitution.RangeAvoidsDomain
+example := @Solcore.TypeSystem.Substitution.SemanticallyExtends
 example := @Solcore.TypeSystem.Ty.apply_eq_self_of_domain_disjoint_freeVariables
 example := @Solcore.TypeSystem.Substitution.SolvedBelow
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.empty
@@ -44,19 +47,33 @@ example := @Solcore.TypeSystem.Substitution.SolvedBelow.range_fixed
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_idempotent
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.compose
 example := @Solcore.TypeSystem.Substitution.RangeAvoidsDomain.compose
+example :=
+  @Solcore.TypeSystem.Substitution.SemanticallyExtends.refl_of_solved
+example :=
+  @Solcore.TypeSystem.Substitution.SemanticallyExtends.compose_left
+example := @Solcore.TypeSystem.Substitution.SemanticallyExtends.trans
 example := @Solcore.TypeSystem.ParameterSubstitution.lookup?_eq_some_mem
 example := @Solcore.TypeSystem.ParameterSubstitution.apply_variables_below
 example := @Solcore.TypeSystem.Constraint.VariablesBelow
 example := @Solcore.TypeSystem.Constraint.VariablesBelow.apply
 example := @Solcore.TypeSystem.Constraint.VariablesOutsideDomain
 example := @Solcore.TypeSystem.Constraint.VariablesOutsideDomain.apply
+example := @Solcore.TypeSystem.Constraint.SatisfiedBy
+example := @Solcore.TypeSystem.Constraint.SatisfiedBy.of_normalized
 example := @Solcore.TypeSystem.ConstraintsBelow
 example := @Solcore.TypeSystem.ConstraintsOutsideDomain
+example := @Solcore.TypeSystem.ConstraintsSatisfiedBy
+example := @Solcore.TypeSystem.ConstraintsSatisfiedBy.cons
 example := @Solcore.TypeSystem.Unification.unifyWithFuel_solvedBelow
+example := @Solcore.TypeSystem.Unification.unifyWithFuel_sound_of_below
+example := @Solcore.TypeSystem.Unification.unifyWithFuel_sound
 example := @Solcore.TypeSystem.Unification.unifyWithFuel_rangeAvoidsDomain
 example := @Solcore.TypeSystem.Unification.unify_solvedBelow
+example := @Solcore.TypeSystem.Unification.unify_sound_of_below
+example := @Solcore.TypeSystem.Unification.unify_sound
 example := @Solcore.TypeSystem.Unification.unify_rangeAvoidsDomain
 example := @Solcore.TypeSystem.Unification.unifyTypes_solvedBelow
+example := @Solcore.TypeSystem.Unification.unifyTypes_sound
 example := @Solcore.TypeSystem.Unification.unifyTypes_rangeAvoidsDomain
 example := @Solcore.TypeSystem.Scheme.instantiate_next_le
 example := @Solcore.TypeSystem.Scheme.FreeVariablesBelow
@@ -163,6 +180,12 @@ example : Solcore.TypeSystem.Unification.unify nestedConstraints =
     .ok nestedSolvedSubstitution := by
   rfl
 
+/-- The general soundness theorem closes the original decomposed constraint,
+not merely the normalized constraints seen by recursive calls. -/
+example : Solcore.TypeSystem.ConstraintsSatisfiedBy
+    nestedSolvedSubstitution nestedConstraints := by
+  exact Solcore.TypeSystem.Unification.unify_sound (by rfl)
+
 example : Solcore.TypeSystem.Substitution.SolvedBelow
     nestedSolvedSubstitution 2 := by
   apply Solcore.TypeSystem.Unification.unify_solvedBelow
@@ -188,6 +211,8 @@ example := @Solcore.TypeSystem.InferState.instantiateDeclaration_substitution
 example := @Solcore.TypeSystem.InferState.instantiateDeclaration_next_le
 example := @Solcore.TypeSystem.InferState.unify_next
 example := @Solcore.TypeSystem.InferState.solve_next
+example := @Solcore.TypeSystem.InferState.unify_resolve_eq
+example := @Solcore.TypeSystem.InferState.solve_satisfies
 example := @Solcore.TypeSystem.InferState.Solved
 example := @Solcore.TypeSystem.InferState.Solved.initial
 example := @Solcore.TypeSystem.InferState.Solved.fresh
@@ -199,6 +224,24 @@ example :=
 example := @Solcore.TypeSystem.InferState.Solved.unify
 example := @Solcore.TypeSystem.InferState.Solved.solve
 example := @Solcore.TypeSystem.Inference.infer_solved_variablesBelow
+
+private def incrementalState : Solcore.TypeSystem.InferState := {
+  next := 2
+  substitution := nonemptySolvedSubstitution
+}
+
+private def incrementalResult : Solcore.TypeSystem.InferState := {
+  next := 2
+  substitution := nestedSolvedSubstitution
+}
+
+/-- Incremental unification composes a new solution through an existing
+nonempty substitution and resolves the original inputs equally. -/
+example : incrementalResult.resolve (.variable solvedMetavariable) =
+    incrementalResult.resolve .word := by
+  apply Solcore.TypeSystem.InferState.unify_resolve_eq
+    (state := incrementalState)
+  rfl
 
 private def outOfBoundMetavariable : Solcore.TypeSystem.TypeVarId := ⟨0⟩
 

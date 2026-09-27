@@ -144,6 +144,7 @@ example :=
 example := @Solcore.Frontend.SourceInference.State.Header
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_state_header
+example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
 example :=

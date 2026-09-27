@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceInference.Expression
 import Solcore.Frontend.SourceInference.StateProperties
+import Solcore.TypeSystem.InferenceProperties
 
 /-! Declaration-scoped state preservation for source inference traversals. -/
 
@@ -262,6 +263,21 @@ the declaration owner and original input binders. -/
       injection success with nextEq
       subst next
       rfl
+
+/-- Successful source-inference unification makes the original input types
+equal under the returned inference state. -/
+theorem unify_resolve_eq
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    next.inference.resolve left = next.inference.resolve right := by
+  unfold unify at success
+  cases inferenceSuccess : state.inference.unify left right with
+  | error error =>
+      simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
+  | ok inference =>
+      simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
+      cases success
+      exact TypeSystem.InferState.unify_resolve_eq inferenceSuccess
 
 @[simp] private theorem unify_preserves_owner
     {state next : State} {left right : Ty}

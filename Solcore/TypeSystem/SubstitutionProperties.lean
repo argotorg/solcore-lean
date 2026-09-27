@@ -22,6 +22,93 @@ theorem lookup?_eq_none_iff_not_mem_domain (substitution : Substitution)
       · simp [lookup?, domain, same]
       · simp [lookup?, domain, same, Ne.symm same, induction]
 
+private theorem lookup?_append (left right : Substitution)
+    (metavariable : TypeVarId) :
+    lookup? (left ++ right) metavariable =
+      match left.lookup? metavariable with
+      | some replacement => some replacement
+      | none => right.lookup? metavariable := by
+  induction left with
+  | nil => rfl
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, replacement⟩
+      by_cases same : candidate = metavariable
+      · simp [lookup?, same]
+      · simp [lookup?, same, induction]
+
+private theorem lookup?_map_apply (newer older : Substitution)
+    (metavariable : TypeVarId) :
+    lookup? (older.map fun entry => (entry.1, newer.apply entry.2))
+        metavariable =
+      (older.lookup? metavariable).map newer.apply := by
+  induction older with
+  | nil => rfl
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, replacement⟩
+      by_cases same : candidate = metavariable
+      · simp [lookup?, same]
+      · simp [lookup?, same, induction]
+
+private theorem lookup?_filter_not_mem (substitution : Substitution)
+    (excluded : List TypeVarId) (metavariable : TypeVarId) :
+    lookup? (substitution.filter fun entry => !(entry.1 ∈ excluded))
+        metavariable =
+      if metavariable ∈ excluded then none
+      else substitution.lookup? metavariable := by
+  induction substitution with
+  | nil => simp [lookup?]
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, replacement⟩
+      by_cases candidateExcluded : candidate ∈ excluded
+      · by_cases same : candidate = metavariable
+        · subst candidate
+          simpa [candidateExcluded] using induction
+        · simp [lookup?, candidateExcluded, same, induction]
+      · by_cases same : candidate = metavariable
+        · subst candidate
+          simp [lookup?, candidateExcluded]
+        · simp [lookup?, candidateExcluded, same, induction]
+
+/-- Composition lookup implements older lookup followed by newer lookup. -/
+theorem lookup?_compose (newer older : Substitution)
+    (metavariable : TypeVarId) :
+    (newer.compose older).lookup? metavariable =
+      match older.lookup? metavariable with
+      | some replacement => some (newer.apply replacement)
+      | none => newer.lookup? metavariable := by
+  rw [compose, lookup?_append, lookup?_map_apply, lookup?_filter_not_mem]
+  cases found : older.lookup? metavariable with
+  | none =>
+      have missing : metavariable ∉ older.domain :=
+        (lookup?_eq_none_iff_not_mem_domain older metavariable).mp found
+      have missingMap : metavariable ∉ older.map Prod.fst := by
+        simpa only [domain] using missing
+      simp only [Option.map_none, missingMap, if_false]
+  | some replacement => rfl
+
+/-- Applying a composed substitution is the same as applying the older
+substitution first and the newer substitution second. -/
+theorem compose_apply (newer older : Substitution) (type : Ty) :
+    (newer.compose older).apply type =
+      newer.apply (older.apply type) := by
+  induction type with
+  | «variable» metavariable =>
+      simp only [apply, lookup?_compose]
+      cases older.lookup? metavariable <;> rfl
+  | parameter parameter => rfl
+  | constructor constructor => rfl
+  | application function argument functionInduction argumentInduction =>
+      simp only [apply, functionInduction, argumentInduction]
+  | function parameter result parameterInduction resultInduction =>
+      simp only [apply, parameterInduction, resultInduction]
+  | product left right leftInduction rightInduction =>
+      simp only [apply, leftInduction, rightInduction]
+  | mapping key value keyInduction valueInduction =>
+      simp only [apply, keyInduction, valueInduction]
+  | proxy inner innerInduction => simp only [apply, innerInduction]
+  | comptime inner innerInduction => simp only [apply, innerInduction]
+  | error => rfl
+
 /-- Every successful first-match lookup names an actual substitution entry. -/
 theorem lookup?_eq_some_mem
     {substitution : Substitution} {metavariable : TypeVarId}
@@ -272,6 +359,11 @@ def RangeAvoidsDomain (newer older : Substitution) : Prop :=
     (metavariable, replacement) ∈ newer →
       ∀ rangeVariable, rangeVariable ∈ replacement.freeVariables →
         rangeVariable ∉ older.domain
+
+/-- `result` semantically extends `previous` when reapplying the previous
+substitution before the result cannot change any type. -/
+def SemanticallyExtends (result previous : Substitution) : Prop :=
+  ∀ type, result.apply (previous.apply type) = result.apply type
 
 /-- A solved substitution has a unique bounded domain, bounded replacement
 variables, and no replacement variable that remains in its own domain. -/
@@ -853,5 +945,40 @@ theorem compose
       exact composedMember.elim outsideOlder outsideNewer
 
 end Substitution.SolvedBelow
+
+namespace Substitution.SemanticallyExtends
+
+/-- A solved substitution semantically extends itself. -/
+theorem refl_of_solved
+    {substitution : Substitution} {next : Nat}
+    (solved : substitution.SolvedBelow next) :
+    substitution.SemanticallyExtends substitution := by
+  exact solved.apply_idempotent
+
+/-- Left composition semantically extends a solved older substitution. -/
+theorem compose_left
+    (newer : Substitution) {older : Substitution} {next : Nat}
+    (solved : older.SolvedBelow next) :
+    (newer.compose older).SemanticallyExtends older := by
+  intro type
+  rw [Substitution.compose_apply, Substitution.compose_apply,
+    solved.apply_idempotent]
+
+/-- Semantic extension is transitive. -/
+theorem trans
+    {newest middle oldest : Substitution}
+    (newestMiddle : newest.SemanticallyExtends middle)
+    (middleOldest : middle.SemanticallyExtends oldest) :
+    newest.SemanticallyExtends oldest := by
+  intro type
+  calc
+    newest.apply (oldest.apply type) =
+        newest.apply (middle.apply (oldest.apply type)) :=
+      (newestMiddle (oldest.apply type)).symm
+    _ = newest.apply (middle.apply type) :=
+      congrArg newest.apply (middleOldest type)
+    _ = newest.apply type := newestMiddle type
+
+end Substitution.SemanticallyExtends
 
 end Solcore.TypeSystem

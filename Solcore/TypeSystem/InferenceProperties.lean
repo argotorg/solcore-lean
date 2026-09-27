@@ -63,6 +63,48 @@ theorem solve_next {state result : InferState}
   cases success
   rfl
 
+/-- Successful incremental binary unification makes the original input types
+equal when resolved by the returned state. -/
+theorem unify_resolve_eq
+    {state result : InferState} {left right : Ty}
+    (success : state.unify left right = .ok result) :
+    result.resolve left = result.resolve right := by
+  unfold InferState.unify at success
+  cases unified : Unification.unifyTypes (state.resolve left)
+      (state.resolve right) with
+  | error error =>
+      simp [unified, bind, Except.bind] at success
+  | ok update =>
+      simp [unified, bind, Except.bind] at success
+      cases success
+      simpa [InferState.resolve, Substitution.compose_apply] using
+        (Unification.unifyTypes_sound unified)
+
+/-- Successful incremental constraint solving makes every original constraint
+equal when resolved by the returned state. -/
+theorem solve_satisfies
+    {state result : InferState} {constraints : List Constraint}
+    (success : state.solve constraints = .ok result) :
+    ConstraintsSatisfiedBy result.substitution constraints := by
+  unfold InferState.solve at success
+  cases unified : Unification.unify
+      (constraints.map (·.apply state.substitution)) with
+  | error error =>
+      simp [unified, bind, Except.bind] at success
+  | ok update =>
+      simp [unified, bind, Except.bind] at success
+      cases success
+      have normalizedSatisfied :=
+        Unification.unify_sound unified
+      intro constraint member
+      have appliedMember : constraint.apply state.substitution ∈
+          constraints.map (·.apply state.substitution) :=
+        List.mem_map.mpr ⟨constraint, member, rfl⟩
+      have equality := normalizedSatisfied
+        (constraint.apply state.substitution) appliedMember
+      simpa [Constraint.SatisfiedBy, Constraint.apply,
+        Substitution.compose_apply] using equality
+
 namespace Solved
 
 /-- Every initial inference state has a solved empty substitution. -/

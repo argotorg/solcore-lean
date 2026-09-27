@@ -40,49 +40,6 @@ theorem apply_variable_of_lookup?_eq_none {substitution : Substitution}
     substitution.apply (.variable metavariable) = .variable metavariable := by
   simp [apply, missing]
 
-private theorem lookup?_append (left right : Substitution) (metavariable : TypeVarId) :
-    lookup? (left ++ right) metavariable =
-      match left.lookup? metavariable with
-      | some replacement => some replacement
-      | none => right.lookup? metavariable := by
-  induction left with
-  | nil => rfl
-  | cons entry rest ih =>
-      rcases entry with ⟨candidate, replacement⟩
-      by_cases same : candidate = metavariable
-      · simp [lookup?, same]
-      · simp [lookup?, same, ih]
-
-private theorem lookup?_map_apply (newer older : Substitution)
-    (metavariable : TypeVarId) :
-    lookup? (older.map fun entry => (entry.1, newer.apply entry.2)) metavariable =
-      (older.lookup? metavariable).map newer.apply := by
-  induction older with
-  | nil => rfl
-  | cons entry rest ih =>
-      rcases entry with ⟨candidate, replacement⟩
-      by_cases same : candidate = metavariable
-      · simp [lookup?, same]
-      · simp [lookup?, same, ih]
-
-private theorem lookup?_filter_not_mem (substitution : Substitution)
-    (excluded : List TypeVarId) (metavariable : TypeVarId) :
-    lookup? (substitution.filter fun entry => !(entry.1 ∈ excluded)) metavariable =
-      if metavariable ∈ excluded then none else substitution.lookup? metavariable := by
-  induction substitution with
-  | nil => simp [lookup?]
-  | cons entry rest ih =>
-      rcases entry with ⟨candidate, replacement⟩
-      by_cases candidate_excluded : candidate ∈ excluded
-      · by_cases same : candidate = metavariable
-        · subst candidate
-          simpa [candidate_excluded] using ih
-        · simp [lookup?, candidate_excluded, same, ih]
-      · by_cases same : candidate = metavariable
-        · subst candidate
-          simp [lookup?, candidate_excluded]
-        · simp [lookup?, candidate_excluded, same, ih]
-
 private theorem lookup?_filter_ne (substitution : Substitution)
     (erased metavariable : TypeVarId) :
     lookup? (substitution.filter fun entry => entry.1 != erased) metavariable =
@@ -144,41 +101,6 @@ theorem lookup?_without_of_mem (substitution : Substitution)
           (substitution.erase metavariable) variables
           (lookup?_erase_self substitution metavariable)
       · exact ih (substitution := substitution.erase erasedVariable) quantified
-
-theorem lookup?_compose (newer older : Substitution) (metavariable : TypeVarId) :
-    (newer.compose older).lookup? metavariable =
-      match older.lookup? metavariable with
-      | some replacement => some (newer.apply replacement)
-      | none => newer.lookup? metavariable := by
-  rw [compose, lookup?_append, lookup?_map_apply, lookup?_filter_not_mem]
-  cases found : older.lookup? metavariable with
-  | none =>
-      have missing : metavariable ∉ older.domain :=
-        (lookup?_eq_none_iff_not_mem_domain older metavariable).mp found
-      have missing_map : metavariable ∉ older.map Prod.fst := by
-        simpa only [domain] using missing
-      simp only [Option.map_none, missing_map, if_false]
-  | some replacement => rfl
-
-theorem compose_apply (newer older : Substitution) (type : Ty) :
-    (newer.compose older).apply type = newer.apply (older.apply type) := by
-  induction type with
-  | «variable» metavariable =>
-      simp only [apply, lookup?_compose]
-      cases older.lookup? metavariable <;> rfl
-  | parameter parameter => rfl
-  | constructor constructor => rfl
-  | application function argument function_ih argument_ih =>
-      simp only [apply, function_ih, argument_ih]
-  | function parameter result parameter_ih result_ih =>
-      simp only [apply, parameter_ih, result_ih]
-  | product left right left_ih right_ih =>
-      simp only [apply, left_ih, right_ih]
-  | mapping key value key_ih value_ih =>
-      simp only [apply, key_ih, value_ih]
-  | proxy inner inner_ih => simp only [apply, inner_ih]
-  | comptime inner inner_ih => simp only [apply, inner_ih]
-  | error => rfl
 
 end Substitution
 

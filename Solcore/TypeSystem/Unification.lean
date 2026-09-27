@@ -54,6 +54,22 @@ theorem VariablesOutsideDomain.apply
     ⟨cross.apply_variables_outside_older_domain constraint.left outside.1,
       cross.apply_variables_outside_older_domain constraint.right outside.2⟩
 
+/-- A substitution satisfies a constraint when it makes both sides equal. -/
+def SatisfiedBy (constraint : Constraint)
+    (substitution : Substitution) : Prop :=
+  substitution.apply constraint.left = substitution.apply constraint.right
+
+/-- A normalized equality can be transported back through a substitution
+which is semantically extended by the final result. -/
+theorem SatisfiedBy.of_normalized
+    {constraint : Constraint} {current result : Substitution}
+    (extension : result.SemanticallyExtends current)
+    (normalized : result.apply (current.apply constraint.left) =
+      result.apply (current.apply constraint.right)) :
+    constraint.SatisfiedBy result := by
+  exact (extension constraint.left).symm.trans
+    (normalized.trans (extension constraint.right))
+
 end Constraint
 
 /-- Every pending unification constraint is bounded by the same allocator
@@ -66,6 +82,52 @@ def ConstraintsOutsideDomain (substitution : Substitution)
     (constraints : List Constraint) : Prop :=
   ∀ constraint, constraint ∈ constraints →
     constraint.VariablesOutsideDomain substitution
+
+/-- A substitution simultaneously satisfies every pending constraint. -/
+def ConstraintsSatisfiedBy (substitution : Substitution)
+    (constraints : List Constraint) : Prop :=
+  ∀ constraint, constraint ∈ constraints → constraint.SatisfiedBy substitution
+
+/-- Every finite constraint set admits a common flexible-variable bound. -/
+private theorem constraintsBelow_exists (constraints : List Constraint) :
+    ∃ next, ConstraintsBelow next constraints := by
+  induction constraints with
+  | nil =>
+      exact ⟨0, by intro constraint member; simp at member⟩
+  | cons constraint rest induction =>
+      obtain ⟨restNext, restBelow⟩ := induction
+      let next := max constraint.left.nextVariable
+        (max constraint.right.nextVariable restNext)
+      refine ⟨next, ?_⟩
+      intro candidate member
+      rcases List.mem_cons.mp member with rfl | member
+      · constructor
+        · exact (Ty.variablesBelow_nextVariable candidate.left).weaken
+            (by exact Nat.le_max_left _ _)
+        · exact (Ty.variablesBelow_nextVariable candidate.right).weaken
+            (by
+              exact Nat.le_trans (Nat.le_max_left _ _)
+                (Nat.le_max_right _ _))
+      · have below := restBelow candidate member
+        have bound : restNext ≤ next := by
+          exact Nat.le_trans (Nat.le_max_right _ _)
+            (Nat.le_max_right _ _)
+        exact ⟨below.1.weaken bound, below.2.weaken bound⟩
+
+namespace ConstraintsSatisfiedBy
+
+theorem cons
+    {substitution : Substitution} {constraint : Constraint}
+    {constraints : List Constraint}
+    (head : constraint.SatisfiedBy substitution)
+    (tail : ConstraintsSatisfiedBy substitution constraints) :
+    ConstraintsSatisfiedBy substitution (constraint :: constraints) := by
+  intro candidate member
+  rcases List.mem_cons.mp member with rfl | member
+  · exact head
+  · exact tail candidate member
+
+end ConstraintsSatisfiedBy
 
 namespace Unification
 
@@ -132,13 +194,31 @@ private theorem bind_solvedBelow
   cases member
   exact typeOutside
 
-private theorem loop_solvedBelow
+private theorem singleton_satisfies_variable
+    {metavariable : TypeVarId} {type : Ty}
+    (occursCheck : type.containsVariable metavariable = false) :
+    Substitution.apply [(metavariable, type)] (.variable metavariable) =
+      Substitution.apply [(metavariable, type)] type := by
+  have typeFixed : Substitution.apply [(metavariable, type)] type = type := by
+    apply Ty.apply_eq_self_of_domain_disjoint_freeVariables
+    intro candidate domainMember occurs
+    have same : candidate = metavariable := by
+      simpa [Substitution.domain] using domainMember
+    subst candidate
+    exact ((Ty.containsVariable_eq_false_iff type metavariable).mp
+      occursCheck) occurs
+  rw [typeFixed]
+  simp [Substitution.apply, Substitution.lookup?]
+
+private theorem loop_sound
     {fuel next : Nat} {substitution result : Substitution}
     {constraints : List Constraint}
     (solved : substitution.SolvedBelow next)
     (constraintsBelow : ConstraintsBelow next constraints)
     (success : loop fuel substitution constraints = .ok result) :
-    result.SolvedBelow next := by
+    result.SolvedBelow next ∧
+      result.SemanticallyExtends substitution ∧
+        ConstraintsSatisfiedBy result constraints := by
   induction fuel generalizing substitution constraints result with
   | zero =>
       simp [loop] at success
@@ -147,7 +227,9 @@ private theorem loop_solvedBelow
       | nil =>
           simp only [loop, Except.ok.injEq] at success
           subst result
-          exact solved
+          exact ⟨solved,
+            Substitution.SemanticallyExtends.refl_of_solved solved,
+            by intro constraint member; simp at member⟩
       | cons constraint rest =>
           have constraintBelow : constraint.VariablesBelow next :=
             constraintsBelow constraint (by simp)
@@ -170,7 +252,14 @@ private theorem loop_solvedBelow
             solved.apply_variables_outside_domain constraint.right
           simp only [loop] at success
           split at success
-          · exact induction solved restBelow success
+          · rename_i normalized
+            rcases induction solved restBelow success with
+              ⟨resultSolved, extension, restSatisfied⟩
+            exact ⟨resultSolved, extension,
+              ConstraintsSatisfiedBy.cons
+                (Constraint.SatisfiedBy.of_normalized extension
+                  (congrArg result.apply normalized))
+                restSatisfied⟩
           · split at success
             · rename_i _ _ metavariable leftEq
               have metavariableBelow : metavariable.index < next := by
@@ -185,10 +274,31 @@ private theorem loop_solvedBelow
                     metavariable with
               | false =>
                   rw [occursCheck] at success
-                  exact induction
-                    (bind_solvedBelow solved metavariableBelow rightBelow
-                      rightOutside occursCheck)
-                    restBelow success
+                  let binding : Substitution :=
+                    [(metavariable, substitution.apply constraint.right)]
+                  let extended := binding.compose substitution
+                  have extendedSolved : extended.SolvedBelow next :=
+                    bind_solvedBelow solved metavariableBelow rightBelow
+                      rightOutside occursCheck
+                  have bindingSatisfied :
+                      constraint.SatisfiedBy extended := by
+                    simpa [Constraint.SatisfiedBy, extended, binding,
+                      Substitution.compose_apply, leftEq] using
+                      (singleton_satisfies_variable occursCheck)
+                  rcases induction extendedSolved restBelow success with
+                    ⟨resultSolved, resultExtended, restSatisfied⟩
+                  have extendedCurrent :
+                      extended.SemanticallyExtends substitution := by
+                    exact Substitution.SemanticallyExtends.compose_left
+                      binding solved
+                  have resultCurrent :
+                      result.SemanticallyExtends substitution :=
+                    resultExtended.trans extendedCurrent
+                  exact ⟨resultSolved, resultCurrent,
+                    ConstraintsSatisfiedBy.cons
+                      (Constraint.SatisfiedBy.of_normalized resultExtended
+                        (congrArg result.apply bindingSatisfied))
+                      restSatisfied⟩
               | true =>
                   simp [occursCheck] at success
             · rename_i _ _ metavariable rightEq _
@@ -204,10 +314,31 @@ private theorem loop_solvedBelow
                     metavariable with
               | false =>
                   rw [occursCheck] at success
-                  exact induction
-                    (bind_solvedBelow solved metavariableBelow leftBelow
-                      leftOutside occursCheck)
-                    restBelow success
+                  let binding : Substitution :=
+                    [(metavariable, substitution.apply constraint.left)]
+                  let extended := binding.compose substitution
+                  have extendedSolved : extended.SolvedBelow next :=
+                    bind_solvedBelow solved metavariableBelow leftBelow
+                      leftOutside occursCheck
+                  have bindingSatisfied :
+                      constraint.SatisfiedBy extended := by
+                    simpa [Constraint.SatisfiedBy, extended, binding,
+                      Substitution.compose_apply, rightEq] using
+                      (singleton_satisfies_variable occursCheck).symm
+                  rcases induction extendedSolved restBelow success with
+                    ⟨resultSolved, resultExtended, restSatisfied⟩
+                  have extendedCurrent :
+                      extended.SemanticallyExtends substitution := by
+                    exact Substitution.SemanticallyExtends.compose_left
+                      binding solved
+                  have resultCurrent :
+                      result.SemanticallyExtends substitution :=
+                    resultExtended.trans extendedCurrent
+                  exact ⟨resultSolved, resultCurrent,
+                    ConstraintsSatisfiedBy.cons
+                      (Constraint.SatisfiedBy.of_normalized resultExtended
+                        (congrArg result.apply bindingSatisfied))
+                      restSatisfied⟩
               | true =>
                   simp [occursCheck] at success
             · rename_i _ _ leftFunction leftArgument rightFunction
@@ -237,7 +368,27 @@ private theorem loop_solvedBelow
                 · rcases List.mem_cons.mp member with rfl | member
                   · exact ⟨leftParts.2, rightParts.2⟩
                   · exact restBelow candidate member
-              exact induction solved decomposedBelow success
+              rcases induction solved decomposedBelow success with
+                ⟨resultSolved, extension, decomposedSatisfied⟩
+              have functionSatisfied := decomposedSatisfied
+                { left := leftFunction, right := rightFunction } (by simp)
+              change result.apply leftFunction = result.apply rightFunction at functionSatisfied
+              have argumentSatisfied := decomposedSatisfied
+                { left := leftArgument, right := rightArgument } (by simp)
+              change result.apply leftArgument = result.apply rightArgument at argumentSatisfied
+              have normalized :
+                  result.apply (substitution.apply constraint.left) =
+                    result.apply (substitution.apply constraint.right) := by
+                rw [leftEq, rightEq]
+                simp only [Substitution.apply]
+                rw [functionSatisfied, argumentSatisfied]
+              have restSatisfied : ConstraintsSatisfiedBy result rest := by
+                intro candidate member
+                exact decomposedSatisfied candidate (by simp [member])
+              exact ⟨resultSolved, extension,
+                ConstraintsSatisfiedBy.cons
+                  (Constraint.SatisfiedBy.of_normalized extension normalized)
+                  restSatisfied⟩
             · rename_i _ _ leftFunction leftArgument rightFunction
                 rightArgument leftEq rightEq
               have normalizedLeft :
@@ -265,7 +416,27 @@ private theorem loop_solvedBelow
                 · rcases List.mem_cons.mp member with rfl | member
                   · exact ⟨leftParts.2, rightParts.2⟩
                   · exact restBelow candidate member
-              exact induction solved decomposedBelow success
+              rcases induction solved decomposedBelow success with
+                ⟨resultSolved, extension, decomposedSatisfied⟩
+              have parameterSatisfied := decomposedSatisfied
+                { left := leftFunction, right := rightFunction } (by simp)
+              change result.apply leftFunction = result.apply rightFunction at parameterSatisfied
+              have resultSatisfied := decomposedSatisfied
+                { left := leftArgument, right := rightArgument } (by simp)
+              change result.apply leftArgument = result.apply rightArgument at resultSatisfied
+              have normalized :
+                  result.apply (substitution.apply constraint.left) =
+                    result.apply (substitution.apply constraint.right) := by
+                rw [leftEq, rightEq]
+                simp only [Substitution.apply]
+                rw [parameterSatisfied, resultSatisfied]
+              have restSatisfied : ConstraintsSatisfiedBy result rest := by
+                intro candidate member
+                exact decomposedSatisfied candidate (by simp [member])
+              exact ⟨resultSolved, extension,
+                ConstraintsSatisfiedBy.cons
+                  (Constraint.SatisfiedBy.of_normalized extension normalized)
+                  restSatisfied⟩
             · rename_i _ _ leftFunction leftArgument rightFunction
                 rightArgument leftEq rightEq
               have normalizedLeft :
@@ -293,7 +464,27 @@ private theorem loop_solvedBelow
                 · rcases List.mem_cons.mp member with rfl | member
                   · exact ⟨leftParts.2, rightParts.2⟩
                   · exact restBelow candidate member
-              exact induction solved decomposedBelow success
+              rcases induction solved decomposedBelow success with
+                ⟨resultSolved, extension, decomposedSatisfied⟩
+              have leftSatisfied := decomposedSatisfied
+                { left := leftFunction, right := rightFunction } (by simp)
+              change result.apply leftFunction = result.apply rightFunction at leftSatisfied
+              have rightSatisfied := decomposedSatisfied
+                { left := leftArgument, right := rightArgument } (by simp)
+              change result.apply leftArgument = result.apply rightArgument at rightSatisfied
+              have normalized :
+                  result.apply (substitution.apply constraint.left) =
+                    result.apply (substitution.apply constraint.right) := by
+                rw [leftEq, rightEq]
+                simp only [Substitution.apply]
+                rw [leftSatisfied, rightSatisfied]
+              have restSatisfied : ConstraintsSatisfiedBy result rest := by
+                intro candidate member
+                exact decomposedSatisfied candidate (by simp [member])
+              exact ⟨resultSolved, extension,
+                ConstraintsSatisfiedBy.cons
+                  (Constraint.SatisfiedBy.of_normalized extension normalized)
+                  restSatisfied⟩
             · rename_i _ _ leftFunction leftArgument rightFunction
                 rightArgument leftEq rightEq
               have normalizedLeft :
@@ -321,7 +512,27 @@ private theorem loop_solvedBelow
                 · rcases List.mem_cons.mp member with rfl | member
                   · exact ⟨leftParts.2, rightParts.2⟩
                   · exact restBelow candidate member
-              exact induction solved decomposedBelow success
+              rcases induction solved decomposedBelow success with
+                ⟨resultSolved, extension, decomposedSatisfied⟩
+              have keySatisfied := decomposedSatisfied
+                { left := leftFunction, right := rightFunction } (by simp)
+              change result.apply leftFunction = result.apply rightFunction at keySatisfied
+              have valueSatisfied := decomposedSatisfied
+                { left := leftArgument, right := rightArgument } (by simp)
+              change result.apply leftArgument = result.apply rightArgument at valueSatisfied
+              have normalized :
+                  result.apply (substitution.apply constraint.left) =
+                    result.apply (substitution.apply constraint.right) := by
+                rw [leftEq, rightEq]
+                simp only [Substitution.apply]
+                rw [keySatisfied, valueSatisfied]
+              have restSatisfied : ConstraintsSatisfiedBy result rest := by
+                intro candidate member
+                exact decomposedSatisfied candidate (by simp [member])
+              exact ⟨resultSolved, extension,
+                ConstraintsSatisfiedBy.cons
+                  (Constraint.SatisfiedBy.of_normalized extension normalized)
+                  restSatisfied⟩
             · rename_i _ _ leftInner rightInner leftEq rightEq
               have normalizedLeft :
                   (Ty.proxy leftInner).VariablesBelow next := by
@@ -331,19 +542,34 @@ private theorem loop_solvedBelow
                   (Ty.proxy rightInner).VariablesBelow next := by
                 rw [← rightEq]
                 exact rightBelow
-              apply induction
-                (constraints := { left := leftInner, right := rightInner } :: rest)
-                solved
-              · intro candidate member
-                rcases List.mem_cons.mp member with same | member
-                · subst candidate
-                  exact
+              have decomposedBelow : ConstraintsBelow next
+                  ({ left := leftInner, right := rightInner } :: rest) := by
+                intro candidate member
+                rcases List.mem_cons.mp member with rfl | member
+                · exact
                     ⟨(Ty.variablesBelow_proxy_iff next leftInner).mp
                         normalizedLeft,
                       (Ty.variablesBelow_proxy_iff next rightInner).mp
                         normalizedRight⟩
                 · exact restBelow candidate member
-              · exact success
+              rcases induction solved decomposedBelow success with
+                ⟨resultSolved, extension, decomposedSatisfied⟩
+              have innerSatisfied := decomposedSatisfied
+                { left := leftInner, right := rightInner } (by simp)
+              change result.apply leftInner = result.apply rightInner at innerSatisfied
+              have normalized :
+                  result.apply (substitution.apply constraint.left) =
+                    result.apply (substitution.apply constraint.right) := by
+                rw [leftEq, rightEq]
+                simp only [Substitution.apply]
+                rw [innerSatisfied]
+              have restSatisfied : ConstraintsSatisfiedBy result rest := by
+                intro candidate member
+                exact decomposedSatisfied candidate (by simp [member])
+              exact ⟨resultSolved, extension,
+                ConstraintsSatisfiedBy.cons
+                  (Constraint.SatisfiedBy.of_normalized extension normalized)
+                  restSatisfied⟩
             · rename_i _ _ leftInner rightInner leftEq rightEq
               have normalizedLeft :
                   (Ty.comptime leftInner).VariablesBelow next := by
@@ -353,20 +579,44 @@ private theorem loop_solvedBelow
                   (Ty.comptime rightInner).VariablesBelow next := by
                 rw [← rightEq]
                 exact rightBelow
-              apply induction
-                (constraints := { left := leftInner, right := rightInner } :: rest)
-                solved
-              · intro candidate member
-                rcases List.mem_cons.mp member with same | member
-                · subst candidate
-                  exact
+              have decomposedBelow : ConstraintsBelow next
+                  ({ left := leftInner, right := rightInner } :: rest) := by
+                intro candidate member
+                rcases List.mem_cons.mp member with rfl | member
+                · exact
                     ⟨(Ty.variablesBelow_comptime_iff next leftInner).mp
                         normalizedLeft,
                       (Ty.variablesBelow_comptime_iff next rightInner).mp
                         normalizedRight⟩
                 · exact restBelow candidate member
-              · exact success
+              rcases induction solved decomposedBelow success with
+                ⟨resultSolved, extension, decomposedSatisfied⟩
+              have innerSatisfied := decomposedSatisfied
+                { left := leftInner, right := rightInner } (by simp)
+              change result.apply leftInner = result.apply rightInner at innerSatisfied
+              have normalized :
+                  result.apply (substitution.apply constraint.left) =
+                    result.apply (substitution.apply constraint.right) := by
+                rw [leftEq, rightEq]
+                simp only [Substitution.apply]
+                rw [innerSatisfied]
+              have restSatisfied : ConstraintsSatisfiedBy result rest := by
+                intro candidate member
+                exact decomposedSatisfied candidate (by simp [member])
+              exact ⟨resultSolved, extension,
+                ConstraintsSatisfiedBy.cons
+                  (Constraint.SatisfiedBy.of_normalized extension normalized)
+                  restSatisfied⟩
             · simp at success
+
+private theorem loop_solvedBelow
+    {fuel next : Nat} {substitution result : Substitution}
+    {constraints : List Constraint}
+    (solved : substitution.SolvedBelow next)
+    (constraintsBelow : ConstraintsBelow next constraints)
+    (success : loop fuel substitution constraints = .ok result) :
+    result.SolvedBelow next :=
+  (loop_sound solved constraintsBelow success).1
 
 private theorem variablesOutside_parts
     {older : Substitution} {whole first second : Ty}
@@ -696,6 +946,25 @@ theorem unifyWithFuel_solvedBelow
   apply loop_solvedBelow (Substitution.SolvedBelow.empty next) below
   exact success
 
+/-- A shared allocator bound exposes successful bounded unification's
+constraint-satisfaction proof directly from the strengthened loop invariant. -/
+theorem unifyWithFuel_sound_of_below
+    {fuel next : Nat} {constraints : List Constraint}
+    {result : Substitution}
+    (below : ConstraintsBelow next constraints)
+    (success : unifyWithFuel fuel constraints = .ok result) :
+    ConstraintsSatisfiedBy result constraints := by
+  exact (loop_sound (Substitution.SolvedBelow.empty next) below success).2.2
+
+/-- Successful bounded unification satisfies every input constraint after
+applying the resulting substitution. -/
+theorem unifyWithFuel_sound
+    {fuel : Nat} {constraints : List Constraint} {result : Substitution}
+    (success : unifyWithFuel fuel constraints = .ok result) :
+    ConstraintsSatisfiedBy result constraints := by
+  obtain ⟨next, below⟩ := constraintsBelow_exists constraints
+  exact unifyWithFuel_sound_of_below (next := next) below success
+
 /-- Successful bounded-fuel unification cannot introduce an older domain
 variable into its result range when all input constraints avoid that domain. -/
 theorem unifyWithFuel_rangeAvoidsDomain
@@ -741,6 +1010,23 @@ theorem unify_solvedBelow
     result.SolvedBelow next := by
   exact unifyWithFuel_solvedBelow below success
 
+/-- A shared allocator bound exposes the default-fuel unifier's successful
+constraint-satisfaction proof. -/
+theorem unify_sound_of_below
+    {next : Nat} {constraints : List Constraint} {result : Substitution}
+    (below : ConstraintsBelow next constraints)
+    (success : unify constraints = .ok result) :
+    ConstraintsSatisfiedBy result constraints := by
+  exact unifyWithFuel_sound_of_below below success
+
+/-- The default-fuel unifier satisfies every input constraint whenever it
+returns successfully. -/
+theorem unify_sound
+    {constraints : List Constraint} {result : Substitution}
+    (success : unify constraints = .ok result) :
+    ConstraintsSatisfiedBy result constraints := by
+  exact unifyWithFuel_sound success
+
 /-- The default-fuel unifier preserves avoidance of an older substitution
 domain. -/
 theorem unify_rangeAvoidsDomain
@@ -767,6 +1053,15 @@ theorem unifyTypes_solvedBelow
     subst constraint
     exact ⟨leftBelow, rightBelow⟩
   · exact success
+
+/-- Successful binary unification makes its two input types equal under the
+resulting substitution. -/
+theorem unifyTypes_sound
+    {left right : Ty} {result : Substitution}
+    (success : unifyTypes left right = .ok result) :
+    result.apply left = result.apply right := by
+  have satisfied := unify_sound (constraints := [{ left, right }]) success
+  exact satisfied { left, right } (by simp)
 
 /-- Binary unification cannot reintroduce an older substitution-domain
 variable when neither normalized input contains one. -/
