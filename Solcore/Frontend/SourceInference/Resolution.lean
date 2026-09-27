@@ -87,6 +87,20 @@ structure PlannedCoercionStep where
   methodPredicates : List ProgramPredicate := []
   deriving Repr, DecidableEq
 
+namespace PlannedCoercionPath
+
+/-- Check exact endpoints and adjacency before stable requirement identities
+are allocated by `commitCoercionPlan`. -/
+def isValid (source target : Ty) : List PlannedCoercionStep → Bool
+  | [] => source == target
+  | step :: rest =>
+      step.source == source &&
+        match rest with
+        | [] => step.target == target
+        | _ => isValid step.target target rest
+
+end PlannedCoercionPath
+
 structure CoercionPath where
   current : Ty
   visited : List Ty

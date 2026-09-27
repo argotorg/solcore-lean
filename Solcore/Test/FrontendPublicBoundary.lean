@@ -188,6 +188,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.qualifiedFunctionsNamed_success_subset_catalog
 example :=
+  @Solcore.Frontend.SourceInference.Detail.PlannedCoercionPath.isValid
+example :=
+  @Solcore.Frontend.SourceInference.Detail.coercionPlan?_some_isValid
+example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_requirementsWellFormed
