@@ -72,6 +72,33 @@ structure CheckedProgramWellFormedConditions
 
 namespace CheckedProgramWellFormedConditions
 
+/-- Successful executable checking discharges the exact function/method
+identity alignment obligations.  The catalog invariant and semantic validity
+of each body remain explicit because they are not yet consequences of checker
+success. -/
+theorem ofCheckLoadedProgram
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkLoadedProgram loaded fuel = Except.ok checked)
+    (signatures : SignatureCatalogWellFormed checked.signatures)
+    (functionsValid : ∀ function, function ∈ checked.functions →
+      FunctionDefinition.Valid checked.signatures
+        (FunctionDefinition.ofChecked function))
+    (methodsValid : ∀ method, method ∈ checked.methods →
+      MethodDefinition.Valid checked.signatures
+        (MethodDefinition.ofChecked method)) :
+    CheckedProgramWellFormedConditions checked := by
+  obtain ⟨functionIds, methodIds⟩ :=
+    Frontend.checkLoadedProgram_success_ids success
+  exact {
+    signatures
+    function_ids := functionIds
+    method_ids := methodIds
+    functions_valid := functionsValid
+    methods_valid := methodsValid
+  }
+
 /-- Assemble whole-program declarative well-formedness from the explicit
 checker-to-semantics bridge obligations. -/
 theorem programWellFormed
@@ -120,6 +147,26 @@ theorem programWellFormed
     refine ⟨MethodDefinition.ofChecked checkedMethod, ?_, ?_⟩
     · exact List.mem_map.mpr ⟨checkedMethod, checkedMethodMem, rfl⟩
     · simpa [MethodDefinition.ofChecked] using idEq
+
+/-- Promote a successful loaded-program check directly to declarative
+whole-program well-formedness once the remaining semantic premises are
+supplied.  Function and method identity alignment is recovered from checker
+success rather than repeated by callers. -/
+theorem programWellFormedOfCheckLoadedProgram
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkLoadedProgram loaded fuel = Except.ok checked)
+    (signatures : SignatureCatalogWellFormed checked.signatures)
+    (functionsValid : ∀ function, function ∈ checked.functions →
+      FunctionDefinition.Valid checked.signatures
+        (FunctionDefinition.ofChecked function))
+    (methodsValid : ∀ method, method ∈ checked.methods →
+      MethodDefinition.Valid checked.signatures
+        (MethodDefinition.ofChecked method)) :
+    ProgramWellFormed (Program.ofChecked checked) :=
+  (CheckedProgramWellFormedConditions.ofCheckLoadedProgram success signatures
+    functionsValid methodsValid).programWellFormed
 
 end CheckedProgramWellFormedConditions
 
