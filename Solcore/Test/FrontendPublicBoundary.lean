@@ -31,6 +31,10 @@ example := @Solcore.Frontend.ProgramSignatures.contract?
 example := @Solcore.Frontend.ProgramFunctionSignature.parameterNames_length
 example := @Solcore.Frontend.ProgramFunctionSignature.parameterTypes_length
 example := @Solcore.Frontend.ProgramFunctionSignature.parameterComptime_length
+example := @Solcore.Frontend.buildProgramSignatures_success_function_shape
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_function_parameter_names_nodup
+example := @Solcore.Frontend.buildProgramSignatures_success_function_scheme_body
 example := @Solcore.Frontend.SignatureParametersWellFormed
 example := @Solcore.Frontend.SignatureParametersWellFormed.parameters_nodup
 example := @Solcore.Frontend.SignatureParametersWellFormed.parameter_owners
@@ -88,6 +92,8 @@ example := @Solcore.Frontend.checkLoadedProgram_success_environment
 example := @Solcore.Frontend.checkLoadedProgram_success_signatures
 example :=
   @Solcore.Frontend.checkLoadedProgram_success_signature_parameters_wellFormed
+example :=
+  @Solcore.Frontend.checkLoadedProgram_success_function_signature_shape
 example := @Solcore.Frontend.checkLoadedProgram_success_ids
 example := @Solcore.Frontend.checkProgram_success_load
 example := @Solcore.Frontend.checkProgram_success_ids
@@ -95,6 +101,7 @@ example := @Solcore.Frontend.checkProgram_success_declarations_nodup
 example := @Solcore.Frontend.checkProgram_success_signature_declaration_ids_nodup
 example :=
   @Solcore.Frontend.checkProgram_success_signature_parameters_wellFormed
+example := @Solcore.Frontend.checkProgram_success_function_signature_shape
 example := @Solcore.Frontend.ProgramCheckError.methodInference
 example := @Solcore.Frontend.ProgramCheckError.methodNoSolution
 example := @Solcore.Frontend.ProgramCheckError.methodInconclusive

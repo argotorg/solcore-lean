@@ -845,6 +845,67 @@ private def resolveFunctionParameters
                 } :: resolvedRest.parameters
               }
 
+/-- Successful parameter resolution produces unique names and keeps every
+newly resolved name distinct from the names already recorded by the caller. -/
+private theorem resolveFunctionParameters_success_names
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {scope : ProgramTypeScope} {sources : List Syntax.FunctionParameter}
+    {index : Nat} {seen : List (String × Nat)}
+    {resolved : ResolvedFunctionParameters}
+    (success : resolveFunctionParameters environment declaration scope
+      sources index seen = .ok resolved) :
+    (resolved.parameters.map (·.name)).Nodup ∧
+      ∀ name, name ∈ resolved.parameters.map (·.name) →
+        ∀ previous, previous ∈ seen → name ≠ previous.1 := by
+  induction sources generalizing index seen resolved with
+  | nil =>
+      simp only [resolveFunctionParameters, Except.ok.injEq] at success
+      subst resolved
+      simp
+  | cons parameter rest induction =>
+      cases valueEq : parameter.value with
+      | error =>
+          simp [resolveFunctionParameters, valueEq] at success
+      | typed comptime name sourceType =>
+          simp only [resolveFunctionParameters, valueEq] at success
+          cases duplicateEq : seen.find? fun previous =>
+              previous.1 == name.value with
+          | some previous =>
+              simp [duplicateEq] at success
+          | none =>
+              simp only [duplicateEq] at success
+              cases typeEq : resolveSignatureType environment declaration scope
+                  sourceType with
+              | error error =>
+                  simp [typeEq, bind, Except.bind] at success
+              | ok type =>
+                  simp only [typeEq, bind, Except.bind] at success
+                  cases restEq : resolveFunctionParameters environment declaration
+                      scope rest (index + 1) ((name.value, index) :: seen) with
+                  | error error =>
+                      simp [restEq] at success
+                  | ok resolvedRest =>
+                      simp only [restEq, pure, Pure.pure, Except.pure,
+                        Except.ok.injEq] at success
+                      subst resolved
+                      have restProperties := induction restEq
+                      constructor
+                      · simp only [List.map_cons, List.nodup_cons]
+                        refine ⟨?_, restProperties.1⟩
+                        intro member
+                        exact (restProperties.2 name.value member
+                          (name.value, index) (by simp)) rfl
+                      · intro candidate member previous previousMember
+                        simp only [List.map_cons, List.mem_cons] at member
+                        rcases member with rfl | member
+                        · intro equal
+                          have rejected :=
+                            (List.find?_eq_none.mp duplicateEq) previous
+                              previousMember
+                          exact rejected (by simp [equal])
+                        · exact restProperties.2 candidate member previous
+                            (by simp [previousMember])
+
 private def functionSignatureOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
     (source : Syntax.FunctionDecl) :
@@ -1324,7 +1385,11 @@ private theorem functionSignatureOfDeclaration_success_header
     (success : functionSignatureOfDeclaration environment declaration source =
       .ok signature) :
     signature.id = declaration.id ∧
-      signature.scheme.parameters = declarationParameters declaration := by
+      signature.scheme.parameters = declarationParameters declaration ∧
+      signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes) := by
   cases scopeEq : validateProgramTypeScope
       (ProgramTypeScope.ofDeclaration declaration) with
   | error error =>
@@ -1343,6 +1408,8 @@ private theorem functionSignatureOfDeclaration_success_header
           change Except.error error = Except.ok signature at success
           cases success
       | ok parameters =>
+          have parameterNames :=
+            (resolveFunctionParameters_success_names parametersEq).1
           simp only [parametersEq] at success
           cases returnsEq : resolveFunctionReturns environment declaration
               (ProgramTypeScope.ofDeclaration declaration)
@@ -1366,7 +1433,10 @@ private theorem functionSignatureOfDeclaration_success_header
                   simp only [predicatesEq] at success
                   injection success with signatureEq
                   subst signature
-                  exact ⟨rfl, rfl⟩
+                  exact ⟨rfl, rfl, by
+                    simpa [ProgramFunctionSignature.parameterNames] using
+                      parameterNames, by
+                    simp [ProgramFunctionSignature.parameterTypes]⟩
 
 private theorem functionSignatureOfDeclaration_success_id
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
@@ -1383,8 +1453,19 @@ private theorem functionSignatureOfDeclaration_success_parameters
       .ok signature) :
     SignatureParametersWellFormed signature.id signature.scheme.parameters := by
   have header := functionSignatureOfDeclaration_success_header success
-  rw [header.1, header.2]
+  rw [header.1, header.2.1]
   exact declarationParameters_wellFormed declaration
+
+private theorem functionSignatureOfDeclaration_success_shape
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.FunctionDecl} {signature : ProgramFunctionSignature}
+    (success : functionSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes) :=
+  (functionSignatureOfDeclaration_success_header success).2.2
 
 private theorem dataSignatureOfDeclaration_success_header
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
@@ -1609,6 +1690,11 @@ private structure ProgramSignatureBuildParametersWellFormed
     (state : ProgramSignatureBuildState) : Prop where
   functions : ∀ signature, signature ∈ state.functions →
     SignatureParametersWellFormed signature.id signature.scheme.parameters
+  functionShapes : ∀ signature, signature ∈ state.functions →
+    signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes)
   dataTypes : ∀ signature, signature ∈ state.dataTypes →
     SignatureParametersWellFormed signature.id signature.parameters
   implementations : ∀ signature, signature ∈ state.implementations →
@@ -1623,6 +1709,7 @@ private theorem ProgramSignatureBuildParametersWellFormed.withErrors
     ProgramSignatureBuildParametersWellFormed
       { state with errors } := {
   functions := initial.functions
+  functionShapes := initial.functionShapes
   dataTypes := initial.dataTypes
   implementations := initial.implementations
   contracts := initial.contracts
@@ -1633,11 +1720,16 @@ private theorem ProgramSignatureBuildParametersWellFormed.addFunction
     (initial : ProgramSignatureBuildParametersWellFormed state)
     {signature : ProgramFunctionSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
-      signature.scheme.parameters) :
+      signature.scheme.parameters)
+    (shape : signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes)) :
     ProgramSignatureBuildParametersWellFormed
       { state with functions := state.functions ++ [signature] } := {
   initial with
   functions := all_mem_append_singleton initial.functions wellFormed
+  functionShapes := all_mem_append_singleton initial.functionShapes shape
 }
 
 private theorem ProgramSignatureBuildParametersWellFormed.addDataType
@@ -1736,7 +1828,8 @@ private theorem collectProgramSignatures_parameters_wellFormed
               simpa [bind, Except.bind, pure, Pure.pure, Except.pure] using induction
                 { state with functions := state.functions ++ [signature] }
                 (initial.addFunction
-                  (functionSignatureOfDeclaration_success_parameters signatureEq))
+                  (functionSignatureOfDeclaration_success_parameters signatureEq)
+                  (functionSignatureOfDeclaration_success_shape signatureEq))
       | impl source =>
           simp only [collectProgramSignatures, sourceEq,
             signatureItemOfDeclaration]
@@ -2276,6 +2369,33 @@ theorem buildProgramSignatures_success_parameter_state
       implementations := signatureParameters.implementations
       contracts := signatureParameters.contracts
     }
+  · simp at success
+
+/-- Internal collector boundary used by `ProgramSignaturesProperties`: every
+successfully collected function retains duplicate-free source parameter names
+and the canonical scheme body assembled from its parameter and return rows. -/
+theorem buildProgramSignatures_success_function_shape_state
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures) :
+    ∀ signature, signature ∈ signatures.functions →
+      signature.parameterNames.Nodup ∧
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes) := by
+  let traitState := collectProgramTraits environment environment.declarations {}
+  let state := collectProgramSignatures environment traitState.traits
+    environment.declarations {}
+  have signatureFacts :
+      ProgramSignatureBuildParametersWellFormed state := by
+    apply collectProgramSignatures_parameters_wellFormed environment
+      traitState.traits environment.declarations
+      ({} : ProgramSignatureBuildState)
+    constructor <;> intro signature member <;> simp at member
+  simp only [buildProgramSignatures] at success
+  split at success
+  · injection success with signaturesEq
+    subst signatures
+    exact signatureFacts.functionShapes
   · simp at success
 
 end Solcore.Frontend

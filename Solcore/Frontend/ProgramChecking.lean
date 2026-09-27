@@ -322,6 +322,22 @@ theorem checkLoadedProgram_success_signature_parameters_wellFormed
   buildProgramSignatures_success_parameters_wellFormed
     (checkLoadedProgram_success_signatures success)
 
+/-- A successful loaded-program check retains the function signature shape
+guarantees established by signature collection. -/
+theorem checkLoadedProgram_success_function_signature_shape
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ checked.signatures.functions) :
+    signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes) :=
+  buildProgramSignatures_success_function_shape
+    (checkLoadedProgram_success_signatures success) member
+
 /-- A successful loaded-program check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkLoadedProgram_success_ids
@@ -445,5 +461,21 @@ theorem checkProgram_success_signature_parameters_wellFormed
     ProgramSignatureParametersWellFormed checked.signatures := by
   obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
   exact checkLoadedProgram_success_signature_parameters_wellFormed checkedSuccess
+
+/-- End-to-end checker success guarantees duplicate-free function parameter
+names and the canonical constrained-scheme body for every collected function. -/
+theorem checkProgram_success_function_signature_shape
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ checked.signatures.functions) :
+    signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes) := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_function_signature_shape checkedSuccess member
 
 end Solcore.Frontend

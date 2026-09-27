@@ -65,12 +65,12 @@ theorem signatureDeclarationIds_nodup_ofCheckProgram
     Frontend.checkProgram_success_signature_declaration_ids_nodup success
 
 /-- Semantic function-signature obligations not yet discharged by executable
-signature collection.  Declaration-owned generic-parameter invariants are
-intentionally absent: successful checking supplies them separately. -/
+signature collection.  Declaration-owned generic-parameter invariants,
+parameter-name uniqueness, and the canonical scheme body are intentionally
+absent: successful checking supplies them separately. -/
 structure FunctionSignatureRemainingConditions
     (signatures : ProgramSignatures)
     (signature : ProgramFunctionSignature) : Prop where
-  parameter_names_nodup : signature.parameterNames.Nodup
   parameter_types : TypesWellFormed
     (signatureContext signatures signature.id signature.scheme.parameters
       signature.scheme.predicates) signature.parameterTypes
@@ -80,9 +80,6 @@ structure FunctionSignatureRemainingConditions
   predicates : PredicatesWellFormed
     (signatureContext signatures signature.id signature.scheme.parameters
       signature.scheme.predicates) signature.scheme.predicates
-  scheme_body : signature.scheme.body = .function
-    (TypeSystem.Ty.productMany signature.parameterTypes)
-    (TypeSystem.Ty.productMany signature.returnTypes)
 
 /-- Semantic data-signature obligations beyond its checker-generated generic
 parameter row. -/
@@ -190,6 +187,11 @@ structure CheckedSignatureCatalogFacts
     (signatures.implementations.map fun signature => signature.id).Nodup
   contract_ids : (signatures.contracts.map fun signature => signature.id).Nodup
   parameters : ProgramSignatureParametersWellFormed signatures
+  function_shapes : ∀ signature, signature ∈ signatures.functions →
+    signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes)
   contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
     ContractSignatureWellFormed signatures signature
 
@@ -201,17 +203,21 @@ theorem complete
     {signatures : ProgramSignatures} {signature : ProgramFunctionSignature}
     (remaining : FunctionSignatureRemainingConditions signatures signature)
     (parameters : SignatureParametersWellFormed signature.id
-      signature.scheme.parameters) :
+      signature.scheme.parameters)
+    (shape : signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes)) :
     FunctionSignatureWellFormed signatures signature := {
   parameters_nodup := parameters.parameters_nodup
   parameters_owned := parameters.parameter_owners
   parameter_positions := by
     simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
-  parameter_names_nodup := remaining.parameter_names_nodup
+  parameter_names_nodup := shape.1
   parameter_types := remaining.parameter_types
   return_types := remaining.return_types
   predicates := remaining.predicates
-  scheme_body := remaining.scheme_body
+  scheme_body := shape.2
 }
 
 end FunctionSignatureRemainingConditions
@@ -322,6 +328,9 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
     contract_ids := Frontend.buildProgramSignatures_success_contract_ids_nodup
       environmentIds signaturesSuccess
     parameters
+    function_shapes := by
+      intro signature member
+      exact Frontend.checkProgram_success_function_signature_shape success member
     contracts_semantic := ?_
   }
   intro signature member
@@ -383,6 +392,7 @@ theorem complete
   · intro signature member
     exact (remaining.functions_semantic signature member).complete
       (checked.parameters.functions signature member)
+      (checked.function_shapes signature member)
   · intro signature member
     exact (remaining.data_semantic signature member).complete
       (checked.parameters.dataTypes signature member)

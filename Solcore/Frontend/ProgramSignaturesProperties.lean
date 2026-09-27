@@ -27,6 +27,41 @@ cardinality. -/
 
 end ProgramFunctionSignature
 
+/-- A collected function has duplicate-free source parameter names and a
+scheme body assembled exactly from its stored parameter and return types. -/
+theorem buildProgramSignatures_success_function_shape
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ signatures.functions) :
+    signature.parameterNames.Nodup ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes) :=
+  buildProgramSignatures_success_function_shape_state success signature member
+
+/-- Successful collection rejects duplicate source parameter names for every
+function signature retained in the catalog. -/
+theorem buildProgramSignatures_success_function_parameter_names_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ signatures.functions) :
+    signature.parameterNames.Nodup :=
+  (buildProgramSignatures_success_function_shape success member).1
+
+/-- Successful collection records the canonical function type as the body of
+every constrained function scheme. -/
+theorem buildProgramSignatures_success_function_scheme_body
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ signatures.functions) :
+    signature.scheme.body = .function
+      (TypeSystem.Ty.productMany signature.parameterTypes)
+      (TypeSystem.Ty.productMany signature.returnTypes) :=
+  (buildProgramSignatures_success_function_shape success member).2
+
 /-- A successfully built signature catalog stores exactly the rules projected from
 its implementation signatures. -/
 theorem buildProgramSignatures_success_implRules_eq
