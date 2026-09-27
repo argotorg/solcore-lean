@@ -452,6 +452,47 @@ theorem owner_ids_unique
       owner.requirement.templateRequirement).Nodup :=
   ownership.ids_unique
 
+private theorem owner_eq_of_mem_of_ids_nodup
+    {owners : List LocalSchemeTemplateOwner}
+    (idsUnique : (owners.map fun owner =>
+      owner.requirement.templateRequirement).Nodup)
+    {left right : LocalSchemeTemplateOwner}
+    (leftMem : left ∈ owners)
+    (rightMem : right ∈ owners)
+    (idEq : left.requirement.templateRequirement =
+      right.requirement.templateRequirement) :
+    left = right := by
+  induction owners generalizing left right with
+  | nil => simp at leftMem
+  | cons first rest induction =>
+      simp only [List.map_cons, List.nodup_cons] at idsUnique
+      rcases idsUnique with ⟨firstFresh, restUnique⟩
+      simp only [List.mem_cons] at leftMem rightMem
+      rcases leftMem with rfl | leftMem
+      · rcases rightMem with rfl | rightMem
+        · rfl
+        · exfalso
+          apply firstFresh
+          exact List.mem_map.mpr ⟨right, rightMem, idEq.symm⟩
+      · rcases rightMem with rfl | rightMem
+        · exfalso
+          apply firstFresh
+          exact List.mem_map.mpr ⟨left, leftMem, idEq⟩
+        · exact induction restUnique leftMem rightMem idEq
+
+/-- Source-wide template-identity uniqueness makes the owner of one retained
+template identity unique as well. -/
+theorem owner_unique
+    {source : TypedSource} (ownership : LocalSchemeTemplateOwnership source)
+    {left right : LocalSchemeTemplateOwner}
+    (leftContains : ContainsLocalSchemeTemplate source left)
+    (rightContains : ContainsLocalSchemeTemplate source right)
+    (idEq : left.requirement.templateRequirement =
+      right.requirement.templateRequirement) :
+    left = right := by
+  exact owner_eq_of_mem_of_ids_nodup ownership.owner_ids_unique
+    leftContains rightContains idEq
+
 end LocalSchemeTemplateOwnership
 
 /-- Primary evidence owners retained directly by one statement form. -/

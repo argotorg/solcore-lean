@@ -505,16 +505,23 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionVali
 example := @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionValid.ofScopedRequirementLedger
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed.proves_predicate_eq
 example := @Solcore.SourceSemantics.RequirementIdsUnique.proves_predicate_eq
+example := @Solcore.SourceSemantics.RequirementIdsUnique.filter_id_eq_singleton
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed.transport
 example := @Solcore.SourceSemantics.RequirementIdsValid.of_subset
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed
 example := @Solcore.SourceSemantics.LocalSchemeTemplateRowScoped
 example := @Solcore.SourceSemantics.ScopedRequirementEntryValid
 example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed
+example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.template_exact
+example :=
+  @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.localSchemeRequirementWellFormed
+example :=
+  @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.localSchemeRequirementsWellFormed
 example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.toRuntime
 example := @Solcore.SourceSemantics.RuntimeRequirementLedgerValid
 example := @Solcore.SourceSemantics.LocalIdentityOwnership
 example := @Solcore.SourceSemantics.RequirementOwnership
+example := @Solcore.SourceSemantics.LocalSchemeTemplateOwnership.owner_unique
 example := @Solcore.SourceSemantics.patternInstructionBinderIds_eq_carrier
 example := @Solcore.SourceSemantics.patternBinderIds_eq_carrier
 example := @Solcore.SourceSemantics.forItemDefinedLocalIds_eq_carrier

@@ -122,6 +122,53 @@ end RequirementSequenceProves
 
 namespace RequirementIdsUnique
 
+private theorem requirementId_beq_iff_eq
+    (left right : RequirementId) : (left == right) = true ↔ left = right := by
+  rw [show (left == right) = (left.index == right.index) by rfl]
+  rw [beq_iff_eq]
+  constructor
+  · intro indicesEq
+    cases left
+    cases right
+    cases indicesEq
+    rfl
+  · intro same
+    exact congrArg RequirementId.index same
+
+private theorem filter_id_eq_singleton_of_nodup
+    {requirements : List SolvedRequirement}
+    (unique : (requirements.map fun requirement => requirement.id).Nodup)
+    {row : SolvedRequirement} (member : row ∈ requirements) :
+    requirements.filter (fun candidate => candidate.id == row.id) = [row] := by
+  induction requirements with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at unique
+      rcases unique with ⟨headFresh, tailUnique⟩
+      rcases List.mem_cons.mp member with rfl | tailMember
+      · have tailMisses :
+            tail.filter (fun candidate => candidate.id == row.id) = [] := by
+          apply List.filter_eq_nil_iff.mpr
+          intro candidate candidateMember
+          have idNe : candidate.id ≠ row.id := by
+            intro idEq
+            apply headFresh
+            exact List.mem_map.mpr ⟨candidate, candidateMember, idEq⟩
+          intro equal
+          exact idNe ((requirementId_beq_iff_eq _ _).mp equal)
+        have selfMatches : (row.id == row.id) = true :=
+          (requirementId_beq_iff_eq _ _).mpr rfl
+        simp [selfMatches, tailMisses]
+      · have idNe : head.id ≠ row.id := by
+          intro idEq
+          apply headFresh
+          exact List.mem_map.mpr ⟨row, tailMember, idEq.symm⟩
+        have headMisses : (head.id == row.id) = false := by
+          apply Bool.eq_false_iff.mpr
+          intro equal
+          exact idNe ((requirementId_beq_iff_eq _ _).mp equal)
+        simp [headMisses, induction tailUnique tailMember]
+
 private theorem entry_unique_of_ids_nodup
     {requirements : List SolvedRequirement}
     (unique : (requirements.map (fun requirement => requirement.id)).Nodup)
@@ -165,6 +212,18 @@ theorem contains_unique
   rcases rightContains with ⟨rightMem, rightId⟩
   exact entry_unique_of_ids_nodup unique leftMem rightMem
     (leftId.trans rightId.symm)
+
+/-- Filtering an identity-unique ledger by the stable identity of one retained
+row returns exactly that row.  Qualified template formation uses this stronger
+list equation rather than only existential lookup. -/
+theorem filter_id_eq_singleton
+    {context : Context}
+    (unique : RequirementIdsUnique context)
+    {row : SolvedRequirement}
+    (member : row ∈ context.solvedRequirements) :
+    context.solvedRequirements.filter (fun candidate =>
+      candidate.id == row.id) = [row] := by
+  exact filter_id_eq_singleton_of_nodup unique member
 
 /-- An identity-unique ledger cannot assign two different predicates to one
 stable requirement identity. -/

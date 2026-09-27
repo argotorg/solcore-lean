@@ -517,6 +517,64 @@ theorem initializerRootTemplateAccepted :
       simp [templateContext, Context.withSolvedRequirements,
         Context.ofSignatures], rfl⟩
 
+/-- The scoped ledger recovers the exact singleton row needed by local-scheme
+formation, not merely a row with the same identity. -/
+example : ∃ row,
+    templateContext.solvedRequirements.filter (fun candidate =>
+      candidate.id == templateRequirement.templateRequirement) = [row] ∧
+    row.id = templateRequirement.templateRequirement ∧
+    row.predicate = templateRequirement.predicate ∧
+    row.evidence = .assumption templateRequirement.predicate :=
+  initializerRootTemplateAccepted.template_exact templateOwnerContained
+
+private theorem templatePredicateAdmissible :
+    PredicateAdmissible
+      (localSchemeInitializerContext templateContext (templateBinder 0))
+      templatePredicate := by
+  refine {
+    subject := ?_
+    arguments := ?_
+    trait := rfl
+  }
+  · refine {
+      binders := ?_
+      typeWellScoped := .variable ?_
+    }
+    · simp [TypeParameterBindersWellFormed, localSchemeInitializerContext,
+        Context.withTypeVariables, Context.withAssumptions, templateContext,
+        Context.withSolvedRequirements, Context.ofSignatures]
+    · simp [admissibleTypeVariables, localSchemeInitializerContext,
+        Context.withTypeVariables, Context.withAssumptions, templateContext,
+        Context.withSolvedRequirements, Context.ofSignatures, templateBinder]
+  · intro argument member
+    simp [templatePredicate, ProgramSignatures.builtinIntPredicate] at member
+
+/-- Source ownership plus the scoped ledger discharges the complete qualified
+requirement formation judgment once predicate admissibility and quantified
+dependency are supplied. -/
+example : LocalSchemeRequirementsWellFormed templateContext
+    (templateBinder 0) := by
+  apply initializerRootTemplateAccepted.localSchemeRequirementsWellFormed
+    (initializer := .expression (expressionId 0))
+  · intro requirement member
+    have requirementEq : requirement = templateRequirement := by
+      simpa [templateBinder] using member
+    subst requirement
+    exact templateOwnerContained
+  · intro requirement member
+    have requirementEq : requirement = templateRequirement := by
+      simpa [templateBinder] using member
+    subst requirement
+    exact templatePredicateAdmissible
+  · intro requirement member
+    have requirementEq : requirement = templateRequirement := by
+      simpa [templateBinder] using member
+    subst requirement
+    exact ⟨templateVariable, by simp [templateBinder], by
+      simp [templateRequirement, templatePredicate,
+        ProgramSignatures.builtinIntPredicate,
+        TypedTraitResolution.predicateVariables, Ty.freeVariables]⟩
+
 private theorem assumptionRowInvalid
     (context : SourceSemantics.Context) (row : SolvedRequirement)
     (evidenceEq : row.evidence = .assumption row.predicate)

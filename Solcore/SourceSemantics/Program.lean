@@ -162,6 +162,139 @@ theorem template_row
       ⟨owner, contains, rfl⟩
   exact ⟨row, member, idEq, wellFormed.template_scoped member templateId⟩
 
+/-- Recover the exact retained assumption row for one source-owned qualified
+local-scheme template.  In addition to matching the owner's predicate and
+evidence, identity uniqueness gives the singleton filtering equation required
+by local-scheme formation. -/
+theorem template_exact
+    {context : Context} {source : TypedSource}
+    (wellFormed : ScopedRequirementLedgerWellFormed context source)
+    {owner : LocalSchemeTemplateOwner}
+    (contains : ContainsLocalSchemeTemplate source owner) :
+    ∃ row,
+      context.solvedRequirements.filter (fun candidate =>
+        candidate.id == owner.requirement.templateRequirement) = [row] ∧
+      row.id = owner.requirement.templateRequirement ∧
+      row.predicate = owner.requirement.predicate ∧
+      row.evidence = .assumption owner.requirement.predicate := by
+  rcases wellFormed.template_row contains with
+    ⟨row, member, idEq, rowScoped⟩
+  rcases rowScoped.exact_owner with
+    ⟨scopedOwner, _, scopedContains, scopedIdEq, predicateEq, evidenceEq,
+      _, _⟩
+  have ownerEq : scopedOwner = owner :=
+    wellFormed.templateOwnership.owner_unique scopedContains contains
+      (scopedIdEq.symm.trans idEq)
+  subst scopedOwner
+  have singleton := wellFormed.idsUnique.filter_id_eq_singleton member
+  exact ⟨row, by simpa [idEq] using singleton,
+    idEq, predicateEq, evidenceEq⟩
+
+/-- A globally duplicate-free flattened inventory makes every retained inner
+inventory duplicate-free. -/
+private theorem sublist_flatMap_of_mem
+    {alpha beta : Type} (f : alpha → List beta)
+    {value : alpha} {values : List alpha} (member : value ∈ values) :
+    (f value).Sublist (values.flatMap f) := by
+  induction values with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · exact List.sublist_append_left _ _
+      · exact (induction member).trans (List.sublist_append_right _ _)
+
+private theorem localSchemeTemplateIds_nodup_of_binding_mem
+    {source : TypedSource}
+    (ownership : LocalSchemeTemplateOwnership source)
+    {binding : InitializedLetBinding}
+    (member : binding ∈ initializedLetBindings source) :
+    (localSchemeTemplateIds binding.binder).Nodup := by
+  have ownersSublist :
+      (InitializedLetBinding.templateOwners binding).Sublist
+        (localSchemeTemplateOwners source) := by
+    unfold localSchemeTemplateOwners
+    exact sublist_flatMap_of_mem InitializedLetBinding.templateOwners member
+  have idsSublist := ownersSublist.map fun owner =>
+    owner.requirement.templateRequirement
+  have idsUnique := idsSublist.nodup ownership.owner_ids_unique
+  simpa [InitializedLetBinding.templateOwners, localSchemeTemplateIds,
+    List.map_map, Function.comp_def] using idsUnique
+
+/-- A source-owned scoped template supplies the exact ledger component of one
+qualified local-scheme requirement.  Predicate admissibility and dependency
+on a quantified variable remain local formation obligations of the caller. -/
+theorem localSchemeRequirementWellFormed
+    {context : Context} {source : TypedSource}
+    (wellFormed : ScopedRequirementLedgerWellFormed context source)
+    {binder : TypedBinder} {initializer : NodeId}
+    {requirement : LocalSchemeRequirement}
+    (contains : ContainsLocalSchemeTemplate source {
+      binder := binder
+      initializer := initializer
+      requirement := requirement
+    })
+    (predicate : PredicateAdmissible
+      (localSchemeInitializerContext context binder) requirement.predicate)
+    (dependsOnQuantified : ∃ metavariable,
+      metavariable ∈ binder.scheme.quantified ∧
+        metavariable ∈
+          Frontend.TypedTraitResolution.predicateVariables
+            requirement.predicate) :
+    LocalSchemeRequirementWellFormed context binder requirement := by
+  refine {
+    predicate
+    depends_on_quantified := dependsOnQuantified
+    template := ?_
+  }
+  exact wellFormed.template_exact contains
+
+/-- A common initialized-let owner and pointwise predicate formation facts
+lift a scoped whole-body ledger to the complete qualified-requirement
+formation judgment for that binder. -/
+theorem localSchemeRequirementsWellFormed
+    {context : Context} {source : TypedSource}
+    (wellFormed : ScopedRequirementLedgerWellFormed context source)
+    {binder : TypedBinder} {initializer : NodeId}
+    (contains : ∀ requirement, requirement ∈ binder.schemeRequirements →
+      ContainsLocalSchemeTemplate source {
+        binder := binder
+        initializer := initializer
+        requirement := requirement
+      })
+    (predicates : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+      PredicateAdmissible (localSchemeInitializerContext context binder)
+        requirement.predicate)
+    (dependsOnQuantified : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+      ∃ metavariable,
+        metavariable ∈ binder.scheme.quantified ∧
+          metavariable ∈
+            Frontend.TypedTraitResolution.predicateVariables
+              requirement.predicate) :
+    LocalSchemeRequirementsWellFormed context binder := by
+  refine {
+    ids_unique := ?_
+    entries := ?_
+  }
+  · cases requirementsEq : binder.schemeRequirements with
+    | nil => simp [localSchemeTemplateIds, requirementsEq]
+    | cons first rest =>
+        have firstMem : first ∈ binder.schemeRequirements := by
+          simp [requirementsEq]
+        have bindingMem :
+            ({ binder := binder, initializer := initializer } :
+              InitializedLetBinding) ∈ initializedLetBindings source :=
+          LocalSchemeTemplateOwner.binding_mem (contains first firstMem)
+        exact localSchemeTemplateIds_nodup_of_binding_mem
+          wellFormed.templateOwnership bindingMem
+  · intro requirement member
+    exact wellFormed.localSchemeRequirementWellFormed
+      (contains requirement member)
+      (predicates requirement member)
+      (dependsOnQuantified requirement member)
+
 /-- An ordinary well-formed ledger is a scoped ledger whenever the source
 declares no qualified local templates. -/
 theorem ofRequirementLedger
