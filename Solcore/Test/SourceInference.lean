@@ -175,6 +175,29 @@ example {retained : SourceInference.PredicateEvidence}
         (requirement := solverRegressionRequirement)
         (by simp [solverRegressionTemplateState]) success
 
+/-- Whole-ledger solving preserves the ordinary row and validates it after
+normalizing the declaration assumptions exactly once. -/
+example : Solcore.SourceSemantics.SolvedRequirementsValid
+    solverRegressionSemanticContext [{
+      id := solverRegressionRequirement.id
+      predicate := solverRegressionNormalized
+      evidence := .assumption solverRegressionNormalized
+    }] := by
+  apply
+    Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_ordinary_sound
+      (inferenceContext := solverRegressionContext)
+      (state := solverRegressionState)
+      (requirements := [solverRegressionRequirement])
+  · intro requirement member
+    have requirement_eq : requirement = solverRegressionRequirement := by
+      simpa using member
+    subst requirement
+    change solverRegressionRequirement.id ∉ []
+    simp
+  · rfl
+  · rfl
+  · rfl
+
 private def integerLiteralRows
     (function : SourceInference.CheckedFunction) :
     List (SourceInference.ExpressionNode ×

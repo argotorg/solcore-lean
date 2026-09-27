@@ -158,6 +158,96 @@ theorem solveRequirementEvidence_template_eq
     exact Except.ok.inj success
   exact retainedEq.symm
 
+/-- Successful ledger solving preserves source order and records, for every
+output row, its exact input identity, normalized predicate, and evidence-solver
+equation. -/
+theorem solveRequirements_corresponds
+    {context : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    (success : Detail.solveRequirements context state requirements =
+      .ok solved) :
+    Forall₂ (fun requirement row =>
+      row.id = requirement.id ∧
+        row.predicate = Detail.applyPredicate state requirement.predicate ∧
+        Detail.solveRequirementEvidence context state requirement =
+          .ok row.evidence) requirements solved := by
+  induction requirements generalizing solved with
+  | nil =>
+      simp only [Detail.solveRequirements, Except.ok.injEq] at success
+      subst solved
+      exact .nil
+  | cons requirement rest induction =>
+      cases evidenceResult :
+          Detail.solveRequirementEvidence context state requirement with
+      | error error =>
+          simp [Detail.solveRequirements, evidenceResult, bind, Except.bind]
+            at success
+      | ok evidence =>
+          cases tailResult : Detail.solveRequirements context state rest with
+          | error error =>
+              simp [Detail.solveRequirements, evidenceResult, tailResult,
+                bind, Except.bind] at success
+          | ok tail =>
+              let solvedHead : SolvedRequirement := {
+                id := requirement.id
+                predicate := Detail.applyPredicate state requirement.predicate
+                evidence := evidence
+              }
+              simp [Detail.solveRequirements, evidenceResult, tailResult,
+                bind, Except.bind] at success
+              injection success with solved_eq
+              subst solved
+              exact .cons (by simp [evidenceResult])
+                (induction tailResult)
+
+/-- When no input row is a qualified-local template, successful ledger
+solving validates every output row in a declarative context with the same
+catalog and normalized declaration assumptions. -/
+theorem solveRequirements_ordinary_sound
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    (ordinary : ∀ requirement, requirement ∈ requirements →
+      requirement.id ∉ state.localSchemeAssumptions)
+    (signatures_eq : semanticContext.signatures = inferenceContext.signatures)
+    (assumptions_eq : semanticContext.assumptions =
+      inferenceContext.assumptions.map (Detail.applyPredicate state))
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved) :
+    SolvedRequirementsValid semanticContext solved := by
+  have corresponds := solveRequirements_corresponds success
+  clear success
+  unfold SolvedRequirementsValid
+  revert ordinary
+  induction corresponds with
+  | nil =>
+      intro _ row member
+      simp at member
+  | @cons requirement row requirements rows head tail induction =>
+      intro ordinary candidate member
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · rcases head with ⟨id_eq, predicate_eq, evidence_success⟩
+        have valid := solveRequirementEvidence_ordinary_sound
+          (semanticContext := semanticContext)
+          (ordinary requirement (by simp)) signatures_eq assumptions_eq
+          evidence_success
+        have candidate_eq : candidate = {
+            id := requirement.id
+            predicate := Detail.applyPredicate state requirement.predicate
+            evidence := candidate.evidence
+          } := by
+          cases candidate
+          simp_all
+        rw [candidate_eq]
+        exact valid
+      · exact induction (fun tailRequirement tailMember =>
+          ordinary tailRequirement (by simp [tailMember])) candidate member
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
 
 namespace Solcore.SourceSemantics.FlexibleSubstitution

@@ -71,6 +71,8 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveNormalizedPred
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solvePredicate_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvidence_ordinary_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvidence_template_eq
+example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_corresponds
+example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_ordinary_sound
 
 example := @Solcore.SourceSemantics.ReferenceHasRawType
 example := @Solcore.SourceSemantics.ReferenceHasRawType.local_iff
