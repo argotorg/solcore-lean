@@ -412,6 +412,7 @@ example := @Solcore.SourceSemantics.FunctionSignatureRemainingConditions
 example := @Solcore.SourceSemantics.DataSignatureRemainingConditions
 example := @Solcore.SourceSemantics.TraitMethodSignatureRemainingConditions
 example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions
+example := @Solcore.SourceSemantics.ImplMethodSignatureRemainingConditions
 example := @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions
 example := @Solcore.SourceSemantics.SignatureCatalogRemainingConditions
 example := @Solcore.SourceSemantics.CheckedSignatureCatalogFacts
@@ -426,9 +427,15 @@ example :=
 example :=
   @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.trait_method_ids
 example :=
+  @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.implementation_method_ids
+example :=
+  @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.implementation_structures
+example :=
   @Solcore.SourceSemantics.FunctionSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.DataSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions.complete
+example :=
+  @Solcore.SourceSemantics.ImplMethodSignatureRemainingConditions.complete
 example :=
   @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions.complete
 example :=

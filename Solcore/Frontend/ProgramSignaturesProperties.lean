@@ -199,6 +199,84 @@ theorem buildProgramSignatures_success_trait_method_parameter_names_nodup
   (buildProgramSignatures_success_trait_structure success member)
     |>.method_parameter_names_nodup
 
+namespace ImplementationSignatureStructuralWellFormed
+
+/-- Stable method identities are unique within one structurally valid
+implementation because their source-order indices are distinct. -/
+theorem method_ids_nodup
+    {signature : ProgramImplementationSignature}
+    (shape : ImplementationSignatureStructuralWellFormed signature) :
+    (signature.methods.map fun method => method.id).Nodup := by
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_map,
+    List.pairwise_iff_getElem]
+  intro leftIndex rightIndex leftBound rightBound before equal
+  have leftPosition := shape.method_positions ⟨leftIndex, leftBound⟩
+  have rightPosition := shape.method_positions ⟨rightIndex, rightBound⟩
+  simp only [List.get_eq_getElem] at leftPosition rightPosition
+  have indexEqual := congrArg ProgramImplMethodId.methodIndex equal
+  rw [leftPosition, rightPosition] at indexEqual
+  omega
+
+end ImplementationSignatureStructuralWellFormed
+
+/-- Successful collection retains duplicate-free method names, canonical
+implementation ownership and source-order IDs, and duplicate-free local
+parameter names for every implementation method. -/
+theorem buildProgramSignatures_success_implementation_structure
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ signatures.implementations) :
+    ImplementationSignatureStructuralWellFormed signature :=
+  buildProgramSignatures_success_implementation_structure_state success
+    signature member
+
+/-- Successful collection rejects duplicate method names within every
+implementation. -/
+theorem buildProgramSignatures_success_implementation_method_names_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ signatures.implementations) :
+    (signature.methods.map fun method => method.name).Nodup :=
+  (buildProgramSignatures_success_implementation_structure success member)
+    |>.method_names_nodup
+
+/-- Every collected implementation method identity records the declaration
+that owns its implementation signature. -/
+theorem buildProgramSignatures_success_implementation_method_owners
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ signatures.implementations) :
+    ∀ method, method ∈ signature.methods →
+      method.id.implementation = signature.id :=
+  (buildProgramSignatures_success_implementation_structure success member)
+    |>.method_owners
+
+/-- Every collected implementation method identity uses its zero-based source
+position within the owning declaration. -/
+theorem buildProgramSignatures_success_implementation_method_positions
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ signatures.implementations) :
+    ∀ index : Fin signature.methods.length,
+      (signature.methods.get index).id.methodIndex = index.val :=
+  (buildProgramSignatures_success_implementation_structure success member)
+    |>.method_positions
+
+/-- Every collected implementation method retains duplicate-free source
+parameter names from ordinary method-shape resolution. -/
+theorem buildProgramSignatures_success_implementation_method_parameter_names_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ signatures.implementations) :
+    ∀ method, method ∈ signature.methods → method.parameterNames.Nodup :=
+  (buildProgramSignatures_success_implementation_structure success member)
+    |>.method_parameter_names_nodup
+
 /-- A successfully built signature catalog stores exactly the rules projected from
 its implementation signatures. -/
 theorem buildProgramSignatures_success_implRules_eq
@@ -457,6 +535,63 @@ theorem buildProgramSignatures_success_implementation_ids_nodup
     environmentIds success
   have withoutContracts := (List.nodup_append.mp all).1
   exact (List.nodup_append.mp withoutContracts).2.1
+
+/-- Distinct owning implementation identities plus each implementation's local
+source-order allocation make implementation-method identities unique across a
+complete catalog. -/
+theorem implementation_method_ids_nodup_of_structural
+    {implementations : List ProgramImplementationSignature}
+    (implementationIds :
+      (implementations.map fun signature => signature.id).Nodup)
+    (shapes : ∀ signature, signature ∈ implementations →
+      ImplementationSignatureStructuralWellFormed signature) :
+    (implementations.flatMap fun signature =>
+      signature.methods.map fun method => method.id).Nodup := by
+  induction implementations with
+  | nil => simp
+  | cons implementation rest induction =>
+      simp only [List.map_cons, List.nodup_cons] at implementationIds
+      have implementationShape := shapes implementation (by simp)
+      have restShapes : ∀ signature, signature ∈ rest →
+          ImplementationSignatureStructuralWellFormed signature := by
+        intro signature member
+        exact shapes signature (by simp [member])
+      simp only [List.flatMap_cons, List.nodup_append]
+      refine ⟨implementationShape.method_ids_nodup,
+        induction implementationIds.2 restShapes, ?_⟩
+      intro left leftMember right rightMember equal
+      rcases List.mem_map.mp leftMember with
+        ⟨leftMethod, leftMethodMember, rfl⟩
+      rcases List.mem_flatMap.mp rightMember with
+        ⟨rightImplementation, rightImplementationMember, rightMember⟩
+      rcases List.mem_map.mp rightMember with
+        ⟨rightMethod, rightMethodMember, rfl⟩
+      apply implementationIds.1
+      apply List.mem_map.mpr
+      refine ⟨rightImplementation, rightImplementationMember, ?_⟩
+      calc
+        rightImplementation.id = rightMethod.id.implementation :=
+          (restShapes rightImplementation rightImplementationMember).method_owners
+            rightMethod rightMethodMember |>.symm
+        _ = leftMethod.id.implementation := by
+          exact congrArg ProgramImplMethodId.implementation equal.symm
+        _ = implementation.id :=
+          implementationShape.method_owners leftMethod leftMethodMember
+
+/-- Successful collection from an identity-unique environment assigns one
+globally unique stable identity to every implementation method. -/
+theorem buildProgramSignatures_success_implementation_method_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.implementations.flatMap fun signature =>
+      signature.methods.map fun method => method.id).Nodup := by
+  apply implementation_method_ids_nodup_of_structural
+    (buildProgramSignatures_success_implementation_ids_nodup
+      environmentIds success)
+  intro signature member
+  exact buildProgramSignatures_success_implementation_structure success member
 
 /-- Contract declaration identities are unique after successful signature
 collection from an environment with unique declaration identities. -/

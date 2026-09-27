@@ -121,16 +121,50 @@ structure TraitSignatureRemainingConditions
   methods : ∀ method, method ∈ signature.methods →
     TraitMethodSignatureRemainingConditions signatures signature method
 
+/-- Trait correspondence and type-formation obligations for one implementation
+method.  Its owner and duplicate-free parameter names are fixed by executable
+implementation-method collection. -/
+structure ImplMethodSignatureRemainingConditions
+    (signatures : ProgramSignatures)
+    (implementation : ProgramImplementationSignature)
+    (method : ProgramImplMethodSignature) : Prop where
+  trait_method : ∃ trait methodSignature,
+    trait ∈ signatures.traits ∧
+    implementation.head.trait = .declaration trait.id ∧
+    methodSignature ∈ trait.methods ∧
+    methodSignature.id = method.traitMethod ∧
+    methodSignature.name = method.name ∧
+    let substitution : TypeSystem.ParameterSubstitution :=
+      trait.parameters.zip
+        (implementation.head.subject :: implementation.head.arguments)
+    method.parameterTypes =
+      methodSignature.parameterTypes.map substitution.apply ∧
+    method.returnTypes =
+      methodSignature.returnTypes.map substitution.apply ∧
+    method.parameterComptime = methodSignature.parameterComptime ∧
+    method.returnComptime = methodSignature.returnComptime ∧
+    method.wherePredicates = methodSignature.wherePredicates.map
+      (ProgramPredicate.applyParameters substitution)
+  parameter_types : TypesWellFormed
+    (signatureContext signatures implementation.id implementation.parameters
+      (implementation.wherePredicates ++ method.wherePredicates))
+    method.parameterTypes
+  return_types : TypesWellFormed
+    (signatureContext signatures implementation.id implementation.parameters
+      (implementation.wherePredicates ++ method.wherePredicates))
+    method.returnTypes
+  predicates : PredicatesWellFormed
+    (signatureContext signatures implementation.id implementation.parameters
+      (implementation.wherePredicates ++ method.wherePredicates))
+    method.wherePredicates
+
 /-- Semantic implementation-signature obligations beyond its checker-generated
-generic parameter row. -/
+generic parameter row and structural method catalog. -/
 structure ImplementationSignatureRemainingConditions
     (signatures : ProgramSignatures)
     (signature : ProgramImplementationSignature) : Prop where
   parameters_in_head : ∀ parameter, parameter ∈ signature.parameters →
     TypeParameterOccursInPredicate parameter signature.head
-  method_names_nodup : (signature.methods.map fun method => method.name).Nodup
-  method_positions : ∀ index : Fin signature.methods.length,
-    (signature.methods.get index).id.methodIndex = index.val
   head : PredicateWellFormed
     (signatureContext signatures signature.id signature.parameters
       signature.wherePredicates) signature.head
@@ -150,7 +184,7 @@ structure ImplementationSignatureRemainingConditions
         (ProgramPredicate.applyParameters substitution) →
         predicate ∈ signature.wherePredicates
   methods : ∀ method, method ∈ signature.methods →
-    ImplMethodSignatureWellFormed signatures signature method
+    ImplMethodSignatureRemainingConditions signatures signature method
   methods_complete : ∀ trait method,
     trait ∈ signatures.traits →
     signature.head.trait = .declaration trait.id →
@@ -162,12 +196,10 @@ structure ImplementationSignatureRemainingConditions
 checker already supplies implementation-rule projection equality, declaration
 identity uniqueness, every generic-parameter invariant, data-constructor
 structure and identity uniqueness, trait-method structure and identity
-uniqueness, and complete contract signature semantics. -/
+uniqueness, implementation-method structure and identity uniqueness, and
+complete contract signature semantics. -/
 structure SignatureCatalogRemainingConditions
     (signatures : ProgramSignatures) : Prop where
-  implementation_method_ids :
-    (signatures.implementations.flatMap fun signature =>
-      signature.methods.map fun method => method.id).Nodup
   functions_semantic : ∀ signature, signature ∈ signatures.functions →
     FunctionSignatureRemainingConditions signatures signature
   data_semantic : ∀ signature, signature ∈ signatures.dataTypes →
@@ -196,6 +228,9 @@ structure CheckedSignatureCatalogFacts
   trait_method_ids :
     (signatures.traits.flatMap fun signature =>
       signature.methods.map fun method => method.id).Nodup
+  implementation_method_ids :
+    (signatures.implementations.flatMap fun signature =>
+      signature.methods.map fun method => method.id).Nodup
   parameters : ProgramSignatureParametersWellFormed signatures
   function_shapes : ∀ signature, signature ∈ signatures.functions →
     signature.parameterNames.Nodup ∧
@@ -206,6 +241,9 @@ structure CheckedSignatureCatalogFacts
     DataSignatureStructuralWellFormed signature
   trait_structures : ∀ signature, signature ∈ signatures.traits →
     TraitSignatureStructuralWellFormed signature
+  implementation_structures : ∀ signature,
+    signature ∈ signatures.implementations →
+      ImplementationSignatureStructuralWellFormed signature
   contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
     ContractSignatureWellFormed signatures signature
 
@@ -292,6 +330,29 @@ theorem complete
 
 end TraitSignatureRemainingConditions
 
+namespace ImplMethodSignatureRemainingConditions
+
+/-- Combine checker-fixed method identity structure with the remaining trait
+correspondence and type-formation obligations. -/
+theorem complete
+    {signatures : ProgramSignatures}
+    {implementation : ProgramImplementationSignature}
+    {method : ProgramImplMethodSignature}
+    (remaining : ImplMethodSignatureRemainingConditions signatures
+      implementation method)
+    (owner : method.id.implementation = implementation.id)
+    (parameterNames : method.parameterNames.Nodup) :
+    ImplMethodSignatureWellFormed signatures implementation method := {
+  owner
+  trait_method := remaining.trait_method
+  parameter_names_nodup := parameterNames
+  parameter_types := remaining.parameter_types
+  return_types := remaining.return_types
+  predicates := remaining.predicates
+}
+
+end ImplMethodSignatureRemainingConditions
+
 namespace ImplementationSignatureRemainingConditions
 
 /-- Combine canonical declaration parameters with the remaining
@@ -302,6 +363,7 @@ theorem complete
     (remaining : ImplementationSignatureRemainingConditions signatures signature)
     (parameters : SignatureParametersWellFormed signature.id
       signature.parameters)
+    (structural : ImplementationSignatureStructuralWellFormed signature)
     (ruleProjection : signature.implRule ∈ signatures.implRules) :
     ImplementationSignatureWellFormed signatures signature := {
   parameters_nodup := parameters.parameters_nodup
@@ -309,13 +371,17 @@ theorem complete
   parameter_positions := by
     simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
   parameters_in_head := remaining.parameters_in_head
-  method_names_nodup := remaining.method_names_nodup
-  method_positions := remaining.method_positions
+  method_names_nodup := structural.method_names_nodup
+  method_positions := structural.method_positions
   head := remaining.head
   predicates := remaining.predicates
   rule_projection := ruleProjection
   trait_catalog := remaining.trait_catalog
-  methods := remaining.methods
+  methods := by
+    intro method member
+    exact (remaining.methods method member).complete
+      (structural.method_owners method member)
+      (structural.method_parameter_names_nodup method member)
   methods_complete := remaining.methods_complete
 }
 
@@ -356,6 +422,8 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
     constructor_ids := Frontend.checkProgram_success_constructor_ids_nodup success
     trait_method_ids :=
       Frontend.checkProgram_success_trait_method_ids_nodup success
+    implementation_method_ids :=
+      Frontend.checkProgram_success_implementation_method_ids_nodup success
     parameters
     function_shapes := by
       intro signature member
@@ -366,6 +434,10 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
     trait_structures := by
       intro signature member
       exact Frontend.checkProgram_success_trait_signature_structure success member
+    implementation_structures := by
+      intro signature member
+      exact Frontend.checkProgram_success_implementation_signature_structure
+        success member
     contracts_semantic := ?_
   }
   intro signature member
@@ -397,7 +469,7 @@ theorem complete
     contract_ids := checked.contract_ids
     constructor_ids := checked.constructor_ids
     trait_method_ids := checked.trait_method_ids
-    implementation_method_ids := remaining.implementation_method_ids
+    implementation_method_ids := checked.implementation_method_ids
     function_parameters := ?_
     data_parameters := ?_
     trait_parameters := ?_
@@ -439,6 +511,7 @@ theorem complete
   · intro signature member
     apply (remaining.implementations_semantic signature member).complete
       (checked.parameters.implementations signature member)
+      (checked.implementation_structures signature member)
     rw [checked.impl_rules_eq]
     exact List.mem_map.mpr ⟨signature, member, rfl⟩
 

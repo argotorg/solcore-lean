@@ -275,6 +275,20 @@ structure ProgramImplementationSignature where
   source : Syntax.ImplDecl
   deriving Repr
 
+/-- Structural facts fixed by implementation-method collection itself.  Trait
+method correspondence and the semantic formation of method types remain
+separate obligations. -/
+structure ImplementationSignatureStructuralWellFormed
+    (signature : ProgramImplementationSignature) : Prop where
+  method_names_nodup :
+    (signature.methods.map fun method => method.name).Nodup
+  method_owners : ∀ method, method ∈ signature.methods →
+    method.id.implementation = signature.id
+  method_positions : ∀ index : Fin signature.methods.length,
+    (signature.methods.get index).id.methodIndex = index.val
+  method_parameter_names_nodup : ∀ method,
+    method ∈ signature.methods → method.parameterNames.Nodup
+
 /-- Stable source identity of one constructor within an algebraic data
 declaration.  Constructor order is semantic because Core data values retain
 the same zero-based tag. -/
@@ -1247,6 +1261,10 @@ private structure UnmatchedProgramImplMethod where
 
 namespace UnmatchedProgramImplMethod
 
+private def parameterNames
+    (method : UnmatchedProgramImplMethod) : List String :=
+  method.parameters.map (·.name)
+
 private def parameterTypes
     (method : UnmatchedProgramImplMethod) : List TypeSystem.Ty :=
   method.parameters.map (·.type)
@@ -1256,6 +1274,32 @@ private def parameterComptime
   method.parameters.map (·.comptime)
 
 end UnmatchedProgramImplMethod
+
+private structure UnmatchedImplMethodsStructural
+    (owner : Resolved.DeclarationId) (index : Nat)
+    (seen : List (String × Nat))
+    (methods : List UnmatchedProgramImplMethod) : Prop where
+  method_names_nodup : (methods.map fun method => method.name).Nodup
+  method_names_fresh : ∀ name,
+    name ∈ methods.map (fun method => method.name) →
+      ∀ previous, previous ∈ seen → name ≠ previous.1
+  method_owners : ∀ method, method ∈ methods →
+    method.id.implementation = owner
+  method_positions : ∀ position : Fin methods.length,
+    (methods.get position).id.methodIndex = index + position.val
+  method_parameter_names_nodup : ∀ method, method ∈ methods →
+    method.parameterNames.Nodup
+
+private structure ImplMethodsStructural
+    (owner : Resolved.DeclarationId) (index : Nat)
+    (methods : List ProgramImplMethodSignature) : Prop where
+  method_names_nodup : (methods.map fun method => method.name).Nodup
+  method_owners : ∀ method, method ∈ methods →
+    method.id.implementation = owner
+  method_positions : ∀ position : Fin methods.length,
+    (methods.get position).id.methodIndex = index + position.val
+  method_parameter_names_nodup : ∀ method, method ∈ methods →
+    method.parameterNames.Nodup
 
 private def unmatchedImplMethodsOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -1288,6 +1332,96 @@ private def unmatchedImplMethodsOfDeclaration
             wherePredicates := shape.wherePredicates
             source
           } :: methods)
+
+/-- Successful implementation-method collection preserves duplicate-name
+rejection, declaration ownership, source-order indices, and each method's
+duplicate-free parameter names. -/
+private theorem unmatchedImplMethodsOfDeclaration_success_structure
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {scope : ProgramTypeScope} {sources : List Syntax.ImplMethod}
+    {index : Nat} {seen : List (String × Nat)}
+    {methods : List UnmatchedProgramImplMethod}
+    (success : unmatchedImplMethodsOfDeclaration environment declaration scope
+      sources index seen = .ok methods) :
+    UnmatchedImplMethodsStructural declaration.id index seen methods := by
+  induction sources generalizing index seen methods with
+  | nil =>
+      change Except.ok [] = Except.ok methods at success
+      injection success with methodsEq
+      subst methods
+      constructor <;> simp
+  | cons source rest induction =>
+      simp only [unmatchedImplMethodsOfDeclaration] at success
+      by_cases generics :
+          source.value.declaration.value.signature.genericParameters.isSome
+      · simp [generics, bind, Except.bind] at success
+      · simp only [generics, Bool.false_eq_true, if_false] at success
+        cases duplicateEq : seen.find? fun previous =>
+            previous.1 == source.value.declaration.value.signature.name.value with
+        | some previous => simp [duplicateEq] at success
+        | none =>
+            simp only [duplicateEq] at success
+            cases shapeEq : resolveMethodShape environment declaration scope
+                source.value.declaration.value.signature with
+            | error error => simp [shapeEq, bind, Except.bind] at success
+            | ok shape =>
+                have parameterNames :=
+                  resolveMethodShape_success_parameter_names_nodup shapeEq
+                simp only [shapeEq, bind, Except.bind] at success
+                cases restEq : unmatchedImplMethodsOfDeclaration environment
+                    declaration scope rest (index + 1)
+                    ((source.value.declaration.value.signature.name.value, index) ::
+                      seen) with
+                | error error => simp [restEq] at success
+                | ok restMethods =>
+                    simp only [restEq, pure, Pure.pure, Except.pure,
+                      Except.ok.injEq] at success
+                    subst methods
+                    have restStructure := induction restEq
+                    refine {
+                      method_names_nodup := ?_
+                      method_names_fresh := ?_
+                      method_owners := ?_
+                      method_positions := ?_
+                      method_parameter_names_nodup := ?_
+                    }
+                    · simp only [List.map_cons, List.nodup_cons]
+                      refine ⟨?_, restStructure.method_names_nodup⟩
+                      intro member
+                      exact (restStructure.method_names_fresh
+                        source.value.declaration.value.signature.name.value member
+                        (source.value.declaration.value.signature.name.value, index)
+                        (by simp)) rfl
+                    · intro name member previous previousMember
+                      simp only [List.map_cons, List.mem_cons] at member
+                      rcases member with rfl | member
+                      · intro equal
+                        have rejected :=
+                          (List.find?_eq_none.mp duplicateEq) previous
+                            previousMember
+                        exact rejected (by simp [equal])
+                      · exact restStructure.method_names_fresh name member previous
+                          (by simp [previousMember])
+                    · intro method member
+                      simp only [List.mem_cons] at member
+                      rcases member with rfl | member
+                      · rfl
+                      · exact restStructure.method_owners method member
+                    · intro position
+                      refine Fin.cases ?_ (fun restPosition => ?_) position
+                      · rfl
+                      · change
+                          (restMethods.get restPosition).id.methodIndex =
+                            index + (restPosition.val + 1)
+                        rw [restStructure.method_positions restPosition]
+                        omega
+                    · intro method member
+                      simp only [List.mem_cons] at member
+                      rcases member with rfl | member
+                      · simpa [UnmatchedProgramImplMethod.parameterNames] using
+                          parameterNames
+                      · exact restStructure.method_parameter_names_nodup method
+                          member
 
 private def validateRequiredImplMethods
     (implementation : Resolved.DeclarationId)
@@ -1342,6 +1476,94 @@ private def attachTraitMethods
         wherePredicates := implMethod.wherePredicates
         source := implMethod.source
       } :: methods)
+
+/-- Attaching trait identities does not change implementation-method order or
+any of the structural projections established by source collection. -/
+private theorem attachTraitMethods_success_structure
+    {traitMethods : List ProgramTraitMethodSignature}
+    {unmatchedMethods : List UnmatchedProgramImplMethod}
+    {methods : List ProgramImplMethodSignature}
+    {owner : Resolved.DeclarationId} {index : Nat}
+    (success : attachTraitMethods traitMethods unmatchedMethods = .ok methods)
+    (unmatched : UnmatchedImplMethodsStructural owner index [] unmatchedMethods) :
+    ImplMethodsStructural owner index methods ∧
+      methods.map (fun method => method.name) =
+        unmatchedMethods.map (fun method => method.name) := by
+  induction unmatchedMethods generalizing methods index with
+  | nil =>
+      change Except.ok [] = Except.ok methods at success
+      injection success with methodsEq
+      subst methods
+      exact ⟨by constructor <;> simp, rfl⟩
+  | cons implMethod rest induction =>
+      simp only [attachTraitMethods] at success
+      cases traitMethodEq : traitMethods.find? fun method =>
+          method.name == implMethod.name with
+      | none => simp [traitMethodEq] at success
+      | some traitMethod =>
+          simp only [traitMethodEq] at success
+          cases restEq : attachTraitMethods traitMethods rest with
+          | error error => simp [restEq, bind, Except.bind] at success
+          | ok restMethods =>
+              simp only [restEq, bind, Except.bind, pure, Pure.pure, Except.pure,
+                Except.ok.injEq] at success
+              subst methods
+              have unmatchedNames := List.nodup_cons.mp unmatched.method_names_nodup
+              have restUnmatched :
+                  UnmatchedImplMethodsStructural owner (index + 1) [] rest := {
+                method_names_nodup := unmatchedNames.2
+                method_names_fresh := by
+                  intro name member previous previousMember
+                  simp at previousMember
+                method_owners := by
+                  intro method member
+                  exact unmatched.method_owners method (by simp [member])
+                method_positions := by
+                  intro position
+                  have positionEq := unmatched.method_positions position.succ
+                  change (rest.get position).id.methodIndex =
+                    index + (position.val + 1) at positionEq
+                  omega
+                method_parameter_names_nodup := by
+                  intro method member
+                  exact unmatched.method_parameter_names_nodup method
+                    (by simp [member])
+              }
+              have restResult := induction restEq restUnmatched
+              have restStructure := restResult.1
+              refine ⟨{
+                method_names_nodup := ?_
+                method_owners := ?_
+                method_positions := ?_
+                method_parameter_names_nodup := ?_
+              }, ?_⟩
+              · simp only [List.map_cons, List.nodup_cons]
+                refine ⟨?_, restStructure.method_names_nodup⟩
+                intro member
+                apply unmatchedNames.1
+                rw [← restResult.2]
+                exact member
+              · intro method member
+                simp only [List.mem_cons] at member
+                rcases member with rfl | member
+                · exact unmatched.method_owners implMethod (by simp)
+                · exact restStructure.method_owners method member
+              · intro position
+                refine Fin.cases ?_ (fun restPosition => ?_) position
+                · simpa using unmatched.method_positions (0 : Fin (implMethod :: rest).length)
+                · change
+                    (restMethods.get restPosition).id.methodIndex =
+                      index + (restPosition.val + 1)
+                  rw [restStructure.method_positions restPosition]
+                  omega
+              · intro method member
+                simp only [List.mem_cons] at member
+                rcases member with rfl | member
+                · simpa [ProgramImplMethodSignature.parameterNames,
+                    UnmatchedProgramImplMethod.parameterNames] using
+                    unmatched.method_parameter_names_nodup implMethod (by simp)
+                · exact restStructure.method_parameter_names_nodup method member
+              · simp [restResult.2]
 
 private def implementationSignatureOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -1825,6 +2047,29 @@ private def Except.SuccessSatisfies {error value : Type}
   | error error => trivial
   | ok value => exact preserves value
 
+private theorem Except.SuccessSatisfies.of_success
+    {error value : Type} {property : value → Prop}
+    (computation : Except error value)
+    (sound : ∀ result, computation = .ok result → property result) :
+    Except.SuccessSatisfies property computation := by
+  cases equation : computation with
+  | error error => trivial
+  | ok result => exact sound result equation
+
+private theorem Except.SuccessSatisfies.bind_property
+    {error source target : Type}
+    {sourceProperty : source → Prop} {targetProperty : target → Prop}
+    (computation : Except error source)
+    (continuation : source → Except error target)
+    (sourceFacts : Except.SuccessSatisfies sourceProperty computation)
+    (preserves : ∀ value, sourceProperty value →
+      Except.SuccessSatisfies targetProperty (continuation value)) :
+    Except.SuccessSatisfies targetProperty
+      (computation.bind continuation) := by
+  cases computation with
+  | error error => trivial
+  | ok value => exact preserves value sourceFacts
+
 private theorem implementationSignatureOfDeclaration_success_header
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
     {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
@@ -1832,11 +2077,13 @@ private theorem implementationSignatureOfDeclaration_success_header
     (success : implementationSignatureOfDeclaration environment declaration
       traits source = .ok signature) :
     signature.id = declaration.id ∧
-      signature.parameters = declarationParameters declaration := by
+      signature.parameters = declarationParameters declaration ∧
+      ImplementationSignatureStructuralWellFormed signature := by
   have satisfies : Except.SuccessSatisfies
       (fun result : ProgramImplementationSignature =>
         result.id = declaration.id ∧
-          result.parameters = declarationParameters declaration)
+          result.parameters = declarationParameters declaration ∧
+          ImplementationSignatureStructuralWellFormed result)
       (implementationSignatureOfDeclaration environment declaration traits
         source) := by
     cases scopeEq : validateProgramTypeScope
@@ -1871,13 +2118,30 @@ private theorem implementationSignatureOfDeclaration_success_header
             | some traitSignature =>
                 apply Except.SuccessSatisfies.bind
                 intro predicatesChecked
-                apply Except.SuccessSatisfies.bind
-                intro unmatchedMethods
+                apply Except.SuccessSatisfies.bind_property
+                  (unmatchedImplMethodsOfDeclaration environment declaration
+                    (ProgramTypeScope.ofDeclaration declaration)
+                    source.value.methods 0 []) _
+                  (Except.SuccessSatisfies.of_success _ (fun result resultEq =>
+                    unmatchedImplMethodsOfDeclaration_success_structure resultEq))
+                intro unmatchedMethods unmatchedStructure
                 apply Except.SuccessSatisfies.bind
                 intro methodsChecked
-                apply Except.SuccessSatisfies.bind
-                intro methods
-                exact ⟨rfl, rfl⟩
+                apply Except.SuccessSatisfies.bind_property
+                  (attachTraitMethods traitSignature.methods unmatchedMethods) _
+                  (Except.SuccessSatisfies.of_success _ (fun result resultEq =>
+                    (attachTraitMethods_success_structure resultEq
+                      unmatchedStructure).1))
+                intro methods methodsStructure
+                exact ⟨rfl, rfl, {
+                  method_names_nodup := methodsStructure.method_names_nodup
+                  method_owners := methodsStructure.method_owners
+                  method_positions := by
+                    intro position
+                    simpa using methodsStructure.method_positions position
+                  method_parameter_names_nodup :=
+                    methodsStructure.method_parameter_names_nodup
+                }⟩
   simpa [success, Except.SuccessSatisfies] using satisfies
 
 private theorem implementationSignatureOfDeclaration_success_id
@@ -1897,8 +2161,17 @@ private theorem implementationSignatureOfDeclaration_success_parameters
       traits source = .ok signature) :
     SignatureParametersWellFormed signature.id signature.parameters := by
   have header := implementationSignatureOfDeclaration_success_header success
-  rw [header.1, header.2]
+  rw [header.1, header.2.1]
   exact declarationParameters_wellFormed declaration
+
+private theorem implementationSignatureOfDeclaration_success_structure
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
+    {signature : ProgramImplementationSignature}
+    (success : implementationSignatureOfDeclaration environment declaration
+      traits source = .ok signature) :
+    ImplementationSignatureStructuralWellFormed signature :=
+  (implementationSignatureOfDeclaration_success_header success).2.2
 
 private theorem all_mem_append_singleton {value : Type} {property : value → Prop}
     {values : List value} {last : value}
@@ -1986,6 +2259,8 @@ private structure ProgramSignatureBuildParametersWellFormed
     DataSignatureStructuralWellFormed signature
   implementations : ∀ signature, signature ∈ state.implementations →
     SignatureParametersWellFormed signature.id signature.parameters
+  implementationShapes : ∀ signature, signature ∈ state.implementations →
+    ImplementationSignatureStructuralWellFormed signature
   contracts : ∀ signature, signature ∈ state.contracts →
     SignatureParametersWellFormed signature.id signature.parameters
 
@@ -2000,6 +2275,7 @@ private theorem ProgramSignatureBuildParametersWellFormed.withErrors
   dataTypes := initial.dataTypes
   dataShapes := initial.dataShapes
   implementations := initial.implementations
+  implementationShapes := initial.implementationShapes
   contracts := initial.contracts
 }
 
@@ -2039,13 +2315,16 @@ private theorem ProgramSignatureBuildParametersWellFormed.addImplementation
     (initial : ProgramSignatureBuildParametersWellFormed state)
     {signature : ProgramImplementationSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
-      signature.parameters) :
+      signature.parameters)
+    (shape : ImplementationSignatureStructuralWellFormed signature) :
     ProgramSignatureBuildParametersWellFormed
       { state with
         implementations := state.implementations ++ [signature]
       } := {
   initial with
   implementations := all_mem_append_singleton initial.implementations wellFormed
+  implementationShapes :=
+    all_mem_append_singleton initial.implementationShapes shape
 }
 
 private theorem ProgramSignatureBuildParametersWellFormed.addContract
@@ -2136,7 +2415,8 @@ private theorem collectProgramSignatures_parameters_wellFormed
                   implementations := state.implementations ++ [signature]
                 }
                 (initial.addImplementation
-                  (implementationSignatureOfDeclaration_success_parameters signatureEq))
+                  (implementationSignatureOfDeclaration_success_parameters signatureEq)
+                  (implementationSignatureOfDeclaration_success_structure signatureEq))
       | importDecl _ | exportDecl _ | pragmaDecl _ | trait _ | error =>
           simp only [collectProgramSignatures, sourceEq,
             signatureItemOfDeclaration]
@@ -2711,6 +2991,30 @@ theorem buildProgramSignatures_success_data_structure_state
   · injection success with signaturesEq
     subst signatures
     exact signatureFacts.dataShapes
+  · simp at success
+
+/-- Internal collector boundary used by `ProgramSignaturesProperties`: every
+successfully collected implementation signature retains the method-name and
+stable identity structure established while traversing its source declaration. -/
+theorem buildProgramSignatures_success_implementation_structure_state
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures) :
+    ∀ signature, signature ∈ signatures.implementations →
+      ImplementationSignatureStructuralWellFormed signature := by
+  let traitState := collectProgramTraits environment environment.declarations {}
+  let state := collectProgramSignatures environment traitState.traits
+    environment.declarations {}
+  have signatureFacts :
+      ProgramSignatureBuildParametersWellFormed state := by
+    apply collectProgramSignatures_parameters_wellFormed environment
+      traitState.traits environment.declarations
+      ({} : ProgramSignatureBuildState)
+    constructor <;> intro signature member <;> simp at member
+  simp only [buildProgramSignatures] at success
+  split at success
+  · injection success with signaturesEq
+    subst signatures
+    exact signatureFacts.implementationShapes
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every
