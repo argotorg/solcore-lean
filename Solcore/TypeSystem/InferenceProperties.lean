@@ -63,6 +63,17 @@ theorem solve_next {state result : InferState}
   cases success
   rfl
 
+/-- Reapplying an earlier state's resolution before a semantically extending
+substitution does not change the final type. -/
+theorem apply_resolve_eq_apply
+    {earlier later : InferState}
+    (extension : later.substitution.SemanticallyExtends
+      earlier.substitution)
+    (type : Ty) :
+    later.substitution.apply (earlier.resolve type) =
+      later.substitution.apply type := by
+  simpa [InferState.resolve] using extension type
+
 /-- Successful incremental binary unification makes the original input types
 equal when resolved by the returned state. -/
 theorem unify_resolve_eq
@@ -154,6 +165,40 @@ theorem instantiateDeclaration_type_variablesBelow
   have stateSolved := solved.instantiateDeclaration scheme
   have applied := stateSolved.variablesBelow_apply rawBelow
   simpa [InferState.instantiateDeclaration, InferState.resolve] using applied
+
+/-- Successful incremental unification composes a new solution on the left,
+so a solved input substitution is semantically preserved by the result. -/
+theorem unify_semanticallyExtends
+    {state result : InferState} {left right : Ty}
+    (solved : state.Solved)
+    (success : state.unify left right = .ok result) :
+    result.substitution.SemanticallyExtends state.substitution := by
+  unfold InferState.unify at success
+  cases unified : Unification.unifyTypes (state.resolve left)
+      (state.resolve right) with
+  | error error =>
+      simp [unified, bind, Except.bind] at success
+  | ok update =>
+      simp [unified, bind, Except.bind] at success
+      cases success
+      exact Substitution.SemanticallyExtends.compose_left update solved
+
+/-- Successful incremental constraint solving likewise preserves the meaning
+of every type already resolved by a solved input substitution. -/
+theorem solve_semanticallyExtends
+    {state result : InferState} {constraints : List Constraint}
+    (solved : state.Solved)
+    (success : state.solve constraints = .ok result) :
+    result.substitution.SemanticallyExtends state.substitution := by
+  unfold InferState.solve at success
+  cases unified : Unification.unify
+      (constraints.map (·.apply state.substitution)) with
+  | error error =>
+      simp [unified, bind, Except.bind] at success
+  | ok update =>
+      simp [unified, bind, Except.bind] at success
+      cases success
+      exact Substitution.SemanticallyExtends.compose_left update solved
 
 /-- Successful binary unification preserves solved inference state when the
 two types actually passed to the unifier lie below the allocator bound. -/

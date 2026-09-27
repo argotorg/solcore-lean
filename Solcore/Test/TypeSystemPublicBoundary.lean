@@ -212,6 +212,7 @@ example := @Solcore.TypeSystem.InferState.instantiateDeclaration_next_le
 example := @Solcore.TypeSystem.InferState.unify_next
 example := @Solcore.TypeSystem.InferState.solve_next
 example := @Solcore.TypeSystem.InferState.unify_resolve_eq
+example := @Solcore.TypeSystem.InferState.apply_resolve_eq_apply
 example := @Solcore.TypeSystem.InferState.solve_satisfies
 example := @Solcore.TypeSystem.InferState.Solved
 example := @Solcore.TypeSystem.InferState.Solved.initial
@@ -223,6 +224,8 @@ example :=
   @Solcore.TypeSystem.InferState.Solved.instantiateDeclaration_type_variablesBelow
 example := @Solcore.TypeSystem.InferState.Solved.unify
 example := @Solcore.TypeSystem.InferState.Solved.solve
+example := @Solcore.TypeSystem.InferState.Solved.unify_semanticallyExtends
+example := @Solcore.TypeSystem.InferState.Solved.solve_semanticallyExtends
 example := @Solcore.TypeSystem.Inference.infer_solved_variablesBelow
 
 private def incrementalState : Solcore.TypeSystem.InferState := {
