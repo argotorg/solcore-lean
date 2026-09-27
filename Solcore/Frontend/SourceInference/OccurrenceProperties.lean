@@ -400,6 +400,75 @@ theorem fitArguments_some_occurrenceState_eq
                           exact ⟨tailEq.1.trans fittedEq.1,
                             tailEq.2.trans fittedEq.2⟩
 
+/-- Every delayed coercion emitted by argument fitting targets one of the
+input argument occurrences.  Fitting may add coercion payloads, but cannot
+invent an unrelated expression identity. -/
+theorem fitArguments_some_coercion_expression_mem
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    ∀ entry ∈ result.coercions,
+      entry.expression ∈ arguments.map (fun argument => argument.id) := by
+  induction arguments generalizing parameters state result with
+  | nil =>
+      cases parameters <;> simp [fitArguments] at success
+      subst result
+      simp
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil => simp [fitArguments] at success
+      | cons parameter parameters =>
+          simp only [fitArguments] at success
+          cases fittedResult :
+              candidateWithExpected context state argument (some parameter) with
+          | error error =>
+              simp [fittedResult, bind, Except.bind] at success
+          | ok fitted? =>
+              cases fitted? with
+              | none =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  change Except.ok (none : Option ArgumentFitResult) =
+                    Except.ok (some result) at success
+                  simp at success
+              | some fitted =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  cases tailResult : fitArguments context fitted.state arguments
+                      parameters with
+                  | error error => simp [tailResult] at success
+                  | ok tail? =>
+                      cases tail? with
+                      | none =>
+                          simp only [tailResult] at success
+                          change Except.ok (none : Option ArgumentFitResult) =
+                            Except.ok (some result) at success
+                          simp at success
+                      | some tail =>
+                          simp only [tailResult] at success
+                          change Except.ok (some {
+                            state := tail.state
+                            cost := fitted.coercions.length + tail.cost
+                            coercions := {
+                              expression := argument.id
+                              coercions := fitted.coercions
+                            } :: tail.coercions
+                          }) = Except.ok (some result) at success
+                          injection success with resultEq
+                          have resultEq : _ = result :=
+                            Option.some.inj resultEq
+                          subst result
+                          intro entry member
+                          simp only [List.map_cons, List.mem_cons] at member ⊢
+                          cases member with
+                          | inl headEq =>
+                              subst entry
+                              exact Or.inl rfl
+                          | inr tailMember =>
+                              exact Or.inr
+                                (induction (result := tail) tailResult entry
+                                  tailMember)
+
 /-- Trying one overload candidate allocates no source occurrences. -/
 theorem tryFunctionCandidate_some_occurrenceState_eq
     {context : Context} {arguments : List InferredExpression}
@@ -455,6 +524,25 @@ theorem tryFunctionCandidate_some_result_id
   all_goals try cases success
   all_goals try have fittedId :=
     candidateWithExpected_some_expression_id (by assumption)
+  all_goals simp_all
+
+/-- A retained overload attempt forwards exactly the delayed argument
+coercions produced by fitting its input argument spine. -/
+theorem tryFunctionCandidate_some_argumentCoercion_expression_mem
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    ∀ entry ∈ result.argumentCoercions,
+      entry.expression ∈ arguments.map (fun argument => argument.id) := by
+  unfold tryFunctionCandidate at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have fittedProvenance :=
+    fitArguments_some_coercion_expression_mem (by assumption)
   all_goals simp_all
 
 private theorem collectCandidateAttempts_success_occurrenceState_eq
@@ -523,6 +611,43 @@ private theorem collectCandidateAttempts_success_result_id
                   subst selected
                   exact attemptId signature result attemptResult
               | inr member => exact induction selected member
+
+private theorem collectCandidateAttempts_success_argumentCoercion_expression_mem
+    {attempt : ProgramFunctionSignature →
+      Except Error (Option CandidateAttemptResult)}
+    {argumentIds : List ExpressionId}
+    (attemptProvenance : ∀ signature result,
+      attempt signature = .ok (some result) →
+        ∀ entry ∈ result.argumentCoercions,
+          entry.expression ∈ argumentIds) :
+    ∀ candidates selected,
+      selected ∈ (collectCandidateAttempts attempt candidates).successes →
+        ∀ entry ∈ selected.attempt.argumentCoercions,
+          entry.expression ∈ argumentIds := by
+  intro candidates
+  induction candidates with
+  | nil => simp [collectCandidateAttempts]
+  | cons signature candidates induction =>
+      intro selected member entry entryMember
+      simp only [collectCandidateAttempts] at member
+      cases attemptResult : attempt signature with
+      | error error =>
+          simp only [attemptResult] at member
+          exact induction selected member entry entryMember
+      | ok result? =>
+          cases result? with
+          | none =>
+              simp only [attemptResult] at member
+              exact induction selected member entry entryMember
+          | some result =>
+              simp only [attemptResult, List.mem_cons] at member
+              cases member with
+              | inl selectedEq =>
+                  subst selected
+                  exact attemptProvenance signature result attemptResult entry
+                    entryMember
+              | inr member =>
+                  exact induction selected member entry entryMember
 
 private theorem bestCandidateSuccesses_occurrence_subset
     (successes : List CandidateSuccess) :
@@ -626,6 +751,74 @@ theorem selectFunctionCandidateFrom_result_id
                 tryFunctionCandidate_some_result_id attemptSuccess)
               candidates candidate member
 
+/-- Explicit overload ranking cannot introduce delayed coercion targets that
+were absent from the caller's argument spine. -/
+theorem selectFunctionCandidateFrom_argumentCoercion_expression_mem
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    ∀ entry ∈ result.argumentCoercions,
+      entry.expression ∈ arguments.map (fun argument => argument.id) := by
+  unfold selectFunctionCandidateFrom at success
+  let attempt := tryFunctionCandidate context arguments integerLiteralOrigins
+    call expected state
+  let search := collectCandidateAttempts attempt candidates
+  change selectCandidateSearch name candidates search = .ok result at success
+  unfold selectCandidateSearch at success
+  cases selected : bestCandidateSuccesses search.successes with
+  | nil =>
+      simp only [selected] at success
+      repeat' first | split at success
+      all_goals contradiction
+  | cons candidate rest =>
+      cases rest with
+      | cons second tail => simp [selected] at success
+      | nil =>
+          simp only [selected] at success
+          split at success
+          · contradiction
+          · injection success with resultEq
+            subst result
+            have member : candidate ∈ search.successes :=
+              bestCandidateSuccesses_occurrence_subset search.successes
+                (by simp [selected])
+            exact
+              collectCandidateAttempts_success_argumentCoercion_expression_mem
+                (argumentIds := arguments.map (fun argument => argument.id))
+                (fun signature attemptResult attemptSuccess =>
+                  tryFunctionCandidate_some_argumentCoercion_expression_mem
+                    attemptSuccess)
+                candidates candidate member
+
+/-- Freshness of every caller argument transfers to every delayed coercion
+target retained by explicit overload selection. -/
+theorem selectFunctionCandidateFrom_argumentCoercions_fresh
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult} {cutoff : Nat}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result)
+    (argumentsFresh : ∀ argument ∈ arguments,
+      cutoff ≤ argument.id.occurrence.index) :
+    ∀ entry ∈ result.argumentCoercions,
+      cutoff ≤ entry.expression.occurrence.index := by
+  intro entry member
+  have idMember :=
+    selectFunctionCandidateFrom_argumentCoercion_expression_mem success entry
+      member
+  obtain ⟨argument, argumentMember, argumentId⟩ :=
+    List.mem_map.mp idMember
+  rw [← argumentId]
+  exact argumentsFresh argument argumentMember
+
 /-- Visible overload lookup itself is read-only, so ordinary selection retains
 the explicit selector's exact occurrence state. -/
 theorem selectFunctionCandidate_occurrenceState_eq
@@ -663,6 +856,48 @@ theorem selectFunctionCandidate_result_id
   | ok candidates =>
       simp only [candidatesResult, bind, Except.bind] at success
       exact selectFunctionCandidateFrom_result_id success
+
+/-- Visible overload lookup inherits delayed-coercion target provenance from
+the explicit selector. -/
+theorem selectFunctionCandidate_argumentCoercion_expression_mem
+    {context : Context} {name : String}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidate context name arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    ∀ entry ∈ result.argumentCoercions,
+      entry.expression ∈ arguments.map (fun argument => argument.id) := by
+  unfold selectFunctionCandidate at success
+  cases candidatesResult : functionsNamed context name with
+  | error error =>
+      simp [candidatesResult, bind, Except.bind] at success
+  | ok candidates =>
+      simp only [candidatesResult, bind, Except.bind] at success
+      exact selectFunctionCandidateFrom_argumentCoercion_expression_mem success
+
+/-- Ordinary visible overload selection also transfers caller-argument
+freshness to every delayed coercion target. -/
+theorem selectFunctionCandidate_argumentCoercions_fresh
+    {context : Context} {name : String}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult} {cutoff : Nat}
+    (success : selectFunctionCandidate context name arguments
+      integerLiteralOrigins call expected state = .ok result)
+    (argumentsFresh : ∀ argument ∈ arguments,
+      cutoff ≤ argument.id.occurrence.index) :
+    ∀ entry ∈ result.argumentCoercions,
+      cutoff ≤ entry.expression.occurrence.index := by
+  intro entry member
+  have idMember :=
+    selectFunctionCandidate_argumentCoercion_expression_mem success entry member
+  obtain ⟨argument, argumentMember, argumentId⟩ :=
+    List.mem_map.mp idMember
+  rw [← argumentId]
+  exact argumentsFresh argument argumentMember
 
 /-- Explicit-candidate overload selection preserves the occurrence bound. -/
 theorem selectFunctionCandidateFrom_occurrenceBoundExtends
@@ -1169,6 +1404,37 @@ theorem recordExpressionWithExpected_success_nodes
   rw [resultState]
   exact State.recordNode_nodes _ _
 
+/-- Expected-type recording returns the occurrence identity supplied by its
+caller, regardless of whether fitting chose unification or coercion. -/
+theorem recordExpressionWithExpected_success_id
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state = .ok result) :
+    result.1.id = id := by
+  obtain ⟨fitted, fittedSuccess, resultExpression, _⟩ :=
+    recordExpressionWithExpected_success_record success
+  rw [resultExpression]
+  exact withExpected_success_expression_id fittedSuccess
+
+/-- Expected-type recording allocates no new occurrence identity; its root ID
+was allocated by the enclosing traversal. -/
+theorem recordExpressionWithExpected_success_nextOccurrence
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state = .ok result) :
+    result.2.nextOccurrence = state.nextOccurrence := by
+  obtain ⟨fitted, fittedSuccess, _, resultState⟩ :=
+    recordExpressionWithExpected_success_record success
+  rw [resultState]
+  change fitted.state.nextOccurrence = state.nextOccurrence
+  exact (withExpected_occurrenceState_eq fittedSuccess).2
+
 /-- Recording a selected declaration call preserves occurrence allocation
 provided the call-result identity was allocated before the supplied state. -/
 theorem recordSelectedCallResult_occurrenceBoundExtends
@@ -1335,6 +1601,28 @@ theorem recordSelectedCallResult_success_nodes
   simp [recordSelectedCallResult, recordExpression, State.recordNode,
     List.append_assoc]
 
+@[simp] theorem recordSelectedCallResult_fst
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) :
+    (recordSelectedCallResult source callee name arguments attempt result
+      trailingCoercions state).1 = result := by
+  simp [recordSelectedCallResult, recordExpression]
+
+@[simp] theorem recordSelectedCall_fst
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+    (recordSelectedCall source callee name arguments attempt).1 =
+      attempt.result := by
+  simp [recordSelectedCall]
+
+@[simp] theorem recordIndirectCall_fst
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult) :
+    (recordIndirectCall source callee arguments result).1 = result.result := by
+  simp [recordIndirectCall, recordExpression, State.recordNode]
+
 /-- Builtin-function argument unification allocates no source occurrences. -/
 theorem unifyBuiltinFunctionArgumentsEqual_occurrenceState_eq
     {arguments : List InferredExpression} {parameters : List Ty}
@@ -1494,6 +1782,22 @@ theorem recordBuiltinFunctionCall_occurrenceBoundExtends
                     resultBelow)
   · simp [arity, bind, Except.bind] at success
 
+/-- Successful builtin-call recording returns the caller-allocated call
+occurrence. -/
+theorem recordBuiltinFunctionCall_success_id
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    result.1.id = call := by
+  unfold recordBuiltinFunctionCall at success
+  simp_all [bind, Except.bind, recordExpression]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals simp_all [recordExpression]
+
 /-- Ordinary unary-operator inference allocates no source occurrences. -/
 theorem inferUnaryOperator_occurrenceState_eq
     {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
@@ -1530,6 +1834,63 @@ theorem inferBinaryOperator_occurrenceState_eq
   all_goals try simp_all [State.addRequirementsWithIds,
     State.addRequirementWithId]
   all_goals grind [unify_occurrenceState_eq]
+
+/-- Constructor application records its result at the occurrence identity
+allocated by the enclosing expression traversal. -/
+theorem inferConstructorApplicationFuel_success_id
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result) :
+    result.1.id = id := by
+  unfold inferConstructorApplicationFuel at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have resultId :=
+    recordExpressionWithExpected_success_id (by assumption)
+  all_goals simp_all [recordExpression]
+
+/-- Every successful expression traversal returns the exact root occurrence
+reserved at entry, before any child traversal or coercion fitting runs. -/
+theorem inferExprFuel_success_id
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    result.1.id = state.allocateExpressionId.1 := by
+  unfold inferExprFuel at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have recordId :=
+    recordExpressionWithExpected_success_id (by assumption)
+  all_goals try have constructorId :=
+    inferConstructorApplicationFuel_success_id (by assumption)
+  all_goals try have selectedId :=
+    selectFunctionCandidateFrom_result_id (by assumption)
+  all_goals try have fittedId :=
+    withExpected_success_expression_id (by assumption)
+  all_goals try have applicationId :=
+    applyFunctionType_result_id (by assumption)
+  all_goals try have builtinId :=
+    recordBuiltinFunctionCall_success_id (by assumption)
+  all_goals simp_all [recordSelectedCall, recordSelectedCallResult,
+    recordIndirectCall, recordExpression]
+
+/-- The returned root index is exactly the input allocator cutoff. -/
+theorem inferExprFuel_success_id_index
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    result.1.id.occurrence.index = state.nextOccurrence := by
+  rw [inferExprFuel_success_id success]
+  rfl
 
 
 end Solcore.Frontend.SourceInference.Detail
