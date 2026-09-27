@@ -232,7 +232,7 @@ theorem buildProgramSignatures_success_implementation_structure
     signature member
 
 /-- Successful collection retains the exact trait-catalog entry and
-containment checks used to admit every implementation head. -/
+containment checks used to accept every implementation head. -/
 theorem buildProgramSignatures_success_implementation_head_validated
     {environment : ProgramEnvironment} {signatures : ProgramSignatures}
     (success : buildProgramSignatures environment = .ok signatures)

@@ -66,6 +66,14 @@ example :=
 example := @Solcore.Frontend.ImplementationSignatureStructuralWellFormed
 example := @Solcore.Frontend.ImplementationSignatureHeadValidated
 example := @Solcore.Frontend.ImplementationSignatureMethodCatalogValidated
+example := @Solcore.Frontend.ProgramSignatureFormationError
+example := @Solcore.Frontend.SignatureTypeFormationValidated
+example := @Solcore.Frontend.SignatureTypesFormationValidated
+example := @Solcore.Frontend.SignaturePredicateFormationValidated
+example := @Solcore.Frontend.SignaturePredicatesFormationValidated
+example := @Solcore.Frontend.ProgramSignatureFormationValidated
+example := @Solcore.Frontend.validateProgramSignatureFormation
+example := @Solcore.Frontend.validateProgramSignatureFormation_success
 example :=
   @Solcore.Frontend.ImplementationSignatureStructuralWellFormed.method_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_implementation_structure
@@ -146,6 +154,7 @@ example := @Solcore.Frontend.checkImplementationMethodBodies
 example := @Solcore.Frontend.checkImplementationMethodBodies_success_ids
 example := @Solcore.Frontend.checkLoadedProgram_success_environment
 example := @Solcore.Frontend.checkLoadedProgram_success_signatures
+example := @Solcore.Frontend.checkLoadedProgram_success_signature_formation
 example :=
   @Solcore.Frontend.checkLoadedProgram_success_signature_parameters_wellFormed
 example :=
@@ -162,6 +171,7 @@ example :=
   @Solcore.Frontend.checkLoadedProgram_success_implementation_method_catalog_validated
 example := @Solcore.Frontend.checkLoadedProgram_success_ids
 example := @Solcore.Frontend.checkProgram_success_load
+example := @Solcore.Frontend.checkProgram_success_signature_formation
 example := @Solcore.Frontend.checkProgram_success_ids
 example := @Solcore.Frontend.checkProgram_success_declarations_nodup
 example := @Solcore.Frontend.checkProgram_success_signature_declaration_ids_nodup
@@ -179,6 +189,7 @@ example :=
   @Solcore.Frontend.checkProgram_success_implementation_method_catalog_validated
 example := @Solcore.Frontend.checkProgram_success_implementation_method_ids_nodup
 example := @Solcore.Frontend.ProgramCheckError.methodInference
+example := @Solcore.Frontend.ProgramCheckError.signatureFormation
 example := @Solcore.Frontend.ProgramCheckError.methodNoSolution
 example := @Solcore.Frontend.ProgramCheckError.methodInconclusive
 

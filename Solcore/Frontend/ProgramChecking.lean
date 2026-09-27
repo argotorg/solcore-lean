@@ -1,4 +1,5 @@
 import Solcore.Frontend.ProgramSignaturesProperties
+import Solcore.Frontend.ProgramSignatureFormation
 import Solcore.Frontend.SourceInference
 
 /-!
@@ -37,6 +38,7 @@ must not be treated as a negative trait answer. -/
 inductive ProgramCheckError where
   | loading (error : ProgramLoadError)
   | signature (error : ProgramSignatureError)
+  | signatureFormation (error : ProgramSignatureFormationError)
   | inference (error : SourceInference.FunctionError)
   | noSolution
       (declaration : Resolved.DeclarationId)
@@ -224,22 +226,77 @@ def checkLoadedProgram (loaded : LoadedProgram) (fuel : Nat := 1024) :
   match buildProgramSignatures loaded.environment with
   | .error errors => .error (errors.map ProgramCheckError.signature)
   | .ok signatures =>
-      let functions := SourceInference.checkFunctionBodies loaded.environment
-        signatures fuel
-      let methods := checkImplementationMethodBodies loaded.environment
-        signatures fuel
-      match functions, methods with
-      | .ok functions, .ok methods => .ok {
+      match validateProgramSignatureFormation signatures with
+      | .error errors =>
+          .error (errors.map ProgramCheckError.signatureFormation)
+      | .ok () =>
+          let functions := SourceInference.checkFunctionBodies loaded.environment
+            signatures fuel
+          let methods := checkImplementationMethodBodies loaded.environment
+            signatures fuel
+          match functions, methods with
+          | .ok functions, .ok methods => .ok {
+              environment := loaded.environment
+              signatures
+              functions
+              methods
+            }
+          | .error functionErrors, .ok _ =>
+              .error (functionErrors.map classifyFunctionError)
+          | .ok _, .error methodErrors => .error methodErrors
+          | .error functionErrors, .error methodErrors =>
+              .error (functionErrors.map classifyFunctionError ++ methodErrors)
+
+private theorem checkLoadedProgram_success_components
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    ∃ signatures functions methods,
+      buildProgramSignatures loaded.environment = .ok signatures ∧
+        validateProgramSignatureFormation signatures = .ok () ∧
+        SourceInference.checkFunctionBodies loaded.environment signatures fuel =
+          .ok functions ∧
+        checkImplementationMethodBodies loaded.environment signatures fuel =
+          .ok methods ∧
+        checked = {
           environment := loaded.environment
           signatures
           functions
           methods
-        }
-      | .error functionErrors, .ok _ =>
-          .error (functionErrors.map classifyFunctionError)
-      | .ok _, .error methodErrors => .error methodErrors
-      | .error functionErrors, .error methodErrors =>
-          .error (functionErrors.map classifyFunctionError ++ methodErrors)
+        } := by
+  cases signaturesResult : buildProgramSignatures loaded.environment with
+  | error signatureErrors =>
+      simp [checkLoadedProgram, signaturesResult] at success
+  | ok signatures =>
+      cases formationResult : validateProgramSignatureFormation signatures with
+      | error formationErrors =>
+          simp [checkLoadedProgram, signaturesResult, formationResult] at success
+      | ok formationUnit =>
+          cases formationUnit
+          cases functionsResult : SourceInference.checkFunctionBodies
+              loaded.environment signatures fuel with
+          | error functionErrors =>
+              cases methodsResult : checkImplementationMethodBodies
+                  loaded.environment signatures fuel with
+              | error methodErrors =>
+                  simp [checkLoadedProgram, signaturesResult, formationResult,
+                    functionsResult, methodsResult] at success
+              | ok methods =>
+                  simp [checkLoadedProgram, signaturesResult, formationResult,
+                    functionsResult, methodsResult] at success
+          | ok functions =>
+              cases methodsResult : checkImplementationMethodBodies
+                  loaded.environment signatures fuel with
+              | error methodErrors =>
+                  simp [checkLoadedProgram, signaturesResult, formationResult,
+                    functionsResult, methodsResult] at success
+              | ok methods =>
+                  simp [checkLoadedProgram, signaturesResult, formationResult,
+                    functionsResult, methodsResult] at success
+                  subst checked
+                  exact ⟨signatures, functions, methods, rfl, formationResult,
+                    functionsResult, methodsResult, rfl⟩
 
 /-- A successful loaded-program check retains the exact environment supplied
 by the loader. -/
@@ -249,32 +306,9 @@ theorem checkLoadedProgram_success_environment
     {checked : CheckedProgram}
     (success : checkLoadedProgram loaded fuel = .ok checked) :
     checked.environment = loaded.environment := by
-  cases signaturesResult : buildProgramSignatures loaded.environment with
-  | error signatureErrors =>
-      simp [checkLoadedProgram, signaturesResult] at success
-  | ok signatures =>
-      cases functionsResult : SourceInference.checkFunctionBodies
-          loaded.environment signatures fuel with
-      | error functionErrors =>
-          cases methodsResult : checkImplementationMethodBodies
-              loaded.environment signatures fuel with
-          | error methodErrors =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-          | ok methods =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-      | ok functions =>
-          cases methodsResult : checkImplementationMethodBodies
-              loaded.environment signatures fuel with
-          | error methodErrors =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-          | ok methods =>
-              simp only [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult, Except.ok.injEq] at success
-              subst checked
-              rfl
+  obtain ⟨_, _, _, _, _, _, _, checked_eq⟩ :=
+    checkLoadedProgram_success_components success
+  rw [checked_eq]
 
 /-- A successful loaded-program check retains the exact signature-builder
 result used by body checking. -/
@@ -284,32 +318,23 @@ theorem checkLoadedProgram_success_signatures
     {checked : CheckedProgram}
     (success : checkLoadedProgram loaded fuel = .ok checked) :
     buildProgramSignatures loaded.environment = .ok checked.signatures := by
-  cases signaturesResult : buildProgramSignatures loaded.environment with
-  | error signatureErrors =>
-      simp [checkLoadedProgram, signaturesResult] at success
-  | ok signatures =>
-      cases functionsResult : SourceInference.checkFunctionBodies
-          loaded.environment signatures fuel with
-      | error functionErrors =>
-          cases methodsResult : checkImplementationMethodBodies
-              loaded.environment signatures fuel with
-          | error methodErrors =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-          | ok methods =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-      | ok functions =>
-          cases methodsResult : checkImplementationMethodBodies
-              loaded.environment signatures fuel with
-          | error methodErrors =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-          | ok methods =>
-              simp only [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult, Except.ok.injEq] at success
-              subst checked
-              rfl
+  obtain ⟨_, _, _, signaturesResult, _, _, _, checked_eq⟩ :=
+    checkLoadedProgram_success_components success
+  rw [checked_eq]
+  exact signaturesResult
+
+/-- A successful loaded-program check has executable formation evidence for
+every directly resolved signature type and predicate. -/
+theorem checkLoadedProgram_success_signature_formation
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    ProgramSignatureFormationValidated checked.signatures := by
+  obtain ⟨_, _, _, _, formationResult, _, _, checked_eq⟩ :=
+    checkLoadedProgram_success_components success
+  rw [checked_eq]
+  exact validateProgramSignatureFormation_success formationResult
 
 /-- A successful loaded-program check carries the signature builder's
 canonical generic-parameter allocation guarantees into the checked artifact. -/
@@ -418,36 +443,13 @@ theorem checkLoadedProgram_success_ids
       checked.methods.map (fun method => method.id) =
         checked.signatures.implementations.flatMap fun implementation =>
           implementation.methods.map (fun method => method.id) := by
-  cases signaturesResult : buildProgramSignatures loaded.environment with
-  | error signatureErrors =>
-      simp [checkLoadedProgram, signaturesResult] at success
-  | ok signatures =>
-      cases functionsResult : SourceInference.checkFunctionBodies
-          loaded.environment signatures fuel with
-      | error functionErrors =>
-          cases methodsResult : checkImplementationMethodBodies
-              loaded.environment signatures fuel with
-          | error methodErrors =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-          | ok methods =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-      | ok functions =>
-          cases methodsResult : checkImplementationMethodBodies
-              loaded.environment signatures fuel with
-          | error methodErrors =>
-              simp [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult] at success
-          | ok methods =>
-              simp only [checkLoadedProgram, signaturesResult, functionsResult,
-                methodsResult, Except.ok.injEq] at success
-              subst checked
-              exact ⟨
-                SourceInference.checkFunctionBodies_success_declaration_ids
-                  functionsResult,
-                checkImplementationMethodBodies_success_ids methodsResult
-              ⟩
+  obtain ⟨_, _, _, _, _, functionsResult, methodsResult, checked_eq⟩ :=
+    checkLoadedProgram_success_components success
+  rw [checked_eq]
+  exact ⟨
+    SourceInference.checkFunctionBodies_success_declaration_ids functionsResult,
+    checkImplementationMethodBodies_success_ids methodsResult
+  ⟩
 
 /-- Validate, parse, catalog, resolve, and check every top-level function and
 implementation-method body in canonical declaration order. -/
@@ -472,6 +474,17 @@ theorem checkProgram_success_load
   | ok loaded =>
       exact ⟨loaded, rfl, by
         simpa [checkProgram, loadedResult] using success⟩
+
+/-- End-to-end checker success exposes executable formation evidence for its
+completed signature catalog. -/
+theorem checkProgram_success_signature_formation
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    ProgramSignatureFormationValidated checked.signatures := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_signature_formation checkedSuccess
 
 /-- A successful raw-workspace check preserves the exact function and method
 identity order of the resolved signature catalog. -/

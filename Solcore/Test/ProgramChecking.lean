@@ -120,6 +120,14 @@ example
     {fuel : Nat}
     {checked : CheckedProgram}
     (success : checkLoadedProgram loaded fuel = .ok checked) :
+    ProgramSignatureFormationValidated checked.signatures :=
+  checkLoadedProgram_success_signature_formation success
+
+example
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
     ProgramSignatureParametersWellFormed checked.signatures :=
   checkLoadedProgram_success_signature_parameters_wellFormed success
 
@@ -172,6 +180,14 @@ example
     (success : checkProgram raw fuel = .ok checked) :
     ProgramSignatureParametersWellFormed checked.signatures :=
   checkProgram_success_signature_parameters_wellFormed success
+
+example
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    ProgramSignatureFormationValidated checked.signatures :=
+  checkProgram_success_signature_formation success
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do
@@ -254,6 +270,31 @@ private def testSuccessfulProgram : IO Unit := do
                 goal == integerPredicate && premises.isEmpty
             | _ => false)
         "nested literal did not retain builtin Int<Word> evidence"
+
+private def testSignatureFormationRejectsFlexibleReturn : IO Unit := do
+  let checked ← match checkProgram successfulWorkspace with
+    | .ok checked => pure checked
+    | .error errors => throw (IO.userError
+        s!"formation rejection fixture failed before mutation: {reprStr errors}")
+  match checked.signatures.functions with
+  | [] => throw (IO.userError "formation rejection fixture lost its function")
+  | signature :: rest =>
+      let malformedFunction := {
+        signature with
+        returnTypes := [.variable ⟨0⟩]
+      }
+      let malformed := {
+        checked.signatures with
+        functions := malformedFunction :: rest
+      }
+      match validateProgramSignatureFormation malformed with
+      | .error [.flexibleVariable owner metavariable] =>
+          assertTrue (decide (owner = signature.id ∧ metavariable.index = 0))
+            "formation rejection lost its declaration or metavariable identity"
+      | .error errors => throw (IO.userError
+          s!"flexible signature type had the wrong error: {reprStr errors}")
+      | .ok () => throw (IO.userError
+          "flexible type in a resolved signature was accepted")
 
 private def importedTypeWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc"
@@ -638,6 +679,7 @@ private def testMethodInconclusive : IO Unit := do
 overloads, calls, predicates, implementation evidence, and integer literals. -/
 def testProgramChecking : IO Unit := do
   testSuccessfulProgram
+  testSignatureFormationRejectsFlexibleReturn
   testImportedTypeProgram
   testNoSolution
   testInconclusive
