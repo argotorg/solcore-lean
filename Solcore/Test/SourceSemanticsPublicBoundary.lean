@@ -397,6 +397,12 @@ example := @Solcore.SourceSemantics.MethodDefinition.Valid
 example := @Solcore.SourceSemantics.SignatureCatalogWellFormed
 example := @Solcore.SourceSemantics.Program
 example := @Solcore.SourceSemantics.ProgramWellFormed
+example := @Solcore.SourceSemantics.FunctionDefinition.ofChecked
+example := @Solcore.SourceSemantics.MethodDefinition.ofChecked
+example := @Solcore.SourceSemantics.Program.ofChecked
+example := @Solcore.SourceSemantics.CheckedProgramWellFormedConditions
+example :=
+  @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormed
 
 example := @Solcore.SourceSemantics.Dynamic.Value
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure

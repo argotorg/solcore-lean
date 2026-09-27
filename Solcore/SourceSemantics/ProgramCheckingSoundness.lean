@@ -1,0 +1,126 @@
+import Solcore.Frontend.ProgramChecking
+import Solcore.SourceSemantics.Program
+
+/-!
+Conditional bridge from executable whole-program checking results to the
+declarative source-program carrier.
+
+The conversions in this module only forget algorithmic bookkeeping.  They do
+not claim that checker success alone proves the declarative judgments.  The
+aggregation theorem therefore requires the signature-catalog invariant, exact
+body/catalog identity alignment, and semantic validity of every converted
+body explicitly.
+-/
+
+set_option autoImplicit false
+
+namespace Solcore.SourceSemantics
+
+open Frontend
+open Frontend.SourceInference
+
+namespace FunctionDefinition
+
+/-- Forget algorithmic bookkeeping from one checked top-level function. -/
+def ofChecked (function : CheckedFunction) : FunctionDefinition := {
+  body := BodyDefinition.ofChecked function
+}
+
+end FunctionDefinition
+
+namespace MethodDefinition
+
+/-- Forget algorithmic bookkeeping from one checked implementation method
+while retaining the stable method identity absent from `CheckedFunction`. -/
+def ofChecked (method : CheckedImplementationMethod) : MethodDefinition := {
+  id := method.id
+  body := BodyDefinition.ofChecked method.checked
+}
+
+end MethodDefinition
+
+namespace Program
+
+/-- Project a frontend checked-program carrier into the declarative source
+program carrier.  Validity remains a separate proposition. -/
+def ofChecked (checked : CheckedProgram) : Program := {
+  signatures := checked.signatures
+  functions := checked.functions.map FunctionDefinition.ofChecked
+  methods := checked.methods.map MethodDefinition.ofChecked
+}
+
+end Program
+
+/-- The remaining proof obligations for promoting a forgeable checked-program
+carrier to a declaratively well-formed source program.  Exact ID alignment
+rules out missing and extra bodies; semantic body validity is deliberately an
+explicit premise rather than being identified with checker success. -/
+structure CheckedProgramWellFormedConditions
+    (checked : CheckedProgram) : Prop where
+  signatures : SignatureCatalogWellFormed checked.signatures
+  function_ids : checked.functions.map (fun function => function.declaration) =
+    checked.signatures.functions.map (fun signature => signature.id)
+  method_ids : checked.methods.map (fun method => method.id) =
+    (checked.signatures.implementations.flatMap fun implementation =>
+      implementation.methods.map fun method => method.id)
+  functions_valid : ∀ function, function ∈ checked.functions →
+    FunctionDefinition.Valid checked.signatures
+      (FunctionDefinition.ofChecked function)
+  methods_valid : ∀ method, method ∈ checked.methods →
+    MethodDefinition.Valid checked.signatures
+      (MethodDefinition.ofChecked method)
+
+namespace CheckedProgramWellFormedConditions
+
+/-- Assemble whole-program declarative well-formedness from the explicit
+checker-to-semantics bridge obligations. -/
+theorem programWellFormed
+    {checked : CheckedProgram}
+    (conditions : CheckedProgramWellFormedConditions checked) :
+    ProgramWellFormed (Program.ofChecked checked) := by
+  constructor
+  · exact conditions.signatures
+  · simp only [Program.ofChecked, List.map_map, Function.comp_def,
+      FunctionDefinition.ofChecked, BodyDefinition.ofChecked]
+    rw [conditions.function_ids]
+    exact conditions.signatures.function_ids
+  · simp only [Program.ofChecked, List.map_map, Function.comp_def,
+      MethodDefinition.ofChecked]
+    rw [conditions.method_ids]
+    exact conditions.signatures.implementation_method_ids
+  · intro definition definitionMem
+    simp only [Program.ofChecked, List.mem_map] at definitionMem
+    rcases definitionMem with ⟨function, functionMem, rfl⟩
+    exact conditions.functions_valid function functionMem
+  · intro definition definitionMem
+    simp only [Program.ofChecked, List.mem_map] at definitionMem
+    rcases definitionMem with ⟨method, methodMem, rfl⟩
+    exact conditions.methods_valid method methodMem
+  · intro signature signatureMem
+    have signatureIdMem : signature.id ∈
+        checked.signatures.functions.map (fun candidate => candidate.id) :=
+      List.mem_map.mpr ⟨signature, signatureMem, rfl⟩
+    rw [← conditions.function_ids] at signatureIdMem
+    rcases List.mem_map.mp signatureIdMem with
+      ⟨function, functionMem, declarationEq⟩
+    refine ⟨FunctionDefinition.ofChecked function, ?_, ?_⟩
+    · exact List.mem_map.mpr ⟨function, functionMem, rfl⟩
+    · simpa [FunctionDefinition.ofChecked, BodyDefinition.ofChecked] using
+        declarationEq
+  · intro implementation implementationMem method methodMem
+    have methodIdMem : method.id ∈
+        (checked.signatures.implementations.flatMap fun candidate =>
+          candidate.methods.map fun candidateMethod => candidateMethod.id) := by
+      apply List.mem_flatMap.mpr
+      exact ⟨implementation, implementationMem,
+        List.mem_map.mpr ⟨method, methodMem, rfl⟩⟩
+    rw [← conditions.method_ids] at methodIdMem
+    rcases List.mem_map.mp methodIdMem with
+      ⟨checkedMethod, checkedMethodMem, idEq⟩
+    refine ⟨MethodDefinition.ofChecked checkedMethod, ?_, ?_⟩
+    · exact List.mem_map.mpr ⟨checkedMethod, checkedMethodMem, rfl⟩
+    · simpa [MethodDefinition.ofChecked] using idEq
+
+end CheckedProgramWellFormedConditions
+
+end Solcore.SourceSemantics
