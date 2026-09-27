@@ -105,6 +105,20 @@ example := @Solcore.SourceSemantics.StructuralSubstitution.applyTypedSource
 example := @Solcore.SourceSemantics.StructuralSubstitution.applySolvedRequirement
 example := @Solcore.SourceSemantics.StructuralSubstitution.applyTypedSource_frontend_eq
 example := @Solcore.SourceSemantics.StructuralSubstitution.ContextSubstitutionValid
+example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.TypeWellScoped.applyParametersTo
+example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.TypesWellScoped.applyParametersTo
+example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.TypeWellFormed.applyParametersTo
+example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.TypesWellFormed.applyParametersTo
+example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.PredicateWellFormed.applyParametersTo
+example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.PredicatesWellFormed.applyParametersTo
+example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.ParameterSubstitution.RangeWellFormed.transportContext
 example := @Solcore.SourceSemantics.StructuralSubstitution.OccurrenceGraphClosed.applyParameters
 example := @Solcore.SourceSemantics.StructuralSubstitution.ImplHeadInstantiates.applyParameters
 example := @Solcore.SourceSemantics.StructuralSubstitution.EvidenceValid.applyParameters
@@ -412,7 +426,6 @@ example := @Solcore.SourceSemantics.FunctionSignatureRemainingConditions
 example := @Solcore.SourceSemantics.DataSignatureRemainingConditions
 example := @Solcore.SourceSemantics.TraitMethodSignatureRemainingConditions
 example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions
-example := @Solcore.SourceSemantics.ImplMethodSignatureRemainingConditions
 example := @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions
 example := @Solcore.SourceSemantics.SignatureCatalogRemainingConditions
 example := @Solcore.SourceSemantics.CheckedSignatureCatalogFacts
@@ -446,8 +459,6 @@ example :=
   @Solcore.SourceSemantics.FunctionSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.DataSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions.complete
-example :=
-  @Solcore.SourceSemantics.ImplMethodSignatureRemainingConditions.complete
 example :=
   @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions.complete
 example :=
