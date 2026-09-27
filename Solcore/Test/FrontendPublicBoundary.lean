@@ -191,6 +191,30 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.markDirectCallRequirements_preserves_nodesBelowNextOccurrence
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorApplicationFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorArgumentsFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferPlaceFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferAssignedValueFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_nextOccurrence_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_success_ids_fresh
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_nextOccurrence_le
+example :=
   @Solcore.Frontend.SourceInference.State.initial_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_preserves_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_requirements_subset

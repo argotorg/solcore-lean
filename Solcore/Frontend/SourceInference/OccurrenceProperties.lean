@@ -1935,5 +1935,438 @@ theorem inferExprFuel_success_id_index
   rw [inferExprFuel_success_id success]
   rfl
 
+private theorem allocateExpressionId_success_nextOccurrence
+    {state next : State} {id : ExpressionId}
+    (success : state.allocateExpressionId = (id, next)) :
+    next.nextOccurrence = state.nextOccurrence + 1 := by
+  have projected := congrArg (fun result => result.2.nextOccurrence) success
+  simpa only [State.allocateExpressionId_nextOccurrence] using projected.symm
+
+private theorem allocateStatementId_success_nextOccurrence
+    {state next : State} {id : StatementId}
+    (success : state.allocateStatementId = (id, next)) :
+    next.nextOccurrence = state.nextOccurrence + 1 := by
+  have projected := congrArg (fun result => result.2.nextOccurrence) success
+  simpa only [State.allocateStatementId_nextOccurrence] using projected.symm
+
+/-- Successful unification leaves the occurrence counter unchanged. -/
+@[simp] private theorem unify_success_nextOccurrence
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    next.nextOccurrence = state.nextOccurrence :=
+  (unify_occurrenceState_eq success).2
+
+/-- Recording a successful builtin call allocates exactly its synthetic callee
+occurrence; the outer call occurrence was allocated by its caller. -/
+private theorem recordBuiltinFunctionCall_success_nextOccurrence
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    result.2.nextOccurrence = state.nextOccurrence + 1 := by
+  unfold recordBuiltinFunctionCall at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have argumentsState :=
+    unifyBuiltinFunctionArgumentsEqual_occurrenceState_eq (by assumption)
+  all_goals try have expectedState :=
+    unify_occurrenceState_eq (by assumption)
+  all_goals simp_all [recordExpression, State.recordNode]
+
+private def PreservesNextOccurrence {alpha : Type}
+    (stateOf : alpha → State) (initial : State)
+    (computation : Except Error alpha) : Prop :=
+  ∀ result, computation = .ok result →
+    initial.nextOccurrence ≤ (stateOf result).nextOccurrence
+
+private theorem pair_except_nextOccurrence {epsilon alpha beta : Type}
+    {computation : Except epsilon (alpha × beta)} {result : alpha × beta}
+    {initial : State} {nextOccurrence : beta → Nat}
+    (invariant : ∀ value state,
+      computation = .ok (value, state) →
+        initial.nextOccurrence ≤ nextOccurrence state)
+    (success : computation = .ok result) :
+    initial.nextOccurrence ≤ nextOccurrence result.2 := by
+  rcases result with ⟨value, state⟩
+  exact invariant value state success
+
+private theorem pair_eq_nextOccurrence {alpha : Type}
+    {result : alpha × State} {initial : State}
+    (invariant : ∀ value state, result = (value, state) →
+      initial.nextOccurrence ≤ state.nextOccurrence) :
+    initial.nextOccurrence ≤ result.2.nextOccurrence := by
+  exact invariant result.1 result.2 (Prod.eta result)
+
+private theorem triple_eq_nextOccurrence {alpha beta : Type}
+    {result : alpha × beta × State} {initial : State}
+    (invariant : ∀ first second state,
+      result = (first, second, state) →
+        initial.nextOccurrence ≤ state.nextOccurrence) :
+    initial.nextOccurrence ≤ result.2.2.nextOccurrence := by
+  rcases result with ⟨first, second, state⟩
+  exact invariant first second state rfl
+
+set_option maxHeartbeats 800000 in
+private theorem inference_preserves_nextOccurrence :
+    (∀ fuel context expression expected state,
+      PreservesNextOccurrence Prod.snd state
+        (inferExprFuel fuel context expression expected state)) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      PreservesNextOccurrence Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state)) ∧
+    (∀ fuel context sources expected state,
+      PreservesNextOccurrence Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state)) ∧
+    (∀ fuel context statements expectedReturn state,
+      PreservesNextOccurrence BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state)) ∧
+    (∀ fuel context statement expectedReturn state,
+      PreservesNextOccurrence StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state)) ∧
+    (∀ fuel context items state,
+      PreservesNextOccurrence InferredForItems.state state
+        (inferForItemsFuel fuel context items state)) ∧
+    (∀ fuel context item state,
+      PreservesNextOccurrence Prod.snd state
+        (inferForItemFuel fuel context item state)) ∧
+    (∀ fuel context target state,
+      PreservesNextOccurrence Prod.snd state
+        (inferPlaceFuel fuel context target state)) ∧
+    (∀ fuel context target operator value state,
+      PreservesNextOccurrence (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state)) ∧
+    (∀ fuel context expressions state,
+      PreservesNextOccurrence Prod.snd state
+        (inferExprsFuel fuel context expressions state)) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      PreservesNextOccurrence MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state)) := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := fun fuel context expression expected state =>
+      PreservesNextOccurrence Prod.snd state
+        (inferExprFuel fuel context expression expected state))
+    (motive2 := fun fuel context source id instantiation arguments expected
+        state =>
+      PreservesNextOccurrence Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state))
+    (motive3 := fun fuel context sources expected state =>
+      PreservesNextOccurrence Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state))
+    (motive4 := fun fuel context statements expectedReturn state =>
+      PreservesNextOccurrence BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state))
+    (motive5 := fun fuel context statement expectedReturn state =>
+      PreservesNextOccurrence StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state))
+    (motive6 := fun fuel context items state =>
+      PreservesNextOccurrence InferredForItems.state state
+        (inferForItemsFuel fuel context items state))
+    (motive7 := fun fuel context item state =>
+      PreservesNextOccurrence Prod.snd state
+        (inferForItemFuel fuel context item state))
+    (motive8 := fun fuel context target state =>
+      PreservesNextOccurrence Prod.snd state
+        (inferPlaceFuel fuel context target state))
+    (motive9 := fun fuel context target operator value state =>
+      PreservesNextOccurrence (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state))
+    (motive10 := fun fuel context expressions state =>
+      PreservesNextOccurrence Prod.snd state
+        (inferExprsFuel fuel context expressions state))
+    (motive11 := fun fuel context scrutineeType expectedReturn outerScope
+        cases state =>
+      PreservesNextOccurrence MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state))
+  case case15 =>
+    intros context expression expected state fuel calleeId stateAfterId
+      allocationEq keyword parameters returnType body expressionEq bodyInduction
+    unfold PreservesNextOccurrence at *
+    intro result success
+    unfold inferExprFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals try have bodyNext := bodyInduction _ _ _ (by assumption)
+    all_goals try have allocationNext :=
+      allocateExpressionId_success_nextOccurrence (by assumption)
+    all_goals try have lambdaNext :=
+      bindLambdaParameters_occurrenceState_eq (by assumption)
+    all_goals try have unifiedNext := unify_occurrenceState_eq (by assumption)
+    all_goals try have recordNext :=
+      recordExpressionWithExpected_success_nextOccurrence (by assumption)
+    all_goals simp_all only [except_pure_eq_ok]
+    all_goals simp only [State.restoreLexicalScope]
+    all_goals rw [unifiedNext.2]
+    all_goals apply Nat.le_trans ?_ bodyNext
+    all_goals grind [State.fresh, unify_occurrenceState_eq,
+      unify_success_nextOccurrence,
+      bindLambdaParameters_occurrenceState_eq]
+  case case67 =>
+    unfold PreservesNextOccurrence at *
+    intros
+    simp_all only [inferPlaceFuel]
+  case case70 =>
+    intros fuel context target operator value state placeInduction
+      valueInduction
+    unfold PreservesNextOccurrence at *
+    intro result success
+    unfold inferAssignedValueFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try have placeNext :=
+      pair_except_nextOccurrence placeInduction (by assumption)
+    all_goals try have valueNext :=
+      pair_except_nextOccurrence (valueInduction _ _) (by assumption)
+    all_goals try have unifiedNext :=
+      unify_occurrenceState_eq (by assumption)
+    all_goals simp_all [Prod.eta]
+    all_goals grind [unify_success_nextOccurrence]
+  all_goals
+    intros
+    unfold PreservesNextOccurrence at *
+    intro result success
+    first
+      | unfold inferExprFuel at success
+      | unfold inferConstructorApplicationFuel at success
+      | unfold inferConstructorArgumentsFuel at success
+      | unfold inferStatementsFuel at success
+      | unfold inferStatementFuel at success
+      | unfold inferForItemsFuel at success
+      | unfold inferForItemFuel at success
+      | unfold inferPlaceFuel at success
+      | unfold inferAssignedValueFuel at success
+      | unfold inferExprsFuel at success
+      | unfold inferMatchCasesFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals first
+      | specialize ih1 _ _ _ _ (by assumption)
+      | specialize ih1 _ _ _ (by assumption)
+      | specialize ih1 _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih2 _ _ _ _ (by assumption)
+      | specialize ih2 _ _ _ (by assumption)
+      | specialize ih2 _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih3 _ _ _ _ (by assumption)
+      | specialize ih3 _ _ _ (by assumption)
+      | specialize ih3 _ _ (by assumption)
+      | skip
+    all_goals try have unifiedState :=
+      unify_occurrenceState_eq (by assumption)
+    all_goals try have recordState :=
+      recordExpressionWithExpected_success_nextOccurrence (by assumption)
+    all_goals try have lambdaState :=
+      bindLambdaParameters_occurrenceState_eq (by assumption)
+    all_goals try have patternState :=
+      inferMatchPatternFuel_occurrenceState_eq (by assumption)
+    all_goals try have unaryState :=
+      inferUnaryOperator_occurrenceState_eq (by assumption)
+    all_goals try have binaryState :=
+      inferBinaryOperator_occurrenceState_eq (by assumption)
+    all_goals try have selectionState :=
+      selectFunctionCandidateFrom_occurrenceState_eq (by assumption)
+    all_goals try have expectedState :=
+      withExpected_occurrenceState_eq (by assumption)
+    all_goals try have applicationState :=
+      applyFunctionType_occurrenceState_eq (by assumption)
+    all_goals try have builtinState :=
+      recordBuiltinFunctionCall_success_nextOccurrence (by assumption)
+    all_goals first
+      | have ih1Next := pair_eq_nextOccurrence ih1
+      | have ih1Next := triple_eq_nextOccurrence ih1
+      | skip
+    all_goals first
+      | have ih2Next := pair_eq_nextOccurrence ih2
+      | have ih2Next := triple_eq_nextOccurrence ih2
+      | skip
+    all_goals first
+      | have ih3Next := pair_eq_nextOccurrence ih3
+      | have ih3Next := triple_eq_nextOccurrence ih3
+      | skip
+    all_goals try simp_all
+    all_goals try simp_all [State.fresh, State.addRequirementWithId,
+      State.addRequirementsWithIds, State.allocateBinder,
+      State.allocateHiddenLocal, State.restoreLexicalScope, State.recordNode,
+      bind, Except.bind]
+    all_goals try simp_all only [State.allocateExpressionId_nextOccurrence,
+      State.allocateStatementId_nextOccurrence]
+    all_goals try simp_all [recordExpression]
+    all_goals try grind [allocateExpressionId_success_nextOccurrence,
+      allocateStatementId_success_nextOccurrence,
+      unify_success_nextOccurrence,
+      freshDataConstructorInstantiation_nextOccurrence]
+
+/-- Every successful expression traversal monotonically advances its input
+occurrence cutoff. -/
+theorem inferExprFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    state.nextOccurrence ≤ result.2.nextOccurrence :=
+  inference_preserves_nextOccurrence.1 fuel context expression expected state
+    result success
+
+/-- Constructor-application inference monotonically advances occurrences. -/
+theorem inferConstructorApplicationFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result) :
+    state.nextOccurrence ≤ result.2.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.1 fuel context source id instantiation
+    arguments expected state result success
+
+/-- Constructor-argument inference monotonically advances occurrences. -/
+theorem inferConstructorArgumentsFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {expected : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expected
+      state = .ok result) :
+    state.nextOccurrence ≤ result.2.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.1 fuel context sources expected state
+    result success
+
+/-- Statement-list inference monotonically advances occurrences. -/
+theorem inferStatementsFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {statements : List Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : BlockResult}
+    (success : inferStatementsFuel fuel context statements expectedReturn state =
+      .ok result) :
+    state.nextOccurrence ≤ result.state.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.2.1 fuel context statements
+    expectedReturn state result success
+
+/-- Statement inference monotonically advances occurrences. -/
+theorem inferStatementFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    state.nextOccurrence ≤ result.state.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.2.2.1 fuel context statement
+    expectedReturn state result success
+
+/-- For-item list inference monotonically advances occurrences. -/
+theorem inferForItemsFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    state.nextOccurrence ≤ result.state.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.2.2.2.1 fuel context items state
+    result success
+
+/-- One for-item traversal monotonically advances occurrences. -/
+theorem inferForItemFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    state.nextOccurrence ≤ result.2.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.2.2.2.2.1 fuel context item state
+    result success
+
+/-- Place inference monotonically advances occurrences. -/
+theorem inferPlaceFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    state.nextOccurrence ≤ result.2.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.2.2.2.2.2.1 fuel context target
+    state result success
+
+/-- Assigned-value inference monotonically advances occurrences. -/
+theorem inferAssignedValueFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr} {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result) :
+    state.nextOccurrence ≤ result.2.2.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.2.2.2.2.2.2.1 fuel context target
+    operator value state result success
+
+/-- Expression-list inference monotonically advances occurrences. -/
+theorem inferExprsFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    state.nextOccurrence ≤ result.2.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.2.2.2.2.2.2.2.1 fuel context
+    expressions state result success
+
+/-- Every root returned by expression-list inference was allocated at or after
+the input state's occurrence cutoff. -/
+theorem inferExprsFuel_success_ids_fresh
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    ∀ expression ∈ result.1,
+      state.nextOccurrence ≤ expression.id.occurrence.index := by
+  induction fuel generalizing expressions state result with
+  | zero =>
+      simp [inferExprsFuel] at success
+  | succ fuel induction =>
+      cases expressions with
+      | nil =>
+          simp only [inferExprsFuel] at success
+          injection success with resultEq
+          subst result
+          simp
+      | cons expression expressions =>
+          unfold inferExprsFuel at success
+          simp_all [bind, Except.bind]
+          repeat' first | split at success
+          all_goals try cases success
+          all_goals try rcases v with ⟨v0a, v0b⟩
+          all_goals try rcases v_1 with ⟨v1a, v1b⟩
+          all_goals try subst_vars
+          all_goals try have headIndex :=
+            inferExprFuel_success_id_index (by assumption)
+          all_goals try have headNext :=
+            inferExprFuel_nextOccurrence_le (by assumption)
+          all_goals try have tailFresh := induction (by assumption)
+          all_goals intro current member
+          all_goals simp_all only [List.mem_cons]
+          all_goals grind
+
+/-- Match-case inference monotonically advances occurrences. -/
+theorem inferMatchCasesFuel_nextOccurrence_le
+    {fuel : Nat} {context : Context} {scrutineeType expectedReturn : Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : State} {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    state.nextOccurrence ≤ result.state.nextOccurrence :=
+  inference_preserves_nextOccurrence.2.2.2.2.2.2.2.2.2.2 fuel context
+    scrutineeType expectedReturn outerScope cases state result success
+
 
 end Solcore.Frontend.SourceInference.Detail
