@@ -380,6 +380,38 @@ example :
   exact templateGeneralizationTracking.allocateGeneralizedValue (by rfl)
     [] 0 (.variable templateVariable) "template0" (some testSpan)
 
+/-- Once the executable and declarative barriers agree on the initializer
+type's candidate variable, the real nonempty template exemption yields the
+declarative qualified-generalization judgment. -/
+example :
+    let generalized := SourceInference.Detail.generalizeValue
+      templateGeneralizationState [] 0 (.variable templateVariable)
+    SchemeGeneralizesExcept templateContext
+      (generalized.requirements.map fun requirement =>
+        requirement.templateRequirement)
+      generalized.scheme := by
+  dsimp only
+  apply
+    SourceInferenceSoundness.generalizeValue_schemeGeneralizesExcept_of_barrier
+  intro metavariable member
+  simp only [Ty.freeVariables] at member
+  have variableEq : metavariable = templateVariable := by
+    simpa using member
+  subst metavariable
+  have executableEmpty :
+      SourceInference.Detail.generalizeValueBlockedVariables
+        templateGeneralizationState [] 0 = [] := by
+    decide
+  have templateIds :
+      ((SourceInference.Detail.generalizeValue templateGeneralizationState [] 0
+          (.variable templateVariable)).requirements.map fun requirement =>
+        requirement.templateRequirement) = [templateId] := by
+    decide
+  have semanticEmpty :
+      GeneralizationBlockedVariablesExcept templateContext [templateId] = [] := by
+    decide
+  rw [executableEmpty, templateIds, semanticEmpty]
+
 /-- The locals-only update used by both ordinary lets and for-loop items does
 not disturb pending template ownership. -/
 example : SourceInferenceSoundness.TemplateTracking

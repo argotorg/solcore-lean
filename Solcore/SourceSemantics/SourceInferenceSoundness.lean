@@ -320,6 +320,42 @@ theorem mem_local_freeVariables_iff
 
 end LocalEnvironmentAligned
 
+/-- Agreement of the executable and declarative generalization barriers on
+the inferred type's candidate variables is enough to recover exact qualified
+rank-one generalization.  Variables outside `type.freeVariables` are
+irrelevant because neither side of `SchemeGeneralizesExcept` can select them. -/
+theorem generalizeValue_schemeGeneralizesExcept_of_barrier
+    (state : Frontend.SourceInference.State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat)
+    (type : TypeSystem.Ty) (context : SourceSemantics.Context)
+    (barrier : ∀ metavariable, metavariable ∈ type.freeVariables →
+      (metavariable ∈
+          Detail.generalizeValueBlockedVariables state locals requirementStart ↔
+        metavariable ∈ GeneralizationBlockedVariablesExcept context
+          ((Detail.generalizeValue state locals requirementStart type).requirements.map
+            fun requirement => requirement.templateRequirement))) :
+    SchemeGeneralizesExcept context
+      ((Detail.generalizeValue state locals requirementStart type).requirements.map
+        fun requirement => requirement.templateRequirement)
+      (Detail.generalizeValue state locals requirementStart type).scheme := by
+  unfold SchemeGeneralizesExcept
+  rw [Detail.generalizeValue_scheme_quantified,
+    Detail.generalizeValue_scheme_body]
+  apply List.filter_congr
+  intro metavariable member
+  have barrierAt := barrier metavariable member
+  by_cases executableBlocked : metavariable ∈
+      Detail.generalizeValueBlockedVariables state locals requirementStart
+  · have semanticBlocked := barrierAt.mp executableBlocked
+    simp [executableBlocked, semanticBlocked]
+  · have semanticUnblocked : metavariable ∉
+        GeneralizationBlockedVariablesExcept context
+          ((Detail.generalizeValue state locals requirementStart type).requirements.map
+            fun requirement => requirement.templateRequirement) := by
+      intro semanticBlocked
+      exact executableBlocked (barrierAt.mpr semanticBlocked)
+    simp [executableBlocked, semanticUnblocked]
+
 /-- Any expression node retained by an inference state is declaratively
 contained in every typed-source view of that state. -/
 theorem toTypedSource_containsExpression_of_mem

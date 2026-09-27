@@ -105,6 +105,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.mem_local_freeVariables_iff
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.generalizeValue_schemeGeneralizesExcept_of_barrier
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.toTypedSource_containsExpression_of_mem
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.toTypedSource_containsStatement_of_mem
