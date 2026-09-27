@@ -36,11 +36,31 @@ def defaultIntegerLiteralTargets :
       let state ← defaultIntegerLiteralTarget state origin
       defaultIntegerLiteralTargets rest state
 
+/-- Integer carriers currently supported by both the declarative source
+semantics and runtime materialization. -/
+def supportedIntegerTarget : Ty → Bool
+  | .constructor (.builtin .word)
+  | .constructor (.builtin .integer) => true
+  | _ => false
+
+def validateIntegerPatternTarget (origin : IntegerPatternOrigin)
+    (state : State) : Except Error Unit := do
+  let type := state.resolve (.variable origin.metavariable)
+  if supportedIntegerTarget type then pure ()
+  else throw (.nonNumericPatternType origin.span type)
+
+def validateIntegerPatternTargets (state : State) :
+    List IntegerPatternOrigin → Except Error Unit
+  | [] => .ok ()
+  | origin :: rest => do
+      validateIntegerPatternTarget origin state
+      validateIntegerPatternTargets state rest
+
 def validateIntegerLiteralTarget (origin : IntegerLiteralOrigin)
     (state : State) : Except Error Unit := do
   let type := state.resolve (.variable origin.metavariable)
-  if type.freeVariables.isEmpty then pure ()
-  else throw (.unresolvedIntegerLiteralTarget origin.expression type)
+  if supportedIntegerTarget type then pure ()
+  else throw (.unsupportedIntegerLiteralTarget origin.expression type)
 
 def validateIntegerLiteralTargets (state : State) :
     List IntegerLiteralOrigin → Except Error Unit
@@ -54,6 +74,7 @@ def finalize (context : Context) (type : Ty) (state : State)
     Except Error Result := do
   let state ← defaultIntegerPatternTargets state.integerPatterns state
   let state ← defaultIntegerLiteralTargets state.integerLiterals state
+  validateIntegerPatternTargets state state.integerPatterns
   validateIntegerLiteralTargets state state.integerLiterals
   let solvedRequirements ← solveRequirements context state state.requirements
   let substitution := state.inference.substitution

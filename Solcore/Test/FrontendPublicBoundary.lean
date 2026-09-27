@@ -484,7 +484,22 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_sublist
 example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_fresh
+example := @Solcore.Frontend.SourceInference.Detail.supportedIntegerTarget
+example :=
+  @Solcore.Frontend.SourceInference.Detail.supportedIntegerTarget_eq_true_iff
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIntegerPatternTarget_success_supported
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIntegerPatternTargets_success_supported
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralTarget_success_supported
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralTargets_success_supported
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_integerPatternTarget_supported
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_integerLiteralTarget_supported
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_preserves_resolve_eq
 example := @Solcore.Frontend.SourceInference.Detail.unify_then_finalize_eq

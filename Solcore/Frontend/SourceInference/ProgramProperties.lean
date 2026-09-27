@@ -13,10 +13,125 @@ namespace Solcore.Frontend.SourceInference.Detail
 
 open TypeSystem
 
+@[simp] theorem supportedIntegerTarget_eq_true_iff
+    (type : Ty) :
+    supportedIntegerTarget type = true ↔
+      type = .word ∨ type = .integer := by
+  constructor
+  · intro supported
+    cases type <;> simp [supportedIntegerTarget] at supported
+    case constructor constructor =>
+      cases constructor with
+      | builtin builtin =>
+        cases builtin <;>
+          simp [Ty.word, Ty.integer] at supported ⊢
+      | declaration declaration =>
+          simp at supported
+  · intro supported
+    rcases supported with rfl | rfl <;> rfl
+
+/-- Successful pattern-target validation exposes exactly the two carriers
+implemented by source pattern matching. -/
+theorem validateIntegerPatternTarget_success_supported
+    {state : State} {origin : IntegerPatternOrigin}
+    (success : validateIntegerPatternTarget origin state = .ok ()) :
+    state.resolve (.variable origin.metavariable) = .word ∨
+      state.resolve (.variable origin.metavariable) = .integer := by
+  simp only [validateIntegerPatternTarget] at success
+  by_cases supported : supportedIntegerTarget
+      (state.resolve (.variable origin.metavariable)) = true
+  · exact (supportedIntegerTarget_eq_true_iff _).mp supported
+  · simp [supported] at success
+
+/-- Successful validation of the complete pattern-origin row supports every
+retained integer-pattern target. -/
+theorem validateIntegerPatternTargets_success_supported
+    {state : State} {origins : List IntegerPatternOrigin}
+    (success : validateIntegerPatternTargets state origins = .ok ()) :
+    ∀ origin, origin ∈ origins →
+      state.resolve (.variable origin.metavariable) = .word ∨
+        state.resolve (.variable origin.metavariable) = .integer := by
+  induction origins with
+  | nil =>
+      intro origin member
+      simp at member
+  | cons head tail induction =>
+      simp only [validateIntegerPatternTargets, bind, Except.bind] at success
+      cases headResult : validateIntegerPatternTarget head state with
+      | error error => simp [headResult] at success
+      | ok value =>
+          cases value
+          have tailResult :
+              validateIntegerPatternTargets state tail = .ok () := by
+            simpa [headResult] using success
+          intro origin member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · exact validateIntegerPatternTarget_success_supported headResult
+          · exact induction tailResult origin tailMember
+
+/-- Successful literal-target validation exposes exactly the two carriers
+implemented by source literal materialization. -/
+theorem validateIntegerLiteralTarget_success_supported
+    {state : State} {origin : IntegerLiteralOrigin}
+    (success : validateIntegerLiteralTarget origin state = .ok ()) :
+    state.resolve (.variable origin.metavariable) = .word ∨
+      state.resolve (.variable origin.metavariable) = .integer := by
+  simp only [validateIntegerLiteralTarget] at success
+  by_cases supported : supportedIntegerTarget
+      (state.resolve (.variable origin.metavariable)) = true
+  · exact (supportedIntegerTarget_eq_true_iff _).mp supported
+  · simp [supported] at success
+
+/-- Successful validation of the complete origin row supports every retained
+integer-literal target. -/
+theorem validateIntegerLiteralTargets_success_supported
+    {state : State} {origins : List IntegerLiteralOrigin}
+    (success : validateIntegerLiteralTargets state origins = .ok ()) :
+    ∀ origin, origin ∈ origins →
+      state.resolve (.variable origin.metavariable) = .word ∨
+        state.resolve (.variable origin.metavariable) = .integer := by
+  induction origins with
+  | nil =>
+      intro origin member
+      simp at member
+  | cons head tail induction =>
+      simp only [validateIntegerLiteralTargets, bind, Except.bind] at success
+      cases headResult : validateIntegerLiteralTarget head state with
+      | error error => simp [headResult] at success
+      | ok value =>
+          cases value
+          have tailResult :
+              validateIntegerLiteralTargets state tail = .ok () := by
+            simpa [headResult] using success
+          intro origin member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · exact validateIntegerLiteralTarget_success_supported headResult
+          · exact induction tailResult origin tailMember
+
 theorem unify_localSchemeAssumptions
     {state next : State} {left right : Ty}
     (result : unify state left right = .ok next) :
     next.localSchemeAssumptions = state.localSchemeAssumptions := by
+  unfold unify at result
+  cases unified : state.inference.unify left right <;>
+    simp [liftUnification, unified, bind, Except.bind] at result
+  cases result
+  rfl
+
+theorem unify_integerLiterals
+    {state next : State} {left right : Ty}
+    (result : unify state left right = .ok next) :
+    next.integerLiterals = state.integerLiterals := by
+  unfold unify at result
+  cases unified : state.inference.unify left right <;>
+    simp [liftUnification, unified, bind, Except.bind] at result
+  cases result
+  rfl
+
+theorem unify_integerPatterns
+    {state next : State} {left right : Ty}
+    (result : unify state left right = .ok next) :
+    next.integerPatterns = state.integerPatterns := by
   unfold unify at result
   cases unified : state.inference.unify left right <;>
     simp [liftUnification, unified, bind, Except.bind] at result
@@ -54,6 +169,68 @@ theorem defaultIntegerPatternTargets_localSchemeAssumptions
           exact (induction tailResult).trans
             (defaultIntegerPatternTarget_localSchemeAssumptions headResult)
 
+theorem defaultIntegerPatternTarget_integerLiterals
+    {state next : State} {origin : IntegerPatternOrigin}
+    (result : defaultIntegerPatternTarget state origin = .ok next) :
+    next.integerLiterals = state.integerLiterals := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerPatternTarget, resolved] at result
+  · exact unify_integerLiterals result
+  all_goals cases result <;> rfl
+
+theorem defaultIntegerPatternTargets_integerLiterals
+    {origins : List IntegerPatternOrigin} {state next : State}
+    (result : defaultIntegerPatternTargets origins state = .ok next) :
+    next.integerLiterals = state.integerLiterals := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerPatternTargets] at result
+      cases result
+      rfl
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerPatternTarget state origin with
+      | error error =>
+          simp [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+            at result
+      | ok middle =>
+          have tailResult :
+              defaultIntegerPatternTargets rest middle = .ok next := by
+            simpa [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+              using result
+          exact (induction tailResult).trans
+            (defaultIntegerPatternTarget_integerLiterals headResult)
+
+theorem defaultIntegerPatternTarget_integerPatterns
+    {state next : State} {origin : IntegerPatternOrigin}
+    (result : defaultIntegerPatternTarget state origin = .ok next) :
+    next.integerPatterns = state.integerPatterns := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerPatternTarget, resolved] at result
+  · exact unify_integerPatterns result
+  all_goals cases result <;> rfl
+
+theorem defaultIntegerPatternTargets_integerPatterns
+    {origins : List IntegerPatternOrigin} {state next : State}
+    (result : defaultIntegerPatternTargets origins state = .ok next) :
+    next.integerPatterns = state.integerPatterns := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerPatternTargets] at result
+      cases result
+      rfl
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerPatternTarget state origin with
+      | error error =>
+          simp [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+            at result
+      | ok middle =>
+          have tailResult :
+              defaultIntegerPatternTargets rest middle = .ok next := by
+            simpa [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+              using result
+          exact (induction tailResult).trans
+            (defaultIntegerPatternTarget_integerPatterns headResult)
+
 theorem defaultIntegerLiteralTarget_localSchemeAssumptions
     {state next : State} {origin : IntegerLiteralOrigin}
     (result : defaultIntegerLiteralTarget state origin = .ok next) :
@@ -84,6 +261,68 @@ theorem defaultIntegerLiteralTargets_localSchemeAssumptions
               using result
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_localSchemeAssumptions headResult)
+
+theorem defaultIntegerLiteralTarget_integerLiterals
+    {state next : State} {origin : IntegerLiteralOrigin}
+    (result : defaultIntegerLiteralTarget state origin = .ok next) :
+    next.integerLiterals = state.integerLiterals := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerLiteralTarget, resolved] at result
+  · exact unify_integerLiterals result
+  all_goals cases result <;> rfl
+
+theorem defaultIntegerLiteralTargets_integerLiterals
+    {origins : List IntegerLiteralOrigin} {state next : State}
+    (result : defaultIntegerLiteralTargets origins state = .ok next) :
+    next.integerLiterals = state.integerLiterals := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerLiteralTargets] at result
+      cases result
+      rfl
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerLiteralTarget state origin with
+      | error error =>
+          simp [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+            at result
+      | ok middle =>
+          have tailResult :
+              defaultIntegerLiteralTargets rest middle = .ok next := by
+            simpa [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+              using result
+          exact (induction tailResult).trans
+            (defaultIntegerLiteralTarget_integerLiterals headResult)
+
+theorem defaultIntegerLiteralTarget_integerPatterns
+    {state next : State} {origin : IntegerLiteralOrigin}
+    (result : defaultIntegerLiteralTarget state origin = .ok next) :
+    next.integerPatterns = state.integerPatterns := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerLiteralTarget, resolved] at result
+  · exact unify_integerPatterns result
+  all_goals cases result <;> rfl
+
+theorem defaultIntegerLiteralTargets_integerPatterns
+    {origins : List IntegerLiteralOrigin} {state next : State}
+    (result : defaultIntegerLiteralTargets origins state = .ok next) :
+    next.integerPatterns = state.integerPatterns := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerLiteralTargets] at result
+      cases result
+      rfl
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerLiteralTarget state origin with
+      | error error =>
+          simp [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+            at result
+      | ok middle =>
+          have tailResult :
+              defaultIntegerLiteralTargets rest middle = .ok next := by
+            simpa [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+              using result
+          exact (induction tailResult).trans
+            (defaultIntegerLiteralTarget_integerPatterns headResult)
 
 /-- Defaulting one numeric pattern target preserves every type equality
 already visible through the input inference state. -/
@@ -243,6 +482,132 @@ private theorem defaultIntegerLiteralTargets_toTypedSource
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_toTypedSource headResult)
 
+/-- Finalization closes every retained integer-pattern origin to a carrier
+implemented by both the declarative semantics and runtime. -/
+theorem finalize_integerPatternTarget_supported
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    ∀ origin, origin ∈ state.integerPatterns →
+      result.substitution.apply (.variable origin.metavariable) = .word ∨
+        result.substitution.apply (.variable origin.metavariable) = .integer := by
+  unfold finalize at success
+  cases patternResult :
+      defaultIntegerPatternTargets state.integerPatterns state with
+  | error error =>
+      simp [patternResult, bind, Except.bind] at success
+  | ok patternState =>
+      have patternOrigins :=
+        defaultIntegerPatternTargets_integerPatterns patternResult
+      cases literalResult :
+          defaultIntegerLiteralTargets patternState.integerLiterals
+            patternState with
+      | error error =>
+          simp [patternResult, literalResult, bind, Except.bind] at success
+      | ok finalState =>
+          have finalOrigins :=
+            defaultIntegerLiteralTargets_integerPatterns literalResult
+          cases patternValidationResult :
+              validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
+          | error error =>
+              simp [patternResult, literalResult, patternValidationResult,
+                bind, Except.bind] at success
+          | ok patternValidation =>
+              cases patternValidation
+              have supported :=
+                validateIntegerPatternTargets_success_supported
+                  patternValidationResult
+              cases literalValidationResult :
+                  validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
+              | error error =>
+                  simp [patternResult, literalResult, patternValidationResult,
+                    literalValidationResult, bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  cases requirementsResult :
+                      solveRequirements context finalState
+                        finalState.requirements with
+                  | error error =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                  | ok requirements =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                      cases success
+                      intro origin member
+                      have finalMember : origin ∈ finalState.integerPatterns := by
+                        rw [finalOrigins, patternOrigins]
+                        exact member
+                      simpa [State.resolve, TypeSystem.InferState.resolve] using
+                        supported origin finalMember
+
+/-- Finalization closes every retained integer-literal origin to a carrier
+implemented by both the declarative semantics and runtime. -/
+theorem finalize_integerLiteralTarget_supported
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    ∀ origin, origin ∈ state.integerLiterals →
+      result.substitution.apply (.variable origin.metavariable) = .word ∨
+        result.substitution.apply (.variable origin.metavariable) = .integer := by
+  unfold finalize at success
+  cases patternResult :
+      defaultIntegerPatternTargets state.integerPatterns state with
+  | error error =>
+      simp [patternResult, bind, Except.bind] at success
+  | ok patternState =>
+      have patternOrigins :=
+        defaultIntegerPatternTargets_integerLiterals patternResult
+      cases literalResult :
+          defaultIntegerLiteralTargets patternState.integerLiterals
+            patternState with
+      | error error =>
+          simp [patternResult, literalResult, bind, Except.bind] at success
+      | ok finalState =>
+          have finalOrigins :=
+            defaultIntegerLiteralTargets_integerLiterals literalResult
+          cases patternValidationResult :
+              validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
+          | error error =>
+              simp [patternResult, literalResult, patternValidationResult,
+                bind, Except.bind] at success
+          | ok patternValidation =>
+              cases patternValidation
+              cases literalValidationResult :
+                  validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
+              | error error =>
+                  simp [patternResult, literalResult, patternValidationResult,
+                    literalValidationResult, bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  have supported :=
+                    validateIntegerLiteralTargets_success_supported
+                      literalValidationResult
+                  cases requirementsResult :
+                      solveRequirements context finalState
+                        finalState.requirements with
+                  | error error =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                  | ok requirements =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                      cases success
+                      intro origin member
+                      have finalMember : origin ∈ finalState.integerLiterals := by
+                        rw [finalOrigins, patternOrigins]
+                        exact member
+                      simpa [State.resolve, TypeSystem.InferState.resolve] using
+                        supported origin finalMember
+
 /-- Finalization may extend the inference substitution while defaulting
 numeric targets, but it cannot invalidate a type equality already established
 by the input state. -/
@@ -269,23 +634,35 @@ theorem finalize_preserves_resolve_eq
           have finalEqual :=
             defaultIntegerLiteralTargets_preserves_resolve_eq patternEqual
               literalResult
-          cases validationResult :
-              validateIntegerLiteralTargets finalState
-                finalState.integerLiterals with
+          cases patternValidationResult :
+              validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
           | error error =>
-              simp [patternResult, literalResult, validationResult, bind,
-                Except.bind] at success
-          | ok validation =>
-              cases requirementsResult :
-                  solveRequirements context finalState finalState.requirements with
+              simp [patternResult, literalResult, patternValidationResult,
+                bind, Except.bind] at success
+          | ok patternValidation =>
+              cases patternValidation
+              cases literalValidationResult :
+                  validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
               | error error =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-              | ok requirements =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-                  cases success
-                  exact finalEqual
+                  simp [patternResult, literalResult, patternValidationResult,
+                    literalValidationResult, bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  cases requirementsResult :
+                      solveRequirements context finalState
+                        finalState.requirements with
+                  | error error =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                  | ok requirements =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                      cases success
+                      exact finalEqual
 
 /-- A unification equality survives numeric defaulting and finalization under
 the final substitution returned to callers. -/
@@ -336,23 +713,35 @@ theorem finalize_type
       | error error =>
           simp [patternResult, literalResult, bind, Except.bind] at success
       | ok finalState =>
-          cases validationResult :
-              validateIntegerLiteralTargets finalState
-                finalState.integerLiterals with
+          cases patternValidationResult :
+              validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
           | error error =>
-              simp [patternResult, literalResult, validationResult, bind,
-                Except.bind] at success
-          | ok _validation =>
-              cases requirementsResult :
-                  solveRequirements context finalState finalState.requirements with
+              simp [patternResult, literalResult, patternValidationResult,
+                bind, Except.bind] at success
+          | ok patternValidation =>
+              cases patternValidation
+              cases literalValidationResult :
+                  validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
               | error error =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-              | ok requirements =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-                  cases success
-                  rfl
+                  simp [patternResult, literalResult, patternValidationResult,
+                    literalValidationResult, bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  cases requirementsResult :
+                      solveRequirements context finalState
+                        finalState.requirements with
+                  | error error =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                  | ok requirements =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                      cases success
+                      rfl
 
 /-- Finalization changes only inference metadata before applying the final
 substitution to the source carrier supplied by its input state. -/
@@ -374,24 +763,36 @@ theorem finalize_typedSource
       | error error =>
           simp [patternResult, literalResult, bind, Except.bind] at success
       | ok finalState =>
-          cases validationResult :
-              validateIntegerLiteralTargets finalState
-                finalState.integerLiterals with
+          cases patternValidationResult :
+              validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
           | error error =>
-              simp [patternResult, literalResult, validationResult, bind,
-                Except.bind] at success
-          | ok _validation =>
-              cases requirementsResult :
-                  solveRequirements context finalState finalState.requirements with
+              simp [patternResult, literalResult, patternValidationResult,
+                bind, Except.bind] at success
+          | ok patternValidation =>
+              cases patternValidation
+              cases literalValidationResult :
+                  validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
               | error error =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-              | ok requirements =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-                  cases success
-                  rw [defaultIntegerLiteralTargets_toTypedSource literalResult,
-                    defaultIntegerPatternTargets_toTypedSource patternResult]
+                  simp [patternResult, literalResult, patternValidationResult,
+                    literalValidationResult, bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  cases requirementsResult :
+                      solveRequirements context finalState
+                        finalState.requirements with
+                  | error error =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                  | ok requirements =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                      cases success
+                      rw [defaultIntegerLiteralTargets_toTypedSource literalResult,
+                        defaultIntegerPatternTargets_toTypedSource patternResult]
 
 /-- Finalization preserves the declaration owning the inferred source. -/
 theorem finalize_typedSource_owner

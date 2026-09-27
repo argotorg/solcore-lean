@@ -424,12 +424,60 @@ private def testIntegerLiteralExpectedType : IO Unit := do
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
-        | .body { error := .noTraitImplementation predicate, .. } =>
-            decide (predicate.trait = .builtin .int ∧
-              predicate.subject = TypeSystem.Ty.bool ∧
-              predicate.arguments = [])
+        | .body { error := .unsupportedIntegerLiteralTarget _ type, .. } =>
+            type == TypeSystem.Ty.bool
         | _ => false) "an integer literal silently checked as Bool"
   | .ok _ => throw (IO.userError "an integer literal checked as Bool")
+
+private def testClosedUnsupportedIntegerLiteralTarget : IO Unit := do
+  let metavariable : TypeSystem.TypeVarId := ⟨0⟩
+  let expression : SourceInference.ExpressionId :=
+    ⟨⟨solverRegressionOwner, 0⟩⟩
+  let origin : SourceInference.IntegerLiteralOrigin := {
+    metavariable
+    expression
+    requirement := ⟨0⟩
+  }
+  let initial := SourceInference.State.initial solverRegressionOwner
+  let state : SourceInference.State := {
+    initial with
+    inference := {
+      next := 1
+      substitution := [(metavariable, .bool)]
+    }
+  }
+  match SourceInference.Detail.validateIntegerLiteralTarget origin state with
+  | .error (.unsupportedIntegerLiteralTarget rejected type) =>
+      assertTrue (rejected == expression && type == TypeSystem.Ty.bool)
+        "unsupported closed integer-literal target lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"unsupported closed integer-literal target produced {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "unsupported closed integer-literal target passed final validation")
+
+private def testClosedUnsupportedIntegerPatternTarget : IO Unit := do
+  let metavariable : TypeSystem.TypeVarId := ⟨0⟩
+  let origin : SourceInference.IntegerPatternOrigin := {
+    metavariable
+    span := solverRegressionSpan
+    requirement := ⟨0⟩
+  }
+  let initial := SourceInference.State.initial solverRegressionOwner
+  let state : SourceInference.State := {
+    initial with
+    inference := {
+      next := 1
+      substitution := [(metavariable, .bool)]
+    }
+  }
+  match SourceInference.Detail.validateIntegerPatternTarget origin state with
+  | .error (.nonNumericPatternType span type) =>
+      assertTrue (span == solverRegressionSpan && type == TypeSystem.Ty.bool)
+        "unsupported closed integer-pattern target lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"unsupported closed integer-pattern target produced {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "unsupported closed integer-pattern target passed final validation")
 
 private def testSourceNamedLiteralTraitsDoNotAuthorize : IO Unit := do
   let source := String.intercalate "\n" [
@@ -445,10 +493,8 @@ private def testSourceNamedLiteralTraitsDoNotAuthorize : IO Unit := do
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
-        | .body { error := .noTraitImplementation predicate, .. } =>
-            predicate.trait == .builtin .int &&
-              predicate.subject != TypeSystem.Ty.word &&
-              predicate.arguments.isEmpty
+        | .body { error := .unsupportedIntegerLiteralTarget _ type, .. } =>
+            type != TypeSystem.Ty.word && type != TypeSystem.Ty.integer
         | _ => false)
         "source traits named Int/FromLiteral/Numeric authorized a nominal literal"
   | .ok _ => throw (IO.userError
@@ -1203,6 +1249,8 @@ def testSourceInference : IO Unit := do
   testDiscardedPolymorphicReferenceResidual
   testAmbiguousOverload
   testIntegerLiteralExpectedType
+  testClosedUnsupportedIntegerLiteralTarget
+  testClosedUnsupportedIntegerPatternTarget
   testSourceNamedLiteralTraitsDoNotAuthorize
   testUnconstrainedIntegerLiteralDefaultsToWord
   testLetBoundIntegerLiteralClosesLater

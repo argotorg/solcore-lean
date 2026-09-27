@@ -2255,25 +2255,36 @@ theorem finalize_template_evidence
               Detail.defaultIntegerPatternTargets_localSchemeAssumptions
                 patternResult]
             exact initialTemplate
-          cases validationResult :
-              Detail.validateIntegerLiteralTargets finalState
-                finalState.integerLiterals with
+          cases patternValidationResult :
+              Detail.validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
           | error error =>
-              simp [patternResult, literalResult, validationResult, bind,
-                Except.bind] at success
-          | ok validation =>
-              cases requirementsResult :
-                  Detail.solveRequirements inferenceContext finalState
-                    finalState.requirements with
+              simp [patternResult, literalResult, patternValidationResult,
+                bind, Except.bind] at success
+          | ok patternValidation =>
+              cases patternValidation
+              cases literalValidationResult :
+                  Detail.validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
               | error error =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-              | ok requirements =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-                  cases success
-                  exact solveRequirements_template_evidence requirementsResult
-                    row member finalTemplate
+                  simp [patternResult, literalResult, patternValidationResult,
+                    literalValidationResult, bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  cases requirementsResult :
+                      Detail.solveRequirements inferenceContext finalState
+                        finalState.requirements with
+                  | error error =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                  | ok requirements =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                      cases success
+                      exact solveRequirements_template_evidence
+                        requirementsResult row member finalTemplate
 
 /-- Proof-facing context for the requirement ledger emitted by finalization.
 Both declaration assumptions and solved predicates use the final inference
@@ -2319,33 +2330,44 @@ theorem finalize_solvedRequirementsValid
           have finalOrdinary : finalState.localSchemeAssumptions = [] := by
             rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
               literalResult, patternOrdinary]
-          cases validationResult :
-              Detail.validateIntegerLiteralTargets finalState
-                finalState.integerLiterals with
+          cases patternValidationResult :
+              Detail.validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
           | error error =>
-              simp [patternResult, literalResult, validationResult, bind,
-                Except.bind] at success
-          | ok validation =>
-              cases requirementsResult :
-                  Detail.solveRequirements inferenceContext finalState
-                    finalState.requirements with
+              simp [patternResult, literalResult, patternValidationResult,
+                bind, Except.bind] at success
+          | ok patternValidation =>
+              cases patternValidation
+              cases literalValidationResult :
+                  Detail.validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
               | error error =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-              | ok requirements =>
-                  simp [patternResult, literalResult, validationResult,
-                    requirementsResult, bind, Except.bind] at success
-                  cases success
-                  apply solveRequirements_ordinary_sound
-                    (inferenceContext := inferenceContext)
-                    (state := finalState)
-                    (requirements := finalState.requirements)
-                  · intro requirement member
-                    rw [finalOrdinary]
-                    simp
-                  · rfl
-                  · rfl
-                  · exact requirementsResult
+                  simp [patternResult, literalResult, patternValidationResult,
+                    literalValidationResult, bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  cases requirementsResult :
+                      Detail.solveRequirements inferenceContext finalState
+                        finalState.requirements with
+                  | error error =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                  | ok requirements =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                      cases success
+                      apply solveRequirements_ordinary_sound
+                        (inferenceContext := inferenceContext)
+                        (state := finalState)
+                        (requirements := finalState.requirements)
+                      · intro requirement member
+                        rw [finalOrdinary]
+                        simp
+                      · rfl
+                      · rfl
+                      · exact requirementsResult
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
 
