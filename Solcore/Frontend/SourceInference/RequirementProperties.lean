@@ -250,6 +250,22 @@ inductive CoercionPlanCommitCorresponds (requirements : List Requirement) :
       CoercionPlanCommitCorresponds requirements
         (planned :: plan) (committed :: steps)
 
+namespace CoercionPlanCommitCorresponds
+
+/-- Extending the final ledger preserves every committed edge and its ordered
+requirement correspondence. -/
+theorem mono {smaller larger : List Requirement}
+    {plan : List PlannedCoercionStep} {steps : List CoercionStep}
+    (included : smaller ⊆ larger)
+    (corresponds : CoercionPlanCommitCorresponds smaller plan steps) :
+    CoercionPlanCommitCorresponds larger plan steps := by
+  induction corresponds with
+  | nil => exact .nil
+  | cons head tail induction =>
+      exact .cons (head.mono included) induction
+
+end CoercionPlanCommitCorresponds
+
 open TypeSystem
 
 /-- Unification changes only the inference substitution and fresh-variable
