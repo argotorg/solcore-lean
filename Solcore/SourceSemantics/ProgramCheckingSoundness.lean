@@ -7,12 +7,10 @@ Conditional bridge from executable whole-program checking results to the
 declarative source-program carrier.
 
 The conversions in this module only forget algorithmic bookkeeping.  Checker
-success supplies the catalog facts established by executable collection:
-declaration identities, canonical generic parameters, rule projection, and
-contract-signature semantics.  Separate remaining-condition carriers state
-the signature and body judgments that still need declarative proofs; the final
-bridges combine both sources without treating the executable frontend as the
-definition of semantic validity.
+success supplies declaration identities, canonical generic parameters,
+resolved signature formation, rule projection, and contract-signature
+semantics.  Semantic body validity remains a separate premise because the
+executable frontend is not itself the definition of source typing.
 -/
 
 set_option autoImplicit false
@@ -65,97 +63,187 @@ theorem signatureDeclarationIds_nodup_ofCheckProgram
   simpa [signatureDeclarationIds] using
     Frontend.checkProgram_success_signature_declaration_ids_nodup success
 
-/-- Semantic function-signature obligations not yet discharged by executable
-signature collection.  Declaration-owned generic-parameter invariants,
-parameter-name uniqueness, and the canonical scheme body are intentionally
-absent: successful checking supplies them separately. -/
-structure FunctionSignatureRemainingConditions
-    (signatures : ProgramSignatures)
-    (signature : ProgramFunctionSignature) : Prop where
-  parameter_types : TypesWellFormed
-    (signatureContext signatures signature.id signature.scheme.parameters
-      signature.scheme.predicates) signature.parameterTypes
-  return_types : TypesWellFormed
-    (signatureContext signatures signature.id signature.scheme.parameters
-      signature.scheme.predicates) signature.returnTypes
-  predicates : PredicatesWellFormed
-    (signatureContext signatures signature.id signature.scheme.parameters
-      signature.scheme.predicates) signature.scheme.predicates
+/-- Formation validation is independent of declaration assumptions, so its
+closed type witness embeds into every semantic signature context with the same
+catalog, owner, and rigid parameter row. -/
+theorem SignatureTypeFormationValidated.typeWellScoped
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {type : TypeSystem.Ty}
+    (validated : Frontend.SignatureTypeFormationValidated signatures owner
+      parameters type)
+    (assumptions : List ProgramPredicate) :
+    TypeWellScoped
+      (signatureContext signatures owner parameters assumptions) [] type := by
+  refine Frontend.SignatureTypeFormationValidated.rec
+    (motive_1 := fun type _ => TypeWellScoped
+      (signatureContext signatures owner parameters assumptions) [] type)
+    (motive_2 := fun types _ => TypesWellScoped
+      (signatureContext signatures owner parameters assumptions) [] types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
+  · intro parameter bound owned
+    exact .parameter
+      (by simpa [signatureContext, Context.withAssumptions,
+        Context.forDeclaration] using bound)
+      (by simp [signatureContext, Context.withAssumptions,
+        Context.forDeclaration, owned])
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments cataloged arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments cataloged arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
 
-/-- The constructor-payload typing obligation not yet discharged by executable
-data-signature collection.  Generic parameters, constructor names, owners, and
-source-order positions are supplied separately by checker success. -/
-structure DataSignatureRemainingConditions
-    (signatures : ProgramSignatures)
-    (signature : ProgramDataSignature) : Prop where
-  constructor_payloads : ∀ constructor,
-    constructor ∈ signature.constructors →
-      TypesWellFormed
-        (signatureContext signatures signature.id signature.parameters)
-        constructor.payloadTypes
+/-- Source-order type-row formation embeds into the corresponding semantic
+scope using the type conversion above. -/
+theorem SignatureTypesFormationValidated.typesWellScoped
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {types : List TypeSystem.Ty}
+    (validated : Frontend.SignatureTypesFormationValidated signatures owner
+      parameters types)
+    (assumptions : List ProgramPredicate) :
+    TypesWellScoped
+      (signatureContext signatures owner parameters assumptions) [] types := by
+  cases validated with
+  | nil => exact .nil
+  | cons headValidated tailValidated =>
+      exact .cons
+        (SignatureTypeFormationValidated.typeWellScoped
+          headValidated assumptions)
+        (SignatureTypesFormationValidated.typesWellScoped
+          tailValidated assumptions)
 
-/-- Type- and predicate-formation obligations for one trait method.  Method
-ownership and duplicate-free parameter names are fixed by executable trait
-method collection and therefore supplied separately by checker success. -/
-structure TraitMethodSignatureRemainingConditions
-    (signatures : ProgramSignatures)
-    (trait : ProgramTraitSignature)
-    (method : ProgramTraitMethodSignature) : Prop where
-  parameter_types : TypesWellFormed
-    (signatureContext signatures trait.id trait.parameters
-      (trait.wherePredicates ++ method.wherePredicates)) method.parameterTypes
-  return_types : TypesWellFormed
-    (signatureContext signatures trait.id trait.parameters
-      (trait.wherePredicates ++ method.wherePredicates)) method.returnTypes
-  predicates : PredicatesWellFormed
-    (signatureContext signatures trait.id trait.parameters
-      (trait.wherePredicates ++ method.wherePredicates)) method.wherePredicates
+private theorem signatureContext_typeParameterBinders
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    (canonical : SignatureParametersWellFormed owner parameters)
+    (assumptions : List ProgramPredicate) :
+    TypeParameterBindersWellFormed
+      (signatureContext signatures owner parameters assumptions) := by
+  constructor
+  · simpa [signatureContext, Context.withAssumptions,
+      Context.forDeclaration] using canonical.parameters_nodup
+  · intro parameter member
+    have parameterMember : parameter ∈ parameters := by
+      simpa [signatureContext, Context.withAssumptions,
+        Context.forDeclaration] using member
+    have owned := canonical.parameter_owners parameter parameterMember
+    simp [signatureContext, Context.withAssumptions,
+      Context.forDeclaration, owned]
 
-/-- Semantic trait-signature obligations beyond its checker-generated generic
-parameter row and structural method catalog. -/
-structure TraitSignatureRemainingConditions
-    (signatures : ProgramSignatures)
-    (signature : ProgramTraitSignature) : Prop where
-  predicates : PredicatesWellFormed
-    (signatureContext signatures signature.id signature.parameters
-      signature.wherePredicates) signature.wherePredicates
-  methods : ∀ method, method ∈ signature.methods →
-    TraitMethodSignatureRemainingConditions signatures signature method
+namespace SignatureTypeFormationValidated
 
-/-- Semantic implementation-signature obligations beyond its checker-generated
-generic parameter row and validated head and method catalogs.  Implementation
-method formation is inherited from the corresponding well-formed trait method
-through the exact head substitution, so it is intentionally absent here. -/
-structure ImplementationSignatureRemainingConditions
-    (signatures : ProgramSignatures)
-    (signature : ProgramImplementationSignature) : Prop where
-  head : PredicateWellFormed
-    (signatureContext signatures signature.id signature.parameters
-      signature.wherePredicates) signature.head
-  predicates : PredicatesWellFormed
-    (signatureContext signatures signature.id signature.parameters
-      signature.wherePredicates) signature.wherePredicates
+/-- Close a validated frontend type with the signature collector's canonical
+rigid binder witness. -/
+theorem typeWellFormed
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {type : TypeSystem.Ty}
+    (validated : Frontend.SignatureTypeFormationValidated signatures owner
+      parameters type)
+    (canonical : SignatureParametersWellFormed owner parameters)
+    (assumptions : List ProgramPredicate) :
+    TypeWellFormed
+      (signatureContext signatures owner parameters assumptions) type := {
+  binders := signatureContext_typeParameterBinders canonical assumptions
+  typeWellScoped := SignatureTypeFormationValidated.typeWellScoped
+    validated assumptions
+}
 
-/-- Catalog conditions not yet implied by raw `checkProgram` success.  The
-checker already supplies implementation-rule projection equality, declaration
-identity uniqueness, every generic-parameter invariant, data-constructor
-structure and identity uniqueness, trait-method structure and identity
-uniqueness, implementation-head parameter/catalog validation,
-implementation-method structure, identity uniqueness, trait correspondence and
-completeness, plus complete contract signature semantics. -/
-structure SignatureCatalogRemainingConditions
-    (signatures : ProgramSignatures) : Prop where
-  functions_semantic : ∀ signature, signature ∈ signatures.functions →
-    FunctionSignatureRemainingConditions signatures signature
-  data_semantic : ∀ signature, signature ∈ signatures.dataTypes →
-    DataSignatureRemainingConditions signatures signature
-  traits_semantic : ∀ signature, signature ∈ signatures.traits →
-    TraitSignatureRemainingConditions signatures signature
-  implementations_semantic :
-    ∀ signature, signature ∈ signatures.implementations →
-      ImplementationSignatureRemainingConditions signatures signature
+end SignatureTypeFormationValidated
 
-/-- Facts supplied solely by a successful raw-workspace checker run. -/
+namespace SignatureTypesFormationValidated
+
+/-- Pointwise closed formation for a validated source-order type row. -/
+theorem typesWellFormed
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {types : List TypeSystem.Ty}
+    (validated : Frontend.SignatureTypesFormationValidated signatures owner
+      parameters types)
+    (canonical : SignatureParametersWellFormed owner parameters)
+    (assumptions : List ProgramPredicate) :
+    TypesWellFormed
+      (signatureContext signatures owner parameters assumptions) types := by
+  intro type member
+  exact {
+    binders := signatureContext_typeParameterBinders canonical assumptions
+    typeWellScoped :=
+      (SignatureTypesFormationValidated.typesWellScoped validated assumptions)
+        |>.member member
+  }
+
+end SignatureTypesFormationValidated
+
+namespace SignaturePredicateFormationValidated
+
+/-- Frontend predicate formation is exactly the algorithm-independent
+predicate judgment after closing its declaration binders. -/
+theorem predicateWellFormed
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {predicate : ProgramPredicate}
+    (validated : Frontend.SignaturePredicateFormationValidated signatures owner
+      parameters predicate)
+    (canonical : SignatureParametersWellFormed owner parameters)
+    (assumptions : List ProgramPredicate) :
+    PredicateWellFormed
+      (signatureContext signatures owner parameters assumptions) predicate := {
+  subject := SignatureTypeFormationValidated.typeWellFormed validated.subject
+    canonical assumptions
+  arguments := by
+    intro argument member
+    exact SignatureTypesFormationValidated.typesWellFormed validated.arguments
+      canonical assumptions argument member
+  trait := validated.trait
+}
+
+end SignaturePredicateFormationValidated
+
+namespace SignaturePredicatesFormationValidated
+
+/-- Pointwise conversion of a validated predicate row. -/
+theorem predicatesWellFormed
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {predicates : List ProgramPredicate}
+    (validated : Frontend.SignaturePredicatesFormationValidated signatures owner
+      parameters predicates)
+    (canonical : SignatureParametersWellFormed owner parameters)
+    (assumptions : List ProgramPredicate) :
+    PredicatesWellFormed
+      (signatureContext signatures owner parameters assumptions) predicates := by
+  intro predicate member
+  exact SignaturePredicateFormationValidated.predicateWellFormed
+    (validated predicate member) canonical assumptions
+
+end SignaturePredicatesFormationValidated
+
+/-- Catalog facts retained by successful checking.  Loaded-program checking
+requires a separate declaration-identity uniqueness premise because its input
+carrier is intentionally forgeable; raw checking obtains that premise from
+the loader. -/
 structure CheckedSignatureCatalogFacts
     (signatures : ProgramSignatures) : Prop where
   impl_rules_eq : signatures.implRules =
@@ -177,6 +265,7 @@ structure CheckedSignatureCatalogFacts
     (signatures.implementations.flatMap fun signature =>
       signature.methods.map fun method => method.id).Nodup
   parameters : ProgramSignatureParametersWellFormed signatures
+  formation : Frontend.ProgramSignatureFormationValidated signatures
   function_shapes : ∀ signature, signature ∈ signatures.functions →
     signature.parameterNames.Nodup ∧
       signature.scheme.body = .function
@@ -199,40 +288,44 @@ structure CheckedSignatureCatalogFacts
   contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
     ContractSignatureWellFormed signatures signature
 
-namespace FunctionSignatureRemainingConditions
+namespace ProgramSignatureFormationValidated
 
-/-- Combine the executable collector's parameter witness with the genuinely
-remaining function-signature semantics. -/
-theorem complete
+/-- Combine executable formation, canonical parameters, and callable shape
+into the declarative function-signature judgment. -/
+theorem functionWellFormed
     {signatures : ProgramSignatures} {signature : ProgramFunctionSignature}
-    (remaining : FunctionSignatureRemainingConditions signatures signature)
+    (validated : Frontend.ProgramSignatureFormationValidated signatures)
+    (member : signature ∈ signatures.functions)
     (parameters : SignatureParametersWellFormed signature.id
       signature.scheme.parameters)
     (shape : signature.parameterNames.Nodup ∧
       signature.scheme.body = .function
         (TypeSystem.Ty.productMany signature.parameterTypes)
         (TypeSystem.Ty.productMany signature.returnTypes)) :
-    FunctionSignatureWellFormed signatures signature := {
-  parameters_nodup := parameters.parameters_nodup
-  parameters_owned := parameters.parameter_owners
-  parameter_positions := by
-    simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
-  parameter_names_nodup := shape.1
-  parameter_types := remaining.parameter_types
-  return_types := remaining.return_types
-  predicates := remaining.predicates
-  scheme_body := shape.2
-}
+    FunctionSignatureWellFormed signatures signature := by
+  rcases validated.functions signature member with
+    ⟨parameterTypes, returnTypes, predicates⟩
+  exact {
+    parameters_nodup := parameters.parameters_nodup
+    parameters_owned := parameters.parameter_owners
+    parameter_positions := by
+      simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
+    parameter_names_nodup := shape.1
+    parameter_types := SignatureTypesFormationValidated.typesWellFormed
+      parameterTypes parameters signature.scheme.predicates
+    return_types := SignatureTypesFormationValidated.typesWellFormed
+      returnTypes parameters signature.scheme.predicates
+    predicates := SignaturePredicatesFormationValidated.predicatesWellFormed
+      predicates parameters signature.scheme.predicates
+    scheme_body := shape.2
+  }
 
-end FunctionSignatureRemainingConditions
-
-namespace DataSignatureRemainingConditions
-
-/-- Combine canonical declaration parameters with the remaining data
-constructor semantics. -/
-theorem complete
+/-- Combine executable constructor-payload formation with the collector's
+canonical data-signature structure. -/
+theorem dataWellFormed
     {signatures : ProgramSignatures} {signature : ProgramDataSignature}
-    (remaining : DataSignatureRemainingConditions signatures signature)
+    (validated : Frontend.ProgramSignatureFormationValidated signatures)
+    (member : signature ∈ signatures.dataTypes)
     (parameters : SignatureParametersWellFormed signature.id
       signature.parameters)
     (structural : DataSignatureStructuralWellFormed signature) :
@@ -244,43 +337,52 @@ theorem complete
   constructor_names_nodup := structural.constructor_names_nodup
   constructor_owners := structural.constructor_owners
   constructor_positions := structural.constructor_positions
-  constructor_payloads := remaining.constructor_payloads
+  constructor_payloads := by
+    intro constructor constructorMember
+    exact SignatureTypesFormationValidated.typesWellFormed
+      (validated.dataTypes signature member constructor constructorMember)
+      parameters []
 }
 
-end DataSignatureRemainingConditions
-
-namespace TraitSignatureRemainingConditions
-
-/-- Combine canonical declaration parameters with the remaining trait method
-catalog semantics. -/
-theorem complete
+/-- Combine executable trait and method formation with the collector's
+canonical trait-method structure. -/
+theorem traitWellFormed
     {signatures : ProgramSignatures} {signature : ProgramTraitSignature}
-    (remaining : TraitSignatureRemainingConditions signatures signature)
+    (validated : Frontend.ProgramSignatureFormationValidated signatures)
+    (member : signature ∈ signatures.traits)
     (parameters : SignatureParametersWellFormed signature.id
       signature.parameters)
     (structural : TraitSignatureStructuralWellFormed signature) :
-    TraitSignatureWellFormed signatures signature := {
-  parameters_nodup := parameters.parameters_nodup
-  parameters_owned := parameters.parameter_owners
-  parameter_positions := by
-    simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
-  method_names_nodup := structural.method_names_nodup
-  method_positions := structural.method_positions
-  predicates := remaining.predicates
-  methods := by
-    intro method member
-    have methodRemaining := remaining.methods method member
-    exact {
-      owner := structural.method_owners method member
-      parameter_names_nodup :=
-        structural.method_parameter_names_nodup method member
-      parameter_types := methodRemaining.parameter_types
-      return_types := methodRemaining.return_types
-      predicates := methodRemaining.predicates
-    }
-}
+    TraitSignatureWellFormed signatures signature := by
+  rcases validated.traits signature member with ⟨predicates, methods⟩
+  exact {
+    parameters_nodup := parameters.parameters_nodup
+    parameters_owned := parameters.parameter_owners
+    parameter_positions := by
+      simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
+    method_names_nodup := structural.method_names_nodup
+    method_positions := structural.method_positions
+    predicates := SignaturePredicatesFormationValidated.predicatesWellFormed
+      predicates parameters signature.wherePredicates
+    methods := by
+      intro method methodMember
+      rcases methods method methodMember with
+        ⟨parameterTypes, returnTypes, methodPredicates⟩
+      let assumptions := signature.wherePredicates ++ method.wherePredicates
+      exact {
+        owner := structural.method_owners method methodMember
+        parameter_names_nodup :=
+          structural.method_parameter_names_nodup method methodMember
+        parameter_types := SignatureTypesFormationValidated.typesWellFormed
+          parameterTypes parameters assumptions
+        return_types := SignatureTypesFormationValidated.typesWellFormed
+          returnTypes parameters assumptions
+        predicates := SignaturePredicatesFormationValidated.predicatesWellFormed
+          methodPredicates parameters assumptions
+      }
+  }
 
-end TraitSignatureRemainingConditions
+end ProgramSignatureFormationValidated
 
 namespace ImplementationSignatureMethodCatalogValidated
 
@@ -428,16 +530,17 @@ theorem semantic_trait_catalog
 
 end ImplementationSignatureHeadValidated
 
-namespace ImplementationSignatureRemainingConditions
+namespace ProgramSignatureFormationValidated
 
-/-- Combine checker-derived declaration and catalog facts with the remaining
-implementation-head and predicate obligations.  Every implementation method
-inherits type and predicate formation from its corresponding well-formed trait
-method through the exact, well-formed head substitution. -/
-theorem complete
+/-- Combine checker-derived formation and catalog facts into the declarative
+implementation judgment.  Every implementation method inherits formation
+from its corresponding well-formed trait method through the exact,
+well-formed head substitution. -/
+theorem implementationWellFormed
     {signatures : ProgramSignatures}
     {signature : ProgramImplementationSignature}
-    (remaining : ImplementationSignatureRemainingConditions signatures signature)
+    (formation : Frontend.ProgramSignatureFormationValidated signatures)
+    (member : signature ∈ signatures.implementations)
     (parameters : SignatureParametersWellFormed signature.id
       signature.parameters)
     (structural : ImplementationSignatureStructuralWellFormed signature)
@@ -453,8 +556,16 @@ theorem complete
       TraitSignatureWellFormed signatures trait)
     (ruleProjection : signature.implRule ∈ signatures.implRules) :
     ImplementationSignatureWellFormed signatures signature := by
+  rcases formation.implementations signature member with
+    ⟨headFormation, predicateFormation⟩
+  have headWellFormed :=
+    SignaturePredicateFormationValidated.predicateWellFormed headFormation
+      parameters signature.wherePredicates
+  have predicatesWellFormed :=
+    SignaturePredicatesFormationValidated.predicatesWellFormed
+      predicateFormation parameters signature.wherePredicates
   rcases ImplementationSignatureHeadValidated.semantic_trait_catalog validated
-      remaining.head traitIds traitParameters with
+      headWellFormed traitIds traitParameters with
     ⟨trait, traitMember, headTrait, substitutionExact, substitutionRange,
       requiredPredicates⟩
   let substitution : TypeSystem.ParameterSubstitution :=
@@ -474,8 +585,8 @@ theorem complete
       ImplementationSignatureHeadValidated.semantic_parameters_in_head validated
     method_names_nodup := structural.method_names_nodup
     method_positions := structural.method_positions
-    head := remaining.head
-    predicates := remaining.predicates
+    head := headWellFormed
+    predicates := predicatesWellFormed
     rule_projection := ruleProjection
     trait_catalog := ⟨trait, traitMember, headTrait, substitutionExact,
       substitutionRange, requiredPredicates⟩
@@ -564,28 +675,29 @@ theorem complete
       ImplementationSignatureMethodCatalogValidated.semantic_methods_complete
         methodCatalog traitIds catalogTraitMember catalogHeadTrait methodMember
 
-end ImplementationSignatureRemainingConditions
+end ProgramSignatureFormationValidated
 
-/-- Recover every catalog fact that follows from the actual raw-workspace
-checker pipeline, without asking callers to restate any semantic premise. -/
-theorem checkedSignatureCatalogFacts_ofCheckProgram
-    {raw : Workspace.RawWorkspace}
+/-- Recover every catalog fact from successful checking of a loaded carrier
+whose declaration environment has unique stable identities. -/
+theorem checkedSignatureCatalogFacts_ofCheckLoadedProgram
+    {loaded : LoadedProgram}
     {fuel : Nat}
     {checked : CheckedProgram}
-    (success : Frontend.checkProgram raw fuel = .ok checked) :
+    (success : Frontend.checkLoadedProgram loaded fuel = .ok checked)
+    (environmentIds :
+      (loaded.environment.declarations.map fun declaration => declaration.id).Nodup) :
     CheckedSignatureCatalogFacts checked.signatures := by
-  obtain ⟨loaded, loadedSuccess, checkedSuccess⟩ :=
-    Frontend.checkProgram_success_load success
-  have environmentIds := Frontend.loadProgram_success_declarations_nodup
-    loadedSuccess
   have signaturesSuccess := Frontend.checkLoadedProgram_success_signatures
-    checkedSuccess
+    success
   have parameters :=
-    Frontend.checkProgram_success_signature_parameters_wellFormed success
+    Frontend.checkLoadedProgram_success_signature_parameters_wellFormed success
   refine {
     impl_rules_eq :=
       Frontend.buildProgramSignatures_success_implRules_eq signaturesSuccess
-    declaration_ids := signatureDeclarationIds_nodup_ofCheckProgram success
+    declaration_ids := by
+      simpa [signatureDeclarationIds] using
+        Frontend.buildProgramSignatures_success_declaration_ids_nodup
+          environmentIds signaturesSuccess
     function_ids :=
       Frontend.buildProgramSignatures_success_function_ids_nodup
         environmentIds signaturesSuccess
@@ -598,33 +710,41 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
         environmentIds signaturesSuccess
     contract_ids := Frontend.buildProgramSignatures_success_contract_ids_nodup
       environmentIds signaturesSuccess
-    constructor_ids := Frontend.checkProgram_success_constructor_ids_nodup success
+    constructor_ids :=
+      Frontend.buildProgramSignatures_success_constructor_ids_nodup
+        environmentIds signaturesSuccess
     trait_method_ids :=
-      Frontend.checkProgram_success_trait_method_ids_nodup success
+      Frontend.buildProgramSignatures_success_trait_method_ids_nodup
+        environmentIds signaturesSuccess
     implementation_method_ids :=
-      Frontend.checkProgram_success_implementation_method_ids_nodup success
+      Frontend.buildProgramSignatures_success_implementation_method_ids_nodup
+        environmentIds signaturesSuccess
     parameters
+    formation := Frontend.checkLoadedProgram_success_signature_formation success
     function_shapes := by
       intro signature member
-      exact Frontend.checkProgram_success_function_signature_shape success member
+      exact Frontend.checkLoadedProgram_success_function_signature_shape
+        success member
     data_structures := by
       intro signature member
-      exact Frontend.checkProgram_success_data_signature_structure success member
+      exact Frontend.checkLoadedProgram_success_data_signature_structure
+        success member
     trait_structures := by
       intro signature member
-      exact Frontend.checkProgram_success_trait_signature_structure success member
+      exact Frontend.checkLoadedProgram_success_trait_signature_structure
+        success member
     implementation_structures := by
       intro signature member
-      exact Frontend.checkProgram_success_implementation_signature_structure
+      exact Frontend.checkLoadedProgram_success_implementation_signature_structure
         success member
     implementation_heads := by
       intro signature member
-      exact Frontend.checkProgram_success_implementation_head_validated
+      exact Frontend.checkLoadedProgram_success_implementation_head_validated
         success member
     implementation_method_catalogs := by
       intro signature member
       exact
-        Frontend.checkProgram_success_implementation_method_catalog_validated
+        Frontend.checkLoadedProgram_success_implementation_method_catalog_validated
           success member
     contracts_semantic := ?_
   }
@@ -638,19 +758,32 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
         canonical.parameter_positions
   }
 
-namespace SignatureCatalogRemainingConditions
+/-- Raw-workspace checking supplies loaded-environment identity uniqueness, so
+all catalog facts follow from checker success alone. -/
+theorem checkedSignatureCatalogFacts_ofCheckProgram
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkProgram raw fuel = .ok checked) :
+    CheckedSignatureCatalogFacts checked.signatures := by
+  obtain ⟨loaded, loadedSuccess, checkedSuccess⟩ :=
+    Frontend.checkProgram_success_load success
+  exact checkedSignatureCatalogFacts_ofCheckLoadedProgram checkedSuccess
+    (Frontend.loadProgram_success_declarations_nodup loadedSuccess)
 
-/-- Merge checker-derived facts with precisely the catalog obligations that
-remain declarative. -/
+namespace CheckedSignatureCatalogFacts
+
+/-- Forget executable bookkeeping from a complete set of checked catalog
+facts, including resolved type and predicate formation. -/
 theorem complete
     {signatures : ProgramSignatures}
-    (remaining : SignatureCatalogRemainingConditions signatures)
     (checked : CheckedSignatureCatalogFacts signatures) :
     SignatureCatalogWellFormed signatures := by
   have traitSemantics : ∀ trait, trait ∈ signatures.traits →
       TraitSignatureWellFormed signatures trait := by
     intro trait member
-    exact (remaining.traits_semantic trait member).complete
+    exact ProgramSignatureFormationValidated.traitWellFormed checked.formation
+      member
       (checked.parameters.traits trait member)
       (checked.trait_structures trait member)
   refine {
@@ -691,17 +824,20 @@ theorem complete
     have parameters := checked.parameters.contracts signature member
     exact ⟨parameters.parameters_nodup, parameters.parameter_owners⟩
   · intro signature member
-    exact (remaining.functions_semantic signature member).complete
+    exact ProgramSignatureFormationValidated.functionWellFormed
+      checked.formation member
       (checked.parameters.functions signature member)
       (checked.function_shapes signature member)
   · intro signature member
-    exact (remaining.data_semantic signature member).complete
+    exact ProgramSignatureFormationValidated.dataWellFormed checked.formation
+      member
       (checked.parameters.dataTypes signature member)
       (checked.data_structures signature member)
   · intro signature member
     exact traitSemantics signature member
   · intro signature member
-    apply (remaining.implementations_semantic signature member).complete
+    apply ProgramSignatureFormationValidated.implementationWellFormed
+      checked.formation member
       (checked.parameters.implementations signature member)
       (checked.implementation_structures signature member)
       (checked.implementation_heads signature member)
@@ -710,20 +846,31 @@ theorem complete
     rw [checked.impl_rules_eq]
     exact List.mem_map.mpr ⟨signature, member, rfl⟩
 
-end SignatureCatalogRemainingConditions
+end CheckedSignatureCatalogFacts
 
 namespace SignatureCatalogWellFormed
 
-/-- Raw checker success plus only the still-declarative catalog premises yields
-the complete semantic signature catalog invariant. -/
+/-- Loaded-program checker success yields the semantic catalog invariant when
+the forgeable input environment has unique declaration identities. -/
+theorem ofCheckLoadedProgram
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkLoadedProgram loaded fuel = .ok checked)
+    (environmentIds :
+      (loaded.environment.declarations.map fun declaration => declaration.id).Nodup) :
+    SignatureCatalogWellFormed checked.signatures :=
+  (checkedSignatureCatalogFacts_ofCheckLoadedProgram success environmentIds).complete
+
+/-- Raw checker success alone yields the complete semantic signature catalog
+invariant. -/
 theorem ofCheckProgram
     {raw : Workspace.RawWorkspace}
     {fuel : Nat}
     {checked : CheckedProgram}
-    (success : Frontend.checkProgram raw fuel = .ok checked)
-    (remaining : SignatureCatalogRemainingConditions checked.signatures) :
+    (success : Frontend.checkProgram raw fuel = .ok checked) :
     SignatureCatalogWellFormed checked.signatures :=
-  remaining.complete (checkedSignatureCatalogFacts_ofCheckProgram success)
+  (checkedSignatureCatalogFacts_ofCheckProgram success).complete
 
 end SignatureCatalogWellFormed
 
@@ -748,16 +895,16 @@ structure CheckedProgramWellFormedConditions
 
 namespace CheckedProgramWellFormedConditions
 
-/-- Successful executable checking discharges the exact function/method
-identity alignment obligations.  The catalog invariant and semantic validity
-of each body remain explicit because they are not yet consequences of checker
-success. -/
+/-- Successful loaded-program checking discharges catalog formation and exact
+body identity alignment once declaration identity uniqueness is supplied.
+Semantic body validity remains explicit. -/
 theorem ofCheckLoadedProgram
     {loaded : LoadedProgram}
     {fuel : Nat}
     {checked : CheckedProgram}
     (success : Frontend.checkLoadedProgram loaded fuel = Except.ok checked)
-    (signatures : SignatureCatalogWellFormed checked.signatures)
+    (environmentIds :
+      (loaded.environment.declarations.map fun declaration => declaration.id).Nodup)
     (functionsValid : ∀ function, function ∈ checked.functions →
       FunctionDefinition.Valid checked.signatures
         (FunctionDefinition.ofChecked function))
@@ -768,46 +915,22 @@ theorem ofCheckLoadedProgram
   obtain ⟨functionIds, methodIds⟩ :=
     Frontend.checkLoadedProgram_success_ids success
   exact {
-    signatures
+    signatures := SignatureCatalogWellFormed.ofCheckLoadedProgram success
+      environmentIds
     function_ids := functionIds
     method_ids := methodIds
     functions_valid := functionsValid
     methods_valid := methodsValid
   }
 
-/-- Raw checker success fills the body identity alignment and every automatic
-catalog field; callers provide only the residual catalog semantics and body
-validity. -/
-theorem ofCheckProgramWithRemainingCatalog
-    {raw : Workspace.RawWorkspace}
-    {fuel : Nat}
-    {checked : CheckedProgram}
-    (success : Frontend.checkProgram raw fuel = Except.ok checked)
-    (remaining : SignatureCatalogRemainingConditions checked.signatures)
-    (functionsValid : ∀ function, function ∈ checked.functions →
-      FunctionDefinition.Valid checked.signatures
-        (FunctionDefinition.ofChecked function))
-    (methodsValid : ∀ method, method ∈ checked.methods →
-      MethodDefinition.Valid checked.signatures
-        (MethodDefinition.ofChecked method)) :
-    CheckedProgramWellFormedConditions checked := by
-  obtain ⟨functionIds, methodIds⟩ := Frontend.checkProgram_success_ids success
-  exact {
-    signatures := SignatureCatalogWellFormed.ofCheckProgram success remaining
-    function_ids := functionIds
-    method_ids := methodIds
-    functions_valid := functionsValid
-    methods_valid := methodsValid
-  }
-
-/-- Successful checking from a raw workspace likewise discharges exact body
-identity alignment; callers retain only the semantic catalog/body premises. -/
+/-- Successful raw-workspace checking discharges the complete signature
+catalog and exact body identity alignment.  Only semantic body validity remains
+explicit. -/
 theorem ofCheckProgram
     {raw : Workspace.RawWorkspace}
     {fuel : Nat}
     {checked : CheckedProgram}
     (success : Frontend.checkProgram raw fuel = Except.ok checked)
-    (signatures : SignatureCatalogWellFormed checked.signatures)
     (functionsValid : ∀ function, function ∈ checked.functions →
       FunctionDefinition.Valid checked.signatures
         (FunctionDefinition.ofChecked function))
@@ -817,7 +940,7 @@ theorem ofCheckProgram
     CheckedProgramWellFormedConditions checked := by
   obtain ⟨functionIds, methodIds⟩ := Frontend.checkProgram_success_ids success
   exact {
-    signatures
+    signatures := SignatureCatalogWellFormed.ofCheckProgram success
     function_ids := functionIds
     method_ids := methodIds
     functions_valid := functionsValid
@@ -874,15 +997,15 @@ theorem programWellFormed
     · simpa [MethodDefinition.ofChecked] using idEq
 
 /-- Promote a successful loaded-program check directly to declarative
-whole-program well-formedness once the remaining semantic premises are
-supplied.  Function and method identity alignment is recovered from checker
-success rather than repeated by callers. -/
+whole-program well-formedness once declaration identity uniqueness and body
+validity are supplied. -/
 theorem programWellFormedOfCheckLoadedProgram
     {loaded : LoadedProgram}
     {fuel : Nat}
     {checked : CheckedProgram}
     (success : Frontend.checkLoadedProgram loaded fuel = Except.ok checked)
-    (signatures : SignatureCatalogWellFormed checked.signatures)
+    (environmentIds :
+      (loaded.environment.declarations.map fun declaration => declaration.id).Nodup)
     (functionsValid : ∀ function, function ∈ checked.functions →
       FunctionDefinition.Valid checked.signatures
         (FunctionDefinition.ofChecked function))
@@ -890,18 +1013,16 @@ theorem programWellFormedOfCheckLoadedProgram
       MethodDefinition.Valid checked.signatures
         (MethodDefinition.ofChecked method)) :
     ProgramWellFormed (Program.ofChecked checked) :=
-  (CheckedProgramWellFormedConditions.ofCheckLoadedProgram success signatures
+  (CheckedProgramWellFormedConditions.ofCheckLoadedProgram success environmentIds
     functionsValid methodsValid).programWellFormed
 
 /-- Promote raw-workspace checker success directly to declarative
-whole-program well-formedness once the remaining semantic premises are
-supplied. -/
+whole-program well-formedness once semantic body validity is supplied. -/
 theorem programWellFormedOfCheckProgram
     {raw : Workspace.RawWorkspace}
     {fuel : Nat}
     {checked : CheckedProgram}
     (success : Frontend.checkProgram raw fuel = Except.ok checked)
-    (signatures : SignatureCatalogWellFormed checked.signatures)
     (functionsValid : ∀ function, function ∈ checked.functions →
       FunctionDefinition.Valid checked.signatures
         (FunctionDefinition.ofChecked function))
@@ -909,26 +1030,8 @@ theorem programWellFormedOfCheckProgram
       MethodDefinition.Valid checked.signatures
         (MethodDefinition.ofChecked method)) :
     ProgramWellFormed (Program.ofChecked checked) :=
-  (CheckedProgramWellFormedConditions.ofCheckProgram success signatures
-    functionsValid methodsValid).programWellFormed
-
-/-- End-to-end declarative program admission from raw checker success, the
-remaining signature-catalog semantics, and semantic body validity. -/
-theorem programWellFormedOfCheckProgramWithRemainingCatalog
-    {raw : Workspace.RawWorkspace}
-    {fuel : Nat}
-    {checked : CheckedProgram}
-    (success : Frontend.checkProgram raw fuel = Except.ok checked)
-    (remaining : SignatureCatalogRemainingConditions checked.signatures)
-    (functionsValid : ∀ function, function ∈ checked.functions →
-      FunctionDefinition.Valid checked.signatures
-        (FunctionDefinition.ofChecked function))
-    (methodsValid : ∀ method, method ∈ checked.methods →
-      MethodDefinition.Valid checked.signatures
-        (MethodDefinition.ofChecked method)) :
-    ProgramWellFormed (Program.ofChecked checked) :=
-  (CheckedProgramWellFormedConditions.ofCheckProgramWithRemainingCatalog
-    success remaining functionsValid methodsValid).programWellFormed
+  (CheckedProgramWellFormedConditions.ofCheckProgram success functionsValid
+    methodsValid).programWellFormed
 
 end CheckedProgramWellFormedConditions
 

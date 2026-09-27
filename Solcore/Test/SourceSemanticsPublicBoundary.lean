@@ -422,13 +422,20 @@ example := @Solcore.SourceSemantics.FunctionDefinition.ofChecked
 example := @Solcore.SourceSemantics.MethodDefinition.ofChecked
 example := @Solcore.SourceSemantics.Program.ofChecked
 example := @Solcore.SourceSemantics.signatureDeclarationIds_nodup_ofCheckProgram
-example := @Solcore.SourceSemantics.FunctionSignatureRemainingConditions
-example := @Solcore.SourceSemantics.DataSignatureRemainingConditions
-example := @Solcore.SourceSemantics.TraitMethodSignatureRemainingConditions
-example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions
-example := @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions
-example := @Solcore.SourceSemantics.SignatureCatalogRemainingConditions
+example :=
+  @Solcore.SourceSemantics.SignatureTypeFormationValidated.typeWellScoped
+example :=
+  @Solcore.SourceSemantics.SignatureTypesFormationValidated.typesWellScoped
+example :=
+  @Solcore.SourceSemantics.SignatureTypeFormationValidated.typeWellFormed
+example :=
+  @Solcore.SourceSemantics.SignatureTypesFormationValidated.typesWellFormed
+example :=
+  @Solcore.SourceSemantics.SignaturePredicateFormationValidated.predicateWellFormed
+example :=
+  @Solcore.SourceSemantics.SignaturePredicatesFormationValidated.predicatesWellFormed
 example := @Solcore.SourceSemantics.CheckedSignatureCatalogFacts
+example := @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.formation
 example :=
   @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.function_shapes
 example :=
@@ -456,15 +463,21 @@ example :=
 example :=
   @Solcore.SourceSemantics.ImplementationSignatureMethodCatalogValidated.semantic_methods_complete
 example :=
-  @Solcore.SourceSemantics.FunctionSignatureRemainingConditions.complete
-example := @Solcore.SourceSemantics.DataSignatureRemainingConditions.complete
-example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions.complete
+  @Solcore.SourceSemantics.ProgramSignatureFormationValidated.functionWellFormed
 example :=
-  @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions.complete
+  @Solcore.SourceSemantics.ProgramSignatureFormationValidated.dataWellFormed
+example :=
+  @Solcore.SourceSemantics.ProgramSignatureFormationValidated.traitWellFormed
+example :=
+  @Solcore.SourceSemantics.ProgramSignatureFormationValidated.implementationWellFormed
+example :=
+  @Solcore.SourceSemantics.checkedSignatureCatalogFacts_ofCheckLoadedProgram
 example :=
   @Solcore.SourceSemantics.checkedSignatureCatalogFacts_ofCheckProgram
 example :=
-  @Solcore.SourceSemantics.SignatureCatalogRemainingConditions.complete
+  @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.complete
+example :=
+  @Solcore.SourceSemantics.SignatureCatalogWellFormed.ofCheckLoadedProgram
 example := @Solcore.SourceSemantics.SignatureCatalogWellFormed.ofCheckProgram
 example := @Solcore.SourceSemantics.CheckedProgramWellFormedConditions
 example :=
@@ -472,15 +485,11 @@ example :=
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.ofCheckProgram
 example :=
-  @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.ofCheckProgramWithRemainingCatalog
-example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormed
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormedOfCheckLoadedProgram
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormedOfCheckProgram
-example :=
-  @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormedOfCheckProgramWithRemainingCatalog
 
 example := @Solcore.SourceSemantics.Dynamic.Value
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure
