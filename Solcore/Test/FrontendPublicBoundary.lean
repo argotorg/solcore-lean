@@ -180,6 +180,14 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
 example := @Solcore.Frontend.SourceInference.Detail.unify_preserves_resolve_eq
 example :=
+  @Solcore.Frontend.SourceInference.Detail.unify_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.withExpected_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_preserves_requirementsWellFormed
+example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_instantiation
 example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_success_candidate

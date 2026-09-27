@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceInference.Types
+import Solcore.Frontend.SourceInference.Resolution
 
 /-! Small preservation laws for function-local source obligation identities. -/
 
@@ -174,6 +174,122 @@ theorem requirementIds_nodup (state : State)
 end State
 
 namespace Detail
+
+open TypeSystem
+
+/-- Unification changes only the inference substitution and fresh-variable
+allocator, so a successful step preserves the canonical requirement ledger. -/
+theorem unify_preserves_requirementsWellFormed
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next)
+    (wellFormed : state.RequirementsWellFormed) :
+    next.RequirementsWellFormed := by
+  unfold unify at success
+  cases unification : state.inference.unify left right with
+  | error error =>
+      simp [unification, liftUnification, bind, Except.bind] at success
+  | ok inference =>
+      simp only [unification, liftUnification, bind, Except.bind] at success
+      change Except.ok { state with inference } = Except.ok next at success
+      injection success with nextEq
+      subst next
+      change state.RequirementsWellFormed
+      exact wellFormed
+
+/-- Committing a chosen coercion path allocates its primary and method
+requirements in canonical append order. -/
+theorem commitCoercionPlan_preserves_requirementsWellFormed
+    (state : State) (plan : List PlannedCoercionStep)
+    (wellFormed : state.RequirementsWellFormed) :
+    (commitCoercionPlan state plan).2.RequirementsWellFormed := by
+  induction plan generalizing state with
+  | nil =>
+      simpa [commitCoercionPlan] using wellFormed
+  | cons step rest induction =>
+      cases primaryResult : state.addRequirementWithId step.predicate with
+      | mk requirement afterPrimary =>
+          have primaryWellFormed : afterPrimary.RequirementsWellFormed := by
+            simpa [primaryResult] using
+              State.addRequirementWithId_preserves_requirementsWellFormed
+                state step.predicate wellFormed
+          cases methodResult :
+              afterPrimary.addRequirementsWithIds step.methodPredicates with
+          | mk methodRequirements afterMethods =>
+              have methodsWellFormed :
+                  afterMethods.RequirementsWellFormed := by
+                simpa [methodResult] using
+                  State.addRequirementsWithIds_preserves_requirementsWellFormed
+                    afterPrimary step.methodPredicates primaryWellFormed
+              simpa [commitCoercionPlan, primaryResult, methodResult] using
+                induction afterMethods methodsWellFormed
+
+/-- Successful expected-type fitting preserves the canonical requirement
+ledger, including the coercion path allocated by its mismatch fallback. -/
+theorem withExpected_preserves_requirementsWellFormed
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result)
+    (wellFormed : state.RequirementsWellFormed) :
+    result.state.RequirementsWellFormed := by
+  cases expected with
+  | none =>
+      simp only [withExpected] at success
+      injection success with resultEq
+      subst result
+      change state.RequirementsWellFormed
+      exact wellFormed
+  | some expected =>
+      cases unification : state.inference.unify actual.type expected with
+      | ok inference =>
+          simp only [withExpected, unification] at success
+          injection success with resultEq
+          subst result
+          change state.RequirementsWellFormed
+          exact wellFormed
+      | error error =>
+          cases error with
+          | occursCheck metavariable type =>
+              simp [withExpected, unification] at success
+          | exhausted =>
+              simp [withExpected, unification] at success
+          | mismatch left right =>
+              simp only [withExpected, unification] at success
+              cases planResult : coercionPlan? context state
+                  (state.resolve actual.type) (state.resolve expected) with
+              | error error =>
+                  simp [planResult, bind, Except.bind] at success
+              | ok plan? =>
+                  cases plan? with
+                  | none =>
+                      simp [planResult, bind, Except.bind] at success
+                  | some plan =>
+                      simp only [planResult, bind, Except.bind] at success
+                      change Except.ok _ = Except.ok result at success
+                      injection success with resultEq
+                      subst result
+                      exact commitCoercionPlan_preserves_requirementsWellFormed
+                        state plan wellFormed
+
+/-- A retained expected-type candidate has the same well-formed requirement
+ledger as its input state. -/
+theorem candidateWithExpected_preserves_requirementsWellFormed
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : candidateWithExpected context state actual expected =
+      .ok (some result))
+    (wellFormed : state.RequirementsWellFormed) :
+    result.state.RequirementsWellFormed := by
+  unfold candidateWithExpected at success
+  cases fittedResult : withExpected context state actual expected with
+  | error error =>
+      cases error <;> simp [fittedResult] at success
+      all_goals cases ‹Unification.Error› <;> simp_all
+  | ok fitted =>
+      simp only [fittedResult] at success
+      injection success with resultEq
+      have fittedEq : fitted = result := Option.some.inj resultEq
+      subst result
+      exact withExpected_preserves_requirementsWellFormed fittedResult wellFormed
 
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)
