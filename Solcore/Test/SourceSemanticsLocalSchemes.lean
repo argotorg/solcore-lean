@@ -214,6 +214,15 @@ private theorem callerCovers (signatures : ProgramSignatures)
 /-- The dynamic witness projects back to the established static judgment. -/
 example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
     (fresh : TypeVarId) :
+    LocalSchemeRuntimeSelection (useContext signatures owner fresh)
+      (binder owner fresh) (.function .word .word) [actualId]
+      [(fresh, .word)] :=
+  (runtimeInstantiation signatures owner fresh).toSelection
+
+/-- Forgetting the explicit runtime selection still recovers the established
+static local-scheme judgment. -/
+example (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) :
     LocalSchemeInstantiationValid (useContext signatures owner fresh)
       (binder owner fresh) (.function .word .word) [actualId] :=
   (runtimeInstantiation signatures owner fresh).toLocalSchemeInstantiationValid

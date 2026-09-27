@@ -702,6 +702,24 @@ theorem excludes_rejection
 
 end RuntimeBoundaryAccepts
 
+namespace ExpressionEvaluates
+
+/-- A successful expression evaluation cannot simultaneously claim that its
+root occurrence is absent.  This is the first success/fault exclusion fact
+and applies equally to ordinary forms and generalized-local materialization. -/
+theorem excludes_missing
+    {program : Program} {context : Context} {evidence : EvidenceEnvironment}
+    {source : TypedSource} {environment : Environment}
+    {before after : Heap} {id : ExpressionId} {value : Value}
+    (evaluation : ExpressionEvaluates program context evidence source
+      environment before id value after) :
+    ¬ ExpressionMissing source id := by
+  intro missing
+  rcases evaluation.contains with ⟨node, contains⟩
+  exact ExpressionAbsentIn.excludes_contains missing contains
+
+end ExpressionEvaluates
+
 /-! ## Faulting big-step relations -/
 
 set_option maxHeartbeats 1200000 in

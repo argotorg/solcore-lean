@@ -38,6 +38,59 @@ theorem toRequirementSequenceProves
 
 end RequirementsProduceEnvironment
 
+/-- The evidence-independent part of one executable local-scheme use.
+
+This judgment records the shared substitution, its ground runtime range, and
+the identities selected for the instantiated predicate spine.  Constructing
+the dictionaries which discharge that spine is deliberately a later step, so
+the same selection can be inspected before class resolution has produced an
+`EvidenceEnvironment`. -/
+structure LocalSchemeRuntimeSelection
+    (context : Context) (binder : TypedBinder) (type : Ty)
+    (actualRequirements : List RequirementId)
+    (substitution : Substitution) : Prop where
+  formation : LocalSchemeRequirementsWellFormed context binder
+  scheme_well_formed : SchemeWellFormed context binder.scheme
+  exact : ExactSubstitution substitution binder.scheme.quantified
+  /-- Executable selections are ground in the caller context. -/
+  range : SubstitutionRangeWellFormed context substitution
+  result : substitution.apply binder.scheme.body = type
+  actual_requirements_unique : actualRequirements.Nodup
+  actual_templates_disjoint :
+    ∀ id, id ∈ actualRequirements → id ∉ localSchemeTemplateIds binder
+  requirements : RequirementSequenceProves context actualRequirements
+    (instantiateLocalSchemePredicates substitution binder)
+
+namespace LocalSchemeRuntimeSelection
+
+/-- Forget only that the executable substitution range is stronger than the
+source-level admissibility condition. -/
+theorem toLocalSchemeInstantiationValid
+    {context : Context} {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    {substitution : Substitution}
+    (selection : LocalSchemeRuntimeSelection context binder type
+      actualRequirements substitution) :
+    LocalSchemeInstantiationValid context binder type actualRequirements := by
+  exact .intro selection.formation selection.scheme_well_formed substitution
+    selection.exact selection.range.toAdmissible selection.result
+    selection.actual_requirements_unique selection.actual_templates_disjoint
+    selection.requirements
+
+/-- The selected substitution is also a source-level instantiation of the
+local scheme at the selected result type. -/
+theorem toSchemeInstantiatesAt
+    {context : Context} {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    {substitution : Substitution}
+    (selection : LocalSchemeRuntimeSelection context binder type
+      actualRequirements substitution) :
+    SchemeInstantiatesAt context binder.scheme type := by
+  exact .intro selection.scheme_well_formed substitution selection.exact
+    selection.range.toAdmissible selection.result
+
+end LocalSchemeRuntimeSelection
+
 /-- One runtime use of a generalized local scheme.  A single flexible
 substitution determines the selected occurrence type and its complete ordered
 predicate spine; the attached requirement identities then close that spine
@@ -65,6 +118,23 @@ structure LocalSchemeRuntimeInstantiation
 
 namespace LocalSchemeRuntimeInstantiation
 
+/-- Forget dictionary production while retaining the complete executable
+selection made for this occurrence. -/
+theorem toSelection
+    {context : Context} {callerEvidence producedEvidence : EvidenceEnvironment}
+    {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    {substitution : Substitution}
+    (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
+      binder type actualRequirements substitution producedEvidence) :
+    LocalSchemeRuntimeSelection context binder type actualRequirements
+      substitution := by
+  exact .mk instantiation.formation instantiation.scheme_well_formed
+    instantiation.exact instantiation.range instantiation.result
+    instantiation.actual_requirements_unique
+    instantiation.actual_templates_disjoint
+    instantiation.produces.toRequirementSequenceProves
+
 /-- Forget dynamic evidence closure while retaining the complete static
 use-site instantiation judgment. -/
 theorem toLocalSchemeInstantiationValid
@@ -75,12 +145,7 @@ theorem toLocalSchemeInstantiationValid
     (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
       binder type actualRequirements substitution producedEvidence) :
     LocalSchemeInstantiationValid context binder type actualRequirements := by
-  exact .intro instantiation.formation instantiation.scheme_well_formed
-    substitution instantiation.exact instantiation.range.toAdmissible
-    instantiation.result
-    instantiation.actual_requirements_unique
-    instantiation.actual_templates_disjoint
-    instantiation.produces.toRequirementSequenceProves
+  exact instantiation.toSelection.toLocalSchemeInstantiationValid
 
 /-- Every replacement selected for executable local-scheme code is closed in
 the caller context. -/
@@ -92,7 +157,7 @@ theorem substitution_range_well_formed
     (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
       binder type actualRequirements substitution producedEvidence) :
     SubstitutionRangeWellFormed context substitution :=
-  instantiation.range
+  instantiation.toSelection.range
 
 /-- Runtime closure preserves the source-ordered qualified-predicate arity. -/
 theorem actual_requirements_length_eq
@@ -114,7 +179,7 @@ theorem actual_requirements_nodup
     (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
       binder type actualRequirements substitution producedEvidence) :
     actualRequirements.Nodup :=
-  instantiation.actual_requirements_unique
+  instantiation.toSelection.actual_requirements_unique
 
 /-- A use-site requirement cannot recycle an initializer-only template ID. -/
 theorem actual_requirement_templates_disjoint
@@ -125,7 +190,7 @@ theorem actual_requirement_templates_disjoint
     (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
       binder type actualRequirements substitution producedEvidence) :
     ∀ id, id ∈ actualRequirements → id ∉ localSchemeTemplateIds binder :=
-  instantiation.actual_templates_disjoint
+  instantiation.toSelection.actual_templates_disjoint
 
 /-- Every dictionary produced for a local-scheme use is closed and valid
 under the whole-program resolution catalog. -/
