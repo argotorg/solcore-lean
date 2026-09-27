@@ -248,6 +248,45 @@ theorem requirementsValid
       exact member.elim (argumentValid requirement)
         (outputValid.requirements_valid requirement)
 
+/-- Appending another semantically valid output path preserves every
+shape-specific requirement layout.  This is the semantic counterpart of the
+frontend's `attachExpressionCoercions` node refinement. -/
+theorem appendOutput
+    {context : Context} {rawType middleType finalType : TypeSystem.Ty}
+    {plan : ExpressionRequirementPlan}
+    {requirements : List RequirementId}
+    {first second : List CoercionStep}
+    (valid : ExpressionRequirementPlan.Valid context rawType middleType plan
+      requirements first)
+    (output : CoercionPathValid context middleType finalType second) :
+    ExpressionRequirementPlan.Valid context rawType finalType plan
+      (requirements ++ coercionRequirementIds second) (first ++ second) := by
+  cases valid with
+  | ordinary ownedValid pathValid requirementsEq =>
+      apply ExpressionRequirementPlan.Valid.ordinary ownedValid
+        (pathValid.append output)
+      rw [requirementsEq, coercionRequirementIds_append]
+      simp only [List.append_assoc]
+  | directCall direct =>
+      cases direct with
+      | @intro selectedResult contextual selectedPath contextualPath
+          signatureRequirements directRequirements directCoercions
+          selectedValid contextualValid
+          signatureValid coercionsEq requirementsEq =>
+          apply ExpressionRequirementPlan.Valid.directCall
+          apply DirectCallRequirementsValid.intro (contextual := middleType)
+            selectedValid
+            (contextualValid.append output) signatureValid
+          · rw [coercionsEq]
+            simp only [List.append_assoc]
+          · rw [requirementsEq, coercionRequirementIds_append]
+            simp only [List.append_assoc]
+  | indirectCall argumentValid outputValid requirementsEq =>
+      apply ExpressionRequirementPlan.Valid.indirectCall argumentValid
+        (outputValid.append output)
+      rw [requirementsEq, coercionRequirementIds_append]
+      simp only [List.append_assoc]
+
 end Valid
 
 end ExpressionRequirementPlan

@@ -76,6 +76,12 @@ inductive CoercionPathValid (context : Context) :
 def coercionRequirementIds (steps : List CoercionStep) : List RequirementId :=
   steps.flatMap CoercionStep.requirements
 
+@[simp] theorem coercionRequirementIds_append
+    (first second : List CoercionStep) :
+    coercionRequirementIds (first ++ second) =
+      coercionRequirementIds first ++ coercionRequirementIds second := by
+  simp [coercionRequirementIds]
+
 namespace CoercionPathValid
 
 /-- Valid coercion paths compose at a shared endpoint.  This structural fact
