@@ -82,6 +82,8 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.initial
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.replaceLocals
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.allocateBinder
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.allocateGeneralizedValue
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.recordNode
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.restoreLexicalScope
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.ownership

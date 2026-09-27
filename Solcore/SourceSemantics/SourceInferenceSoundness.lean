@@ -538,6 +538,46 @@ theorem allocateBinder
     · exact tracked.covered id oldMember
     · exact newCovered id (by simpa [added] using addedMember)
 
+/-- Canonical local generalization discharges every side condition required
+by template-tracking binder allocation.  The executable let paths first
+replace `locals` with its substituted form and then perform exactly this
+allocation. -/
+theorem allocateGeneralizedValue
+    {state : Frontend.SourceInference.State}
+    {pending : List RequirementId}
+    (tracked : TemplateTracking state pending)
+    (requirementsWellFormed : state.RequirementsWellFormed)
+    (locals : TypeSystem.Environment) (requirementStart : Nat)
+    (type : TypeSystem.Ty) (name : String)
+    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false) :
+    let generalized := Frontend.SourceInference.Detail.generalizeValue state
+      locals requirementStart type
+    TemplateTracking
+      (({ state with locals := locals }).allocateBinder name
+        generalized.scheme span comptime generalized.requirements).2
+      (pending ++ generalized.requirements.map fun requirement =>
+        requirement.templateRequirement) := by
+  dsimp only
+  apply allocateBinder (tracked.replaceLocals locals) name
+    (Frontend.SourceInference.Detail.generalizeValue state locals
+      requirementStart type).scheme span comptime
+    (Frontend.SourceInference.Detail.generalizeValue state locals
+      requirementStart type).requirements
+  · exact
+      (Frontend.SourceInference.Detail.generalizeValue_templateIds_sublist
+        state locals requirementStart type).nodup
+        (Frontend.SourceInference.State.requirementIds_nodup state
+          requirementsWellFormed)
+  · intro id member
+    change id ∉ state.localSchemeAssumptions
+    exact Frontend.SourceInference.Detail.generalizeValue_templateIds_fresh
+      state locals requirementStart type id member
+  · intro id member
+    change id ∈ state.requirements.map (fun requirement => requirement.id)
+    exact
+      (Frontend.SourceInference.Detail.generalizeValue_templateIds_sublist
+        state locals requirementStart type).subset member
+
 /-- Recording a node materializes a pending suffix matching that node's exact
 template inventory; older ambient pending identities remain pending. -/
 theorem recordNode

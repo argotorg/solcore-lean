@@ -223,6 +223,33 @@ private theorem templateTrackingBase :
       SourceInference.State.toTypedSource, sourceLocalSchemeTemplateIds,
       localSchemeTemplateOwners, initializedLetBindings]
 
+private def templateGeneralizationState : SourceInference.State := {
+  templateTrackingBaseState with
+  directCallRequirements := [templateId]
+}
+
+private theorem templateGeneralizationTracking :
+    SourceInferenceSoundness.TemplateTracking templateGeneralizationState [] := by
+  constructor <;>
+    simp [templateGeneralizationState, templateTrackingBaseState,
+      SourceInference.State.initial, SourceInference.State.toTypedSource,
+      sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+      initializedLetBindings]
+
+/-- The real generalizer supplies allocation's uniqueness, freshness, and
+ledger-coverage premises in one step, including a nonempty template set. -/
+example :
+    let generalized := SourceInference.Detail.generalizeValue
+      templateGeneralizationState [] 0 (.variable templateVariable)
+    SourceInferenceSoundness.TemplateTracking
+      (({ templateGeneralizationState with locals := [] }).allocateBinder
+        "template0" generalized.scheme (some testSpan) false
+        generalized.requirements).2
+      (generalized.requirements.map fun requirement =>
+        requirement.templateRequirement) := by
+  exact templateGeneralizationTracking.allocateGeneralizedValue (by rfl)
+    [] 0 (.variable templateVariable) "template0" (some testSpan)
+
 /-- The locals-only update used by both ordinary lets and for-loop items does
 not disturb pending template ownership. -/
 example : SourceInferenceSoundness.TemplateTracking
