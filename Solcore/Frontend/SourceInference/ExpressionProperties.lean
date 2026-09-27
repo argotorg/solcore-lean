@@ -1018,6 +1018,40 @@ unchanged. -/
         (state.addRequirementWithId step.predicate).2
         step.methodPredicates type
 
+/-- Committing a coercion plan leaves type inference unchanged, so it makes
+reflexive semantic progress from any solved input state. -/
+theorem commitCoercionPlan_inferenceProgress
+    (state : State) (plan : List PlannedCoercionStep)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress (commitCoercionPlan state plan).2 := by
+  induction plan generalizing state with
+  | nil => exact .refl solved
+  | cons step rest induction =>
+      simp only [commitCoercionPlan]
+      have primaryProgress :=
+        State.InferenceProgress.addRequirementWithId
+          state step.predicate solved
+      have methodsProgress :=
+        State.InferenceProgress.addRequirementsWithIds
+          (state.addRequirementWithId step.predicate).2
+          step.methodPredicates primaryProgress.solved
+      exact primaryProgress.trans (methodsProgress.trans
+        (induction _ methodsProgress.solved))
+
+/-- Committing a coercion plan preserves inference readiness because it only
+allocates requirement identities. -/
+theorem commitCoercionPlan_preserves_inferenceReady
+    (state : State) (plan : List PlannedCoercionStep)
+    (ready : state.InferenceReady) :
+    (commitCoercionPlan state plan).2.InferenceReady := by
+  induction plan generalizing state with
+  | nil => exact ready
+  | cons step rest induction =>
+      simp only [commitCoercionPlan]
+      exact induction _
+        (State.InferenceReady.addRequirementsWithIds step.methodPredicates
+          (State.InferenceReady.addRequirementWithId step.predicate ready))
+
 /-- Every successful expected-type fit returns either the empty equality path
 or a committed coercion path with exact resolved endpoints and adjacency. -/
 theorem withExpected_success_coercions_isValid
