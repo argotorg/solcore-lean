@@ -21,9 +21,104 @@ private theorem requirementIds_nodup_of_indices_nodup
 namespace State
 
 theorem initial_requirementsWellFormed (owner : Resolved.DeclarationId)
-    (locals : TypeSystem.Environment) :
-    (initial owner locals).RequirementsWellFormed := by
+    (locals : TypeSystem.Environment) (inputComptime : List Bool) :
+    (initial owner locals inputComptime).RequirementsWellFormed := by
   rfl
+
+/-- Allocating a fresh type metavariable does not change the requirement
+ledger. -/
+theorem fresh_preserves_requirementsWellFormed
+    (state : State) (wellFormed : state.RequirementsWellFormed) :
+    state.fresh.2.RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Replacing the compatibility-only local environment does not change the
+requirement ledger. -/
+theorem withLocals_preserves_requirementsWellFormed
+    (state : State) (locals : TypeSystem.Environment)
+    (wellFormed : state.RequirementsWellFormed) :
+    (state.withLocals locals).RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Restoring a lexical scope preserves all globally allocated requirement
+identities. -/
+theorem restoreLexicalScope_preserves_requirementsWellFormed
+    (state : State) (scope : LexicalScope)
+    (wellFormed : state.RequirementsWellFormed) :
+    (state.restoreLexicalScope scope).RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Allocating a visible binder changes only lexical and local-scheme state,
+not the canonical requirement ledger. -/
+theorem allocateBinder_preserves_requirementsWellFormed
+    (state : State) (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement)
+    (wellFormed : state.RequirementsWellFormed) :
+    RequirementsWellFormed
+      (state.allocateBinder name scheme span comptime schemeRequirements).2 := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Reserving a hidden local identity does not change the requirement ledger. -/
+theorem allocateHiddenLocal_preserves_requirementsWellFormed
+    (state : State) (wellFormed : state.RequirementsWellFormed) :
+    state.allocateHiddenLocal.2.RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Allocating an expression identity does not change the requirement ledger. -/
+theorem allocateExpressionId_preserves_requirementsWellFormed
+    (state : State) (wellFormed : state.RequirementsWellFormed) :
+    state.allocateExpressionId.2.RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Allocating a statement identity does not change the requirement ledger. -/
+theorem allocateStatementId_preserves_requirementsWellFormed
+    (state : State) (wellFormed : state.RequirementsWellFormed) :
+    state.allocateStatementId.2.RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Recording a typed-source node does not change the requirement ledger. -/
+theorem recordNode_preserves_requirementsWellFormed
+    (state : State) (node : Node)
+    (wellFormed : state.RequirementsWellFormed) :
+    (state.recordNode node).RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Updating an existing expression node does not change the requirement
+ledger. -/
+theorem modifyExpressionNode_preserves_requirementsWellFormed
+    (state : State) (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode)
+    (wellFormed : state.RequirementsWellFormed) :
+    (state.modifyExpressionNode id modify).RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Updating an existing statement node does not change the requirement
+ledger. -/
+theorem modifyStatementNode_preserves_requirementsWellFormed
+    (state : State) (id : StatementId)
+    (modify : StatementNode → StatementNode)
+    (wellFormed : state.RequirementsWellFormed) :
+    (state.modifyStatementNode id modify).RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
+
+/-- Recording direct-call provenance changes no canonical requirement IDs. -/
+theorem markDirectCallRequirements_preserves_requirementsWellFormed
+    (state : State) (requirements : List RequirementId)
+    (wellFormed : state.RequirementsWellFormed) :
+    (state.markDirectCallRequirements requirements).RequirementsWellFormed := by
+  change state.RequirementsWellFormed
+  exact wellFormed
 
 theorem addRequirementWithId_preserves_requirementsWellFormed
     (state : State) (predicate : ProgramPredicate)

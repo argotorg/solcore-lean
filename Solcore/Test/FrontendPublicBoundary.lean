@@ -153,6 +153,29 @@ example :=
   @Solcore.Frontend.SourceInference.FunctionBodiesChecked.exists_signature_of_function_mem
 example := @Solcore.Frontend.SourceInference.State.Header
 example :=
+  @Solcore.Frontend.SourceInference.State.initial_requirementsWellFormed
+example := @Solcore.Frontend.SourceInference.State.fresh_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.withLocals_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateBinder_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateHiddenLocal_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateExpressionId_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateStatementId_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.recordNode_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.modifyExpressionNode_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.modifyStatementNode_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.State.markDirectCallRequirements_preserves_requirementsWellFormed
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_state_header
 example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
 example := @Solcore.Frontend.SourceInference.Detail.unify_preserves_resolve_eq
