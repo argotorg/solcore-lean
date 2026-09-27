@@ -4,6 +4,9 @@ set_option autoImplicit false
 
 namespace Tests
 
+example := @Solcore.Frontend.loadValidatedProgram_success_environment
+example := @Solcore.Frontend.loadProgram_success_environment
+example := @Solcore.Frontend.loadProgram_success_declarations_nodup
 example := @Solcore.Frontend.buildProgramEnvironment_success_modules_nodup
 example := @Solcore.Frontend.buildProgramEnvironment_success_declarations_nodup
 example :=

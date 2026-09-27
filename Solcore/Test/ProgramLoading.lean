@@ -8,6 +8,27 @@ namespace Tests
 
 open Solcore Solcore.Frontend
 
+example
+    {workspace : Workspace.ValidatedUserWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadValidatedProgram workspace = .ok loaded) :
+    buildProgramEnvironment loaded.sources = .ok loaded.environment :=
+  loadValidatedProgram_success_environment success
+
+example
+    {raw : Workspace.RawWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadProgram raw = .ok loaded) :
+    buildProgramEnvironment loaded.sources = .ok loaded.environment :=
+  loadProgram_success_environment success
+
+example
+    {raw : Workspace.RawWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadProgram raw = .ok loaded) :
+    (loaded.environment.declarations.map (·.id)).Nodup :=
+  loadProgram_success_declarations_nodup success
+
 private def assertTrue (condition : Bool) (label : String) : IO Unit := do
   unless condition do
     throw (IO.userError label)

@@ -1,6 +1,6 @@
 import Solcore.Workspace
 import Solcore.Syntax.Parser
-import Solcore.Frontend.ProgramEnvironment
+import Solcore.Frontend.ProgramEnvironmentProperties
 
 /-! Validation and parsing at the executable whole-program boundary. -/
 
@@ -91,5 +91,48 @@ def loadProgram (raw : Workspace.RawWorkspace) :
   match Workspace.validate raw with
   | .error errors => .error (errors.map ProgramLoadError.workspace)
   | .ok workspace => loadValidatedProgram workspace
+
+/-- A successful validated-workspace load retains the exact declaration
+environment constructed from its parsed sources. -/
+theorem loadValidatedProgram_success_environment
+    {workspace : Workspace.ValidatedUserWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadValidatedProgram workspace = .ok loaded) :
+    buildProgramEnvironment loaded.sources = .ok loaded.environment := by
+  cases parsed : parseWorkspaceFiles workspace.files with
+  | mk parseErrors sources =>
+      simp only [loadValidatedProgram, parsed] at success
+      by_cases noParseErrors : parseErrors.isEmpty
+      · simp only [noParseErrors, if_true] at success
+        cases environmentResult : buildProgramEnvironment sources with
+        | error errors => simp [environmentResult] at success
+        | ok environment =>
+            simp only [environmentResult, Except.ok.injEq] at success
+            subst loaded
+            exact environmentResult
+      · simp [noParseErrors] at success
+
+/-- A successful raw-workspace load likewise exposes the exact environment
+builder success retained in the loaded carrier. -/
+theorem loadProgram_success_environment
+    {raw : Workspace.RawWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadProgram raw = .ok loaded) :
+    buildProgramEnvironment loaded.sources = .ok loaded.environment := by
+  cases validationResult : Workspace.validate raw with
+  | error errors => simp [loadProgram, validationResult] at success
+  | ok workspace =>
+      apply loadValidatedProgram_success_environment
+      simpa [loadProgram, validationResult] using success
+
+/-- Loaded declaration identities are unique because every successful raw
+load is backed by a successful environment construction. -/
+theorem loadProgram_success_declarations_nodup
+    {raw : Workspace.RawWorkspace}
+    {loaded : LoadedProgram}
+    (success : loadProgram raw = .ok loaded) :
+    (loaded.environment.declarations.map (·.id)).Nodup :=
+  buildProgramEnvironment_success_declarations_nodup
+    (loadProgram_success_environment success)
 
 end Solcore.Frontend
