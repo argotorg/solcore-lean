@@ -1292,6 +1292,89 @@ theorem SchemeWellFormed.transportContext
       parameters_eq declaration_eq wellFormed.body
 }
 
+/-- Exact substitution of every rigid binder transports a generic well-scoped
+type to any target context whose catalog agrees with the source and in which
+every replacement is well formed.  The target may bind a different
+declaration: every source rigid parameter is removed through exactness, while
+the replacement types may mention the target declaration's parameters. -/
+theorem TypeWellScoped.applyParametersTo
+    {source target : Context} {flexibleVariables : List TypeVarId} {type : Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      source.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      target substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (wellScoped : TypeWellScoped source flexibleVariables type) :
+    TypeWellScoped target flexibleVariables (substitution.apply type) := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ =>
+      TypeWellScoped target flexibleVariables (substitution.apply type))
+    (motive_2 := fun types _ =>
+      TypesWellScoped target flexibleVariables (types.map substitution.apply))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound _
+    obtain ⟨replacement, member, lookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some exact bound
+    simp only [TypeSystem.ParameterSubstitution.apply, lookup,
+      Option.getD_some]
+    exact StructuralSubstitution.TypeWellScoped.weakenFlexible
+      (fun metavariable impossible => by simp at impossible)
+      (range _ _ member).typeWellScoped
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    rw [apply_nominal]
+    exact .nominal dataType (arguments.map substitution.apply)
+      (by simpa [signatures_eq] using cataloged)
+      (by simpa using arity) argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    rw [apply_nominal]
+    exact .contractNominal contract (arguments.map substitution.apply)
+      (by simpa [signatures_eq] using cataloged)
+      (by simpa using arity) argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+/-- List-valued companion to `TypeWellScoped.applyParametersTo`. -/
+theorem TypesWellScoped.applyParametersTo
+    {source target : Context} {flexibleVariables : List TypeVarId}
+    {types : List Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      source.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      target substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (wellScoped : TypesWellScoped source flexibleVariables types) :
+    TypesWellScoped target flexibleVariables
+      (types.map substitution.apply) := by
+  let rec go {types : List Ty}
+      (typing : TypesWellScoped source flexibleVariables types) :
+      TypesWellScoped target flexibleVariables
+        (types.map substitution.apply) :=
+    match typing with
+    | .nil => .nil
+    | .cons headWellScoped tailWellScoped =>
+        .cons
+          (TypeWellScoped.applyParametersTo substitution exact range
+            signatures_eq headWellScoped)
+          (go tailWellScoped)
+  exact go wellScoped
+
 /-- Exact substitution of every rigid binder turns a generic well-scoped type
 into a type scoped by the closed substituted context. -/
 theorem TypeWellScoped.applyParameters
@@ -1303,50 +1386,8 @@ theorem TypeWellScoped.applyParameters
       (applyContext substitution context) substitution)
     (wellScoped : TypeWellScoped context flexibleVariables type) :
     TypeWellScoped (applyContext substitution context) flexibleVariables
-      (substitution.apply type) := by
-  refine TypeWellScoped.rec
-    (motive_1 := fun type _ =>
-      TypeWellScoped (applyContext substitution context) flexibleVariables
-        (substitution.apply type))
-    (motive_2 := fun types _ =>
-      TypesWellScoped (applyContext substitution context) flexibleVariables
-        (types.map substitution.apply))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
-  · intro metavariable bound
-    exact .variable bound
-  · intro parameter bound _
-    obtain ⟨replacement, member, lookup⟩ :=
-      ParameterSubstitution.exists_lookup?_eq_some exact bound
-    simp only [TypeSystem.ParameterSubstitution.apply, lookup,
-      Option.getD_some]
-    exact StructuralSubstitution.TypeWellScoped.weakenFlexible
-      (fun metavariable impossible => by simp at impossible)
-      (range _ _ member).typeWellScoped
-  · intro builtin
-    exact .builtin builtin
-  · intro dataType arguments cataloged arity _ argumentsInduction
-    rw [apply_nominal]
-    exact .nominal dataType (arguments.map substitution.apply)
-      (by simpa [applyContext] using cataloged)
-      (by simpa using arity) argumentsInduction
-  · intro contract arguments cataloged arity _ argumentsInduction
-    rw [apply_nominal]
-    exact .contractNominal contract (arguments.map substitution.apply)
-      (by simpa [applyContext] using cataloged)
-      (by simpa using arity) argumentsInduction
-  · intro parameter result _ _ parameterInduction resultInduction
-    exact .function parameterInduction resultInduction
-  · intro left right _ _ leftInduction rightInduction
-    exact .product leftInduction rightInduction
-  · intro key value _ _ keyInduction valueInduction
-    exact .mapping keyInduction valueInduction
-  · intro inner _ innerInduction
-    exact .proxy innerInduction
-  · intro inner _ innerInduction
-    exact .comptime innerInduction
-  · exact .nil
-  · intro head tail _ _ headInduction tailInduction
-    exact .cons headInduction tailInduction
+      (substitution.apply type) :=
+  TypeWellScoped.applyParametersTo substitution exact range rfl wellScoped
 
 theorem TypesWellScoped.applyParameters
     {context : Context} {flexibleVariables : List TypeVarId}
@@ -1358,50 +1399,8 @@ theorem TypesWellScoped.applyParameters
       (applyContext substitution context) substitution)
     (wellScoped : TypesWellScoped context flexibleVariables types) :
     TypesWellScoped (applyContext substitution context) flexibleVariables
-      (types.map substitution.apply) := by
-  refine TypesWellScoped.rec
-    (motive_1 := fun type _ =>
-      TypeWellScoped (applyContext substitution context) flexibleVariables
-        (substitution.apply type))
-    (motive_2 := fun types _ =>
-      TypesWellScoped (applyContext substitution context) flexibleVariables
-        (types.map substitution.apply))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
-  · intro metavariable bound
-    exact .variable bound
-  · intro parameter bound _
-    obtain ⟨replacement, member, lookup⟩ :=
-      ParameterSubstitution.exists_lookup?_eq_some exact bound
-    simp only [TypeSystem.ParameterSubstitution.apply, lookup,
-      Option.getD_some]
-    exact StructuralSubstitution.TypeWellScoped.weakenFlexible
-      (fun metavariable impossible => by simp at impossible)
-      (range _ _ member).typeWellScoped
-  · intro builtin
-    exact .builtin builtin
-  · intro dataType arguments cataloged arity _ argumentsInduction
-    rw [apply_nominal]
-    exact .nominal dataType (arguments.map substitution.apply)
-      (by simpa [applyContext] using cataloged)
-      (by simpa using arity) argumentsInduction
-  · intro contract arguments cataloged arity _ argumentsInduction
-    rw [apply_nominal]
-    exact .contractNominal contract (arguments.map substitution.apply)
-      (by simpa [applyContext] using cataloged)
-      (by simpa using arity) argumentsInduction
-  · intro parameter result _ _ parameterInduction resultInduction
-    exact .function parameterInduction resultInduction
-  · intro left right _ _ leftInduction rightInduction
-    exact .product leftInduction rightInduction
-  · intro key value _ _ keyInduction valueInduction
-    exact .mapping keyInduction valueInduction
-  · intro inner _ innerInduction
-    exact .proxy innerInduction
-  · intro inner _ innerInduction
-    exact .comptime innerInduction
-  · exact .nil
-  · intro head tail _ _ headInduction tailInduction
-    exact .cons headInduction tailInduction
+      (types.map substitution.apply) :=
+  TypesWellScoped.applyParametersTo substitution exact range rfl wellScoped
 
 theorem TypeParameterBindersWellFormed.applyContext
     (substitution : ParameterSubstitution) (context : Context) :
@@ -1413,6 +1412,26 @@ theorem TypeParameterBindersWellFormed.applyContext
     change parameter ∈ ([] : List TypeParameterId) at member
     simp at member
 
+/-- Exact rigid substitution preserves closed type formation in any compatible
+target context.  Target binder formation is explicit because an exact empty
+substitution has no range entry from which it could be recovered. -/
+theorem TypeWellFormed.applyParametersTo
+    {source target : Context} {type : Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      source.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      target substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (targetBinders : TypeParameterBindersWellFormed target)
+    (wellFormed : TypeWellFormed source type) :
+    TypeWellFormed target
+      (substitution.apply type) := {
+  binders := targetBinders
+  typeWellScoped := StructuralSubstitution.TypeWellScoped.applyParametersTo
+    substitution exact range signatures_eq wellFormed.typeWellScoped
+}
+
 theorem TypeWellFormed.applyParameters
     {context : Context} {type : Ty}
     (substitution : ParameterSubstitution)
@@ -1422,11 +1441,10 @@ theorem TypeWellFormed.applyParameters
       (applyContext substitution context) substitution)
     (wellFormed : TypeWellFormed context type) :
     TypeWellFormed (applyContext substitution context)
-      (substitution.apply type) := {
-  binders := TypeParameterBindersWellFormed.applyContext substitution context
-  typeWellScoped := StructuralSubstitution.TypeWellScoped.applyParameters
-    substitution exact range wellFormed.typeWellScoped
-}
+      (substitution.apply type) :=
+  TypeWellFormed.applyParametersTo substitution exact range rfl
+    (TypeParameterBindersWellFormed.applyContext substitution context)
+    wellFormed
 
 @[simp] theorem freeVariables_applyParameters
     {context : Context} (substitution : ParameterSubstitution)
@@ -1957,6 +1975,27 @@ theorem ParameterSubstitution.RangeAdmissible.mapRange
   exact StructuralSubstitution.TypeAdmissible.applyParameters outer outerExact
     outerRange (innerRange innerParameter innerReplacement entryMember)
 
+/-- Pointwise closed type formation transports to an arbitrary compatible
+target context under an exact rigid substitution. -/
+theorem TypesWellFormed.applyParametersTo
+    {source target : Context} {types : List Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      source.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      target substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (targetBinders : TypeParameterBindersWellFormed target)
+    (wellFormed : TypesWellFormed source types) :
+    TypesWellFormed target
+      (types.map substitution.apply) := by
+  intro type member
+  rcases List.mem_map.mp member with ⟨original, originalMember, typeEq⟩
+  subst type
+  exact StructuralSubstitution.TypeWellFormed.applyParametersTo substitution
+    exact range signatures_eq targetBinders
+    (wellFormed original originalMember)
+
 theorem TypesWellFormed.applyParameters
     {context : Context} {types : List Ty}
     (substitution : ParameterSubstitution)
@@ -1966,12 +2005,10 @@ theorem TypesWellFormed.applyParameters
       (applyContext substitution context) substitution)
     (wellFormed : TypesWellFormed context types) :
     TypesWellFormed (applyContext substitution context)
-      (types.map substitution.apply) := by
-  intro type member
-  rcases List.mem_map.mp member with ⟨original, originalMember, typeEq⟩
-  subst type
-  exact StructuralSubstitution.TypeWellFormed.applyParameters substitution exact
-    range (wellFormed original originalMember)
+      (types.map substitution.apply) :=
+  TypesWellFormed.applyParametersTo substitution exact range rfl
+    (TypeParameterBindersWellFormed.applyContext substitution context)
+    wellFormed
 
 theorem TypesWellFormed.applyParameters_compose
     {context : Context} {types : List Ty}
@@ -2014,24 +2051,29 @@ theorem TypesWellScoped.productMany
           exact .product headScoped
             (StructuralSubstitution.TypesWellScoped.productMany tailScoped)
 
-theorem PredicateWellFormed.applyParameters
-    {context : Context} {predicate : ProgramPredicate}
+/-- Predicate formation transports to an arbitrary compatible target context
+under an exact rigid substitution. -/
+theorem PredicateWellFormed.applyParametersTo
+    {source target : Context} {predicate : ProgramPredicate}
     (substitution : ParameterSubstitution)
     (exact : SourceSemantics.ParameterSubstitution.Exact substitution
-      context.typeParameters)
+      source.typeParameters)
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
-      (applyContext substitution context) substitution)
-    (wellFormed : PredicateWellFormed context predicate) :
-    PredicateWellFormed (applyContext substitution context)
+      target substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (targetBinders : TypeParameterBindersWellFormed target)
+    (wellFormed : PredicateWellFormed source predicate) :
+    PredicateWellFormed target
       (ProgramPredicate.applyParameters substitution predicate) := by
   constructor
-  · exact StructuralSubstitution.TypeWellFormed.applyParameters substitution
-      exact range wellFormed.subject
+  · exact StructuralSubstitution.TypeWellFormed.applyParametersTo substitution
+      exact range signatures_eq targetBinders wellFormed.subject
   · intro argument member
     rcases List.mem_map.mp member with ⟨original, originalMember, argumentEq⟩
     subst argument
-    exact StructuralSubstitution.TypeWellFormed.applyParameters substitution
-      exact range (wellFormed.arguments original originalMember)
+    exact StructuralSubstitution.TypeWellFormed.applyParametersTo substitution
+      exact range signatures_eq targetBinders
+      (wellFormed.arguments original originalMember)
   · cases traitEq : predicate.trait with
     | builtin builtin =>
         cases builtin with
@@ -2044,8 +2086,22 @@ theorem PredicateWellFormed.applyParameters
         rw [traitEq] at traitValid
         rcases traitValid with ⟨signature, member, idEq, arity⟩
         simp only [ProgramPredicate.applyParameters, traitEq]
-        exact ⟨signature, by simpa [applyContext] using member, idEq,
+        exact ⟨signature, by simpa [signatures_eq] using member, idEq,
           by simpa [ProgramPredicate.applyParameters] using arity⟩
+
+theorem PredicateWellFormed.applyParameters
+    {context : Context} {predicate : ProgramPredicate}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      context.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (applyContext substitution context) substitution)
+    (wellFormed : PredicateWellFormed context predicate) :
+    PredicateWellFormed (applyContext substitution context)
+      (ProgramPredicate.applyParameters substitution predicate) :=
+  PredicateWellFormed.applyParametersTo substitution exact range rfl
+    (TypeParameterBindersWellFormed.applyContext substitution context)
+    wellFormed
 
 theorem PredicateAdmissible.applyParameters
     {context : Context} {predicate : ProgramPredicate}
@@ -2113,6 +2169,27 @@ theorem PredicateAdmissible.applyMixed_compose
           inner outerExact outerRange innerExact
           (admissible.arguments argument member).typeWellScoped
 
+/-- Pointwise predicate formation transports to an arbitrary compatible target
+context under an exact rigid substitution. -/
+theorem PredicatesWellFormed.applyParametersTo
+    {source target : Context} {predicates : List ProgramPredicate}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      source.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      target substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (targetBinders : TypeParameterBindersWellFormed target)
+    (wellFormed : PredicatesWellFormed source predicates) :
+    PredicatesWellFormed target
+      (predicates.map (ProgramPredicate.applyParameters substitution)) := by
+  intro predicate member
+  rcases List.mem_map.mp member with ⟨original, originalMember, predicateEq⟩
+  subst predicate
+  exact StructuralSubstitution.PredicateWellFormed.applyParametersTo substitution
+    exact range signatures_eq targetBinders
+    (wellFormed original originalMember)
+
 theorem PredicatesWellFormed.applyParameters
     {context : Context} {predicates : List ProgramPredicate}
     (substitution : ParameterSubstitution)
@@ -2122,12 +2199,10 @@ theorem PredicatesWellFormed.applyParameters
       (applyContext substitution context) substitution)
     (wellFormed : PredicatesWellFormed context predicates) :
     PredicatesWellFormed (applyContext substitution context)
-      (predicates.map (ProgramPredicate.applyParameters substitution)) := by
-  intro predicate member
-  rcases List.mem_map.mp member with ⟨original, originalMember, predicateEq⟩
-  subst predicate
-  exact StructuralSubstitution.PredicateWellFormed.applyParameters substitution
-    exact range (wellFormed original originalMember)
+      (predicates.map (ProgramPredicate.applyParameters substitution)) :=
+  PredicatesWellFormed.applyParametersTo substitution exact range rfl
+    (TypeParameterBindersWellFormed.applyContext substitution context)
+    wellFormed
 
 theorem PredicateWellFormed.applyParameters_compose
     {context : Context} {predicate : ProgramPredicate}
@@ -2169,6 +2244,23 @@ theorem PredicatesWellFormed.applyParameters_compose
           wellFormed predicate (by simp [member]))
 
 namespace ParameterSubstitution.RangeWellFormed
+
+/-- A rigid-substitution range transports whenever the target preserves the
+signature catalog, rigid parameter row, and current declaration.  Lexical
+locals, assumptions, and solved requirements do not participate in closed
+type formation. -/
+theorem transportContext
+    {source target : Context} {substitution : ParameterSubstitution}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      source substitution) :
+    SourceSemantics.ParameterSubstitution.RangeWellFormed
+      target substitution := by
+  intro parameter replacement member
+  exact StructuralSubstitution.TypeWellFormed.transportContext signatures_eq
+    parameters_eq declaration_eq (range parameter replacement member)
 
 theorem atApplyContextOfBase
     {context : Context} {substitution : ParameterSubstitution}
