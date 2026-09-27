@@ -474,7 +474,7 @@ def solvePredicates (context : Context) (state : State) :
   | [] => .ok ([], [])
   | predicate :: rest => do
       let normalized := applyPredicate state predicate
-      let evidence ← solvePredicate context state normalized
+      let evidence ← solveNormalizedPredicate context state normalized
       let (predicates, evidenceRest) ← solvePredicates context state rest
       pure (normalized :: predicates, evidence :: evidenceRest)
 

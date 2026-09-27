@@ -54,6 +54,56 @@ private def hasBuiltinIntWordEvidence
         goal == solved.predicate && premises.isEmpty
     | _ => false
 
+private def solverRegressionModule : Workspace.ModuleId :=
+  ⟨.main, ⟨[⟨"source_inference_solver", by decide⟩], by decide⟩⟩
+
+private def solverRegressionOwner : Resolved.DeclarationId :=
+  ⟨solverRegressionModule, 0⟩
+
+private def solverRegressionFirst : TypeSystem.TypeVarId := ⟨0⟩
+private def solverRegressionSecond : TypeSystem.TypeVarId := ⟨1⟩
+
+private def solverRegressionSource : ProgramPredicate :=
+  ProgramSignatures.builtinIntPredicate (.variable solverRegressionFirst)
+
+private def solverRegressionNormalized : ProgramPredicate :=
+  ProgramSignatures.builtinIntPredicate (.variable solverRegressionSecond)
+
+private def solverRegressionContext : SourceInference.Context := {
+  environment := { modules := [], declarations := [] }
+  signatures := {
+    functions := []
+    implRules := []
+    traits := []
+    implementations := []
+  }
+  scope := {
+    currentModule := solverRegressionModule
+    genericOwner := solverRegressionOwner
+    genericParameters := []
+  }
+  assumptions := [solverRegressionSource]
+}
+
+private def solverRegressionState : SourceInference.State := {
+  SourceInference.State.initial solverRegressionOwner with
+  inference := {
+    next := 2
+    substitution := [
+      (solverRegressionFirst, .variable solverRegressionSecond),
+      (solverRegressionSecond, .bool)
+    ]
+  }
+}
+
+/-- This equation fails if the already-normalized head is passed through
+`solvePredicate` and receives the inference substitution a second time. -/
+example : SourceInference.Detail.solvePredicates solverRegressionContext
+    solverRegressionState [solverRegressionSource] =
+    .ok ([solverRegressionNormalized],
+      [.assumption solverRegressionNormalized]) := by
+  rfl
+
 private def integerLiteralRows
     (function : SourceInference.CheckedFunction) :
     List (SourceInference.ExpressionNode ×
