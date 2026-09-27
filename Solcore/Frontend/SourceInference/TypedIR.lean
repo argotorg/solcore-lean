@@ -368,6 +368,122 @@ inductive Node where
   | statement (node : StatementNode)
   deriving Repr, BEq, DecidableEq
 
+namespace PlaceProjection
+
+/-- Category-preserving expression edges retained by one place projection. -/
+def references : PlaceProjection → List NodeId
+  | .index key => [.expression key]
+  | .member _ _ => []
+
+end PlaceProjection
+
+namespace PlaceResolution
+
+/-- Every expression edge retained by an assignable place, in projection
+order. -/
+def references (place : PlaceResolution) : List NodeId :=
+  place.projections.flatMap PlaceProjection.references
+
+end PlaceResolution
+
+namespace AssignmentResolution
+
+/-- Expression edges retained by the target place of one assignment. -/
+def references (assignment : AssignmentResolution) : List NodeId :=
+  assignment.target.references
+
+end AssignmentResolution
+
+namespace ForItemForm
+
+/-- Direct occurrence edges retained by one `for` initializer or post item. -/
+def references : ForItemForm → List NodeId
+  | .letDecl _ initializer => initializer.map NodeId.expression |>.toList
+  | ForItemForm.expression expressionId => [NodeId.expression expressionId]
+  | .assignValue assignment _ value =>
+      assignment.references ++ [NodeId.expression value]
+  | .assignBitNot assignment => assignment.references
+
+end ForItemForm
+
+namespace ExpressionForm
+
+/-- Direct occurrence edges retained by one expression form. -/
+def references : ExpressionForm → List NodeId
+  | .literal _ => []
+  | .integerLiteral _ _ => []
+  | .reference _ _ => []
+  | .group inner => [NodeId.expression inner]
+  | .tuple elements => elements.map NodeId.expression
+  | .unary _ operand => [NodeId.expression operand]
+  | .binary left _ right =>
+      [NodeId.expression left, NodeId.expression right]
+  | .conditional condition thenBranch elseBranch =>
+      [NodeId.expression condition, NodeId.expression thenBranch,
+        NodeId.expression elseBranch]
+  | .lambda _ _ body => body.map NodeId.statement
+  | .call callee arguments _ =>
+      NodeId.expression callee :: arguments.map NodeId.expression
+  | .constructor _ arguments => arguments.map NodeId.expression
+  | .member base _ _ => [NodeId.expression base]
+  | .proxy _ => []
+  | .index base key => [NodeId.expression base, NodeId.expression key]
+
+end ExpressionForm
+
+namespace TypedMatchCase
+
+/-- Statement edges retained by one match case. -/
+def references (matchCase : TypedMatchCase) : List NodeId :=
+  matchCase.body.map NodeId.statement
+
+end TypedMatchCase
+
+namespace MatchResolution
+
+/-- Every edge retained by a match, in source order. -/
+def references (resolution : MatchResolution) : List NodeId :=
+  [NodeId.expression resolution.scrutinee] ++
+    resolution.cases.flatMap TypedMatchCase.references ++
+    (resolution.defaultBody.getD []).map NodeId.statement
+
+end MatchResolution
+
+namespace StatementForm
+
+/-- Direct occurrence edges retained by one statement form. -/
+def references : StatementForm → List NodeId
+  | .letDecl _ initializer => initializer.map NodeId.expression |>.toList
+  | .returnStmt value => value.map NodeId.expression |>.toList
+  | StatementForm.expression expressionId _ => [NodeId.expression expressionId]
+  | .assignValue assignment _ value =>
+      assignment.references ++ [NodeId.expression value]
+  | .assignBitNot assignment => assignment.references
+  | .ifThen condition thenBody elseBody =>
+      [NodeId.expression condition] ++ thenBody.map NodeId.statement ++
+        (elseBody.getD []).map NodeId.statement
+  | .block body => body.map NodeId.statement
+  | .matchWith resolution => resolution.references
+  | .forLoop initializer condition post body =>
+      initializer.flatMap ForItemForm.references ++
+        [NodeId.expression condition] ++
+        post.flatMap ForItemForm.references ++ body.map NodeId.statement
+  | .whileLoop condition body =>
+      NodeId.expression condition :: body.map NodeId.statement
+  | .breakStmt => []
+  | .continueStmt => []
+
+end StatementForm
+
+namespace Node
+
+/-- Direct category-preserving occurrence edges retained by one node. -/
+def references : Node → List NodeId
+  | .expression node => node.form.references
+  | .statement node => node.form.references
+
+end Node
+
 /-- Typed source for one declaration.  All recursive edges point into `nodes`;
 `roots` retain the checked entry points in order, including standalone
 expression roots. -/

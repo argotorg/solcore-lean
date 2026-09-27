@@ -559,6 +559,16 @@ example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputNa
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputComptime
 example := @Solcore.Frontend.SourceInference.TypedBinder.applySubstitution_name
 example := @Solcore.Frontend.SourceInference.TypedBinder.applySubstitution_comptime
+example := @Solcore.Frontend.SourceInference.PlaceResolution.references
+example := @Solcore.Frontend.SourceInference.AssignmentResolution.references
+example := @Solcore.Frontend.SourceInference.ForItemForm.references
+example := @Solcore.Frontend.SourceInference.TypedMatchCase.references
+example := @Solcore.Frontend.SourceInference.MatchResolution.references
+example := @Solcore.Frontend.SourceInference.ExpressionForm.references
+example := @Solcore.Frontend.SourceInference.StatementForm.references
+example := @Solcore.Frontend.SourceInference.Node.references
+example :=
+  @Solcore.Frontend.SourceInference.Node.applySubstitution_references
 example :=
   @Solcore.Frontend.SourceInference.CoercionPath.isValid_applySubstitution
 example := @Solcore.Frontend.SourceInference.TypedSource.applySubstitution_inputNames

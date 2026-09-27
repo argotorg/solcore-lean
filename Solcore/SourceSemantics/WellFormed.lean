@@ -61,80 +61,37 @@ def NodesOwned (source : TypedSource) : Prop :=
 def RootsOwned (source : TypedSource) : Prop :=
   ∀ root, root ∈ source.roots → NodeIdOwnedBy source.owner root
 
-/-- Index expressions retained by an assignable place. -/
+/-- Compatibility name for the canonical place edges stored by typed IR. -/
 def placeChildIds (place : PlaceResolution) : List NodeId :=
-  place.projections.flatMap fun projection =>
-    match projection with
-    | .index key => [.expression key]
-    | .member _ _ => []
+  place.references
 
-/-- Occurrence edges retained by an assignment target. -/
+/-- Compatibility name for the canonical assignment-target edges. -/
 def assignmentChildIds (assignment : AssignmentResolution) : List NodeId :=
-  placeChildIds assignment.target
+  assignment.references
 
-/-- Occurrence edges retained by one `for` initializer or post item. -/
+/-- Compatibility name for the canonical `for`-item edges. -/
 def forItemChildIds : ForItemForm → List NodeId
-  | .letDecl _ initializer =>
-      initializer.map NodeId.expression |>.toList
-  | .expression expression => [.expression expression]
-  | .assignValue assignment _ value =>
-      assignmentChildIds assignment ++ [.expression value]
-  | .assignBitNot assignment => assignmentChildIds assignment
+  | item => item.references
 
-/-- Statement edges retained by one match case. -/
+/-- Compatibility name for the canonical match-case edges. -/
 def matchCaseChildIds (matchCase : TypedMatchCase) : List NodeId :=
-  matchCase.body.map NodeId.statement
+  matchCase.references
 
-/-- Occurrence edges retained by a resolved match. -/
+/-- Compatibility name for the canonical resolved-match edges. -/
 def matchChildIds (resolution : MatchResolution) : List NodeId :=
-  [.expression resolution.scrutinee] ++
-    resolution.cases.flatMap matchCaseChildIds ++
-    (resolution.defaultBody.getD []).map NodeId.statement
+  resolution.references
 
-/-- Direct occurrence edges retained by an expression form. -/
+/-- Compatibility name for the canonical expression-form edges. -/
 def expressionChildIds : ExpressionForm → List NodeId
-  | .literal _ => []
-  | .integerLiteral _ _ => []
-  | .reference _ _ => []
-  | .group inner => [.expression inner]
-  | .tuple elements => elements.map NodeId.expression
-  | .unary _ operand => [.expression operand]
-  | .binary left _ right => [.expression left, .expression right]
-  | .conditional condition thenBranch elseBranch =>
-      [.expression condition, .expression thenBranch, .expression elseBranch]
-  | .lambda _ _ body => body.map NodeId.statement
-  | .call callee arguments _ =>
-      .expression callee :: arguments.map NodeId.expression
-  | .constructor _ arguments => arguments.map NodeId.expression
-  | .member base _ _ => [.expression base]
-  | .proxy _ => []
-  | .index base index => [.expression base, .expression index]
+  | form => form.references
 
-/-- Direct occurrence edges retained by a statement form. -/
+/-- Compatibility name for the canonical statement-form edges. -/
 def statementChildIds : StatementForm → List NodeId
-  | .letDecl _ initializer => initializer.map NodeId.expression |>.toList
-  | .returnStmt value => value.map NodeId.expression |>.toList
-  | .expression expression _ => [.expression expression]
-  | .assignValue assignment _ value =>
-      assignmentChildIds assignment ++ [.expression value]
-  | .assignBitNot assignment => assignmentChildIds assignment
-  | .ifThen condition thenBody elseBody =>
-      [.expression condition] ++ thenBody.map NodeId.statement ++
-        (elseBody.getD []).map NodeId.statement
-  | .block body => body.map NodeId.statement
-  | .matchWith resolution => matchChildIds resolution
-  | .forLoop initializer condition post body =>
-      initializer.flatMap forItemChildIds ++ [.expression condition] ++
-        post.flatMap forItemChildIds ++ body.map NodeId.statement
-  | .whileLoop condition body =>
-      .expression condition :: body.map NodeId.statement
-  | .breakStmt => []
-  | .continueStmt => []
+  | form => form.references
 
-/-- Direct occurrence edges retained by a heterogeneous node. -/
+/-- Compatibility name for the canonical heterogeneous-node edges. -/
 def nodeChildIds : Node → List NodeId
-  | .expression node => expressionChildIds node.form
-  | .statement node => statementChildIds node.form
+  | node => node.references
 
 /-- Every category-safe root names a table node of the same category. -/
 def RootsExist (source : TypedSource) : Prop :=

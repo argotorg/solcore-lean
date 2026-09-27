@@ -288,6 +288,11 @@ open TypeSystem
     (applyPlaceResolution substitution place).projections = place.projections := by
   rfl
 
+@[simp] theorem applyPlaceResolution_references
+    (substitution : ParameterSubstitution) (place : PlaceResolution) :
+    (applyPlaceResolution substitution place).references = place.references := by
+  rfl
+
 @[simp] theorem applyAssignmentResolution_requirements
     (substitution : ParameterSubstitution) (assignment : AssignmentResolution) :
     (applyAssignmentResolution substitution assignment).requirements =
@@ -298,6 +303,12 @@ open TypeSystem
     (substitution : ParameterSubstitution) (assignment : AssignmentResolution) :
     assignmentChildIds (applyAssignmentResolution substitution assignment) =
       assignmentChildIds assignment := by
+  rfl
+
+@[simp] theorem applyAssignmentResolution_references
+    (substitution : ParameterSubstitution) (assignment : AssignmentResolution) :
+    (applyAssignmentResolution substitution assignment).references =
+      assignment.references := by
   rfl
 
 @[simp] theorem applyMatchPatternInstruction_binderIds
@@ -336,6 +347,12 @@ open TypeSystem
       matchCaseChildIds matchCase := by
   rfl
 
+@[simp] theorem applyTypedMatchCase_references
+    (substitution : ParameterSubstitution) (matchCase : TypedMatchCase) :
+    (applyTypedMatchCase substitution matchCase).references =
+      matchCase.references := by
+  rfl
+
 @[simp] theorem applyTypedMatchCases_childIds
     (substitution : ParameterSubstitution) (cases : List TypedMatchCase) :
     (cases.map (applyTypedMatchCase substitution)).flatMap matchCaseChildIds =
@@ -344,11 +361,31 @@ open TypeSystem
   | nil => rfl
   | cons matchCase cases induction => simp [induction]
 
+@[simp] theorem applyTypedMatchCases_references
+    (substitution : ParameterSubstitution) (cases : List TypedMatchCase) :
+    (cases.map (applyTypedMatchCase substitution)).flatMap
+        TypedMatchCase.references =
+      cases.flatMap TypedMatchCase.references := by
+  induction cases with
+  | nil => rfl
+  | cons matchCase cases induction => simp [induction]
+
+@[simp] theorem applyMatchResolution_references
+    (substitution : ParameterSubstitution) (resolution : MatchResolution) :
+    (applyMatchResolution substitution resolution).references =
+      resolution.references := by
+  simp [applyMatchResolution, MatchResolution.references]
+
+@[simp] theorem applyForItemForm_references
+    (substitution : ParameterSubstitution) (item : ForItemForm) :
+    (applyForItemForm substitution item).references = item.references := by
+  cases item <;> simp [applyForItemForm, ForItemForm.references]
+
 @[simp] theorem applyForItemForm_childIds
     (substitution : ParameterSubstitution) (item : ForItemForm) :
     forItemChildIds (applyForItemForm substitution item) =
       forItemChildIds item := by
-  cases item <;> simp [applyForItemForm, forItemChildIds]
+  simp [forItemChildIds]
 
 @[simp] theorem applyForItemForms_childIds
     (substitution : ParameterSubstitution) (items : List ForItemForm) :
@@ -358,19 +395,37 @@ open TypeSystem
   | nil => rfl
   | cons item items induction => simp [induction]
 
+@[simp] theorem applyForItemForms_references
+    (substitution : ParameterSubstitution) (items : List ForItemForm) :
+    (items.map (applyForItemForm substitution)).flatMap
+        ForItemForm.references =
+      items.flatMap ForItemForm.references := by
+  induction items with
+  | nil => rfl
+  | cons item items induction => simp [induction]
+
+@[simp] theorem applyExpressionForm_references
+    (substitution : ParameterSubstitution) (form : ExpressionForm) :
+    (applyExpressionForm substitution form).references = form.references := by
+  cases form <;> rfl
+
 @[simp] theorem applyExpressionForm_childIds
     (substitution : ParameterSubstitution) (form : ExpressionForm) :
     expressionChildIds (applyExpressionForm substitution form) =
       expressionChildIds form := by
-  cases form <;> rfl
+  simp [expressionChildIds]
+
+@[simp] theorem applyStatementForm_references
+    (substitution : ParameterSubstitution) (form : StatementForm) :
+    (applyStatementForm substitution form).references = form.references := by
+  cases form <;>
+    simp [applyStatementForm, StatementForm.references]
 
 @[simp] theorem applyStatementForm_childIds
     (substitution : ParameterSubstitution) (form : StatementForm) :
     statementChildIds (applyStatementForm substitution form) =
       statementChildIds form := by
-  cases form <;>
-    simp [applyStatementForm, statementChildIds, matchChildIds,
-      applyMatchResolution]
+  simp [statementChildIds]
 
 @[simp] theorem applyNode_id
     (substitution : ParameterSubstitution) (node : Node) :
@@ -382,11 +437,16 @@ open TypeSystem
     (applyNode substitution node).occurrenceId = node.occurrenceId := by
   cases node <;> rfl
 
+@[simp] theorem applyNode_references
+    (substitution : ParameterSubstitution) (node : Node) :
+    (applyNode substitution node).references = node.references := by
+  cases node <;>
+    simp [applyNode, Node.references, applyExpressionNode, applyStatementNode]
+
 @[simp] theorem applyNode_childIds
     (substitution : ParameterSubstitution) (node : Node) :
     nodeChildIds (applyNode substitution node) = nodeChildIds node := by
-  cases node <;>
-    simp [applyNode, applyExpressionNode, applyStatementNode, nodeChildIds]
+  simp [nodeChildIds]
 
 @[simp] theorem applyTypedSource_owner
     (substitution : ParameterSubstitution) (source : TypedSource) :
@@ -544,15 +604,13 @@ open TypeSystem
     (substitution : Substitution) (assignment : AssignmentResolution) :
     assignmentChildIds (assignment.applySubstitution substitution) =
       assignmentChildIds assignment := by
-  simp [assignmentChildIds, placeChildIds,
-    AssignmentResolution.applySubstitution,
-    PlaceResolution.applySubstitution]
+  simp [assignmentChildIds]
 
 @[simp] theorem applyTypedMatchCase_childIds
     (substitution : Substitution) (matchCase : TypedMatchCase) :
     matchCaseChildIds (matchCase.applySubstitution substitution) =
       matchCaseChildIds matchCase := by
-  rfl
+  simp [matchCaseChildIds]
 
 @[simp] theorem applyTypedMatchCases_childIds
     (substitution : Substitution) (cases : List TypedMatchCase) :
@@ -567,8 +625,7 @@ open TypeSystem
     (substitution : Substitution) (item : ForItemForm) :
     forItemChildIds (item.applySubstitution substitution) =
       forItemChildIds item := by
-  cases item <;>
-    simp [ForItemForm.applySubstitution, forItemChildIds]
+  simp [forItemChildIds]
 
 @[simp] theorem applyForItemForms_childIds
     (substitution : Substitution) (items : List ForItemForm) :
@@ -583,22 +640,18 @@ open TypeSystem
     (substitution : Substitution) (form : ExpressionForm) :
     expressionChildIds (form.applySubstitution substitution) =
       expressionChildIds form := by
-  cases form <;> rfl
+  simp [expressionChildIds]
 
 @[simp] theorem applyStatementForm_childIds
     (substitution : Substitution) (form : StatementForm) :
     statementChildIds (form.applySubstitution substitution) =
       statementChildIds form := by
-  cases form <;>
-    simp [StatementForm.applySubstitution, MatchResolution.applySubstitution,
-      statementChildIds, matchChildIds]
+  simp [statementChildIds]
 
 @[simp] theorem applyNode_childIds
     (substitution : Substitution) (node : Node) :
     nodeChildIds (node.applySubstitution substitution) = nodeChildIds node := by
-  cases node <;>
-    simp [Node.applySubstitution, ExpressionNode.applySubstitution,
-      StatementNode.applySubstitution, nodeChildIds]
+  simp [nodeChildIds]
 
 @[simp] theorem applyTypedSource_nodeIds
     (substitution : Substitution) (source : TypedSource) :
