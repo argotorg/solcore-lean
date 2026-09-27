@@ -7,6 +7,14 @@ namespace Tests
 example := @Solcore.Frontend.TraitResolution.ResolutionEvidenceValid
 example := @Solcore.Frontend.TraitResolution.ResolutionPremisesValid
 example := @Solcore.Frontend.TraitResolution.resolve_success_sound
+example := @Solcore.Frontend.TypedTraitResolution.RuleMatchSubstitution
+example := @Solcore.Frontend.TypedTraitResolution.HeadMatchCertificate
+example := @Solcore.Frontend.TypedTraitResolution.ruleVariables_nodup
+example := @Solcore.Frontend.TypedTraitResolution.ruleParameters_nodup
+example := @Solcore.Frontend.TypedTraitResolution.mem_ruleVariables_iff
+example := @Solcore.Frontend.TypedTraitResolution.mem_ruleParameters_iff
+example := @Solcore.Frontend.TypedTraitResolution.matchImplHeadWithParameters?_certificate
+example := @Solcore.Frontend.TypedTraitResolution.matchImplHead?_certificate
 
 example :=
   @Solcore.Frontend.SourceInference.Detail.solveRequirements_ids_nodup

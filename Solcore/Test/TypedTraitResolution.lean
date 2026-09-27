@@ -26,6 +26,7 @@ private def boxType := declaration 3
 private def equalityWordImpl := declaration 10
 private def showBoxImpl := declaration 11
 private def convertSameImpl := declaration 12
+private def whereOnlyImpl := declaration 13
 
 private def predicate (trait : TraitId) (subject : Ty)
     (arguments : List Ty := []) : Predicate :=
@@ -66,6 +67,14 @@ private def convertSameRule : ImplRule :=
     head := convert variable0 variable0
     wherePredicates := [] }
 
+private def whereOnlyParameter : TypeParameterId :=
+  { owner := whereOnlyImpl, index := 0 }
+
+private def whereOnlyRule : ImplRule :=
+  { id := whereOnlyImpl
+    head := equality .word
+    wherePredicates := [convert (.parameter whereOnlyParameter) variable0] }
+
 private def expectedFreshShowBoxRule : ImplRule :=
   { id := showBoxImpl
     head := showPredicate (box (.variable ⟨0⟩))
@@ -86,6 +95,39 @@ example : matchImplHeadWithParameters? [showBoxParameter] showBoxRule
     } := by
   rfl
 
+example : ∃ substitution, HeadMatchCertificate showBoxRule
+    (showPredicate (box .word)) [equality .word] substitution := by
+  exact matchImplHead?_certificate (by rfl)
+
+example : ∃ substitution, HeadMatchCertificate showBoxRule
+    (showPredicate (box .word)) [equality .word] substitution := by
+  have matched : matchImplHeadWithParameters? [showBoxParameter] showBoxRule
+      (showPredicate (box .word)) = some {
+        parameterSubstitution := [(showBoxParameter, .word)]
+        wherePredicates := [equality .word]
+      } := by rfl
+  exact matchImplHeadWithParameters?_certificate matched
+
+example : ∃ substitution : RuleMatchSubstitution,
+    substitution.parameters.map Prod.fst = [showBoxParameter] ∧
+      substitution.variables.domain = [] ∧
+      substitution.applyPredicate showBoxRule.head =
+        showPredicate (box .word) ∧
+      showBoxRule.wherePredicates.map substitution.applyPredicate =
+        [equality .word] := by
+  rcases matchImplHead?_certificate (rule := showBoxRule)
+      (goal := showPredicate (box .word)) (premises := [equality .word])
+      (by rfl) with ⟨substitution, certificate⟩
+  cases certificate with
+  | intro _ _ parameter_domain variable_domain head_eq premises_eq =>
+      have parameters_eq : ruleParameters showBoxRule =
+          [showBoxParameter] := by native_decide
+      have variables_eq : ruleVariables showBoxRule = [] := by native_decide
+      rw [parameters_eq] at parameter_domain
+      rw [variables_eq] at variable_domain
+      exact ⟨substitution, parameter_domain, variable_domain, head_eq,
+        premises_eq⟩
+
 example : matchImplHead? showBoxRule (equality (box .word)) = none := by
   rfl
 
@@ -94,6 +136,56 @@ example : matchImplHead? convertSameRule (convert .word .bool) = none := by
 
 example : matchImplHead? convertSameRule (convert .word .word) = some [] := by
   rfl
+
+example : ∃ substitution : RuleMatchSubstitution,
+    substitution.parameters.map Prod.fst = [] ∧
+      substitution.variables.domain = [⟨0⟩] ∧
+      substitution.applyPredicate convertSameRule.head =
+        convert .word .word := by
+  rcases matchImplHead?_certificate (rule := convertSameRule)
+      (goal := convert .word .word) (premises := []) (by rfl) with
+    ⟨substitution, certificate⟩
+  cases certificate with
+  | intro _ _ parameter_domain variable_domain head_eq _ =>
+      have parameters_eq : ruleParameters convertSameRule = [] := by
+        native_decide
+      have variables_eq : ruleVariables convertSameRule = [⟨0⟩] := by
+        native_decide
+      rw [parameters_eq] at parameter_domain
+      rw [variables_eq] at variable_domain
+      exact ⟨substitution, parameter_domain, variable_domain, head_eq⟩
+
+example : matchImplHead? whereOnlyRule (equality .word) =
+    some [convert (.variable ⟨1⟩) (.variable ⟨2⟩)] := by
+  rfl
+
+example : ∃ substitution : RuleMatchSubstitution,
+    substitution.parameters.map Prod.fst = [whereOnlyParameter] ∧
+      substitution.variables.domain = [⟨0⟩] ∧
+      substitution.applyPredicate whereOnlyRule.head = equality .word ∧
+      whereOnlyRule.wherePredicates.map substitution.applyPredicate =
+        [convert (.variable ⟨1⟩) (.variable ⟨2⟩)] := by
+  rcases matchImplHead?_certificate (rule := whereOnlyRule)
+      (goal := equality .word)
+      (premises := [convert (.variable ⟨1⟩) (.variable ⟨2⟩)])
+      (by rfl) with ⟨substitution, certificate⟩
+  cases certificate with
+  | intro _ _ parameter_domain variable_domain head_eq premises_eq =>
+      have parameters_eq : ruleParameters whereOnlyRule =
+          [whereOnlyParameter] := by native_decide
+      have variables_eq : ruleVariables whereOnlyRule = [⟨0⟩] := by
+        native_decide
+      rw [parameters_eq] at parameter_domain
+      rw [variables_eq] at variable_domain
+      exact ⟨substitution, parameter_domain, variable_domain, head_eq,
+        premises_eq⟩
+
+example : (ruleParameters showBoxRule).Nodup :=
+  ruleParameters_nodup showBoxRule
+
+example : showBoxParameter ∈ ruleParameters showBoxRule := by
+  rw [mem_ruleParameters_iff]
+  exact .inl (by native_decide)
 
 private def evidenceMatches : Evidence → Bool
   | .byImpl actualGoal actualImpl [
