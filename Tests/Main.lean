@@ -18,6 +18,7 @@ import Solcore.Test.ResolvedScopeProperties
 import Solcore.Test.ResolvedFreshBindingProperties
 import Solcore.Test.ResolvedScopeReflectionProperties
 import Solcore.Test.FrontendPublicBoundary
+import Solcore.Test.ProgramSignatureFormation
 import Solcore.Test.FrontendLocalReferenceProperties
 import Solcore.Test.FrontendLocalReferenceExecutionProperties
 import Solcore.Test.FrontendLocalExpressionProperties
