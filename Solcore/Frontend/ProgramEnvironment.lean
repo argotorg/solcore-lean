@@ -164,12 +164,14 @@ def programDeclarationOfTopItem?
   | .pragmaDecl _
   | .error => none
 
-private def declarationsOfModule (module : ProgramModule) :
+/-- Cataloged semantic declarations of one module, retaining source indices. -/
+def declarationsOfModule (module : ProgramModule) :
     List ProgramDeclaration :=
   module.source.items.zipIdx.filterMap fun (item, declarationIndex) =>
     programDeclarationOfTopItem? module.id declarationIndex item
 
-private def canonicalizeModules : List Syntax.ParsedFile →
+/-- Canonicalize all valid parser source identities without dropping errors. -/
+def canonicalizeModules : List Syntax.ParsedFile →
     List ProgramEnvironmentError × List ProgramModule
   | [] => ([], [])
   | source :: rest =>
@@ -178,7 +180,7 @@ private def canonicalizeModules : List Syntax.ParsedFile →
       | none => (.invalidSourceId source.source :: errors, modules)
       | some id => (errors, { id, source } :: modules)
 
-private def duplicateModuleErrorsAux
+def duplicateModuleErrorsAux
     (seen : List Workspace.ModuleId) :
     List ProgramModule → List ProgramEnvironmentError
   | [] => []
@@ -188,7 +190,7 @@ private def duplicateModuleErrorsAux
       else
         duplicateModuleErrorsAux (module.id :: seen) rest
 
-private def duplicateModuleErrors
+def duplicateModuleErrors
     (modules : List ProgramModule) : List ProgramEnvironmentError :=
   duplicateModuleErrorsAux [] modules
 

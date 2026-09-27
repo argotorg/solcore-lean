@@ -4,6 +4,9 @@ set_option autoImplicit false
 
 namespace Tests
 
+example := @Solcore.Frontend.buildProgramEnvironment_success_modules_nodup
+example := @Solcore.Frontend.buildProgramEnvironment_success_declarations_nodup
+
 example := @Solcore.Frontend.TraitResolution.ResolutionEvidenceValid
 example := @Solcore.Frontend.TraitResolution.ResolutionPremisesValid
 example := @Solcore.Frontend.TraitResolution.resolve_success_sound
