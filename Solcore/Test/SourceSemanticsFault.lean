@@ -143,6 +143,28 @@ example (environment : EvidenceEnvironment)
     (fault : EvidenceClosureFaults environment openEvidence) : False :=
   closes.excludes_fault fault
 
+/-- Every finite retained evidence tree has a constructive runtime outcome:
+either all assumptions close or a missing assumption is identified. -/
+example (environment : EvidenceEnvironment) (openEvidence : TraitEvidence) :
+    (∃ closedEvidence,
+      EvidenceCloses environment openEvidence closedEvidence) ∨
+      EvidenceClosureFaults environment openEvidence :=
+  EvidenceCloses.exists_or_fault environment openEvidence
+
+/-- A dictionary covering the static context materializes a closed, valid
+evidence tree from every valid open tree. -/
+example (context : SourceSemantics.Context)
+    (environment : EvidenceEnvironment) (goal : ProgramPredicate)
+    (openEvidence : TraitEvidence)
+    (covers : EvidenceEnvironment.Covers context environment)
+    (valid : EvidenceValid context.assumptions
+      context.signatures.resolutionRules goal openEvidence) :
+    ∃ closedEvidence,
+      EvidenceCloses environment openEvidence closedEvidence ∧
+        EvidenceValid [] context.signatures.resolutionRules goal
+          closedEvidence :=
+  SourceSemantics.Dynamic.EvidenceValid.close_of_covers covers valid
+
 /-- Under the static requirement-identity invariant, successful materialization
 and runtime unavailability are mutually exclusive. -/
 example (context : SourceSemantics.Context)

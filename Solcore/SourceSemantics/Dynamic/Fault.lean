@@ -215,6 +215,27 @@ theorem excludes_lookup
 
 end EvidenceEnvironment.Unbound
 
+namespace EvidenceEnvironment
+
+/-- First-match lookup either selects concrete evidence or constructively
+reaches the end of the dictionary without finding the requested goal. -/
+theorem lookup_or_unbound
+    (environment : EvidenceEnvironment) (goal : ProgramPredicate) :
+    (∃ evidence, environment.LooksUp goal evidence) ∨
+      environment.Unbound goal := by
+  induction environment with
+  | nil => exact .inr (.nil goal)
+  | cons entry rest induction =>
+      rcases entry with ⟨other, evidence⟩
+      by_cases same : other = goal
+      · subst other
+        exact .inl ⟨evidence, .head⟩
+      · rcases induction with ⟨foundEvidence, found⟩ | unbound
+        · exact .inl ⟨foundEvidence, .tail same found⟩
+        · exact .inr (.cons same unbound)
+
+end EvidenceEnvironment
+
 /- Closing a retained evidence tree faults at its first missing assumption. -/
 mutual
   inductive EvidenceClosureFaults (environment : EvidenceEnvironment) :
@@ -241,6 +262,47 @@ mutual
         (head : EvidenceCloses environment evidence closed)
         (fault : EvidenceClosuresFault environment rest) :
         EvidenceClosuresFault environment (evidence :: rest)
+end
+
+mutual
+  /-- Closing one retained evidence tree either produces a closed tree or
+  identifies a missing assumption at a finite position in that tree. -/
+  theorem EvidenceCloses.exists_or_fault
+      (environment : EvidenceEnvironment) (openEvidence : TraitEvidence) :
+      (∃ closedEvidence,
+        EvidenceCloses environment openEvidence closedEvidence) ∨
+        EvidenceClosureFaults environment openEvidence := by
+    cases openEvidence with
+    | assumption goal =>
+        rcases environment.lookup_or_unbound goal with
+          ⟨evidence, found⟩ | unbound
+        · exact .inl ⟨evidence, .assumption found⟩
+        · exact .inr (.assumption unbound)
+    | implementation goal implementation premises =>
+        rcases Forall₂EvidenceCloses.exists_or_fault environment premises with
+          ⟨closedPremises, closes⟩ | fault
+        · exact .inl ⟨.implementation goal implementation closedPremises,
+            .implementation closes⟩
+        · exact .inr (.implementation fault)
+
+  /-- Closing a retained evidence spine either closes every entry in order or
+  identifies the first entry whose evidence tree faults. -/
+  theorem Forall₂EvidenceCloses.exists_or_fault
+      (environment : EvidenceEnvironment) (openEvidence : List TraitEvidence) :
+      (∃ closedEvidence,
+        Forall₂ (EvidenceCloses environment) openEvidence closedEvidence) ∨
+        EvidenceClosuresFault environment openEvidence := by
+    cases openEvidence with
+    | nil => exact .inl ⟨[], .nil⟩
+    | cons evidence rest =>
+        rcases EvidenceCloses.exists_or_fault environment evidence with
+          ⟨closedEvidence, closes⟩ | fault
+        · rcases Forall₂EvidenceCloses.exists_or_fault environment rest with
+            ⟨closedRest, restCloses⟩ | restFault
+          · exact .inl ⟨closedEvidence :: closedRest,
+              .cons closes restCloses⟩
+          · exact .inr (.tail closes restFault)
+        · exact .inr (.head fault)
 end
 
 mutual

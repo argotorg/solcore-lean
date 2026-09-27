@@ -403,6 +403,129 @@ theorem goal_eq
 
 end EvidenceCloses
 
+mutual
+
+  /-- Replacing every open assumption leaf by a closed runtime dictionary
+  preserves semantic evidence validity and removes all explicit assumptions. -/
+  theorem EvidenceCloses.preserves_valid
+      {assumptions : List ProgramPredicate}
+      {rules : List ProgramImplRule}
+      {environment : EvidenceEnvironment}
+      {goal : ProgramPredicate} {openEvidence closedEvidence : TraitEvidence}
+      (environmentValid : environment.Valid rules)
+      (closes : EvidenceCloses environment openEvidence closedEvidence)
+      (valid : EvidenceValid assumptions rules goal openEvidence) :
+      EvidenceValid [] rules goal closedEvidence := by
+    cases closes with
+    | assumption found =>
+        cases valid with
+        | assumption => exact environmentValid _ _ found
+    | implementation premises =>
+        cases valid with
+        | implementation rule_mem id_eq head_instantiates premises_valid =>
+            exact .implementation rule_mem id_eq head_instantiates
+              (Forall₂EvidenceCloses.preserves_valid environmentValid premises
+                premises_valid)
+
+  /-- Pointwise closure preserves validity for an ordered evidence-premise
+  spine while discharging every assumption in the spine. -/
+  theorem Forall₂EvidenceCloses.preserves_valid
+      {assumptions : List ProgramPredicate}
+      {rules : List ProgramImplRule}
+      {environment : EvidenceEnvironment}
+      {goals : List ProgramPredicate}
+      {openEvidence closedEvidence : List TraitEvidence}
+      (environmentValid : environment.Valid rules)
+      (closes : Forall₂ (EvidenceCloses environment) openEvidence
+        closedEvidence)
+      (valid : Forall₂ (EvidenceValid assumptions rules) goals openEvidence) :
+      Forall₂ (EvidenceValid [] rules) goals closedEvidence := by
+    cases closes with
+    | nil =>
+        cases valid
+        exact .nil
+    | cons head tail =>
+        cases valid with
+        | cons headValid tailValid =>
+            exact .cons
+              (EvidenceCloses.preserves_valid environmentValid head headValid)
+              (Forall₂EvidenceCloses.preserves_valid environmentValid tail
+                tailValid)
+
+end
+
+mutual
+
+  /-- Every valid open evidence tree can be closed when the runtime dictionary
+  supplies all of its explicit assumptions. -/
+  theorem EvidenceValid.close
+      {assumptions : List ProgramPredicate}
+      {rules : List ProgramImplRule}
+      {environment : EvidenceEnvironment}
+      {goal : ProgramPredicate} {openEvidence : TraitEvidence}
+      (environmentValid : environment.Valid rules)
+      (supplies : environment.Supplies assumptions)
+      (valid : EvidenceValid assumptions rules goal openEvidence) :
+      ∃ closedEvidence,
+        EvidenceCloses environment openEvidence closedEvidence ∧
+          EvidenceValid [] rules goal closedEvidence := by
+    cases valid with
+    | assumption goal_mem =>
+        rcases supplies _ goal_mem with ⟨closedEvidence, found⟩
+        let closes : EvidenceCloses environment (.assumption goal)
+            closedEvidence := .assumption found
+        exact ⟨closedEvidence, closes, environmentValid _ _ found⟩
+    | @implementation rule goal implId premiseGoals openPremises rule_mem id_eq
+        head_instantiates premises_valid =>
+        rcases Forall₂EvidenceValid.close environmentValid supplies
+            premises_valid with
+          ⟨closedPremises, premises_close, closed_valid⟩
+        let closes : EvidenceCloses environment
+            (.implementation goal implId openPremises)
+            (.implementation goal implId closedPremises) :=
+          .implementation premises_close
+        exact ⟨.implementation goal implId closedPremises, closes,
+          .implementation rule_mem id_eq head_instantiates closed_valid⟩
+
+  /-- Closing extends pointwise to an ordered premise spine, preserving its
+  goal indices and producing assumption-free validity for every entry. -/
+  theorem Forall₂EvidenceValid.close
+      {assumptions : List ProgramPredicate}
+      {rules : List ProgramImplRule}
+      {environment : EvidenceEnvironment}
+      {goals : List ProgramPredicate} {openEvidence : List TraitEvidence}
+      (environmentValid : environment.Valid rules)
+      (supplies : environment.Supplies assumptions)
+      (valid : Forall₂ (EvidenceValid assumptions rules) goals openEvidence) :
+      ∃ closedEvidence,
+        Forall₂ (EvidenceCloses environment) openEvidence closedEvidence ∧
+          Forall₂ (EvidenceValid [] rules) goals closedEvidence := by
+    cases valid with
+    | nil => exact ⟨[], .nil, .nil⟩
+    | @cons goal goals head tail head_valid tail_valid =>
+        rcases EvidenceValid.close environmentValid supplies head_valid with
+          ⟨closedHead, head_closes, closed_head_valid⟩
+        rcases Forall₂EvidenceValid.close environmentValid supplies tail_valid with
+          ⟨closedTail, tail_closes, closed_tail_valid⟩
+        exact ⟨closedHead :: closedTail, .cons head_closes tail_closes,
+          .cons closed_head_valid closed_tail_valid⟩
+
+end
+
+/-- A context-covering runtime dictionary closes every evidence tree valid
+under that context's explicit assumption spine. -/
+theorem EvidenceValid.close_of_covers
+    {context : Context} {environment : EvidenceEnvironment}
+    {goal : ProgramPredicate} {openEvidence : TraitEvidence}
+    (covers : environment.Covers context)
+    (valid : EvidenceValid context.assumptions
+      context.signatures.resolutionRules goal openEvidence) :
+    ∃ closedEvidence,
+      EvidenceCloses environment openEvidence closedEvidence ∧
+        EvidenceValid [] context.signatures.resolutionRules goal
+          closedEvidence :=
+  EvidenceValid.close covers.1 covers.2 valid
+
 /-- One stable requirement closes to an assumption-free semantic proof.  The
 same ledger entry supplies the predicate, retained representation, and source
 validity; a separate closed validity premise checks the invocation dictionary. -/
