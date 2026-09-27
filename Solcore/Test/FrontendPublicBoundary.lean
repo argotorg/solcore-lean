@@ -172,6 +172,8 @@ example := @Solcore.Frontend.SourceInference.State.NodesBelowNextOccurrence
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.refl
 example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.of_substitution_eq
+example :=
   @Solcore.Frontend.SourceInference.State.InferenceProgress.of_inference_eq
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.trans
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.fresh
@@ -202,6 +204,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.InferenceProgress.markDirectCallRequirements
 example := @Solcore.Frontend.SourceInference.State.InferenceReady
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.of_progress_of_binderEnvironment_eq
 example :=
   @Solcore.Frontend.SourceInference.State.InferenceReady.lookupBinder?_body_variablesBelow
 example :=
@@ -377,6 +381,12 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_resolve
 example :=
+  @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_inferenceProgress
+example :=
+  @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_inferenceReady
+example :=
+  @Solcore.Frontend.SourceInference.Detail.withExpected_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_coercions_isValid
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_cases
@@ -437,6 +447,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordSelectedCallResult_preserves_requirementsWellFormed
 example :=

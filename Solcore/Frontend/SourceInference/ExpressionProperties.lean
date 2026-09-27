@@ -1489,6 +1489,155 @@ theorem unify_preserves_inferenceReady
       · change state.binderEnvironment.BodiesBelow inference.next
         exact ready.bindersBelow.weaken progress.next_le
 
+/-- Expected-type fitting makes semantic inference progress, preserves
+readiness, and returns an allocator-bounded expression type. -/
+theorem withExpected_inferenceProperties
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (ready : state.InferenceReady)
+    (actualBelow : actual.type.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : withExpected context state actual expected = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.expression.type.VariablesBelow result.state.inference.next := by
+  cases expected with
+  | none =>
+      simp only [withExpected] at success
+      injection success with resultEq
+      subst result
+      have resolvedBelow :
+          (state.resolve actual.type).VariablesBelow state.inference.next :=
+        ready.solved.variablesBelow_apply actualBelow
+      exact ⟨.refl ready.solved, ready, resolvedBelow⟩
+  | some expected =>
+      have expectedTypeBelow :
+          expected.VariablesBelow state.inference.next :=
+        expectedBelow expected (by simp)
+      cases unification : state.inference.unify actual.type expected with
+      | ok inference =>
+          simp only [withExpected, unification] at success
+          injection success with resultEq
+          subst result
+          have actualResolvedBelow :
+              (state.inference.resolve actual.type).VariablesBelow
+                state.inference.next :=
+            ready.solved.variablesBelow_apply actualBelow
+          have expectedResolvedBelow :
+              (state.inference.resolve expected).VariablesBelow
+                state.inference.next :=
+            ready.solved.variablesBelow_apply expectedTypeBelow
+          have inferenceSolved : inference.Solved :=
+            TypeSystem.InferState.Solved.unify ready.solved
+              actualResolvedBelow expectedResolvedBelow unification
+          have nextEq : inference.next = state.inference.next :=
+            TypeSystem.InferState.unify_next unification
+          have progress :
+              state.InferenceProgress ({ state with inference } : State) := by
+            constructor
+            · rw [nextEq]
+              exact Nat.le_refl _
+            · exact inferenceSolved
+            · exact TypeSystem.InferState.Solved.unify_semanticallyExtends
+                ready.solved unification
+          have resultReady :
+              ({ state with inference } : State).InferenceReady :=
+            State.InferenceReady.of_progress_of_binderEnvironment_eq
+              ready progress rfl
+          have expectedAtResult :
+              expected.VariablesBelow inference.next := by
+            rw [nextEq]
+            exact expectedTypeBelow
+          have resultBelow :
+              (({ state with inference } : State).resolve expected).VariablesBelow
+                inference.next :=
+            inferenceSolved.variablesBelow_apply expectedAtResult
+          exact ⟨progress, resultReady, resultBelow⟩
+      | error error =>
+          cases error with
+          | occursCheck metavariable type =>
+              simp [withExpected, unification] at success
+          | exhausted =>
+              simp [withExpected, unification] at success
+          | mismatch left right =>
+              simp only [withExpected, unification] at success
+              cases planResult : coercionPlan? context state
+                  (state.resolve actual.type) (state.resolve expected) with
+              | error error =>
+                  simp [planResult, bind, Except.bind] at success
+              | ok planOption =>
+                  cases planOption with
+                  | none =>
+                      simp [planResult, bind, Except.bind] at success
+                  | some plan =>
+                      simp only [planResult, bind, Except.bind] at success
+                      change Except.ok _ = Except.ok result at success
+                      injection success with resultEq
+                      subst result
+                      have progress :=
+                        commitCoercionPlan_inferenceProgress state plan
+                          ready.solved
+                      have resultReady :=
+                        commitCoercionPlan_preserves_inferenceReady state plan
+                          ready
+                      have expectedAtResult :
+                          expected.VariablesBelow
+                            (commitCoercionPlan state plan).2.inference.next :=
+                        expectedTypeBelow.weaken progress.next_le
+                      have resolvedExpectedBelow :
+                          Ty.VariablesBelow
+                            (commitCoercionPlan state plan).2.inference.next
+                            ((commitCoercionPlan state plan).2.resolve expected) :=
+                        resultReady.solved.variablesBelow_apply expectedAtResult
+                      refine ⟨progress, resultReady, ?_⟩
+                      simpa only [commitCoercionPlan_resolve] using
+                        resolvedExpectedBelow
+
+/-- Expected-type fitting followed by expression recording has the same
+inference guarantees; recording the typed node leaves inference unchanged. -/
+theorem recordExpressionWithExpected_inferenceProperties
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (ready : state.InferenceReady)
+    (typeBelow : type.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  obtain ⟨fitted, fittedSuccess, resultExpression, resultState⟩ :=
+    recordExpressionWithExpected_success_record success
+  have fittedProperties := withExpected_inferenceProperties ready typeBelow
+    expectedBelow fittedSuccess
+  rw [resultExpression, resultState]
+  have recordedProgress :=
+    State.InferenceProgress.recordNode fitted.state (.expression {
+      id := fitted.expression.id
+      span := source.span
+      type := fitted.expression.type
+      form
+      requirements := requirements ++
+        coercionRequirements fitted.coercions
+      coercions := fitted.coercions
+    }) fittedProperties.2.1.solved
+  have recordedReady :=
+    State.InferenceReady.recordNode (.expression {
+      id := fitted.expression.id
+      span := source.span
+      type := fitted.expression.type
+      form
+      requirements := requirements ++
+        coercionRequirements fitted.coercions
+      coercions := fitted.coercions
+    }) fittedProperties.2.1
+  exact ⟨fittedProperties.1.trans recordedProgress, recordedReady,
+    fittedProperties.2.2⟩
+
 /-- Successful source-inference unification makes the original input types
 equal under the returned inference state. -/
 theorem unify_resolve_eq

@@ -260,6 +260,45 @@ private def solverRegressionState : SourceInference.State := {
   }
 }
 
+/-- Expected-type fitting packages allocator progress, readiness, and the
+returned expression's allocator bound for downstream inference proofs. -/
+example {actual : SourceInference.InferredExpression}
+    {expected : Option TypeSystem.Ty}
+    {result : SourceInference.Detail.ExpectationResult}
+    (ready : solverRegressionState.InferenceReady)
+    (actualBelow : actual.type.VariablesBelow
+      solverRegressionState.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow solverRegressionState.inference.next)
+    (success : SourceInference.Detail.withExpected solverRegressionContext
+      solverRegressionState actual expected = .ok result) :
+    solverRegressionState.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.expression.type.VariablesBelow result.state.inference.next := by
+  exact SourceInference.Detail.withExpected_inferenceProperties ready
+    actualBelow expectedBelow success
+
+/-- Recording an expected expression extends the same inference guarantees
+through source-node allocation without requiring a concrete evaluator case. -/
+example {source : Syntax.Expr} {id : SourceInference.ExpressionId}
+    {type : TypeSystem.Ty} {form : SourceInference.ExpressionForm}
+    {requirements : List SourceInference.RequirementId}
+    {expected : Option TypeSystem.Ty}
+    {result : SourceInference.InferredExpression × SourceInference.State}
+    (ready : solverRegressionState.InferenceReady)
+    (typeBelow : type.VariablesBelow
+      solverRegressionState.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow solverRegressionState.inference.next)
+    (success : SourceInference.Detail.recordExpressionWithExpected
+      solverRegressionContext source id type form requirements expected
+      solverRegressionState = .ok result) :
+    solverRegressionState.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  exact SourceInference.Detail.recordExpressionWithExpected_inferenceProperties
+    ready typeBelow expectedBelow success
+
 private def solverRegressionRequirement : SourceInference.Requirement := {
   id := ⟨0⟩
   predicate := solverRegressionSource
