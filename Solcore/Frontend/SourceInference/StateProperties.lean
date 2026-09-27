@@ -14,6 +14,46 @@ def NodesBelowNextOccurrence (state : State) : Prop :=
   ∀ node ∈ state.nodes,
     node.occurrenceId.index < state.nextOccurrence
 
+/-- The part of source-inference state evolution needed to preserve occurrence
+allocation safety.  This deliberately says nothing about exact node payloads:
+`attachExpressionCoercions` may refine freshly recorded expression nodes while
+still preserving their identities and the allocation bound. -/
+structure OccurrenceBoundExtends (before after : State) : Prop where
+  nextOccurrence_le : before.nextOccurrence ≤ after.nextOccurrence
+  nodesBelowNextOccurrence :
+    before.NodesBelowNextOccurrence → after.NodesBelowNextOccurrence
+
+namespace OccurrenceBoundExtends
+
+/-- Every state trivially extends its own occurrence-allocation bound. -/
+theorem refl (state : State) : state.OccurrenceBoundExtends state :=
+  ⟨Nat.le_refl _, fun below => below⟩
+
+/-- Equal node tables and equal occurrence counters are sufficient for an
+occurrence-bound extension, even when unrelated state fields change. -/
+theorem of_nodes_eq_nextOccurrence_eq {before after : State}
+    (nodesEq : after.nodes = before.nodes)
+    (nextEq : after.nextOccurrence = before.nextOccurrence) :
+    before.OccurrenceBoundExtends after := by
+  constructor
+  · rw [nextEq]
+    exact Nat.le_refl _
+  · intro below node member
+    rw [nodesEq] at member
+    rw [nextEq]
+    exact below node member
+
+/-- Occurrence-bound extension composes across sequential inference steps. -/
+theorem trans {first second third : State}
+    (left : first.OccurrenceBoundExtends second)
+    (right : second.OccurrenceBoundExtends third) :
+    first.OccurrenceBoundExtends third :=
+  ⟨Nat.le_trans left.nextOccurrence_le right.nextOccurrence_le,
+    fun below => right.nodesBelowNextOccurrence
+      (left.nodesBelowNextOccurrence below)⟩
+
+end OccurrenceBoundExtends
+
 private theorem map_mapIdx {α β γ : Type} (items : List α)
     (indexed : Nat → α → β)
     (project : β → γ) :
@@ -248,6 +288,73 @@ theorem modifyExpressionNode_preserves_nodesBelowNextOccurrence
       · subst current
         exact below (.expression node) originalMember
 
+private theorem map_modifyExpressionNode_eq_self_of_fresh
+    (id : ExpressionId) (modify : ExpressionNode → ExpressionNode)
+    (cutoff : Nat) (idFresh : cutoff ≤ id.occurrence.index) :
+    ∀ nodes : List Node,
+      (∀ node ∈ nodes, node.occurrenceId.index < cutoff) →
+      nodes.map (fun
+        | .expression node =>
+            if node.id = id then
+              .expression { modify node with id }
+            else
+              .expression node
+        | .statement node => .statement node) = nodes
+  | [], _ => rfl
+  | .expression node :: nodes, below => by
+      have headBelow : node.id.occurrence.index < cutoff := by
+        simpa [Node.occurrenceId, Node.id, NodeId.occurrenceId] using
+          below (.expression node) (by simp)
+      have idNe : node.id ≠ id := by
+        intro idEq
+        rw [idEq] at headBelow
+        exact (Nat.not_lt_of_ge idFresh) headBelow
+      have tailBelow :
+          ∀ tail ∈ nodes, tail.occurrenceId.index < cutoff := by
+        intro tail member
+        exact below tail (by simp [member])
+      simp only [List.map_cons]
+      rw [if_neg idNe]
+      exact congrArg (.expression node :: ·)
+        (map_modifyExpressionNode_eq_self_of_fresh id modify cutoff idFresh
+          nodes tailBelow)
+  | .statement node :: nodes, below => by
+      have tailBelow :
+          ∀ tail ∈ nodes, tail.occurrenceId.index < cutoff := by
+        intro tail member
+        exact below tail (by simp [member])
+      simp only [List.map_cons]
+      exact congrArg (.statement node :: ·)
+        (map_modifyExpressionNode_eq_self_of_fresh id modify cutoff idFresh
+          nodes tailBelow)
+
+/-- Updating an expression whose identity is at or above a cutoff leaves an
+older bounded node prefix byte-for-byte unchanged. -/
+theorem modifyExpressionNode_preserves_nodesPrefix_of_fresh
+    (state : State) (baseNodes : List Node) (cutoff : Nat)
+    (id : ExpressionId) (modify : ExpressionNode → ExpressionNode)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow :
+      ∀ node ∈ baseNodes, node.occurrenceId.index < cutoff)
+    (idFresh : cutoff ≤ id.occurrence.index) :
+    baseNodes <+: (state.modifyExpressionNode id modify).nodes := by
+  let update : Node → Node := fun
+    | .expression node =>
+        if node.id = id then
+          .expression { modify node with id }
+        else
+          .expression node
+    | .statement node => .statement node
+  have baseUnchanged : baseNodes.map update = baseNodes := by
+    exact map_modifyExpressionNode_eq_self_of_fresh id modify cutoff idFresh
+      baseNodes (by
+        intro node member
+        exact baseBelow node member)
+  rcases nodesPrefix with ⟨suffix, stateNodes⟩
+  refine ⟨suffix.map update, ?_⟩
+  change baseNodes ++ suffix.map update = state.nodes.map update
+  rw [← stateNodes, List.map_append, baseUnchanged]
+
 @[simp] theorem modifyStatementNode_header (state : State)
     (id : StatementId) (modify : StatementNode → StatementNode) :
     (state.modifyStatementNode id modify).header = state.header := by
@@ -338,6 +445,36 @@ theorem addRequirements_preserves_nodesBelowNextOccurrence
   exact addRequirementsWithIds_preserves_nodesBelowNextOccurrence
     state predicates below
 
+@[simp] theorem addRequirementsWithIds_nodes (state : State)
+    (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.nodes = state.nodes := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate predicates induction =>
+      simp only [State.addRequirementsWithIds]
+      exact induction (state.addRequirementWithId predicate).2
+
+@[simp] theorem addRequirementsWithIds_nextOccurrence (state : State)
+    (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.nextOccurrence =
+      state.nextOccurrence := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate predicates induction =>
+      simp only [State.addRequirementsWithIds]
+      exact induction (state.addRequirementWithId predicate).2
+
+@[simp] theorem addRequirements_nodes (state : State)
+    (predicates : List ProgramPredicate) :
+    (state.addRequirements predicates).nodes = state.nodes :=
+  addRequirementsWithIds_nodes state predicates
+
+@[simp] theorem addRequirements_nextOccurrence (state : State)
+    (predicates : List ProgramPredicate) :
+    (state.addRequirements predicates).nextOccurrence =
+      state.nextOccurrence :=
+  addRequirementsWithIds_nextOccurrence state predicates
+
 @[simp] theorem markDirectCallRequirements_header (state : State)
     (requirements : List RequirementId) :
     (state.markDirectCallRequirements requirements).header = state.header := by
@@ -379,9 +516,17 @@ theorem markDirectCallRequirements_preserves_nodesBelowNextOccurrence
       state.nextOccurrence + 1 := by
   rfl
 
+@[simp] theorem allocateExpressionId_nodes (state : State) :
+    (state.allocateExpressionId).2.nodes = state.nodes := by
+  rfl
+
 @[simp] theorem allocateStatementId_nextOccurrence (state : State) :
     (state.allocateStatementId).2.nextOccurrence =
       state.nextOccurrence + 1 := by
+  rfl
+
+@[simp] theorem allocateStatementId_nodes (state : State) :
+    (state.allocateStatementId).2.nodes = state.nodes := by
   rfl
 
 /-- The freshly reserved expression identity is immediately below the
@@ -423,5 +568,117 @@ advanced occurrence bound. -/
 @[simp] theorem recordNode_nodes (state : State) (node : Node) :
     (state.recordNode node).nodes = state.nodes ++ [node] := by
   rfl
+
+namespace OccurrenceBoundExtends
+
+/-- Type-metavariable allocation is an occurrence-bound extension. -/
+theorem fresh (state : State) :
+    state.OccurrenceBoundExtends state.fresh.2 :=
+  ⟨Nat.le_refl _, fresh_preserves_nodesBelowNextOccurrence state⟩
+
+/-- Compatibility-local replacement is an occurrence-bound extension. -/
+theorem withLocals (state : State) (locals : TypeSystem.Environment) :
+    state.OccurrenceBoundExtends (state.withLocals locals) :=
+  ⟨Nat.le_refl _,
+    withLocals_preserves_nodesBelowNextOccurrence state locals⟩
+
+/-- Lexical restoration is an occurrence-bound extension. -/
+theorem restoreLexicalScope (state : State) (scope : LexicalScope) :
+    state.OccurrenceBoundExtends (state.restoreLexicalScope scope) :=
+  ⟨Nat.le_refl _,
+    restoreLexicalScope_preserves_nodesBelowNextOccurrence state scope⟩
+
+/-- Visible-binder allocation is an occurrence-bound extension. -/
+theorem allocateBinder (state : State) (name : String)
+    (scheme : TypeSystem.Scheme) (span : Option Syntax.SourceSpan)
+    (comptime : Bool) (schemeRequirements : List LocalSchemeRequirement) :
+    state.OccurrenceBoundExtends
+      (state.allocateBinder name scheme span comptime schemeRequirements).2 :=
+  ⟨Nat.le_refl _, allocateBinder_preserves_nodesBelowNextOccurrence
+    state name scheme span comptime schemeRequirements⟩
+
+/-- Hidden-local allocation is an occurrence-bound extension. -/
+theorem allocateHiddenLocal (state : State) :
+    state.OccurrenceBoundExtends state.allocateHiddenLocal.2 :=
+  ⟨Nat.le_refl _, allocateHiddenLocal_preserves_nodesBelowNextOccurrence state⟩
+
+/-- Expression-identity allocation advances the occurrence bound. -/
+theorem allocateExpressionId (state : State) :
+    state.OccurrenceBoundExtends state.allocateExpressionId.2 := by
+  constructor
+  · change state.nextOccurrence ≤ state.nextOccurrence + 1
+    exact Nat.le_succ _
+  · exact allocateExpressionId_preserves_nodesBelowNextOccurrence state
+
+/-- Statement-identity allocation advances the occurrence bound. -/
+theorem allocateStatementId (state : State) :
+    state.OccurrenceBoundExtends state.allocateStatementId.2 := by
+  constructor
+  · change state.nextOccurrence ≤ state.nextOccurrence + 1
+    exact Nat.le_succ _
+  · exact allocateStatementId_preserves_nodesBelowNextOccurrence state
+
+/-- Recording a previously allocated node extends the occurrence bound. -/
+theorem recordNode (state : State) (node : Node)
+    (nodeBelow : node.occurrenceId.index < state.nextOccurrence) :
+    state.OccurrenceBoundExtends (state.recordNode node) :=
+  ⟨Nat.le_refl _, fun below =>
+    recordNode_preserves_nodesBelowNextOccurrence state node below nodeBelow⟩
+
+/-- Expression-node payload refinement preserves the occurrence bound. -/
+theorem modifyExpressionNode (state : State) (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode) :
+    state.OccurrenceBoundExtends (state.modifyExpressionNode id modify) :=
+  ⟨Nat.le_refl _, fun below =>
+    modifyExpressionNode_preserves_nodesBelowNextOccurrence state id modify below⟩
+
+/-- Statement-node payload refinement preserves the occurrence bound. -/
+theorem modifyStatementNode (state : State) (id : StatementId)
+    (modify : StatementNode → StatementNode) :
+    state.OccurrenceBoundExtends (state.modifyStatementNode id modify) :=
+  ⟨Nat.le_refl _, fun below =>
+    modifyStatementNode_preserves_nodesBelowNextOccurrence state id modify below⟩
+
+/-- Single requirement allocation is independent of occurrence allocation. -/
+theorem addRequirementWithId (state : State) (predicate : ProgramPredicate) :
+    state.OccurrenceBoundExtends
+      (state.addRequirementWithId predicate).2 :=
+  ⟨Nat.le_refl _, fun below =>
+    addRequirementWithId_preserves_nodesBelowNextOccurrence
+      state predicate below⟩
+
+/-- Adding one requirement is independent of occurrence allocation. -/
+theorem addRequirement (state : State) (predicate : ProgramPredicate) :
+    state.OccurrenceBoundExtends (state.addRequirement predicate) :=
+  ⟨Nat.le_refl _, fun below =>
+    addRequirement_preserves_nodesBelowNextOccurrence state predicate below⟩
+
+/-- Requirement-list allocation is independent of occurrence allocation. -/
+theorem addRequirementsWithIds (state : State)
+    (predicates : List ProgramPredicate) :
+    state.OccurrenceBoundExtends
+      (state.addRequirementsWithIds predicates).2 := by
+  induction predicates generalizing state with
+  | nil => exact .refl state
+  | cons predicate rest induction =>
+      simpa only [State.addRequirementsWithIds] using
+        (addRequirementWithId state predicate).trans
+          (induction (state.addRequirementWithId predicate).2)
+
+/-- Adding requirements is independent of occurrence allocation. -/
+theorem addRequirements (state : State) (predicates : List ProgramPredicate) :
+    state.OccurrenceBoundExtends (state.addRequirements predicates) := by
+  exact addRequirementsWithIds state predicates
+
+/-- Marking direct-call provenance preserves the occurrence bound. -/
+theorem markDirectCallRequirements (state : State)
+    (requirements : List RequirementId) :
+    state.OccurrenceBoundExtends
+      (state.markDirectCallRequirements requirements) :=
+  ⟨Nat.le_refl _, fun below =>
+    markDirectCallRequirements_preserves_nodesBelowNextOccurrence
+      state requirements below⟩
+
+end OccurrenceBoundExtends
 
 end Solcore.Frontend.SourceInference.State

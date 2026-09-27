@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Expression
+import Solcore.Frontend.SourceInference.OccurrenceProperties
 import Solcore.Frontend.SourceInference.RequirementProperties
 import Solcore.Frontend.SourceInference.StateProperties
 import Solcore.Frontend.ProgramSignatureFormationProperties
