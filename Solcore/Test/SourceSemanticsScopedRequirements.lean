@@ -336,6 +336,15 @@ example : LocalSchemeTemplateOwnership templateFinalizedResult.typedSource :=
   SourceInferenceSoundness.finalize_localSchemeTemplateOwnership
     templateFinalizeSuccess
 
+/-- Successful finalization supplies the complete scoped ledger for the
+finalized source. -/
+example : ScopedRequirementLedgerWellFormed
+    (SourceInferenceSoundness.finalizedRequirementContext
+      templateInferenceContext templateFinalizedResult)
+    templateFinalizedResult.typedSource :=
+  SourceInferenceSoundness.finalize_scopedRequirementLedgerWellFormed
+    templateFinalizeSuccess
+
 /-- Finalization preserves the exact source/state template-ID alignment of a
 nonempty qualified-local fixture. -/
 example : ∀ id,

@@ -520,11 +520,17 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTable
 example := @Solcore.Frontend.SourceInference.MatchPatternInstruction.binderIds
 example := @Solcore.Frontend.SourceInference.TypedMatchPattern.binderIds
+example := @Solcore.Frontend.SourceInference.LocalSchemeTemplateSite
+example := @Solcore.Frontend.SourceInference.PrimaryRequirementSite
 example := @Solcore.Frontend.SourceInference.ForItemForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.ExpressionForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.StatementForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.Node.definedLocalIds
 example := @Solcore.Frontend.SourceInference.TypedSource.definedLocalIds
+example := @Solcore.Frontend.SourceInference.ForItemForm.localSchemeTemplateSites
+example := @Solcore.Frontend.SourceInference.StatementForm.localSchemeTemplateSites
+example := @Solcore.Frontend.SourceInference.Node.localSchemeTemplateSites
+example := @Solcore.Frontend.SourceInference.TypedSource.localSchemeTemplateSites
 example := @Solcore.Frontend.SourceInference.ForItemForm.localSchemeTemplateIds
 example := @Solcore.Frontend.SourceInference.StatementForm.localSchemeTemplateIds
 example := @Solcore.Frontend.SourceInference.Node.localSchemeTemplateIds
@@ -533,6 +539,8 @@ example := @Solcore.Frontend.SourceInference.ForItemForm.primaryRequirementIds
 example := @Solcore.Frontend.SourceInference.StatementForm.primaryRequirementIds
 example := @Solcore.Frontend.SourceInference.Node.primaryRequirementIds
 example := @Solcore.Frontend.SourceInference.TypedSource.primaryRequirementIds
+example := @Solcore.Frontend.SourceInference.Node.primaryRequirementSites
+example := @Solcore.Frontend.SourceInference.TypedSource.primaryRequirementSites
 example := @Solcore.Frontend.SourceInference.Detail.localIdMember
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateLocalIdentitiesFrom
@@ -565,6 +573,11 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.collectReachableNodeIdsFuel
 example := @Solcore.Frontend.SourceInference.Detail.sourceReachableNodeIds
+example := @Solcore.Frontend.SourceInference.Detail.sourceSubtreeNodeIds
+example := @Solcore.Frontend.SourceInference.Detail.validateSourceTemplateScope
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceTemplateScopesFrom
+example := @Solcore.Frontend.SourceInference.Detail.validateSourceTemplateScopes
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateAllSourceNodesReachedFrom
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceForest
@@ -583,6 +596,10 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceRequirementOwnership_success
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceTemplateTracking_success
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceTemplateScope_success
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceTemplateScopes_success
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceRoots_success_rootsExist
 example :=

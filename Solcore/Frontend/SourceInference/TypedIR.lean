@@ -271,6 +271,21 @@ inductive NodeId where
   | statement (id : StatementId)
   deriving Repr, BEq, DecidableEq
 
+/-- One initialized local-scheme template together with the exact binder and
+initializer occurrence which own it. -/
+structure LocalSchemeTemplateSite where
+  binder : TypedBinder
+  initializer : NodeId
+  requirement : LocalSchemeRequirement
+  deriving Repr, BEq, DecidableEq
+
+/-- One primary requirement attachment together with its exact source
+occurrence.  Secondary mirrors are deliberately excluded. -/
+structure PrimaryRequirementSite where
+  occurrence : NodeId
+  requirement : RequirementId
+  deriving Repr, BEq, DecidableEq
+
 namespace NodeId
 
 def occurrenceId : NodeId → OccurrenceId
@@ -852,6 +867,16 @@ def definedLocalIds : ForItemForm → List Resolved.LocalId
 /-- Qualified-local template identities materialized by an initialized `let`
 in a `for` initializer or post clause.  Uninitialized declarations do not own
 an initializer scope and therefore contribute no templates. -/
+def localSchemeTemplateSites : ForItemForm → List LocalSchemeTemplateSite
+  | .letDecl binder (some initializer) =>
+      binder.schemeRequirements.map fun requirement => {
+        binder
+        initializer := .expression initializer
+        requirement
+      }
+  | .letDecl _ none | .expression _ | .assignValue .. | .assignBitNot _ => []
+
+/-- Stable qualified-template identities in predicate order. -/
 def localSchemeTemplateIds : ForItemForm → List RequirementId
   | .letDecl binder (some _) =>
       binder.schemeRequirements.map fun requirement =>
@@ -888,6 +913,21 @@ def definedLocalIds : StatementForm → List Resolved.LocalId
 /-- Qualified-local template identities materialized directly by initialized
 statement lets, including initialized lets in `for` initializer and post
 clauses.  Child occurrence bodies are represented by their own table nodes. -/
+def localSchemeTemplateSites : StatementForm → List LocalSchemeTemplateSite
+  | .letDecl binder (some initializer) =>
+      binder.schemeRequirements.map fun requirement => {
+        binder
+        initializer := .expression initializer
+        requirement
+      }
+  | .forLoop initializer _ post _ =>
+      initializer.flatMap ForItemForm.localSchemeTemplateSites ++
+        post.flatMap ForItemForm.localSchemeTemplateSites
+  | .letDecl _ none | .returnStmt _ | .expression .. | .assignValue .. |
+      .assignBitNot _ | .ifThen .. | .block _ | .matchWith _ | .whileLoop .. |
+      .breakStmt | .continueStmt => []
+
+/-- Stable qualified-template identities in predicate order. -/
 def localSchemeTemplateIds : StatementForm → List RequirementId
   | .letDecl binder (some _) =>
       binder.schemeRequirements.map fun requirement =>
@@ -954,6 +994,11 @@ def definedLocalIds : Node → List Resolved.LocalId
 
 /-- Qualified-local template identities materialized directly by one
 heterogeneous source node. -/
+def localSchemeTemplateSites : Node → List LocalSchemeTemplateSite
+  | .expression _ => []
+  | .statement node => node.form.localSchemeTemplateSites
+
+/-- Stable qualified-template identities in predicate order. -/
 def localSchemeTemplateIds : Node → List RequirementId
   | .expression _ => []
   | .statement node => node.form.localSchemeTemplateIds
@@ -963,6 +1008,19 @@ source node. -/
 def primaryRequirementIds : Node → List RequirementId
   | .expression node => node.requirements
   | .statement node => node.form.primaryRequirementIds
+
+/-- Exact primary attachments owned directly by one heterogeneous node. -/
+def primaryRequirementSites : Node → List PrimaryRequirementSite
+  | .expression node =>
+      node.requirements.map fun requirement => {
+        occurrence := .expression node.id
+        requirement
+      }
+  | .statement node =>
+      node.form.primaryRequirementIds.map fun requirement => {
+        occurrence := .statement node.id
+        requirement
+      }
 
 end Node
 
@@ -980,10 +1038,20 @@ order.  Only initialized lexical lets own template requirements. -/
 def localSchemeTemplateIds (source : TypedSource) : List RequirementId :=
   source.nodes.flatMap Node.localSchemeTemplateIds
 
+/-- Full initialized local-scheme template inventory in node-table and
+predicate order. -/
+def localSchemeTemplateSites (source : TypedSource) :
+    List LocalSchemeTemplateSite :=
+  source.nodes.flatMap Node.localSchemeTemplateSites
+
 /-- Stable primary requirement inventory in node-table and attachment order.
 This excludes every secondary mirror of a requirement identity. -/
 def primaryRequirementIds (source : TypedSource) : List RequirementId :=
   source.nodes.flatMap Node.primaryRequirementIds
+
+/-- Exact primary requirement attachments in node-table and attachment order. -/
+def primaryRequirementSites (source : TypedSource) : List PrimaryRequirementSite :=
+  source.nodes.flatMap Node.primaryRequirementSites
 
 /-- Declaration entries and direct child slots, retaining expression/statement
 categories.  A closed occurrence forest names every retained node exactly once

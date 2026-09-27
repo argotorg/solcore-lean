@@ -182,6 +182,51 @@ def sourceReachableNodeIds (source : TypedSource) : List NodeId :=
   collectReachableNodeIdsFuel source (source.incomingNodeIds.length + 1)
     source.roots []
 
+/-- Exact identities collected below one arbitrary occurrence root.  Final
+graph validation guarantees the initializer exists; the bounded collector is
+shared with whole-source reachability. -/
+def sourceSubtreeNodeIds (source : TypedSource) (root : NodeId) : List NodeId :=
+  sourceReachableNodeIds { source with roots := [root] }
+
+/-- Validate one initialized local-scheme template against its raw ledger row
+and unique primary source attachment. -/
+def validateSourceTemplateScope (source : TypedSource) (state : State)
+    (site : LocalSchemeTemplateSite) : Except Error Unit :=
+  let id := site.requirement.templateRequirement
+  match state.requirements.find? fun requirement =>
+      decide (requirement.id = id) with
+  | none => .error (.missingLocalSchemeRequirement id)
+  | some requirement =>
+      let expected := site.requirement.predicate
+      let actual := applyPredicate state requirement.predicate
+      if _predicateEq : expected = actual then
+        match source.primaryRequirementSites.find? fun primary =>
+            decide (primary.requirement = id) with
+        | none => .error (.missingLocalSchemePrimaryRequirement id)
+        | some primary =>
+            if nodeIdMember (sourceSubtreeNodeIds source site.initializer)
+                primary.occurrence then
+              .ok ()
+            else
+              .error (.localSchemeTemplateOutOfScope id site.initializer
+                primary.occurrence)
+      else
+        .error (.localSchemeTemplatePredicateMismatch id expected actual)
+
+/-- Validate a source-ordered suffix of qualified template sites. -/
+def validateSourceTemplateScopesFrom (source : TypedSource) (state : State) :
+    List LocalSchemeTemplateSite → Except Error Unit
+  | [] => .ok ()
+  | site :: rest => do
+      validateSourceTemplateScope source state site
+      validateSourceTemplateScopesFrom source state rest
+
+/-- Validate predicate agreement and initializer-local primary ownership for
+every qualified local-scheme template retained by a typed source. -/
+def validateSourceTemplateScopes (source : TypedSource) (state : State) :
+    Except Error Unit :=
+  validateSourceTemplateScopesFrom source state source.localSchemeTemplateSites
+
 /-- Ensure every retained table node was collected by the root worklist. -/
 def validateAllSourceNodesReachedFrom (reached : List NodeId) :
     List Node → Except Error Unit
@@ -323,13 +368,15 @@ def finalize (context : Context) (type : Ty) (state : State)
   validateIntegerLiteralTargets state state.integerLiterals
   validateSourceRequirementOwnership (state.toTypedSource roots)
     state.requirements
-  let solvedRequirements ← solveRequirements context state state.requirements
   let substitution := state.inference.substitution
+  let typedSource := (state.toTypedSource roots).applySubstitution substitution
+  validateSourceTemplateScopes typedSource state
+  let solvedRequirements ← solveRequirements context state state.requirements
   pure {
     type := state.resolve type
     substitution
     solvedRequirements
-    typedSource := (state.toTypedSource roots).applySubstitution substitution
+    typedSource
   }
 
 end Detail

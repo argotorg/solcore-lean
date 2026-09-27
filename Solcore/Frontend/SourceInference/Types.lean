@@ -111,6 +111,11 @@ inductive Error where
   | missingLocalSchemeAssumption (id : RequirementId)
   | unownedLocalSchemeAssumption (id : RequirementId)
   | missingLocalSchemeRequirement (id : RequirementId)
+  | localSchemeTemplatePredicateMismatch
+      (id : RequirementId) (expected actual : ProgramPredicate)
+  | missingLocalSchemePrimaryRequirement (id : RequirementId)
+  | localSchemeTemplateOutOfScope
+      (id : RequirementId) (initializer occurrence : NodeId)
   | missingRoot (root : NodeId)
   | missingChild (parent child : NodeId)
   | duplicateIncomingNode (id : NodeId)

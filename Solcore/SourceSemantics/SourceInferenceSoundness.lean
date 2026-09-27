@@ -264,6 +264,84 @@ theorem sourceReachableNodeIds_sound
     exact .root member
   · simp
 
+private theorem reachableFromSingletonRoot_inReflexiveSubtree
+    {source : TypedSource} {root id : NodeId}
+    (reachable : Reachable { source with roots := [root] } id) :
+    InReflexiveSubtree source root id := by
+  induction reachable with
+  | @root found member =>
+      exact Or.inl (by simpa using member)
+  | @child parent child parentReachable edge induction =>
+      have sourceEdge : DirectChild source parent child := by
+        simpa [DirectChild, ContainsNode] using edge
+      rcases induction with parentEq | parentPath
+      · subst parent
+        exact Or.inr (.direct sourceEdge)
+      · exact Or.inr (Descends.trans parentPath (.direct sourceEdge))
+
+/-- Every identity returned by the arbitrary-root executable worklist lies in
+the declarative reflexive subtree rooted at that exact occurrence. -/
+theorem sourceSubtreeNodeIds_sound
+    (source : TypedSource) (root : NodeId) :
+    ∀ id, id ∈ Detail.sourceSubtreeNodeIds source root →
+      InReflexiveSubtree source root id := by
+  intro id member
+  apply reachableFromSingletonRoot_inReflexiveSubtree
+  exact sourceReachableNodeIds_sound { source with roots := [root] } id (by
+    simpa [Detail.sourceSubtreeNodeIds] using member)
+
+/-- The executable template-scope validator and raw-ledger identity
+uniqueness construct the exact declarative scoped-row witness for any source
+template row. -/
+theorem validateSourceTemplateScopes_success_rowScoped
+    {source : TypedSource} {state : Frontend.SourceInference.State}
+    (scopeSuccess : Detail.validateSourceTemplateScopes source state = .ok ())
+    (ledgerUnique :
+      (state.requirements.map fun requirement => requirement.id).Nodup)
+    {requirement : Requirement}
+    (requirementMember : requirement ∈ state.requirements)
+    (templateMember :
+      requirement.id ∈ sourceLocalSchemeTemplateIds source) :
+    LocalSchemeTemplateRowScoped source {
+      id := requirement.id
+      predicate := Detail.applyPredicate state requirement.predicate
+      evidence := .assumption
+        (Detail.applyPredicate state requirement.predicate)
+    } := by
+  have executableTemplateMember :
+      requirement.id ∈ source.localSchemeTemplateIds := by
+    simpa using templateMember
+  rw [typedSourceLocalSchemeTemplateIds_eq_sites] at executableTemplateMember
+  rcases List.mem_map.mp executableTemplateMember with
+    ⟨site, siteMember, siteIdEq⟩
+  obtain ⟨selected, primary, selectedMember, selectedId,
+      predicateEq, primaryMember, primaryId, primaryScoped⟩ :=
+    Detail.validateSourceTemplateScopes_success scopeSuccess site siteMember
+  have selectedEq : selected = requirement :=
+    StructuralSubstitution.eq_of_mem_of_mapped_nodup ledgerUnique
+      selectedMember requirementMember (selectedId.trans siteIdEq)
+  subst selected
+  have contains : ContainsLocalSchemeTemplate source site := by
+    unfold ContainsLocalSchemeTemplate
+    rw [← typedSourceLocalSchemeTemplateSites_eq_carrier]
+    exact siteMember
+  have primaryRequirementEq : primary.requirement = requirement.id :=
+    primaryId.trans siteIdEq
+  have occurs : PrimaryRequirementOccursAt source primary.occurrence
+      requirement.id := by
+    unfold PrimaryRequirementOccursAt
+    rw [← typedSourcePrimaryRequirementSites_eq_carrier]
+    cases primary with
+    | mk occurrence primaryRequirement =>
+        simp only at primaryRequirementEq ⊢
+        subst primaryRequirement
+        exact primaryMember
+  exact .intro site contains siteIdEq.symm predicateEq
+    (congrArg PredicateEvidence.assumption predicateEq)
+    primary.occurrence occurs
+    ⟨contains, sourceSubtreeNodeIds_sound source site.initializer
+      primary.occurrence primaryScoped⟩
+
 /-- Successful executable graph validation proves that every retained node is
 reachable from one of the exact declaration roots. -/
 theorem validateSourceGraph_success_allNodesReachable
@@ -2211,15 +2289,16 @@ theorem solveRequirements_scoped_entries_sound
             template_scoped tailRequirement (by simp [tailMember]) template)
           candidate member
 
-/-- A canonical inference ledger with complete source-template coverage
+/-- A duplicate-free inference ledger with complete source-template coverage
 becomes a whole-body scoped requirement ledger after successful solving. -/
-theorem solveRequirements_scoped_ledger_sound
+theorem solveRequirements_scoped_ledger_sound_of_nodup
     {inferenceContext : Frontend.SourceInference.Context}
     {state : Frontend.SourceInference.State}
     {solved : List SolvedRequirement}
     {baseContext : SourceSemantics.Context}
     {source : TypedSource}
-    (stateWellFormed : state.RequirementsWellFormed)
+    (ledgerUnique :
+      (state.requirements.map fun requirement => requirement.id).Nodup)
     (signatures_eq : baseContext.signatures = inferenceContext.signatures)
     (assumptions_eq : baseContext.assumptions =
       inferenceContext.assumptions.map (Detail.applyPredicate state))
@@ -2248,8 +2327,9 @@ theorem solveRequirements_scoped_ledger_sound
     templatesComplete := ?_
   }
   · change (solved.map (fun requirement => requirement.id)).Nodup
-    exact Detail.solveRequirements_ids_nodup inferenceContext state solved
-      stateWellFormed success
+    rw [Detail.solveRequirements_preserves_ids inferenceContext state
+      state.requirements solved success]
+    exact ledgerUnique
   · exact solveRequirements_scoped_entries_sound
       (semanticContext := baseContext.withSolvedRequirements solved)
       signatures_eq assumptions_eq template_iff template_scoped success
@@ -2268,6 +2348,41 @@ theorem solveRequirements_scoped_ledger_sound
       exact inputMember
     rcases List.mem_map.mp outputMember with ⟨row, member, id_eq⟩
     exact ⟨row, member, id_eq⟩
+
+/-- Compatibility form deriving duplicate-free raw requirement identities
+from the canonical allocation invariant. -/
+theorem solveRequirements_scoped_ledger_sound
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {solved : List SolvedRequirement}
+    {baseContext : SourceSemantics.Context}
+    {source : TypedSource}
+    (stateWellFormed : state.RequirementsWellFormed)
+    (signatures_eq : baseContext.signatures = inferenceContext.signatures)
+    (assumptions_eq : baseContext.assumptions =
+      inferenceContext.assumptions.map (Detail.applyPredicate state))
+    (templateOwnership : LocalSchemeTemplateOwnership source)
+    (template_iff : ∀ requirement, requirement ∈ state.requirements →
+      (requirement.id ∈ state.localSchemeAssumptions ↔
+        requirement.id ∈ sourceLocalSchemeTemplateIds source))
+    (templates_subset : sourceLocalSchemeTemplateIds source ⊆
+      state.requirements.map (fun requirement => requirement.id))
+    (template_scoped : ∀ requirement, requirement ∈ state.requirements →
+      requirement.id ∈ state.localSchemeAssumptions →
+      LocalSchemeTemplateRowScoped source {
+        id := requirement.id
+        predicate := Detail.applyPredicate state requirement.predicate
+        evidence := .assumption
+          (Detail.applyPredicate state requirement.predicate)
+      })
+    (success : Detail.solveRequirements inferenceContext state
+      state.requirements = .ok solved) :
+    ScopedRequirementLedgerWellFormed
+      (baseContext.withSolvedRequirements solved) source := by
+  apply solveRequirements_scoped_ledger_sound_of_nodup
+    (Frontend.SourceInference.State.requirementIds_nodup state stateWellFormed)
+    signatures_eq assumptions_eq templateOwnership template_iff
+    templates_subset template_scoped success
 
 /-- Qualified-local template identities materialized directly by one source
 node.  Expression nodes never materialize binders; statement nodes may retain
@@ -2631,7 +2746,7 @@ theorem finalize_template_evidence
   have initialTemplate : row.id ∈ state.localSchemeAssumptions :=
     (finalize_templateIdsAligned aligned success row.id).mp template
   obtain ⟨patternState, finalState, requirements, _, _, _, _, patternResult,
-      literalResult, _, _, _, requirementsResult, resultEq⟩ :=
+      literalResult, _, _, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have finalTemplate : row.id ∈ finalState.localSchemeAssumptions := by
     rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
@@ -2672,6 +2787,102 @@ def finalizedRequirementContext
         (TypedTraitResolution.applySubstitution result.substitution)))
     |>.withSolvedRequirements result.solvedRequirements
 
+/-- Requirement-only semantic context projected from a checked function.  It
+retains the final substitution on declaration predicates without yet adding
+the declaration/type-variable fields used by deep body typing. -/
+def checkedFinalizedRequirementContext
+    (signatures : ProgramSignatures)
+    (signature : ProgramFunctionSignature)
+    (checked : CheckedFunction) : SourceSemantics.Context :=
+  ((SourceSemantics.Context.ofSignatures signatures)
+    |>.withAssumptions
+      (signature.scheme.predicates.map
+        (TypedTraitResolution.applySubstitution checked.substitution)))
+    |>.withSolvedRequirements checked.solvedRequirements
+
+/-- Successful finalization establishes the complete scoped requirement
+ledger for its finalized source, including ordinary evidence and qualified
+initializer-local assumption templates. -/
+theorem finalize_scopedRequirementLedgerWellFormed
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    ScopedRequirementLedgerWellFormed
+      (finalizedRequirementContext inferenceContext result)
+      result.typedSource := by
+  obtain ⟨patternState, finalState, solved, _, _, trackingValidation, _,
+      patternDefault, literalDefault, _, _, ownershipValidation,
+      scopeValidation, requirementsSolved, resultEq⟩ :=
+    Detail.finalize_success_witness success
+  have aligned := finalize_templateIdsAligned_validated success
+  have templateOwnership := finalize_localSchemeTemplateOwnership success
+  have ownershipFacts :=
+    Detail.validateSourceRequirementOwnership_success ownershipValidation
+  subst result
+  have assumptionsEq : finalState.localSchemeAssumptions =
+      state.localSchemeAssumptions := by
+    rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
+      literalDefault,
+      Detail.defaultIntegerPatternTargets_localSchemeAssumptions
+        patternDefault]
+  have templateIff : ∀ requirement,
+      requirement ∈ finalState.requirements →
+      (requirement.id ∈ finalState.localSchemeAssumptions ↔
+        requirement.id ∈ sourceLocalSchemeTemplateIds
+          ((finalState.toTypedSource roots).applySubstitution
+            finalState.inference.substitution)) := by
+    intro requirement _
+    rw [assumptionsEq]
+    exact (aligned requirement.id).symm
+  have templatesSubset :
+      sourceLocalSchemeTemplateIds
+          ((finalState.toTypedSource roots).applySubstitution
+            finalState.inference.substitution) ⊆
+        finalState.requirements.map (fun requirement => requirement.id) := by
+    intro id templateMember
+    have executableTemplateMember : id ∈
+        ((finalState.toTypedSource roots).applySubstitution
+          finalState.inference.substitution).localSchemeTemplateIds := by
+      simpa using templateMember
+    rw [typedSourceLocalSchemeTemplateIds_eq_sites] at executableTemplateMember
+    rcases List.mem_map.mp executableTemplateMember with
+      ⟨site, siteMember, siteIdEq⟩
+    obtain ⟨requirement, _, requirementMember, requirementId, _, _, _, _⟩ :=
+      Detail.validateSourceTemplateScopes_success scopeValidation site
+        siteMember
+    exact List.mem_map.mpr
+      ⟨requirement, requirementMember, requirementId.trans siteIdEq⟩
+  have templateScoped : ∀ requirement,
+      requirement ∈ finalState.requirements →
+      requirement.id ∈ finalState.localSchemeAssumptions →
+      LocalSchemeTemplateRowScoped
+        ((finalState.toTypedSource roots).applySubstitution
+          finalState.inference.substitution) {
+          id := requirement.id
+          predicate := Detail.applyPredicate finalState requirement.predicate
+          evidence := .assumption
+            (Detail.applyPredicate finalState requirement.predicate)
+        } := by
+    intro requirement requirementMember classified
+    exact validateSourceTemplateScopes_success_rowScoped scopeValidation
+      ownershipFacts.2.1 requirementMember
+      ((templateIff requirement requirementMember).mp classified)
+  let baseContext : SourceSemantics.Context :=
+    (SourceSemantics.Context.ofSignatures inferenceContext.signatures)
+      |>.withAssumptions
+        (inferenceContext.assumptions.map
+          (TypedTraitResolution.applySubstitution
+            finalState.inference.substitution))
+  have ledgerProof := solveRequirements_scoped_ledger_sound_of_nodup
+    (baseContext := baseContext)
+    ownershipFacts.2.1 (by rfl) (by rfl) templateOwnership templateIff
+    templatesSubset templateScoped requirementsSolved
+  simpa [finalizedRequirementContext, baseContext]
+    using ledgerProof
+
 /-- Exact executable source-to-ledger validation survives final substitution
 and establishes the declarative whole-source requirement ownership judgment. -/
 theorem finalize_requirementOwnership
@@ -2686,7 +2897,7 @@ theorem finalize_requirementOwnership
     (success : Detail.finalize inferenceContext type state roots = .ok result) :
     RequirementOwnership semanticContext result.typedSource := by
   obtain ⟨_, finalState, solved, _, _, _, _, _, _, _, _,
-      ownershipValidation, requirementsSolved, resultEq⟩ :=
+      ownershipValidation, _, requirementsSolved, resultEq⟩ :=
     Detail.finalize_success_witness success
   have validated :=
     Detail.validateSourceRequirementOwnership_success ownershipValidation
@@ -2715,6 +2926,25 @@ theorem checkFunctionBody_success_requirementOwnership
   subst checked
   exact finalize_requirementOwnership rfl finalizeSuccess
 
+/-- Every successfully checked function body carries a complete scoped
+requirement ledger in its final requirement-only semantic context. -/
+theorem checkFunctionBody_success_scopedRequirementLedgerWellFormed
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    ScopedRequirementLedgerWellFormed
+      (checkedFinalizedRequirementContext signatures signature checked)
+      checked.typedBody := by
+  obtain ⟨_, _, _, result, _, _, _, finalizeSuccess, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  simpa [checkedFinalizedRequirementContext, finalizedRequirementContext]
+    using finalize_scopedRequirementLedgerWellFormed finalizeSuccess
+
 /-- Executable finalization connects one retained integer-literal node to the
 declarative validity judgment through its exact requirement row. -/
 theorem finalize_integerLiteralValid_of_mem
@@ -2739,7 +2969,7 @@ theorem finalize_integerLiteralValid_of_mem
       (resolution.applySubstitution result.substitution) := by
   obtain ⟨patternState, finalState, requirements, _, _, _, ledgerValidation,
       patternResult, literalResult, _, literalValidation, _,
-      requirementsResult, resultEq⟩ :=
+      _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have ledger :=
     Detail.validateIntegerLiteralLedger_success_correspondence
@@ -2780,7 +3010,7 @@ theorem finalize_solvedRequirementsValid
       (finalizedRequirementContext inferenceContext result)
       result.solvedRequirements := by
   obtain ⟨patternState, finalState, requirements, _, _, _, _, patternResult,
-      literalResult, _, _, _, requirementsResult, resultEq⟩ :=
+      literalResult, _, _, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have patternOrdinary : patternState.localSchemeAssumptions = [] := by
     rw [Detail.defaultIntegerPatternTargets_localSchemeAssumptions

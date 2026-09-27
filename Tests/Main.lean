@@ -1208,6 +1208,7 @@ import Solcore.Test.SourceInference
 import Solcore.Test.SourceInferenceLocalIdentityValidation
 import Solcore.Test.SourceInferenceRequirementOwnershipValidation
 import Solcore.Test.SourceInferenceTemplateTrackingValidation
+import Solcore.Test.SourceInferenceTemplateScopeValidation
 import Solcore.Test.SourcePhase7Inference
 import Solcore.Test.SourceConstructorVisibility
 import Solcore.Test.SourceCoercionRanking
@@ -2055,6 +2056,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceInferenceLocalIdentityValidation.testSourceInferenceLocalIdentityValidation
   SourceInferenceRequirementOwnershipValidation.testSourceInferenceRequirementOwnershipValidation
   SourceInferenceTemplateTrackingValidation.testSourceInferenceTemplateTrackingValidation
+  SourceInferenceTemplateScopeValidation.testSourceInferenceTemplateScopeValidation
   SourcePhase7Inference.testSourcePhase7Inference
   testSourceConstructorVisibility
   SourceCoercionRanking.testSourceCoercionRanking

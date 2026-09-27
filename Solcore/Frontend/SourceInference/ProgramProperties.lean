@@ -398,6 +398,119 @@ theorem validateSourceTemplateTracking_success
   exact ⟨templatesUnique, classifiedUnique, classifiedExact,
     validateRequirementIdsContained_success ledgerContained⟩
 
+/-- Successful validation of one qualified template exposes its exact raw
+ledger row, primary source attachment, predicate agreement, and executable
+initializer-subtree membership. -/
+theorem validateSourceTemplateScope_success
+    {source : TypedSource} {state : State}
+    {site : LocalSchemeTemplateSite}
+    (success : validateSourceTemplateScope source state site = .ok ()) :
+    ∃ requirement primary,
+      requirement ∈ state.requirements ∧
+      requirement.id = site.requirement.templateRequirement ∧
+      applyPredicate state requirement.predicate = site.requirement.predicate ∧
+      primary ∈ source.primaryRequirementSites ∧
+      primary.requirement = site.requirement.templateRequirement ∧
+      primary.occurrence ∈ sourceSubtreeNodeIds source site.initializer := by
+  cases requirementResult : state.requirements.find? (fun requirement =>
+      decide (requirement.id = site.requirement.templateRequirement)) with
+  | none =>
+      simp [validateSourceTemplateScope, requirementResult] at success
+  | some requirement =>
+      have requirementMember : requirement ∈ state.requirements :=
+        List.mem_of_find?_eq_some requirementResult
+      have requirementId :
+          requirement.id = site.requirement.templateRequirement :=
+        of_decide_eq_true (List.find?_some
+          (p := fun candidate : Requirement =>
+            decide (candidate.id = site.requirement.templateRequirement))
+          requirementResult)
+      by_cases predicateEq : site.requirement.predicate =
+          applyPredicate state requirement.predicate
+      · have predicateEq' :
+            applyPredicate state requirement.predicate =
+              site.requirement.predicate := predicateEq.symm
+        cases primaryResult : source.primaryRequirementSites.find?
+            (fun primary => decide (primary.requirement =
+              site.requirement.templateRequirement)) with
+        | none =>
+            simp [validateSourceTemplateScope, requirementResult,
+              predicateEq, primaryResult] at success
+        | some primary =>
+            have primaryMember : primary ∈ source.primaryRequirementSites :=
+              List.mem_of_find?_eq_some primaryResult
+            have primaryId :
+                primary.requirement =
+                  site.requirement.templateRequirement :=
+              of_decide_eq_true (List.find?_some
+                (p := fun candidate : PrimaryRequirementSite =>
+                  decide (candidate.requirement =
+                    site.requirement.templateRequirement)) primaryResult)
+            cases contained : nodeIdMember
+                (sourceSubtreeNodeIds source site.initializer)
+                primary.occurrence with
+            | false =>
+                simp [validateSourceTemplateScope, requirementResult,
+                  predicateEq, primaryResult, contained] at success
+            | true =>
+                have primaryScoped : primary.occurrence ∈
+                    sourceSubtreeNodeIds source site.initializer :=
+                  (nodeIdMember_eq_true_iff _ _).mp contained
+                exact ⟨requirement, primary, requirementMember,
+                  requirementId, predicateEq', primaryMember, primaryId,
+                  primaryScoped⟩
+      · simp [validateSourceTemplateScope, requirementResult, predicateEq]
+          at success
+
+private theorem validateSourceTemplateScopesFrom_success
+    {source : TypedSource} {state : State}
+    {sites : List LocalSchemeTemplateSite}
+    (success : validateSourceTemplateScopesFrom source state sites = .ok ()) :
+    ∀ site, site ∈ sites →
+      ∃ requirement primary,
+        requirement ∈ state.requirements ∧
+        requirement.id = site.requirement.templateRequirement ∧
+        applyPredicate state requirement.predicate =
+          site.requirement.predicate ∧
+        primary ∈ source.primaryRequirementSites ∧
+        primary.requirement = site.requirement.templateRequirement ∧
+        primary.occurrence ∈
+          sourceSubtreeNodeIds source site.initializer := by
+  induction sites with
+  | nil => simp
+  | cons head tail induction =>
+      cases headResult : validateSourceTemplateScope source state head with
+      | error error =>
+          simp [validateSourceTemplateScopesFrom, headResult, bind,
+            Except.bind] at success
+      | ok value =>
+          cases value
+          have tailResult :
+              validateSourceTemplateScopesFrom source state tail = .ok () := by
+            simpa [validateSourceTemplateScopesFrom, headResult, bind,
+              Except.bind] using success
+          intro site member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · exact validateSourceTemplateScope_success headResult
+          · exact induction tailResult site tailMember
+
+/-- Successful complete template-scope validation supplies the exact witness
+for every canonical source template site. -/
+theorem validateSourceTemplateScopes_success
+    {source : TypedSource} {state : State}
+    (success : validateSourceTemplateScopes source state = .ok ()) :
+    ∀ site, site ∈ source.localSchemeTemplateSites →
+      ∃ requirement primary,
+        requirement ∈ state.requirements ∧
+        requirement.id = site.requirement.templateRequirement ∧
+        applyPredicate state requirement.predicate =
+          site.requirement.predicate ∧
+        primary ∈ source.primaryRequirementSites ∧
+        primary.requirement = site.requirement.templateRequirement ∧
+        primary.occurrence ∈
+          sourceSubtreeNodeIds source site.initializer := by
+  exact validateSourceTemplateScopesFrom_success success
+
 private theorem validateSourceRootsFrom_success
     {source : TypedSource} {roots : List NodeId}
     (success : validateSourceRootsFrom source roots = .ok ()) :
@@ -1387,6 +1500,10 @@ structure FinalizeSuccessWitness
   requirementOwnershipValidation :
     validateSourceRequirementOwnership (finalState.toTypedSource roots)
       finalState.requirements = .ok ()
+  templateScopeValidation :
+    validateSourceTemplateScopes
+      ((finalState.toTypedSource roots).applySubstitution
+        finalState.inference.substitution) finalState = .ok ()
   requirementsSolved :
     solveRequirements context finalState finalState.requirements =
       .ok solvedRequirements
@@ -1487,43 +1604,60 @@ def finalize_success_witness
                             ownershipResult, bind, Except.bind] at success
                       | ok ownershipValidation =>
                           cases ownershipValidation
-                          cases requirementsResult :
-                              solveRequirements context finalState
-                                finalState.requirements with
+                          cases templateScopeResult :
+                              validateSourceTemplateScopes
+                                ((finalState.toTypedSource roots).applySubstitution
+                                  finalState.inference.substitution)
+                                finalState with
                           | error error =>
                               simp [graphValidation, localIdentityValidation,
                                 templateTrackingValidation, ledgerResult,
                                 patternResult, literalResult,
                                 patternValidationResult,
                                 literalValidationResult, ownershipResult,
-                                requirementsResult, bind, Except.bind]
+                                templateScopeResult, bind, Except.bind]
                                 at success
-                          | ok requirements =>
-                              simp [graphValidation,
-                                localIdentityValidation,
-                                templateTrackingValidation, ledgerResult,
-                                patternResult, literalResult,
-                                patternValidationResult,
-                                literalValidationResult, ownershipResult,
-                                requirementsResult, bind, Except.bind]
-                                at success
-                              cases success
-                              exact {
-                                patternState
-                                finalState
-                                solvedRequirements := requirements
-                                graphValidation
-                                localIdentityValidation
-                                templateTrackingValidation
-                                ledgerValidation := ledgerResult
-                                patternDefault := patternResult
-                                literalDefault := literalResult
-                                patternValidation := patternValidationResult
-                                literalValidation := literalValidationResult
-                                requirementOwnershipValidation := ownershipResult
-                                requirementsSolved := requirementsResult
-                                result_eq := rfl
-                              }
+                          | ok templateScopeValidation =>
+                              cases templateScopeValidation
+                              cases requirementsResult :
+                                  solveRequirements context finalState
+                                    finalState.requirements with
+                              | error error =>
+                                  simp [graphValidation,
+                                    localIdentityValidation,
+                                    templateTrackingValidation, ledgerResult,
+                                    patternResult, literalResult,
+                                    patternValidationResult,
+                                    literalValidationResult, ownershipResult,
+                                    templateScopeResult, requirementsResult,
+                                    bind, Except.bind] at success
+                              | ok requirements =>
+                                  simp [graphValidation,
+                                    localIdentityValidation,
+                                    templateTrackingValidation, ledgerResult,
+                                    patternResult, literalResult,
+                                    patternValidationResult,
+                                    literalValidationResult, ownershipResult,
+                                    templateScopeResult, requirementsResult,
+                                    bind, Except.bind] at success
+                                  cases success
+                                  exact {
+                                    patternState
+                                    finalState
+                                    solvedRequirements := requirements
+                                    graphValidation
+                                    localIdentityValidation
+                                    templateTrackingValidation
+                                    ledgerValidation := ledgerResult
+                                    patternDefault := patternResult
+                                    literalDefault := literalResult
+                                    patternValidation := patternValidationResult
+                                    literalValidation := literalValidationResult
+                                    requirementOwnershipValidation := ownershipResult
+                                    templateScopeValidation := templateScopeResult
+                                    requirementsSolved := requirementsResult
+                                    result_eq := rfl
+                                  }
 
 /-- Successful finalization includes successful structural validation of its
 input typed-source graph. -/

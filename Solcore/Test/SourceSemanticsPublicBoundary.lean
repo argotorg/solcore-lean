@@ -105,6 +105,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.sourceReachableNodeIds_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.sourceSubtreeNodeIds_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceTemplateScopes_success_rowScoped
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_allNodesReachable
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_occurrenceGraphClosed
@@ -199,6 +203,8 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_t
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_ordinary_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_scoped_entries_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_scoped_ledger_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_scoped_ledger_sound_of_nodup
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.nodeLocalSchemeTemplateIds
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.recordNode_sourceLocalSchemeTemplateIds
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking
@@ -227,6 +233,12 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_template_e
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_template_evidence_validated
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalizedRequirementContext
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.checkedFinalizedRequirementContext
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_scopedRequirementLedgerWellFormed
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_integerLiteralValid_of_mem
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_solvedRequirementsValid
@@ -516,6 +528,7 @@ example :=
 example := @Solcore.SourceSemantics.nodePrimaryRequirementIds_eq_carrier
 example :=
   @Solcore.SourceSemantics.typedSourcePrimaryRequirementIds_eq_carrier
+example := @Solcore.SourceSemantics.typedSourcePrimaryRequirementSites_eq_carrier
 example := @Solcore.SourceSemantics.TypeWellScoped
 example := @Solcore.SourceSemantics.TypesWellScoped
 example := @Solcore.SourceSemantics.TypeWellScoped.contractNominal
@@ -555,6 +568,9 @@ example :=
 example := @Solcore.SourceSemantics.nodeLocalSchemeTemplateIds_eq_carrier
 example :=
   @Solcore.SourceSemantics.typedSourceLocalSchemeTemplateIds_eq_carrier
+example :=
+  @Solcore.SourceSemantics.typedSourceLocalSchemeTemplateSites_eq_carrier
+example := @Solcore.SourceSemantics.typedSourceLocalSchemeTemplateIds_eq_sites
 example := @Solcore.SourceSemantics.instantiateLocalSchemePredicates
 example := @Solcore.SourceSemantics.localSchemeInitializerContext
 example := @Solcore.SourceSemantics.LocalSchemeRequirementWellFormed

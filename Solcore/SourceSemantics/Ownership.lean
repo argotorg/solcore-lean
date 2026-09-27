@@ -162,12 +162,9 @@ def initializedLetBindings (source : TypedSource) : List InitializedLetBinding :
     | .expression _ => []
     | .statement statement => statementInitializedLetBindings statement.form
 
-/-- One source-level owner of one qualified local-scheme template row. -/
-structure LocalSchemeTemplateOwner where
-  binder : TypedBinder
-  initializer : NodeId
-  requirement : LocalSchemeRequirement
-  deriving Repr, BEq, DecidableEq
+/-- Proof-facing name for the canonical executable local-scheme template
+site.  Both layers deliberately share the same carrier. -/
+abbrev LocalSchemeTemplateOwner := LocalSchemeTemplateSite
 
 namespace InitializedLetBinding
 
@@ -187,6 +184,78 @@ end InitializedLetBinding
 def localSchemeTemplateOwners (source : TypedSource) :
     List LocalSchemeTemplateOwner :=
   (initializedLetBindings source).flatMap InitializedLetBinding.templateOwners
+
+/-- The executable and proof-facing template-site inventories agree for one
+`for` header item. -/
+@[simp] theorem forItemLocalSchemeTemplateSites_eq_carrier
+    (item : ForItemForm) :
+    item.localSchemeTemplateSites =
+      (forItemInitializedLetBindings item).flatMap
+        InitializedLetBinding.templateOwners := by
+  cases item with
+  | letDecl binder initializer =>
+      cases initializer <;> simp [ForItemForm.localSchemeTemplateSites,
+        forItemInitializedLetBindings, InitializedLetBinding.templateOwners]
+  | expression expression => rfl
+  | assignValue assignment operator value => rfl
+  | assignBitNot assignment => rfl
+
+@[simp] theorem flatMapForItemLocalSchemeTemplateSites_eq_carrier
+    (items : List ForItemForm) :
+    items.flatMap ForItemForm.localSchemeTemplateSites =
+      (items.flatMap forItemInitializedLetBindings).flatMap
+        InitializedLetBinding.templateOwners := by
+  induction items with
+  | nil => rfl
+  | cons item rest induction => simp [induction]
+
+/-- The executable and proof-facing template-site inventories agree for one
+statement form. -/
+@[simp] theorem statementLocalSchemeTemplateSites_eq_carrier
+    (form : StatementForm) :
+    form.localSchemeTemplateSites =
+      (statementInitializedLetBindings form).flatMap
+        InitializedLetBinding.templateOwners := by
+  cases form with
+  | letDecl binder initializer =>
+      cases initializer <;> simp [StatementForm.localSchemeTemplateSites,
+        statementInitializedLetBindings, InitializedLetBinding.templateOwners]
+  | returnStmt value => rfl
+  | expression expression trailingSemicolon => rfl
+  | assignValue assignment operator value => rfl
+  | assignBitNot assignment => rfl
+  | ifThen condition thenBody elseBody => rfl
+  | block body => rfl
+  | matchWith resolution => rfl
+  | forLoop initializer condition post body =>
+      simp [StatementForm.localSchemeTemplateSites,
+        statementInitializedLetBindings]
+  | whileLoop condition body => rfl
+  | breakStmt => rfl
+  | continueStmt => rfl
+
+@[simp] theorem nodeLocalSchemeTemplateSites_eq_carrier (node : Node) :
+    node.localSchemeTemplateSites =
+      match node with
+      | .expression _ => []
+      | .statement statement =>
+          (statementInitializedLetBindings statement.form).flatMap
+            InitializedLetBinding.templateOwners := by
+  cases node <;> simp [Node.localSchemeTemplateSites]
+
+/-- The canonical executable template sites are exactly the declarative owner
+inventory. -/
+@[simp] theorem typedSourceLocalSchemeTemplateSites_eq_carrier
+    (source : TypedSource) :
+    source.localSchemeTemplateSites = localSchemeTemplateOwners source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      simp only [TypedSource.localSchemeTemplateSites,
+        localSchemeTemplateOwners, initializedLetBindings]
+      induction nodes with
+      | nil => rfl
+      | cons node nodes induction =>
+          cases node <;> simp [induction]
 
 /-- Stable identities of every qualified local-scheme template in the source. -/
 def sourceLocalSchemeTemplateIds (source : TypedSource) : List RequirementId :=
@@ -283,6 +352,16 @@ source ownership inventory. -/
       | nil => rfl
       | cons node nodes induction =>
           cases node <;> simp [induction]
+
+/-- Forgetting the owner metadata from canonical executable template sites
+recovers the stable template-ID inventory exactly. -/
+theorem typedSourceLocalSchemeTemplateIds_eq_sites (source : TypedSource) :
+    source.localSchemeTemplateIds =
+      source.localSchemeTemplateSites.map fun site =>
+        site.requirement.templateRequirement := by
+  rw [typedSourceLocalSchemeTemplateIds_eq_carrier,
+    typedSourceLocalSchemeTemplateSites_eq_carrier]
+  rfl
 
 /-- Exact source ownership of one qualified local-scheme template. -/
 def ContainsLocalSchemeTemplate (source : TypedSource)
@@ -386,12 +465,9 @@ def statementPrimaryRequirementIds : StatementForm → List RequirementId
         post.flatMap forItemPrimaryRequirementIds
   | _ => []
 
-/-- One primary source attachment, retaining both its stable requirement
-identity and the expression or statement occurrence which owns it. -/
-structure PrimaryRequirementOccurrence where
-  occurrence : NodeId
-  requirement : RequirementId
-  deriving Repr, BEq, DecidableEq
+/-- Proof-facing name for the canonical executable primary requirement site.
+Both layers deliberately share the same carrier. -/
+abbrev PrimaryRequirementOccurrence := PrimaryRequirementSite
 
 /-- Primary requirement attachments owned by one expression occurrence. -/
 def expressionPrimaryRequirementOccurrences
@@ -483,6 +559,30 @@ declarative ownership inventory. -/
     (source : TypedSource) :
     source.primaryRequirementIds = primaryRequirementIds source := by
   simp [TypedSource.primaryRequirementIds, primaryRequirementIds]
+
+/-- The executable primary sites and proof-facing occurrences agree for one
+heterogeneous source node. -/
+@[simp] theorem nodePrimaryRequirementSites_eq_carrier (node : Node) :
+    node.primaryRequirementSites = nodePrimaryRequirementOccurrences node := by
+  cases node with
+  | expression expression =>
+      rfl
+  | statement statement =>
+      simp [Node.primaryRequirementSites, nodePrimaryRequirementOccurrences,
+        statementPrimaryRequirementOccurrences]
+
+/-- The executable primary-site inventory is exactly the proof-facing
+occurrence inventory. -/
+@[simp] theorem typedSourcePrimaryRequirementSites_eq_carrier
+    (source : TypedSource) :
+    source.primaryRequirementSites = primaryRequirementOccurrences source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      simp only [TypedSource.primaryRequirementSites,
+        primaryRequirementOccurrences]
+      induction nodes with
+      | nil => rfl
+      | cons node nodes induction => simp [induction]
 
 /-- Forgetting occurrence ownership from the detailed inventory recovers the
 original flat primary-requirement identity inventory exactly. -/
