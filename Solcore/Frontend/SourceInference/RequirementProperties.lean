@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceInference.Resolution
+import Solcore.Frontend.SourceInference.Expression
 
 /-! Small preservation laws for function-local source obligation identities. -/
 
@@ -389,6 +389,125 @@ theorem tryFunctionCandidate_preserves_requirementsWellFormed
     exact State.markDirectCallRequirements_preserves_requirementsWellFormed _ _
       (State.addRequirementsWithIds_preserves_requirementsWellFormed _ _
         fittedResultWellFormed)
+
+/-- Attaching already allocated coercion metadata changes expression nodes but
+does not change the canonical requirement ledger. -/
+theorem attachExpressionCoercions_preserves_requirementsWellFormed
+    (state : State) (entries : List ExpressionCoercions)
+    (wellFormed : state.RequirementsWellFormed) :
+    (attachExpressionCoercions state entries).RequirementsWellFormed := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil =>
+      exact wellFormed
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      exact induction _
+        (State.modifyExpressionNode_preserves_requirementsWellFormed
+          state entry.expression _ wellFormed)
+
+/-- Recording one expression node preserves the canonical requirement
+ledger.  Requirement identities stored on the node are references to the
+existing ledger, not new allocations. -/
+theorem recordExpression_preserves_requirementsWellFormed
+    (source : Syntax.Expr) (expression : InferredExpression)
+    (form : ExpressionForm) (requirements : List RequirementId)
+    (coercions : List CoercionStep) (state : State)
+    (wellFormed : state.RequirementsWellFormed) :
+    State.RequirementsWellFormed
+      (recordExpression source expression form requirements coercions state).2 := by
+  exact State.recordNode_preserves_requirementsWellFormed state _ wellFormed
+
+/-- Expected-type fitting may allocate coercion requirements; recording the
+resulting node itself leaves that fitted ledger unchanged. -/
+theorem recordExpressionWithExpected_preserves_requirementsWellFormed
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state = .ok result)
+    (wellFormed : state.RequirementsWellFormed) :
+    result.2.RequirementsWellFormed := by
+  unfold recordExpressionWithExpected at success
+  cases fittedResult : withExpected context state { id, type } expected with
+  | error error =>
+      simp [fittedResult, bind, Except.bind] at success
+  | ok fitted =>
+      simp only [fittedResult, bind, Except.bind] at success
+      change Except.ok (recordExpression source fitted.expression form
+        (requirements ++ coercionRequirements fitted.coercions)
+        fitted.coercions fitted.state) = Except.ok result at success
+      injection success with resultEq
+      subst result
+      exact recordExpression_preserves_requirementsWellFormed
+        source fitted.expression form
+        (requirements ++ coercionRequirements fitted.coercions)
+        fitted.coercions fitted.state
+        (withExpected_preserves_requirementsWellFormed fittedResult wellFormed)
+
+/-- Recording the callee and call nodes for a selected declaration preserves
+the explicitly supplied state ledger. -/
+theorem recordSelectedCallResult_preserves_requirementsWellFormed
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) (wellFormed : state.RequirementsWellFormed) :
+    (recordSelectedCallResult source callee name arguments attempt result
+      trailingCoercions state).2.RequirementsWellFormed := by
+  let attachedState :=
+    attachExpressionCoercions state attempt.argumentCoercions
+  have attachedWellFormed : attachedState.RequirementsWellFormed :=
+    attachExpressionCoercions_preserves_requirementsWellFormed
+      state attempt.argumentCoercions wellFormed
+  let allocation := attachedState.allocateExpressionId
+  have allocatedWellFormed : allocation.2.RequirementsWellFormed :=
+    State.allocateExpressionId_preserves_requirementsWellFormed
+      attachedState attachedWellFormed
+  let calleeExpression : InferredExpression := {
+    id := allocation.1
+    type := allocation.2.resolve attempt.instantiation.type
+  }
+  let calleeRecord := recordExpression callee calleeExpression
+    (.reference name (.declaration attempt.instantiation)) [] [] allocation.2
+  have calleeWellFormed : calleeRecord.2.RequirementsWellFormed :=
+    recordExpression_preserves_requirementsWellFormed callee calleeExpression
+      (.reference name (.declaration attempt.instantiation)) [] [] allocation.2
+      allocatedWellFormed
+  change State.RequirementsWellFormed
+    (recordExpression source result
+      (.call allocation.1 (arguments.map (fun argument => argument.id))
+        (.declaration attempt.instantiation))
+      (coercionRequirements attempt.callCoercions ++
+        attempt.signatureRequirements ++
+        coercionRequirements trailingCoercions)
+      (attempt.callCoercions ++ trailingCoercions) calleeRecord.2).2
+  exact recordExpression_preserves_requirementsWellFormed source result _ _ _ _
+    calleeWellFormed
+
+/-- Recording an ordinary selected call preserves the selected attempt's
+canonical requirement ledger. -/
+theorem recordSelectedCall_preserves_requirementsWellFormed
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (wellFormed : attempt.state.RequirementsWellFormed) :
+    State.RequirementsWellFormed
+      (recordSelectedCall source callee name arguments attempt).2 := by
+  exact recordSelectedCallResult_preserves_requirementsWellFormed
+    source callee name arguments attempt attempt.result [] attempt.state
+    wellFormed
+
+/-- Recording an indirect call adds one node and preserves the application
+result state's canonical requirement ledger. -/
+theorem recordIndirectCall_preserves_requirementsWellFormed
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult)
+    (wellFormed : result.state.RequirementsWellFormed) :
+    State.RequirementsWellFormed
+      (recordIndirectCall source callee arguments result).2 := by
+  unfold recordIndirectCall
+  exact recordExpression_preserves_requirementsWellFormed _ _ _ _ _ _
+    wellFormed
 
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)

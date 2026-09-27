@@ -200,6 +200,18 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_preserves_requirementsWellFormed
 example :=
+  @Solcore.Frontend.SourceInference.Detail.attachExpressionCoercions_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordExpression_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordSelectedCallResult_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordSelectedCall_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordIndirectCall_preserves_requirementsWellFormed
+example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_instantiation
 example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_success_candidate
