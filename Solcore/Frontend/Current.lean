@@ -1,5 +1,6 @@
 import Solcore.Frontend.ProgramIdentity
 import Solcore.Frontend.ProgramEnvironmentProperties
+import Solcore.Frontend.ProgramSignaturesProperties
 import Solcore.Frontend.TraitResolutionProperties
 import Solcore.Frontend.ProgramChecking
 import Solcore.Frontend.ExecutableImplMethods

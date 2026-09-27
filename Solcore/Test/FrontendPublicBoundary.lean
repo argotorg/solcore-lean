@@ -6,6 +6,8 @@ namespace Tests
 
 example := @Solcore.Frontend.buildProgramEnvironment_success_modules_nodup
 example := @Solcore.Frontend.buildProgramEnvironment_success_declarations_nodup
+example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
+example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
 
 example := @Solcore.Frontend.TraitResolution.ResolutionEvidenceValid
 example := @Solcore.Frontend.TraitResolution.ResolutionPremisesValid
