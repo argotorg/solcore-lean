@@ -41,6 +41,440 @@ private theorem list_eq_pair_of_length_eq_two
           | nil => exact ⟨first, second, rfl⟩
           | cons third tail => simp at length_eq
 
+private theorem list_eq_singleton_of_length_eq_one
+    {value : Type} {values : List value}
+    (length_eq : values.length = 1) :
+    ∃ item, values = [item] := by
+  cases values with
+  | nil => simp at length_eq
+  | cons item rest =>
+      cases rest with
+      | nil => exact ⟨item, rfl⟩
+      | cons second tail => simp at length_eq
+
+/-- The executable binary dispatch table agrees exactly with the declarative
+trait dispatch relation on every trait-backed spelling. -/
+theorem binaryOperatorDispatch_traitMethod
+    {operator : Syntax.BinaryOp} {traitName methodName : String}
+    (dispatch : Detail.binaryOperatorDispatch operator =
+      .traitMethod traitName methodName) :
+    BinaryTraitDispatch operator traitName methodName := by
+  cases operator <;>
+    simp [Detail.binaryOperatorDispatch] at dispatch
+  all_goals rcases dispatch with ⟨rfl, rfl⟩
+  all_goals constructor
+
+/-- The executable unary dispatch table agrees exactly with the declarative
+trait dispatch relation on its trait-backed spelling. -/
+theorem unaryOperatorDispatch_traitMethod
+    {operator : Syntax.UnaryOp} {traitName methodName : String}
+    (dispatch : Detail.unaryOperatorDispatch operator =
+      .traitMethod traitName methodName) :
+    UnaryTraitDispatch operator traitName methodName := by
+  cases operator <;>
+    simp [Detail.unaryOperatorDispatch] at dispatch
+  rcases dispatch with ⟨rfl, rfl⟩
+  constructor
+
+/-- Exact successful branch retained by unary-operator inference before final
+substitution.  The only non-semantic primitive case is an open integer-literal
+target deliberately deferred to finalization. -/
+inductive UnaryOperatorInferenceCase
+    (inferenceContext : Frontend.SourceInference.Context)
+    (semanticContext : SourceSemantics.Context)
+    (initial : Frontend.SourceInference.State)
+    (operator : Syntax.UnaryOp) (operandType : TypeSystem.Ty)
+    (integerLiterals : List IntegerLiteralOrigin)
+    (result : Detail.OperatorInferenceResult) : Prop where
+  | primitive
+      (typing : UnaryOperatorHasType semanticContext operator
+        (result.state.resolve operandType) result.type result.requirements) :
+      UnaryOperatorInferenceCase inferenceContext semanticContext initial
+        operator operandType integerLiterals result
+  | deferredBitNot
+      (operator_eq : operator = .bitNot)
+      (requirements_eq : result.requirements = [])
+      (type_eq : result.type = result.state.resolve operandType)
+      (deferred : Detail.isDeferredBuiltinOperatorTarget result.state
+        (Detail.isOpenIntegerLiteralTarget initial integerLiterals operandType)
+        .word (result.state.resolve operandType) = true) :
+      UnaryOperatorInferenceCase inferenceContext semanticContext initial
+        operator operandType integerLiterals result
+  | trait
+      {trait : Resolved.DeclarationId} {traitName methodName : String}
+      {predicates : List ProgramPredicate}
+      (dispatch : UnaryTraitDispatch operator traitName methodName)
+      (selected : Detail.operatorTrait? inferenceContext traitName =
+        .ok (some trait))
+      (profile : Detail.operatorTraitPredicates inferenceContext trait
+        methodName (result.state.resolve operandType)
+        [result.state.resolve operandType] [result.type] = .ok predicates)
+      (corresponds : RequirementPredicatesCorrespond result.state.requirements
+        predicates result.requirements) :
+      UnaryOperatorInferenceCase inferenceContext semanticContext initial
+        operator operandType integerLiterals result
+
+/-- Exact successful branch retained by binary-operator inference before final
+substitution.  Direct builtins already carry declarative typing, trait calls retain
+their selected profile and requirement correspondence, and the literal-only
+fallback is isolated for final defaulting. -/
+inductive BinaryOperatorInferenceCase
+    (inferenceContext : Frontend.SourceInference.Context)
+    (semanticContext : SourceSemantics.Context)
+    (initial : Frontend.SourceInference.State)
+    (operator : Syntax.BinaryOp) (left right : TypeSystem.Ty)
+    (integerLiterals : List IntegerLiteralOrigin)
+    (result : Detail.OperatorInferenceResult) : Prop where
+  | primitive
+      (typing : BinaryOperatorHasType semanticContext operator
+        (result.state.resolve left) (result.state.resolve right)
+        result.type result.requirements) :
+      BinaryOperatorInferenceCase inferenceContext semanticContext initial
+        operator left right integerLiterals result
+  | literalFallback
+      (requirements_eq : result.requirements = [])
+      (operands_eq : result.state.resolve left = result.state.resolve right)
+      (type_eq : result.type = if Detail.binaryResultIsBool operator
+        then .bool else result.state.resolve left)
+      (fallback :
+        Detail.isDeferredBuiltinOperatorTarget result.state
+            (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+              Detail.isOpenIntegerLiteralTarget initial integerLiterals right)
+            (Detail.binaryBuiltinType operator)
+            (result.state.resolve left) = true ∨
+          Detail.isStagedIntegerOperatorTarget result.state
+            (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+              Detail.isOpenIntegerLiteralTarget initial integerLiterals right)
+            (Detail.binaryBuiltinType operator)
+            (result.state.resolve left) = true) :
+      BinaryOperatorInferenceCase inferenceContext semanticContext initial
+        operator left right integerLiterals result
+  | trait
+      {trait : Resolved.DeclarationId} {traitName methodName : String}
+      {predicates : List ProgramPredicate}
+      (operands_eq : result.state.resolve left = result.state.resolve right)
+      (dispatch : BinaryTraitDispatch operator traitName methodName)
+      (selected : Detail.operatorTrait? inferenceContext traitName =
+        .ok (some trait))
+      (profile : Detail.operatorTraitPredicates inferenceContext trait
+        methodName (result.state.resolve left)
+        [result.state.resolve left, result.state.resolve left] [result.type] =
+          .ok predicates)
+      (corresponds : RequirementPredicatesCorrespond result.state.requirements
+        predicates result.requirements) :
+      BinaryOperatorInferenceCase inferenceContext semanticContext initial
+        operator left right integerLiterals result
+
+/-- The fixed builtin type and result table is a declarative binary typing
+table for every operator spelling. -/
+theorem binaryBuiltin_hasType
+    (context : SourceSemantics.Context) (operator : Syntax.BinaryOp) :
+    BinaryOperatorHasType context operator
+      (Detail.binaryBuiltinType operator)
+      (Detail.binaryBuiltinType operator)
+      (if Detail.binaryResultIsBool operator then .bool
+        else Detail.binaryBuiltinType operator) [] := by
+  cases operator <;>
+    simp [Detail.binaryBuiltinType, Detail.binaryResultIsBool]
+  all_goals constructor
+  all_goals constructor
+
+/-- Every Word-backed binary builtin also has the staged integer typing used
+while literal targets are being finalized. -/
+theorem binaryInteger_hasType
+    (context : SourceSemantics.Context) (operator : Syntax.BinaryOp)
+    (word_builtin : Detail.binaryBuiltinType operator = TypeSystem.Ty.word) :
+    BinaryOperatorHasType context operator .integer .integer
+      (if Detail.binaryResultIsBool operator then .bool else .integer) [] := by
+  cases operator <;>
+    simp [Detail.binaryBuiltinType, Detail.binaryResultIsBool,
+      TypeSystem.Ty.bool, TypeSystem.Ty.word] at word_builtin ⊢
+  all_goals constructor
+  all_goals constructor
+
+/-- Requirement allocation leaves the inference substitution, and therefore
+type resolution, unchanged. -/
+@[simp] theorem addRequirementsWithIds_resolve
+    (state : Frontend.SourceInference.State)
+    (predicates : List ProgramPredicate) (type : TypeSystem.Ty) :
+    (state.addRequirementsWithIds predicates).2.resolve type =
+      state.resolve type := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate rest induction =>
+      simp only [Frontend.SourceInference.State.addRequirementsWithIds]
+      rw [induction]
+      rfl
+
+/-- Allocating a source-ordered predicate row records exactly the returned
+requirement identities in the enlarged canonical ledger. -/
+theorem addRequirementsWithIds_correspond
+    (state : Frontend.SourceInference.State)
+    (predicates : List ProgramPredicate) :
+    RequirementPredicatesCorrespond
+      (state.addRequirementsWithIds predicates).2.requirements predicates
+      (state.addRequirementsWithIds predicates).1 := by
+  induction predicates generalizing state with
+  | nil => exact .nil
+  | cons predicate rest induction =>
+      simp only [Frontend.SourceInference.State.addRequirementsWithIds]
+      apply RequirementPredicatesCorrespond.cons
+      · have included :=
+          Frontend.SourceInference.State.addRequirementsWithIds_requirements_subset
+            (state.addRequirementWithId predicate).2 rest
+        apply included
+        simp [Frontend.SourceInference.State.addRequirementWithId]
+      · exact induction (state.addRequirementWithId predicate).2
+
+/-- Every successful unary-operator inference step is already a declarative
+primitive or trait typing, except for the one open Word-literal target which
+is intentionally left to final defaulting.  Solvedness is explicit because
+the staged-integer test normalizes an already resolved operand once more. -/
+theorem inferUnaryOperator_success_case
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {operator : Syntax.UnaryOp} {operandType : TypeSystem.Ty}
+    {expected : Option TypeSystem.Ty}
+    {integerLiterals : List IntegerLiteralOrigin}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.OperatorInferenceResult}
+    (success : Detail.inferUnaryOperator inferenceContext operator operandType
+      expected integerLiterals initial = .ok result)
+    (result_solved : result.state.inference.Solved) :
+    UnaryOperatorInferenceCase inferenceContext semanticContext initial
+      operator operandType integerLiterals result := by
+  have resolve_idempotent :
+      result.state.resolve (result.state.resolve operandType) =
+        result.state.resolve operandType := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using
+        result_solved.apply_idempotent operandType
+  have logicalNot_beq :
+      (Syntax.UnaryOp.logicalNot == Syntax.UnaryOp.logicalNot) = true := rfl
+  have bitNot_beq :
+      (Syntax.UnaryOp.bitNot == Syntax.UnaryOp.logicalNot) = false := rfl
+  have bool_word_beq :
+      (TypeSystem.Ty.bool == TypeSystem.Ty.word) = false := rfl
+  have word_word_beq :
+      (TypeSystem.Ty.word == TypeSystem.Ty.word) = true := rfl
+  cases operator <;>
+    unfold Detail.inferUnaryOperator at success <;>
+    simp_all [bind, Except.bind] <;>
+    repeat' first | split at success
+  all_goals try cases success
+  all_goals try simp_all [Detail.unaryOperatorDispatch]
+  all_goals try exact .primitive (by
+    simp_all
+    first | exact .logicalNot | exact .wordBitNot | exact .integerBitNot)
+  all_goals try simp_all [Detail.isDeferredBuiltinOperatorTarget,
+    Detail.isStagedIntegerOperatorTarget, bool_word_beq, word_word_beq]
+  all_goals try grind [Detail.isDeferredBuiltinOperatorTarget,
+    Detail.isStagedIntegerOperatorTarget, TypeSystem.Ty.bool,
+    TypeSystem.Ty.word, TypeSystem.Ty.integer]
+  all_goals try obtain ⟨rfl, rfl⟩ := ‹"BitNot" = _ ∧ "bnot" = _›
+  all_goals subst_vars
+  all_goals first
+    | exact UnaryOperatorInferenceCase.trait
+        (dispatch := UnaryTraitDispatch.bitNot)
+        (selected := by assumption)
+        (profile := by simpa using (by assumption))
+        (corresponds := addRequirementsWithIds_correspond _ _)
+    | skip
+  all_goals
+    rcases ‹_ ∨ _› with deferred | staged
+    · exact UnaryOperatorInferenceCase.deferredBitNot rfl rfl rfl (by simp_all)
+    · exact UnaryOperatorInferenceCase.primitive (by
+        simp_all [Detail.isStagedIntegerOperatorTarget, TypeSystem.Ty.word]
+        exact UnaryOperatorHasType.integerBitNot)
+
+/-- The tail shared by all expected-type branches of binary inference.  This
+is definitionally the suffix of `Detail.inferBinaryOperator`; naming it keeps
+the successful branch inversion local and readable. -/
+private def finishBinaryOperator
+    (context : Frontend.SourceInference.Context) (operator : Syntax.BinaryOp)
+    (left right : TypeSystem.Ty)
+    (integerLiterals : List IntegerLiteralOrigin)
+    (initial state : Frontend.SourceInference.State) :
+    Except Frontend.SourceInference.Error Detail.OperatorInferenceResult := do
+  let hasOpenLiteralOperand :=
+    Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+      Detail.isOpenIntegerLiteralTarget initial integerLiterals right
+  let operand := state.resolve left
+  let builtin := Detail.binaryBuiltinType operator
+  if operand = builtin then
+    pure {
+      type := if Detail.binaryResultIsBool operator then .bool else builtin
+      requirements := []
+      state
+    }
+  else
+    match Detail.binaryOperatorDispatch operator with
+    | .function name =>
+        if Detail.isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+              builtin operand ||
+            Detail.isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+              builtin operand then
+          pure {
+            type := if Detail.binaryResultIsBool operator then .bool else operand
+            requirements := []
+            state
+          }
+        else
+          throw (.unknownVariable name)
+    | .traitMethod traitName methodName =>
+        match ← Detail.operatorTrait? context traitName with
+        | some trait =>
+            let result := if Detail.binaryResultIsBool operator then .bool
+              else operand
+            let predicates ←
+              Detail.operatorTraitPredicates context trait methodName operand
+                [operand, operand] [result]
+            let (requirements, state) :=
+              state.addRequirementsWithIds predicates
+            pure { type := result, requirements, state }
+        | none =>
+            if Detail.isDeferredBuiltinOperatorTarget state
+                  hasOpenLiteralOperand builtin operand ||
+                Detail.isStagedIntegerOperatorTarget state
+                  hasOpenLiteralOperand builtin operand then
+              pure {
+                type := if Detail.binaryResultIsBool operator then .bool
+                  else operand
+                requirements := []
+                state
+              }
+            else
+              throw (.operatorNotSupported traitName operand)
+
+private theorem finishBinaryOperator_success_case
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {operator : Syntax.BinaryOp} {left right : TypeSystem.Ty}
+    {integerLiterals : List IntegerLiteralOrigin}
+    {initial state : Frontend.SourceInference.State}
+    {result : Detail.OperatorInferenceResult}
+    (operands_eq : state.resolve left = state.resolve right)
+    (success : finishBinaryOperator inferenceContext operator left right
+      integerLiterals initial state = .ok result) :
+    BinaryOperatorInferenceCase inferenceContext semanticContext initial
+      operator left right integerLiterals result := by
+  unfold finishBinaryOperator at success
+  simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at success
+  by_cases operand_builtin :
+      state.resolve left = Detail.binaryBuiltinType operator
+  · simp [operand_builtin] at success
+    cases success
+    exact .primitive (by
+      rw [← operands_eq, operand_builtin]
+      exact binaryBuiltin_hasType semanticContext operator)
+  · cases dispatch_eq : Detail.binaryOperatorDispatch operator with
+    | function name =>
+        simp only [operand_builtin, ↓reduceIte, dispatch_eq] at success
+        by_cases fallback :
+            (Detail.isDeferredBuiltinOperatorTarget state
+                  (Detail.isOpenIntegerLiteralTarget initial integerLiterals
+                    left ||
+                    Detail.isOpenIntegerLiteralTarget initial integerLiterals
+                      right)
+                  (Detail.binaryBuiltinType operator) (state.resolve left) ||
+              Detail.isStagedIntegerOperatorTarget state
+                  (Detail.isOpenIntegerLiteralTarget initial integerLiterals
+                    left ||
+                    Detail.isOpenIntegerLiteralTarget initial integerLiterals
+                      right)
+                  (Detail.binaryBuiltinType operator) (state.resolve left)) =
+              true
+        · simp [fallback] at success
+          cases success
+          exact .literalFallback rfl operands_eq rfl (by simpa using fallback)
+        · simp [fallback] at success
+    | traitMethod traitName methodName =>
+        simp only [operand_builtin, ↓reduceIte, dispatch_eq] at success
+        cases selected : Detail.operatorTrait? inferenceContext traitName with
+        | error error => simp [selected] at success
+        | ok selection =>
+            cases selection with
+            | none =>
+                by_cases fallback :
+                    (Detail.isDeferredBuiltinOperatorTarget state
+                          (Detail.isOpenIntegerLiteralTarget initial
+                              integerLiterals left ||
+                            Detail.isOpenIntegerLiteralTarget initial
+                              integerLiterals right)
+                          (Detail.binaryBuiltinType operator)
+                          (state.resolve left) ||
+                      Detail.isStagedIntegerOperatorTarget state
+                          (Detail.isOpenIntegerLiteralTarget initial
+                              integerLiterals left ||
+                            Detail.isOpenIntegerLiteralTarget initial
+                              integerLiterals right)
+                          (Detail.binaryBuiltinType operator)
+                          (state.resolve left)) = true
+                · simp [selected, fallback] at success
+                  cases success
+                  exact .literalFallback rfl operands_eq rfl
+                    (by simpa using fallback)
+                · simp [selected, fallback] at success
+            | some trait =>
+                cases profile : Detail.operatorTraitPredicates inferenceContext
+                    trait methodName (state.resolve left)
+                    [state.resolve left, state.resolve left]
+                    [if Detail.binaryResultIsBool operator then .bool
+                      else state.resolve left] with
+                | error error => simp [selected, profile] at success
+                | ok predicates =>
+                    simp [selected, profile] at success
+                    cases success
+                    exact .trait
+                      (operands_eq := by simpa using operands_eq)
+                      (dispatch :=
+                        binaryOperatorDispatch_traitMethod dispatch_eq)
+                      (selected := selected)
+                      (profile := by simpa using profile)
+                      (corresponds :=
+                        addRequirementsWithIds_correspond state predicates)
+
+/-- Every successful binary-operator inference step is exactly a direct
+builtin, a selected trait profile with its allocated evidence rows, or the
+literal-only fallback deliberately left to final defaulting. -/
+theorem inferBinaryOperator_success_case
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {operator : Syntax.BinaryOp} {left right : TypeSystem.Ty}
+    {expected : Option TypeSystem.Ty}
+    {integerLiterals : List IntegerLiteralOrigin}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.OperatorInferenceResult}
+    (success : Detail.inferBinaryOperator inferenceContext operator left right
+      expected integerLiterals initial = .ok result) :
+    BinaryOperatorInferenceCase inferenceContext semanticContext initial
+      operator left right integerLiterals result := by
+  unfold Detail.inferBinaryOperator at success
+  simp only [bind, Except.bind] at success
+  cases first_unify : Detail.unify initial left right with
+  | error error => simp [first_unify] at success
+  | ok unified =>
+      have unified_eq := Detail.unify_resolve_eq first_unify
+      simp only [first_unify] at success
+      cases expected with
+      | none =>
+          simp only [pure, Pure.pure, Except.pure]
+            at success
+          exact finishBinaryOperator_success_case unified_eq success
+      | some expected =>
+          simp only [pure, Pure.pure, Except.pure]
+            at success
+          split at success
+          · exact finishBinaryOperator_success_case unified_eq success
+          · cases second_unify : Detail.unify unified
+                (unified.resolve left) expected with
+            | error error => simp [second_unify] at success
+            | ok prepared =>
+                have prepared_eq :=
+                  Detail.unify_preserves_resolve_eq unified_eq second_unify
+                simp only [second_unify] at success
+                exact finishBinaryOperator_success_case prepared_eq success
+
 /-- A successfully loaded coercion-method profile and its successfully
 instantiated predicate row supply the declarative `Coerce` profile used by
 source typing.  The explicit name premise isolates the remaining
@@ -128,6 +562,115 @@ theorem coercionMethodProfile?_some_instantiates
                 simp at profile_success
       · rw [if_neg arity] at profile_success
         simp at profile_success
+
+/-- Successful operator-method profile validation supplies the declarative
+profile used by unary and binary source typing.  The explicit trait-name
+premise isolates the environment-to-signature alignment obligation in the
+same way as the coercion-profile bridge above. -/
+theorem operatorTraitPredicates_instantiates
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {trait : Resolved.DeclarationId} {traitName methodName : String}
+    {operand : TypeSystem.Ty}
+    {expectedParameters expectedReturns : List TypeSystem.Ty}
+    {predicates : List ProgramPredicate}
+    (signatures_eq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some traitName)
+    (success : Detail.operatorTraitPredicates inferenceContext trait methodName
+      operand expectedParameters expectedReturns = .ok predicates) :
+    OperatorProfileInstantiates semanticContext traitName methodName operand
+      expectedParameters expectedReturns predicates := by
+  cases signature_lookup : inferenceContext.signatures.trait? trait with
+  | none =>
+      simp [signature_lookup] at trait_name
+  | some signature =>
+      have signature_name : signature.name = traitName := by
+        simpa [signature_lookup] using trait_name
+      have signature_facts := trait?_eq_some_facts signature_lookup
+      simp only [Detail.operatorTraitPredicates,
+        Detail.exactOperatorTraitMethod, signature_lookup, pure, Pure.pure,
+        Except.pure, bind, Except.bind] at success
+      cases methods_eq : signature.methods.filter
+          (fun candidate => candidate.name == methodName) with
+      | nil =>
+          rw [methods_eq] at success
+          simp at success
+      | cons method rest =>
+          cases rest with
+          | nil =>
+              rw [methods_eq] at success
+              simp only at success
+              by_cases arity : signature.parameters.length = 1
+              · rw [if_pos arity] at success
+                obtain ⟨parameter, parameters_eq⟩ :=
+                  list_eq_singleton_of_length_eq_one arity
+                by_cases parameter_types_eq :
+                    method.parameterTypes.map
+                        (TypeSystem.ParameterSubstitution.apply
+                          [(parameter, operand)]) = expectedParameters
+                · by_cases return_types_eq :
+                      method.returnTypes.map
+                          (TypeSystem.ParameterSubstitution.apply
+                            [(parameter, operand)]) = expectedReturns
+                  · have predicates_eq :
+                        ({
+                          trait
+                          subject := operand
+                          arguments := []
+                        } : ProgramPredicate) ::
+                            method.wherePredicates.map
+                              (ProgramPredicate.applyParameters
+                                [(parameter, operand)]) = predicates := by
+                      simpa [parameters_eq, parameter_types_eq,
+                        return_types_eq] using success
+                    subst predicates
+                    rw [← signature_facts.2]
+                    exact .intro
+                      (by rw [signatures_eq]; exact signature_facts.1)
+                      signature_name parameters_eq methods_eq
+                      parameter_types_eq return_types_eq
+                  · simp [parameters_eq, parameter_types_eq,
+                      return_types_eq] at success
+                · simp [parameters_eq, parameter_types_eq] at success
+              · rw [if_neg arity] at success
+                simp at success
+          | cons second tail =>
+              rw [methods_eq] at success
+              simp at success
+
+/-- The operator profile selected before finalization remains valid after the
+same semantic substitution used to normalize operand, result, and evidence
+predicates. -/
+theorem operatorTraitPredicates_instantiatesAfterSubstitution
+    {inferenceContext : Frontend.SourceInference.Context}
+    {sourceContext targetContext : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {trait : Resolved.DeclarationId} {traitName methodName : String}
+    {operand : TypeSystem.Ty}
+    {expectedParameters expectedReturns : List TypeSystem.Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid substitution
+      closedVariables sourceContext targetContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some traitName)
+    (success : Detail.operatorTraitPredicates inferenceContext trait methodName
+      operand expectedParameters expectedReturns = .ok predicates) :
+    OperatorProfileInstantiates targetContext traitName methodName
+      (substitution.apply operand)
+      (expectedParameters.map substitution.apply)
+      (expectedReturns.map substitution.apply)
+      (predicates.map
+        (TypedTraitResolution.applySubstitution substitution)) := by
+  apply FlexibleSubstitution.OperatorProfileInstantiates.applySubstitution
+    catalog contextValid
+  exact operatorTraitPredicates_instantiates signatures_eq trait_name success
 
 /-- A profile-consistent planned coercion edge remains a declaratively valid
 `Coerce` profile after the ambient inference substitution closes its endpoint
@@ -666,6 +1209,87 @@ theorem solveRequirements_correspondingSequenceProves
         exact ⟨row, ⟨by simpa [solved_eq] using rowMember, idEq⟩,
           predicateEq, valid row rowMember⟩
       · exact induction
+
+/-- A validated unary trait profile and its source-ordered rows in the final
+solved ledger assemble the declarative unary-operator judgment after applying
+the final inference substitution. -/
+theorem unaryOperatorTrait_hasTypeAfterSubstitution
+    {inferenceContext : Frontend.SourceInference.Context}
+    {sourceContext targetContext : SourceSemantics.Context}
+    {state : Frontend.SourceInference.State}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {solved : List SolvedRequirement}
+    {operator : Syntax.UnaryOp} {trait : Resolved.DeclarationId}
+    {traitName methodName : String} {operand result : TypeSystem.Ty}
+    {predicates : List ProgramPredicate} {requirements : List RequirementId}
+    (dispatch : UnaryTraitDispatch operator traitName methodName)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      state.inference.substitution closedVariables sourceContext targetContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some traitName)
+    (profile_success : Detail.operatorTraitPredicates inferenceContext trait
+      methodName operand [operand] [result] = .ok predicates)
+    (corresponds : RequirementPredicatesCorrespond state.requirements
+      predicates requirements)
+    (solve_success : Detail.solveRequirements inferenceContext state
+      state.requirements = .ok solved)
+    (solved_eq : targetContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid targetContext solved) :
+    UnaryOperatorHasType targetContext operator
+      (state.inference.substitution.apply operand)
+      (state.inference.substitution.apply result) requirements := by
+  apply UnaryOperatorHasType.trait dispatch
+  · simpa using
+      operatorTraitPredicates_instantiatesAfterSubstitution catalog contextValid
+        signatures_eq trait_name profile_success
+  · change RequirementSequenceProves targetContext requirements
+      (predicates.map (Detail.applyPredicate state))
+    exact solveRequirements_correspondingSequenceProves corresponds
+      solve_success solved_eq valid
+
+/-- Binary trait inference has the analogous composition: a validated
+two-operand profile plus the corresponding solved ledger rows yields the
+declarative binary-operator judgment under the final substitution. -/
+theorem binaryOperatorTrait_hasTypeAfterSubstitution
+    {inferenceContext : Frontend.SourceInference.Context}
+    {sourceContext targetContext : SourceSemantics.Context}
+    {state : Frontend.SourceInference.State}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {solved : List SolvedRequirement}
+    {operator : Syntax.BinaryOp} {trait : Resolved.DeclarationId}
+    {traitName methodName : String} {operand result : TypeSystem.Ty}
+    {predicates : List ProgramPredicate} {requirements : List RequirementId}
+    (dispatch : BinaryTraitDispatch operator traitName methodName)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      state.inference.substitution closedVariables sourceContext targetContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some traitName)
+    (profile_success : Detail.operatorTraitPredicates inferenceContext trait
+      methodName operand [operand, operand] [result] = .ok predicates)
+    (corresponds : RequirementPredicatesCorrespond state.requirements
+      predicates requirements)
+    (solve_success : Detail.solveRequirements inferenceContext state
+      state.requirements = .ok solved)
+    (solved_eq : targetContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid targetContext solved) :
+    BinaryOperatorHasType targetContext operator
+      (state.inference.substitution.apply operand)
+      (state.inference.substitution.apply operand)
+      (state.inference.substitution.apply result) requirements := by
+  apply BinaryOperatorHasType.trait dispatch
+  · simpa using
+      operatorTraitPredicates_instantiatesAfterSubstitution catalog contextValid
+        signatures_eq trait_name profile_success
+  · change RequirementSequenceProves targetContext requirements
+      (predicates.map (Detail.applyPredicate state))
+    exact solveRequirements_correspondingSequenceProves corresponds
+      solve_success solved_eq valid
 
 /-- A committed coercion edge inherits the primary and method evidence rows
 owned by its planned edge, in the exact order expected by
