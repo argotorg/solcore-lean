@@ -273,3 +273,58 @@ theorem finalize_typedSource_inputComptime
   simp [State.toTypedSource]
 
 end Solcore.Frontend.SourceInference.Detail
+
+namespace Solcore.Frontend.SourceInference
+
+open TypeSystem
+
+/-- Successful checking retains the callable type assembled by the signature
+builder. -/
+theorem checkFunctionBody_success_type
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.type = signature.scheme.body := by
+  obtain ⟨_, _, _, _, _, _, _, _, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  rfl
+
+/-- Successful checking retains the signature's independent return-staging
+marker. -/
+theorem checkFunctionBody_success_returnComptime
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.returnComptime = signature.returnComptime := by
+  obtain ⟨_, _, _, _, _, _, _, _, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  rfl
+
+/-- The checked body's reported result type is the declared return bundle
+under the final inference substitution. -/
+theorem checkFunctionBody_success_inferredBodyType
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.inferredBodyType = checked.substitution.apply
+      (Ty.productMany signature.returnTypes) := by
+  obtain ⟨_, _, _, _, _, _, _, finalizeEq, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  exact Detail.finalize_type finalizeEq
+
+end Solcore.Frontend.SourceInference
