@@ -265,6 +265,20 @@ private def testStageClassification : IO Unit := do
         | _ => false) "ordinary body failure was not classified as inference"
   | .ok _ => throw (IO.userError "unknown body variable was accepted")
 
+private def testPhantomImplementationParameterRejection : IO Unit := do
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
+      "trait Identity<T> {}",
+      "impl<T, U> Identity<T> {}"
+    ])) with
+  | .error [.signature
+        (.implementationParameterNotInHead implementation parameter)] =>
+      assertTrue (decide (parameter.owner = implementation ∧ parameter.index = 1))
+        "phantom-parameter rejection lost its stable implementation identity"
+  | .error errors => throw (IO.userError
+      s!"phantom implementation had the wrong pipeline error: {reprStr errors}")
+  | .ok _ => throw (IO.userError
+      "a phantom implementation parameter reached body checking")
+
 /-- Exercise the complete raw-workspace pipeline, including generics,
 overloads, calls, predicates, implementation evidence, and integer literals. -/
 def testProgramChecking : IO Unit := do
@@ -274,5 +288,6 @@ def testProgramChecking : IO Unit := do
   testInconclusive
   testDefaultImplementationPriority
   testStageClassification
+  testPhantomImplementationParameterRejection
 
 end Tests.ProgramChecking

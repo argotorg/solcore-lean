@@ -1,6 +1,7 @@
 import Solcore.Frontend.ProgramTypeResolution
 import Solcore.Frontend.ProgramIdentity
 import Solcore.Frontend.TraitResolution
+import Solcore.Frontend.TypedTraitResolution
 import Solcore.TypeSystem.Scheme
 
 /-!
@@ -473,6 +474,9 @@ inductive ProgramSignatureError where
       (expected actual : List ProgramPredicate)
   | traitCatalogUnavailable
       (implementation trait : Resolved.DeclarationId)
+  | implementationParameterNotInHead
+      (implementation : Resolved.DeclarationId)
+      (parameter : TypeSystem.TypeParameterId)
   | duplicateDataConstructor
       (dataType : Resolved.DeclarationId) (name : String)
       (firstIndex duplicateIndex : Nat)
@@ -500,6 +504,7 @@ private def programSignatureErrorDeclaration :
   | .implMethodComptimeMismatch method _ _ _ _ _ => method.implementation
   | .implMethodPredicateMismatch method _ _ _ => method.implementation
   | .traitCatalogUnavailable implementation _ => implementation
+  | .implementationParameterNotInHead implementation _ => implementation
   | .duplicateDataConstructor dataType _ _ _ => dataType
 
 private def declarationParameters
@@ -949,6 +954,12 @@ private def implementationSignatureOfDeclaration
     | subject :: arguments => pure (subject, arguments)
   let trait ← resolveTrait environment declaration
     source.value.traitName.value (arguments.length + 1)
+  let parameters := declarationParameters declaration
+  let head : ProgramPredicate := { trait, subject, arguments }
+  let headParameters := TypedTraitResolution.predicateParameters head
+  for parameter in parameters do
+    unless headParameters.contains parameter do
+      throw (.implementationParameterNotInHead declaration.id parameter)
   let wherePredicates ← resolveWhereClause environment declaration scope
     source.value.whereClause
   let some traitSignature := traits.find? fun signature =>
@@ -964,8 +975,8 @@ private def implementationSignatureOfDeclaration
   pure {
     id := declaration.id
     isDefault := source.value.defaultMarker.isSome
-    parameters := declarationParameters declaration
-    head := { trait, subject, arguments }
+    parameters
+    head
     wherePredicates
     methods
     source

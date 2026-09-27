@@ -588,11 +588,26 @@ private def testGenericImplementationSpecialization : IO Unit := do
 private def testUndeterminedImplementationParameterRejection : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Identity<T> { function identity(value: T) returns (T); }",
-    "impl<T, U> Identity<T> {",
+    "impl<T> Identity<T> {",
     "  function identity(value: T) returns (T) { return value; }",
     "}"
   ])
   let implementation ← onlyImplementation program
+  let phantom : TypeSystem.TypeParameterId := {
+    owner := implementation.id
+    index := 1
+  }
+  let forgedImplementation := {
+    implementation with
+    parameters := implementation.parameters ++ [phantom]
+  }
+  let forgedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      implementations := [forgedImplementation]
+    }
+  }
   let identity ← match program.signatures.traits.filter fun trait =>
       trait.name == "Identity" with
     | [trait] => pure trait
@@ -608,11 +623,7 @@ private def testUndeterminedImplementationParameterRejection : IO Unit := do
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
         s!"phantom Identity<Word> head did not resolve: {reprStr outcome}")
-  let phantom ← match implementation.parameters with
-    | [_, phantom] => pure phantom
-    | parameters => throw (IO.userError
-        s!"expected two implementation parameters, found {parameters.length}")
-  match ExecutableImplMethods.checkMethodWithArity program evidence 1
+  match ExecutableImplMethods.checkMethodWithArity forgedProgram evidence 1
       "identity" with
   | .error (.implementationParameterNotDetermined id parameter (.flexible _)) =>
       assertTrue (decide (id = implementation.id ∧ parameter = phantom))

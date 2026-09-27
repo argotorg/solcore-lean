@@ -447,6 +447,13 @@ private def testFailures : IO Unit := do
     fun error => match error with
       | .duplicateDataConstructor _ "Same" 0 1 => true
       | _ => false
+  expectSingleError (String.intercalate "\n" [
+    "trait Identity<T> {}",
+    "impl<T, U> Identity<T> {}"
+  ]) fun error => match error with
+    | .implementationParameterNotInHead implementation parameter =>
+        decide (parameter.owner = implementation ∧ parameter.index = 1)
+    | _ => false
 
 private def testMethodFailures : IO Unit := do
   expectSingleError (String.intercalate "\n" [

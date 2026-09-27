@@ -17,6 +17,8 @@ example :=
   @Solcore.Frontend.buildProgramEnvironment_success_declaration?_eq_some
 example :=
   @Solcore.Frontend.buildProgramEnvironment_success_declaration?_eq_some_iff
+example :=
+  @Solcore.Frontend.ProgramSignatureError.implementationParameterNotInHead
 example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
 example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
 
