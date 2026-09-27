@@ -323,6 +323,66 @@ private theorem mem_unionVariables_iff (metavariable : TypeVarId)
     VariablesBelow next .error := by
   simp [VariablesBelow, freeVariables]
 
+/-- Applying a type head to an argument row is allocator-bounded exactly
+when the head and every argument are allocator-bounded. -/
+@[simp] theorem variablesBelow_applyMany_iff
+    (next : Nat) (head : Ty) (arguments : List Ty) :
+    VariablesBelow next (applyMany head arguments) ↔
+      VariablesBelow next head ∧
+        ∀ argument ∈ arguments, VariablesBelow next argument := by
+  induction arguments generalizing head with
+  | nil => simp [applyMany]
+  | cons argument arguments induction =>
+      change VariablesBelow next
+          (applyMany (.application head argument) arguments) ↔ _
+      rw [induction, variablesBelow_application_iff,
+        List.forall_mem_cons]
+      constructor
+      · rintro ⟨⟨headBelow, argumentBelow⟩, argumentsBelow⟩
+        exact ⟨headBelow, argumentBelow, argumentsBelow⟩
+      · rintro ⟨headBelow, argumentBelow, argumentsBelow⟩
+        exact ⟨⟨headBelow, argumentBelow⟩, argumentsBelow⟩
+
+/-- Allocator bounds compose through left-associated type application. -/
+theorem variablesBelow_applyMany
+    {next : Nat} {head : Ty} {arguments : List Ty}
+    (headBelow : VariablesBelow next head)
+    (argumentsBelow :
+      ∀ argument ∈ arguments, VariablesBelow next argument) :
+    VariablesBelow next (applyMany head arguments) := by
+  exact (variablesBelow_applyMany_iff next head arguments).mpr
+    ⟨headBelow, argumentsBelow⟩
+
+/-- A right-associated product row is allocator-bounded when every element
+is allocator-bounded. -/
+theorem variablesBelow_productMany
+    {next : Nat} {types : List Ty}
+    (typesBelow : ∀ type ∈ types, VariablesBelow next type) :
+    VariablesBelow next (productMany types) := by
+  induction types with
+  | nil => exact variablesBelow_constructor next (.builtin .unit)
+  | cons head tail induction =>
+      cases tail with
+      | nil => exact typesBelow head (by simp)
+      | cons second rest =>
+          exact (variablesBelow_product_iff next head
+            (productMany (second :: rest))).mpr
+              ⟨typesBelow head (by simp), induction (by
+                intro type member
+                exact typesBelow type (by simp [member]))⟩
+
+/-- A nominal type application is allocator-bounded when all of its type
+arguments are allocator-bounded. -/
+theorem variablesBelow_nominal
+    {next : Nat} {declaration : Resolved.DeclarationId}
+    {arguments : List Ty}
+    (argumentsBelow :
+      ∀ argument ∈ arguments, VariablesBelow next argument) :
+    VariablesBelow next (nominal declaration arguments) := by
+  simpa only [nominal] using variablesBelow_applyMany
+    (variablesBelow_constructor next (.declaration declaration))
+    argumentsBelow
+
 /-- Whether a flexible metavariable occurs in a type. -/
 def containsVariable (type : Ty) (metavariable : TypeVarId) : Bool :=
   type.freeVariables.contains metavariable

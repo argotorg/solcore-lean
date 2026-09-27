@@ -9,21 +9,6 @@ namespace Solcore.Frontend
 
 open TypeSystem
 
-private theorem variablesBelow_applyMany
-    {head : Ty} {arguments : List Ty} {next : Nat}
-    (headBelow : head.VariablesBelow next)
-    (argumentsBelow : ∀ argument, argument ∈ arguments →
-      argument.VariablesBelow next) :
-    (Ty.applyMany head arguments).VariablesBelow next := by
-  induction arguments generalizing head with
-  | nil => exact headBelow
-  | cons argument arguments induction =>
-      apply induction
-      · exact (Ty.variablesBelow_application_iff _ _ _).mpr
-          ⟨headBelow, argumentsBelow argument (by simp)⟩
-      · intro candidate member
-        exact argumentsBelow candidate (by simp [member])
-
 /-- A frontend-validated signature type contains only rigid parameters and
 closed constructors, so it is below every flexible-metavariable bound. -/
 theorem SignatureTypeFormationValidated.variablesBelow
@@ -45,13 +30,9 @@ theorem SignatureTypeFormationValidated.variablesBelow
   · intro builtin
     exact Ty.variablesBelow_constructor next (.builtin builtin)
   · intro dataType arguments _ _ _ argumentsInduction
-    exact variablesBelow_applyMany
-      (Ty.variablesBelow_constructor next (.declaration dataType.id))
-      argumentsInduction
+    exact Ty.variablesBelow_nominal argumentsInduction
   · intro contract arguments _ _ _ argumentsInduction
-    exact variablesBelow_applyMany
-      (Ty.variablesBelow_constructor next (.declaration contract.id))
-      argumentsInduction
+    exact Ty.variablesBelow_nominal argumentsInduction
   · intro _ _ _ _ parameterInduction resultInduction
     exact (Ty.variablesBelow_function_iff _ _ _).mpr
       ⟨parameterInduction, resultInduction⟩

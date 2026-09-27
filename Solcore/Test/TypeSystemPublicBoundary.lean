@@ -15,6 +15,10 @@ example := @Solcore.TypeSystem.Ty.variablesBelow_application_iff
 example := @Solcore.TypeSystem.Ty.variablesBelow_function_iff
 example := @Solcore.TypeSystem.Ty.variablesBelow_product_iff
 example := @Solcore.TypeSystem.Ty.variablesBelow_mapping_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_applyMany_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_applyMany
+example := @Solcore.TypeSystem.Ty.variablesBelow_productMany
+example := @Solcore.TypeSystem.Ty.variablesBelow_nominal
 example := @Solcore.TypeSystem.Ty.containsVariable_eq_false_iff
 example := @Solcore.TypeSystem.Ty.variablesBelow_nextVariable
 example := @Solcore.TypeSystem.Substitution.lookup?_eq_none_iff_not_mem_domain
@@ -94,6 +98,52 @@ example := @Solcore.TypeSystem.Environment.mem_freeVariables_iff
 example := @Solcore.TypeSystem.Environment.bodiesBelow_nextVariable
 example := @Solcore.TypeSystem.Expr.AnnotationsBelow
 example := @Solcore.TypeSystem.Expr.AnnotationsBelow.weaken
+
+/-- Aggregate application preserves a bound across a mixed flexible-variable
+and builtin argument row. -/
+example :
+    (Solcore.TypeSystem.Ty.applyMany Solcore.TypeSystem.Ty.bool
+      [.variable ⟨0⟩, Solcore.TypeSystem.Ty.word]).VariablesBelow 1 := by
+  apply Solcore.TypeSystem.Ty.variablesBelow_applyMany
+  · simp [Solcore.TypeSystem.Ty.bool]
+  · intro type member
+    simp only [List.mem_cons, List.mem_nil_iff, or_false] at member
+    rcases member with rfl | rfl
+    · simp
+    · simp [Solcore.TypeSystem.Ty.word]
+
+/-- The reverse aggregate characterization still exposes an out-of-bound
+variable when the other argument is a closed builtin. -/
+example : ¬
+    (Solcore.TypeSystem.Ty.applyMany Solcore.TypeSystem.Ty.bool
+      [Solcore.TypeSystem.Ty.word, .variable ⟨1⟩]).VariablesBelow 1 := by
+  rw [Solcore.TypeSystem.Ty.variablesBelow_applyMany_iff]
+  simp [Solcore.TypeSystem.Ty.bool, Solcore.TypeSystem.Ty.word]
+
+/-- Aggregate products reuse the same member-wise allocator bound. -/
+example :
+    (Solcore.TypeSystem.Ty.productMany
+      [Solcore.TypeSystem.Ty.word, .variable ⟨0⟩,
+        Solcore.TypeSystem.Ty.bool]).VariablesBelow 1 := by
+  apply Solcore.TypeSystem.Ty.variablesBelow_productMany
+  intro type member
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at member
+  rcases member with rfl | rfl | rfl
+  · simp [Solcore.TypeSystem.Ty.word]
+  · simp
+  · simp [Solcore.TypeSystem.Ty.bool]
+
+/-- Nominal application needs no additional allocator premise beyond its
+mixed argument row. -/
+example (declaration : Solcore.Resolved.DeclarationId) :
+    (Solcore.TypeSystem.Ty.nominal declaration
+      [.variable ⟨0⟩, Solcore.TypeSystem.Ty.word]).VariablesBelow 1 := by
+  apply Solcore.TypeSystem.Ty.variablesBelow_nominal
+  intro type member
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at member
+  rcases member with rfl | rfl
+  · simp
+  · simp [Solcore.TypeSystem.Ty.word]
 
 private def solvedMetavariable : Solcore.TypeSystem.TypeVarId := ⟨0⟩
 
