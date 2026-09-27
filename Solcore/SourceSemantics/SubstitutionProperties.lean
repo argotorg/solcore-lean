@@ -3346,10 +3346,10 @@ theorem DirectCallRequirementsValid.applyParameters
       (predicates.map (ProgramPredicate.applyParameters substitution))
       requirements (coercions.map (applyCoercionStep substitution)) := by
   cases valid with
-  | @intro selectedResult contextual selectedPath contextualPath
+  | @intro selectedResult selectedPath contextualPath
       signatureRequirements requirements coercions selectedValid contextualValid
       signatureValid coercionsEq requirementsEq =>
-      exact .intro (contextual := substitution.apply contextual)
+      exact .intro
         (StructuralSubstitution.CoercionPathValid.applyParameters catalog
           contextValid selectedValid)
         (StructuralSubstitution.CoercionPathValid.applyParameters catalog
@@ -10359,10 +10359,10 @@ theorem DirectCallRequirementsValid.applySubstitution
       requirements
       (coercions.map (CoercionStep.applySubstitution substitution)) := by
   cases valid with
-  | @intro selectedResult contextual selectedPath contextualPath
+  | @intro selectedResult selectedPath contextualPath
       signatureRequirements requirements coercions selectedValid contextualValid
       signatureValid coercionsEq requirementsEq =>
-      exact .intro (contextual := substitution.apply contextual)
+      exact .intro
         (CoercionPathValid.applySubstitution catalog contextValid selectedValid)
         (CoercionPathValid.applySubstitution catalog contextValid contextualValid)
         (RequirementSequenceProves.applySubstitution contextValid

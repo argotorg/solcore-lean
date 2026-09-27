@@ -87,7 +87,7 @@ inductive DirectCallRequirementsValid (context : Context)
     (predicates : List ProgramPredicate) :
     List RequirementId → List CoercionStep → Prop where
   | intro
-      {selectedResult contextual : TypeSystem.Ty}
+      {selectedResult : TypeSystem.Ty}
       {selectedPath contextualPath : List CoercionStep}
       {signatureRequirements : List RequirementId}
       {requirements : List RequirementId}
@@ -129,7 +129,7 @@ theorem requirements_valid
       predicates requirements coercions) :
     RequirementIdsValid context requirements := by
   cases valid with
-  | @intro selectedResult contextual selectedPath contextualPath
+  | @intro selectedResult selectedPath contextualPath
       signatureRequirements requirements coercions selectedValid contextualValid
       signatureValid coercionsEq requirementsEq =>
       subst requirements

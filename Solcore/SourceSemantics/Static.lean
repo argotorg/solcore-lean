@@ -269,13 +269,12 @@ theorem appendOutput
       simp only [List.append_assoc]
   | directCall direct =>
       cases direct with
-      | @intro selectedResult contextual selectedPath contextualPath
+      | @intro selectedResult selectedPath contextualPath
           signatureRequirements directRequirements directCoercions
           selectedValid contextualValid
           signatureValid coercionsEq requirementsEq =>
           apply ExpressionRequirementPlan.Valid.directCall
-          apply DirectCallRequirementsValid.intro (contextual := middleType)
-            selectedValid
+          apply DirectCallRequirementsValid.intro selectedValid
             (contextualValid.append output) signatureValid
           · rw [coercionsEq]
             simp only [List.append_assoc]
