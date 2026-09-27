@@ -117,6 +117,44 @@ private def solverRegressionFinalizeState : SourceInference.State := {
   requirements := [solverRegressionRequirement]
 }
 
+private def generalizationSideConditionState : SourceInference.State := {
+  SourceInference.State.initial solverRegressionOwner with
+  nextRequirement := 1
+  requirements := [solverRegressionRequirement]
+  directCallRequirements := [solverRegressionRequirement.id]
+}
+
+private theorem generalizationSideConditionIds :
+    (SourceInference.Detail.generalizeValue generalizationSideConditionState []
+      0 (.variable solverRegressionFirst)).requirements.map
+        (fun requirement => requirement.templateRequirement) =
+      [solverRegressionRequirement.id] := by
+  rfl
+
+/-- The generalization projections supply exactly the uniqueness, coverage,
+and freshness side conditions needed by template-tracking allocation. -/
+example :
+    ((SourceInference.Detail.generalizeValue generalizationSideConditionState []
+      0 (.variable solverRegressionFirst)).requirements.map
+        (fun requirement => requirement.templateRequirement)).Nodup ∧
+    ((SourceInference.Detail.generalizeValue generalizationSideConditionState []
+      0 (.variable solverRegressionFirst)).requirements.map
+        (fun requirement => requirement.templateRequirement)).Sublist
+      (generalizationSideConditionState.requirements.map
+        (fun requirement => requirement.id)) ∧
+    solverRegressionRequirement.id ∉
+      generalizationSideConditionState.localSchemeAssumptions := by
+  have ledgerUnique := SourceInference.State.requirementIds_nodup
+    generalizationSideConditionState (by rfl)
+  have covered := SourceInference.Detail.generalizeValue_templateIds_sublist
+    generalizationSideConditionState [] 0 (.variable solverRegressionFirst)
+  have fresh := SourceInference.Detail.generalizeValue_templateIds_fresh
+    generalizationSideConditionState [] 0 (.variable solverRegressionFirst)
+      solverRegressionRequirement.id (by
+        rw [generalizationSideConditionIds]
+        simp)
+  exact ⟨covered.nodup ledgerUnique, covered, fresh⟩
+
 private def solverRegressionSolvedRow : SourceInference.SolvedRequirement := {
   id := solverRegressionRequirement.id
   predicate := solverRegressionNormalized

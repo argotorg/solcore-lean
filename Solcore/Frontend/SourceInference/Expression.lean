@@ -105,6 +105,142 @@ def generalizeValue (state : State) (locals : TypeSystem.Environment)
     requirements
   }
 
+private theorem filterMap_templateRequirementIds_sublist
+    (requirements : List Requirement)
+    (select : Requirement → Option LocalSchemeRequirement)
+    (selectedId : ∀ requirement template,
+      select requirement = some template →
+      template.templateRequirement = requirement.id) :
+    ((requirements.filterMap select).map
+      (fun requirement => requirement.templateRequirement)).Sublist
+      (requirements.map (fun requirement => requirement.id)) := by
+  induction requirements with
+  | nil => exact .slnil
+  | cons requirement rest induction =>
+      cases selected : select requirement with
+      | none =>
+          simp only [List.filterMap_cons, selected, List.map_cons]
+          exact .cons _ induction
+      | some template =>
+          simp only [List.filterMap_cons, selected, List.map_cons]
+          rw [selectedId requirement template selected]
+          exact .cons_cons _ induction
+
+/-- Every template identity retained by local generalization comes from the
+input state's requirement ledger. -/
+theorem generalizeValue_templateIds_sublist (state : State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat) (type : Ty) :
+    ((generalizeValue state locals requirementStart type).requirements.map
+      (fun requirement => requirement.templateRequirement)).Sublist
+      (state.requirements.map (fun requirement => requirement.id)) := by
+  let introducedRequirements := state.requirements.drop requirementStart
+  let eligibleRequirements := introducedRequirements.filter fun requirement =>
+    state.directCallRequirements.contains requirement.id &&
+      !state.localSchemeAssumptions.contains requirement.id
+  let blockedVariables := locals.freeVariables ++
+    requirementVariables state
+      (state.requirements.take requirementStart ++
+        introducedRequirements.filter fun requirement =>
+          !state.directCallRequirements.contains requirement.id)
+  let quantified := type.freeVariables.filter fun metavariable =>
+    !(blockedVariables.contains metavariable)
+  let select : Requirement → Option LocalSchemeRequirement := fun requirement =>
+    let predicate := applyPredicate state requirement.predicate
+    let dependsOnQuantified :=
+      (TypedTraitResolution.predicateVariables predicate).any fun metavariable =>
+        quantified.contains metavariable
+    if dependsOnQuantified then
+      some { templateRequirement := requirement.id, predicate }
+    else
+      none
+  have selected :
+      ((eligibleRequirements.filterMap select).map
+        (fun requirement => requirement.templateRequirement)).Sublist
+        (eligibleRequirements.map (fun requirement => requirement.id)) := by
+    apply filterMap_templateRequirementIds_sublist
+    intro requirement template produced
+    simp only [select] at produced
+    split at produced
+    · cases produced
+      rfl
+    · contradiction
+  have eligible : eligibleRequirements.Sublist state.requirements := by
+    exact List.filter_sublist.trans (List.drop_sublist _ _)
+  change ((eligibleRequirements.filterMap select).map
+      (fun requirement => requirement.templateRequirement)).Sublist
+    (state.requirements.map (fun requirement => requirement.id))
+  exact selected.trans (eligible.map _)
+
+private theorem requirementId_beq_iff_eq
+    (left right : RequirementId) : (left == right) = true ↔ left = right := by
+  rw [show (left == right) = (left.index == right.index) by rfl]
+  rw [beq_iff_eq]
+  constructor
+  · intro indicesEq
+    cases left
+    cases right
+    cases indicesEq
+    rfl
+  · intro same
+    exact congrArg RequirementId.index same
+
+private theorem requirementId_contains_iff_mem
+    (ids : List RequirementId) (id : RequirementId) :
+    ids.contains id = true ↔ id ∈ ids := by
+  induction ids with
+  | nil => simp
+  | cons head tail induction =>
+      simp only [List.contains_cons, List.mem_cons]
+      rw [Bool.or_eq_true, requirementId_beq_iff_eq, induction]
+
+/-- Canonical local generalization never reclassifies an identity that was
+already owned by an enclosing local scheme. -/
+theorem generalizeValue_templateIds_fresh (state : State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat) (type : Ty)
+    (id : RequirementId)
+    (member : id ∈
+      (generalizeValue state locals requirementStart type).requirements.map
+        (fun requirement => requirement.templateRequirement)) :
+    id ∉ state.localSchemeAssumptions := by
+  let introducedRequirements := state.requirements.drop requirementStart
+  let eligibleRequirements := introducedRequirements.filter fun requirement =>
+    state.directCallRequirements.contains requirement.id &&
+      !state.localSchemeAssumptions.contains requirement.id
+  let blockedVariables := locals.freeVariables ++
+    requirementVariables state
+      (state.requirements.take requirementStart ++
+        introducedRequirements.filter fun requirement =>
+          !state.directCallRequirements.contains requirement.id)
+  let quantified := type.freeVariables.filter fun metavariable =>
+    !(blockedVariables.contains metavariable)
+  let select : Requirement → Option LocalSchemeRequirement := fun requirement =>
+    let predicate := applyPredicate state requirement.predicate
+    let dependsOnQuantified :=
+      (TypedTraitResolution.predicateVariables predicate).any fun metavariable =>
+        quantified.contains metavariable
+    if dependsOnQuantified then
+      some { templateRequirement := requirement.id, predicate }
+    else
+      none
+  change id ∈ (eligibleRequirements.filterMap select).map
+      (fun requirement => requirement.templateRequirement) at member
+  rw [List.mem_map] at member
+  obtain ⟨template, templateMember, idEq⟩ := member
+  rw [List.mem_filterMap] at templateMember
+  obtain ⟨requirement, requirementMember, produced⟩ := templateMember
+  simp only [select] at produced
+  split at produced
+  · injection produced with templateEq
+    subst template
+    subst id
+    have selected := (List.mem_filter.mp requirementMember).2
+    have absent := (Bool.and_eq_true_iff.mp selected).2
+    intro oldMember
+    have present : state.localSchemeAssumptions.contains requirement.id = true :=
+      (requirementId_contains_iff_mem _ _).mpr oldMember
+    simp [present] at absent
+  · contradiction
+
 def coercionRequirements (coercions : List CoercionStep) :
     List RequirementId :=
   coercions.flatMap (·.requirements)

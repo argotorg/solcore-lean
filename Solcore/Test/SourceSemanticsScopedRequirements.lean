@@ -223,6 +223,13 @@ private theorem templateTrackingBase :
       SourceInference.State.toTypedSource, sourceLocalSchemeTemplateIds,
       localSchemeTemplateOwners, initializedLetBindings]
 
+/-- The locals-only update used by both ordinary lets and for-loop items does
+not disturb pending template ownership. -/
+example : SourceInferenceSoundness.TemplateTracking
+    { templateTrackingBaseState with
+      locals := [("replacement", .mono .word)] } [] := by
+  exact templateTrackingBase.replaceLocals [("replacement", .mono .word)]
+
 private theorem templateTrackingAllocated :
     SourceInferenceSoundness.TemplateTracking templateTrackingAllocatedState
       [templateId] := by

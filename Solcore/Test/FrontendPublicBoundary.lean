@@ -38,6 +38,11 @@ example := @Solcore.Frontend.TypedTraitResolution.matchImplHead?_certificate
 
 example :=
   @Solcore.Frontend.SourceInference.Detail.solveRequirements_ids_nodup
+example := @Solcore.Frontend.SourceInference.State.requirementIds_nodup
+example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_sublist
+example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_fresh
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource
 

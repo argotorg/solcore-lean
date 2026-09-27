@@ -475,6 +475,25 @@ theorem initial (owner : Resolved.DeclarationId)
       sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
       initializedLetBindings]
 
+/-- Replacing only the executable local type environment leaves template
+classification, uniqueness, and requirement-ledger coverage unchanged.  This
+is the exact state update performed immediately before let-binder allocation. -/
+theorem replaceLocals
+    {state : Frontend.SourceInference.State}
+    {pending : List RequirementId}
+    (tracked : TemplateTracking state pending)
+    (locals : TypeSystem.Environment) :
+    TemplateTracking { state with locals := locals } pending := by
+  constructor
+  · change state.localSchemeAssumptions.Perm
+      (sourceLocalSchemeTemplateIds (state.toTypedSource []) ++ pending)
+    exact tracked.classified
+  · change state.localSchemeAssumptions.Nodup
+    exact tracked.unique
+  · change ∀ id, id ∈ state.localSchemeAssumptions →
+      id ∈ state.requirements.map (fun requirement => requirement.id)
+    exact tracked.covered
+
 /-- Allocating a binder moves its qualified requirement identities into the
 pending suffix.  Canonical generalization supplies the three side conditions:
 new identities are distinct, fresh for the classification, and already occur

@@ -80,6 +80,7 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.nodeLocalSchemeTemp
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.recordNode_sourceLocalSchemeTemplateIds
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.initial
+example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.replaceLocals
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.allocateBinder
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.recordNode
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.restoreLexicalScope

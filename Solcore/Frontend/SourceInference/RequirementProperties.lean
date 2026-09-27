@@ -6,6 +6,18 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend.SourceInference
 
+private theorem requirementIds_nodup_of_indices_nodup
+    (ids : List RequirementId)
+    (indices : (ids.map (fun id => id.index)).Nodup) : ids.Nodup := by
+  induction ids with
+  | nil => exact .nil
+  | cons head tail induction =>
+      simp only [List.map_cons] at indices
+      rw [List.nodup_cons] at indices ⊢
+      refine ⟨?_, induction indices.2⟩
+      intro member
+      exact indices.1 (List.mem_map.mpr ⟨_, member, rfl⟩)
+
 namespace State
 
 theorem initial_requirementsWellFormed (owner : Resolved.DeclarationId)
@@ -48,23 +60,25 @@ theorem addRequirements_preserves_requirementsWellFormed
   exact addRequirementsWithIds_preserves_requirementsWellFormed
     state predicates wellFormed
 
+/-- A canonical requirement ledger has no duplicate requirement identities. -/
+theorem requirementIds_nodup (state : State)
+    (wellFormed : state.RequirementsWellFormed) :
+    (state.requirements.map (fun requirement => requirement.id)).Nodup := by
+  have indices :
+      (state.requirements.map (fun requirement => requirement.id)).map
+          (fun id => id.index) =
+        List.range state.nextRequirement := by
+    simpa [RequirementsWellFormed, List.map_map, Function.comp_def] using
+      wellFormed
+  have indicesNodup :
+      ((state.requirements.map (fun requirement => requirement.id)).map
+        (fun id => id.index)).Nodup :=
+    indices ▸ List.nodup_range
+  exact requirementIds_nodup_of_indices_nodup _ indicesNodup
+
 end State
 
 namespace Detail
-
-/-- Requirement identities are injective whenever their numeric projections
-are injective.  `RequirementId` deliberately exposes only this stable index. -/
-private theorem requirementIds_nodup_of_indices_nodup
-    (ids : List RequirementId)
-    (indices : (ids.map (fun id => id.index)).Nodup) : ids.Nodup := by
-  induction ids with
-  | nil => exact .nil
-  | cons head tail induction =>
-      simp only [List.map_cons] at indices
-      rw [List.nodup_cons] at indices ⊢
-      refine ⟨?_, induction indices.2⟩
-      intro member
-      exact indices.1 (List.mem_map.mpr ⟨_, member, rfl⟩)
 
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)
