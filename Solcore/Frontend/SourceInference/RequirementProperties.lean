@@ -291,6 +291,105 @@ theorem candidateWithExpected_preserves_requirementsWellFormed
       subst result
       exact withExpected_preserves_requirementsWellFormed fittedResult wellFormed
 
+/-- Fitting an argument spine preserves the canonical requirement ledger.
+Every requirement added by an inserted coercion is committed by the
+corresponding successful `candidateWithExpected` step. -/
+theorem fitArguments_preserves_requirementsWellFormed
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result))
+    (wellFormed : state.RequirementsWellFormed) :
+    result.state.RequirementsWellFormed := by
+  induction arguments generalizing parameters state result with
+  | nil =>
+      cases parameters <;> simp [fitArguments] at success
+      subst result
+      exact wellFormed
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil =>
+          simp [fitArguments] at success
+      | cons parameter parameters =>
+          simp only [fitArguments] at success
+          cases fittedResult :
+              candidateWithExpected context state argument (some parameter) with
+          | error error =>
+              simp [fittedResult, bind, Except.bind] at success
+          | ok fitted? =>
+              cases fitted? with
+              | none =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  change Except.ok (none : Option ArgumentFitResult) =
+                    Except.ok (some result) at success
+                  simp at success
+              | some fitted =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  have fittedWellFormed :
+                      fitted.state.RequirementsWellFormed :=
+                    candidateWithExpected_preserves_requirementsWellFormed
+                      fittedResult wellFormed
+                  cases tailResult : fitArguments context fitted.state arguments
+                      parameters with
+                  | error error =>
+                      simp [tailResult] at success
+                  | ok tail? =>
+                      cases tail? with
+                      | none =>
+                          simp only [tailResult] at success
+                          change Except.ok (none : Option ArgumentFitResult) =
+                            Except.ok (some result) at success
+                          simp at success
+                      | some tail =>
+                          simp only [tailResult] at success
+                          change Except.ok (some {
+                            state := tail.state
+                            cost := fitted.coercions.length + tail.cost
+                            coercions := {
+                              expression := argument.id
+                              coercions := fitted.coercions
+                            } :: tail.coercions
+                          }) = Except.ok (some result) at success
+                          injection success with resultEq
+                          have resultEq : _ = result :=
+                            Option.some.inj resultEq
+                          subst result
+                          exact induction (result := tail) tailResult
+                            fittedWellFormed
+
+/-- A retained function candidate preserves the canonical requirement ledger.
+The integer-literal and predicate validators return only `Bool`/`Unit`; they
+inspect the fitted state but do not construct a replacement state.  The only
+later state changes append the instantiated signature requirements and record
+their direct-call provenance. -/
+theorem tryFunctionCandidate_preserves_requirementsWellFormed
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result))
+    (wellFormed : state.RequirementsWellFormed) :
+    result.state.RequirementsWellFormed := by
+  unfold tryFunctionCandidate at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try
+    have fittedArgumentsWellFormed :=
+      fitArguments_preserves_requirementsWellFormed (by assumption) (by
+        change state.RequirementsWellFormed
+        exact wellFormed)
+  all_goals try
+    have fittedResultWellFormed :=
+      candidateWithExpected_preserves_requirementsWellFormed (by assumption)
+        fittedArgumentsWellFormed
+  all_goals
+    exact State.markDirectCallRequirements_preserves_requirementsWellFormed _ _
+      (State.addRequirementsWithIds_preserves_requirementsWellFormed _ _
+        fittedResultWellFormed)
+
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)
     (solved : List SolvedRequirement)

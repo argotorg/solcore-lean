@@ -196,6 +196,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_preserves_requirementsWellFormed
 example :=
+  @Solcore.Frontend.SourceInference.Detail.fitArguments_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_preserves_requirementsWellFormed
+example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_instantiation
 example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_success_candidate
