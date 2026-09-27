@@ -1,4 +1,5 @@
 import Solcore.TypeSystem.Scheme
+import Solcore.TypeSystem.SubstitutionProperties
 import Solcore.TypeSystem.Unification
 
 set_option autoImplicit false
@@ -63,17 +64,6 @@ private theorem lookup?_map_apply (newer older : Substitution)
       by_cases same : candidate = metavariable
       · simp [lookup?, same]
       · simp [lookup?, same, ih]
-
-private theorem lookup?_eq_none_iff_not_mem_domain (substitution : Substitution)
-    (metavariable : TypeVarId) :
-    substitution.lookup? metavariable = none ↔ metavariable ∉ substitution.domain := by
-  induction substitution with
-  | nil => simp [lookup?, domain]
-  | cons entry rest ih =>
-      rcases entry with ⟨candidate, replacement⟩
-      by_cases same : candidate = metavariable
-      · simp [lookup?, domain, same]
-      · simp [lookup?, domain, same, Ne.symm same, ih]
 
 private theorem lookup?_filter_not_mem (substitution : Substitution)
     (excluded : List TypeVarId) (metavariable : TypeVarId) :

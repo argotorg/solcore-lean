@@ -155,6 +155,57 @@ theorem freeVariables_nodup (type : Ty) : type.freeVariables.Nodup := by
   | proxy inner induction
   | comptime inner induction => exact induction
 
+private theorem mem_unionVariables_iff (metavariable : TypeVarId)
+    (left right : List TypeVarId) :
+    metavariable ∈ unionVariables left right ↔
+      metavariable ∈ left ∨ metavariable ∈ right := by
+  induction right generalizing left with
+  | nil => simp [unionVariables]
+  | cons head tail induction =>
+      change metavariable ∈ unionVariables
+          (if head ∈ left then left else left ++ [head]) tail ↔
+        metavariable ∈ left ∨ metavariable ∈ head :: tail
+      rw [induction]
+      by_cases present : head ∈ left
+      · simp only [if_pos present, List.mem_cons]
+        constructor
+        · rintro (member | member)
+          · exact Or.inl member
+          · exact Or.inr (Or.inr member)
+        · rintro (member | same | member)
+          · exact Or.inl member
+          · exact Or.inl (by simpa [same] using present)
+          · exact Or.inr member
+      · simp [present, or_assoc]
+
+@[simp] theorem mem_freeVariables_application_iff
+    (metavariable : TypeVarId) (function argument : Ty) :
+    metavariable ∈ (Ty.application function argument).freeVariables ↔
+      metavariable ∈ function.freeVariables ∨
+        metavariable ∈ argument.freeVariables := by
+  exact mem_unionVariables_iff metavariable _ _
+
+@[simp] theorem mem_freeVariables_function_iff
+    (metavariable : TypeVarId) (parameter result : Ty) :
+    metavariable ∈ (Ty.function parameter result).freeVariables ↔
+      metavariable ∈ parameter.freeVariables ∨
+        metavariable ∈ result.freeVariables := by
+  exact mem_unionVariables_iff metavariable _ _
+
+@[simp] theorem mem_freeVariables_product_iff
+    (metavariable : TypeVarId) (left right : Ty) :
+    metavariable ∈ (Ty.product left right).freeVariables ↔
+      metavariable ∈ left.freeVariables ∨
+        metavariable ∈ right.freeVariables := by
+  exact mem_unionVariables_iff metavariable _ _
+
+@[simp] theorem mem_freeVariables_mapping_iff
+    (metavariable : TypeVarId) (key value : Ty) :
+    metavariable ∈ (Ty.mapping key value).freeVariables ↔
+      metavariable ∈ key.freeVariables ∨
+        metavariable ∈ value.freeVariables := by
+  exact mem_unionVariables_iff metavariable _ _
+
 /-- Whether a flexible metavariable occurs in a type. -/
 def containsVariable (type : Ty) (metavariable : TypeVarId) : Bool :=
   type.freeVariables.contains metavariable

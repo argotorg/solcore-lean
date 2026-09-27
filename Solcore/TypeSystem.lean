@@ -1,5 +1,6 @@
 import Solcore.TypeSystem.Type
 import Solcore.TypeSystem.Substitution
+import Solcore.TypeSystem.SubstitutionProperties
 import Solcore.TypeSystem.Unification
 import Solcore.TypeSystem.Scheme
 import Solcore.TypeSystem.Inference
