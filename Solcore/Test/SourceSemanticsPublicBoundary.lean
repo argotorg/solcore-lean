@@ -86,6 +86,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_containsExpression
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_containsExpression_of_mem
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_containsStatement_of_mem
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.binaryOperatorDispatch_traitMethod
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.unaryOperatorDispatch_traitMethod

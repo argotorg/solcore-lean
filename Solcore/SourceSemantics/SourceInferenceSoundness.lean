@@ -144,6 +144,38 @@ theorem recordExpressionWithExpected_success_containsExpression
   rw [resultState, resultExpression]
   exact recordNode_containsExpression fitted.state _ roots
 
+/-- Finalization transports every retained expression node into the emitted
+typed source under exactly the substitution returned to callers. -/
+theorem finalize_containsExpression_of_mem
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty} {state : Frontend.SourceInference.State}
+    {roots : List NodeId} {result : Frontend.SourceInference.Result}
+    {node : ExpressionNode}
+    (success : Detail.finalize inferenceContext type state roots = .ok result)
+    (member : Node.expression node ∈ state.nodes) :
+    ContainsExpression result.typedSource node.id
+      (node.applySubstitution result.substitution) := by
+  rw [Detail.finalize_typedSource success]
+  exact FlexibleSubstitution.ContainsExpression.applySubstitution
+    result.substitution
+    (toTypedSource_containsExpression_of_mem member roots)
+
+/-- Finalization transports every retained statement node into the emitted
+typed source under exactly the substitution returned to callers. -/
+theorem finalize_containsStatement_of_mem
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty} {state : Frontend.SourceInference.State}
+    {roots : List NodeId} {result : Frontend.SourceInference.Result}
+    {node : StatementNode}
+    (success : Detail.finalize inferenceContext type state roots = .ok result)
+    (member : Node.statement node ∈ state.nodes) :
+    ContainsStatement result.typedSource node.id
+      (node.applySubstitution result.substitution) := by
+  rw [Detail.finalize_typedSource success]
+  exact FlexibleSubstitution.ContainsStatement.applySubstitution
+    result.substitution
+    (toTypedSource_containsStatement_of_mem member roots)
+
 /-- The executable binary dispatch table agrees exactly with the declarative
 trait dispatch relation on every trait-backed spelling. -/
 theorem binaryOperatorDispatch_traitMethod
