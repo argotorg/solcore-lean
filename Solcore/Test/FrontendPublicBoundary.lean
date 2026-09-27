@@ -37,8 +37,11 @@ example :=
   @Solcore.Frontend.SourceInference.checkFunctionBodies_success_declaration_ids
 example := @Solcore.Frontend.checkImplementationMethodBodies
 example := @Solcore.Frontend.checkImplementationMethodBodies_success_ids
+example := @Solcore.Frontend.checkLoadedProgram_success_environment
 example := @Solcore.Frontend.checkLoadedProgram_success_ids
+example := @Solcore.Frontend.checkProgram_success_load
 example := @Solcore.Frontend.checkProgram_success_ids
+example := @Solcore.Frontend.checkProgram_success_declarations_nodup
 example := @Solcore.Frontend.ProgramCheckError.methodInference
 example := @Solcore.Frontend.ProgramCheckError.methodNoSolution
 example := @Solcore.Frontend.ProgramCheckError.methodInconclusive

@@ -55,6 +55,14 @@ example
   checkLoadedProgram_success_ids success
 
 example
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    checked.environment = loaded.environment :=
+  checkLoadedProgram_success_environment success
+
+example
     {raw : Workspace.RawWorkspace}
     {fuel : Nat}
     {checked : CheckedProgram}
@@ -65,6 +73,24 @@ example
         checked.signatures.implementations.flatMap fun implementation =>
           implementation.methods.map (fun method => method.id) :=
   checkProgram_success_ids success
+
+example
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    ∃ loaded,
+      loadProgram raw = .ok loaded ∧
+        checkLoadedProgram loaded fuel = .ok checked :=
+  checkProgram_success_load success
+
+example
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    (checked.environment.declarations.map (·.id)).Nodup :=
+  checkProgram_success_declarations_nodup success
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

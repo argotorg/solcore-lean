@@ -240,6 +240,41 @@ def checkLoadedProgram (loaded : LoadedProgram) (fuel : Nat := 1024) :
       | .error functionErrors, .error methodErrors =>
           .error (functionErrors.map classifyFunctionError ++ methodErrors)
 
+/-- A successful loaded-program check retains the exact environment supplied
+by the loader. -/
+theorem checkLoadedProgram_success_environment
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    checked.environment = loaded.environment := by
+  cases signaturesResult : buildProgramSignatures loaded.environment with
+  | error signatureErrors =>
+      simp [checkLoadedProgram, signaturesResult] at success
+  | ok signatures =>
+      cases functionsResult : SourceInference.checkFunctionBodies
+          loaded.environment signatures fuel with
+      | error functionErrors =>
+          cases methodsResult : checkImplementationMethodBodies
+              loaded.environment signatures fuel with
+          | error methodErrors =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+          | ok methods =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+      | ok functions =>
+          cases methodsResult : checkImplementationMethodBodies
+              loaded.environment signatures fuel with
+          | error methodErrors =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+          | ok methods =>
+              simp only [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult, Except.ok.injEq] at success
+              subst checked
+              rfl
+
 /-- A successful loaded-program check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkLoadedProgram_success_ids
@@ -291,6 +326,22 @@ def checkProgram (raw : Workspace.RawWorkspace) (fuel : Nat := 1024) :
   | .error errors => .error (errors.map ProgramCheckError.loading)
   | .ok loaded => checkLoadedProgram loaded fuel
 
+/-- Decompose raw checker success into the successful loader result and the
+corresponding successful loaded-program check. -/
+theorem checkProgram_success_load
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    ∃ loaded,
+      loadProgram raw = .ok loaded ∧
+        checkLoadedProgram loaded fuel = .ok checked := by
+  cases loadedResult : loadProgram raw with
+  | error errors => simp [checkProgram, loadedResult] at success
+  | ok loaded =>
+      exact ⟨loaded, rfl, by
+        simpa [checkProgram, loadedResult] using success⟩
+
 /-- A successful raw-workspace check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkProgram_success_ids
@@ -303,11 +354,20 @@ theorem checkProgram_success_ids
       checked.methods.map (fun method => method.id) =
         checked.signatures.implementations.flatMap fun implementation =>
           implementation.methods.map (fun method => method.id) := by
-  cases loadedResult : loadProgram raw with
-  | error errors =>
-      simp [checkProgram, loadedResult] at success
-  | ok loaded =>
-      apply checkLoadedProgram_success_ids
-      simpa [checkProgram, loadedResult] using success
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_ids checkedSuccess
+
+/-- A successfully checked raw workspace retains pairwise distinct declaration
+identities in its checked environment. -/
+theorem checkProgram_success_declarations_nodup
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    (checked.environment.declarations.map (·.id)).Nodup := by
+  obtain ⟨loaded, loadedSuccess, checkedSuccess⟩ :=
+    checkProgram_success_load success
+  rw [checkLoadedProgram_success_environment checkedSuccess]
+  exact loadProgram_success_declarations_nodup loadedSuccess
 
 end Solcore.Frontend
