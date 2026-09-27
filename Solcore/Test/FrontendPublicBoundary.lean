@@ -194,6 +194,32 @@ example :=
   @Solcore.Frontend.SourceInference.State.initial_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_preserves_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_requirements_subset
+example := @Solcore.Frontend.SourceInference.State.withLocals_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateBinder_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateHiddenLocal_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateExpressionId_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateStatementId_requirements_subset
+example := @Solcore.Frontend.SourceInference.State.recordNode_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.modifyExpressionNode_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.modifyStatementNode_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.markDirectCallRequirements_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementWithId_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirement_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementsWithIds_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirements_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.State.withLocals_preserves_requirementsWellFormed
 example :=
@@ -311,6 +337,18 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.recordIndirectCall_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.applyFunctionType_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.bindLambdaParameters_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.freshTypes_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.unifyBuiltinFunctionArgumentsEqual_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordBuiltinFunctionCall_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_instantiation
 example :=

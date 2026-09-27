@@ -47,6 +47,12 @@ theorem withLocals_preserves_requirementsWellFormed
   change state.RequirementsWellFormed
   exact wellFormed
 
+/-- Replacing compatibility-only locals does not remove requirement rows. -/
+theorem withLocals_requirements_subset
+    (state : State) (locals : TypeSystem.Environment) :
+    state.requirements ⊆ (state.withLocals locals).requirements := by
+  exact fun _ member => member
+
 /-- Restoring a lexical scope preserves all globally allocated requirement
 identities. -/
 theorem restoreLexicalScope_preserves_requirementsWellFormed
@@ -55,6 +61,13 @@ theorem restoreLexicalScope_preserves_requirementsWellFormed
     (state.restoreLexicalScope scope).RequirementsWellFormed := by
   change state.RequirementsWellFormed
   exact wellFormed
+
+/-- Restoring lexical scope does not remove globally allocated requirements. -/
+theorem restoreLexicalScope_requirements_subset
+    (state : State) (scope : LexicalScope) :
+    state.requirements ⊆
+      (state.restoreLexicalScope scope).requirements := by
+  exact fun _ member => member
 
 /-- Allocating a visible binder changes only lexical and local-scheme state,
 not the canonical requirement ledger. -/
@@ -68,12 +81,27 @@ theorem allocateBinder_preserves_requirementsWellFormed
   change state.RequirementsWellFormed
   exact wellFormed
 
+/-- Allocating a binder does not remove requirement rows. -/
+theorem allocateBinder_requirements_subset
+    (state : State) (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement) :
+    state.requirements ⊆
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).2.requirements := by
+  exact fun _ member => member
+
 /-- Reserving a hidden local identity does not change the requirement ledger. -/
 theorem allocateHiddenLocal_preserves_requirementsWellFormed
     (state : State) (wellFormed : state.RequirementsWellFormed) :
     state.allocateHiddenLocal.2.RequirementsWellFormed := by
   change state.RequirementsWellFormed
   exact wellFormed
+
+/-- Allocating a hidden local does not remove requirement rows. -/
+theorem allocateHiddenLocal_requirements_subset (state : State) :
+    state.requirements ⊆ state.allocateHiddenLocal.2.requirements := by
+  exact fun _ member => member
 
 /-- Allocating an expression identity does not change the requirement ledger. -/
 theorem allocateExpressionId_preserves_requirementsWellFormed
@@ -82,12 +110,22 @@ theorem allocateExpressionId_preserves_requirementsWellFormed
   change state.RequirementsWellFormed
   exact wellFormed
 
+/-- Allocating an expression identity does not remove requirement rows. -/
+theorem allocateExpressionId_requirements_subset (state : State) :
+    state.requirements ⊆ state.allocateExpressionId.2.requirements := by
+  exact fun _ member => member
+
 /-- Allocating a statement identity does not change the requirement ledger. -/
 theorem allocateStatementId_preserves_requirementsWellFormed
     (state : State) (wellFormed : state.RequirementsWellFormed) :
     state.allocateStatementId.2.RequirementsWellFormed := by
   change state.RequirementsWellFormed
   exact wellFormed
+
+/-- Allocating a statement identity does not remove requirement rows. -/
+theorem allocateStatementId_requirements_subset (state : State) :
+    state.requirements ⊆ state.allocateStatementId.2.requirements := by
+  exact fun _ member => member
 
 /-- Recording a typed-source node does not change the requirement ledger. -/
 theorem recordNode_preserves_requirementsWellFormed
@@ -96,6 +134,11 @@ theorem recordNode_preserves_requirementsWellFormed
     (state.recordNode node).RequirementsWellFormed := by
   change state.RequirementsWellFormed
   exact wellFormed
+
+/-- Recording a typed-source node does not remove requirement rows. -/
+theorem recordNode_requirements_subset (state : State) (node : Node) :
+    state.requirements ⊆ (state.recordNode node).requirements := by
+  exact fun _ member => member
 
 /-- Updating an existing expression node does not change the requirement
 ledger. -/
@@ -107,6 +150,14 @@ theorem modifyExpressionNode_preserves_requirementsWellFormed
   change state.RequirementsWellFormed
   exact wellFormed
 
+/-- Updating an expression node does not remove requirement rows. -/
+theorem modifyExpressionNode_requirements_subset
+    (state : State) (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode) :
+    state.requirements ⊆
+      (state.modifyExpressionNode id modify).requirements := by
+  exact fun _ member => member
+
 /-- Updating an existing statement node does not change the requirement
 ledger. -/
 theorem modifyStatementNode_preserves_requirementsWellFormed
@@ -117,6 +168,14 @@ theorem modifyStatementNode_preserves_requirementsWellFormed
   change state.RequirementsWellFormed
   exact wellFormed
 
+/-- Updating a statement node does not remove requirement rows. -/
+theorem modifyStatementNode_requirements_subset
+    (state : State) (id : StatementId)
+    (modify : StatementNode → StatementNode) :
+    state.requirements ⊆
+      (state.modifyStatementNode id modify).requirements := by
+  exact fun _ member => member
+
 /-- Recording direct-call provenance changes no canonical requirement IDs. -/
 theorem markDirectCallRequirements_preserves_requirementsWellFormed
     (state : State) (requirements : List RequirementId)
@@ -124,6 +183,13 @@ theorem markDirectCallRequirements_preserves_requirementsWellFormed
     (state.markDirectCallRequirements requirements).RequirementsWellFormed := by
   change state.RequirementsWellFormed
   exact wellFormed
+
+/-- Marking direct-call provenance does not remove requirement rows. -/
+theorem markDirectCallRequirements_requirements_subset
+    (state : State) (requirements : List RequirementId) :
+    state.requirements ⊆
+      (state.markDirectCallRequirements requirements).requirements := by
+  exact fun _ member => member
 
 theorem addRequirementWithId_preserves_requirementsWellFormed
     (state : State) (predicate : ProgramPredicate)
@@ -133,12 +199,28 @@ theorem addRequirementWithId_preserves_requirementsWellFormed
     List.map_cons, List.map_nil, List.range_succ]
   exact congrArg (· ++ [state.nextRequirement]) wellFormed
 
+/-- Allocating one requirement appends a row to the existing ledger. -/
+theorem addRequirementWithId_requirements_subset
+    (state : State) (predicate : ProgramPredicate) :
+    state.requirements ⊆
+      (state.addRequirementWithId predicate).2.requirements := by
+  intro requirement member
+  simp only [addRequirementWithId, List.mem_append, List.mem_cons,
+    List.mem_nil_iff, or_false]
+  exact Or.inl member
+
 theorem addRequirement_preserves_requirementsWellFormed
     (state : State) (predicate : ProgramPredicate)
     (wellFormed : state.RequirementsWellFormed) :
     (state.addRequirement predicate).RequirementsWellFormed := by
   exact addRequirementWithId_preserves_requirementsWellFormed
     state predicate wellFormed
+
+/-- Allocating one anonymous requirement appends a row to the ledger. -/
+theorem addRequirement_requirements_subset
+    (state : State) (predicate : ProgramPredicate) :
+    state.requirements ⊆ (state.addRequirement predicate).requirements := by
+  exact addRequirementWithId_requirements_subset state predicate
 
 theorem addRequirementsWithIds_preserves_requirementsWellFormed
     (state : State) (predicates : List ProgramPredicate)
@@ -153,12 +235,34 @@ theorem addRequirementsWithIds_preserves_requirementsWellFormed
         (addRequirementWithId_preserves_requirementsWellFormed
           state predicate wellFormed)
 
+/-- Allocating a predicate list appends rows without removing the input
+ledger. -/
+theorem addRequirementsWithIds_requirements_subset
+    (state : State) (predicates : List ProgramPredicate) :
+    state.requirements ⊆
+      (state.addRequirementsWithIds predicates).2.requirements := by
+  induction predicates generalizing state with
+  | nil => exact fun _ member => member
+  | cons predicate rest induction =>
+      simp only [addRequirementsWithIds]
+      exact List.Subset.trans
+        (addRequirementWithId_requirements_subset state predicate)
+        (induction (state.addRequirementWithId predicate).2)
+
 theorem addRequirements_preserves_requirementsWellFormed
     (state : State) (predicates : List ProgramPredicate)
     (wellFormed : state.RequirementsWellFormed) :
     (state.addRequirements predicates).RequirementsWellFormed := by
   exact addRequirementsWithIds_preserves_requirementsWellFormed
     state predicates wellFormed
+
+/-- Allocating anonymous requirements appends rows without removing the input
+ledger. -/
+theorem addRequirements_requirements_subset
+    (state : State) (predicates : List ProgramPredicate) :
+    state.requirements ⊆
+      (state.addRequirements predicates).requirements := by
+  exact addRequirementsWithIds_requirements_subset state predicates
 
 /-- A canonical requirement ledger has no duplicate requirement identities. -/
 theorem requirementIds_nodup (state : State)
@@ -938,6 +1042,18 @@ private theorem pureState_eq
   change Except.ok state = Except.ok next at success
   exact Except.ok.inj success
 
+private theorem exceptPure_eq {epsilon alpha : Type} {value result : alpha}
+    (success : (pure value : Except epsilon alpha) = .ok result) :
+    value = result := by
+  change Except.ok value = Except.ok result at success
+  exact Except.ok.inj success
+
+private theorem exceptPure_eq_ok {epsilon alpha : Type}
+    (value result : alpha) :
+    ((pure value : Except epsilon alpha) = .ok result) ↔ value = result := by
+  change (Except.ok value = Except.ok result) ↔ value = result
+  simp
+
 /-- Unary-operator inference changes only unification metadata and may append
 the selected trait method's obligations. -/
 theorem inferUnaryOperator_requirements_subset
@@ -1293,6 +1409,207 @@ theorem applyFunctionType_requirements_subset
               exact List.Subset.trans freshSubset
                 (List.Subset.trans (unify_requirements_subset unifyResult)
                   (withExpected_requirements_subset resultResult))
+
+/-- Binding lambda parameters changes only inference and lexical metadata, so
+it retains the input requirement ledger. -/
+theorem bindLambdaParameters_requirements_subset
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {state : State}
+    {result : List TypedBinder × List Ty × State}
+    (success : bindLambdaParameters context parameters index seen state =
+      .ok result) :
+    state.requirements ⊆ result.2.2.requirements := by
+  induction parameters generalizing index seen state result with
+  | nil =>
+      simp only [bindLambdaParameters] at success
+      injection success with resultEq
+      subst result
+      exact fun _ member => member
+  | cons parameter rest induction =>
+      cases parameterValue : parameter.value with
+      | error =>
+          simp [bindLambdaParameters, parameterValue, bind, Except.bind]
+            at success
+      | inferred name =>
+          simp only [bindLambdaParameters, parameterValue] at success
+          simp only [bind, Except.bind] at success
+          repeat' first | split at success
+          all_goals try simp_all only [exceptPure_eq_ok]
+          all_goals try simp_all
+          all_goals
+            subst result
+            subst_vars
+            have tailSubset := induction _ _ _ (by assumption)
+            simpa [State.fresh, State.allocateBinder] using tailSubset
+      | typed marker name sourceType =>
+          simp only [bindLambdaParameters, parameterValue] at success
+          cases typeResult : resolveSourceType context sourceType with
+          | error error =>
+              simp [typeResult, bind, Except.bind] at success
+          | ok type =>
+              simp only [typeResult, bind, Except.bind] at success
+              repeat' first | split at success
+              all_goals try simp_all only [exceptPure_eq_ok]
+              all_goals try simp_all
+              all_goals
+                subst result
+                subst_vars
+                have tailSubset := induction _ _ _ (by assumption)
+                simpa [State.allocateBinder] using tailSubset
+
+/-- Allocating a list of fresh types does not remove requirement rows. -/
+theorem freshTypes_requirements_subset (count : Nat) (state : State) :
+    state.requirements ⊆ (freshTypes count state).2.requirements := by
+  induction count generalizing state with
+  | zero => exact fun _ member => member
+  | succ count induction =>
+      simpa [freshTypes, State.fresh] using induction state.fresh.2
+
+/-- Freshening a data-constructor instantiation changes no requirement rows. -/
+theorem freshDataConstructorInstantiation_requirements_subset
+    (dataType : ProgramDataSignature)
+    (constructor : ProgramDataConstructorSignature) (state : State) :
+    state.requirements ⊆
+      (freshDataConstructorInstantiation dataType constructor
+        state).2.requirements := by
+  let step : List Ty × State → TypeParameterId → List Ty × State :=
+    fun result _ =>
+      (result.1 ++ [result.2.fresh.1], result.2.fresh.2)
+  have foldSubset (parameters : List TypeParameterId)
+      (accumulator : List Ty × State) :
+      accumulator.2.requirements ⊆
+        (parameters.foldl step accumulator).2.requirements := by
+    induction parameters generalizing accumulator with
+    | nil => exact fun _ member => member
+    | cons parameter parameters induction =>
+        simp only [List.foldl_cons]
+        simpa [step, State.fresh] using
+          induction (step accumulator parameter)
+  unfold freshDataConstructorInstantiation
+  exact foldSubset dataType.parameters ([], state)
+
+private def PreservesRequirements {alpha : Type} (stateOf : alpha → State)
+    (initial : State) (computation : Except Error alpha) : Prop :=
+  ∀ result, computation = .ok result →
+    initial.requirements ⊆ (stateOf result).requirements
+
+private theorem inferMatchPatternFlatFuel_preserves_requirements
+    (fuel : Nat) (context : Context) (pattern : Syntax.Pattern)
+    (expected : Ty) (seen : List String) (state : State) :
+    PreservesRequirements InferredPattern.state state
+      (inferMatchPatternFlatFuel fuel context pattern expected seen state) := by
+  apply inferMatchPatternFlatFuel.induct context
+      (motive1 := fun fuel pattern expected seen state =>
+        PreservesRequirements InferredPattern.state state
+          (inferMatchPatternFlatFuel fuel context pattern expected seen state))
+      (motive2 := fun fuel patterns expected seen state =>
+        PreservesRequirements InferredPatterns.state state
+          (inferMatchPatternsFlatFuel fuel context patterns expected seen state))
+  all_goals
+    intros
+    unfold PreservesRequirements at *
+    intro result success
+    simp_all [inferMatchPatternFlatFuel, inferMatchPatternsFlatFuel,
+      bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try simp_all only [exceptPure_eq_ok]
+    all_goals try have unifySubset :=
+      unify_requirements_subset (by assumption)
+    all_goals try specialize ih1 _ _ _ heq
+    all_goals try specialize ih1 _ _ heq
+    all_goals try specialize ih2 _ heq
+    all_goals try simp_all [State.fresh, State.addRequirementWithId,
+      State.allocateBinder]
+    all_goals intro requirement member
+    all_goals try grind
+      [unify_requirements_subset,
+        State.addRequirementWithId_requirements_subset,
+        State.allocateBinder_requirements_subset,
+        freshDataConstructorInstantiation_requirements_subset,
+        freshTypes_requirements_subset]
+
+/-- Successful pattern inference only retains or extends the input requirement
+ledger. -/
+theorem inferMatchPatternFuel_requirements_subset
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {state : State} {result : TypedMatchPattern × State}
+    (success : inferMatchPatternFuel fuel context pattern expected state =
+      .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  unfold inferMatchPatternFuel at success
+  cases flatResult :
+      inferMatchPatternFlatFuel fuel context pattern expected [] state with
+  | error error =>
+      simp [flatResult, bind, Except.bind] at success
+  | ok inferred =>
+      simp only [flatResult, bind, Except.bind] at success
+      change Except.ok ({
+        source := inferred.source
+        type := inferred.state.resolve expected
+        resolution := inferred.resolution
+        requirements := inferred.requirements
+      }, inferred.state) = Except.ok result at success
+      injection success with resultEq
+      subst result
+      exact inferMatchPatternFlatFuel_preserves_requirements fuel context pattern
+        expected [] state inferred flatResult
+
+/-- Pairwise builtin argument unification does not remove requirement rows. -/
+theorem unifyBuiltinFunctionArgumentsEqual_requirements_subset
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {state next : State}
+    (success : unifyBuiltinFunctionArgumentsEqual arguments parameters state =
+      .ok next) :
+    state.requirements ⊆ next.requirements := by
+  induction arguments generalizing parameters state next with
+  | nil =>
+      simp only [unifyBuiltinFunctionArgumentsEqual] at success
+      injection success with nextEq
+      subst next
+      exact fun _ member => member
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          injection success with nextEq
+          subst next
+          exact fun _ member => member
+      | cons parameter parameters =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          cases unifyResult : unify state argument.type parameter with
+          | error error =>
+              simp [unifyResult, bind, Except.bind] at success
+          | ok unified =>
+              simp only [unifyResult, bind, Except.bind] at success
+              exact List.Subset.trans
+                (unify_requirements_subset unifyResult)
+                (induction success)
+
+/-- Recording a fixed builtin call changes inference metadata and source nodes
+without removing input requirement rows. -/
+theorem recordBuiltinFunctionCall_requirements_subset
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  unfold recordBuiltinFunctionCall at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try simp_all
+  all_goals try
+    have pureEq := pureState_eq (by assumption)
+    subst_vars
+  all_goals intro requirement member
+  all_goals solve_by_elim (maxDepth := 12)
+    [unifyBuiltinFunctionArgumentsEqual_requirements_subset,
+      unify_requirements_subset,
+      State.allocateExpressionId_requirements_subset,
+      recordExpression_requirements_subset]
 
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)
