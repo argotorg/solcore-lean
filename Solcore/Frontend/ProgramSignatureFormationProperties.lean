@@ -72,6 +72,30 @@ theorem SignatureTypesFormationValidated.variablesBelow
       · exact headValidated.variablesBelow next
       · exact tailValidated.variablesBelow next type member
 
+namespace ProgramSignatureFormationValidated
+
+/-- A cataloged function whose callable scheme has the canonical collected
+shape contains no flexible metavariables, so its scheme body lies below every
+inference allocator bound. -/
+theorem function_scheme_body_variablesBelow
+    {signatures : ProgramSignatures}
+    (validated : ProgramSignatureFormationValidated signatures)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ signatures.functions)
+    (bodyEq : signature.scheme.body = .function
+      (Ty.productMany signature.parameterTypes)
+      (Ty.productMany signature.returnTypes))
+    (next : Nat) :
+    signature.scheme.body.VariablesBelow next := by
+  rcases validated.functions signature member with
+    ⟨parameterTypes, returnTypes, _⟩
+  rw [bodyEq]
+  exact (Ty.variablesBelow_function_iff next _ _).mpr ⟨
+    Ty.variablesBelow_productMany (parameterTypes.variablesBelow next),
+    Ty.variablesBelow_productMany (returnTypes.variablesBelow next)⟩
+
+end ProgramSignatureFormationValidated
+
 /-- A frontend-validated signature type contains no flexible metavariables,
 so every flexible substitution fixes it. -/
 theorem SignatureTypeFormationValidated.apply_eq_self
