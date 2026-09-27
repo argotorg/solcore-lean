@@ -252,6 +252,19 @@ inductive ProgramCheckError where
 
 namespace State
 
+/-- The declaration-scoped part of inference state that no body traversal may
+change. -/
+structure Header where
+  owner : Resolved.DeclarationId
+  inputs : List TypedBinder
+  deriving Repr, DecidableEq
+
+/-- Project the immutable declaration-scoped portion of inference state. -/
+def header (state : State) : Header := {
+  owner := state.owner
+  inputs := state.inputs
+}
+
 private def initialBinders (owner : Resolved.DeclarationId)
     (locals : TypeSystem.Environment) (inputComptime : List Bool) :
     List TypedBinder :=
@@ -274,6 +287,17 @@ def initial (owner : Resolved.DeclarationId)
     localBinders := binders
     nextLocal := locals.length
   }
+
+theorem initial_inputs_definition (owner : Resolved.DeclarationId)
+    (locals : TypeSystem.Environment) (inputComptime : List Bool) :
+    (initial owner locals inputComptime).inputs =
+      locals.mapIdx fun index entry => {
+        id := { owner, binderIndex := index }
+        name := entry.1
+        scheme := entry.2
+        comptime := inputComptime.getD index false
+      } := by
+  rfl
 
 def resolve (state : State) (type : Ty) : Ty :=
   state.inference.resolve type

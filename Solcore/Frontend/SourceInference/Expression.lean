@@ -372,7 +372,7 @@ private def instantiateDataConstructor
     resultType := Ty.nominal dataType.id arguments
   }
 
-private def freshDataConstructorInstantiation
+def freshDataConstructorInstantiation
     (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature)
     (state : State) : DataConstructorInstantiation × State :=
@@ -501,7 +501,7 @@ def recordIndirectCall (source : Syntax.Expr) (callee : InferredExpression)
       coercionRequirements result.callCoercions)
     result.callCoercions result.state
 
-private def unifyBuiltinFunctionArgumentsEqual :
+def unifyBuiltinFunctionArgumentsEqual :
     List InferredExpression → List Ty → State → Except Error State
   | [], _, state => .ok state
   | _, [], state => .ok state
@@ -546,14 +546,14 @@ structure MatchCasesResult where
   allReturn : Bool
   state : State
 
-private structure InferredForItems where
+structure InferredForItems where
   items : List ForItemForm
   state : State
 
 /-- Internal result of recursively checking one source pattern.  The prefix
 instruction stream is self-delimiting because constructor and tuple nodes
 retain their child counts. -/
-private structure InferredPattern where
+structure InferredPattern where
   source : MatchPatternSource
   resolution : MatchPatternResolution
   instructions : List MatchPatternInstruction
@@ -561,13 +561,13 @@ private structure InferredPattern where
   names : List String
   state : State
 
-private structure InferredPatterns where
+structure InferredPatterns where
   instructions : List MatchPatternInstruction
   requirements : List RequirementId
   names : List String
   state : State
 
-private def freshTypes : Nat → State → List Ty × State
+def freshTypes : Nat → State → List Ty × State
   | 0, state => ([], state)
   | count + 1, state =>
       let (type, state) := state.fresh
@@ -576,7 +576,7 @@ private def freshTypes : Nat → State → List Ty × State
 
 mutual
 
-  private def inferMatchPatternFlatFuel (fuel : Nat) (context : Context)
+  def inferMatchPatternFlatFuel (fuel : Nat) (context : Context)
       (pattern : Syntax.Pattern) (expected : Ty) (seen : List String)
       (state : State) : Except Error InferredPattern :=
     match fuel with
@@ -707,7 +707,7 @@ mutual
           .error (.unsupportedPattern pattern.span "comptime")
       | .error => .error (.unsupportedPattern pattern.span "parser recovery")
 
-  private def inferMatchPatternsFlatFuel (fuel : Nat) (context : Context) :
+  def inferMatchPatternsFlatFuel (fuel : Nat) (context : Context) :
       List Syntax.Pattern → List Ty → List String → State →
         Except Error InferredPatterns
     | [], [], seen, state => pure {
