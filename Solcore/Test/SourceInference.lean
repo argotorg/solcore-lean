@@ -171,6 +171,61 @@ private def stableGeneralizationState : SourceInference.State :=
     ("captured", .mono (.variable stableGeneralizationVariable))
   ]
 
+/-- The executable blocker characterization exposes the exact lexical scheme
+that prevents a captured variable from being generalized. -/
+example : stableGeneralizationVariable ∈
+    SourceInference.Detail.generalizeValueBlockedVariables
+      stableGeneralizationState
+      [("captured", .mono (.variable stableGeneralizationVariable))] 0 := by
+  rw [SourceInference.Detail.mem_generalizeValueBlockedVariables_iff]
+  left
+  refine ⟨("captured", .mono (.variable stableGeneralizationVariable)),
+    by simp, ?_⟩
+  simp [TypeSystem.Scheme.mono, TypeSystem.Scheme.freeVariables,
+    TypeSystem.Ty.freeVariables]
+
+/-- A requirement predating the initializer contributes an exact blocker
+witness even when its identity is otherwise classified as a direct call. -/
+example :
+    solverRegressionRequirement ∈
+        SourceInference.Detail.generalizeValueBlockingRequirements
+          generalizationSideConditionState 1 ∧
+      solverRegressionRequirement ∉
+        SourceInference.Detail.generalizeValueBlockingRequirements
+          generalizationSideConditionState 0 := by
+  constructor
+  · rw [SourceInference.Detail.mem_generalizeValueBlockingRequirements_iff]
+    exact Or.inl (by simp [generalizationSideConditionState])
+  · rw [SourceInference.Detail.mem_generalizeValueBlockingRequirements_iff]
+    simp [generalizationSideConditionState]
+
+/-- A requirement-witness blocker exposes the variable carried by its
+normalized predicate. -/
+example : solverRegressionFirst ∈
+    SourceInference.Detail.generalizeValueBlockedVariables
+      generalizationSideConditionState [] 1 := by
+  rw [SourceInference.Detail.mem_generalizeValueBlockedVariables_iff]
+  right
+  refine ⟨solverRegressionRequirement, ?_, ?_⟩
+  · rw [SourceInference.Detail.mem_generalizeValueBlockingRequirements_iff]
+    exact Or.inl (by simp [generalizationSideConditionState])
+  · change solverRegressionFirst ∈
+      (TypeSystem.Substitution.apply []
+        (.variable solverRegressionFirst)).freeVariables
+    rw [show ([] : TypeSystem.Substitution) =
+      TypeSystem.Substitution.empty by rfl]
+    rw [TypeSystem.Substitution.empty_apply]
+    simp [TypeSystem.Ty.freeVariables]
+
+/-- Exact quantified-variable projection excludes the requirement-blocked
+variable and retains the other free variable in stable type order. -/
+example :
+    (SourceInference.Detail.generalizeValue generalizationSideConditionState []
+      1 (.product (.variable solverRegressionFirst)
+        (.variable solverRegressionSecond))).scheme.quantified =
+      [solverRegressionSecond] := by
+  decide
+
 /-- Generalization derives its lexical barrier from stable binders.  Replacing
 the legacy environment cache with a stale closed scheme therefore cannot make
 the captured variable polymorphic; using that stale cache directly would. -/

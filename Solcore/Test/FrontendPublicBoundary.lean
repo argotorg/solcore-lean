@@ -520,7 +520,17 @@ example := @Solcore.Frontend.SourceInference.State.requirementIds_nodup
 example :=
   @Solcore.Frontend.SourceInference.State.IntegerLiteralLedgerCorrespondence
 example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValueBlockingRequirements
+example :=
+  @Solcore.Frontend.SourceInference.Detail.mem_generalizeValueBlockingRequirements_iff
+example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValueBlockedVariables
+example :=
+  @Solcore.Frontend.SourceInference.Detail.mem_generalizeValueBlockedVariables_iff
+example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_scheme_body
+example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValue_scheme_quantified
 example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_scheme_quantified_nodup
 example :=

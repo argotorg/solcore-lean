@@ -68,21 +68,110 @@ private def requirementVariables (state : State)
     TypedTraitResolution.predicateVariables
       (applyPredicate state requirement.predicate)
 
+private theorem requirementId_beq_iff_eq
+    (left right : RequirementId) : (left == right) = true ↔ left = right := by
+  rw [show (left == right) = (left.index == right.index) by rfl]
+  rw [beq_iff_eq]
+  constructor
+  · intro indicesEq
+    cases left
+    cases right
+    cases indicesEq
+    rfl
+  · intro same
+    exact congrArg RequirementId.index same
+
+private theorem requirementId_contains_iff_mem
+    (ids : List RequirementId) (id : RequirementId) :
+    ids.contains id = true ↔ id ∈ ids := by
+  induction ids with
+  | nil => simp
+  | cons head tail induction =>
+      simp only [List.contains_cons, List.mem_cons]
+      rw [Bool.or_eq_true, requirementId_beq_iff_eq, induction]
+
+/-- Requirements whose variables prevent local generalization.  Requirements
+that predate the initializer remain visible, while newly introduced direct
+declaration-call requirements are candidates for qualified generalization
+rather than blockers. -/
+def generalizeValueBlockingRequirements (state : State)
+    (requirementStart : Nat) : List Requirement :=
+  state.requirements.take requirementStart ++
+    (state.requirements.drop requirementStart).filter fun requirement =>
+      !state.directCallRequirements.contains requirement.id
+
+/-- A blocking row either predates the initializer or is a row introduced by
+the initializer whose identity is not classified as a direct declaration
+call. -/
+@[simp] theorem mem_generalizeValueBlockingRequirements_iff
+    (state : State) (requirementStart : Nat) (requirement : Requirement) :
+    requirement ∈
+        generalizeValueBlockingRequirements state requirementStart ↔
+      requirement ∈ state.requirements.take requirementStart ∨
+      (requirement ∈ state.requirements.drop requirementStart ∧
+        requirement.id ∉ state.directCallRequirements) := by
+  unfold generalizeValueBlockingRequirements
+  rw [List.mem_append]
+  constructor
+  · rintro (prior | operational)
+    · exact Or.inl prior
+    · rcases List.mem_filter.mp operational with ⟨introduced, selected⟩
+      refine Or.inr ⟨introduced, ?_⟩
+      intro direct
+      have present :
+          state.directCallRequirements.contains requirement.id = true :=
+        (requirementId_contains_iff_mem _ _).mpr direct
+      simp [present] at selected
+  · rintro (prior | ⟨introduced, notDirect⟩)
+    · exact Or.inl prior
+    · apply Or.inr
+      apply List.mem_filter.mpr
+      refine ⟨introduced, ?_⟩
+      have absent :
+          state.directCallRequirements.contains requirement.id = false := by
+        apply Bool.eq_false_iff.mpr
+        intro present
+        exact notDirect ((requirementId_contains_iff_mem _ _).mp present)
+      simp [absent]
+
+/-- Flexible variables that the executable local-value generalizer must not
+quantify: variables free in the lexical environment together with variables
+mentioned by every blocking requirement after applying the current inference
+substitution. -/
+def generalizeValueBlockedVariables (state : State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat) :
+    List TypeVarId :=
+  locals.freeVariables ++
+    requirementVariables state
+      (generalizeValueBlockingRequirements state requirementStart)
+
+/-- Membership in the executable generalization barrier has either an exact
+lexical-scheme witness or an exact blocking-requirement witness. -/
+@[simp] theorem mem_generalizeValueBlockedVariables_iff
+    (state : State) (locals : TypeSystem.Environment)
+    (requirementStart : Nat) (metavariable : TypeVarId) :
+    metavariable ∈
+        generalizeValueBlockedVariables state locals requirementStart ↔
+      (∃ entry ∈ locals, metavariable ∈ entry.2.freeVariables) ∨
+      ∃ requirement ∈
+          generalizeValueBlockingRequirements state requirementStart,
+        metavariable ∈ TypedTraitResolution.predicateVariables
+          (applyPredicate state requirement.predicate) := by
+  simp [generalizeValueBlockedVariables, requirementVariables,
+    TypeSystem.Environment.mem_freeVariables_iff]
+
 /-- Generalize one local value together with the proof-only declaration-call
 requirements introduced while inferring its initializer.  Every older
 requirement, and every new operational requirement, continues to block its
 variables exactly as before. -/
 def generalizeValue (state : State) (locals : TypeSystem.Environment)
     (requirementStart : Nat) (type : Ty) : GeneralizedValue :=
-  let priorRequirements := state.requirements.take requirementStart
   let introducedRequirements := state.requirements.drop requirementStart
   let eligibleRequirements := introducedRequirements.filter fun requirement =>
     state.directCallRequirements.contains requirement.id &&
       !state.localSchemeAssumptions.contains requirement.id
-  let operationalRequirements := introducedRequirements.filter fun requirement =>
-    !state.directCallRequirements.contains requirement.id
-  let blockedVariables := locals.freeVariables ++
-    requirementVariables state (priorRequirements ++ operationalRequirements)
+  let blockedVariables :=
+    generalizeValueBlockedVariables state locals requirementStart
   let quantified := type.freeVariables.filter fun metavariable =>
     !(blockedVariables.contains metavariable)
   let requirements := eligibleRequirements.filterMap fun requirement =>
@@ -111,11 +200,21 @@ def generalizeValue (state : State) (locals : TypeSystem.Environment)
     (generalizeValue state locals requirementStart type).scheme.body = type := by
   rfl
 
+/-- Local generalization quantifies exactly the inferred type variables that
+are absent from the executable lexical-and-requirement barrier. -/
+@[simp] theorem generalizeValue_scheme_quantified (state : State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat) (type : Ty) :
+    (generalizeValue state locals requirementStart type).scheme.quantified =
+      type.freeVariables.filter fun metavariable =>
+        !(generalizeValueBlockedVariables state locals requirementStart).contains
+          metavariable := by
+  rfl
+
 /-- Local generalization quantifies each flexible metavariable at most once. -/
 theorem generalizeValue_scheme_quantified_nodup (state : State)
     (locals : TypeSystem.Environment) (requirementStart : Nat) (type : Ty) :
     (generalizeValue state locals requirementStart type).scheme.quantified.Nodup := by
-  simp only [generalizeValue]
+  rw [generalizeValue_scheme_quantified]
   exact (Ty.freeVariables_nodup type).filter _
 
 private theorem generalizeValue_requirement_witness
@@ -135,11 +234,8 @@ private theorem generalizeValue_requirement_witness
   let eligibleRequirements := introducedRequirements.filter fun requirement =>
     state.directCallRequirements.contains requirement.id &&
       !state.localSchemeAssumptions.contains requirement.id
-  let blockedVariables := locals.freeVariables ++
-    requirementVariables state
-      (state.requirements.take requirementStart ++
-        introducedRequirements.filter fun requirement =>
-          !state.directCallRequirements.contains requirement.id)
+  let blockedVariables :=
+    generalizeValueBlockedVariables state locals requirementStart
   let quantified := type.freeVariables.filter fun metavariable =>
     !(blockedVariables.contains metavariable)
   let select : Requirement → Option LocalSchemeRequirement := fun requirement =>
@@ -251,11 +347,8 @@ theorem generalizeValue_templateIds_sublist (state : State)
   let eligibleRequirements := introducedRequirements.filter fun requirement =>
     state.directCallRequirements.contains requirement.id &&
       !state.localSchemeAssumptions.contains requirement.id
-  let blockedVariables := locals.freeVariables ++
-    requirementVariables state
-      (state.requirements.take requirementStart ++
-        introducedRequirements.filter fun requirement =>
-          !state.directCallRequirements.contains requirement.id)
+  let blockedVariables :=
+    generalizeValueBlockedVariables state locals requirementStart
   let quantified := type.freeVariables.filter fun metavariable =>
     !(blockedVariables.contains metavariable)
   let select : Requirement → Option LocalSchemeRequirement := fun requirement =>
@@ -285,28 +378,6 @@ theorem generalizeValue_templateIds_sublist (state : State)
     (state.requirements.map (fun requirement => requirement.id))
   exact selected.trans (eligible.map _)
 
-private theorem requirementId_beq_iff_eq
-    (left right : RequirementId) : (left == right) = true ↔ left = right := by
-  rw [show (left == right) = (left.index == right.index) by rfl]
-  rw [beq_iff_eq]
-  constructor
-  · intro indicesEq
-    cases left
-    cases right
-    cases indicesEq
-    rfl
-  · intro same
-    exact congrArg RequirementId.index same
-
-private theorem requirementId_contains_iff_mem
-    (ids : List RequirementId) (id : RequirementId) :
-    ids.contains id = true ↔ id ∈ ids := by
-  induction ids with
-  | nil => simp
-  | cons head tail induction =>
-      simp only [List.contains_cons, List.mem_cons]
-      rw [Bool.or_eq_true, requirementId_beq_iff_eq, induction]
-
 /-- Canonical local generalization never reclassifies an identity that was
 already owned by an enclosing local scheme. -/
 theorem generalizeValue_templateIds_fresh (state : State)
@@ -320,11 +391,8 @@ theorem generalizeValue_templateIds_fresh (state : State)
   let eligibleRequirements := introducedRequirements.filter fun requirement =>
     state.directCallRequirements.contains requirement.id &&
       !state.localSchemeAssumptions.contains requirement.id
-  let blockedVariables := locals.freeVariables ++
-    requirementVariables state
-      (state.requirements.take requirementStart ++
-        introducedRequirements.filter fun requirement =>
-          !state.directCallRequirements.contains requirement.id)
+  let blockedVariables :=
+    generalizeValueBlockedVariables state locals requirementStart
   let quantified := type.freeVariables.filter fun metavariable =>
     !(blockedVariables.contains metavariable)
   let select : Requirement → Option LocalSchemeRequirement := fun requirement =>
