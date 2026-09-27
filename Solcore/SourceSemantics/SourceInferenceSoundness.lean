@@ -562,6 +562,40 @@ theorem solveRequirements_committedCoercionStepSequenceProves
   · exact solveRequirements_correspondingSequenceProves
       corresponds.methods success solved_eq valid
 
+/-- Once its normalized profile and solved ledger are valid, a committed
+frontend edge is a declaratively valid coercion step after applying the same
+inference substitution used to normalize its requirements. -/
+theorem committedCoercionStepValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    {planned : Detail.PlannedCoercionStep}
+    {committed : CoercionStep}
+    (corresponds : Detail.PlannedCoercionStep.CommitCorresponds requirements
+      planned committed)
+    (profile : CoercionProfileInstantiates semanticContext
+      (state.resolve planned.source) (state.resolve planned.target)
+      (Detail.applyPredicate state planned.predicate)
+      (planned.methodPredicates.map (Detail.applyPredicate state)))
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    CoercionStepValid semanticContext
+      (committed.applySubstitution state.inference.substitution) := by
+  apply CoercionStepValid.intro
+      (primary := Detail.applyPredicate state planned.predicate)
+      (methodPredicates :=
+        planned.methodPredicates.map (Detail.applyPredicate state))
+  · simpa [CoercionStep.applySubstitution, State.resolve,
+      TypeSystem.InferState.resolve, corresponds.source_eq,
+      corresponds.target_eq] using profile
+  · simpa [CoercionStep.applySubstitution] using
+      solveRequirements_committedCoercionStepSequenceProves corresponds
+        success solved_eq valid
+
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
 predicate. -/

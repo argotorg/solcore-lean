@@ -86,6 +86,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_correspondingSequenceProves
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_committedCoercionStepSequenceProves
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.committedCoercionStepValid
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_template_evidence
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_ordinary_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_scoped_entries_sound
