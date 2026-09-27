@@ -439,6 +439,27 @@ private theorem nominal_ne_error
   rw [applicationHead_nominal] at heads
   cases heads
 
+private theorem nominal_ne_function
+    (declaration : Resolved.DeclarationId)
+    (arguments : List TypeSystem.Ty)
+    (parameter result : TypeSystem.Ty) :
+    TypeSystem.Ty.nominal declaration arguments ≠
+      .function parameter result := by
+  intro equal
+  have heads := congrArg applicationHead equal
+  rw [applicationHead_nominal] at heads
+  cases heads
+
+private theorem nominal_ne_mapping
+    (declaration : Resolved.DeclarationId)
+    (arguments : List TypeSystem.Ty)
+    (key value : TypeSystem.Ty) :
+    TypeSystem.Ty.nominal declaration arguments ≠ .mapping key value := by
+  intro equal
+  have heads := congrArg applicationHead equal
+  rw [applicationHead_nominal] at heads
+  cases heads
+
 /-- Inversion for flexible variables: every occurrence is explicitly bound by
 the flexible-variable list of the judgment. -/
 theorem variable_mem {context : Context}
@@ -515,6 +536,66 @@ theorem ne_error {context : Context}
   | .mapping _ _ => by intro equal; cases equal
   | .proxy _ => by intro equal; cases equal
   | .comptime _ => by intro equal; cases equal
+
+/-- Inversion for function types exposes both structurally scoped
+components. -/
+theorem function_components
+    {context : Context} {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    ∀ parameter result, type = .function parameter result →
+      TypeWellScoped context flexibleVariables parameter ∧
+        TypeWellScoped context flexibleVariables result :=
+  match wellScoped with
+  | .variable _ => by intro _ _ equal; cases equal
+  | .parameter _ _ => by intro _ _ equal; cases equal
+  | .builtin _ => by intro _ _ equal; cases equal
+  | .nominal dataType arguments _ _ _ => by
+      intro parameter result equal
+      exact False.elim
+        (nominal_ne_function dataType.id arguments parameter result equal)
+  | .contractNominal contract arguments _ _ _ => by
+      intro parameter result equal
+      exact False.elim
+        (nominal_ne_function contract.id arguments parameter result equal)
+  | .function parameterScoped resultScoped => by
+      intro _ _ equal
+      cases equal
+      exact ⟨parameterScoped, resultScoped⟩
+  | .product _ _ => by intro _ _ equal; cases equal
+  | .mapping _ _ => by intro _ _ equal; cases equal
+  | .proxy _ => by intro _ _ equal; cases equal
+  | .comptime _ => by intro _ _ equal; cases equal
+
+/-- Inversion for mapping types exposes both structurally scoped
+components. -/
+theorem mapping_components
+    {context : Context} {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    ∀ key value, type = .mapping key value →
+      TypeWellScoped context flexibleVariables key ∧
+        TypeWellScoped context flexibleVariables value :=
+  match wellScoped with
+  | .variable _ => by intro _ _ equal; cases equal
+  | .parameter _ _ => by intro _ _ equal; cases equal
+  | .builtin _ => by intro _ _ equal; cases equal
+  | .nominal dataType arguments _ _ _ => by
+      intro key value equal
+      exact False.elim
+        (nominal_ne_mapping dataType.id arguments key value equal)
+  | .contractNominal contract arguments _ _ _ => by
+      intro key value equal
+      exact False.elim
+        (nominal_ne_mapping contract.id arguments key value equal)
+  | .function _ _ => by intro _ _ equal; cases equal
+  | .product _ _ => by intro _ _ equal; cases equal
+  | .mapping keyScoped valueScoped => by
+      intro _ _ equal
+      cases equal
+      exact ⟨keyScoped, valueScoped⟩
+  | .proxy _ => by intro _ _ equal; cases equal
+  | .comptime _ => by intro _ _ equal; cases equal
 
 theorem variable_iff {context : Context}
     {flexibleVariables : List TypeSystem.TypeVarId}

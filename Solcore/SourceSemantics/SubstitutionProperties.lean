@@ -1408,6 +1408,65 @@ private theorem TypesWellScoped.ofEachAdmissibleWithin
           (fun type member => admissible type (by simp [member]))
           (fun type member => included type (by simp [member])))
 
+/-- When residual inference variables are admitted, any structurally scoped
+type is admissible at its own occurrence.  The original flexible scope is
+irrelevant: every flexible variable retained by the type is re-scoped through
+that type's own free-variable list. -/
+theorem TypeWellScoped.toAdmissibleOfResidual
+    {context : Context} {flexibleVariables : List TypeVarId} {type : Ty}
+    (binders : TypeParameterBindersWellFormed context)
+    (residual : context.residualTypeVariables = true)
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    TypeAdmissible context type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun current _ => TypeAdmissible context current)
+    (motive_2 := fun types _ => ∀ current, current ∈ types →
+      TypeAdmissible context current)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable _
+    exact TypeAdmissible.variableOfResidual binders residual metavariable
+  · intro parameter bound owned
+    exact {
+      binders
+      typeWellScoped := .parameter bound owned
+    }
+  · intro builtin
+    exact TypeAdmissible.builtin binders builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    refine {
+      binders
+      typeWellScoped := .nominal dataType arguments cataloged arity ?_
+    }
+    apply TypesWellScoped.ofEachAdmissibleWithin argumentsInduction
+    intro argument member metavariable occurs
+    exact (mem_freeVariables_nominal_iff).mpr
+      ⟨argument, member, occurs⟩
+  · intro contract arguments cataloged arity _ argumentsInduction
+    refine {
+      binders
+      typeWellScoped := .contractNominal contract arguments cataloged arity ?_
+    }
+    apply TypesWellScoped.ofEachAdmissibleWithin argumentsInduction
+    intro argument member metavariable occurs
+    exact (mem_freeVariables_nominal_iff).mpr
+      ⟨argument, member, occurs⟩
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact TypeAdmissible.function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact TypeAdmissible.product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact TypeAdmissible.mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact TypeAdmissible.proxy innerInduction
+  · intro inner _ innerInduction
+    exact TypeAdmissible.comptime innerInduction
+  · intro current member
+    simp at member
+  · intro head tail _ _ headInduction tailInduction current member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact headInduction
+    · exact tailInduction current member
+
 /-- Exact rigid substitution of a closed signature type by admissible
 use-site arguments yields an admissible occurrence type.  Unlike
 `applyParametersTo`, replacement types may retain lexical or residual
@@ -5531,6 +5590,72 @@ theorem BodyDefinitionHasType.instantiate_of_body
         exact bodyAfter lexicalContext inputsExtend bodyType
 
 end Solcore.SourceSemantics.StructuralSubstitution
+
+namespace Solcore.SourceSemantics.TypeAdmissible
+
+open TypeSystem
+
+/-- Rebase a structurally scoped component of an admissible enclosing type to
+the component's own admissible occurrence scope. -/
+private theorem component
+    {context : Context} {outer inner : Ty}
+    (outerAdmissible : TypeAdmissible context outer)
+    (innerScoped : TypeWellScoped context
+      (admissibleTypeVariables context outer) inner) :
+    TypeAdmissible context inner := by
+  cases residual : context.residualTypeVariables with
+  | false =>
+      exact {
+        binders := outerAdmissible.binders
+        typeWellScoped := by
+          simpa [admissibleTypeVariables, residual] using innerScoped
+      }
+  | true =>
+      exact StructuralSubstitution.TypeWellScoped.toAdmissibleOfResidual
+        outerAdmissible.binders residual innerScoped
+
+/-- The parameter component of an admissible function type is admissible. -/
+theorem function_parameter
+    {context : Context} {parameter result : Ty}
+    (admissible : TypeAdmissible context (.function parameter result)) :
+    TypeAdmissible context parameter := by
+  have componentScoped : TypeWellScoped context
+      (admissibleTypeVariables context (.function parameter result))
+      parameter := by
+    exact (admissible.typeWellScoped.function_components parameter result rfl).1
+  exact component admissible componentScoped
+
+/-- The result component of an admissible function type is admissible. -/
+theorem function_result
+    {context : Context} {parameter result : Ty}
+    (admissible : TypeAdmissible context (.function parameter result)) :
+    TypeAdmissible context result := by
+  have componentScoped : TypeWellScoped context
+      (admissibleTypeVariables context (.function parameter result)) result := by
+    exact (admissible.typeWellScoped.function_components parameter result rfl).2
+  exact component admissible componentScoped
+
+/-- The key component of an admissible mapping type is admissible. -/
+theorem mapping_key
+    {context : Context} {key value : Ty}
+    (admissible : TypeAdmissible context (.mapping key value)) :
+    TypeAdmissible context key := by
+  have componentScoped : TypeWellScoped context
+      (admissibleTypeVariables context (.mapping key value)) key := by
+    exact (admissible.typeWellScoped.mapping_components key value rfl).1
+  exact component admissible componentScoped
+
+/-- The value component of an admissible mapping type is admissible. -/
+theorem mapping_value
+    {context : Context} {key value : Ty}
+    (admissible : TypeAdmissible context (.mapping key value)) :
+    TypeAdmissible context value := by
+  have componentScoped : TypeWellScoped context
+      (admissibleTypeVariables context (.mapping key value)) value := by
+    exact (admissible.typeWellScoped.mapping_components key value rfl).2
+  exact component admissible componentScoped
+
+end Solcore.SourceSemantics.TypeAdmissible
 
 namespace Solcore.SourceSemantics.DeclarationInstantiation.Admissible
 
