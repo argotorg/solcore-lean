@@ -240,6 +240,49 @@ def checkLoadedProgram (loaded : LoadedProgram) (fuel : Nat := 1024) :
       | .error functionErrors, .error methodErrors =>
           .error (functionErrors.map classifyFunctionError ++ methodErrors)
 
+/-- A successful loaded-program check preserves the exact function and method
+identity order of the resolved signature catalog. -/
+theorem checkLoadedProgram_success_ids
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    checked.functions.map (fun function => function.declaration) =
+        checked.signatures.functions.map (fun signature => signature.id) ∧
+      checked.methods.map (fun method => method.id) =
+        checked.signatures.implementations.flatMap fun implementation =>
+          implementation.methods.map (fun method => method.id) := by
+  cases signaturesResult : buildProgramSignatures loaded.environment with
+  | error signatureErrors =>
+      simp [checkLoadedProgram, signaturesResult] at success
+  | ok signatures =>
+      cases functionsResult : SourceInference.checkFunctionBodies
+          loaded.environment signatures fuel with
+      | error functionErrors =>
+          cases methodsResult : checkImplementationMethodBodies
+              loaded.environment signatures fuel with
+          | error methodErrors =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+          | ok methods =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+      | ok functions =>
+          cases methodsResult : checkImplementationMethodBodies
+              loaded.environment signatures fuel with
+          | error methodErrors =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+          | ok methods =>
+              simp only [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult, Except.ok.injEq] at success
+              subst checked
+              exact ⟨
+                SourceInference.checkFunctionBodies_success_declaration_ids
+                  functionsResult,
+                checkImplementationMethodBodies_success_ids methodsResult
+              ⟩
+
 /-- Validate, parse, catalog, resolve, and check every top-level function and
 implementation-method body in canonical declaration order. -/
 def checkProgram (raw : Workspace.RawWorkspace) (fuel : Nat := 1024) :

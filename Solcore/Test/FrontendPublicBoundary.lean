@@ -28,8 +28,13 @@ example :=
   @Solcore.Frontend.ProgramImplementationSignature.functionSignatureOfMethodWithTrait
 example := @Solcore.Frontend.CheckedImplementationMethod
 example := @Solcore.Frontend.CheckedProgram.methods
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_declaration
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBodies_success_declaration_ids
 example := @Solcore.Frontend.checkImplementationMethodBodies
 example := @Solcore.Frontend.checkImplementationMethodBodies_success_ids
+example := @Solcore.Frontend.checkLoadedProgram_success_ids
 example := @Solcore.Frontend.ProgramCheckError.methodInference
 example := @Solcore.Frontend.ProgramCheckError.methodNoSolution
 example := @Solcore.Frontend.ProgramCheckError.methodInconclusive

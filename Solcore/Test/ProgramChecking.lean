@@ -11,6 +11,28 @@ open Solcore Solcore.Frontend
 example
     {environment : ProgramEnvironment}
     {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : SourceInference.CheckedFunction}
+    (success : SourceInference.checkFunctionBody environment signatures signature
+      fuel = .ok checked) :
+    checked.declaration = signature.id :=
+  SourceInference.checkFunctionBody_success_declaration success
+
+example
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {fuel : Nat}
+    {functions : List SourceInference.CheckedFunction}
+    (success : SourceInference.checkFunctionBodies environment signatures fuel =
+      .ok functions) :
+    functions.map (fun function => function.declaration) =
+      signatures.functions.map (fun signature => signature.id) :=
+  SourceInference.checkFunctionBodies_success_declaration_ids success
+
+example
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
     {fuel : Nat}
     {methods : List CheckedImplementationMethod}
     (success : checkImplementationMethodBodies environment signatures fuel =
@@ -19,6 +41,18 @@ example
       signatures.implementations.flatMap fun implementation =>
         implementation.methods.map (fun method => method.id) :=
   checkImplementationMethodBodies_success_ids success
+
+example
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    checked.functions.map (fun function => function.declaration) =
+        checked.signatures.functions.map (fun signature => signature.id) ∧
+      checked.methods.map (fun method => method.id) =
+        checked.signatures.implementations.flatMap fun implementation =>
+          implementation.methods.map (fun method => method.id) :=
+  checkLoadedProgram_success_ids success
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do
