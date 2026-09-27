@@ -71,6 +71,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_instantiationAdmissible
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_declarationApplicationValid
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.selectFunctionCandidateFrom_declarationApplicationValid
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveNormalizedPredicate_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solvePredicate_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvidence_ordinary_sound

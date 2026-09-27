@@ -83,6 +83,43 @@ theorem tryFunctionCandidate_declarationApplicationValid
     StructuralSubstitution.apply_function,
     StructuralSubstitution.apply_productMany]
 
+/-- A successful overload selection comes from one semantic-catalog member
+in the supplied candidate list and retains that member's exact declarative
+application profile.  This theorem intentionally forgets ranking optimality;
+only origin and static validity are needed by direct-call typing. -/
+theorem selectFunctionCandidateFrom_declarationApplicationValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {name : String} {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {result : Detail.CandidateAttemptResult}
+    {semanticContext : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (binders : TypeParameterBindersWellFormed semanticContext)
+    (residual : semanticContext.residualTypeVariables = true)
+    (candidates_subset : candidates ⊆
+      semanticContext.signatures.functions)
+    (success : Detail.selectFunctionCandidateFrom inferenceContext name
+      candidates arguments integerLiteralOrigins call expected state =
+        .ok result) :
+    ∃ signature, signature ∈ candidates ∧
+      DeclarationApplicationValid semanticContext result.instantiation
+        (signature.parameterTypes.map
+          (TypeSystem.ParameterSubstitution.apply
+            (signature.scheme.instantiate
+              state.inference.next).parameterSubstitution))
+        ((signature.scheme.instantiate state.inference.next)
+          |>.parameterSubstitution.apply
+            (TypeSystem.Ty.productMany signature.returnTypes))
+        (signature.scheme.instantiate state.inference.next).predicates := by
+  obtain ⟨signature, member, candidateSuccess⟩ :=
+    Detail.selectFunctionCandidateFrom_success_candidate success
+  refine ⟨signature, member, ?_⟩
+  exact tryFunctionCandidate_declarationApplicationValid catalog binders
+    residual (candidates_subset member) candidateSuccess
+
 private theorem requirementId_beq_iff_eq
     (left right : RequirementId) :
     (left == right) = true ↔ left = right := by

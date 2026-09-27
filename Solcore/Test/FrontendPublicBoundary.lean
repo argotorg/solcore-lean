@@ -182,6 +182,8 @@ example := @Solcore.Frontend.SourceInference.Detail.unify_preserves_resolve_eq
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_instantiation
 example :=
+  @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_success_candidate
+example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_formation
 example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_apply_eq_self

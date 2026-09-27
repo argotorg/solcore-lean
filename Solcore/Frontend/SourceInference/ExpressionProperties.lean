@@ -615,6 +615,43 @@ private theorem collectCandidateAttempts_success_header
                   exact attemptHeader signature result attemptResult
               | inr member => exact induction success member
 
+private theorem collectCandidateAttempts_success_provenance
+    {attempt : ProgramFunctionSignature →
+      Except Error (Option CandidateAttemptResult)} :
+    ∀ candidates success,
+      success ∈ (collectCandidateAttempts attempt candidates).successes →
+        ∃ signature, signature ∈ candidates ∧
+          attempt signature = .ok (some success.attempt) := by
+  intro candidates
+  induction candidates with
+  | nil => simp [collectCandidateAttempts]
+  | cons signature candidates induction =>
+      intro success member
+      simp only [collectCandidateAttempts] at member
+      cases attemptResult : attempt signature with
+      | error error =>
+          simp only [attemptResult] at member
+          obtain ⟨selected, selectedMember, selectedSuccess⟩ :=
+            induction success member
+          exact ⟨selected, by simp [selectedMember], selectedSuccess⟩
+      | ok result? =>
+          cases result? with
+          | none =>
+              simp only [attemptResult] at member
+              obtain ⟨selected, selectedMember, selectedSuccess⟩ :=
+                induction success member
+              exact ⟨selected, by simp [selectedMember], selectedSuccess⟩
+          | some result =>
+              simp only [attemptResult, List.mem_cons] at member
+              cases member with
+              | inl successEq =>
+                  subst success
+                  exact ⟨signature, by simp, attemptResult⟩
+              | inr member =>
+                  obtain ⟨selected, selectedMember, selectedSuccess⟩ :=
+                    induction success member
+                  exact ⟨selected, by simp [selectedMember], selectedSuccess⟩
+
 private theorem bestCandidateSuccesses_subset
     (successes : List CandidateSuccess) :
     bestCandidateSuccesses successes ⊆ successes := by
@@ -633,6 +670,49 @@ private theorem bestCandidateSuccesses_subset
             !success.attempt.hasDeferredIntegerLiterals := by
         simpa [empty] using preferredMember
       exact (List.mem_filter.mp groundMember).1
+
+/-- Every successfully selected overload is the unchanged successful result
+of checking one signature from the caller-provided candidate list.  Ranking
+may discard other successes, but it cannot synthesize or rewrite the retained
+candidate attempt. -/
+theorem selectFunctionCandidateFrom_success_candidate
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    ∃ signature, signature ∈ candidates ∧
+      tryFunctionCandidate context arguments integerLiteralOrigins call
+        expected state signature = .ok (some result) := by
+  unfold selectFunctionCandidateFrom at success
+  let attempt := tryFunctionCandidate context arguments integerLiteralOrigins
+    call expected state
+  let search := collectCandidateAttempts attempt candidates
+  change selectCandidateSearch name candidates search = .ok result at success
+  unfold selectCandidateSearch at success
+  cases selected : bestCandidateSuccesses search.successes with
+  | nil =>
+      simp only [selected] at success
+      repeat' first | split at success
+      all_goals contradiction
+  | cons candidate rest =>
+      cases rest with
+      | cons second tail => simp [selected] at success
+      | nil =>
+          simp only [selected] at success
+          split at success
+          · contradiction
+          · injection success with resultEq
+            subst result
+            have member : candidate ∈ search.successes :=
+              bestCandidateSuccesses_subset search.successes
+                (by simp [selected])
+            simpa [attempt] using
+              (collectCandidateAttempts_success_provenance
+                candidates candidate member)
 
 private theorem selectFunctionCandidateFrom_state_header
     {context : Context} {name : String}
