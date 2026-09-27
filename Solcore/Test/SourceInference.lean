@@ -406,6 +406,31 @@ example {context : SourceInference.Context}
   exact SourceInference.Detail.tryFunctionCandidate_some_inferenceProperties
     ready argumentsBelow schemeBodyBelow expectedBelow success
 
+/-- Selecting among bounded function candidates preserves the retained
+attempt's progress, readiness, and result-type allocator bound. -/
+example {context : SourceInference.Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List SourceInference.InferredExpression}
+    {integerLiteralOrigins : List SourceInference.IntegerLiteralOrigin}
+    {call : SourceInference.ExpressionId}
+    {expected : Option TypeSystem.Ty} {state : SourceInference.State}
+    {result : SourceInference.Detail.CandidateAttemptResult}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (candidateBodiesBelow : ∀ signature ∈ candidates,
+      signature.scheme.body.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.selectFunctionCandidateFrom context name
+      candidates arguments integerLiteralOrigins call expected state =
+        .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.result.type.VariablesBelow result.state.inference.next := by
+  exact SourceInference.Detail.selectFunctionCandidateFrom_inferenceProperties
+    ready argumentsBelow candidateBodiesBelow expectedBelow success
+
 /-- Recording an expected expression extends the same inference guarantees
 through source-node allocation without requiring a concrete evaluator case. -/
 example {source : Syntax.Expr} {id : SourceInference.ExpressionId}

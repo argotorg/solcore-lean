@@ -2592,6 +2592,33 @@ theorem selectFunctionCandidateFrom_success_candidate
               (collectCandidateAttempts_success_provenance
                 candidates candidate member)
 
+/-- Selecting an overload preserves the inference guarantees established for
+the retained candidate attempt. -/
+theorem selectFunctionCandidateFrom_inferenceProperties
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (candidateBodiesBelow : ∀ signature ∈ candidates,
+      signature.scheme.body.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.result.type.VariablesBelow result.state.inference.next := by
+  obtain ⟨signature, signatureMember, candidateSuccess⟩ :=
+    selectFunctionCandidateFrom_success_candidate success
+  exact tryFunctionCandidate_some_inferenceProperties ready argumentsBelow
+    (candidateBodiesBelow signature signatureMember) expectedBelow
+    candidateSuccess
+
 /-- Overload ranking returns one unchanged successful candidate attempt, so
 its requirement ledger is canonical whenever the shared input ledger is. -/
 theorem selectFunctionCandidateFrom_preserves_requirementsWellFormed
