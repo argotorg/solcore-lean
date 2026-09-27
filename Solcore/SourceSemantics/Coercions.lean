@@ -78,6 +78,20 @@ def coercionRequirementIds (steps : List CoercionStep) : List RequirementId :=
 
 namespace CoercionPathValid
 
+/-- Valid coercion paths compose at a shared endpoint.  This structural fact
+belongs to the static coercion judgment itself and is available to inference
+soundness as well as to the dynamic preservation development. -/
+theorem append
+    {context : Context} {source middle target : TypeSystem.Ty}
+    {first second : List CoercionStep}
+    (left : CoercionPathValid context source middle first)
+    (right : CoercionPathValid context middle target second) :
+    CoercionPathValid context source target (first ++ second) := by
+  induction left with
+  | nil => exact right
+  | cons head tail inductionHypothesis =>
+      exact .cons head (inductionHypothesis right)
+
 private theorem step_requirements_valid
     {context : Context}
     {step : CoercionStep}

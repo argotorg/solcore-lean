@@ -1501,41 +1501,6 @@ theorem preserves
 
 end CoercionPathExecutes
 
-namespace CoercionPathValid
-
-theorem append
-    {context : Context} {source middle target : Ty}
-    {first second : List CoercionStep}
-    (left : CoercionPathValid context source middle first)
-    (right : CoercionPathValid context middle target second) :
-    CoercionPathValid context source target (first ++ second) := by
-  induction left with
-  | nil => exact right
-  | cons head tail inductionHypothesis =>
-      exact .cons head (inductionHypothesis right)
-
-end CoercionPathValid
-
-namespace ExpressionRequirementPlan.Valid
-
-theorem outputPath
-    {context : Context} {rawType finalType : Ty}
-    {plan : ExpressionRequirementPlan} {requirements : List RequirementId}
-    {coercions : List CoercionStep}
-    (valid : ExpressionRequirementPlan.Valid context rawType finalType plan
-      requirements coercions) :
-    CoercionPathValid context rawType finalType coercions := by
-  cases valid with
-  | ordinary _ path _ => exact path
-  | directCall direct =>
-      cases direct with
-      | intro selected contextual signature coercions_eq requirements_eq =>
-          subst coercions
-          exact CoercionPathValid.append selected contextual
-  | indirectCall _ output _ => exact output
-
-end ExpressionRequirementPlan.Valid
-
 private theorem containsExpression_unique
     {source : TypedSource} {id : ExpressionId}
     {left right : ExpressionNode}

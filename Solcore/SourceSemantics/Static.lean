@@ -203,6 +203,53 @@ inductive Valid (context : Context) (rawType finalType : TypeSystem.Ty) :
       Valid context rawType finalType (.indirectCall argumentCoercions)
         requirements outputCoercions
 
+namespace Valid
+
+/-- Every valid requirement layout exposes the complete output-coercion path,
+independently of whether the expression is ordinary, a direct call, or an
+indirect call. -/
+theorem outputPath
+    {context : Context} {rawType finalType : TypeSystem.Ty}
+    {plan : ExpressionRequirementPlan} {requirements : List RequirementId}
+    {coercions : List CoercionStep}
+    (valid : ExpressionRequirementPlan.Valid context rawType finalType plan
+      requirements coercions) :
+    CoercionPathValid context rawType finalType coercions := by
+  cases valid with
+  | ordinary _ path _ => exact path
+  | directCall direct =>
+      cases direct with
+      | intro selected contextual signature coercions_eq requirements_eq =>
+          subst coercions
+          exact CoercionPathValid.append selected contextual
+  | indirectCall _ output _ => exact output
+
+/-- A valid shape-specific layout justifies every requirement identity stored
+on the expression node. -/
+theorem requirementsValid
+    {context : Context} {rawType finalType : TypeSystem.Ty}
+    {plan : ExpressionRequirementPlan} {requirements : List RequirementId}
+    {coercions : List CoercionStep}
+    (valid : ExpressionRequirementPlan.Valid context rawType finalType plan
+      requirements coercions) :
+    RequirementIdsValid context requirements := by
+  cases valid with
+  | ordinary ownedValid pathValid requirementsEq =>
+      rw [requirementsEq]
+      intro requirement member
+      simp only [List.mem_append] at member
+      exact member.elim (ownedValid requirement)
+        (pathValid.requirements_valid requirement)
+  | directCall direct => exact direct.requirements_valid
+  | indirectCall argumentValid outputValid requirementsEq =>
+      rw [requirementsEq]
+      intro requirement member
+      simp only [List.mem_append] at member
+      exact member.elim (argumentValid requirement)
+        (outputValid.requirements_valid requirement)
+
+end Valid
+
 end ExpressionRequirementPlan
 
 /-- One constructor-pattern arm covers a nominal constructor when all payload
@@ -968,21 +1015,7 @@ theorem requirements_valid
       RequirementIdsValid context node.requirements := by
   cases typing with
   | @intro _ _ node rawType plan contains _ _ _ _ requirements =>
-      refine ⟨node, contains, ?_⟩
-      cases requirements with
-      | ordinary ownedValid pathValid requirementsEq =>
-          rw [requirementsEq]
-          intro requirement member
-          simp only [List.mem_append] at member
-          exact member.elim (ownedValid requirement)
-            (pathValid.requirements_valid requirement)
-      | directCall valid => exact valid.requirements_valid
-      | indirectCall argumentValid outputValid requirementsEq =>
-          rw [requirementsEq]
-          intro requirement member
-          simp only [List.mem_append] at member
-          exact member.elim (argumentValid requirement)
-            (outputValid.requirements_valid requirement)
+      exact ⟨node, contains, requirements.requirementsValid⟩
 
 end ExpressionHasType
 
