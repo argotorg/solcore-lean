@@ -120,6 +120,22 @@ inductive UniformMemberProjection (context : Context) :
 
 namespace UniformMemberProjection
 
+/-- A valid uniform projection records an admissible nominal base type. -/
+theorem base_type_admissible
+    {context : Context} {base member : TypeSystem.Ty} {index : Nat}
+    (projection : UniformMemberProjection context base index member) :
+    TypeAdmissible context base := by
+  cases projection with
+  | intro _ _ _ baseWellFormed => exact baseWellFormed
+
+/-- A valid uniform projection records an admissible selected member type. -/
+theorem member_type_admissible
+    {context : Context} {base member : TypeSystem.Ty} {index : Nat}
+    (projection : UniformMemberProjection context base index member) :
+    TypeAdmissible context member := by
+  cases projection with
+  | intro _ _ _ _ memberWellFormed => exact memberWellFormed
+
 /-- Any admissible constructor occurrence at the projected nominal base
 exposes the same payload type at this position, independently of substitution
 list order. -/
