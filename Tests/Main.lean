@@ -1,4 +1,5 @@
 import Solcore
+import Solcore.Test.TypeSystemPublicBoundary
 import Solcore.Test.SourceSemantics
 import Solcore.Test.SourceSemanticsSubstitution
 import Solcore.Test.SourceSemanticsProgram
