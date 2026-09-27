@@ -291,6 +291,21 @@ structure ProgramDataSignature where
 
 namespace ProgramImplementationSignature
 
+/-- Exact generic assumptions available while checking one implementation
+method.  Trait predicates are instantiated at the implementation head before
+the implementation- and method-level predicates are appended in source
+semantic order. -/
+def methodAssumptions
+    (implementation : ProgramImplementationSignature)
+    (trait : ProgramTraitSignature)
+    (method : ProgramImplMethodSignature) : List ProgramPredicate :=
+  let traitSubstitution : TypeSystem.ParameterSubstitution :=
+    trait.parameters.zip
+      (implementation.head.subject :: implementation.head.arguments)
+  trait.wherePredicates.map
+      (ProgramPredicate.applyParameters traitSubstitution) ++
+    implementation.wherePredicates ++ method.wherePredicates
+
 /-- Backward-compatible trait-search projection of an implementation catalog. -/
 def implRule (implementation : ProgramImplementationSignature) :
     ProgramImplRule := {
@@ -320,6 +335,22 @@ def functionSignatureOfMethod
   }
   source := method.source.value.declaration
 }
+
+/-- Present an implementation method to the ordinary body checker with the
+same trait-, implementation-, and method-level assumptions used by the source
+semantics. -/
+def functionSignatureOfMethodWithTrait
+    (implementation : ProgramImplementationSignature)
+    (trait : ProgramTraitSignature)
+    (method : ProgramImplMethodSignature) : ProgramFunctionSignature :=
+  let signature := implementation.functionSignatureOfMethod method
+  {
+    signature with
+    scheme := {
+      signature.scheme with
+      predicates := implementation.methodAssumptions trait method
+    }
+  }
 
 end ProgramImplementationSignature
 

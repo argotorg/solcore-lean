@@ -8,6 +8,18 @@ namespace Tests.ProgramChecking
 
 open Solcore Solcore.Frontend
 
+example
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {fuel : Nat}
+    {methods : List CheckedImplementationMethod}
+    (success : checkImplementationMethodBodies environment signatures fuel =
+      .ok methods) :
+    methods.map (fun method => method.id) =
+      signatures.implementations.flatMap fun implementation =>
+        implementation.methods.map (fun method => method.id) :=
+  checkImplementationMethodBodies_success_ids success
+
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do
     throw (IO.userError message)
@@ -52,7 +64,7 @@ private def testSuccessfulProgram : IO Unit := do
   assertTrue (decide (checked.environment.modules.length = 3 ∧
       checked.signatures.functions.length = 4 ∧
       checked.signatures.implRules.length = 1 ∧
-      checked.functions.length = 4))
+      checked.functions.length = 4 ∧ checked.methods.isEmpty))
     "whole-program summary omitted modules, overloads, impls, or bodies"
   assertTrue (decide (checked.functions.map (·.declaration) =
       checked.signatures.functions.map (·.id)))
@@ -302,6 +314,173 @@ private def testMissingImplementationTraitPredicateRejection : IO Unit := do
   | .ok _ => throw (IO.userError
       "an implementation missing a trait-level requirement reached body checking")
 
+private def checkedMethodWorkspace : Workspace.RawWorkspace :=
+  singleSourceWorkspace (String.intercalate "\n" [
+    "trait TraitProof<T> {}",
+    "trait ImplProof<T> {}",
+    "trait MethodProof<T> {}",
+    "trait Transform<T> where T: TraitProof {",
+    "  function first(value: T) returns (T) where T: MethodProof;",
+    "  function second(value: T) returns (T);",
+    "}",
+    "function useTrait<T>(value: T) returns (T) where T: TraitProof {",
+    "  return value;",
+    "}",
+    "function useImpl<T>(value: T) returns (T) where T: ImplProof {",
+    "  return value;",
+    "}",
+    "function useMethod<T>(value: T) returns (T) where T: MethodProof {",
+    "  return value;",
+    "}",
+    "impl<T> Transform<T> where T: TraitProof, T: ImplProof {",
+    "  function first(value: T) returns (T) where T: MethodProof {",
+    "    return useMethod(useImpl(useTrait(value)));",
+    "  }",
+    "  function second(value: T) returns (T) {",
+    "    return useImpl(useTrait(value));",
+    "  }",
+    "}"
+  ])
+
+private def testImplementationMethodsCheckedInSourceOrder : IO Unit := do
+  let checked ← match checkProgram checkedMethodWorkspace with
+    | .ok checked => pure checked
+    | .error errors => throw (IO.userError
+        s!"generic implementation methods failed eager checking: {reprStr errors}")
+  let implementation ← match checked.signatures.implementations with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"expected one Transform implementation, found {implementations.length}")
+  let trait ← match checked.signatures.traits.filter fun trait =>
+      trait.name == "Transform" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one Transform trait, found {traits.length}")
+  let first ← match implementation.methods with
+    | first :: _ => pure first
+    | [] => throw (IO.userError "Transform implementation lost its methods")
+  let synthetic := implementation.functionSignatureOfMethodWithTrait trait first
+  let traitSubstitution : TypeSystem.ParameterSubstitution :=
+    trait.parameters.zip
+      (implementation.head.subject :: implementation.head.arguments)
+  let traitPredicates := trait.wherePredicates.map
+    (ProgramPredicate.applyParameters traitSubstitution)
+  let expectedAssumptions := traitPredicates ++
+    implementation.wherePredicates ++ first.wherePredicates
+  assertTrue (decide (synthetic.scheme.predicates = expectedAssumptions ∧
+      synthetic.scheme.predicates.length = 4 ∧
+      synthetic.scheme.predicates[0]? = synthetic.scheme.predicates[1]?))
+    "synthetic method assumptions diverged from source-semantics order"
+  let expectedIds := checked.signatures.implementations.flatMap
+    fun candidate => candidate.methods.map (fun method => method.id)
+  assertTrue (decide (checked.methods.map (fun method => method.id) = expectedIds ∧
+      checked.methods.length = 2 ∧
+      checked.methods.map (fun method => method.checked.declaration) =
+        [implementation.id, implementation.id] ∧
+      checked.methods.map (fun method => method.id.methodIndex) = [0, 1]))
+    "eager method checking lost implementation or method source order"
+  let firstChecked ← match checked.methods with
+    | firstChecked :: _ => pure firstChecked
+    | [] => throw (IO.userError "checked method catalog was empty")
+  let solvedPredicates := firstChecked.checked.solvedRequirements.map
+    (fun requirement => requirement.predicate)
+  let assumptionsOnly := firstChecked.checked.solvedRequirements.all
+    fun requirement => match requirement.evidence with
+      | .assumption _ => true
+      | .implementation _ => false
+  assertTrue (assumptionsOnly &&
+      expectedAssumptions.all fun predicate => solvedPredicates.contains predicate)
+    "trait-, implementation-, or method-level assumptions were unavailable"
+
+private def testFunctionAndMethodErrorsAccumulate : IO Unit := do
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
+      "trait Broken<T> {",
+      "  function first(value: T) returns (T);",
+      "  function second(value: T) returns (T);",
+      "}",
+      "impl Broken<Word> {",
+      "  function first(value: Word) returns (Word) { return missingFirst; }",
+      "  function second(value: Word) returns (Word) { return missingSecond; }",
+      "}",
+      "function bad() returns (Word) { return missingTop; }"
+    ])) with
+  | .error [
+      .inference {
+        declaration := functionId
+        error := .unknownVariable "missingTop"
+      },
+      .methodInference firstId (.unknownVariable "missingFirst"),
+      .methodInference secondId (.unknownVariable "missingSecond")
+    ] =>
+      assertTrue (decide (functionId.declarationIndex = 2 ∧
+          firstId.implementation.declarationIndex = 1 ∧
+          secondId.implementation = firstId.implementation ∧
+          firstId.methodIndex = 0 ∧ secondId.methodIndex = 1))
+        "combined body errors lost function-first or method source order"
+  | .error errors => throw (IO.userError
+      s!"combined function/method failures changed: {reprStr errors}")
+  | .ok _ => throw (IO.userError
+      "invalid function and implementation methods passed eager checking")
+
+private def testMethodNoSolution : IO Unit := do
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
+      "trait Add<T> {",
+      "  function add(left: T, right: T) returns (T);",
+      "}",
+      "trait Use<T> {",
+      "  function use(left: T, right: T) returns (T);",
+      "}",
+      "enum Box { Only }",
+      "impl Use<Box> {",
+      "  function use(left: Box, right: Box) returns (Box) {",
+      "    return left + right;",
+      "  }",
+      "}"
+    ])) with
+  | .error [.methodNoSolution method predicate] =>
+      match predicate.trait with
+      | .declaration trait =>
+          assertTrue (decide (method.implementation.declarationIndex = 3 ∧
+              method.methodIndex = 0 ∧ trait.declarationIndex = 0 ∧
+              predicate.arguments.isEmpty))
+            "method no-solution lost its stable method or trait goal"
+      | .builtin _ => throw (IO.userError
+          "source Add method failure was reported for a builtin trait")
+  | .error errors => throw (IO.userError
+      s!"method no-solution had the wrong classification: {reprStr errors}")
+  | .ok _ => throw (IO.userError
+      "implementation method with missing Add evidence was accepted")
+
+private def testMethodInconclusive : IO Unit := do
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
+      "trait Add<T> {",
+      "  function add(left: T, right: T) returns (T);",
+      "}",
+      "trait Use<T> {",
+      "  function use(left: T, right: T) returns (T);",
+      "}",
+      "enum Box { Only }",
+      "impl Add<Box> {",
+      "  function add(left: Box, right: Box) returns (Box) { return left; }",
+      "}",
+      "impl Add<Box> {",
+      "  function add(left: Box, right: Box) returns (Box) { return right; }",
+      "}",
+      "impl Use<Box> {",
+      "  function use(left: Box, right: Box) returns (Box) {",
+      "    return left + right;",
+      "  }",
+      "}"
+    ])) with
+  | .error [.methodInconclusive method (.ambiguous _ _ _)] =>
+      assertTrue (decide (method.implementation.declarationIndex = 5 ∧
+          method.methodIndex = 0))
+        "inconclusive method search lost the selected method identity"
+  | .error errors => throw (IO.userError
+      s!"ambiguous method obligation had the wrong classification: {reprStr errors}")
+  | .ok _ => throw (IO.userError
+      "ambiguous method trait obligation was selected")
+
 /-- Exercise the complete raw-workspace pipeline, including generics,
 overloads, calls, predicates, implementation evidence, and integer literals. -/
 def testProgramChecking : IO Unit := do
@@ -313,5 +492,9 @@ def testProgramChecking : IO Unit := do
   testStageClassification
   testPhantomImplementationParameterRejection
   testMissingImplementationTraitPredicateRejection
+  testImplementationMethodsCheckedInSourceOrder
+  testFunctionAndMethodErrorsAccumulate
+  testMethodNoSolution
+  testMethodInconclusive
 
 end Tests.ProgramChecking

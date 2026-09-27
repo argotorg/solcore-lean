@@ -918,7 +918,7 @@ private def testMethodPredicateEvidence : IO Unit := do
   | .ok _ => throw (IO.userError "an open method predicate was executable")
 
 private def testBodyIsActuallyChecked : IO Unit := do
-  let program ← checkedProgramOf (String.intercalate "\n" [
+  let raw := singleSourceWorkspace (String.intercalate "\n" [
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
     "impl Add<Word> {",
     "  function add(left: Word, right: Word) returns (Word) {",
@@ -926,6 +926,22 @@ private def testBodyIsActuallyChecked : IO Unit := do
     "  }",
     "}"
   ])
+  let loaded ← match loadProgram raw with
+    | .ok loaded => pure loaded
+    | .error errors => throw (IO.userError
+        s!"invalid-method defense fixture failed loading: {reprStr errors}")
+  let signatures ← match buildProgramSignatures loaded.environment with
+    | .ok signatures => pure signatures
+    | .error errors => throw (IO.userError
+        s!"invalid-method defense fixture failed cataloging: {reprStr errors}")
+  /- `checkProgram` now rejects this body eagerly.  Forge the public carrier
+  from the independently loaded catalog to retain the executable boundary's
+  defense-in-depth regression. -/
+  let program : CheckedProgram := {
+    environment := loaded.environment
+    signatures
+    functions := []
+  }
   let implementation ← onlyImplementation program
   match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program
       (evidenceFor implementation) 1 "add" with

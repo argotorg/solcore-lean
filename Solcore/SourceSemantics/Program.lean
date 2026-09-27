@@ -477,12 +477,7 @@ inductive BodyDefinitionHasType
 def methodAssumptions (trait : ProgramTraitSignature)
     (implementation : ProgramImplementationSignature)
     (method : ProgramImplMethodSignature) : List ProgramPredicate :=
-  let traitSubstitution : TypeSystem.ParameterSubstitution :=
-    trait.parameters.zip
-      (implementation.head.subject :: implementation.head.arguments)
-  trait.wherePredicates.map
-      (ProgramPredicate.applyParameters traitSubstitution) ++
-    implementation.wherePredicates ++ method.wherePredicates
+  implementation.methodAssumptions trait method
 
 namespace FunctionDefinition
 

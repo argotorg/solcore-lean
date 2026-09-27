@@ -23,6 +23,16 @@ example :=
   @Solcore.Frontend.ProgramSignatureError.missingImplementationTraitPredicate
 example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
 example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
+example := @Solcore.Frontend.ProgramImplementationSignature.methodAssumptions
+example :=
+  @Solcore.Frontend.ProgramImplementationSignature.functionSignatureOfMethodWithTrait
+example := @Solcore.Frontend.CheckedImplementationMethod
+example := @Solcore.Frontend.CheckedProgram.methods
+example := @Solcore.Frontend.checkImplementationMethodBodies
+example := @Solcore.Frontend.checkImplementationMethodBodies_success_ids
+example := @Solcore.Frontend.ProgramCheckError.methodInference
+example := @Solcore.Frontend.ProgramCheckError.methodNoSolution
+example := @Solcore.Frontend.ProgramCheckError.methodInconclusive
 
 example := @Solcore.Frontend.TraitResolution.ResolutionEvidenceValid
 example := @Solcore.Frontend.TraitResolution.ResolutionPremisesValid
