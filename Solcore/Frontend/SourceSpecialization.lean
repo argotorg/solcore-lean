@@ -659,62 +659,31 @@ def isDirectLambdaInitializer (source : TypedSource)
   | some { form := .lambda _ _ _, .. } => true
   | _ => false
 
-/-- Structurally recover the instantiation of a rank-1 scheme at one
-occurrence type.  Only the scheme's quantified variables may be assigned;
-repeated occurrences must agree. -/
-private def matchSchemeBody? (quantified : List TypeVarId) :
-    Ty → Ty → Substitution → Option Substitution
-  | .variable metavariable, actual, substitution =>
-      if quantified.contains metavariable then
-        match substitution.lookup? metavariable with
-        | some previous =>
-            if previous = actual then some substitution else none
-        | none => some ((metavariable, actual) :: substitution)
-      else if Ty.variable metavariable = actual then some substitution else none
-  | .parameter expected, .parameter actual, substitution =>
-      if expected = actual then some substitution else none
-  | .constructor expected, .constructor actual, substitution =>
-      if expected = actual then some substitution else none
-  | .application expectedFunction expectedArgument,
-      .application actualFunction actualArgument, substitution => do
-      let substitution ← matchSchemeBody? quantified expectedFunction
-        actualFunction substitution
-      matchSchemeBody? quantified expectedArgument actualArgument substitution
-  | .function expectedParameter expectedResult,
-      .function actualParameter actualResult, substitution => do
-      let substitution ← matchSchemeBody? quantified expectedParameter
-        actualParameter substitution
-      matchSchemeBody? quantified expectedResult actualResult substitution
-  | .product expectedLeft expectedRight,
-      .product actualLeft actualRight, substitution => do
-      let substitution ← matchSchemeBody? quantified expectedLeft actualLeft
-        substitution
-      matchSchemeBody? quantified expectedRight actualRight substitution
-  | .mapping expectedKey expectedValue,
-      .mapping actualKey actualValue, substitution => do
-      let substitution ← matchSchemeBody? quantified expectedKey actualKey
-        substitution
-      matchSchemeBody? quantified expectedValue actualValue substitution
-  | .proxy expected, .proxy actual, substitution =>
-      matchSchemeBody? quantified expected actual substitution
-  | .comptime expected, .comptime actual, substitution =>
-      matchSchemeBody? quantified expected actual substitution
-  | .error, .error, substitution => some substitution
-  | _, _, _ => none
-
 /-- Recover a complete ground substitution for one use of a polymorphic local
 scheme.  Phantom or otherwise undetermined quantified variables are rejected,
 as are occurrences which still contain inference metavariables. -/
 def matchClosedSchemeInstance? (scheme : Scheme) (actual : Ty) :
     Option Substitution := do
   if (firstNonConcrete actual).isSome then none else pure ()
-  if scheme.quantified.eraseDups.length != scheme.quantified.length then
-    none
-  else
-    pure ()
-  let matched ← matchSchemeBody? scheme.quantified scheme.body actual []
-  scheme.quantified.mapM fun metavariable => do
-    pure (metavariable, ← matched.lookup? metavariable)
+  scheme.matchInstance? actual
+
+/-- Successful closed matching exposes both the specialization policy and the
+complete rank-1 instantiation certificate supplied by `TypeSystem`. -/
+theorem matchClosedSchemeInstance?_sound
+    {scheme : Scheme} {actual : Ty} {substitution : Substitution}
+    (matched : matchClosedSchemeInstance? scheme actual = some substitution) :
+    firstNonConcrete actual = none ∧
+      scheme.quantified.Nodup ∧
+      substitution.domain = scheme.quantified ∧
+      substitution.apply scheme.body = actual := by
+  cases concrete : firstNonConcrete actual with
+  | none =>
+      have instanceMatched :
+          scheme.matchInstance? actual = some substitution := by
+        simpa [matchClosedSchemeInstance?, concrete] using matched
+      exact ⟨rfl, Scheme.matchInstance?_sound instanceMatched⟩
+  | some reason =>
+      simp [matchClosedSchemeInstance?, concrete] at matched
 
 private def polymorphicLetAllowed (source : TypedSource)
     (binder : TypedBinder) (initializer : Option ExpressionId) : Bool :=

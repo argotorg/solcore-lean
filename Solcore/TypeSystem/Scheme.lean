@@ -204,6 +204,99 @@ def instantiate (scheme : Scheme) (next : Nat) : Ty × Nat :=
   let instantiated := scheme.instantiateWithSubstitution next
   (instantiated.body, instantiated.next)
 
+/-- Structurally match a scheme body against one occurrence type.  Only the
+listed quantified variables may acquire assignments, and repeated appearances
+must agree with the first assignment. -/
+private def matchBody? (quantified : List TypeVarId) :
+    Ty → Ty → Substitution → Option Substitution
+  | .variable metavariable, actual, substitution =>
+      if quantified.contains metavariable then
+        match substitution.lookup? metavariable with
+        | some previous =>
+            if previous = actual then some substitution else none
+        | none => some ((metavariable, actual) :: substitution)
+      else if Ty.variable metavariable = actual then some substitution else none
+  | .parameter expected, .parameter actual, substitution =>
+      if expected = actual then some substitution else none
+  | .constructor expected, .constructor actual, substitution =>
+      if expected = actual then some substitution else none
+  | .application expectedFunction expectedArgument,
+      .application actualFunction actualArgument, substitution => do
+      let substitution ← matchBody? quantified expectedFunction
+        actualFunction substitution
+      matchBody? quantified expectedArgument actualArgument substitution
+  | .function expectedParameter expectedResult,
+      .function actualParameter actualResult, substitution => do
+      let substitution ← matchBody? quantified expectedParameter
+        actualParameter substitution
+      matchBody? quantified expectedResult actualResult substitution
+  | .product expectedLeft expectedRight,
+      .product actualLeft actualRight, substitution => do
+      let substitution ← matchBody? quantified expectedLeft actualLeft
+        substitution
+      matchBody? quantified expectedRight actualRight substitution
+  | .mapping expectedKey expectedValue,
+      .mapping actualKey actualValue, substitution => do
+      let substitution ← matchBody? quantified expectedKey actualKey
+        substitution
+      matchBody? quantified expectedValue actualValue substitution
+  | .proxy expected, .proxy actual, substitution =>
+      matchBody? quantified expected actual substitution
+  | .comptime expected, .comptime actual, substitution =>
+      matchBody? quantified expected actual substitution
+  | .error, .error, substitution => some substitution
+  | _, _, _ => none
+
+private structure InstanceMatch (scheme : Scheme) (actual : Ty) where
+  substitution : Substitution
+  quantifiedUnique : scheme.quantified.Nodup
+  domainExact : Substitution.domain substitution = scheme.quantified
+  applies : Substitution.apply substitution scheme.body = actual
+
+private def matchInstanceCertificate? (scheme : Scheme) (actual : Ty) :
+    Option (InstanceMatch scheme actual) :=
+  if quantifiedUnique : scheme.quantified.Nodup then do
+    let matched ← matchBody? scheme.quantified scheme.body actual []
+    let substitution : Substitution ← scheme.quantified.mapM fun metavariable => do
+      pure (metavariable, ← matched.lookup? metavariable)
+    if domainExact : Substitution.domain substitution = scheme.quantified then
+      if applies : Substitution.apply substitution scheme.body = actual then
+        some { substitution, quantifiedUnique, domainExact, applies }
+      else
+        none
+    else
+      none
+  else
+    none
+
+/-- Recover the complete substitution witnessing one rank-1 scheme instance.
+
+The structural matcher proposes assignments, then this public boundary
+reorders them to the quantified binder list and validates the complete
+certificate.  The final checks make success independent of matcher internals
+and provide a compact proof boundary for source typing. -/
+def matchInstance? (scheme : Scheme) (actual : Ty) : Option Substitution :=
+  (matchInstanceCertificate? scheme actual).map
+    (fun certificate => certificate.substitution)
+
+/-- A successful scheme match is a complete, duplicate-free instantiation
+certificate for the requested occurrence type. -/
+theorem matchInstance?_sound
+    {scheme : Scheme} {actual : Ty} {substitution : Substitution}
+    (accepted : scheme.matchInstance? actual = some substitution) :
+    scheme.quantified.Nodup ∧
+      substitution.domain = scheme.quantified ∧
+      substitution.apply scheme.body = actual := by
+  unfold matchInstance? at accepted
+  cases certificateResult : matchInstanceCertificate? scheme actual with
+  | none => simp [certificateResult] at accepted
+  | some certificate =>
+      simp only [certificateResult, Option.map_some, Option.some.injEq]
+        at accepted
+      subst substitution
+      exact ⟨certificate.quantifiedUnique, certificate.domainExact,
+        certificate.applies⟩
+
 /-- Scheme instantiation never moves the fresh-variable allocator backwards. -/
 theorem instantiate_next_le (scheme : Scheme) (next : Nat) :
     next ≤ (scheme.instantiate next).2 := by

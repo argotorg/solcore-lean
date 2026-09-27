@@ -85,4 +85,58 @@ example :
         next := 12 } := by
   rfl
 
+private def matchedVariable : TypeVarId := ⟨7⟩
+private def openOccurrenceVariable : TypeVarId := ⟨42⟩
+
+private def repeatedVariableScheme : Scheme := {
+  quantified := [matchedVariable]
+  body := .function (.variable matchedVariable) (.variable matchedVariable)
+}
+
+/-- Open occurrence types are valid rank-1 scheme instances; closing them is
+a separate specialization policy. -/
+example : repeatedVariableScheme.matchInstance?
+    (.function (.variable openOccurrenceVariable)
+      (.variable openOccurrenceVariable)) =
+    some [(matchedVariable, .variable openOccurrenceVariable)] := by
+  rfl
+
+/-- Repeated occurrences of one quantified variable must select one type. -/
+example : repeatedVariableScheme.matchInstance? (.function .word .bool) =
+    none := by
+  rfl
+
+/-- Phantom quantified variables cannot produce a complete substitution. -/
+example : Scheme.matchInstance?
+    ({ quantified := [matchedVariable], body := Ty.word } : Scheme) .word =
+    none := by
+  rfl
+
+/-- Duplicate quantifier identities are rejected at the certificate boundary. -/
+example : ({
+      quantified := [matchedVariable, matchedVariable]
+      body := Ty.variable matchedVariable
+    } : Scheme).matchInstance? .word = none := by
+  rfl
+
+/-- Unquantified flexible variables remain rigid during scheme matching. -/
+example : (Scheme.mono (.variable matchedVariable)).matchInstance?
+    (.variable matchedVariable) = some [] := by
+  rfl
+
+example : (Scheme.mono (.variable matchedVariable)).matchInstance? .word =
+    none := by
+  rfl
+
+/-- The exported soundness projection exposes the exact open instantiation. -/
+example :
+    let substitution : Substitution :=
+      [(matchedVariable, .variable openOccurrenceVariable)]
+    repeatedVariableScheme.quantified.Nodup ∧
+      substitution.domain = repeatedVariableScheme.quantified ∧
+      substitution.apply repeatedVariableScheme.body =
+        .function (.variable openOccurrenceVariable)
+          (.variable openOccurrenceVariable) := by
+  exact Scheme.matchInstance?_sound (by rfl)
+
 end Solcore.Test.TypeSystemInference

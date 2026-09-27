@@ -4,6 +4,10 @@ set_option autoImplicit false
 
 namespace Tests
 
+example := @Solcore.Frontend.SourceSpecialization.matchClosedSchemeInstance?
+example :=
+  @Solcore.Frontend.SourceSpecialization.matchClosedSchemeInstance?_sound
+
 example := @Solcore.Frontend.loadValidatedProgram_success_environment
 example := @Solcore.Frontend.loadProgram_success_environment
 example := @Solcore.Frontend.loadProgram_success_declarations_nodup

@@ -4,6 +4,9 @@ set_option autoImplicit false
 
 namespace Tests
 
+example := @Solcore.SourceSemantics.SchemeInstantiates.of_matchInstance?
+example := @Solcore.SourceSemantics.SchemeInstantiatesAt.of_matchInstance?
+
 example := @Solcore.SourceSemantics.Context
 example := @Solcore.SourceSemantics.Context.ofSignatures
 example := @Solcore.SourceSemantics.Context.withLocal

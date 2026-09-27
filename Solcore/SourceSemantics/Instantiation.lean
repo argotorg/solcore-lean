@@ -118,6 +118,20 @@ theorem has_exact_substitution {scheme : TypeSystem.Scheme}
   | intro substitution exact result =>
       exact ⟨substitution, exact, result⟩
 
+/-- The executable TypeSystem matcher emits a witness for the declarative
+rank-1 instantiation relation. -/
+theorem of_matchInstance?
+    {scheme : TypeSystem.Scheme} {type : TypeSystem.Ty}
+    {substitution : TypeSystem.Substitution}
+    (matched : scheme.matchInstance? type = some substitution) :
+    SchemeInstantiates scheme type := by
+  obtain ⟨quantifiedUnique, domainExact, applies⟩ :=
+    TypeSystem.Scheme.matchInstance?_sound matched
+  exact .intro substitution {
+    variables_nodup := quantifiedUnique
+    domain_permutation := by rw [domainExact]
+  } applies
+
 end SchemeInstantiates
 
 /-- A use-site-valid scheme instance.  Besides exact domain coverage, every
@@ -144,6 +158,22 @@ theorem toSchemeInstantiates
   cases instantiates with
   | intro _ substitution exact _ result =>
       exact .intro substitution exact result
+
+/-- A successful executable match becomes a use-site-valid instance once the
+scheme and every recovered replacement are admissible in that context. -/
+theorem of_matchInstance?
+    {context : Context} {scheme : TypeSystem.Scheme} {type : TypeSystem.Ty}
+    {substitution : TypeSystem.Substitution}
+    (schemeWellFormed : SchemeWellFormed context scheme)
+    (rangeAdmissible : SubstitutionRangeAdmissible context substitution)
+    (matched : scheme.matchInstance? type = some substitution) :
+    SchemeInstantiatesAt context scheme type := by
+  obtain ⟨quantifiedUnique, domainExact, applies⟩ :=
+    TypeSystem.Scheme.matchInstance?_sound matched
+  exact .intro schemeWellFormed substitution {
+    variables_nodup := quantifiedUnique
+    domain_permutation := by rw [domainExact]
+  } rangeAdmissible applies
 
 /-- Admissible flexible variables may occur in a monomorphic local while the
 initializer of an enclosing generalized binding is checked or while a body
