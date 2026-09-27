@@ -83,6 +83,24 @@ theorem refl {state : State} (solved : state.inference.Solved) :
   ⟨Nat.le_refl _, solved,
     TypeSystem.Substitution.SemanticallyExtends.refl_of_solved solved⟩
 
+/-- An unchanged substitution makes allocator growth into semantic inference
+progress whenever the input inference state is solved. -/
+theorem of_substitution_eq {before after : State}
+    (solved : before.inference.Solved)
+    (nextLe : before.inference.next ≤ after.inference.next)
+    (substitutionEq :
+      after.inference.substitution = before.inference.substitution) :
+    before.InferenceProgress after := by
+  constructor
+  · exact nextLe
+  · change after.inference.substitution.SolvedBelow after.inference.next
+    rw [substitutionEq]
+    exact solved.weaken nextLe
+  · change after.inference.substitution.SemanticallyExtends
+      before.inference.substitution
+    rw [substitutionEq]
+    exact TypeSystem.Substitution.SemanticallyExtends.refl_of_solved solved
+
 /-- Equality of the inference projections is enough to lift reflexive
 progress across a source-state-only update. -/
 theorem of_inference_eq {before after : State}
@@ -932,6 +950,19 @@ theorem markDirectCallRequirements (state : State)
 end InferenceProgress
 
 namespace InferenceReady
+
+/-- Semantic inference progress preserves readiness when the stable lexical
+binder environment is unchanged. -/
+theorem of_progress_of_binderEnvironment_eq {before after : State}
+    (ready : before.InferenceReady)
+    (progress : before.InferenceProgress after)
+    (binderEnvironmentEq :
+      after.binderEnvironment = before.binderEnvironment) :
+    after.InferenceReady := by
+  constructor
+  · exact progress.solved
+  · rw [binderEnvironmentEq]
+    exact ready.bindersBelow.weaken progress.next_le
 
 /-- A successfully looked-up binder in a ready state has a scheme body below
 the state's current flexible-variable allocator. -/
