@@ -52,6 +52,98 @@ private theorem list_eq_singleton_of_length_eq_one
       | nil => exact ⟨item, rfl⟩
       | cons second tail => simp at length_eq
 
+/-- Any expression node retained by an inference state is declaratively
+contained in every typed-source view of that state. -/
+theorem toTypedSource_containsExpression_of_mem
+    {state : Frontend.SourceInference.State} {node : ExpressionNode}
+    (member : Node.expression node ∈ state.nodes)
+    (roots : List NodeId := []) :
+    ContainsExpression (state.toTypedSource roots) node.id node := by
+  exact ⟨(by simpa [Frontend.SourceInference.State.toTypedSource] using member),
+    rfl⟩
+
+/-- Any statement node retained by an inference state is declaratively
+contained in every typed-source view of that state. -/
+theorem toTypedSource_containsStatement_of_mem
+    {state : Frontend.SourceInference.State} {node : StatementNode}
+    (member : Node.statement node ∈ state.nodes)
+    (roots : List NodeId := []) :
+    ContainsStatement (state.toTypedSource roots) node.id node := by
+  exact ⟨(by simpa [Frontend.SourceInference.State.toTypedSource] using member),
+    rfl⟩
+
+/-- Recording an expression node immediately materializes declarative
+expression containment. -/
+theorem recordNode_containsExpression
+    (state : Frontend.SourceInference.State) (node : ExpressionNode)
+    (roots : List NodeId := []) :
+    ContainsExpression
+      ((state.recordNode (.expression node)).toTypedSource roots)
+      node.id node := by
+  apply toTypedSource_containsExpression_of_mem
+  simp [Frontend.SourceInference.State.recordNode]
+
+/-- Recording a statement node immediately materializes declarative
+statement containment. -/
+theorem recordNode_containsStatement
+    (state : Frontend.SourceInference.State) (node : StatementNode)
+    (roots : List NodeId := []) :
+    ContainsStatement
+      ((state.recordNode (.statement node)).toTypedSource roots)
+      node.id node := by
+  apply toTypedSource_containsStatement_of_mem
+  simp [Frontend.SourceInference.State.recordNode]
+
+/-- The expression-recording helper materializes its exact payload as a
+declaratively contained expression node. -/
+theorem recordExpression_containsExpression
+    (source : Syntax.Expr) (expression : InferredExpression)
+    (form : ExpressionForm) (requirements : List RequirementId)
+    (coercions : List CoercionStep)
+    (state : Frontend.SourceInference.State) (roots : List NodeId := []) :
+    ContainsExpression
+      ((Detail.recordExpression source expression form requirements coercions
+        state).2.toTypedSource roots)
+      expression.id {
+        id := expression.id
+        span := source.span
+        type := expression.type
+        form
+        requirements
+        coercions
+      } := by
+  unfold Detail.recordExpression
+  exact recordNode_containsExpression state _ roots
+
+/-- Successful expected-type recording materializes the exact expression node
+returned by the frontend, leaving only its fitted coercion path existential. -/
+theorem recordExpressionWithExpected_success_containsExpression
+    {context : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {id : ExpressionId}
+    {type : TypeSystem.Ty} {form : ExpressionForm}
+    {requirements : List RequirementId}
+    {expected : Option TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (success : Detail.recordExpressionWithExpected context source id type form
+      requirements expected state = .ok result)
+    (roots : List NodeId := []) :
+    ∃ coercions,
+      ContainsExpression (result.2.toTypedSource roots) result.1.id {
+        id := result.1.id
+        span := source.span
+        type := result.1.type
+        form
+        requirements := requirements ++
+          Detail.coercionRequirements coercions
+        coercions
+      } := by
+  obtain ⟨fitted, _, resultExpression, resultState⟩ :=
+    Detail.recordExpressionWithExpected_success_record success
+  refine ⟨fitted.coercions, ?_⟩
+  rw [resultState, resultExpression]
+  exact recordNode_containsExpression fitted.state _ roots
+
 /-- The executable binary dispatch table agrees exactly with the declarative
 trait dispatch relation on every trait-backed spelling. -/
 theorem binaryOperatorDispatch_traitMethod

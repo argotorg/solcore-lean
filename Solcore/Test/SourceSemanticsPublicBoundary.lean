@@ -74,6 +74,18 @@ example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_evi
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_entails
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_retainedEvidenceValid
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.toTypedSource_containsExpression_of_mem
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.toTypedSource_containsStatement_of_mem
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordNode_containsExpression
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordNode_containsStatement
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpression_containsExpression
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_containsExpression
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.binaryOperatorDispatch_traitMethod
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.unaryOperatorDispatch_traitMethod
