@@ -96,6 +96,11 @@ inductive Error where
   | integerLiteralRequirementPredicateMismatch
       (expression : ExpressionId) (requirement : RequirementId)
       (expected actual : ProgramPredicate)
+  | nodeOwnerMismatch
+      (expected : Resolved.DeclarationId) (actual : OccurrenceId)
+  | duplicateOccurrence (occurrence : OccurrenceId)
+  | missingRoot (root : NodeId)
+  | missingChild (parent child : NodeId)
   | matchScrutineeArityMismatch (expected actual : Nat)
   | constructorNeedsExpectedType (name : String)
   | unknownConstructor (qualifiers : List String) (name : String)

@@ -23,6 +23,14 @@ example := @Solcore.SourceSemantics.ContainsExpression.of_nodes_prefix
 example := @Solcore.SourceSemantics.ContainsStatement.of_nodes_prefix
 example := @Solcore.SourceSemantics.NodeOccurrencesUnique
 example := @Solcore.SourceSemantics.OccurrenceGraphWellFormed
+example := @Solcore.SourceSemantics.RootsExist.contains_root
+example := @Solcore.SourceSemantics.RootsExist.expression_root_exists
+example := @Solcore.SourceSemantics.RootsExist.statement_root_exists
+example := @Solcore.SourceSemantics.rootsOwned_of_nodesOwned_of_rootsExist
+example :=
+  @Solcore.SourceSemantics.OccurrenceGraphWellFormed.expression_root_exists
+example :=
+  @Solcore.SourceSemantics.OccurrenceGraphWellFormed.statement_root_exists
 example := @Solcore.SourceSemantics.OccurrenceGraphClosed
 example := @Solcore.SourceSemantics.lookupExpression?_sound
 example := @Solcore.SourceSemantics.lookupExpression?_complete
@@ -85,6 +93,14 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpression_containsExpression
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_containsExpression
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_occurrenceGraphWellFormed
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_occurrenceGraphWellFormed
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_expression_root_exists
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_statement_root_exists
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_containsExpression_of_mem
 example :=

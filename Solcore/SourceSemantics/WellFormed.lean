@@ -113,6 +113,82 @@ structure OccurrenceGraphWellFormed (source : TypedSource) : Prop where
   rootsExist : RootsExist source
   childEdgesExist : ChildEdgesExist source
 
+namespace RootsExist
+
+/-- Every validated root has a concrete heterogeneous node in the source
+table at exactly the same category-preserving identity. -/
+theorem contains_root
+    {source : TypedSource} {root : NodeId}
+    (rootsExist : RootsExist source) (member : root ∈ source.roots) :
+    ∃ node, ContainsNode source root node := by
+  rcases List.mem_map.mp (rootsExist root member) with
+    ⟨node, nodeMember, nodeId⟩
+  exact ⟨node, nodeMember, nodeId⟩
+
+/-- An expression root names a concrete expression node, never a statement
+node with the same erased occurrence identity. -/
+theorem expression_root_exists
+    {source : TypedSource} {id : ExpressionId}
+    (rootsExist : RootsExist source)
+    (member : NodeId.expression id ∈ source.roots) :
+    ∃ node, ContainsExpression source id node := by
+  rcases rootsExist.contains_root member with ⟨node, nodeMember, nodeId⟩
+  cases node with
+  | expression expression =>
+      simp only [Node.id, NodeId.expression.injEq] at nodeId
+      exact ⟨expression, nodeMember, nodeId⟩
+  | statement statement =>
+      simp [Node.id] at nodeId
+
+/-- A statement root names a concrete statement node, never an expression
+node with the same erased occurrence identity. -/
+theorem statement_root_exists
+    {source : TypedSource} {id : StatementId}
+    (rootsExist : RootsExist source)
+    (member : NodeId.statement id ∈ source.roots) :
+    ∃ node, ContainsStatement source id node := by
+  rcases rootsExist.contains_root member with ⟨node, nodeMember, nodeId⟩
+  cases node with
+  | expression expression =>
+      simp [Node.id] at nodeId
+  | statement statement =>
+      simp only [Node.id, NodeId.statement.injEq] at nodeId
+      exact ⟨statement, nodeMember, nodeId⟩
+
+end RootsExist
+
+/-- Node ownership and exact root existence together imply root ownership. -/
+theorem rootsOwned_of_nodesOwned_of_rootsExist
+    {source : TypedSource}
+    (nodesOwned : NodesOwned source) (rootsExist : RootsExist source) :
+    RootsOwned source := by
+  intro root rootMember
+  rcases rootsExist.contains_root rootMember with
+    ⟨node, nodeMember, nodeId⟩
+  subst root
+  simpa [NodeIdOwnedBy, OccurrenceOwnedBy, Node.occurrenceId] using
+    nodesOwned node nodeMember
+
+namespace OccurrenceGraphWellFormed
+
+/-- Project concrete containment for an expression root from graph
+well-formedness. -/
+theorem expression_root_exists
+    {source : TypedSource} (wellFormed : OccurrenceGraphWellFormed source)
+    {id : ExpressionId} (member : NodeId.expression id ∈ source.roots) :
+    ∃ node, ContainsExpression source id node :=
+  wellFormed.rootsExist.expression_root_exists member
+
+/-- Project concrete containment for a statement root from graph
+well-formedness. -/
+theorem statement_root_exists
+    {source : TypedSource} (wellFormed : OccurrenceGraphWellFormed source)
+    {id : StatementId} (member : NodeId.statement id ∈ source.roots) :
+    ∃ node, ContainsStatement source id node :=
+  wellFormed.rootsExist.statement_root_exists member
+
+end OccurrenceGraphWellFormed
+
 private theorem expressionId_eq_of_occurrence_eq
     {left right : ExpressionId}
     (equal : left.occurrence = right.occurrence) : left = right := by

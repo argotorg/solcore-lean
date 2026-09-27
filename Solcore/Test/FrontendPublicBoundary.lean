@@ -512,6 +512,42 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_fresh
 example := @Solcore.Frontend.SourceInference.Detail.supportedIntegerTarget
 example :=
+  @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTableFrom
+example := @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTable
+example := @Solcore.Frontend.SourceInference.Detail.sourceContainsNodeId
+example := @Solcore.Frontend.SourceInference.Detail.validateSourceRootsFrom
+example := @Solcore.Frontend.SourceInference.Detail.validateSourceRoots
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceReferencesFrom
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceNodeChildren
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceChildrenFrom
+example := @Solcore.Frontend.SourceInference.Detail.validateSourceChildren
+example := @Solcore.Frontend.SourceInference.Detail.validateSourceGraph
+example :=
+  @Solcore.Frontend.SourceInference.Detail.sourceContainsNodeId_eq_true_iff
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTable_success_nodesOwned
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTable_success_nodeOccurrencesUnique
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceRoots_success_rootsExist
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceChildren_success_childEdgesExist
+example :=
+  @Solcore.Frontend.SourceInference.Detail.SourceGraphValidationWitness
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_witness
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_nodeOccurrencesUnique
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_nodesOwned
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_rootsExist
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_childEdgesExist
+example :=
   @Solcore.Frontend.SourceInference.Detail.supportedIntegerTarget_eq_true_iff
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateIntegerPatternTarget_success_supported
@@ -538,6 +574,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_success_witness
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceGraph
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateIntegerLiteralLedger
 example :=

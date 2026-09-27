@@ -144,6 +144,74 @@ theorem recordExpressionWithExpected_success_containsExpression
   rw [resultState, resultExpression]
   exact recordNode_containsExpression fitted.state _ roots
 
+/-- Successful executable graph validation establishes the complete initial
+declarative occurrence-graph well-formedness layer. -/
+theorem validateSourceGraph_success_occurrenceGraphWellFormed
+    {source : TypedSource}
+    (success : Detail.validateSourceGraph source = .ok ()) :
+    OccurrenceGraphWellFormed source := by
+  have unique :=
+    Detail.validateSourceGraph_success_nodeOccurrencesUnique success
+  have nodesOwned := Detail.validateSourceGraph_success_nodesOwned success
+  have rootsExist := Detail.validateSourceGraph_success_rootsExist success
+  have childEdges :=
+    Detail.validateSourceGraph_success_childEdgesExist success
+  refine {
+    nodeOccurrencesUnique := by
+      simpa [NodeOccurrencesUnique, nodeOccurrenceIds] using unique
+    nodesOwned := by
+      simpa [NodesOwned, OccurrenceOwnedBy] using nodesOwned
+    rootsOwned := rootsOwned_of_nodesOwned_of_rootsExist
+      (by simpa [NodesOwned, OccurrenceOwnedBy] using nodesOwned)
+      (by simpa [RootsExist, nodeIds] using rootsExist)
+    rootsExist := by
+      simpa [RootsExist, nodeIds] using rootsExist
+    childEdgesExist := by
+      simpa [ChildEdgesExist, nodeChildIds, nodeIds] using childEdges
+  }
+
+/-- Successful finalization emits a source whose occurrence table, roots, and
+direct child edges satisfy the declarative graph invariant. -/
+theorem finalize_occurrenceGraphWellFormed
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty} {state : Frontend.SourceInference.State}
+    {roots : List NodeId} {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    OccurrenceGraphWellFormed result.typedSource := by
+  have inputWellFormed :
+      OccurrenceGraphWellFormed (state.toTypedSource roots) :=
+    validateSourceGraph_success_occurrenceGraphWellFormed
+      (Detail.finalize_validateSourceGraph success)
+  rw [Detail.finalize_typedSource success]
+  exact FlexibleSubstitution.OccurrenceGraphWellFormed.applySubstitution
+    result.substitution inputWellFormed
+
+/-- Every expression entry root supplied to successful finalization has a
+concrete expression node in the emitted source. -/
+theorem finalize_expression_root_exists
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty} {state : Frontend.SourceInference.State}
+    {roots : List NodeId} {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result)
+    {id : ExpressionId} (member : NodeId.expression id ∈ roots) :
+    ∃ node, ContainsExpression result.typedSource id node := by
+  apply (finalize_occurrenceGraphWellFormed success).expression_root_exists
+  rw [Detail.finalize_typedSource success]
+  simpa [Frontend.SourceInference.State.toTypedSource] using member
+
+/-- Every statement entry root supplied to successful finalization has a
+concrete statement node in the emitted source. -/
+theorem finalize_statement_root_exists
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty} {state : Frontend.SourceInference.State}
+    {roots : List NodeId} {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result)
+    {id : StatementId} (member : NodeId.statement id ∈ roots) :
+    ∃ node, ContainsStatement result.typedSource id node := by
+  apply (finalize_occurrenceGraphWellFormed success).statement_root_exists
+  rw [Detail.finalize_typedSource success]
+  simpa [Frontend.SourceInference.State.toTypedSource] using member
+
 /-- Finalization transports every retained expression node into the emitted
 typed source under exactly the substitution returned to callers. -/
 theorem finalize_containsExpression_of_mem
@@ -2313,7 +2381,7 @@ theorem finalize_template_evidence
   intro row member template
   have initialTemplate : row.id ∈ state.localSchemeAssumptions :=
     (finalize_templateIdsAligned aligned success row.id).mp template
-  obtain ⟨patternState, finalState, requirements, _, patternResult,
+  obtain ⟨patternState, finalState, requirements, _, _, patternResult,
       literalResult, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have finalTemplate : row.id ∈ finalState.localSchemeAssumptions := by
@@ -2360,7 +2428,7 @@ theorem finalize_integerLiteralValid_of_mem
       (finalizedRequirementContext inferenceContext result)
       source
       (resolution.applySubstitution result.substitution) := by
-  obtain ⟨patternState, finalState, requirements, ledgerValidation,
+  obtain ⟨patternState, finalState, requirements, _, ledgerValidation,
       patternResult, literalResult, _, literalValidation,
       requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
@@ -2402,7 +2470,7 @@ theorem finalize_solvedRequirementsValid
     SolvedRequirementsValid
       (finalizedRequirementContext inferenceContext result)
       result.solvedRequirements := by
-  obtain ⟨patternState, finalState, requirements, _, patternResult,
+  obtain ⟨patternState, finalState, requirements, _, _, patternResult,
       literalResult, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have patternOrdinary : patternState.localSchemeAssumptions = [] := by

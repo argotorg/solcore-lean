@@ -13,6 +13,270 @@ namespace Solcore.Frontend.SourceInference.Detail
 
 open TypeSystem
 
+/-- Exact category-preserving table membership recognized by the executable
+source-node membership test. -/
+theorem sourceContainsNodeId_eq_true_iff
+    (source : TypedSource) (id : NodeId) :
+    sourceContainsNodeId source id = true ↔
+      ∃ node, node ∈ source.nodes ∧ node.id = id := by
+  simp [sourceContainsNodeId]
+
+private theorem occurrenceId_beq_iff_eq
+    (left right : OccurrenceId) :
+    (left == right) = true ↔ left = right := by
+  constructor
+  · intro accepted
+    cases left
+    cases right
+    delta instBEqOccurrenceId instBEqOccurrenceId.beq at accepted
+    obtain ⟨ownerEqual, indexEqual⟩ := Bool.and_eq_true_iff.mp accepted
+    cases beq_iff_eq.mp ownerEqual
+    cases beq_iff_eq.mp indexEqual
+    rfl
+  · rintro rfl
+    cases left
+    delta instBEqOccurrenceId instBEqOccurrenceId.beq
+    simp
+
+private theorem occurrenceId_contains_iff_mem
+    (ids : List OccurrenceId) (id : OccurrenceId) :
+    ids.contains id = true ↔ id ∈ ids := by
+  induction ids with
+  | nil => simp
+  | cons head tail induction =>
+      simp only [List.contains_cons, List.mem_cons]
+      rw [Bool.or_eq_true, occurrenceId_beq_iff_eq, induction]
+
+private theorem validateOccurrenceTableFrom_success
+    {owner : Resolved.DeclarationId} {seen : List OccurrenceId}
+    {nodes : List Node}
+    (success : validateOccurrenceTableFrom owner seen nodes = .ok ()) :
+    (∀ node, node ∈ nodes → node.occurrenceId.owner = owner) ∧
+      (nodes.map Node.occurrenceId).Nodup ∧
+      ∀ occurrence, occurrence ∈ nodes.map Node.occurrenceId →
+        occurrence ∉ seen := by
+  induction nodes generalizing seen with
+  | nil => simp
+  | cons node rest induction =>
+      cases ownerMismatch : node.occurrenceId.owner != owner with
+      | true =>
+          simp [validateOccurrenceTableFrom, ownerMismatch, bind, Except.bind]
+            at success
+      | false =>
+        have ownerEq : node.occurrenceId.owner = owner := by
+          simpa using ownerMismatch
+        cases duplicate : seen.contains node.occurrenceId with
+        | true =>
+            simp [validateOccurrenceTableFrom, ownerMismatch, duplicate,
+              bind, Except.bind] at success
+        | false =>
+          have seenFresh : node.occurrenceId ∉ seen := by
+            intro member
+            have contained : seen.contains node.occurrenceId = true :=
+              (occurrenceId_contains_iff_mem seen node.occurrenceId).mpr member
+            rw [duplicate] at contained
+            simp at contained
+          have tailSuccess :
+              validateOccurrenceTableFrom owner
+                (node.occurrenceId :: seen) rest = .ok () := by
+            simpa [validateOccurrenceTableFrom, ownerMismatch, duplicate,
+              bind, Except.bind] using success
+          obtain ⟨tailOwned, tailUnique, tailFresh⟩ := induction tailSuccess
+          refine ⟨?_, ?_, ?_⟩
+          · intro candidate member
+            rcases List.mem_cons.mp member with rfl | tailMember
+            · exact ownerEq
+            · exact tailOwned candidate tailMember
+          · simp only [List.map_cons, List.nodup_cons]
+            refine ⟨?_, tailUnique⟩
+            intro tailMember
+            exact tailFresh node.occurrenceId tailMember (by simp)
+          · intro occurrence member occurrenceSeen
+            simp only [List.map_cons, List.mem_cons] at member
+            rcases member with headEq | tailMember
+            · subst occurrence
+              exact seenFresh occurrenceSeen
+            · exact tailFresh occurrence tailMember (by simp [occurrenceSeen])
+
+/-- Successful occurrence-table validation proves declaration ownership for
+every node retained by the table. -/
+theorem validateOccurrenceTable_success_nodesOwned
+    {source : TypedSource}
+    (success : validateOccurrenceTable source = .ok ()) :
+    ∀ node, node ∈ source.nodes →
+      node.occurrenceId.owner = source.owner := by
+  exact (validateOccurrenceTableFrom_success success).1
+
+/-- Successful occurrence-table validation proves global uniqueness after
+erasing the expression/statement category. -/
+theorem validateOccurrenceTable_success_nodeOccurrencesUnique
+    {source : TypedSource}
+    (success : validateOccurrenceTable source = .ok ()) :
+    (source.nodes.map Node.occurrenceId).Nodup := by
+  exact (validateOccurrenceTableFrom_success success).2.1
+
+private theorem validateSourceRootsFrom_success
+    {source : TypedSource} {roots : List NodeId}
+    (success : validateSourceRootsFrom source roots = .ok ()) :
+    ∀ root, root ∈ roots → root ∈ source.nodes.map Node.id := by
+  induction roots with
+  | nil => simp
+  | cons head tail induction =>
+      cases contained : sourceContainsNodeId source head with
+      | false =>
+          simp [validateSourceRootsFrom, contained, bind, Except.bind] at success
+      | true =>
+          have tailSuccess : validateSourceRootsFrom source tail = .ok () := by
+            simpa [validateSourceRootsFrom, contained, bind, Except.bind]
+              using success
+          intro root member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · obtain ⟨node, nodeMem, nodeId⟩ :=
+              (sourceContainsNodeId_eq_true_iff source root).mp contained
+            exact List.mem_map.mpr ⟨node, nodeMem, nodeId⟩
+          · exact induction tailSuccess root tailMember
+
+/-- Successful root validation proves exact category-preserving existence of
+every retained root in the source table. -/
+theorem validateSourceRoots_success_rootsExist
+    {source : TypedSource}
+    (success : validateSourceRoots source = .ok ()) :
+    ∀ root, root ∈ source.roots → root ∈ source.nodes.map Node.id := by
+  exact validateSourceRootsFrom_success success
+
+private theorem validateSourceReferencesFrom_success
+    {source : TypedSource} {parent : NodeId} {children : List NodeId}
+    (success :
+      validateSourceReferencesFrom source parent children = .ok ()) :
+    ∀ child, child ∈ children → child ∈ source.nodes.map Node.id := by
+  induction children with
+  | nil => simp
+  | cons head tail induction =>
+      cases contained : sourceContainsNodeId source head with
+      | false =>
+          simp [validateSourceReferencesFrom, contained, bind, Except.bind]
+            at success
+      | true =>
+          have tailSuccess :
+              validateSourceReferencesFrom source parent tail = .ok () := by
+            simpa [validateSourceReferencesFrom, contained, bind, Except.bind]
+              using success
+          intro child member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · obtain ⟨node, nodeMem, nodeId⟩ :=
+              (sourceContainsNodeId_eq_true_iff source child).mp contained
+            exact List.mem_map.mpr ⟨node, nodeMem, nodeId⟩
+          · exact induction tailSuccess child tailMember
+
+private theorem validateSourceNodeChildren_success
+    {source : TypedSource} {node : Node}
+    (success : validateSourceNodeChildren source node = .ok ()) :
+    ∀ child, child ∈ node.references →
+      child ∈ source.nodes.map Node.id := by
+  exact validateSourceReferencesFrom_success success
+
+private theorem validateSourceChildrenFrom_success
+    {source : TypedSource} {nodes : List Node}
+    (success : validateSourceChildrenFrom source nodes = .ok ()) :
+    ∀ node, node ∈ nodes → ∀ child, child ∈ node.references →
+      child ∈ source.nodes.map Node.id := by
+  induction nodes with
+  | nil => simp
+  | cons head tail induction =>
+      cases headResult : validateSourceNodeChildren source head with
+      | error error =>
+          simp [validateSourceChildrenFrom, headResult, bind, Except.bind]
+            at success
+      | ok value =>
+          cases value
+          have tailSuccess : validateSourceChildrenFrom source tail = .ok () := by
+            simpa [validateSourceChildrenFrom, headResult, bind, Except.bind]
+              using success
+          intro node member child childMember
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · exact validateSourceNodeChildren_success headResult child childMember
+          · exact induction tailSuccess node tailMember child childMember
+
+/-- Successful child validation proves exact category-preserving existence of
+every direct source edge. -/
+theorem validateSourceChildren_success_childEdgesExist
+    {source : TypedSource}
+    (success : validateSourceChildren source = .ok ()) :
+    ∀ node, node ∈ source.nodes →
+      ∀ child, child ∈ node.references →
+        child ∈ source.nodes.map Node.id := by
+  exact validateSourceChildrenFrom_success success
+
+/-- Successful graph validation exposes the successful result of each
+structural validation stage. -/
+structure SourceGraphValidationWitness (source : TypedSource) : Prop where
+  occurrenceTable : validateOccurrenceTable source = .ok ()
+  roots : validateSourceRoots source = .ok ()
+  children : validateSourceChildren source = .ok ()
+
+theorem validateSourceGraph_success_witness
+    {source : TypedSource}
+    (success : validateSourceGraph source = .ok ()) :
+    SourceGraphValidationWitness source := by
+  unfold validateSourceGraph at success
+  cases occurrenceResult : validateOccurrenceTable source with
+  | error error => simp [occurrenceResult, bind, Except.bind] at success
+  | ok occurrenceValue =>
+      cases occurrenceValue
+      cases rootsResult : validateSourceRoots source with
+      | error error =>
+          simp [occurrenceResult, rootsResult, bind, Except.bind] at success
+      | ok rootsValue =>
+          cases rootsValue
+          cases childrenResult : validateSourceChildren source with
+          | error error =>
+              simp [occurrenceResult, rootsResult, childrenResult, bind,
+                Except.bind] at success
+          | ok childrenValue =>
+              cases childrenValue
+              exact {
+                occurrenceTable := occurrenceResult
+                roots := rootsResult
+                children := childrenResult
+              }
+
+/-- Successful complete graph validation proves category-erased occurrence
+uniqueness. -/
+theorem validateSourceGraph_success_nodeOccurrencesUnique
+    {source : TypedSource}
+    (success : validateSourceGraph source = .ok ()) :
+    (source.nodes.map Node.occurrenceId).Nodup := by
+  exact validateOccurrenceTable_success_nodeOccurrencesUnique
+    (validateSourceGraph_success_witness success).occurrenceTable
+
+/-- Successful complete graph validation proves ownership of every node. -/
+theorem validateSourceGraph_success_nodesOwned
+    {source : TypedSource}
+    (success : validateSourceGraph source = .ok ()) :
+    ∀ node, node ∈ source.nodes →
+      node.occurrenceId.owner = source.owner := by
+  exact validateOccurrenceTable_success_nodesOwned
+    (validateSourceGraph_success_witness success).occurrenceTable
+
+/-- Successful complete graph validation proves exact root existence. -/
+theorem validateSourceGraph_success_rootsExist
+    {source : TypedSource}
+    (success : validateSourceGraph source = .ok ()) :
+    ∀ root, root ∈ source.roots → root ∈ source.nodes.map Node.id := by
+  exact validateSourceRoots_success_rootsExist
+    (validateSourceGraph_success_witness success).roots
+
+/-- Successful complete graph validation proves exact direct-child
+existence. -/
+theorem validateSourceGraph_success_childEdgesExist
+    {source : TypedSource}
+    (success : validateSourceGraph source = .ok ()) :
+    ∀ node, node ∈ source.nodes →
+      ∀ child, child ∈ node.references →
+        child ∈ source.nodes.map Node.id := by
+  exact validateSourceChildren_success_childEdgesExist
+    (validateSourceGraph_success_witness success).children
+
 @[simp] theorem supportedIntegerTarget_eq_true_iff
     (type : Ty) :
     supportedIntegerTarget type = true ↔
@@ -679,6 +943,8 @@ structure FinalizeSuccessWitness
   patternState : State
   finalState : State
   solvedRequirements : List SolvedRequirement
+  graphValidation :
+    validateSourceGraph (state.toTypedSource roots) = .ok ()
   ledgerValidation : validateIntegerLiteralLedger state = .ok ()
   patternDefault :
     defaultIntegerPatternTargets state.integerPatterns state =
@@ -711,56 +977,69 @@ def finalize_success_witness
     (success : finalize context type state roots = .ok result) :
     FinalizeSuccessWitness context type state roots result := by
   unfold finalize at success
+  have graphValidation :
+      validateSourceGraph (state.toTypedSource roots) = .ok () := by
+    cases graphResult : validateSourceGraph (state.toTypedSource roots) with
+    | error error =>
+        simp [graphResult, bind, Except.bind] at success
+    | ok graphValue =>
+        cases graphValue
+        simp at graphResult ⊢
   cases ledgerResult : validateIntegerLiteralLedger state with
   | error error =>
-      simp [ledgerResult, bind, Except.bind] at success
+      simp [graphValidation, ledgerResult, bind, Except.bind] at success
   | ok ledgerValue =>
       cases ledgerValue
       cases patternResult :
           defaultIntegerPatternTargets state.integerPatterns state with
       | error error =>
-          simp [ledgerResult, patternResult, bind, Except.bind] at success
+          simp [graphValidation, ledgerResult, patternResult, bind,
+            Except.bind] at success
       | ok patternState =>
           cases literalResult :
               defaultIntegerLiteralTargets patternState.integerLiterals
                 patternState with
           | error error =>
-              simp [ledgerResult, patternResult, literalResult, bind,
-                Except.bind] at success
+              simp [graphValidation, ledgerResult, patternResult,
+                literalResult, bind, Except.bind] at success
           | ok finalState =>
               cases patternValidationResult :
                   validateIntegerPatternTargets finalState
                     finalState.integerPatterns with
               | error error =>
-                  simp [ledgerResult, patternResult, literalResult,
-                    patternValidationResult, bind, Except.bind] at success
+                  simp [graphValidation, ledgerResult, patternResult,
+                    literalResult, patternValidationResult, bind,
+                    Except.bind] at success
               | ok patternValidation =>
                   cases patternValidation
                   cases literalValidationResult :
                       validateIntegerLiteralTargets finalState
                         finalState.integerLiterals with
                   | error error =>
-                      simp [ledgerResult, patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        bind, Except.bind] at success
+                      simp [graphValidation, ledgerResult, patternResult,
+                        literalResult, patternValidationResult,
+                        literalValidationResult, bind, Except.bind] at success
                   | ok literalValidation =>
                       cases literalValidation
                       cases requirementsResult :
                           solveRequirements context finalState
                             finalState.requirements with
                       | error error =>
-                          simp [ledgerResult, patternResult, literalResult,
-                            patternValidationResult, literalValidationResult,
-                            requirementsResult, bind, Except.bind] at success
+                          simp [graphValidation, ledgerResult, patternResult,
+                            literalResult, patternValidationResult,
+                            literalValidationResult, requirementsResult, bind,
+                            Except.bind] at success
                       | ok requirements =>
-                          simp [ledgerResult, patternResult, literalResult,
-                            patternValidationResult, literalValidationResult,
-                            requirementsResult, bind, Except.bind] at success
+                          simp [graphValidation, ledgerResult, patternResult,
+                            literalResult, patternValidationResult,
+                            literalValidationResult, requirementsResult, bind,
+                            Except.bind] at success
                           cases success
                           exact {
                             patternState
                             finalState
                             solvedRequirements := requirements
+                            graphValidation
                             ledgerValidation := ledgerResult
                             patternDefault := patternResult
                             literalDefault := literalResult
@@ -769,6 +1048,15 @@ def finalize_success_witness
                             requirementsSolved := requirementsResult
                             result_eq := rfl
                           }
+
+/-- Successful finalization includes successful structural validation of its
+input typed-source graph. -/
+theorem finalize_validateSourceGraph
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    validateSourceGraph (state.toTypedSource roots) = .ok () := by
+  exact (finalize_success_witness success).graphValidation
 
 /-- Successful finalization includes successful validation of its input
 integer-literal ledger. -/
@@ -798,7 +1086,7 @@ theorem finalize_integerPatternTarget_supported
     ∀ origin, origin ∈ state.integerPatterns →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
-  obtain ⟨patternState, finalState, _, _, patternResult, literalResult,
+  obtain ⟨patternState, finalState, _, _, _, patternResult, literalResult,
       patternValidation, _, _, resultEq⟩ := finalize_success_witness success
   have patternOrigins :=
     defaultIntegerPatternTargets_integerPatterns patternResult
@@ -823,7 +1111,7 @@ theorem finalize_integerLiteralTarget_supported
     ∀ origin, origin ∈ state.integerLiterals →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
-  obtain ⟨patternState, finalState, _, _, patternResult, literalResult, _,
+  obtain ⟨patternState, finalState, _, _, _, patternResult, literalResult, _,
       literalValidation, _, resultEq⟩ := finalize_success_witness success
   have patternOrigins :=
     defaultIntegerPatternTargets_integerLiterals patternResult
@@ -848,7 +1136,7 @@ theorem finalize_preserves_resolve_eq
     (equal : state.resolve left = state.resolve right)
     (success : finalize context type state roots = .ok result) :
     result.substitution.apply left = result.substitution.apply right := by
-  obtain ⟨patternState, finalState, _, _, patternResult, literalResult,
+  obtain ⟨patternState, finalState, _, _, _, patternResult, literalResult,
       _, _, _, resultEq⟩ := finalize_success_witness success
   have patternEqual :=
     defaultIntegerPatternTargets_preserves_resolve_eq equal patternResult
@@ -894,7 +1182,7 @@ theorem finalize_type
     {result : Result}
     (success : finalize context type state roots = .ok result) :
     result.type = result.substitution.apply type := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, resultEq⟩ :=
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, resultEq⟩ :=
     finalize_success_witness success
   subst result
   rfl
@@ -907,7 +1195,7 @@ theorem finalize_typedSource
     (success : finalize context type state roots = .ok result) :
     result.typedSource =
       (state.toTypedSource roots).applySubstitution result.substitution := by
-  obtain ⟨patternState, _, _, _, patternResult, literalResult, _, _, _,
+  obtain ⟨patternState, _, _, _, _, patternResult, literalResult, _, _, _,
       resultEq⟩ := finalize_success_witness success
   subst result
   rw [defaultIntegerLiteralTargets_toTypedSource literalResult,

@@ -562,6 +562,145 @@ private def testIntegerLiteralLedgerValidation : IO Unit := do
   | .ok () => throw (IO.userError
       "an integer-literal node with an inconsistent value passed validation")
 
+private def graphValidationOccurrence (index : Nat) :
+    SourceInference.OccurrenceId :=
+  ⟨solverRegressionOwner, index⟩
+
+private def graphValidationExpression (index : Nat) :
+    SourceInference.ExpressionId :=
+  ⟨graphValidationOccurrence index⟩
+
+private def graphValidationStatement (index : Nat) :
+    SourceInference.StatementId :=
+  ⟨graphValidationOccurrence index⟩
+
+private def graphValidationExpressionNode (index : Nat)
+    (form : SourceInference.ExpressionForm) :
+    SourceInference.ExpressionNode := {
+  id := graphValidationExpression index
+  span := solverRegressionSpan
+  type := .word
+  form
+}
+
+private def graphValidationStatementNode (index : Nat)
+    (form : SourceInference.StatementForm) :
+    SourceInference.StatementNode := {
+  id := graphValidationStatement index
+  span := solverRegressionSpan
+  type := .word
+  form
+}
+
+private def validSourceGraph : SourceInference.TypedSource := {
+  owner := solverRegressionOwner
+  inputs := []
+  roots := [.expression (graphValidationExpression 1)]
+  nodes := [
+    .expression (graphValidationExpressionNode 0 (.literal (.decimal "0"))),
+    .expression (graphValidationExpressionNode 1
+      (.group (graphValidationExpression 0)))
+  ]
+}
+
+/-- The finalization boundary rejects malformed occurrence graphs before
+exposing them to semantic consumers.  Duplicate detection deliberately erases
+node category, while root and child lookup preserve it. -/
+private def testSourceGraphValidation : IO Unit := do
+  match SourceInference.Detail.validateSourceGraph validSourceGraph with
+  | .ok () => pure ()
+  | .error error => throw (IO.userError
+      s!"a valid typed-source graph produced {reprStr error}")
+
+  let foreignOwner : Resolved.DeclarationId :=
+    { solverRegressionOwner with declarationIndex := 1 }
+  let foreignOccurrence : SourceInference.OccurrenceId := ⟨foreignOwner, 0⟩
+  let foreignExpression : SourceInference.ExpressionId := ⟨foreignOccurrence⟩
+  let foreignNode : SourceInference.ExpressionNode := {
+    graphValidationExpressionNode 0 (.literal (.decimal "0")) with
+    id := foreignExpression
+  }
+  let ownerMismatch := {
+    validSourceGraph with
+    roots := []
+    nodes := [.expression foreignNode]
+  }
+  match SourceInference.Detail.validateSourceGraph ownerMismatch with
+  | .error (.nodeOwnerMismatch expected actual) =>
+      assertTrue (expected == solverRegressionOwner &&
+          actual == foreignOccurrence)
+        "node-owner mismatch lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"node-owner mismatch produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      "a foreign-owner source node passed graph validation")
+
+  let duplicateOccurrence := graphValidationOccurrence 0
+  let crossCategoryDuplicate := {
+    validSourceGraph with
+    roots := []
+    nodes := [
+      .expression (graphValidationExpressionNode 0 (.literal (.decimal "0"))),
+      .statement (graphValidationStatementNode 0 .continueStmt)
+    ]
+  }
+  match SourceInference.Detail.validateSourceGraph crossCategoryDuplicate with
+  | .error (.duplicateOccurrence occurrence) =>
+      assertTrue (occurrence == duplicateOccurrence)
+        "cross-category duplicate occurrence lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"cross-category duplicate occurrence produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      "expression and statement nodes shared one occurrence")
+
+  let wrongCategoryRoot : SourceInference.NodeId :=
+    .statement (graphValidationStatement 1)
+  let missingRoot := { validSourceGraph with roots := [wrongCategoryRoot] }
+  match SourceInference.Detail.validateSourceGraph missingRoot with
+  | .error (.missingRoot root) =>
+      assertTrue (root == wrongCategoryRoot)
+        "wrong-category root lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"wrong-category root produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      "a statement root resolved to an expression at the same occurrence")
+
+  let parentId : SourceInference.NodeId :=
+    .expression (graphValidationExpression 1)
+  let missingChildId : SourceInference.NodeId :=
+    .expression (graphValidationExpression 0)
+  let wrongCategoryChild := {
+    validSourceGraph with
+    nodes := [
+      .statement (graphValidationStatementNode 0 .continueStmt),
+      .expression (graphValidationExpressionNode 1
+        (.group (graphValidationExpression 0)))
+    ]
+  }
+  match SourceInference.Detail.validateSourceGraph wrongCategoryChild with
+  | .error (.missingChild parent child) =>
+      assertTrue (parent == parentId && child == missingChildId)
+        "wrong-category child edge lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"wrong-category child edge produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      "an expression edge resolved to a statement at the same occurrence")
+
+  let finalizationState : SourceInference.State := {
+    SourceInference.State.initial solverRegressionOwner with
+    nextOccurrence := 2
+    nodes := validSourceGraph.nodes
+  }
+  match SourceInference.Detail.finalize solverRegressionContext .word
+      finalizationState [wrongCategoryRoot] with
+  | .error (.missingRoot root) =>
+      assertTrue (root == wrongCategoryRoot)
+        "finalization lost its graph-validation diagnostic"
+  | .error error => throw (IO.userError
+      s!"finalization returned the wrong graph error: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "finalization accepted a wrong-category root")
+
 private def testClosedUnsupportedIntegerPatternTarget : IO Unit := do
   let metavariable : TypeSystem.TypeVarId := ⟨0⟩
   let origin : SourceInference.IntegerPatternOrigin := {
@@ -1358,6 +1497,7 @@ def testSourceInference : IO Unit := do
   testIntegerLiteralExpectedType
   testClosedUnsupportedIntegerLiteralTarget
   testIntegerLiteralLedgerValidation
+  testSourceGraphValidation
   testClosedUnsupportedIntegerPatternTarget
   testSourceNamedLiteralTraitsDoNotAuthorize
   testUnconstrainedIntegerLiteralDefaultsToWord

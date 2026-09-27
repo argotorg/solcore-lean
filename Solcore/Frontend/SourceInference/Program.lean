@@ -10,6 +10,74 @@ open TypeSystem
 
 namespace Detail
 
+/-- Validate declaration ownership and category-erased occurrence uniqueness
+while accumulating the occurrences already present in the node table. -/
+def validateOccurrenceTableFrom (owner : Resolved.DeclarationId) :
+    List OccurrenceId → List Node → Except Error Unit
+  | _, [] => .ok ()
+  | seen, node :: rest => do
+      let occurrence := node.occurrenceId
+      if occurrence.owner != owner then
+        throw (.nodeOwnerMismatch owner occurrence)
+      if seen.contains occurrence then
+        throw (.duplicateOccurrence occurrence)
+      validateOccurrenceTableFrom owner (occurrence :: seen) rest
+
+/-- Validate the declaration ownership and global occurrence uniqueness of a
+typed source's heterogeneous node table. -/
+def validateOccurrenceTable (source : TypedSource) : Except Error Unit :=
+  validateOccurrenceTableFrom source.owner [] source.nodes
+
+/-- Whether the table contains a node at the exact category-preserving ID. -/
+def sourceContainsNodeId (source : TypedSource) (id : NodeId) : Bool :=
+  source.nodes.any fun node => decide (node.id = id)
+
+/-- Validate exact category-preserving existence for a list of source roots. -/
+def validateSourceRootsFrom (source : TypedSource) :
+    List NodeId → Except Error Unit
+  | [] => .ok ()
+  | root :: rest => do
+      unless sourceContainsNodeId source root do
+        throw (.missingRoot root)
+      validateSourceRootsFrom source rest
+
+/-- Validate every root retained by a typed source. -/
+def validateSourceRoots (source : TypedSource) : Except Error Unit :=
+  validateSourceRootsFrom source source.roots
+
+/-- Validate exact category-preserving existence for one node's child edges. -/
+def validateSourceReferencesFrom (source : TypedSource) (parent : NodeId) :
+    List NodeId → Except Error Unit
+  | [] => .ok ()
+  | child :: rest => do
+      unless sourceContainsNodeId source child do
+        throw (.missingChild parent child)
+      validateSourceReferencesFrom source parent rest
+
+/-- Validate all direct child edges retained by one source node. -/
+def validateSourceNodeChildren (source : TypedSource)
+    (node : Node) : Except Error Unit :=
+  validateSourceReferencesFrom source node.id node.references
+
+/-- Validate child edges for a list of source-table nodes. -/
+def validateSourceChildrenFrom (source : TypedSource) :
+    List Node → Except Error Unit
+  | [] => .ok ()
+  | node :: rest => do
+      validateSourceNodeChildren source node
+      validateSourceChildrenFrom source rest
+
+/-- Validate every direct child edge retained by a typed source. -/
+def validateSourceChildren (source : TypedSource) : Except Error Unit :=
+  validateSourceChildrenFrom source source.nodes
+
+/-- Reject malformed occurrence tables and dangling graph entry/child edges
+before finalization exposes the typed source to semantic consumers. -/
+def validateSourceGraph (source : TypedSource) : Except Error Unit := do
+  validateOccurrenceTable source
+  validateSourceRoots source
+  validateSourceChildren source
+
 def defaultIntegerPatternTarget (state : State)
     (origin : IntegerPatternOrigin) : Except Error State :=
   match state.resolve (.variable origin.metavariable) with
@@ -116,6 +184,7 @@ def validateIntegerLiteralLedger (state : State) : Except Error Unit :=
 def finalize (context : Context) (type : Ty) (state : State)
     (roots : List NodeId) :
     Except Error Result := do
+  validateSourceGraph (state.toTypedSource roots)
   validateIntegerLiteralLedger state
   let state ← defaultIntegerPatternTargets state.integerPatterns state
   let state ← defaultIntegerLiteralTargets state.integerLiterals state
