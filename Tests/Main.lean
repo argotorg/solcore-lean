@@ -10,6 +10,7 @@ import Solcore.Test.SourceSemanticsGeneralizedClosure
 import Solcore.Test.SourceSemanticsGeneralizedClosureTyping
 import Solcore.Test.SourceSemanticsExecution
 import Solcore.Test.SourceSemanticsPublicBoundary
+import Solcore.Test.SourceSemanticsStaticValidation
 import Solcore.Test.ResolvedPublicBoundary
 import Solcore.Test.ResolvedLocalSemantics
 import Solcore.Test.ResolvedIdentityRenamingProperties

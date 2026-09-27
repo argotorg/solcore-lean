@@ -19,6 +19,7 @@ import Solcore.SourceSemantics.Places
 import Solcore.SourceSemantics.Ownership
 import Solcore.SourceSemantics.Control
 import Solcore.SourceSemantics.Static
+import Solcore.SourceSemantics.StaticValidation
 import Solcore.SourceSemantics.Program
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 import Solcore.SourceSemantics.SubstitutionProperties
