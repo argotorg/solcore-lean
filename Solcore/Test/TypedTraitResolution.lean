@@ -213,6 +213,40 @@ private def successfulResolution : Bool :=
   | .success evidence => evidenceMatches evidence
   | _ => false
 
+private def expectedResolutionEvidence : Evidence :=
+  .byImpl (showPredicate (box .word)) showBoxImpl
+    [.byImpl (equality .word) equalityWordImpl []]
+
+private def expectedSemanticEvidence :
+    Solcore.SourceSemantics.TraitEvidence :=
+  .implementation (showPredicate (box .word)) showBoxImpl
+    [.implementation (equality .word) equalityWordImpl []]
+
+/-- Typed resolution retains the exact outer and nested implementation
+identities after instantiating the generic where predicate. -/
+theorem nestedResolution_exact :
+    (resolve [equalityWordRule, showBoxRule] 2
+      (showPredicate (box .word))).outcome =
+        .success expectedResolutionEvidence := by
+  rfl
+
+/-- The generic resolver-to-source-semantics bridge validates the same nested
+evidence tree, including both selected implementation identities. -/
+theorem nestedResolution_evidenceValid :
+    Solcore.SourceSemantics.EvidenceValid []
+      [equalityWordRule, showBoxRule] (showPredicate (box .word))
+      expectedSemanticEvidence := by
+  obtain ⟨semantic, represents, valid⟩ :=
+    Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_evidenceValid
+      nestedResolution_exact
+  have expectedRep :
+      Solcore.SourceSemantics.ImplementationEvidenceRepresents
+        expectedResolutionEvidence expectedSemanticEvidence := by
+    exact .byImpl (.cons (.byImpl .nil) .nil)
+  have semanticEq : semantic = expectedSemanticEvidence :=
+    represents.functional expectedRep
+  simpa [semanticEq] using valid
+
 private def rejectedArgumentMismatch : Bool :=
   match (resolve [convertSameRule] 1 (convert .word .bool)).outcome with
   | .noSolution => true

@@ -62,6 +62,11 @@ example := @Solcore.SourceSemantics.TraitResolutionSoundness.toImplSubstitution
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.toImplSubstitution_applyType
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.toImplSubstitution_applyPredicate
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.matchImplHead?_sound
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolutionEvidenceValid_sound
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolutionPremisesValid_sound
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_evidenceValid
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_entails
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_retainedEvidenceValid
 
 example := @Solcore.SourceSemantics.ReferenceHasRawType
 example := @Solcore.SourceSemantics.ReferenceHasRawType.local_iff
