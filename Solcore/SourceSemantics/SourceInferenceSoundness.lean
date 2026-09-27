@@ -1302,6 +1302,51 @@ theorem solveRequirements_correspondingSequenceProves
           predicateEq, valid row rowMember⟩
       · exact induction
 
+/-- Decoding, final carrier closure, exact ledger ownership, and solver
+soundness compose into the declarative validity judgment for one inferred
+integer literal. -/
+theorem integerLiteralValid_of_solved
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (decoded : Frontend.numericLiteralValue? source = some resolution.rawValue)
+    (target_supported :
+      (resolution.applySubstitution state.inference.substitution).targetType =
+          .word ∨
+        (resolution.applySubstitution state.inference.substitution).targetType =
+          .integer)
+    (requirement_mem :
+      ({ id := resolution.requirement, predicate := resolution.predicate } :
+        Requirement) ∈ state.requirements)
+    (solve_success : Detail.solveRequirements inferenceContext state
+      state.requirements = .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    IntegerLiteralValid semanticContext source
+      (resolution.applySubstitution state.inference.substitution) := by
+  have proves : RequirementSequenceProves semanticContext
+      [resolution.requirement] [Detail.applyPredicate state
+        resolution.predicate] :=
+    solveRequirements_correspondingSequenceProves
+      (.cons requirement_mem .nil) solve_success solved_eq valid
+  have evidence : RequirementProves semanticContext
+      (resolution.applySubstitution state.inference.substitution).requirement
+      (resolution.applySubstitution state.inference.substitution).predicate := by
+    rw [IntegerLiteralResolution.applySubstitution_requirement,
+      IntegerLiteralResolution.applySubstitution_predicate]
+    simpa [Detail.applyPredicate] using proves.head
+  have meaning : Frontend.NumericLiteralDenotes source
+      (resolution.applySubstitution state.inference.substitution).rawValue := by
+    simpa using Frontend.numericLiteralValue?_sound decoded
+  rcases target_supported with target_eq | target_eq
+  · exact .word meaning target_eq
+      (by simpa [IntegerLiteralResolution.predicate] using evidence)
+  · exact .integer meaning target_eq
+      (by simpa [IntegerLiteralResolution.predicate] using evidence)
+
 /-- A validated unary trait profile and its source-ordered rows in the final
 solved ledger assemble the declarative unary-operator judgment after applying
 the final inference substitution. -/

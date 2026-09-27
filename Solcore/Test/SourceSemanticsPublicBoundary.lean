@@ -137,6 +137,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_correspondingSequenceProves
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.integerLiteralValid_of_solved
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_committedCoercionStepSequenceProves
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.committedCoercionStepValid
