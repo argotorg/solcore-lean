@@ -1206,6 +1206,7 @@ import Solcore.Test.ProgramSignatures
 import Solcore.Test.ExecutableImplMethods
 import Solcore.Test.SourceInference
 import Solcore.Test.SourceInferenceLocalIdentityValidation
+import Solcore.Test.SourceInferenceRequirementOwnershipValidation
 import Solcore.Test.SourcePhase7Inference
 import Solcore.Test.SourceConstructorVisibility
 import Solcore.Test.SourceCoercionRanking
@@ -2051,6 +2052,7 @@ def staticSemanticsSpineTests : IO Unit := do
   ExecutableImplMethods.testExecutableImplMethods
   SourceInference.testSourceInference
   SourceInferenceLocalIdentityValidation.testSourceInferenceLocalIdentityValidation
+  SourceInferenceRequirementOwnershipValidation.testSourceInferenceRequirementOwnershipValidation
   SourcePhase7Inference.testSourcePhase7Inference
   testSourceConstructorVisibility
   SourceCoercionRanking.testSourceCoercionRanking

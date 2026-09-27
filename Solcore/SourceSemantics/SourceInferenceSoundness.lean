@@ -2540,8 +2540,8 @@ theorem finalize_template_evidence
   intro row member template
   have initialTemplate : row.id ∈ state.localSchemeAssumptions :=
     (finalize_templateIdsAligned aligned success row.id).mp template
-  obtain ⟨patternState, finalState, requirements, _, _, patternResult,
-      literalResult, _, _, requirementsResult, resultEq⟩ :=
+  obtain ⟨patternState, finalState, requirements, _, _, _, patternResult,
+      literalResult, _, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have finalTemplate : row.id ∈ finalState.localSchemeAssumptions := by
     rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
@@ -2565,6 +2565,49 @@ def finalizedRequirementContext
         (TypedTraitResolution.applySubstitution result.substitution)))
     |>.withSolvedRequirements result.solvedRequirements
 
+/-- Exact executable source-to-ledger validation survives final substitution
+and establishes the declarative whole-source requirement ownership judgment. -/
+theorem finalize_requirementOwnership
+    {semanticContext : SourceSemantics.Context}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (solved_eq :
+      semanticContext.solvedRequirements = result.solvedRequirements)
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    RequirementOwnership semanticContext result.typedSource := by
+  obtain ⟨_, finalState, solved, _, _, _, _, _, _, _, ownershipValidation,
+      requirementsSolved, resultEq⟩ :=
+    Detail.finalize_success_witness success
+  have validated :=
+    Detail.validateSourceRequirementOwnership_success ownershipValidation
+  have idsEq := Detail.solveRequirements_preserves_ids inferenceContext
+    finalState finalState.requirements solved requirementsSolved
+  subst result
+  constructor
+  · simpa using validated.1
+  · rw [solved_eq]
+    simpa [idsEq] using validated.2.2
+
+/-- Every successfully checked function body owns each solved requirement at
+exactly one primary source occurrence, independently of ledger order. -/
+theorem checkFunctionBody_success_requirementOwnership
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    RequirementOwnership (checkedBodyContext signatures signature checked)
+      checked.typedBody := by
+  obtain ⟨_, _, _, _, _, _, _, finalizeSuccess, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  exact finalize_requirementOwnership rfl finalizeSuccess
+
 /-- Executable finalization connects one retained integer-literal node to the
 declarative validity judgment through its exact requirement row. -/
 theorem finalize_integerLiteralValid_of_mem
@@ -2587,8 +2630,8 @@ theorem finalize_integerLiteralValid_of_mem
       (finalizedRequirementContext inferenceContext result)
       source
       (resolution.applySubstitution result.substitution) := by
-  obtain ⟨patternState, finalState, requirements, _, ledgerValidation,
-      patternResult, literalResult, _, literalValidation,
+  obtain ⟨patternState, finalState, requirements, _, _, ledgerValidation,
+      patternResult, literalResult, _, literalValidation, _,
       requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have ledger :=
@@ -2629,8 +2672,8 @@ theorem finalize_solvedRequirementsValid
     SolvedRequirementsValid
       (finalizedRequirementContext inferenceContext result)
       result.solvedRequirements := by
-  obtain ⟨patternState, finalState, requirements, _, _, patternResult,
-      literalResult, _, _, requirementsResult, resultEq⟩ :=
+  obtain ⟨patternState, finalState, requirements, _, _, _, patternResult,
+      literalResult, _, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have patternOrdinary : patternState.localSchemeAssumptions = [] := by
     rw [Detail.defaultIntegerPatternTargets_localSchemeAssumptions

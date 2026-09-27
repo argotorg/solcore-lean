@@ -825,7 +825,7 @@ def binderIds (instructions : List MatchPatternInstruction) :
   instructions.filterMap fun instruction =>
     match instruction with
     | .binder selectedBinder => some selectedBinder.id
-    | _ => none
+    | .wildcard | .integerLiteral .. | .constructor .. | .tuple .. => none
 
 end MatchPatternInstruction
 
@@ -856,7 +856,9 @@ namespace ExpressionForm
 /-- Local definitions retained directly by one expression form. -/
 def definedLocalIds : ExpressionForm → List Resolved.LocalId
   | .lambda parameters _ _ => parameters.map (fun binder => binder.id)
-  | _ => []
+  | .literal _ | .integerLiteral .. | .reference .. | .group _ | .tuple _ |
+      .unary .. | .binary .. | .conditional .. | .call .. | .constructor .. |
+      .member .. | .proxy _ | .index .. => []
 
 end ExpressionForm
 
@@ -871,7 +873,37 @@ def definedLocalIds : StatementForm → List Resolved.LocalId
   | .forLoop initializer _ post _ =>
       initializer.flatMap ForItemForm.definedLocalIds ++
         post.flatMap ForItemForm.definedLocalIds
-  | _ => []
+  | .returnStmt _ | .expression .. | .assignValue .. | .assignBitNot _ |
+      .ifThen .. | .block _ | .whileLoop .. | .breakStmt | .continueStmt => []
+
+end StatementForm
+
+namespace ForItemForm
+
+/-- Primary requirement identities owned by assignments in one `for` header
+item.  Expression and local-declaration requirements belong to their own
+source nodes and therefore are not mirrored here. -/
+def primaryRequirementIds : ForItemForm → List RequirementId
+  | .assignValue assignment _ _ | .assignBitNot assignment =>
+      assignment.requirements
+  | .letDecl .. | .expression _ => []
+
+end ForItemForm
+
+namespace StatementForm
+
+/-- Primary requirement identities owned directly by one statement form.
+Match aggregates and coercion metadata are mirrors and deliberately excluded. -/
+def primaryRequirementIds : StatementForm → List RequirementId
+  | .assignValue assignment _ _ | .assignBitNot assignment =>
+      assignment.requirements
+  | .matchWith resolution =>
+      resolution.cases.flatMap fun matchCase => matchCase.pattern.requirements
+  | .forLoop initializer _ post _ =>
+      initializer.flatMap ForItemForm.primaryRequirementIds ++
+        post.flatMap ForItemForm.primaryRequirementIds
+  | .letDecl .. | .returnStmt _ | .expression .. | .ifThen .. | .block _ |
+      .whileLoop .. | .breakStmt | .continueStmt => []
 
 end StatementForm
 
@@ -897,6 +929,12 @@ def definedLocalIds : Node → List Resolved.LocalId
   | .expression node => node.form.definedLocalIds
   | .statement node => node.form.definedLocalIds
 
+/-- Primary requirement identities retained directly by one heterogeneous
+source node. -/
+def primaryRequirementIds : Node → List RequirementId
+  | .expression node => node.requirements
+  | .statement node => node.form.primaryRequirementIds
+
 end Node
 
 namespace TypedSource
@@ -907,6 +945,11 @@ the declarative ownership judgment. -/
 def definedLocalIds (source : TypedSource) : List Resolved.LocalId :=
   source.inputs.map (fun binder => binder.id) ++
     source.nodes.flatMap Node.definedLocalIds
+
+/-- Stable primary requirement inventory in node-table and attachment order.
+This excludes every secondary mirror of a requirement identity. -/
+def primaryRequirementIds (source : TypedSource) : List RequirementId :=
+  source.nodes.flatMap Node.primaryRequirementIds
 
 /-- Declaration entries and direct child slots, retaining expression/statement
 categories.  A closed occurrence forest names every retained node exactly once

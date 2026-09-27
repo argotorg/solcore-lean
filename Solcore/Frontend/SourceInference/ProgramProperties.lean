@@ -52,6 +52,11 @@ private theorem localIdMember_eq_true_iff
     localIdMember ids id = true ↔ id ∈ ids := by
   simp [localIdMember]
 
+private theorem requirementIdMember_eq_true_iff
+    (ids : List RequirementId) (id : RequirementId) :
+    requirementIdMember ids id = true ↔ id ∈ ids := by
+  simp [requirementIdMember]
+
 private theorem nodeIdMember_eq_true_iff
     (ids : List NodeId) (id : NodeId) :
     nodeIdMember ids id = true ↔ id ∈ ids := by
@@ -185,6 +190,133 @@ theorem validateSourceLocalIdentities_success_owned
     (success : validateSourceLocalIdentities source = .ok ()) :
     ∀ id, id ∈ source.definedLocalIds → id.owner = source.owner :=
   (validateLocalIdentitiesFrom_success success).2.1
+
+private theorem validateRequirementIdsUniqueFrom_success
+    {duplicateError : RequirementId → Error}
+    {seen ids : List RequirementId}
+    (success : validateRequirementIdsUniqueFrom duplicateError seen ids =
+      .ok ()) :
+    ids.Nodup ∧ ∀ id, id ∈ ids → id ∉ seen := by
+  induction ids generalizing seen with
+  | nil => simp
+  | cons head tail induction =>
+      cases duplicate : requirementIdMember seen head with
+      | true =>
+          simp [validateRequirementIdsUniqueFrom, duplicate, bind,
+            Except.bind] at success
+      | false =>
+          have headFresh : head ∉ seen := by
+            intro member
+            have contained : requirementIdMember seen head = true :=
+              (requirementIdMember_eq_true_iff seen head).mpr member
+            rw [duplicate] at contained
+            simp at contained
+          have tailSuccess :
+              validateRequirementIdsUniqueFrom duplicateError (head :: seen)
+                tail = .ok () := by
+            simpa [validateRequirementIdsUniqueFrom, duplicate, bind,
+              Except.bind] using success
+          obtain ⟨tailUnique, tailFresh⟩ := induction tailSuccess
+          refine ⟨?_, ?_⟩
+          · simp only [List.nodup_cons]
+            refine ⟨?_, tailUnique⟩
+            intro member
+            exact tailFresh head member (by simp)
+          · intro id member seenMember
+            rcases List.mem_cons.mp member with rfl | tailMember
+            · exact headFresh seenMember
+            · exact tailFresh id tailMember (by simp [seenMember])
+
+private theorem validateRequirementIdsContained_success
+    {missingError : RequirementId → Error}
+    {available requested : List RequirementId}
+    (success : validateRequirementIdsContained missingError available requested =
+      .ok ()) :
+    requested ⊆ available := by
+  induction requested with
+  | nil => simp
+  | cons head tail induction =>
+      cases memberResult : requirementIdMember available head with
+      | false =>
+          simp [validateRequirementIdsContained, memberResult, bind,
+            Except.bind] at success
+      | true =>
+          have headMember : head ∈ available :=
+            (requirementIdMember_eq_true_iff available head).mp memberResult
+          have tailSuccess :
+              validateRequirementIdsContained missingError available tail =
+                .ok () := by
+            simpa [validateRequirementIdsContained, memberResult, bind,
+              Except.bind] using success
+          intro id member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · exact headMember
+          · exact induction tailSuccess tailMember
+
+/-- Successful exact-ledger validation proves both side-specific uniqueness
+facts and the order-insensitive primary-to-ledger bijection. -/
+theorem validateSourceRequirementOwnership_success
+    {source : TypedSource} {requirements : List Requirement}
+    (success : validateSourceRequirementOwnership source requirements =
+      .ok ()) :
+    source.primaryRequirementIds.Nodup ∧
+      (requirements.map (fun requirement => requirement.id)).Nodup ∧
+      source.primaryRequirementIds.Perm
+        (requirements.map (fun requirement => requirement.id)) := by
+  let primary := source.primaryRequirementIds
+  let ledger := requirements.map (fun requirement => requirement.id)
+  have primarySuccess :
+      validateRequirementIdsUniqueFrom Error.duplicatePrimaryRequirement []
+        primary = .ok () := by
+    cases primaryResult :
+        validateRequirementIdsUniqueFrom Error.duplicatePrimaryRequirement []
+          primary with
+    | error error =>
+        simp [validateSourceRequirementOwnership, primary,
+          primaryResult, bind, Except.bind] at success
+    | ok value =>
+        exact congrArg Except.ok (Subsingleton.elim _ _)
+  have ledgerSuccess :
+      validateRequirementIdsUniqueFrom Error.duplicateRequirementLedgerRow []
+        ledger = .ok () := by
+    cases ledgerResult :
+        validateRequirementIdsUniqueFrom Error.duplicateRequirementLedgerRow []
+          ledger with
+    | error error =>
+        simp [validateSourceRequirementOwnership, primary, ledger,
+          primarySuccess, ledgerResult, bind, Except.bind] at success
+    | ok value =>
+        exact congrArg Except.ok (Subsingleton.elim _ _)
+  have primaryContained :
+      validateRequirementIdsContained Error.missingRequirementLedgerRow ledger
+        primary = .ok () := by
+    cases containmentResult :
+        validateRequirementIdsContained Error.missingRequirementLedgerRow ledger
+          primary with
+    | error error =>
+        simp [validateSourceRequirementOwnership, primary, ledger,
+          primarySuccess, ledgerSuccess, containmentResult, bind, Except.bind]
+          at success
+    | ok value =>
+        exact congrArg Except.ok (Subsingleton.elim _ _)
+  have ledgerContained :
+      validateRequirementIdsContained Error.unattachedRequirementLedgerRow
+        primary ledger = .ok () := by
+    simpa [validateSourceRequirementOwnership, primary, ledger, primarySuccess,
+      ledgerSuccess, primaryContained, bind, Except.bind] using success
+  have primaryUnique : primary.Nodup :=
+    (validateRequirementIdsUniqueFrom_success primarySuccess).1
+  have ledgerUnique : ledger.Nodup :=
+    (validateRequirementIdsUniqueFrom_success ledgerSuccess).1
+  have primarySubset : primary ⊆ ledger :=
+    validateRequirementIdsContained_success primaryContained
+  have ledgerSubset : ledger ⊆ primary :=
+    validateRequirementIdsContained_success ledgerContained
+  have exactMembership : ∀ id, id ∈ primary ↔ id ∈ ledger :=
+    fun _ => ⟨fun member => primarySubset member,
+      fun member => ledgerSubset member⟩
+  exact ⟨primaryUnique, ledgerUnique,
+    (List.perm_ext_iff_of_nodup primaryUnique ledgerUnique).2 exactMembership⟩
 
 private theorem validateSourceRootsFrom_success
     {source : TypedSource} {roots : List NodeId}
@@ -1155,6 +1287,8 @@ structure FinalizeSuccessWitness
   solvedRequirements : List SolvedRequirement
   graphValidation :
     validateSourceGraph (state.toTypedSource roots) = .ok ()
+  localIdentityValidation :
+    validateSourceLocalIdentities (state.toTypedSource roots) = .ok ()
   ledgerValidation : validateIntegerLiteralLedger state = .ok ()
   patternDefault :
     defaultIntegerPatternTargets state.integerPatterns state =
@@ -1168,6 +1302,9 @@ structure FinalizeSuccessWitness
   literalValidation :
     validateIntegerLiteralTargets finalState finalState.integerLiterals =
       .ok ()
+  requirementOwnershipValidation :
+    validateSourceRequirementOwnership (finalState.toTypedSource roots)
+      finalState.requirements = .ok ()
   requirementsSolved :
     solveRequirements context finalState finalState.requirements =
       .ok solvedRequirements
@@ -1242,33 +1379,51 @@ def finalize_success_witness
                         Except.bind] at success
                   | ok literalValidation =>
                       cases literalValidation
-                      cases requirementsResult :
-                          solveRequirements context finalState
+                      cases ownershipResult :
+                          validateSourceRequirementOwnership
+                            (finalState.toTypedSource roots)
                             finalState.requirements with
                       | error error =>
                           simp [graphValidation, localIdentityValidation,
                             ledgerResult, patternResult, literalResult,
                             patternValidationResult, literalValidationResult,
-                            requirementsResult, bind, Except.bind] at success
-                      | ok requirements =>
-                          simp [graphValidation, localIdentityValidation,
-                            ledgerResult, patternResult, literalResult,
-                            patternValidationResult, literalValidationResult,
-                            requirementsResult, bind, Except.bind] at success
-                          cases success
-                          exact {
-                            patternState
-                            finalState
-                            solvedRequirements := requirements
-                            graphValidation
-                            ledgerValidation := ledgerResult
-                            patternDefault := patternResult
-                            literalDefault := literalResult
-                            patternValidation := patternValidationResult
-                            literalValidation := literalValidationResult
-                            requirementsSolved := requirementsResult
-                            result_eq := rfl
-                          }
+                            ownershipResult, bind, Except.bind] at success
+                      | ok ownershipValidation =>
+                          cases ownershipValidation
+                          cases requirementsResult :
+                              solveRequirements context finalState
+                                finalState.requirements with
+                          | error error =>
+                              simp [graphValidation, localIdentityValidation,
+                                ledgerResult, patternResult, literalResult,
+                                patternValidationResult,
+                                literalValidationResult, ownershipResult,
+                                requirementsResult, bind, Except.bind]
+                                at success
+                          | ok requirements =>
+                              simp [graphValidation,
+                                localIdentityValidation, ledgerResult,
+                                patternResult, literalResult,
+                                patternValidationResult,
+                                literalValidationResult, ownershipResult,
+                                requirementsResult, bind, Except.bind]
+                                at success
+                              cases success
+                              exact {
+                                patternState
+                                finalState
+                                solvedRequirements := requirements
+                                graphValidation
+                                localIdentityValidation
+                                ledgerValidation := ledgerResult
+                                patternDefault := patternResult
+                                literalDefault := literalResult
+                                patternValidation := patternValidationResult
+                                literalValidation := literalValidationResult
+                                requirementOwnershipValidation := ownershipResult
+                                requirementsSolved := requirementsResult
+                                result_eq := rfl
+                              }
 
 /-- Successful finalization includes successful structural validation of its
 input typed-source graph. -/
@@ -1286,18 +1441,27 @@ theorem finalize_validateSourceLocalIdentities
     {roots : List NodeId} {result : Result}
     (success : finalize context type state roots = .ok result) :
     validateSourceLocalIdentities (state.toTypedSource roots) = .ok () := by
-  unfold finalize at success
-  cases graphResult : validateSourceGraph (state.toTypedSource roots) with
-  | error error => simp [graphResult, bind, Except.bind] at success
-  | ok graphValue =>
-      cases graphValue
-      cases localResult :
-          validateSourceLocalIdentities (state.toTypedSource roots) with
-      | error error =>
-          simp [graphResult, localResult, bind, Except.bind] at success
-      | ok localValue =>
-          cases localValue
-          rfl
+  exact (finalize_success_witness success).localIdentityValidation
+
+/-- Successful finalization establishes the exact primary-to-ledger ownership
+boundary.  Numeric defaulting changes neither the source carrier nor the raw
+requirement ledger, so the validation is exposed at the input state. -/
+theorem finalize_validateSourceRequirementOwnership
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    validateSourceRequirementOwnership (state.toTypedSource roots)
+      state.requirements = .ok () := by
+  let witness := finalize_success_witness success
+  have sourceEq : witness.finalState.toTypedSource roots =
+      state.toTypedSource roots :=
+    (defaultIntegerLiteralTargets_toTypedSource witness.literalDefault).trans
+      (defaultIntegerPatternTargets_toTypedSource witness.patternDefault)
+  have requirementsEq : witness.finalState.requirements = state.requirements := by
+    rw [defaultIntegerLiteralTargets_requirements witness.literalDefault,
+      defaultIntegerPatternTargets_requirements witness.patternDefault]
+  rw [← sourceEq, ← requirementsEq]
+  exact witness.requirementOwnershipValidation
 
 /-- Successful finalization includes successful validation of its input
 integer-literal ledger. -/
@@ -1327,8 +1491,8 @@ theorem finalize_integerPatternTarget_supported
     ∀ origin, origin ∈ state.integerPatterns →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
-  obtain ⟨patternState, finalState, _, _, _, patternResult, literalResult,
-      patternValidation, _, _, resultEq⟩ := finalize_success_witness success
+  obtain ⟨patternState, finalState, _, _, _, _, patternResult, literalResult,
+      patternValidation, _, _, _, resultEq⟩ := finalize_success_witness success
   have patternOrigins :=
     defaultIntegerPatternTargets_integerPatterns patternResult
   have finalOrigins :=
@@ -1352,8 +1516,9 @@ theorem finalize_integerLiteralTarget_supported
     ∀ origin, origin ∈ state.integerLiterals →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
-  obtain ⟨patternState, finalState, _, _, _, patternResult, literalResult, _,
-      literalValidation, _, resultEq⟩ := finalize_success_witness success
+  obtain ⟨patternState, finalState, _, _, _, _, patternResult,
+      literalResult, _, literalValidation, _, _, resultEq⟩ :=
+    finalize_success_witness success
   have patternOrigins :=
     defaultIntegerPatternTargets_integerLiterals patternResult
   have finalOrigins :=
@@ -1377,8 +1542,8 @@ theorem finalize_preserves_resolve_eq
     (equal : state.resolve left = state.resolve right)
     (success : finalize context type state roots = .ok result) :
     result.substitution.apply left = result.substitution.apply right := by
-  obtain ⟨patternState, finalState, _, _, _, patternResult, literalResult,
-      _, _, _, resultEq⟩ := finalize_success_witness success
+  obtain ⟨patternState, finalState, _, _, _, _, patternResult, literalResult,
+      _, _, _, _, resultEq⟩ := finalize_success_witness success
   have patternEqual :=
     defaultIntegerPatternTargets_preserves_resolve_eq equal patternResult
   have finalEqual :=
@@ -1423,7 +1588,7 @@ theorem finalize_type
     {result : Result}
     (success : finalize context type state roots = .ok result) :
     result.type = result.substitution.apply type := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, resultEq⟩ :=
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, resultEq⟩ :=
     finalize_success_witness success
   subst result
   rfl
@@ -1436,8 +1601,8 @@ theorem finalize_typedSource
     (success : finalize context type state roots = .ok result) :
     result.typedSource =
       (state.toTypedSource roots).applySubstitution result.substitution := by
-  obtain ⟨patternState, _, _, _, _, patternResult, literalResult, _, _, _,
-      resultEq⟩ := finalize_success_witness success
+  obtain ⟨patternState, _, _, _, _, _, patternResult, literalResult, _, _,
+      _, _, resultEq⟩ := finalize_success_witness success
   subst result
   rw [defaultIntegerLiteralTargets_toTypedSource literalResult,
     defaultIntegerPatternTargets_toTypedSource patternResult]

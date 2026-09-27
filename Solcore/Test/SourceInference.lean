@@ -124,6 +124,21 @@ private def solverRegressionRequirement : SourceInference.Requirement := {
   predicate := solverRegressionSource
 }
 
+private def solverRegressionExpressionId : SourceInference.ExpressionId :=
+  ⟨⟨solverRegressionOwner, 0⟩⟩
+
+private def solverRegressionRequirementNode :
+    SourceInference.ExpressionNode := {
+  id := solverRegressionExpressionId
+  span := solverRegressionSpan
+  type := .word
+  form := .literal (.decimal "0")
+  requirements := [solverRegressionRequirement.id]
+}
+
+private def solverRegressionRoots : List SourceInference.NodeId :=
+  [.expression solverRegressionExpressionId]
+
 private def solverRegressionSemanticContext :
     Solcore.SourceSemantics.Context :=
   (Solcore.SourceSemantics.Context.ofSignatures
@@ -137,6 +152,8 @@ private def solverRegressionTemplateState : SourceInference.State := {
 
 private def solverRegressionFinalizeState : SourceInference.State := {
   solverRegressionState with
+  nextOccurrence := 1
+  nodes := [.expression solverRegressionRequirementNode]
   requirements := [solverRegressionRequirement]
 }
 
@@ -189,7 +206,8 @@ private def solverRegressionFinalizedResult : SourceInference.Result := {
   substitution := solverRegressionFinalizeState.inference.substitution
   solvedRequirements := [solverRegressionSolvedRow]
   typedSource :=
-    (solverRegressionFinalizeState.toTypedSource []).applySubstitution
+    (solverRegressionFinalizeState.toTypedSource
+      solverRegressionRoots).applySubstitution
       solverRegressionFinalizeState.inference.substitution
 }
 
@@ -290,7 +308,7 @@ example : Solcore.SourceSemantics.SolvedRequirementsValid
       (inferenceContext := solverRegressionContext)
       (type := .word)
       (state := solverRegressionFinalizeState)
-      (roots := [])
+      (roots := solverRegressionRoots)
   · rfl
   · rfl
 

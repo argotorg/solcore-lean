@@ -117,6 +117,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_localIdentityOwnership
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_requirementOwnership
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_requirementOwnership
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_expression_root_exists
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_statement_root_exists
@@ -486,6 +490,19 @@ example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.toRuntime
 example := @Solcore.SourceSemantics.RuntimeRequirementLedgerValid
 example := @Solcore.SourceSemantics.LocalIdentityOwnership
 example := @Solcore.SourceSemantics.RequirementOwnership
+example := @Solcore.SourceSemantics.patternInstructionBinderIds_eq_carrier
+example := @Solcore.SourceSemantics.patternBinderIds_eq_carrier
+example := @Solcore.SourceSemantics.forItemDefinedLocalIds_eq_carrier
+example := @Solcore.SourceSemantics.expressionDefinedLocalIds_eq_carrier
+example := @Solcore.SourceSemantics.statementDefinedLocalIds_eq_carrier
+example := @Solcore.SourceSemantics.nodeDefinedLocalIds_eq_carrier
+example := @Solcore.SourceSemantics.typedSourceDefinedLocalIds_eq_carrier
+example := @Solcore.SourceSemantics.forItemPrimaryRequirementIds_eq_carrier
+example :=
+  @Solcore.SourceSemantics.statementPrimaryRequirementIds_eq_carrier
+example := @Solcore.SourceSemantics.nodePrimaryRequirementIds_eq_carrier
+example :=
+  @Solcore.SourceSemantics.typedSourcePrimaryRequirementIds_eq_carrier
 example := @Solcore.SourceSemantics.TypeWellScoped
 example := @Solcore.SourceSemantics.TypesWellScoped
 example := @Solcore.SourceSemantics.TypeWellScoped.contractNominal

@@ -297,10 +297,10 @@ private def testTypedInferenceFacts (fixture : Fixture)
   | nodes => throw (IO.userError
       s!"expected one Int<Word> literal owner, found {nodes.length}")
 
-  let attached := (expressionNodes source).flatMap (·.requirements)
+  let attached := source.primaryRequirementIds
   let solvedIds := run.solvedRequirements.map (·.id)
   assertTrue (attached.length == attached.eraseDups.length)
-    "one requirement identity is owned by multiple expression nodes"
+    "one requirement identity is owned by multiple primary source nodes"
   assertTrue (decide (attached.length = solvedIds.length) &&
       attached.all solvedIds.contains && solvedIds.all attached.contains)
     "typed expression requirement ownership and solved requirements diverged"

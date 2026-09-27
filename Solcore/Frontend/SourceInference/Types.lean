@@ -102,6 +102,10 @@ inductive Error where
   | localIdentityOwnerMismatch
       (expected : Resolved.DeclarationId) (actual : Resolved.LocalId)
   | duplicateLocalIdentity (id : Resolved.LocalId)
+  | duplicatePrimaryRequirement (id : RequirementId)
+  | duplicateRequirementLedgerRow (id : RequirementId)
+  | missingRequirementLedgerRow (id : RequirementId)
+  | unattachedRequirementLedgerRow (id : RequirementId)
   | missingRoot (root : NodeId)
   | missingChild (parent child : NodeId)
   | duplicateIncomingNode (id : NodeId)

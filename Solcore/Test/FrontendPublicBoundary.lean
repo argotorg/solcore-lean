@@ -525,11 +525,22 @@ example := @Solcore.Frontend.SourceInference.ExpressionForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.StatementForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.Node.definedLocalIds
 example := @Solcore.Frontend.SourceInference.TypedSource.definedLocalIds
+example := @Solcore.Frontend.SourceInference.ForItemForm.primaryRequirementIds
+example := @Solcore.Frontend.SourceInference.StatementForm.primaryRequirementIds
+example := @Solcore.Frontend.SourceInference.Node.primaryRequirementIds
+example := @Solcore.Frontend.SourceInference.TypedSource.primaryRequirementIds
 example := @Solcore.Frontend.SourceInference.Detail.localIdMember
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateLocalIdentitiesFrom
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceLocalIdentities
+example := @Solcore.Frontend.SourceInference.Detail.requirementIdMember
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateRequirementIdsUniqueFrom
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateRequirementIdsContained
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceRequirementOwnership
 example := @Solcore.Frontend.SourceInference.Detail.sourceContainsNodeId
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceRootsFrom
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceRoots
@@ -562,6 +573,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceLocalIdentities_success_unique
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceLocalIdentities_success_owned
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceRequirementOwnership_success
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceRoots_success_rootsExist
 example :=
@@ -621,6 +634,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceGraph
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceLocalIdentities
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceRequirementOwnership
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateIntegerLiteralLedger
 example :=

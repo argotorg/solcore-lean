@@ -49,6 +49,41 @@ stable-identity namespace. -/
 def validateSourceLocalIdentities (source : TypedSource) : Except Error Unit :=
   validateLocalIdentitiesFrom source.owner [] source.definedLocalIds
 
+/-- Executable membership for stable requirement identities. -/
+def requirementIdMember (ids : List RequirementId) (id : RequirementId) : Bool :=
+  ids.any fun candidate => decide (candidate = id)
+
+/-- Reject duplicates in one requirement-ID inventory while retaining the
+caller-selected diagnostic for its ownership role. -/
+def validateRequirementIdsUniqueFrom (duplicateError : RequirementId → Error) :
+    List RequirementId → List RequirementId → Except Error Unit
+  | _, [] => .ok ()
+  | seen, id :: rest => do
+      if requirementIdMember seen id then
+        throw (duplicateError id)
+      validateRequirementIdsUniqueFrom duplicateError (id :: seen) rest
+
+/-- Check that every requested requirement identity occurs in the available
+inventory, retaining the caller-selected diagnostic for the missing side. -/
+def validateRequirementIdsContained (missingError : RequirementId → Error)
+    (available : List RequirementId) : List RequirementId → Except Error Unit
+  | [] => .ok ()
+  | id :: rest => do
+      if !requirementIdMember available id then
+        throw (missingError id)
+      validateRequirementIdsContained missingError available rest
+
+/-- Validate the exact, order-insensitive bijection between primary source
+attachments and the raw solver ledger.  Both sides must be duplicate-free. -/
+def validateSourceRequirementOwnership (source : TypedSource)
+    (requirements : List Requirement) : Except Error Unit := do
+  let primary := source.primaryRequirementIds
+  let ledger := requirements.map (fun requirement => requirement.id)
+  validateRequirementIdsUniqueFrom Error.duplicatePrimaryRequirement [] primary
+  validateRequirementIdsUniqueFrom Error.duplicateRequirementLedgerRow [] ledger
+  validateRequirementIdsContained Error.missingRequirementLedgerRow ledger primary
+  validateRequirementIdsContained Error.unattachedRequirementLedgerRow primary ledger
+
 /-- Whether the table contains a node at the exact category-preserving ID. -/
 def sourceContainsNodeId (source : TypedSource) (id : NodeId) : Bool :=
   source.nodes.any fun node => decide (node.id = id)
@@ -268,6 +303,8 @@ def finalize (context : Context) (type : Ty) (state : State)
   let state ← defaultIntegerLiteralTargets state.integerLiterals state
   validateIntegerPatternTargets state state.integerPatterns
   validateIntegerLiteralTargets state state.integerLiterals
+  validateSourceRequirementOwnership (state.toTypedSource roots)
+    state.requirements
   let solvedRequirements ← solveRequirements context state state.requirements
   let substitution := state.inference.substitution
   pure {

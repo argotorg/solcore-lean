@@ -22,7 +22,7 @@ def patternInstructionBinderIds
   instructions.filterMap fun instruction =>
     match instruction with
     | .binder binder => some binder.id
-    | _ => none
+    | .wildcard | .integerLiteral .. | .constructor .. | .tuple .. => none
 
 /-- Binder identities introduced by a resolved pattern root and its children. -/
 def patternBinderIds (pattern : TypedMatchPattern) : List Resolved.LocalId :=
@@ -344,6 +344,54 @@ def primaryRequirementIds (source : TypedSource) : List RequirementId :=
     match node with
     | .expression expression => expression.requirements
     | .statement statement => statementPrimaryRequirementIds statement.form
+
+/-- The executable carrier and declarative semantics agree on the primary
+requirements owned by one `for` header item. -/
+@[simp] theorem forItemPrimaryRequirementIds_eq_carrier
+    (item : ForItemForm) :
+    item.primaryRequirementIds = forItemPrimaryRequirementIds item := by
+  cases item <;> rfl
+
+@[simp] theorem flatMapForItemPrimaryRequirementIds_eq_carrier
+    (items : List ForItemForm) :
+    items.flatMap ForItemForm.primaryRequirementIds =
+      items.flatMap forItemPrimaryRequirementIds := by
+  induction items with
+  | nil => rfl
+  | cons item rest induction => simp [induction]
+
+/-- The executable carrier and declarative semantics agree on the primary
+requirements owned directly by one statement form. -/
+@[simp] theorem statementPrimaryRequirementIds_eq_carrier
+    (form : StatementForm) :
+    form.primaryRequirementIds = statementPrimaryRequirementIds form := by
+  cases form <;> simp [StatementForm.primaryRequirementIds,
+    statementPrimaryRequirementIds]
+
+@[simp] theorem nodePrimaryRequirementIds_eq_carrier (node : Node) :
+    node.primaryRequirementIds =
+      match node with
+      | .expression expression => expression.requirements
+      | .statement statement => statementPrimaryRequirementIds statement.form := by
+  cases node <;> simp [Node.primaryRequirementIds]
+
+@[simp] theorem flatMapNodePrimaryRequirementIds_eq_carrier
+    (nodes : List Node) :
+    nodes.flatMap Node.primaryRequirementIds =
+      nodes.flatMap (fun node =>
+        match node with
+        | .expression expression => expression.requirements
+        | .statement statement => statementPrimaryRequirementIds statement.form) := by
+  induction nodes with
+  | nil => rfl
+  | cons node rest induction => simp [induction]
+
+/-- The canonical executable primary-requirement inventory is exactly the
+declarative ownership inventory. -/
+@[simp] theorem typedSourcePrimaryRequirementIds_eq_carrier
+    (source : TypedSource) :
+    source.primaryRequirementIds = primaryRequirementIds source := by
+  simp [TypedSource.primaryRequirementIds, primaryRequirementIds]
 
 /-- Forgetting occurrence ownership from the detailed inventory recovers the
 original flat primary-requirement identity inventory exactly. -/
