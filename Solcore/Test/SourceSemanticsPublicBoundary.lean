@@ -441,8 +441,12 @@ example := @Solcore.SourceSemantics.CoercionPathValid.expressionNode_rawType
 example := @Solcore.SourceSemantics.IntegerLiteralValid
 example := @Solcore.SourceSemantics.IntegerLiteralValid.target_type_admissible
 example := @Solcore.SourceSemantics.WordLiteralValid
+example :=
+  @Solcore.SourceSemantics.OperatorProfileInstantiates.return_types_admissible
 example := @Solcore.SourceSemantics.UnaryOperatorHasType
+example := @Solcore.SourceSemantics.UnaryOperatorHasType.result_type_admissible
 example := @Solcore.SourceSemantics.BinaryOperatorHasType
+example := @Solcore.SourceSemantics.BinaryOperatorHasType.result_type_admissible
 example := @Solcore.SourceSemantics.DeclarationApplicationValid
 example :=
   @Solcore.SourceSemantics.DeclarationApplicationValid.parameter_types_admissible

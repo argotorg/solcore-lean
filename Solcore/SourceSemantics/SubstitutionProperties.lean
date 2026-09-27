@@ -5787,6 +5787,127 @@ theorem result_type_admissible
 
 end Solcore.SourceSemantics.DeclarationApplicationValid
 
+namespace Solcore.SourceSemantics.OperatorProfileInstantiates
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- Every result type exposed by a valid operator profile is admissible at
+the operator occurrence once its single operand instantiation is admissible.
+The catalog premise supplies well-scoped method signatures; the profile's
+singleton trait parameter turns the operand into the exact rigid-substitution
+range. -/
+theorem return_types_admissible
+    {context : Context} {traitName methodName : String}
+    {operand : Ty} {parameterTypes returnTypes : List Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (operandAdmissible : TypeAdmissible context operand)
+    (profile : OperatorProfileInstantiates context traitName methodName operand
+      parameterTypes returnTypes predicates) :
+    ∀ type, type ∈ returnTypes → TypeAdmissible context type := by
+  cases profile with
+  | @intro signature method parameter signatureMem traitNameEq parametersEq
+      methodUnique parameterTypesEq returnTypesEq =>
+      have signatureWellFormed :=
+        catalog.traits_semantic signature signatureMem
+      have methodFiltered : method ∈
+          signature.methods.filter
+            (fun candidate => candidate.name == methodName) := by
+        rw [methodUnique]
+        simp
+      have methodMem : method ∈ signature.methods :=
+        (List.mem_filter.mp methodFiltered).1
+      have methodWellFormed :=
+        signatureWellFormed.methods method methodMem
+      have substitutionExact :
+          SourceSemantics.ParameterSubstitution.Exact
+            [(parameter, operand)] signature.parameters := by
+        constructor
+        · exact signatureWellFormed.parameters_nodup
+        · rw [parametersEq]
+          simp [SourceSemantics.ParameterSubstitution.domain]
+      have substitutionRange :
+          SourceSemantics.ParameterSubstitution.RangeAdmissible context
+            [(parameter, operand)] := by
+        intro candidate replacement member
+        simp only [List.mem_cons] at member
+        rcases member with pairEq | impossible
+        · cases pairEq
+          exact operandAdmissible
+        · contradiction
+      intro type typeMember
+      rw [← returnTypesEq] at typeMember
+      rcases List.mem_map.mp typeMember with
+        ⟨rawType, rawMember, rfl⟩
+      exact StructuralSubstitution.TypeWellScoped.applyParametersAdmissibleTo
+        (source := signatureContext context.signatures signature.id
+          signature.parameters
+          (signature.wherePredicates ++ method.wherePredicates))
+        (target := context) [(parameter, operand)] substitutionExact
+        substitutionRange rfl binders
+        (TypesWellScoped.member
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            methodWellFormed.return_types)
+          rawMember)
+
+end Solcore.SourceSemantics.OperatorProfileInstantiates
+
+namespace Solcore.SourceSemantics.UnaryOperatorHasType
+
+open Frontend.SourceInference
+open TypeSystem
+
+/-- A declaratively valid unary operator preserves admissibility from its
+operand to its result, including trait-backed overloads. -/
+theorem result_type_admissible
+    {context : Context} {operator : Syntax.UnaryOp}
+    {operand result : Ty} {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (operandAdmissible : TypeAdmissible context operand)
+    (typing : UnaryOperatorHasType context operator operand result
+      requirements) :
+    TypeAdmissible context result := by
+  cases typing with
+  | logicalNot => exact TypeAdmissible.bool binders
+  | wordBitNot => exact TypeAdmissible.word binders
+  | integerBitNot => exact TypeAdmissible.integer binders
+  | trait _ profile _ =>
+      exact profile.return_types_admissible catalog binders operandAdmissible
+        result (by simp)
+
+end Solcore.SourceSemantics.UnaryOperatorHasType
+
+namespace Solcore.SourceSemantics.BinaryOperatorHasType
+
+open Frontend.SourceInference
+open TypeSystem
+
+/-- A declaratively valid binary operator preserves admissibility from its
+common operand type to its result, including trait-backed overloads. -/
+theorem result_type_admissible
+    {context : Context} {operator : Syntax.BinaryOp}
+    {operand result : Ty} {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (operandAdmissible : TypeAdmissible context operand)
+    (typing : BinaryOperatorHasType context operator operand operand result
+      requirements) :
+    TypeAdmissible context result := by
+  cases typing with
+  | wordArithmetic => exact TypeAdmissible.word binders
+  | integerArithmetic => exact TypeAdmissible.integer binders
+  | wordComparison | integerComparison => exact TypeAdmissible.bool binders
+  | booleanAnd | booleanOr => exact TypeAdmissible.bool binders
+  | trait _ profile _ =>
+      exact profile.return_types_admissible catalog binders operandAdmissible
+        result (by simp)
+
+end Solcore.SourceSemantics.BinaryOperatorHasType
+
 namespace Solcore.SourceSemantics.FlexibleSubstitution
 
 open Frontend
