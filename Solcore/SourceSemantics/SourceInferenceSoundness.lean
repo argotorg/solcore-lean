@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.ProgramProperties
+import Solcore.Frontend.SourceInference.RequirementProperties
 import Solcore.SourceSemantics.TraitSubstitutionProperties
 import Solcore.SourceSemantics.TraitResolutionSoundness
 
@@ -324,6 +325,64 @@ theorem solveRequirements_scoped_entries_sound
           (fun tailRequirement tailMember template =>
             template_scoped tailRequirement (by simp [tailMember]) template)
           candidate member
+
+/-- A canonical inference ledger with complete source-template coverage
+becomes a whole-body scoped requirement ledger after successful solving. -/
+theorem solveRequirements_scoped_ledger_sound
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {solved : List SolvedRequirement}
+    {baseContext : SourceSemantics.Context}
+    {source : TypedSource}
+    (stateWellFormed : state.RequirementsWellFormed)
+    (signatures_eq : baseContext.signatures = inferenceContext.signatures)
+    (assumptions_eq : baseContext.assumptions =
+      inferenceContext.assumptions.map (Detail.applyPredicate state))
+    (templateOwnership : LocalSchemeTemplateOwnership source)
+    (template_iff : ∀ requirement, requirement ∈ state.requirements →
+      (requirement.id ∈ state.localSchemeAssumptions ↔
+        requirement.id ∈ sourceLocalSchemeTemplateIds source))
+    (templates_subset : sourceLocalSchemeTemplateIds source ⊆
+      state.requirements.map (fun requirement => requirement.id))
+    (template_scoped : ∀ requirement, requirement ∈ state.requirements →
+      requirement.id ∈ state.localSchemeAssumptions →
+      LocalSchemeTemplateRowScoped source {
+        id := requirement.id
+        predicate := Detail.applyPredicate state requirement.predicate
+        evidence := .assumption
+          (Detail.applyPredicate state requirement.predicate)
+      })
+    (success : Detail.solveRequirements inferenceContext state
+      state.requirements = .ok solved) :
+    ScopedRequirementLedgerWellFormed
+      (baseContext.withSolvedRequirements solved) source := by
+  refine {
+    idsUnique := ?_
+    templateOwnership := templateOwnership
+    entriesValid := ?_
+    templatesComplete := ?_
+  }
+  · change (solved.map (fun requirement => requirement.id)).Nodup
+    exact Detail.solveRequirements_ids_nodup inferenceContext state solved
+      stateWellFormed success
+  · exact solveRequirements_scoped_entries_sound
+      (semanticContext := baseContext.withSolvedRequirements solved)
+      signatures_eq assumptions_eq template_iff template_scoped success
+  · intro owner contains
+    have templateMember : owner.requirement.templateRequirement ∈
+        sourceLocalSchemeTemplateIds source :=
+      sourceLocalSchemeTemplateIds_mem_iff.mpr ⟨owner, contains, rfl⟩
+    have inputMember : owner.requirement.templateRequirement ∈
+        state.requirements.map (fun requirement => requirement.id) :=
+      templates_subset templateMember
+    have ids_eq := Detail.solveRequirements_preserves_ids inferenceContext state
+      state.requirements solved success
+    have outputMember : owner.requirement.templateRequirement ∈
+        solved.map (fun requirement => requirement.id) := by
+      rw [ids_eq]
+      exact inputMember
+    rcases List.mem_map.mp outputMember with ⟨row, member, id_eq⟩
+    exact ⟨row, member, id_eq⟩
 
 /-- Proof-facing context for the requirement ledger emitted by finalization.
 Both declaration assumptions and solved predicates use the final inference

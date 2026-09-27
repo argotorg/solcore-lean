@@ -74,6 +74,7 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvi
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_corresponds
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_ordinary_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_scoped_entries_sound
+example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_scoped_ledger_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalizedRequirementContext
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_solvedRequirementsValid
 

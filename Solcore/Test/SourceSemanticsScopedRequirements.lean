@@ -44,7 +44,7 @@ private def emptySignatures : ProgramSignatures := {
 
 private def templateVariable : TypeVarId := ⟨400⟩
 
-private def templateId : RequirementId := ⟨400⟩
+private def templateId : RequirementId := ⟨0⟩
 
 private def ordinaryId : RequirementId := ⟨401⟩
 
@@ -191,6 +191,8 @@ private def templateInputRequirement : Requirement := {
 
 private def templateSolverState : SourceInference.State := {
   SourceInference.State.initial testOwner with
+  nextRequirement := 1
+  requirements := [templateInputRequirement]
   localSchemeAssumptions := [templateId]
 }
 
@@ -247,6 +249,54 @@ theorem templateSolverProducesScopedEntry :
         (scopedTemplateOwner.scopes_initializer templateOwnerContained))
   · rfl
   · simp
+
+/-- A nonempty canonical inference ledger containing a qualified-local
+template becomes a complete scoped semantic ledger after solving. -/
+theorem templateSolverProducesScopedLedger :
+    ScopedRequirementLedgerWellFormed templateContext
+      scopedTemplateSource := by
+  apply
+    SourceInferenceSoundness.solveRequirements_scoped_ledger_sound
+      (inferenceContext := templateInferenceContext)
+      (state := templateSolverState)
+      (solved := [templateRow])
+      (baseContext := Context.ofSignatures emptySignatures)
+  · rfl
+  · rfl
+  · rfl
+  · constructor
+    simp [sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+      initializedLetBindings, statementInitializedLetBindings,
+      InitializedLetBinding.templateOwners, scopedTemplateSource, letNode,
+      templateBinder, templateRequirement]
+  · intro requirement member
+    have requirement_eq : requirement = templateInputRequirement := by
+      simpa [templateSolverState] using member
+    subst requirement
+    constructor
+    · intro _
+      exact sourceLocalSchemeTemplateIds_mem_iff.mpr
+        ⟨scopedTemplateOwner, templateOwnerContained, rfl⟩
+    · intro _
+      simp [templateInputRequirement, templateSolverState]
+  · intro id member
+    simp [sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+      initializedLetBindings, statementInitializedLetBindings,
+      InitializedLetBinding.templateOwners, scopedTemplateSource, letNode,
+      templateBinder, templateRequirement, templateSolverState] at member ⊢
+    exact member
+  · intro requirement member template
+    have requirement_eq : requirement = templateInputRequirement := by
+      simpa [templateSolverState] using member
+    subst requirement
+    simpa [templateInputRequirement, templateSolverState,
+      SourceInference.Detail.applyPredicate, SourceInference.State.initial,
+      TypedTraitResolution.applySubstitution] using
+      (LocalSchemeTemplateRowScoped.intro scopedTemplateOwner
+        templateOwnerContained rfl rfl rfl (.expression (expressionId 0))
+        templateOccursAtInitializer
+        (scopedTemplateOwner.scopes_initializer templateOwnerContained))
+  · rfl
 
 /-- A template assumption attached at the root of its exact initializer is a
 valid scoped ledger entry even though it is not a declaration assumption. -/
