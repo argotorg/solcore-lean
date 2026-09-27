@@ -164,6 +164,10 @@ example :=
   @Solcore.Frontend.SourceInference.FunctionBodiesChecked.exists_signature_of_function_mem
 example := @Solcore.Frontend.SourceInference.State.Header
 example := @Solcore.Frontend.SourceInference.State.binderEnvironment
+example :=
+  @Solcore.Frontend.SourceInference.State.lookupBinder?_eq_some_facts
+example :=
+  @Solcore.Frontend.SourceInference.State.lookupBinder?_eq_some_mem_binderEnvironment
 example := @Solcore.Frontend.SourceInference.State.NodesBelowNextOccurrence
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.refl
@@ -198,6 +202,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.InferenceProgress.markDirectCallRequirements
 example := @Solcore.Frontend.SourceInference.State.InferenceReady
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.lookupBinder?_body_variablesBelow
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.lookupBinder?_freeVariablesBelow
 example := @Solcore.Frontend.SourceInference.State.InferenceReady.initial
 example := @Solcore.Frontend.SourceInference.State.InferenceReady.fresh
 example := @Solcore.Frontend.SourceInference.State.InferenceReady.withLocals
@@ -487,6 +495,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidate_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_formation
+example :=
+  @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_variablesBelow
 example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_apply_eq_self
 example :=

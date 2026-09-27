@@ -146,6 +146,31 @@ environment, including schemes and source order. -/
   | cons entry rest induction =>
       simp [List.mapIdx_cons, induction]
 
+/-- Successful lexical lookup returns a retained stable binder whose source
+name is exactly the queried name. -/
+theorem lookupBinder?_eq_some_facts
+    {state : State} {name : String} {binder : TypedBinder}
+    (found : state.lookupBinder? name = some binder) :
+    binder ∈ state.localBinders ∧ binder.name = name := by
+  have rawFound : state.localBinders.find?
+      (fun candidate => candidate.name == name) = some binder := by
+    simpa only [lookupBinder?] using found
+  have accepted : (binder.name == name) = true :=
+    List.find?_some
+      (p := fun candidate : TypedBinder => candidate.name == name) rawFound
+  exact ⟨List.mem_of_find?_eq_some rawFound, by simpa using accepted⟩
+
+/-- Successful lexical lookup exposes the selected scheme under the queried
+name in the canonical binder environment. -/
+theorem lookupBinder?_eq_some_mem_binderEnvironment
+    {state : State} {name : String} {binder : TypedBinder}
+    (found : state.lookupBinder? name = some binder) :
+    (name, binder.scheme) ∈ state.binderEnvironment := by
+  rcases lookupBinder?_eq_some_facts found with
+    ⟨binderMember, nameEq⟩
+  apply List.mem_map.mpr
+  exact ⟨binder, binderMember, by simp [nameEq]⟩
+
 /-- Initial input names are exactly the source parameter names, in order. -/
 theorem initial_input_names (owner : Resolved.DeclarationId)
     (locals : TypeSystem.Environment) (inputComptime : List Bool) :
@@ -907,6 +932,26 @@ theorem markDirectCallRequirements (state : State)
 end InferenceProgress
 
 namespace InferenceReady
+
+/-- A successfully looked-up binder in a ready state has a scheme body below
+the state's current flexible-variable allocator. -/
+theorem lookupBinder?_body_variablesBelow
+    {state : State} (ready : state.InferenceReady)
+    {name : String} {binder : TypedBinder}
+    (found : state.lookupBinder? name = some binder) :
+    binder.scheme.body.VariablesBelow state.inference.next := by
+  exact ready.bindersBelow (name, binder.scheme)
+    (lookupBinder?_eq_some_mem_binderEnvironment found)
+
+/-- Consequently, every unquantified free variable of a successfully
+looked-up binder scheme lies below the current allocator. -/
+theorem lookupBinder?_freeVariablesBelow
+    {state : State} (ready : state.InferenceReady)
+    {name : String} {binder : TypedBinder}
+    (found : state.lookupBinder? name = some binder) :
+    binder.scheme.FreeVariablesBelow state.inference.next := by
+  exact TypeSystem.Scheme.FreeVariablesBelow.of_body
+    (lookupBinder?_body_variablesBelow ready found)
 
 /-- Initial inference is solved and starts at the exact allocator bound
 computed from its input environment. -/

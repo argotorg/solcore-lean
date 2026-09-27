@@ -104,6 +104,48 @@ example :
     freshReady (by
       simpa [TypeSystem.Scheme.mono] using freshTypeBelow)
 
+private def shadowingBinderEnvironment : TypeSystem.Environment :=
+  [("shadowed", TypeSystem.Scheme.mono .bool),
+    ("shadowed", TypeSystem.Scheme.mono .word)]
+
+private def shadowingBinderState : SourceInference.State :=
+  SourceInference.State.initial solverRegressionOwner
+    shadowingBinderEnvironment
+
+private def shadowingSelectedBinder : SourceInference.TypedBinder := {
+  id := { owner := solverRegressionOwner, binderIndex := 0 }
+  name := "shadowed"
+  scheme := TypeSystem.Scheme.mono .bool
+}
+
+private theorem shadowingBinderState_ready :
+    shadowingBinderState.InferenceReady := by
+  exact SourceInference.State.InferenceReady.initial
+    solverRegressionOwner shadowingBinderEnvironment []
+
+private theorem shadowingBinderState_lookup :
+    shadowingBinderState.lookupBinder? "shadowed" =
+      some shadowingSelectedBinder := by
+  rfl
+
+/-- First-match shadowing selects the innermost binder while readiness exposes
+that exact selected scheme in the canonical environment and bounds both its
+body and unquantified free variables. -/
+example :
+    ("shadowed", shadowingSelectedBinder.scheme) ∈
+        shadowingBinderState.binderEnvironment ∧
+      shadowingSelectedBinder.scheme.body.VariablesBelow
+        shadowingBinderState.inference.next ∧
+      shadowingSelectedBinder.scheme.FreeVariablesBelow
+        shadowingBinderState.inference.next := by
+  exact ⟨
+    SourceInference.State.lookupBinder?_eq_some_mem_binderEnvironment
+      shadowingBinderState_lookup,
+    shadowingBinderState_ready.lookupBinder?_body_variablesBelow
+      shadowingBinderState_lookup,
+    shadowingBinderState_ready.lookupBinder?_freeVariablesBelow
+      shadowingBinderState_lookup⟩
+
 private def unificationProgressInput : SourceInference.State :=
   (SourceInference.State.initial solverRegressionOwner).fresh.2
 
@@ -181,6 +223,16 @@ private def solverRegressionRecoveryType : Syntax.TypeExpr := {
   span := solverRegressionSpan
   value := .error
 }
+
+/-- Successful source annotation resolution produces an allocator-bounded
+type independently of the allocator's current position. -/
+example {source : Syntax.TypeExpr} {type : TypeSystem.Ty}
+    (success : SourceInference.Detail.resolveSourceType
+      solverRegressionContext source = .ok type)
+    (next : Nat) :
+    type.VariablesBelow next :=
+  SourceInference.Detail.resolveSourceType_success_variablesBelow
+    success next
 
 /-- Formation validation rejects the recovery sentinel independently of how
 the resolved type was produced. -/

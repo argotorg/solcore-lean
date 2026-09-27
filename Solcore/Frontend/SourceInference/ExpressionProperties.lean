@@ -1130,6 +1130,15 @@ theorem withExpected_success_cases
                       exact .inr ⟨expectedType, plan, rfl, planResult, rfl⟩
 
 /-- A successfully resolved source annotation contains no flexible
+metavariables, so it lies below every inference allocator bound. -/
+theorem resolveSourceType_success_variablesBelow
+    {context : Context} {source : Syntax.TypeExpr} {type : Ty}
+    (success : resolveSourceType context source = .ok type)
+    (next : Nat) :
+    type.VariablesBelow next :=
+  (resolveSourceType_success_formation success).variablesBelow next
+
+/-- A successfully resolved source annotation contains no flexible
 metavariables, so every inference substitution fixes it. -/
 theorem resolveSourceType_success_apply_eq_self
     {context : Context} {source : Syntax.TypeExpr} {type : Ty}
