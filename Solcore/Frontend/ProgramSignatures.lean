@@ -1120,4 +1120,574 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
   else
     .error errors
 
+/-! The identity projections below are deliberately proved next to the
+private collectors which establish them.  Their public consequences live in
+`ProgramSignaturesProperties`; no collector state is exposed as API. -/
+
+private def isFunctionSignatureDeclaration
+    (declaration : ProgramDeclaration) : Bool :=
+  match declaration.source.value with
+  | .function _ => true
+  | _ => false
+
+private def isDataSignatureDeclaration
+    (declaration : ProgramDeclaration) : Bool :=
+  match declaration.source.value with
+  | .enum _ => true
+  | _ => false
+
+private def isTraitSignatureDeclaration
+    (declaration : ProgramDeclaration) : Bool :=
+  match declaration.source.value with
+  | .trait _ => true
+  | _ => false
+
+private def isImplementationSignatureDeclaration
+    (declaration : ProgramDeclaration) : Bool :=
+  match declaration.source.value with
+  | .impl _ => true
+  | _ => false
+
+private theorem traitSignatureOfDeclaration_success_id
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.TraitDecl} {signature : ProgramTraitSignature}
+    (success : traitSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    signature.id = declaration.id := by
+  cases scopeEq : validateProgramTypeScope
+      (ProgramTypeScope.ofDeclaration declaration) with
+  | error error =>
+      simp only [traitSignatureOfDeclaration, scopeEq] at success
+      change Except.error (ProgramSignatureError.typeResolution
+          declaration.id error) =
+        Except.ok signature at success
+      cases success
+  | ok scopeUnit =>
+      cases scopeUnit
+      simp only [traitSignatureOfDeclaration, scopeEq] at success
+      cases predicatesEq : resolveWhereClause environment declaration
+          (ProgramTypeScope.ofDeclaration declaration)
+          source.value.whereClause with
+      | error error =>
+          simp only [predicatesEq] at success
+          change Except.error error = Except.ok signature at success
+          cases success
+      | ok predicates =>
+          simp only [predicatesEq] at success
+          cases methodsEq : traitMethodsOfDeclaration environment declaration
+              (ProgramTypeScope.ofDeclaration declaration)
+              source.value.methods 0 [] with
+          | error error =>
+              simp only [methodsEq] at success
+              change Except.error error = Except.ok signature at success
+              cases success
+          | ok methods =>
+              simp only [methodsEq] at success
+              change Except.ok {
+                id := declaration.id
+                name := source.value.name.value
+                parameters := declarationParameters declaration
+                wherePredicates := predicates
+                methods
+                source
+              } = Except.ok signature at success
+              injection success with signatureEq
+              rw [← signatureEq]
+
+private theorem functionSignatureOfDeclaration_success_id
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.FunctionDecl} {signature : ProgramFunctionSignature}
+    (success : functionSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    signature.id = declaration.id := by
+  cases scopeEq : validateProgramTypeScope
+      (ProgramTypeScope.ofDeclaration declaration) with
+  | error error =>
+      simp only [functionSignatureOfDeclaration, scopeEq] at success
+      change Except.error (ProgramSignatureError.typeResolution
+          declaration.id error) = Except.ok signature at success
+      cases success
+  | ok scopeUnit =>
+      cases scopeUnit
+      simp only [functionSignatureOfDeclaration, scopeEq] at success
+      cases parametersEq : resolveFunctionParameters environment declaration
+          (ProgramTypeScope.ofDeclaration declaration)
+          source.value.signature.parameters.elements 0 [] with
+      | error error =>
+          simp only [parametersEq] at success
+          change Except.error error = Except.ok signature at success
+          cases success
+      | ok parameters =>
+          simp only [parametersEq] at success
+          cases returnsEq : resolveFunctionReturns environment declaration
+              (ProgramTypeScope.ofDeclaration declaration)
+              ((source.value.signature.returnsClause.map
+                fun clause => clause.types.elements).getD []) with
+          | error error =>
+              simp only [returnsEq] at success
+              change Except.error error = Except.ok signature at success
+              cases success
+          | ok returns =>
+              simp only [returnsEq] at success
+              rcases returns with ⟨returnTypes, returnComptime⟩
+              cases predicatesEq : resolveWhereClause environment declaration
+                  (ProgramTypeScope.ofDeclaration declaration)
+                  source.value.signature.whereClause with
+              | error error =>
+                  simp only [predicatesEq] at success
+                  change Except.error error = Except.ok signature at success
+                  cases success
+              | ok predicates =>
+                  simp only [predicatesEq] at success
+                  injection success with signatureEq
+                  rw [← signatureEq]
+
+private theorem dataSignatureOfDeclaration_success_id
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.EnumDecl} {signature : ProgramDataSignature}
+    (success : dataSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    signature.id = declaration.id := by
+  cases scopeEq : validateProgramTypeScope
+      (ProgramTypeScope.ofDeclaration declaration) with
+  | error error =>
+      simp only [dataSignatureOfDeclaration, scopeEq] at success
+      change Except.error (ProgramSignatureError.typeResolution
+          declaration.id error) = Except.ok signature at success
+      cases success
+  | ok scopeUnit =>
+      cases scopeUnit
+      simp only [dataSignatureOfDeclaration, scopeEq] at success
+      cases constructorsEq : dataConstructorsOfDeclaration environment
+          declaration (ProgramTypeScope.ofDeclaration declaration)
+          source.value.constructors 0 [] with
+      | error error =>
+          simp only [constructorsEq] at success
+          change Except.error error = Except.ok signature at success
+          cases success
+      | ok constructors =>
+          simp only [constructorsEq] at success
+          injection success with signatureEq
+          rw [← signatureEq]
+
+private def Except.SuccessSatisfies {error value : Type}
+    (property : value → Prop) : Except error value → Prop
+  | .error _ => True
+  | .ok result => property result
+
+@[simp] private theorem Except.SuccessSatisfies.bind
+    {error source target : Type} {property : target → Prop}
+    (computation : Except error source)
+    (continuation : source → Except error target)
+    (preserves : ∀ value, Except.SuccessSatisfies property
+      (continuation value)) :
+    Except.SuccessSatisfies property (computation.bind continuation) := by
+  cases computation with
+  | error error => trivial
+  | ok value => exact preserves value
+
+private theorem implementationSignatureOfDeclaration_success_id
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
+    {signature : ProgramImplementationSignature}
+    (success : implementationSignatureOfDeclaration environment declaration
+      traits source = .ok signature) :
+    signature.id = declaration.id := by
+  have satisfies : Except.SuccessSatisfies
+      (fun result : ProgramImplementationSignature =>
+        result.id = declaration.id)
+      (implementationSignatureOfDeclaration environment declaration traits
+        source) := by
+    cases scopeEq : validateProgramTypeScope
+        (ProgramTypeScope.ofDeclaration declaration) with
+    | error error =>
+        simp only [implementationSignatureOfDeclaration, scopeEq]
+        change True
+        trivial
+    | ok scopeUnit =>
+        cases scopeUnit
+        simp only [implementationSignatureOfDeclaration, scopeEq]
+        apply Except.SuccessSatisfies.bind
+        intro headTypes
+        cases headTypes with
+        | nil =>
+            change True
+            trivial
+        | cons subject arguments =>
+            apply Except.SuccessSatisfies.bind
+            intro head
+            apply Except.SuccessSatisfies.bind
+            intro trait
+            apply Except.SuccessSatisfies.bind
+            intro parametersChecked
+            apply Except.SuccessSatisfies.bind
+            intro wherePredicates
+            cases traitEq : traits.find? fun candidate =>
+                decide (candidate.id = trait) with
+            | none =>
+                change True
+                trivial
+            | some traitSignature =>
+                apply Except.SuccessSatisfies.bind
+                intro predicatesChecked
+                apply Except.SuccessSatisfies.bind
+                intro unmatchedMethods
+                apply Except.SuccessSatisfies.bind
+                intro methodsChecked
+                apply Except.SuccessSatisfies.bind
+                intro methods
+                rfl
+  simpa [success, Except.SuccessSatisfies] using satisfies
+
+private theorem collectProgramTraits_ids_sublist
+    (environment : ProgramEnvironment)
+    (declarations : List ProgramDeclaration)
+    (state : ProgramTraitBuildState) :
+    ((collectProgramTraits environment declarations state).traits.map
+        (fun signature => signature.id)).Sublist
+      (state.traits.map (fun signature => signature.id) ++
+        (declarations.filter isTraitSignatureDeclaration).map
+          (fun declaration => declaration.id)) := by
+  induction declarations generalizing state with
+  | nil => simp [collectProgramTraits]
+  | cons declaration rest induction =>
+      cases sourceEq : declaration.source.value with
+      | trait source =>
+          simp only [collectProgramTraits, sourceEq]
+          cases signatureEq : traitSignatureOfDeclaration environment declaration
+              source with
+          | error error =>
+              exact (induction _).trans (by
+                simp [List.filter, isTraitSignatureDeclaration, sourceEq])
+          | ok signature =>
+              have idEq := traitSignatureOfDeclaration_success_id signatureEq
+              exact (induction _).trans (by
+                simp [List.filter, isTraitSignatureDeclaration, sourceEq, idEq])
+      | importDecl source | exportDecl source | pragmaDecl source
+      | typeAlias source | enum source | impl source | contract source
+      | function source =>
+          simp only [collectProgramTraits, sourceEq]
+          exact (induction state).trans (by
+            simp [List.filter, isTraitSignatureDeclaration, sourceEq])
+      | error =>
+          simp only [collectProgramTraits, sourceEq]
+          exact (induction state).trans (by
+            simp [List.filter, isTraitSignatureDeclaration, sourceEq])
+
+private theorem append_sublist_append_cons {alpha : Type}
+    (before after : List alpha) (value : alpha) :
+    (before ++ after).Sublist (before ++ value :: after) :=
+  (List.Sublist.refl before).append
+    (List.Sublist.cons value (List.Sublist.refl after))
+
+private theorem collectProgramSignatures_ids_sublist
+    (environment : ProgramEnvironment) (traits : List ProgramTraitSignature)
+    (declarations : List ProgramDeclaration)
+    (state : ProgramSignatureBuildState) :
+    ((collectProgramSignatures environment traits declarations state).functions.map
+        (fun signature => signature.id)).Sublist
+      (state.functions.map (fun signature => signature.id) ++
+        (declarations.filter isFunctionSignatureDeclaration).map
+          (fun declaration => declaration.id)) ∧
+    ((collectProgramSignatures environment traits declarations state).dataTypes.map
+        (fun signature => signature.id)).Sublist
+      (state.dataTypes.map (fun signature => signature.id) ++
+        (declarations.filter isDataSignatureDeclaration).map
+          (fun declaration => declaration.id)) ∧
+    ((collectProgramSignatures environment traits declarations state).implementations.map
+        (fun signature => signature.id)).Sublist
+      (state.implementations.map (fun signature => signature.id) ++
+        (declarations.filter isImplementationSignatureDeclaration).map
+          (fun declaration => declaration.id)) := by
+  induction declarations generalizing state with
+  | nil => simp [collectProgramSignatures]
+  | cons declaration rest induction =>
+      cases sourceEq : declaration.source.value with
+      | typeAlias source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases aliasEq : resolveSignatureAliasBody environment declaration
+              source.value.value with
+          | error error =>
+              simpa [List.filter, isFunctionSignatureDeclaration,
+                isDataSignatureDeclaration,
+                isImplementationSignatureDeclaration, sourceEq] using
+                induction { state with errors := state.errors ++ [error] }
+          | ok type =>
+              simpa [List.filter, isFunctionSignatureDeclaration,
+                isDataSignatureDeclaration,
+                isImplementationSignatureDeclaration, sourceEq] using
+                induction state
+      | enum source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases signatureEq : dataSignatureOfDeclaration environment declaration
+              source with
+          | error error =>
+              obtain ⟨functions, dataTypes, implementations⟩ :=
+                induction { state with errors := state.errors ++ [error] }
+              refine ⟨?_, ?_, ?_⟩
+              · simpa [List.filter, isFunctionSignatureDeclaration,
+                  sourceEq] using functions
+              · exact dataTypes.trans (by
+                  simpa only [List.filter, isDataSignatureDeclaration,
+                    sourceEq, Bool.true_eq, List.map]
+                    using append_sublist_append_cons
+                      (state.dataTypes.map fun signature => signature.id)
+                      ((rest.filter isDataSignatureDeclaration).map
+                        fun candidate => candidate.id)
+                      declaration.id)
+              · simpa [List.filter, isImplementationSignatureDeclaration,
+                  sourceEq] using implementations
+          | ok signature =>
+              have idEq := dataSignatureOfDeclaration_success_id signatureEq
+              simpa [List.filter, isFunctionSignatureDeclaration,
+                isDataSignatureDeclaration,
+                isImplementationSignatureDeclaration, sourceEq, idEq,
+                List.map_append, List.append_assoc] using
+                induction { state with dataTypes := state.dataTypes ++ [signature] }
+      | function source =>
+          simp only [collectProgramSignatures, sourceEq,
+            signatureItemOfDeclaration]
+          cases signatureEq : functionSignatureOfDeclaration environment declaration
+              source with
+          | error error =>
+              obtain ⟨functions, dataTypes, implementations⟩ :=
+                induction { state with errors := state.errors ++ [error] }
+              refine ⟨?_, ?_, ?_⟩
+              · exact functions.trans (by
+                  simpa only [List.filter, isFunctionSignatureDeclaration,
+                    sourceEq, Bool.true_eq, List.map]
+                    using append_sublist_append_cons
+                      (state.functions.map fun signature => signature.id)
+                      ((rest.filter isFunctionSignatureDeclaration).map
+                        fun candidate => candidate.id)
+                      declaration.id)
+              · simpa [List.filter, isDataSignatureDeclaration,
+                  sourceEq, signatureEq, bind, Except.bind] using dataTypes
+              · simpa [List.filter, isImplementationSignatureDeclaration,
+                  sourceEq, signatureEq, bind, Except.bind] using implementations
+          | ok signature =>
+              have idEq := functionSignatureOfDeclaration_success_id signatureEq
+              simpa [List.filter, isFunctionSignatureDeclaration,
+                isDataSignatureDeclaration,
+                isImplementationSignatureDeclaration, sourceEq, idEq,
+                signatureEq, bind, Except.bind, pure, Pure.pure, Except.pure,
+                List.map_append, List.append_assoc] using
+                induction { state with
+                  functions := state.functions ++ [signature]
+                }
+      | impl source =>
+          simp only [collectProgramSignatures, sourceEq,
+            signatureItemOfDeclaration]
+          cases signatureEq : implementationSignatureOfDeclaration environment
+              declaration traits source with
+          | error error =>
+              obtain ⟨functions, dataTypes, implementations⟩ :=
+                induction { state with errors := state.errors ++ [error] }
+              refine ⟨?_, ?_, ?_⟩
+              · simpa [List.filter, isFunctionSignatureDeclaration,
+                  sourceEq, signatureEq, bind, Except.bind] using functions
+              · simpa [List.filter, isDataSignatureDeclaration,
+                  sourceEq, signatureEq, bind, Except.bind] using dataTypes
+              · exact implementations.trans (by
+                  simpa only [List.filter,
+                    isImplementationSignatureDeclaration, sourceEq,
+                    Bool.true_eq, List.map]
+                    using append_sublist_append_cons
+                      (state.implementations.map fun signature => signature.id)
+                      ((rest.filter isImplementationSignatureDeclaration).map
+                        fun candidate => candidate.id)
+                      declaration.id)
+          | ok signature =>
+              have idEq :=
+                implementationSignatureOfDeclaration_success_id signatureEq
+              simpa [List.filter, isFunctionSignatureDeclaration,
+                isDataSignatureDeclaration,
+                isImplementationSignatureDeclaration, sourceEq, idEq,
+                signatureEq, bind, Except.bind, pure, Pure.pure, Except.pure,
+                List.map_append, List.append_assoc] using
+                induction { state with
+                  implementations := state.implementations ++ [signature]
+                }
+      | importDecl source | exportDecl source | pragmaDecl source
+      | trait source | contract source =>
+          simp only [collectProgramSignatures, sourceEq,
+            signatureItemOfDeclaration]
+          simpa [List.filter, isFunctionSignatureDeclaration,
+            isDataSignatureDeclaration,
+            isImplementationSignatureDeclaration, sourceEq] using
+            induction state
+      | error =>
+          simp only [collectProgramSignatures, sourceEq,
+            signatureItemOfDeclaration]
+          simpa [List.filter, isFunctionSignatureDeclaration,
+            isDataSignatureDeclaration,
+            isImplementationSignatureDeclaration, sourceEq] using
+            induction state
+
+private theorem signature_category_ids_nodup
+    (declarations : List ProgramDeclaration)
+    (unique : (declarations.map fun declaration => declaration.id).Nodup) :
+    ((declarations.filter isFunctionSignatureDeclaration).map
+          (fun declaration => declaration.id) ++
+      (declarations.filter isDataSignatureDeclaration).map
+          (fun declaration => declaration.id) ++
+      (declarations.filter isTraitSignatureDeclaration).map
+          (fun declaration => declaration.id) ++
+      (declarations.filter isImplementationSignatureDeclaration).map
+          (fun declaration => declaration.id)).Nodup := by
+  induction declarations with
+  | nil => simp
+  | cons declaration rest induction =>
+      have uniqueParts := List.nodup_cons.mp unique
+      have tailNodup := induction uniqueParts.2
+      have headNotFiltered
+          (selector : ProgramDeclaration → Bool) :
+          declaration.id ∉
+            (rest.filter selector).map (fun candidate => candidate.id) := by
+        intro member
+        apply uniqueParts.1
+        exact ((List.filter_sublist (p := selector)).map
+          (fun candidate : ProgramDeclaration => candidate.id)).subset member
+      have headNotCategories :
+          declaration.id ∉
+            ((rest.filter isFunctionSignatureDeclaration).map
+                (fun candidate => candidate.id) ++
+              (rest.filter isDataSignatureDeclaration).map
+                (fun candidate => candidate.id) ++
+              (rest.filter isTraitSignatureDeclaration).map
+                (fun candidate => candidate.id) ++
+              (rest.filter isImplementationSignatureDeclaration).map
+                (fun candidate => candidate.id)) := by
+        simp only [List.mem_append, not_or]
+        exact ⟨⟨⟨headNotFiltered _, headNotFiltered _⟩,
+          headNotFiltered _⟩, headNotFiltered _⟩
+      have inserted :
+          (declaration.id ::
+            ((rest.filter isFunctionSignatureDeclaration).map
+                (fun candidate => candidate.id) ++
+              (rest.filter isDataSignatureDeclaration).map
+                (fun candidate => candidate.id) ++
+              (rest.filter isTraitSignatureDeclaration).map
+                (fun candidate => candidate.id) ++
+              (rest.filter isImplementationSignatureDeclaration).map
+                (fun candidate => candidate.id))).Nodup :=
+        List.nodup_cons.mpr ⟨headNotCategories, tailNodup⟩
+      cases sourceEq : declaration.source.value with
+      | function _ =>
+          simpa [List.filter, isFunctionSignatureDeclaration,
+            isDataSignatureDeclaration, isTraitSignatureDeclaration,
+            isImplementationSignatureDeclaration, sourceEq] using inserted
+      | enum _ =>
+          apply inserted.perm
+          simpa [List.filter, isFunctionSignatureDeclaration,
+            isDataSignatureDeclaration, isTraitSignatureDeclaration,
+            isImplementationSignatureDeclaration, sourceEq,
+            List.append_assoc] using
+            (List.perm_middle (α := Resolved.DeclarationId)
+              (a := declaration.id)
+              (l₁ := (rest.filter isFunctionSignatureDeclaration).map
+                (fun candidate => candidate.id))
+              (l₂ :=
+                (rest.filter isDataSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isTraitSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isImplementationSignatureDeclaration).map
+                    (fun candidate => candidate.id))).symm
+      | trait _ =>
+          apply inserted.perm
+          simpa [List.filter, isFunctionSignatureDeclaration,
+            isDataSignatureDeclaration, isTraitSignatureDeclaration,
+            isImplementationSignatureDeclaration, sourceEq,
+            List.append_assoc] using
+            (List.perm_middle (α := Resolved.DeclarationId)
+              (a := declaration.id)
+              (l₁ :=
+                (rest.filter isFunctionSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isDataSignatureDeclaration).map
+                    (fun candidate => candidate.id))
+              (l₂ :=
+                (rest.filter isTraitSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isImplementationSignatureDeclaration).map
+                    (fun candidate => candidate.id))).symm
+      | impl _ =>
+          apply inserted.perm
+          simpa [List.filter, isFunctionSignatureDeclaration,
+            isDataSignatureDeclaration, isTraitSignatureDeclaration,
+            isImplementationSignatureDeclaration, sourceEq,
+            List.append_assoc] using
+            (List.perm_middle (α := Resolved.DeclarationId)
+              (a := declaration.id)
+              (l₁ :=
+                (rest.filter isFunctionSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isDataSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isTraitSignatureDeclaration).map
+                    (fun candidate => candidate.id))
+              (l₂ :=
+                (rest.filter isImplementationSignatureDeclaration).map
+                  (fun candidate => candidate.id))).symm
+      | importDecl _ | exportDecl _ | pragmaDecl _ | typeAlias _
+      | contract _ | error =>
+          simpa [List.filter, isFunctionSignatureDeclaration,
+            isDataSignatureDeclaration, isTraitSignatureDeclaration,
+            isImplementationSignatureDeclaration, sourceEq] using tailNodup
+
+/-- Successful collection cannot duplicate a declaration identity across or
+within the four declaration-backed signature categories when the input
+environment itself has unique declaration identities. -/
+theorem buildProgramSignatures_success_declaration_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.functions.map (fun signature => signature.id) ++
+      signatures.dataTypes.map (fun signature => signature.id) ++
+      signatures.traits.map (fun signature => signature.id) ++
+      signatures.implementations.map (fun signature => signature.id)).Nodup := by
+  let traitState := collectProgramTraits environment environment.declarations {}
+  let state := collectProgramSignatures environment traitState.traits
+    environment.declarations {}
+  have traitsSublist :
+      (traitState.traits.map (fun signature => signature.id)).Sublist
+        ((environment.declarations.filter
+          isTraitSignatureDeclaration).map
+            (fun declaration => declaration.id)) := by
+    simpa [traitState] using collectProgramTraits_ids_sublist environment
+      environment.declarations {}
+  have collected := collectProgramSignatures_ids_sublist environment
+    traitState.traits environment.declarations ({} : ProgramSignatureBuildState)
+  have functionsSublist :
+      (state.functions.map (fun signature => signature.id)).Sublist
+        ((environment.declarations.filter
+          isFunctionSignatureDeclaration).map
+            (fun declaration => declaration.id)) := by
+    simpa [state] using collected.1
+  have dataSublist :
+      (state.dataTypes.map (fun signature => signature.id)).Sublist
+        ((environment.declarations.filter isDataSignatureDeclaration).map
+          (fun declaration => declaration.id)) := by
+    simpa [state] using collected.2.1
+  have implementationsSublist :
+      (state.implementations.map (fun signature => signature.id)).Sublist
+        ((environment.declarations.filter
+          isImplementationSignatureDeclaration).map
+            (fun declaration => declaration.id)) := by
+    simpa [state] using collected.2.2
+  have allSublist :=
+    ((functionsSublist.append dataSublist).append traitsSublist).append
+      implementationsSublist
+  have collectedNodup :=
+    allSublist.nodup
+      (signature_category_ids_nodup environment.declarations environmentIds)
+  simp only [buildProgramSignatures] at success
+  split at success
+  · injection success with signaturesEq
+    subst signatures
+    simpa [traitState, state] using collectedNodup
+  · simp at success
+
 end Solcore.Frontend

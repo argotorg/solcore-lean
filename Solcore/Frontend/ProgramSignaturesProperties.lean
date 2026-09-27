@@ -34,4 +34,54 @@ theorem buildProgramSignatures_success_implRule_mem_iff
   rw [buildProgramSignatures_success_implRules_eq success]
   simp
 
+/-- Function declaration identities are unique after successful signature
+collection from an environment with unique declaration identities. -/
+theorem buildProgramSignatures_success_function_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.functions.map fun signature => signature.id).Nodup := by
+  have all := buildProgramSignatures_success_declaration_ids_nodup
+    environmentIds success
+  exact (List.nodup_append.mp
+    (List.nodup_append.mp (List.nodup_append.mp all).1).1).1
+
+/-- Data declaration identities are unique after successful signature
+collection from an environment with unique declaration identities. -/
+theorem buildProgramSignatures_success_data_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.dataTypes.map fun signature => signature.id).Nodup := by
+  have all := buildProgramSignatures_success_declaration_ids_nodup
+    environmentIds success
+  exact (List.nodup_append.mp
+    (List.nodup_append.mp (List.nodup_append.mp all).1).1).2.1
+
+/-- Trait declaration identities are unique after successful signature
+collection from an environment with unique declaration identities. -/
+theorem buildProgramSignatures_success_trait_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.traits.map fun signature => signature.id).Nodup := by
+  have all := buildProgramSignatures_success_declaration_ids_nodup
+    environmentIds success
+  exact (List.nodup_append.mp (List.nodup_append.mp all).1).2.1
+
+/-- Implementation declaration identities are unique after successful
+signature collection from an environment with unique declaration identities. -/
+theorem buildProgramSignatures_success_implementation_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.implementations.map fun signature => signature.id).Nodup := by
+  have all := buildProgramSignatures_success_declaration_ids_nodup
+    environmentIds success
+  exact (List.nodup_append.mp all).2.1
+
 end Solcore.Frontend
