@@ -10,6 +10,29 @@ namespace Solcore.SourceSemantics.SourceInferenceSoundness
 
 open Frontend SourceInference
 
+private theorem requirementId_beq_iff_eq
+    (left right : RequirementId) :
+    (left == right) = true ↔ left = right := by
+  rw [show (left == right) = (left.index == right.index) by rfl]
+  rw [beq_iff_eq]
+  constructor
+  · intro indices_eq
+    cases left
+    cases right
+    cases indices_eq
+    rfl
+  · intro same
+    exact congrArg RequirementId.index same
+
+private theorem requirementId_contains_iff_mem
+    (id : RequirementId) (ids : List RequirementId) :
+    ids.contains id = true ↔ id ∈ ids := by
+  induction ids with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.contains_cons, List.mem_cons]
+      rw [Bool.or_eq_true, requirementId_beq_iff_eq, induction]
+
 /-- Successful normalized predicate solving retains declaratively valid
 evidence.  The available assumptions are normalized exactly once by the same
 inference substitution used by the executable solver. -/
@@ -71,6 +94,69 @@ theorem solvePredicate_sound
       context.signatures.resolutionRules
       (Detail.applyPredicate state source) retained := by
   exact solveNormalizedPredicate_sound success
+
+/-- An ordinary solved ledger row inherits the predicate solver's evidence
+validity once the executable and declarative contexts agree on the catalog and
+on the normalized declaration assumptions. -/
+theorem solveRequirementEvidence_ordinary_sound
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirement : Requirement}
+    {retained : PredicateEvidence}
+    {semanticContext : SourceSemantics.Context}
+    (ordinary : requirement.id ∉ state.localSchemeAssumptions)
+    (signatures_eq : semanticContext.signatures = inferenceContext.signatures)
+    (assumptions_eq : semanticContext.assumptions =
+      inferenceContext.assumptions.map (Detail.applyPredicate state))
+    (success : Detail.solveRequirementEvidence inferenceContext state
+      requirement = .ok retained) :
+    SolvedRequirementValid semanticContext {
+      id := requirement.id
+      predicate := Detail.applyPredicate state requirement.predicate
+      evidence := retained
+    } := by
+  have ordinaryContains :
+      state.localSchemeAssumptions.contains requirement.id = false := by
+    cases containsEq : state.localSchemeAssumptions.contains requirement.id with
+    | false => rfl
+    | true =>
+        exact False.elim
+          (ordinary ((requirementId_contains_iff_mem _ _).mp containsEq))
+  have normalizedSuccess :
+      Detail.solveNormalizedPredicate inferenceContext state
+          (Detail.applyPredicate state requirement.predicate) = .ok retained := by
+    unfold Detail.solveRequirementEvidence at success
+    rw [ordinaryContains] at success
+    simpa using success
+  apply SolvedRequirementValid.intro
+  rw [signatures_eq, assumptions_eq]
+  exact solveNormalizedPredicate_sound normalizedSuccess
+
+/-- Qualified-local template rows bypass trait search and retain exactly an
+assumption for their normalized predicate. -/
+theorem solveRequirementEvidence_template_eq
+    {context : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirement : Requirement}
+    {retained : PredicateEvidence}
+    (template : requirement.id ∈ state.localSchemeAssumptions)
+    (success : Detail.solveRequirementEvidence context state requirement =
+      .ok retained) :
+    retained = .assumption
+      (Detail.applyPredicate state requirement.predicate) := by
+  have templateContains :
+      state.localSchemeAssumptions.contains requirement.id = true := by
+    exact (requirementId_contains_iff_mem _ _).mpr template
+  have retainedEq :
+      (.assumption (Detail.applyPredicate state requirement.predicate) :
+        PredicateEvidence) = retained := by
+    unfold Detail.solveRequirementEvidence at success
+    rw [templateContains] at success
+    change Except.ok (.assumption
+      (Detail.applyPredicate state requirement.predicate)) =
+        Except.ok retained at success
+    exact Except.ok.inj success
+  exact retainedEq.symm
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
 

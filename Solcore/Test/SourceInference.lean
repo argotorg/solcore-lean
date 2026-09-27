@@ -96,6 +96,22 @@ private def solverRegressionState : SourceInference.State := {
   }
 }
 
+private def solverRegressionRequirement : SourceInference.Requirement := {
+  id := ⟨0⟩
+  predicate := solverRegressionSource
+}
+
+private def solverRegressionSemanticContext :
+    Solcore.SourceSemantics.Context :=
+  (Solcore.SourceSemantics.Context.ofSignatures
+    solverRegressionContext.signatures).withAssumptions
+      [solverRegressionNormalized]
+
+private def solverRegressionTemplateState : SourceInference.State := {
+  solverRegressionState with
+  localSchemeAssumptions := [solverRegressionRequirement.id]
+}
+
 /-- This equation fails if the already-normalized head is passed through
 `solvePredicate` and receives the inference substitution a second time. -/
 example : SourceInference.Detail.solvePredicates solverRegressionContext
@@ -129,6 +145,35 @@ example : Solcore.SourceSemantics.RetainedEvidenceValid
       (state := solverRegressionState)
       (goal := ProgramSignatures.builtinIntPredicate .word)
       (by rfl)
+
+example : Solcore.SourceSemantics.SolvedRequirementValid
+    solverRegressionSemanticContext {
+      id := solverRegressionRequirement.id
+      predicate := solverRegressionNormalized
+      evidence := .assumption solverRegressionNormalized
+    } := by
+  exact
+    Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvidence_ordinary_sound
+        (inferenceContext := solverRegressionContext)
+        (state := solverRegressionState)
+        (requirement := solverRegressionRequirement)
+        (retained := .assumption solverRegressionNormalized)
+        (semanticContext := solverRegressionSemanticContext)
+        (by
+          change solverRegressionRequirement.id ∉ []
+          simp) rfl rfl (by rfl)
+
+example {retained : SourceInference.PredicateEvidence}
+    (success : SourceInference.Detail.solveRequirementEvidence
+      solverRegressionContext solverRegressionTemplateState
+      solverRegressionRequirement = .ok retained) :
+    retained = .assumption solverRegressionNormalized := by
+  exact
+    Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvidence_template_eq
+        (context := solverRegressionContext)
+        (state := solverRegressionTemplateState)
+        (requirement := solverRegressionRequirement)
+        (by simp [solverRegressionTemplateState]) success
 
 private def integerLiteralRows
     (function : SourceInference.CheckedFunction) :
