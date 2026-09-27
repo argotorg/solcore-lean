@@ -859,6 +859,68 @@ theorem coercionPlan?_some_committedPathValid_at
   exact committedCoercionStepValid (state := later) correspondence
     normalizedProfile solve_success solved_eq valid
 
+/-- Expected-type fitting yields a semantically valid output-coercion path
+after the enclosing inference traversal has finished.  An absent expectation
+or successful unification gives the empty path; a mismatch reuses the exact
+planned and committed path exposed by `withExpected_success_cases`. -/
+theorem withExpected_success_coercionPathValid_afterFinalization
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state later : Frontend.SourceInference.State}
+    {actual : InferredExpression}
+    {expected : Option TypeSystem.Ty}
+    {result : Detail.ExpectationResult}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext semanticContext : SourceSemantics.Context}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.withExpected inferenceContext state actual expected =
+      .ok result)
+    (trait_success :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profile_success :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (requirements_subset : result.state.requirements ⊆ later.requirements)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext
+        semanticContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solve_success : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    CoercionPathValid semanticContext
+      (later.inference.substitution.apply
+        (result.state.resolve actual.type))
+      (later.inference.substitution.apply result.expression.type)
+      (result.coercions.map
+        (CoercionStep.applySubstitution later.inference.substitution)) := by
+  rcases Detail.withExpected_success_cases success with
+    ⟨coercions_eq, requirements_eq, type_eq⟩ |
+      ⟨expectedType, plan, expected_eq, plan_success, result_eq⟩
+  · rw [coercions_eq]
+    simp only [List.map_nil]
+    rw [type_eq]
+    exact .nil _
+  · subst expected
+    subst result
+    change CoercionPathValid semanticContext
+      (later.inference.substitution.apply
+        ((Detail.commitCoercionPlan state plan).2.resolve actual.type))
+      (later.inference.substitution.apply (state.resolve expectedType))
+      ((Detail.commitCoercionPlan state plan).1.map
+        (CoercionStep.applySubstitution later.inference.substitution))
+    rw [Detail.commitCoercionPlan_resolve]
+    exact coercionPlan?_some_committedPathValid_at trait_success
+      profile_success plan_success requirements_subset catalog contextValid
+      signatures_eq trait_name solve_success solved_eq valid
+
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
 predicate. -/
