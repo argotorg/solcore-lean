@@ -139,6 +139,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_witness
 example := @Solcore.Frontend.SourceInference.FunctionBodiesChecked
+example :=
+  @Solcore.Frontend.SourceInference.FunctionBodiesChecked.exists_signature_of_function_mem
 example := @Solcore.Frontend.SourceInference.State.Header
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_state_header
@@ -167,6 +169,10 @@ example := @Solcore.Frontend.checkImplementationMethodBodies
 example := @Solcore.Frontend.checkImplementationMethodBodies_success_ids
 example :=
   @Solcore.Frontend.checkImplementationMethodBodies_success_corresponds
+example :=
+  @Solcore.Frontend.ImplementationMethodBodiesChecked.exists_target_of_method_mem
+example :=
+  @Solcore.Frontend.checkImplementationMethodBodies_success_member
 example := @Solcore.Frontend.checkLoadedProgram_success_environment
 example := @Solcore.Frontend.checkLoadedProgram_success_signatures
 example := @Solcore.Frontend.checkLoadedProgram_success_signature_formation
@@ -186,10 +192,14 @@ example :=
   @Solcore.Frontend.checkLoadedProgram_success_implementation_method_catalog_validated
 example := @Solcore.Frontend.checkLoadedProgram_success_ids
 example := @Solcore.Frontend.checkLoadedProgram_success_body_checks
+example := @Solcore.Frontend.checkLoadedProgram_success_function_body
+example := @Solcore.Frontend.checkLoadedProgram_success_method_body
 example := @Solcore.Frontend.checkProgram_success_load
 example := @Solcore.Frontend.checkProgram_success_signature_formation
 example := @Solcore.Frontend.checkProgram_success_ids
 example := @Solcore.Frontend.checkProgram_success_body_checks
+example := @Solcore.Frontend.checkProgram_success_function_body
+example := @Solcore.Frontend.checkProgram_success_method_body
 example := @Solcore.Frontend.checkProgram_success_declarations_nodup
 example := @Solcore.Frontend.checkProgram_success_signature_declaration_ids_nodup
 example :=

@@ -207,6 +207,34 @@ inductive ImplementationMethodBodiesChecked
       ImplementationMethodBodiesChecked environment signatures fuel
         (target :: remaining) (method :: methods)
 
+namespace ImplementationMethodBodiesChecked
+
+/-- Every retained checked method comes from one exact target in the flattened
+implementation-method checking order. -/
+theorem exists_target_of_method_mem
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {fuel : Nat}
+    {targets : List ImplementationMethodCheckTarget}
+    {methods : List CheckedImplementationMethod}
+    (checked : ImplementationMethodBodiesChecked environment signatures fuel
+      targets methods)
+    {method : CheckedImplementationMethod}
+    (member : method ∈ methods) :
+    ∃ target, target ∈ targets ∧
+      ImplementationMethodBodyChecked environment signatures fuel target
+        method := by
+  induction checked with
+  | nil => simp at member
+  | @cons target remaining headMethod tailMethods head tail induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · exact ⟨target, by simp, head⟩
+      · obtain ⟨found, foundMember, foundChecked⟩ := induction member
+        exact ⟨found, by simp [foundMember], foundChecked⟩
+
+end ImplementationMethodBodiesChecked
+
 private theorem checkImplementationMethodBodiesAux_success_ids
     (environment : ProgramEnvironment)
     (signatures : ProgramSignatures)
@@ -356,6 +384,37 @@ theorem checkImplementationMethodBodies_success_corresponds
               methods resultEq
         simpa using methodsEq ▸ corresponds
       · simp [errorsEmpty] at success
+
+/-- Every successfully retained method exposes its catalog membership, trait
+lookup, stable identity, and exact synthetic-signature body-check equation. -/
+theorem checkImplementationMethodBodies_success_member
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {fuel : Nat}
+    {methods : List CheckedImplementationMethod}
+    (success : checkImplementationMethodBodies environment signatures fuel =
+      .ok methods)
+    {checked : CheckedImplementationMethod}
+    (member : checked ∈ methods) :
+    ∃ implementation method trait,
+      implementation ∈ signatures.implementations ∧
+        method ∈ implementation.methods ∧
+          signatures.trait? method.traitMethod.trait = some trait ∧
+            checked.id = method.id ∧
+              SourceInference.checkFunctionBody environment signatures
+                (implementation.functionSignatureOfMethodWithTrait trait method)
+                  fuel = .ok checked.checked := by
+  obtain ⟨target, targetMember, targetChecked⟩ :=
+    (checkImplementationMethodBodies_success_corresponds success)
+      |>.exists_target_of_method_mem member
+  rcases target with ⟨implementation, method⟩
+  have catalogMember : implementation ∈ signatures.implementations ∧
+      method ∈ implementation.methods := by
+    simpa [implementationMethodCheckTargets] using targetMember
+  cases targetChecked with
+  | @intro trait idEq traitLookup bodySuccess =>
+      exact ⟨implementation, method, trait, catalogMember.1,
+        catalogMember.2, traitLookup, idEq, bodySuccess⟩
 
 /-- Check an already loaded program while retaining its environment and the
 resolved signature/implementation catalog in the successful result. -/
@@ -609,6 +668,44 @@ theorem checkLoadedProgram_success_body_checks
     checkImplementationMethodBodies_success_corresponds methodsResult
   ⟩
 
+/-- Recover the exact catalog signature and body-check equation for any
+function retained by successful loaded-program checking. -/
+theorem checkLoadedProgram_success_function_body
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked)
+    {function : SourceInference.CheckedFunction}
+    (member : function ∈ checked.functions) :
+    ∃ signature, signature ∈ checked.signatures.functions ∧
+      SourceInference.checkFunctionBody checked.environment checked.signatures
+        signature fuel = .ok function := by
+  exact (checkLoadedProgram_success_body_checks success).1
+    |>.exists_signature_of_function_mem member
+
+/-- Recover the exact implementation, method, selected trait, and synthetic
+body-check equation for any method retained by successful loaded checking. -/
+theorem checkLoadedProgram_success_method_body
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked)
+    {checkedMethod : CheckedImplementationMethod}
+    (member : checkedMethod ∈ checked.methods) :
+    ∃ implementation method trait,
+      implementation ∈ checked.signatures.implementations ∧
+        method ∈ implementation.methods ∧
+          checked.signatures.trait? method.traitMethod.trait = some trait ∧
+            checkedMethod.id = method.id ∧
+              SourceInference.checkFunctionBody checked.environment
+                checked.signatures
+                (implementation.functionSignatureOfMethodWithTrait trait method)
+                  fuel = .ok checkedMethod.checked := by
+  obtain ⟨_, _, _, _, _, functionsResult, methodsResult, checkedEq⟩ :=
+    checkLoadedProgram_success_components success
+  subst checked
+  exact checkImplementationMethodBodies_success_member methodsResult member
+
 /-- Validate, parse, catalog, resolve, and check every top-level function and
 implementation-method body in canonical declaration order. -/
 def checkProgram (raw : Workspace.RawWorkspace) (fuel : Nat := 1024) :
@@ -673,6 +770,42 @@ theorem checkProgram_success_body_checks
           checked.methods := by
   obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
   exact checkLoadedProgram_success_body_checks checkedSuccess
+
+/-- Raw checker success exposes one exact catalog signature and body-check
+equation for every retained top-level function. -/
+theorem checkProgram_success_function_body
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked)
+    {function : SourceInference.CheckedFunction}
+    (member : function ∈ checked.functions) :
+    ∃ signature, signature ∈ checked.signatures.functions ∧
+      SourceInference.checkFunctionBody checked.environment checked.signatures
+        signature fuel = .ok function := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_function_body checkedSuccess member
+
+/-- Raw checker success exposes the complete synthetic-signature provenance
+for every retained implementation method. -/
+theorem checkProgram_success_method_body
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked)
+    {checkedMethod : CheckedImplementationMethod}
+    (member : checkedMethod ∈ checked.methods) :
+    ∃ implementation method trait,
+      implementation ∈ checked.signatures.implementations ∧
+        method ∈ implementation.methods ∧
+          checked.signatures.trait? method.traitMethod.trait = some trait ∧
+            checkedMethod.id = method.id ∧
+              SourceInference.checkFunctionBody checked.environment
+                checked.signatures
+                (implementation.functionSignatureOfMethodWithTrait trait method)
+                  fuel = .ok checkedMethod.checked := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_method_body checkedSuccess member
 
 /-- A successfully checked raw workspace retains pairwise distinct declaration
 identities in its checked environment. -/

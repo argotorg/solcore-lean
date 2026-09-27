@@ -284,6 +284,33 @@ inductive FunctionBodiesChecked
       FunctionBodiesChecked environment signatures fuel
         (signature :: remaining) (function :: functions)
 
+namespace FunctionBodiesChecked
+
+/-- Every retained checked function has a catalog member whose exact
+body-checking equation produced it. -/
+theorem exists_signature_of_function_mem
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {fuel : Nat}
+    {catalog : List ProgramFunctionSignature}
+    {functions : List CheckedFunction}
+    (checked : FunctionBodiesChecked environment signatures fuel catalog
+      functions)
+    {function : CheckedFunction}
+    (member : function ∈ functions) :
+    ∃ signature, signature ∈ catalog ∧
+      checkFunctionBody environment signatures signature fuel = .ok function := by
+  induction checked with
+  | nil => simp at member
+  | @cons signature remaining headFunction tailFunctions head tail induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · exact ⟨signature, by simp, head⟩
+      · obtain ⟨found, foundMember, foundSuccess⟩ := induction member
+        exact ⟨found, by simp [foundMember], foundSuccess⟩
+
+end FunctionBodiesChecked
+
 private def checkFunctionBodiesAux (environment : ProgramEnvironment)
     (signatures : ProgramSignatures) (fuel : Nat) :
     List ProgramFunctionSignature → List CheckedFunction → List FunctionError →
