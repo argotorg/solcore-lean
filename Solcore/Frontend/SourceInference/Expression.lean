@@ -427,14 +427,46 @@ def coercionRequirements (coercions : List CoercionStep) :
     List RequirementId :=
   coercions.flatMap (·.requirements)
 
+private def nominalTypePartsAux? (type : Ty) (arguments : List Ty) :
+    Option (Resolved.DeclarationId × List Ty) :=
+  match type with
+  | .application function argument =>
+      nominalTypePartsAux? function (argument :: arguments)
+  | .constructor (.declaration declaration) => some (declaration, arguments)
+  | _ => none
+
 private def nominalTypeParts? (type : Ty) :
     Option (Resolved.DeclarationId × List Ty) :=
-  let rec loop (type : Ty) (arguments : List Ty) :=
-    match type with
-    | .application function argument => loop function (argument :: arguments)
-    | .constructor (.declaration declaration) => some (declaration, arguments)
-    | _ => none
-  loop type []
+  nominalTypePartsAux? type []
+
+private theorem nominalTypePartsAux?_success_reconstruct
+    {type : Ty} {arguments : List Ty}
+    {declaration : Resolved.DeclarationId} {resultArguments : List Ty}
+    (success : nominalTypePartsAux? type arguments =
+      some (declaration, resultArguments)) :
+    Ty.applyMany type arguments = Ty.nominal declaration resultArguments := by
+  induction type generalizing arguments with
+  | application function argument induction =>
+      exact induction success
+  | constructor constructor =>
+      cases constructor with
+      | builtin builtin => simp [nominalTypePartsAux?] at success
+      | declaration candidate =>
+          simp only [nominalTypePartsAux?, Option.some.injEq,
+            Prod.mk.injEq] at success
+          rcases success with ⟨rfl, rfl⟩
+          rfl
+  | «variable» | parameter | function | product | mapping | proxy | comptime
+  | error =>
+      simp [nominalTypePartsAux?] at success
+
+private theorem nominalTypeParts?_success_reconstruct
+    {type : Ty} {declaration : Resolved.DeclarationId}
+    {arguments : List Ty}
+    (success : nominalTypeParts? type = some (declaration, arguments)) :
+    type = Ty.nominal declaration arguments := by
+  simpa only [nominalTypeParts?, Ty.applyMany, List.foldl_nil] using
+    nominalTypePartsAux?_success_reconstruct success
 
 private structure AccessibleDataType where
   signature : ProgramDataSignature
@@ -458,6 +490,56 @@ private def dataSignaturesForPublicEntities (context : Context)
     let signature ← context.signatures.dataType? entity.declaration.id
     pure { signature, constructors := entity.constructors }
 
+private theorem dataType?_success_member
+    {signatures : ProgramSignatures} {id : Resolved.DeclarationId}
+    {dataType : ProgramDataSignature}
+    (success : signatures.dataType? id = some dataType) :
+    dataType ∈ signatures.dataTypes := by
+  apply List.mem_of_find?_eq_some
+  simpa [ProgramSignatures.dataType?] using success
+
+private theorem dataType?_success_id
+    {signatures : ProgramSignatures} {id : Resolved.DeclarationId}
+    {dataType : ProgramDataSignature}
+    (success : signatures.dataType? id = some dataType) :
+    dataType.id = id := by
+  have rawFound : signatures.dataTypes.find?
+      (fun candidate => decide (candidate.id = id)) = some dataType := by
+    simpa [ProgramSignatures.dataType?] using success
+  have accepted : decide (dataType.id = id) = true :=
+    List.find?_some
+      (p := fun candidate : ProgramDataSignature =>
+        decide (candidate.id = id)) rawFound
+  exact of_decide_eq_true accepted
+
+private theorem dataSignaturesForImportedTypes_members
+    (context : Context) (types : List ProgramImportedType) :
+    ∀ accessible ∈ dataSignaturesForImportedTypes context types,
+      accessible.signature ∈ context.signatures.dataTypes := by
+  intro accessible member
+  simp only [dataSignaturesForImportedTypes, List.mem_filterMap] at member
+  obtain ⟨imported, _, produced⟩ := member
+  cases found : context.signatures.dataType? imported.declaration.id with
+  | none => simp [found, pure, Pure.pure] at produced
+  | some signature =>
+      simp [found, pure, Pure.pure] at produced
+      subst accessible
+      exact dataType?_success_member found
+
+private theorem dataSignaturesForPublicEntities_members
+    (context : Context) (entities : List ProgramPublicEntity) :
+    ∀ accessible ∈ dataSignaturesForPublicEntities context entities,
+      accessible.signature ∈ context.signatures.dataTypes := by
+  intro accessible member
+  simp only [dataSignaturesForPublicEntities, List.mem_filterMap] at member
+  obtain ⟨entity, _, produced⟩ := member
+  cases found : context.signatures.dataType? entity.declaration.id with
+  | none => simp [found, pure, Pure.pure] at produced
+  | some signature =>
+      simp [found, pure, Pure.pure] at produced
+      subst accessible
+      exact dataType?_success_member found
+
 private def visibleDataTypesNamed (context : Context) (name : String) :
     Except Error (List AccessibleDataType) :=
   let localDataTypes := context.signatures.dataTypes.filter fun dataType =>
@@ -471,6 +553,33 @@ private def visibleDataTypesNamed (context : Context) (name : String) :
     | .ok visibility =>
         pure (dataSignaturesForImportedTypes context
           (visibility.typeBindingsNamed name))
+
+private theorem visibleDataTypesNamed_success_members
+    {context : Context} {name : String} {dataTypes : List AccessibleDataType}
+    (success : visibleDataTypesNamed context name = .ok dataTypes) :
+    ∀ accessible ∈ dataTypes,
+      accessible.signature ∈ context.signatures.dataTypes := by
+  let localDataTypes := context.signatures.dataTypes.filter fun dataType =>
+    dataType.name == name &&
+      decide (dataType.id.moduleId = context.scope.currentModule)
+  by_cases localEmpty : localDataTypes = []
+  · cases imported : buildProgramImports context.environment
+      context.scope.currentModule with
+    | error errors =>
+        simp [visibleDataTypesNamed, localDataTypes, localEmpty, imported]
+          at success
+    | ok visibility =>
+        simp [visibleDataTypesNamed, localDataTypes, localEmpty, imported,
+          pure, Pure.pure, Except.pure] at success
+        subst dataTypes
+        exact dataSignaturesForImportedTypes_members context
+          (visibility.typeBindingsNamed name)
+  · simp [visibleDataTypesNamed, localDataTypes, localEmpty, pure,
+      Pure.pure, Except.pure] at success
+    subst dataTypes
+    intro accessible member
+    rcases List.mem_map.mp member with ⟨dataType, dataTypeMember, rfl⟩
+    exact (List.mem_filter.mp dataTypeMember).1
 
 private def qualifiedDataTypesNamed (context : Context)
     (qualifiers : List String) : Except Error (List AccessibleDataType) := do
@@ -490,6 +599,63 @@ private def qualifiedDataTypesNamed (context : Context)
         else
           pure []
 
+private theorem qualifiedDataTypesNamed_success_members
+    {context : Context} {qualifiers : List String}
+    {dataTypes : List AccessibleDataType}
+    (success : qualifiedDataTypesNamed context qualifiers = .ok dataTypes) :
+    ∀ accessible ∈ dataTypes,
+      accessible.signature ∈ context.signatures.dataTypes := by
+  have afterTypeName : ∀ typeName,
+      (if qualifiers.dropLast.isEmpty then
+        visibleDataTypesNamed context typeName
+      else
+        match buildProgramImports context.environment
+            context.scope.currentModule with
+        | .error errors => throw (.importVisibility errors)
+        | .ok visibility =>
+            if visibility.hasNamespaceRoot qualifiers.dropLast then
+              pure (dataSignaturesForPublicEntities context
+                (visibility.typeEntitiesInNamespacePathNamed
+                  qualifiers.dropLast typeName))
+            else
+              pure []) = .ok dataTypes →
+        ∀ accessible ∈ dataTypes,
+          accessible.signature ∈ context.signatures.dataTypes := by
+    intro typeName reduced
+    cases pathEmpty : qualifiers.dropLast.isEmpty with
+    | true =>
+        apply visibleDataTypesNamed_success_members
+        simpa [pathEmpty] using reduced
+    | false =>
+        cases imported : buildProgramImports context.environment
+            context.scope.currentModule with
+        | error errors =>
+            simp [pathEmpty, imported] at reduced
+        | ok visibility =>
+            cases namespaceRoot : visibility.hasNamespaceRoot
+                qualifiers.dropLast with
+            | false =>
+                simp [pathEmpty, imported, namespaceRoot, pure, Pure.pure,
+                  Except.pure] at reduced
+                subst dataTypes
+                simp
+            | true =>
+                simp [pathEmpty, imported, namespaceRoot, pure, Pure.pure,
+                  Except.pure] at reduced
+                subst dataTypes
+                exact dataSignaturesForPublicEntities_members context
+                  (visibility.typeEntitiesInNamespacePathNamed
+                    qualifiers.dropLast typeName)
+  cases last : qualifiers.getLast? with
+  | none =>
+      apply afterTypeName ""
+      simpa [qualifiedDataTypesNamed, last, bind, Except.bind, pure, Pure.pure,
+        Except.pure] using success
+  | some typeName =>
+      apply afterTypeName typeName
+      simpa [qualifiedDataTypesNamed, last, bind, Except.bind, pure, Pure.pure,
+        Except.pure] using success
+
 private def constructorsInDataTypes (dataTypes : List AccessibleDataType)
     (name : String) :
     List (ProgramDataSignature × ProgramDataConstructorSignature) :=
@@ -499,6 +665,40 @@ private def constructorsInDataTypes (dataTypes : List AccessibleDataType)
         some (dataType.signature, constructor)
       else none
 
+private theorem constructorsInDataTypes_member_origin
+    {dataTypes : List AccessibleDataType} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    (member : (dataType, constructor) ∈
+      constructorsInDataTypes dataTypes name) :
+    ∃ accessible ∈ dataTypes,
+      dataType = accessible.signature ∧
+        constructor ∈ accessible.signature.constructors := by
+  unfold constructorsInDataTypes at member
+  rcases List.mem_flatMap.mp member with
+    ⟨accessible, accessibleMember, constructorMember⟩
+  simp only [List.mem_filterMap] at constructorMember
+  obtain ⟨candidate, candidateMember, produced⟩ := constructorMember
+  split at produced
+  · simp only [Option.some.injEq, Prod.mk.injEq] at produced
+    rcases produced with ⟨dataTypeEq, rfl⟩
+    exact ⟨accessible, accessibleMember, dataTypeEq.symm, candidateMember⟩
+  · contradiction
+
+private theorem constructorsInDataTypes_member_facts
+    {context : Context} {dataTypes : List AccessibleDataType} {name : String}
+    (cataloged : ∀ accessible ∈ dataTypes,
+      accessible.signature ∈ context.signatures.dataTypes)
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    (member : (dataType, constructor) ∈
+      constructorsInDataTypes dataTypes name) :
+    dataType ∈ context.signatures.dataTypes ∧
+      constructor ∈ dataType.constructors := by
+  rcases constructorsInDataTypes_member_origin member with
+    ⟨accessible, accessibleMember, rfl, constructorMember⟩
+  exact ⟨cataloged accessible accessibleMember, constructorMember⟩
+
 private def exactConstructorCandidate (qualifiers : List String) (name : String) :
     List (ProgramDataSignature × ProgramDataConstructorSignature) →
       Except Error (ProgramDataSignature × ProgramDataConstructorSignature)
@@ -507,13 +707,56 @@ private def exactConstructorCandidate (qualifiers : List String) (name : String)
   | candidates => throw (.ambiguousConstructor qualifiers name
       (candidates.map fun candidate => candidate.2.id))
 
-private def explicitConstructorCandidate (context : Context)
+private theorem exactConstructorCandidate_success_member
+    {qualifiers : List String} {name : String}
+    {candidates : List
+      (ProgramDataSignature × ProgramDataConstructorSignature)}
+    {candidate : ProgramDataSignature × ProgramDataConstructorSignature}
+    (success : exactConstructorCandidate qualifiers name candidates =
+      .ok candidate) :
+    candidate ∈ candidates := by
+  cases candidates with
+  | nil =>
+      simp [exactConstructorCandidate] at success
+  | cons head tail =>
+      cases tail with
+      | nil =>
+          simp [exactConstructorCandidate, pure, Pure.pure, Except.pure]
+            at success
+          subst candidate
+          simp
+      | cons second rest =>
+          simp [exactConstructorCandidate] at success
+
+def explicitConstructorCandidate (context : Context)
     (qualifiers : List String) (name : String) :
     Except Error (ProgramDataSignature × ProgramDataConstructorSignature) := do
   exactConstructorCandidate qualifiers name
     (constructorsInDataTypes (← qualifiedDataTypesNamed context qualifiers) name)
 
-private def contextualConstructorCandidate (context : Context) (state : State)
+/-- An explicitly selected constructor comes from the whole-program data
+catalog and from the constructor list of its selected data declaration. -/
+theorem explicitConstructorCandidate_success_members
+    {context : Context} {qualifiers : List String} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    (success : explicitConstructorCandidate context qualifiers name =
+      .ok (dataType, constructor)) :
+    dataType ∈ context.signatures.dataTypes ∧
+      constructor ∈ dataType.constructors := by
+  cases found : qualifiedDataTypesNamed context qualifiers with
+  | error errors =>
+      simp [explicitConstructorCandidate, found, bind, Except.bind] at success
+  | ok dataTypes =>
+      have selected : (dataType, constructor) ∈
+          constructorsInDataTypes dataTypes name := by
+        apply exactConstructorCandidate_success_member
+        simpa [explicitConstructorCandidate, found, bind, Except.bind, pure,
+          Pure.pure, Except.pure] using success
+      exact constructorsInDataTypes_member_facts
+        (qualifiedDataTypesNamed_success_members found) selected
+
+def contextualConstructorCandidate (context : Context) (state : State)
     (expected : Option Ty) (name : String) :
     Except Error (ProgramDataSignature × ProgramDataConstructorSignature × List Ty) := do
   let expected ← match expected with
@@ -541,7 +784,131 @@ private def contextualConstructorCandidate (context : Context) (state : State)
     }] name)
   pure (constructor.1, constructor.2, arguments)
 
-private def instantiateDataConstructor
+/-- Contextual constructor selection preserves both catalog provenance and
+the nominal expected type that supplied its type arguments. -/
+theorem contextualConstructorCandidate_success_facts
+    {context : Context} {state : State} {expected : Option Ty} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
+    (success : contextualConstructorCandidate context state expected name =
+      .ok (dataType, constructor, arguments)) :
+    dataType ∈ context.signatures.dataTypes ∧
+      constructor ∈ dataType.constructors ∧
+      ∃ expectedType,
+        expected = some expectedType ∧
+          state.resolve expectedType = Ty.nominal dataType.id arguments := by
+  cases expected with
+  | none =>
+      simp [contextualConstructorCandidate, bind, Except.bind, pure,
+        Pure.pure, Except.pure] at success
+  | some expectedType =>
+      cases parts : nominalTypeParts? (state.resolve expectedType) with
+      | none =>
+          simp [contextualConstructorCandidate, parts, bind, Except.bind, pure,
+            Pure.pure, Except.pure] at success
+      | some result =>
+          rcases result with ⟨declaration, sourceArguments⟩
+          have nominal := nominalTypeParts?_success_reconstruct parts
+          cases found : context.signatures.dataType? declaration with
+          | none =>
+              simp [contextualConstructorCandidate, parts, found, bind,
+                Except.bind, pure, Pure.pure, Except.pure] at success
+          | some sourceDataType =>
+              have sourceDataTypeMember :
+                  sourceDataType ∈ context.signatures.dataTypes :=
+                dataType?_success_member found
+              have nominalSource : state.resolve expectedType =
+                  Ty.nominal sourceDataType.id sourceArguments := by
+                rw [dataType?_success_id found]
+                exact nominal
+              have selectedFacts : ∀ visibility selectedDataType
+                  selectedConstructor,
+                  exactConstructorCandidate [] name
+                    (constructorsInDataTypes [{
+                      signature := sourceDataType
+                      constructors := visibility
+                    }] name) = .ok (selectedDataType, selectedConstructor) →
+                  selectedDataType = sourceDataType ∧
+                    selectedDataType ∈ context.signatures.dataTypes ∧
+                    selectedConstructor ∈ selectedDataType.constructors := by
+                intro visibility selectedDataType selectedConstructor selected
+                rcases constructorsInDataTypes_member_origin
+                    (exactConstructorCandidate_success_member selected) with
+                  ⟨accessible, accessibleMember, selectedOwner,
+                    constructorMember⟩
+                simp only [List.mem_singleton] at accessibleMember
+                subst accessible
+                subst selectedDataType
+                exact ⟨rfl, sourceDataTypeMember, constructorMember⟩
+              cases isLocal : decide
+                  (sourceDataType.id.moduleId = context.scope.currentModule) with
+              | true =>
+                  cases selected : exactConstructorCandidate [] name
+                      (constructorsInDataTypes [{
+                        signature := sourceDataType
+                        constructors :=
+                          (fullyAccessibleDataType sourceDataType).constructors
+                      }] name) with
+                  | error error =>
+                      simp [contextualConstructorCandidate, parts, found,
+                        isLocal, selected, bind, Except.bind, pure, Pure.pure,
+                        Except.pure] at success
+                  | ok selectedConstructor =>
+                      rcases selectedConstructor with
+                        ⟨selectedDataType, selectedConstructor⟩
+                      have provenance := selectedFacts
+                        (fullyAccessibleDataType sourceDataType).constructors
+                        selectedDataType selectedConstructor selected
+                      simp [contextualConstructorCandidate, parts, found,
+                        isLocal, selected, bind, Except.bind, pure, Pure.pure,
+                        Except.pure] at success
+                      rcases success with ⟨rfl, rfl, rfl⟩
+                      have nominalSelected : state.resolve expectedType =
+                          Ty.nominal selectedDataType.id sourceArguments := by
+                        rw [provenance.1]
+                        exact nominalSource
+                      exact ⟨provenance.2.1, provenance.2.2, expectedType,
+                        rfl, nominalSelected⟩
+              | false =>
+                  cases imported : buildProgramImports context.environment
+                      context.scope.currentModule with
+                  | error errors =>
+                      simp [contextualConstructorCandidate, parts, found,
+                        isLocal, imported, bind, Except.bind, pure, Pure.pure,
+                        Except.pure] at success
+                  | ok visibility =>
+                      let constructorVisibility :=
+                        (visibility.constructorVisibilityForDeclaration?
+                          sourceDataType.id).getD .opaqueData
+                      cases selected : exactConstructorCandidate [] name
+                          (constructorsInDataTypes [{
+                            signature := sourceDataType
+                            constructors := constructorVisibility
+                          }] name) with
+                      | error error =>
+                          simp [contextualConstructorCandidate, parts, found,
+                            isLocal, imported, constructorVisibility, selected,
+                            bind, Except.bind, pure, Pure.pure, Except.pure]
+                            at success
+                      | ok selectedConstructor =>
+                          rcases selectedConstructor with
+                            ⟨selectedDataType, selectedConstructor⟩
+                          have provenance := selectedFacts
+                            constructorVisibility selectedDataType
+                            selectedConstructor selected
+                          simp [contextualConstructorCandidate, parts, found,
+                            isLocal, imported, constructorVisibility, selected,
+                            bind, Except.bind, pure, Pure.pure, Except.pure]
+                            at success
+                          rcases success with ⟨rfl, rfl, rfl⟩
+                          have nominalSelected : state.resolve expectedType =
+                              Ty.nominal selectedDataType.id sourceArguments := by
+                            rw [provenance.1]
+                            exact nominalSource
+                          exact ⟨provenance.2.1, provenance.2.2, expectedType,
+                            rfl, nominalSelected⟩
+
+def instantiateDataConstructor
     (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature)
     (arguments : List Ty) : DataConstructorInstantiation :=
@@ -554,6 +921,34 @@ private def instantiateDataConstructor
     resultType := Ty.nominal dataType.id arguments
   }
 
+/-- Applying constructor parameters cannot introduce an out-of-range flexible
+variable when both the actual arguments and source payload types are bounded. -/
+theorem instantiateDataConstructor_types_variablesBelow
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
+    {next : Nat}
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.VariablesBelow next)
+    (payloadTypesBelow : ∀ payload ∈ constructor.payloadTypes,
+      payload.VariablesBelow next) :
+    (∀ payload ∈
+        (instantiateDataConstructor dataType constructor arguments).payloadTypes,
+      payload.VariablesBelow next) ∧
+      Ty.VariablesBelow next
+        (instantiateDataConstructor dataType constructor arguments).resultType := by
+  constructor
+  · intro payload member
+    change payload ∈ constructor.payloadTypes.map
+      (TypeSystem.ParameterSubstitution.apply
+        (dataType.parameters.zip arguments)) at member
+    rcases List.mem_map.mp member with
+      ⟨sourcePayload, sourceMember, rfl⟩
+    apply TypeSystem.ParameterSubstitution.apply_variables_below
+    · intro parameter replacement entryMember
+      exact argumentsBelow replacement (List.of_mem_zip entryMember).2
+    · exact payloadTypesBelow sourcePayload sourceMember
+  · exact Ty.variablesBelow_nominal argumentsBelow
+
 def freshDataConstructorInstantiation
     (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature)
@@ -564,7 +959,7 @@ def freshDataConstructorInstantiation
       (result.1 ++ [type], state)) ([], state)
   (instantiateDataConstructor dataType constructor arguments, state)
 
-private def constructorCalleeCandidates (context : Context) (state : State)
+def constructorCalleeCandidates (context : Context) (state : State)
     (callee : Syntax.Expr) :
     Except Error
       (List (ProgramDataSignature × ProgramDataConstructorSignature)) := do
@@ -586,6 +981,74 @@ private def constructorCalleeCandidates (context : Context) (state : State)
             pure (constructorsInDataTypes
               ((← visibleDataTypesNamed context name).filter fun dataType =>
                 dataType.signature.name == name) name)
+
+/-- Constructor-callee discovery only returns constructors paired with their
+owning declarations from the whole-program data catalog. -/
+theorem constructorCalleeCandidates_success_members
+    {context : Context} {state : State} {callee : Syntax.Expr}
+    {candidates : List
+      (ProgramDataSignature × ProgramDataConstructorSignature)}
+    (success : constructorCalleeCandidates context state callee =
+      .ok candidates) :
+    ∀ dataType constructor, (dataType, constructor) ∈ candidates →
+      dataType ∈ context.signatures.dataTypes ∧
+        constructor ∈ dataType.constructors := by
+  intro dataType constructor member
+  cases qualified : calleeQualifiedIdentifier? callee with
+  | some qualifiedName =>
+      rcases qualifiedName with ⟨qualifiers, name⟩
+      cases qualifiers with
+      | nil =>
+          simp [constructorCalleeCandidates, qualified, pure, Pure.pure,
+            Except.pure] at success
+          subst candidates
+          simp at member
+      | cons root rest =>
+          cases binder : state.lookupBinder? root with
+          | some binding =>
+              simp [constructorCalleeCandidates, qualified, binder, pure,
+                Pure.pure, Except.pure] at success
+              subst candidates
+              simp at member
+          | none =>
+              cases found : qualifiedDataTypesNamed context (root :: rest) with
+              | error errors =>
+                  simp [constructorCalleeCandidates, qualified, binder, found,
+                    bind, Except.bind] at success
+              | ok dataTypes =>
+                  simp [constructorCalleeCandidates, qualified, binder, found,
+                    bind, Except.bind, pure, Pure.pure, Except.pure] at success
+                  subst candidates
+                  exact constructorsInDataTypes_member_facts
+                    (qualifiedDataTypesNamed_success_members found) member
+  | none =>
+      cases identifier : calleeIdentifier? callee with
+      | none =>
+          simp [constructorCalleeCandidates, qualified, identifier, pure,
+            Pure.pure, Except.pure] at success
+          subst candidates
+          simp at member
+      | some name =>
+          cases binder : state.lookupBinder? name with
+          | some binding =>
+              simp [constructorCalleeCandidates, qualified, identifier, binder,
+                pure, Pure.pure, Except.pure] at success
+              subst candidates
+              simp at member
+          | none =>
+              cases found : visibleDataTypesNamed context name with
+              | error errors =>
+                  simp [constructorCalleeCandidates, qualified, identifier,
+                    binder, found, bind, Except.bind] at success
+              | ok dataTypes =>
+                  simp [constructorCalleeCandidates, qualified, identifier,
+                    binder, found, bind, Except.bind, pure, Pure.pure,
+                    Except.pure] at success
+                  subst candidates
+                  apply constructorsInDataTypes_member_facts _ member
+                  intro accessible accessibleMember
+                  exact visibleDataTypesNamed_success_members found accessible
+                    (List.mem_filter.mp accessibleMember).1
 
 /-- Distinguish an existing data namespace with a missing constructor from an
 ordinary qualified function/member expression.  Local roots continue to shadow
