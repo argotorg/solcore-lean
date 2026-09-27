@@ -198,7 +198,6 @@ theorem solveRequirements_corresponds
               }
               simp [Detail.solveRequirements, evidenceResult, tailResult,
                 bind, Except.bind] at success
-              injection success with solved_eq
               subst solved
               exact .cons (by simp [evidenceResult])
                 (induction tailResult)
