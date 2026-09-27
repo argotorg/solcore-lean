@@ -81,6 +81,29 @@ example :
     freshProgress.solved
   exact reflexive.trans (freshProgress.trans stateOnlyProgress)
 
+/-- Readiness starts from the input environment, survives fresh allocation,
+and admits a binder whose monomorphic body is the freshly allocated type. -/
+example :
+    let initial := SourceInference.State.initial solverRegressionOwner
+    let allocation := initial.fresh
+    let scheme := TypeSystem.Scheme.mono allocation.1
+    (allocation.2.allocateBinder "fresh" scheme none false []).2
+      |>.InferenceReady := by
+  dsimp only
+  let initial := SourceInference.State.initial solverRegressionOwner
+  have initialReady : initial.InferenceReady :=
+    SourceInference.State.InferenceReady.initial solverRegressionOwner [] []
+  have freshReady : initial.fresh.2.InferenceReady :=
+    SourceInference.State.InferenceReady.fresh initialReady
+  have freshTypeBelow :
+      initial.fresh.1.VariablesBelow initial.fresh.2.inference.next := by
+    simp [initial, SourceInference.State.fresh,
+      TypeSystem.InferState.fresh]
+  exact SourceInference.State.InferenceReady.allocateBinder
+    "fresh" (TypeSystem.Scheme.mono initial.fresh.1) none false []
+    freshReady (by
+      simpa [TypeSystem.Scheme.mono] using freshTypeBelow)
+
 private def solverRegressionFirst : TypeSystem.TypeVarId := ⟨0⟩
 private def solverRegressionSecond : TypeSystem.TypeVarId := ⟨1⟩
 

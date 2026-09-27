@@ -192,6 +192,33 @@ example :=
   @Solcore.Frontend.SourceInference.State.InferenceProgress.addRequirements
 example :=
   @Solcore.Frontend.SourceInference.State.InferenceProgress.markDirectCallRequirements
+example := @Solcore.Frontend.SourceInference.State.InferenceReady
+example := @Solcore.Frontend.SourceInference.State.InferenceReady.initial
+example := @Solcore.Frontend.SourceInference.State.InferenceReady.fresh
+example := @Solcore.Frontend.SourceInference.State.InferenceReady.withLocals
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.restoreLexicalScope
+example := @Solcore.Frontend.SourceInference.State.InferenceReady.allocateBinder
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.allocateHiddenLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.allocateExpressionId
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.allocateStatementId
+example := @Solcore.Frontend.SourceInference.State.InferenceReady.recordNode
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.modifyExpressionNode
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.modifyStatementNode
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.addRequirementWithId
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.addRequirement
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.addRequirementsWithIds
+example := @Solcore.Frontend.SourceInference.State.InferenceReady.addRequirements
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceReady.markDirectCallRequirements
 example :=
   @Solcore.Frontend.SourceInference.State.initial_binderEnvironment
 example :=

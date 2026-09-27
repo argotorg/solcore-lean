@@ -35,6 +35,14 @@ structure InferenceProgress (before after : State) : Prop where
     after.inference.substitution.SemanticallyExtends
       before.inference.substitution
 
+/-- A source-inference state is ready for recursive inference when its
+substitution is solved and every stable lexical binder lies below the current
+type-variable allocator. -/
+structure InferenceReady (state : State) : Prop where
+  solved : state.inference.Solved
+  bindersBelow :
+    state.binderEnvironment.BodiesBelow state.inference.next
+
 namespace OccurrenceBoundExtends
 
 /-- Every state trivially extends its own occurrence-allocation bound. -/
@@ -897,5 +905,177 @@ theorem markDirectCallRequirements (state : State)
   of_inference_eq solved rfl
 
 end InferenceProgress
+
+namespace InferenceReady
+
+/-- Initial inference is solved and starts at the exact allocator bound
+computed from its input environment. -/
+theorem initial (owner : Resolved.DeclarationId)
+    (locals : TypeSystem.Environment) (inputComptime : List Bool) :
+    (State.initial owner locals inputComptime).InferenceReady := by
+  constructor
+  · change (TypeSystem.InferState.initial locals.nextVariable).Solved
+    exact TypeSystem.InferState.Solved.initial locals.nextVariable
+  · rw [initial_binderEnvironment]
+    change locals.BodiesBelow locals.nextVariable
+    exact TypeSystem.Environment.bodiesBelow_nextVariable locals
+
+/-- Fresh type-variable allocation preserves readiness by weakening all
+existing binder bounds to the advanced allocator. -/
+theorem fresh {state : State} (ready : state.InferenceReady) :
+    state.fresh.2.InferenceReady := by
+  constructor
+  · change state.inference.fresh.2.Solved
+    exact TypeSystem.InferState.Solved.fresh ready.solved
+  · change state.binderEnvironment.BodiesBelow (state.inference.next + 1)
+    exact ready.bindersBelow.weaken (Nat.le_succ _)
+
+/-- Replacing the compatibility-only local cache preserves readiness. -/
+theorem withLocals {state : State} (locals : TypeSystem.Environment)
+    (ready : state.InferenceReady) :
+    (state.withLocals locals).InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Restoring a lexical scope is ready when the restored stable binders are
+explicitly known to lie below the unchanged inference allocator. -/
+theorem restoreLexicalScope {state : State} (scope : LexicalScope)
+    (ready : state.InferenceReady)
+    (scopeBelow :
+      TypeSystem.Environment.BodiesBelow state.inference.next
+        (scope.binders.map fun binder => (binder.name, binder.scheme))) :
+    (state.restoreLexicalScope scope).InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change TypeSystem.Environment.BodiesBelow state.inference.next
+      (scope.binders.map fun binder => (binder.name, binder.scheme))
+    exact scopeBelow
+
+/-- Entering one stable binder preserves readiness when its scheme body is
+bounded by the current allocator. -/
+theorem allocateBinder {state : State} (name : String)
+    (scheme : TypeSystem.Scheme) (span : Option Syntax.SourceSpan)
+    (comptime : Bool) (schemeRequirements : List LocalSchemeRequirement)
+    (ready : state.InferenceReady)
+    (bodyBelow : scheme.body.VariablesBelow state.inference.next) :
+    (state.allocateBinder name scheme span comptime
+      schemeRequirements).2.InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · rw [allocateBinder_binderEnvironment]
+    exact TypeSystem.Environment.BodiesBelow.cons
+      bodyBelow ready.bindersBelow
+
+/-- Hidden-local allocation does not change inference readiness. -/
+theorem allocateHiddenLocal {state : State} (ready : state.InferenceReady) :
+    state.allocateHiddenLocal.2.InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Expression-identity allocation does not change inference readiness. -/
+theorem allocateExpressionId {state : State} (ready : state.InferenceReady) :
+    state.allocateExpressionId.2.InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Statement-identity allocation does not change inference readiness. -/
+theorem allocateStatementId {state : State} (ready : state.InferenceReady) :
+    state.allocateStatementId.2.InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Recording a typed-source node does not change inference readiness. -/
+theorem recordNode {state : State} (node : Node)
+    (ready : state.InferenceReady) :
+    (state.recordNode node).InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Refining an expression node does not change inference readiness. -/
+theorem modifyExpressionNode {state : State} (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode) (ready : state.InferenceReady) :
+    (state.modifyExpressionNode id modify).InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Refining a statement node does not change inference readiness. -/
+theorem modifyStatementNode {state : State} (id : StatementId)
+    (modify : StatementNode → StatementNode) (ready : state.InferenceReady) :
+    (state.modifyStatementNode id modify).InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Allocating one requirement does not change inference readiness. -/
+theorem addRequirementWithId {state : State} (predicate : ProgramPredicate)
+    (ready : state.InferenceReady) :
+    (state.addRequirementWithId predicate).2.InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Adding one requirement does not change inference readiness. -/
+theorem addRequirement {state : State} (predicate : ProgramPredicate)
+    (ready : state.InferenceReady) :
+    (state.addRequirement predicate).InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+/-- Allocating a list of requirements does not change inference readiness. -/
+theorem addRequirementsWithIds {state : State}
+    (predicates : List ProgramPredicate) (ready : state.InferenceReady) :
+    (state.addRequirementsWithIds predicates).2.InferenceReady := by
+  induction predicates generalizing state with
+  | nil => exact ready
+  | cons predicate rest induction =>
+      simpa only [State.addRequirementsWithIds] using
+        induction
+          (addRequirementWithId predicate ready)
+
+/-- Adding a list of requirements does not change inference readiness. -/
+theorem addRequirements {state : State} (predicates : List ProgramPredicate)
+    (ready : state.InferenceReady) :
+    (state.addRequirements predicates).InferenceReady :=
+  addRequirementsWithIds predicates ready
+
+/-- Recording direct-call requirement provenance does not change inference
+readiness. -/
+theorem markDirectCallRequirements {state : State}
+    (requirements : List RequirementId) (ready : state.InferenceReady) :
+    (state.markDirectCallRequirements requirements).InferenceReady := by
+  constructor
+  · change state.inference.Solved
+    exact ready.solved
+  · change state.binderEnvironment.BodiesBelow state.inference.next
+    exact ready.bindersBelow
+
+end InferenceReady
 
 end Solcore.Frontend.SourceInference.State
