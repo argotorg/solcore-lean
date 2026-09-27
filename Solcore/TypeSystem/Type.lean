@@ -52,6 +52,23 @@ inductive Ty where
   | error
   deriving Repr, DecidableEq
 
+/-- Syntactic occurrence of one rigid declaration parameter in a type.
+This low-level predicate is independent of substitution lookup and can be
+shared by frontend collectors and declarative source semantics. -/
+def TypeParameterOccurs (parameter : TypeParameterId) : Ty → Prop
+  | .parameter candidate => candidate = parameter
+  | .application function argument
+  | .function function argument
+  | .product function argument
+  | .mapping function argument =>
+      TypeParameterOccurs parameter function ∨
+        TypeParameterOccurs parameter argument
+  | .proxy inner
+  | .comptime inner => TypeParameterOccurs parameter inner
+  | .variable _
+  | .constructor _
+  | .error => False
+
 namespace Ty
 
 def unit : Ty := .constructor (.builtin .unit)
@@ -98,6 +115,45 @@ def freeVariables : Ty → List TypeVarId
       unionVariables leftPart.freeVariables rightPart.freeVariables
   | .proxy inner
   | .comptime inner => inner.freeVariables
+
+private theorem insertVariable_nodup
+    {variables : List TypeVarId} (metavariable : TypeVarId)
+    (nodup : variables.Nodup) :
+    (insertVariable variables metavariable).Nodup := by
+  unfold insertVariable
+  by_cases present : metavariable ∈ variables
+  · rw [if_pos present]
+    exact nodup
+  · rw [if_neg present, List.nodup_append]
+    refine ⟨nodup, by simp, ?_⟩
+    intro candidate member
+    simp only [List.mem_singleton]
+    intro other other_eq same
+    subst other
+    exact present (same ▸ member)
+
+private theorem unionVariables_nodup
+    (right : List TypeVarId) {left : List TypeVarId}
+    (nodup : left.Nodup) :
+    (unionVariables left right).Nodup := by
+  unfold unionVariables
+  induction right generalizing left with
+  | nil => exact nodup
+  | cons head tail induction =>
+      exact induction (insertVariable_nodup head nodup)
+
+/-- The stable flexible-variable ledger of every source type contains each
+metavariable at most once. -/
+theorem freeVariables_nodup (type : Ty) : type.freeVariables.Nodup := by
+  induction type with
+  | «variable» | «parameter» | constructor | error => simp [freeVariables]
+  | application left right leftInduction _
+  | function left right leftInduction _
+  | product left right leftInduction _
+  | mapping left right leftInduction _ =>
+      exact unionVariables_nodup right.freeVariables leftInduction
+  | proxy inner induction
+  | comptime inner induction => exact induction
 
 /-- Whether a flexible metavariable occurs in a type. -/
 def containsVariable (type : Ty) (metavariable : TypeVarId) : Bool :=

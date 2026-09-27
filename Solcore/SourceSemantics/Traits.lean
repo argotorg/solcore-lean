@@ -139,30 +139,32 @@ private theorem mem_appendParameters_iff
     parameter ∈ appendParameters parameters type ↔
       parameter ∈ parameters ∨ TypeParameterOccurs parameter type := by
   induction type generalizing parameters with
-  | @«variable» metavariable => simp [appendParameters, TypeParameterOccurs]
+  | @«variable» metavariable =>
+      simp [appendParameters, TypeSystem.TypeParameterOccurs]
   | @«parameter» candidate =>
-      simpa [appendParameters, TypeParameterOccurs, eq_comm] using
+      simpa [appendParameters, TypeSystem.TypeParameterOccurs, eq_comm] using
         mem_insertParameter_iff parameter candidate parameters
-  | constructor constructor => simp [appendParameters, TypeParameterOccurs]
+  | constructor constructor =>
+      simp [appendParameters, TypeSystem.TypeParameterOccurs]
   | application left right leftInduction rightInduction =>
       rw [appendParameters, rightInduction, leftInduction]
-      simp [TypeParameterOccurs, or_assoc]
+      simp [TypeSystem.TypeParameterOccurs, or_assoc]
   | function domain codomain domainInduction codomainInduction =>
       rw [appendParameters, codomainInduction, domainInduction]
-      simp [TypeParameterOccurs, or_assoc]
+      simp [TypeSystem.TypeParameterOccurs, or_assoc]
   | product left right leftInduction rightInduction =>
       rw [appendParameters, rightInduction, leftInduction]
-      simp [TypeParameterOccurs, or_assoc]
+      simp [TypeSystem.TypeParameterOccurs, or_assoc]
   | mapping key value keyInduction valueInduction =>
       rw [appendParameters, valueInduction, keyInduction]
-      simp [TypeParameterOccurs, or_assoc]
+      simp [TypeSystem.TypeParameterOccurs, or_assoc]
   | proxy inner induction =>
-      simpa [appendParameters, TypeParameterOccurs] using
+      simpa [appendParameters, TypeSystem.TypeParameterOccurs] using
         induction parameters
   | comptime inner induction =>
-      simpa [appendParameters, TypeParameterOccurs] using
+      simpa [appendParameters, TypeSystem.TypeParameterOccurs] using
         induction parameters
-  | error => simp [appendParameters, TypeParameterOccurs]
+  | error => simp [appendParameters, TypeSystem.TypeParameterOccurs]
 
 private theorem mem_foldl_appendParameters_iff
     (parameter : TypeSystem.TypeParameterId)

@@ -168,20 +168,9 @@ theorem SchemeGeneralizesExcept_nil (context : Context)
 /-- Syntactic occurrence of one rigid declaration parameter in a type.  This
 is intentionally independent of substitution lookup and is used to rule out
 phantom implementation parameters. -/
-def TypeParameterOccurs (parameter : TypeSystem.TypeParameterId) :
-    TypeSystem.Ty → Prop
-  | .parameter candidate => candidate = parameter
-  | .application function argument
-  | .function function argument
-  | .product function argument
-  | .mapping function argument =>
-      TypeParameterOccurs parameter function ∨
-        TypeParameterOccurs parameter argument
-  | .proxy inner
-  | .comptime inner => TypeParameterOccurs parameter inner
-  | .variable _
-  | .constructor _
-  | .error => False
+abbrev TypeParameterOccurs (parameter : TypeSystem.TypeParameterId) :
+    TypeSystem.Ty → Prop :=
+  TypeSystem.TypeParameterOccurs parameter
 
 /-- One rigid parameter occurs in the subject or an argument of a trait
 predicate. -/

@@ -73,7 +73,8 @@ private theorem applyType_mapRange_of_covered
       obtain ⟨replacement, member, lookup⟩ :=
         StructuralSubstitution.ParameterSubstitution.exists_lookup?_eq_some
           exact.parameters
-          (parametersCovered parameter (by simp [TypeParameterOccurs]))
+          (parametersCovered parameter
+            (by simp [TypeSystem.TypeParameterOccurs]))
       have mappedMember :
           (parameter, outer.apply replacement) ∈
             ParameterSubstitution.mapRange outer inner.parameters :=
@@ -626,7 +627,8 @@ private theorem applyType_mapRange_of_covered
       obtain ⟨replacement, member, lookup⟩ :=
         StructuralSubstitution.ParameterSubstitution.exists_lookup?_eq_some
           exact.parameters
-          (parametersCovered parameter (by simp [TypeParameterOccurs]))
+          (parametersCovered parameter
+            (by simp [TypeSystem.TypeParameterOccurs]))
       have mappedMember :
           (parameter, outer.apply replacement) ∈
             ParameterSubstitution.mapRange outer inner.parameters :=
