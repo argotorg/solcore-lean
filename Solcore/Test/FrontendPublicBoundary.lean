@@ -6,6 +6,17 @@ namespace Tests
 
 example := @Solcore.Frontend.buildProgramEnvironment_success_modules_nodup
 example := @Solcore.Frontend.buildProgramEnvironment_success_declarations_nodup
+example :=
+  @Solcore.Frontend.buildProgramEnvironment_success_declarations_eq_flatMap
+example :=
+  @Solcore.Frontend.buildProgramEnvironment_success_declaration_module_exists
+example := @Solcore.Frontend.ProgramEnvironment.declaration?_sound
+example :=
+  @Solcore.Frontend.ProgramEnvironment.declaration?_eq_some_of_mem_of_ids_nodup
+example :=
+  @Solcore.Frontend.buildProgramEnvironment_success_declaration?_eq_some
+example :=
+  @Solcore.Frontend.buildProgramEnvironment_success_declaration?_eq_some_iff
 example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
 example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
 

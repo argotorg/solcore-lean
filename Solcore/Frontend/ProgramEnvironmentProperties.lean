@@ -162,4 +162,99 @@ theorem buildProgramEnvironment_success_declarations_nodup
     exact flatMap_declaration_ids_nodup _ modules
   · simp at success
 
+/-- A successful catalog retains exactly the declarations collected from its
+canonical modules, in module and source order. -/
+theorem buildProgramEnvironment_success_declarations_eq_flatMap
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    (success : buildProgramEnvironment sources = .ok environment) :
+    environment.declarations =
+      environment.modules.flatMap declarationsOfModule := by
+  simp only [buildProgramEnvironment] at success
+  split at success
+  · injection success with environmentEq
+    subst environment
+    rfl
+  · simp at success
+
+/-- Every retained declaration is owned by one of the canonical modules in
+the successfully constructed environment. -/
+theorem buildProgramEnvironment_success_declaration_module_exists
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    {declaration : ProgramDeclaration}
+    (success : buildProgramEnvironment sources = .ok environment)
+    (member : declaration ∈ environment.declarations) :
+    ∃ module, module ∈ environment.modules ∧
+      module.id = declaration.id.moduleId := by
+  rw [buildProgramEnvironment_success_declarations_eq_flatMap success] at member
+  obtain ⟨module, moduleMember, declarationMember⟩ :=
+    List.mem_flatMap.mp member
+  exact ⟨module, moduleMember,
+    (declarationsOfModule_id_module declarationMember).symm⟩
+
+private theorem find?_eq_some_of_mem_of_nodup_map
+    {alpha beta : Type} [DecidableEq beta] (key : alpha → beta)
+    {items : List alpha} {item : alpha}
+    (unique : (items.map key).Nodup) (member : item ∈ items) :
+    items.find? (fun candidate => decide (key candidate = key item)) =
+      some item := by
+  induction items with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at unique
+      rcases unique with ⟨headAbsent, tailUnique⟩
+      simp only [List.mem_cons] at member
+      rcases member with rfl | tailMember
+      · simp
+      · have keysDiffer : key head ≠ key item := by
+          intro keysEqual
+          apply headAbsent
+          rw [keysEqual]
+          exact List.mem_map.mpr ⟨item, tailMember, rfl⟩
+        simp [List.find?, keysDiffer,
+          induction tailUnique tailMember]
+
+/-- Stable-ID lookup returns only a retained declaration with the requested
+identity.  This direction does not require a successful builder run. -/
+theorem ProgramEnvironment.declaration?_sound
+    {environment : ProgramEnvironment} {id : Resolved.DeclarationId}
+    {declaration : ProgramDeclaration}
+    (found : environment.declaration? id = some declaration) :
+    declaration ∈ environment.declarations ∧ declaration.id = id := by
+  constructor
+  · exact List.mem_of_find?_eq_some found
+  · have predicateMatches := List.find?_some found
+    simpa [ProgramEnvironment.declaration?] using predicateMatches
+
+/-- Unique stable identities make membership complete for declaration lookup. -/
+theorem ProgramEnvironment.declaration?_eq_some_of_mem_of_ids_nodup
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    (unique : (environment.declarations.map (·.id)).Nodup)
+    (member : declaration ∈ environment.declarations) :
+    environment.declaration? declaration.id = some declaration := by
+  exact find?_eq_some_of_mem_of_nodup_map ProgramDeclaration.id unique member
+
+/-- Successful construction makes stable-ID lookup complete for every
+retained declaration. -/
+theorem buildProgramEnvironment_success_declaration?_eq_some
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    {declaration : ProgramDeclaration}
+    (success : buildProgramEnvironment sources = .ok environment)
+    (member : declaration ∈ environment.declarations) :
+    environment.declaration? declaration.id = some declaration := by
+  exact ProgramEnvironment.declaration?_eq_some_of_mem_of_ids_nodup
+    (buildProgramEnvironment_success_declarations_nodup success) member
+
+/-- In a successfully constructed catalog, stable-ID lookup is equivalent to
+declarative membership together with identity agreement. -/
+theorem buildProgramEnvironment_success_declaration?_eq_some_iff
+    {sources : List Syntax.ParsedFile} {environment : ProgramEnvironment}
+    {id : Resolved.DeclarationId} {declaration : ProgramDeclaration}
+    (success : buildProgramEnvironment sources = .ok environment) :
+    environment.declaration? id = some declaration ↔
+      declaration ∈ environment.declarations ∧ declaration.id = id := by
+  constructor
+  · exact ProgramEnvironment.declaration?_sound
+  · rintro ⟨member, rfl⟩
+    exact buildProgramEnvironment_success_declaration?_eq_some success member
+
 end Solcore.Frontend
