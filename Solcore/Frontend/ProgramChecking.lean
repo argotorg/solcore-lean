@@ -1,3 +1,4 @@
+import Solcore.Frontend.ProgramSignaturesProperties
 import Solcore.Frontend.SourceInference
 
 /-!
@@ -310,6 +311,17 @@ theorem checkLoadedProgram_success_signatures
               subst checked
               rfl
 
+/-- A successful loaded-program check carries the signature builder's
+canonical generic-parameter allocation guarantees into the checked artifact. -/
+theorem checkLoadedProgram_success_signature_parameters_wellFormed
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    ProgramSignatureParametersWellFormed checked.signatures :=
+  buildProgramSignatures_success_parameters_wellFormed
+    (checkLoadedProgram_success_signatures success)
+
 /-- A successful loaded-program check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkLoadedProgram_success_ids
@@ -422,5 +434,16 @@ theorem checkProgram_success_signature_declaration_ids_nodup
   exact buildProgramSignatures_success_declaration_ids_nodup
     (loadProgram_success_declarations_nodup loadedSuccess)
     (checkLoadedProgram_success_signatures checkedSuccess)
+
+/-- End-to-end checker success guarantees canonical declaration ownership and
+source-order numbering for every collected rigid generic parameter. -/
+theorem checkProgram_success_signature_parameters_wellFormed
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    ProgramSignatureParametersWellFormed checked.signatures := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_signature_parameters_wellFormed checkedSuccess
 
 end Solcore.Frontend
