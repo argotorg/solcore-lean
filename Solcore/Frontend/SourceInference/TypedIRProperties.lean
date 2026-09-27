@@ -66,6 +66,49 @@ theorem IntegerLiteralResolution.applySubstitution_predicate
     (step.applySubstitution substitution).requirements = step.requirements := by
   rfl
 
+namespace CoercionPath
+
+/-- Closing flexible types preserves exact coercion endpoints and adjacency;
+stable requirement identities are unchanged by `CoercionStep.applySubstitution`.
+-/
+theorem isValid_applySubstitution
+    (substitution : TypeSystem.Substitution)
+    {source target : TypeSystem.Ty} {steps : List CoercionStep}
+    (valid : isValid source target steps = true) :
+    isValid (substitution.apply source) (substitution.apply target)
+      (steps.map (CoercionStep.applySubstitution substitution)) = true := by
+  induction steps generalizing source with
+  | nil =>
+      exact beq_iff_eq.mpr
+        (congrArg substitution.apply (beq_iff_eq.mp valid))
+  | cons step rest induction =>
+      cases rest with
+      | nil =>
+          change (step.source == source && step.target == target) = true
+            at valid
+          change
+            (substitution.apply step.source == substitution.apply source &&
+              substitution.apply step.target == substitution.apply target) =
+                true
+          rw [Bool.and_eq_true, beq_iff_eq, beq_iff_eq] at valid ⊢
+          exact ⟨congrArg substitution.apply valid.1,
+            congrArg substitution.apply valid.2⟩
+      | cons next tail =>
+          change
+            (step.source == source &&
+              isValid step.target target (next :: tail)) = true at valid
+          change
+            (substitution.apply step.source == substitution.apply source &&
+              isValid (substitution.apply step.target)
+                (substitution.apply target)
+                ((next :: tail).map
+                  (CoercionStep.applySubstitution substitution))) = true
+          rw [Bool.and_eq_true, beq_iff_eq] at valid ⊢
+          exact ⟨congrArg substitution.apply valid.1,
+            induction valid.2⟩
+
+end CoercionPath
+
 @[simp] theorem ExpressionNode.applySubstitution_id
     (substitution : TypeSystem.Substitution) (node : ExpressionNode) :
     (node.applySubstitution substitution).id = node.id := by
