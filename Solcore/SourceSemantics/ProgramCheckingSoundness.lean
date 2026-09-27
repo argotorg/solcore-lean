@@ -121,30 +121,13 @@ structure TraitSignatureRemainingConditions
   methods : ∀ method, method ∈ signature.methods →
     TraitMethodSignatureRemainingConditions signatures signature method
 
-/-- Trait correspondence and type-formation obligations for one implementation
-method.  Its owner and duplicate-free parameter names are fixed by executable
-implementation-method collection. -/
+/-- Type-formation obligations for one implementation method.  Its owner,
+trait correspondence, and duplicate-free parameter names are fixed by
+executable implementation-method collection. -/
 structure ImplMethodSignatureRemainingConditions
     (signatures : ProgramSignatures)
     (implementation : ProgramImplementationSignature)
     (method : ProgramImplMethodSignature) : Prop where
-  trait_method : ∃ trait methodSignature,
-    trait ∈ signatures.traits ∧
-    implementation.head.trait = .declaration trait.id ∧
-    methodSignature ∈ trait.methods ∧
-    methodSignature.id = method.traitMethod ∧
-    methodSignature.name = method.name ∧
-    let substitution : TypeSystem.ParameterSubstitution :=
-      trait.parameters.zip
-        (implementation.head.subject :: implementation.head.arguments)
-    method.parameterTypes =
-      methodSignature.parameterTypes.map substitution.apply ∧
-    method.returnTypes =
-      methodSignature.returnTypes.map substitution.apply ∧
-    method.parameterComptime = methodSignature.parameterComptime ∧
-    method.returnComptime = methodSignature.returnComptime ∧
-    method.wherePredicates = methodSignature.wherePredicates.map
-      (ProgramPredicate.applyParameters substitution)
   parameter_types : TypesWellFormed
     (signatureContext signatures implementation.id implementation.parameters
       (implementation.wherePredicates ++ method.wherePredicates))
@@ -159,7 +142,7 @@ structure ImplMethodSignatureRemainingConditions
     method.wherePredicates
 
 /-- Semantic implementation-signature obligations beyond its checker-generated
-generic parameter row, validated head catalog, and structural method catalog. -/
+generic parameter row and validated head and method catalogs. -/
 structure ImplementationSignatureRemainingConditions
     (signatures : ProgramSignatures)
     (signature : ProgramImplementationSignature) : Prop where
@@ -171,20 +154,14 @@ structure ImplementationSignatureRemainingConditions
       signature.wherePredicates) signature.wherePredicates
   methods : ∀ method, method ∈ signature.methods →
     ImplMethodSignatureRemainingConditions signatures signature method
-  methods_complete : ∀ trait method,
-    trait ∈ signatures.traits →
-    signature.head.trait = .declaration trait.id →
-    method ∈ trait.methods →
-    ∃ implementationMethod ∈ signature.methods,
-      implementationMethod.traitMethod = method.id
 
 /-- Catalog conditions not yet implied by raw `checkProgram` success.  The
 checker already supplies implementation-rule projection equality, declaration
 identity uniqueness, every generic-parameter invariant, data-constructor
 structure and identity uniqueness, trait-method structure and identity
 uniqueness, implementation-head parameter/catalog validation,
-implementation-method structure and identity uniqueness, and complete
-contract signature semantics. -/
+implementation-method structure, identity uniqueness, trait correspondence and
+completeness, plus complete contract signature semantics. -/
 structure SignatureCatalogRemainingConditions
     (signatures : ProgramSignatures) : Prop where
   functions_semantic : ∀ signature, signature ∈ signatures.functions →
@@ -234,6 +211,10 @@ structure CheckedSignatureCatalogFacts
   implementation_heads : ∀ signature,
     signature ∈ signatures.implementations →
       Frontend.ImplementationSignatureHeadValidated signatures.traits signature
+  implementation_method_catalogs : ∀ signature,
+    signature ∈ signatures.implementations →
+      Frontend.ImplementationSignatureMethodCatalogValidated
+        signatures.traits signature
   contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
     ContractSignatureWellFormed signatures signature
 
@@ -320,10 +301,73 @@ theorem complete
 
 end TraitSignatureRemainingConditions
 
+namespace ImplementationSignatureMethodCatalogValidated
+
+/-- The executable method-catalog witness directly supplies the declarative
+trait correspondence for every retained implementation method. -/
+theorem semantic_method
+    {signatures : ProgramSignatures}
+    {implementation : ProgramImplementationSignature}
+    (validated : Frontend.ImplementationSignatureMethodCatalogValidated
+      signatures.traits implementation)
+    {method : ProgramImplMethodSignature}
+    (member : method ∈ implementation.methods) :
+    ∃ trait methodSignature,
+      trait ∈ signatures.traits ∧
+      implementation.head.trait = .declaration trait.id ∧
+      methodSignature ∈ trait.methods ∧
+      methodSignature.id = method.traitMethod ∧
+      methodSignature.name = method.name ∧
+      let substitution : TypeSystem.ParameterSubstitution :=
+        trait.parameters.zip
+          (implementation.head.subject :: implementation.head.arguments)
+      method.parameterTypes =
+        methodSignature.parameterTypes.map substitution.apply ∧
+      method.returnTypes =
+        methodSignature.returnTypes.map substitution.apply ∧
+      method.parameterComptime = methodSignature.parameterComptime ∧
+      method.returnComptime = methodSignature.returnComptime ∧
+      method.wherePredicates = methodSignature.wherePredicates.map
+        (ProgramPredicate.applyParameters substitution) := by
+  rcases validated.trait_catalog with
+    ⟨trait, traitMember, headTrait, correspondence, completeness⟩
+  obtain ⟨traitMethod, traitMethodMember, traitMethodId, traitMethodName,
+    parameterTypes, returnTypes, parameterComptime, returnComptime,
+    predicates⟩ := correspondence method member
+  exact ⟨trait, traitMethod, traitMember, headTrait, traitMethodMember,
+    traitMethodId, traitMethodName, parameterTypes, returnTypes,
+    parameterComptime, returnComptime, predicates⟩
+
+/-- Selected-trait completeness transports to the declarative judgment's
+arbitrary equal-headed trait entry using global trait identity uniqueness. -/
+theorem semantic_methods_complete
+    {signatures : ProgramSignatures}
+    {implementation : ProgramImplementationSignature}
+    (validated : Frontend.ImplementationSignatureMethodCatalogValidated
+      signatures.traits implementation)
+    (traitIds : (signatures.traits.map fun trait => trait.id).Nodup)
+    {trait : ProgramTraitSignature} (traitMember : trait ∈ signatures.traits)
+    (headTrait : implementation.head.trait = .declaration trait.id)
+    {method : ProgramTraitMethodSignature} (methodMember : method ∈ trait.methods) :
+    ∃ implementationMethod ∈ implementation.methods,
+      implementationMethod.traitMethod = method.id := by
+  rcases validated.trait_catalog with
+    ⟨selected, selectedMember, selectedHead, correspondence, completeness⟩
+  have selectedId : selected.id = trait.id := by
+    have equal := selectedHead.symm.trans headTrait
+    injection equal
+  have selectedEq : selected = trait :=
+    Frontend.trait_signature_eq_of_mem_of_id_eq traitIds
+      selectedMember traitMember selectedId
+  subst trait
+  exact completeness method methodMember
+
+end ImplementationSignatureMethodCatalogValidated
+
 namespace ImplMethodSignatureRemainingConditions
 
-/-- Combine checker-fixed method identity structure with the remaining trait
-correspondence and type-formation obligations. -/
+/-- Combine checker-fixed method identity and trait correspondence with the
+remaining type-formation obligations. -/
 theorem complete
     {signatures : ProgramSignatures}
     {implementation : ProgramImplementationSignature}
@@ -331,10 +375,14 @@ theorem complete
     (remaining : ImplMethodSignatureRemainingConditions signatures
       implementation method)
     (owner : method.id.implementation = implementation.id)
-    (parameterNames : method.parameterNames.Nodup) :
+    (parameterNames : method.parameterNames.Nodup)
+    (validated : Frontend.ImplementationSignatureMethodCatalogValidated
+      signatures.traits implementation)
+    (member : method ∈ implementation.methods) :
     ImplMethodSignatureWellFormed signatures implementation method := {
   owner
-  trait_method := remaining.trait_method
+  trait_method :=
+    ImplementationSignatureMethodCatalogValidated.semantic_method validated member
   parameter_names_nodup := parameterNames
   parameter_types := remaining.parameter_types
   return_types := remaining.return_types
@@ -428,8 +476,8 @@ end ImplementationSignatureHeadValidated
 
 namespace ImplementationSignatureRemainingConditions
 
-/-- Combine canonical declaration parameters with the remaining
-implementation-head and method-catalog semantics. -/
+/-- Combine checker-derived declaration and catalog facts with the remaining
+implementation-head, predicate, and method type-formation obligations. -/
 theorem complete
     {signatures : ProgramSignatures}
     {signature : ProgramImplementationSignature}
@@ -438,6 +486,8 @@ theorem complete
       signature.parameters)
     (structural : ImplementationSignatureStructuralWellFormed signature)
     (validated : Frontend.ImplementationSignatureHeadValidated
+      signatures.traits signature)
+    (methodCatalog : Frontend.ImplementationSignatureMethodCatalogValidated
       signatures.traits signature)
     (traitIds :
       (signatures.traits.map fun trait => trait.id).Nodup)
@@ -464,7 +514,12 @@ theorem complete
     exact (remaining.methods method member).complete
       (structural.method_owners method member)
       (structural.method_parameter_names_nodup method member)
-  methods_complete := remaining.methods_complete
+      methodCatalog member
+  methods_complete := by
+    intro trait method traitMember headTrait methodMember
+    exact
+      ImplementationSignatureMethodCatalogValidated.semantic_methods_complete
+        methodCatalog traitIds traitMember headTrait methodMember
 }
 
 end ImplementationSignatureRemainingConditions
@@ -524,6 +579,11 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
       intro signature member
       exact Frontend.checkProgram_success_implementation_head_validated
         success member
+    implementation_method_catalogs := by
+      intro signature member
+      exact
+        Frontend.checkProgram_success_implementation_method_catalog_validated
+          success member
     contracts_semantic := ?_
   }
   intro signature member
@@ -599,6 +659,7 @@ theorem complete
       (checked.parameters.implementations signature member)
       (checked.implementation_structures signature member)
       (checked.implementation_heads signature member)
+      (checked.implementation_method_catalogs signature member)
       checked.trait_ids checked.parameters.traits
     rw [checked.impl_rules_eq]
     exact List.mem_map.mpr ⟨signature, member, rfl⟩
