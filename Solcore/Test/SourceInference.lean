@@ -603,9 +603,35 @@ private def validSourceGraph : SourceInference.TypedSource := {
   ]
 }
 
+/-- Require the forest validator to retain the exact repeated incoming ID. -/
+private def expectDuplicateIncomingNode (label : String)
+    (source : SourceInference.TypedSource)
+    (expected : SourceInference.NodeId) : IO Unit := do
+  match SourceInference.Detail.validateSourceGraph source with
+  | .error (.duplicateIncomingNode id) =>
+      assertTrue (id == expected)
+        s!"{label} lost its exact duplicate-incoming diagnostic"
+  | .error error => throw (IO.userError
+      s!"{label} produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      s!"{label} passed graph validation")
+
+/-- Require root-driven coverage to identify the first unreachable table ID. -/
+private def expectUnreachableNode (label : String)
+    (source : SourceInference.TypedSource)
+    (expected : SourceInference.NodeId) : IO Unit := do
+  match SourceInference.Detail.validateSourceGraph source with
+  | .error (.unreachableNode id) =>
+      assertTrue (id == expected)
+        s!"{label} lost its exact unreachable-node diagnostic"
+  | .error error => throw (IO.userError
+      s!"{label} produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      s!"{label} passed graph validation")
+
 /-- The finalization boundary rejects malformed occurrence graphs before
-exposing them to semantic consumers.  Duplicate detection deliberately erases
-node category, while root and child lookup preserve it. -/
+exposing them to semantic consumers.  Node-table duplicate detection erases
+category, while lookup and forest validation preserve it. -/
 private def testSourceGraphValidation : IO Unit := do
   match SourceInference.Detail.validateSourceGraph validSourceGraph with
   | .ok () => pure ()
@@ -685,6 +711,76 @@ private def testSourceGraphValidation : IO Unit := do
       s!"wrong-category child edge produced {reprStr error}")
   | .ok () => throw (IO.userError
       "an expression edge resolved to a statement at the same occurrence")
+
+  let rootOne : SourceInference.NodeId :=
+    .expression (graphValidationExpression 1)
+  let rootZero : SourceInference.NodeId :=
+    .expression (graphValidationExpression 0)
+  let rootTwo : SourceInference.NodeId :=
+    .expression (graphValidationExpression 2)
+
+  let duplicateRoot := {
+    validSourceGraph with
+    roots := [rootOne, rootOne]
+  }
+  expectDuplicateIncomingNode "a duplicate source root" duplicateRoot rootOne
+
+  let duplicateChildSlot := {
+    validSourceGraph with
+    nodes := [
+      .expression (graphValidationExpressionNode 0 (.literal (.decimal "0"))),
+      .expression (graphValidationExpressionNode 1
+        (.tuple [graphValidationExpression 0, graphValidationExpression 0]))
+    ]
+  }
+  expectDuplicateIncomingNode "a duplicate child slot"
+    duplicateChildSlot rootZero
+
+  let sharedChild := {
+    validSourceGraph with
+    roots := [rootOne, rootTwo]
+    nodes := [
+      .expression (graphValidationExpressionNode 0 (.literal (.decimal "0"))),
+      .expression (graphValidationExpressionNode 1
+        (.group (graphValidationExpression 0))),
+      .expression (graphValidationExpressionNode 2
+        (.group (graphValidationExpression 0)))
+    ]
+  }
+  expectDuplicateIncomingNode "a child shared by two parents"
+    sharedChild rootZero
+
+  let rootAsChild := {
+    validSourceGraph with
+    roots := [rootZero, rootOne]
+  }
+  expectDuplicateIncomingNode "a root retained as a child"
+    rootAsChild rootZero
+
+  let orphanCycle := {
+    validSourceGraph with
+    roots := [rootZero]
+    nodes := [
+      .expression (graphValidationExpressionNode 0 (.literal (.decimal "0"))),
+      .expression (graphValidationExpressionNode 1
+        (.group (graphValidationExpression 2))),
+      .expression (graphValidationExpressionNode 2
+        (.group (graphValidationExpression 1)))
+    ]
+  }
+  expectUnreachableNode "an orphan cycle" orphanCycle rootOne
+
+  let simpleCycle := {
+    validSourceGraph with
+    roots := [rootZero]
+    nodes := [
+      .expression (graphValidationExpressionNode 0
+        (.group (graphValidationExpression 1))),
+      .expression (graphValidationExpressionNode 1
+        (.group (graphValidationExpression 0)))
+    ]
+  }
+  expectDuplicateIncomingNode "a reachable cycle" simpleCycle rootZero
 
   let finalizationState : SourceInference.State := {
     SourceInference.State.initial solverRegressionOwner with

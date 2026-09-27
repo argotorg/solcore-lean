@@ -212,6 +212,38 @@ theorem trans
   | direct edge => exact .step edge right
   | step edge _ induction => exact .step edge (induction right)
 
+/-- Every nonempty descendant path exposes its final incoming edge together
+with the possibly empty prefix leading to that edge's parent. -/
+theorem final_edge
+    {source : TypedSource} {first last : NodeId}
+    (path : Descends source first last) :
+    ∃ parent, DirectChild source parent last ∧
+      (first = parent ∨ Descends source first parent) := by
+  induction path with
+  | direct edge =>
+      exact ⟨_, edge, Or.inl rfl⟩
+  | step edge _ induction =>
+      rcases induction with ⟨parent, finalEdge, pathPrefix⟩
+      refine ⟨parent, finalEdge, Or.inr ?_⟩
+      rcases pathPrefix with middleEq | pathPrefix
+      · subst parent
+        exact .direct edge
+      · exact .step edge pathPrefix
+
+/-- The start of every nonempty descendant path is represented by an exact
+node in the source table. -/
+theorem start_node
+    {source : TypedSource} {first last : NodeId}
+    (path : Descends source first last) :
+    ∃ node, ContainsNode source first node := by
+  cases path with
+  | direct edge =>
+      rcases edge with ⟨node, contains, _⟩
+      exact ⟨node, contains⟩
+  | step edge _ =>
+      rcases edge with ⟨node, contains, _⟩
+      exact ⟨node, contains⟩
+
 end Descends
 
 namespace Reachable
@@ -225,9 +257,142 @@ theorem descendant
   | direct edge => exact .child reachable edge
   | step edge _ induction => exact induction (.child reachable edge)
 
+/-- A reachable occurrence cannot lie on a cycle when incoming parents are
+unique and declaration roots have no incoming edge. -/
+theorem not_descends_self_of_unique_parent
+    {source : TypedSource}
+    (uniqueParent : ChildHasUniqueParent source)
+    (rootsHaveNoParent : RootsHaveNoParent source)
+    {id : NodeId} (reachable : Reachable source id) :
+    ¬ Descends source id id := by
+  induction reachable with
+  | root member =>
+      intro path
+      obtain ⟨_, finalEdge, _⟩ := path.final_edge
+      exact rootsHaveNoParent member finalEdge
+  | @child parent child parentReach edge induction =>
+      intro path
+      obtain ⟨lastParent, finalEdge, pathPrefix⟩ := path.final_edge
+      have lastParentEq : lastParent = parent :=
+        uniqueParent finalEdge edge
+      subst lastParent
+      rcases pathPrefix with childEq | pathPrefix
+      · subst child
+        exact induction (.direct edge)
+      · exact induction (.step edge pathPrefix)
+
 end Reachable
 
+private theorem sublist_flatMap_of_mem
+    {alpha beta : Type} (f : alpha → List beta)
+    {value : alpha} {values : List alpha} (member : value ∈ values) :
+    (f value).Sublist (values.flatMap f) := by
+  induction values with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · exact List.sublist_append_left _ _
+      · exact (induction member).trans (List.sublist_append_right _ _)
+
+/-- A globally duplicate-free flattened row cannot contain the same element
+in rows belonging to two different outer values. -/
+private theorem eq_of_common_mem_of_flatMap_nodup
+    {alpha beta : Type} (f : alpha → List beta)
+    {values : List alpha} {left right : alpha} {item : beta}
+    (unique : (values.flatMap f).Nodup)
+    (leftMem : left ∈ values) (rightMem : right ∈ values)
+    (leftItem : item ∈ f left) (rightItem : item ∈ f right) :
+    left = right := by
+  induction values generalizing left right with
+  | nil => simp at leftMem
+  | cons head tail induction =>
+      simp only [List.flatMap_cons, List.nodup_append] at unique
+      rcases unique with ⟨_, tailUnique, separated⟩
+      simp only [List.mem_cons] at leftMem rightMem
+      rcases leftMem with rfl | leftMem
+      · rcases rightMem with rfl | rightMem
+        · rfl
+        · exfalso
+          exact separated item leftItem item
+            (List.mem_flatMap.mpr ⟨right, rightMem, rightItem⟩) rfl
+      · rcases rightMem with rfl | rightMem
+        · exfalso
+          exact separated item rightItem item
+            (List.mem_flatMap.mpr ⟨left, leftMem, leftItem⟩) rfl
+        · exact induction tailUnique leftMem rightMem leftItem rightItem
+
+/-- Reachability, unique incoming parents, and parentless roots exclude every
+cycle, including cycles hidden behind a nonempty root path. -/
+private theorem occurrenceGraphAcyclic_of_reachable_unique_parent
+    {source : TypedSource}
+    (allNodesReachable : AllNodesReachable source)
+    (uniqueParent : ChildHasUniqueParent source)
+    (rootsHaveNoParent : RootsHaveNoParent source) :
+    OccurrenceGraphAcyclic source := by
+  intro id path
+  obtain ⟨node, contains⟩ := path.start_node
+  have reachable : Reachable source node.id :=
+    allNodesReachable node contains.1
+  apply reachable.not_descends_self_of_unique_parent uniqueParent
+    rootsHaveNoParent
+  simpa [contains.2] using path
+
 namespace OccurrenceGraphClosed
+
+/-- The executable forest certificate has only two semantic obligations beyond
+base graph well-formedness: every root/child incoming slot is globally unique,
+and every retained table node is root-reachable.  These imply all remaining
+fields of full occurrence-graph closure. -/
+theorem of_wellFormed_incomingUnique_reachable
+    {source : TypedSource}
+    (wellFormed : OccurrenceGraphWellFormed source)
+    (incomingUnique : source.incomingNodeIds.Nodup)
+    (allNodesReachable : AllNodesReachable source) :
+    OccurrenceGraphClosed source := by
+  have incomingUnique' :
+      (source.roots ++ source.nodes.flatMap nodeChildIds).Nodup := by
+    unfold TypedSource.incomingNodeIds at incomingUnique
+    change (source.roots ++ source.nodes.flatMap nodeChildIds).Nodup at incomingUnique
+    exact incomingUnique
+  have rootsUnique : RootsUnique source :=
+    (List.nodup_append.mp incomingUnique').1
+  have childrenUnique :
+      (source.nodes.flatMap nodeChildIds).Nodup :=
+    (List.nodup_append.mp incomingUnique').2.1
+  have rootsChildrenDisjoint :=
+    (List.nodup_append.mp incomingUnique').2.2
+  have childSlotsUnique : ChildSlotsUnique source := by
+    intro node member
+    exact (sublist_flatMap_of_mem nodeChildIds member).nodup childrenUnique
+  have childHasUniqueParent : ChildHasUniqueParent source := by
+    intro left right child leftEdge rightEdge
+    rcases leftEdge with ⟨leftNode, leftContains, leftChild⟩
+    rcases rightEdge with ⟨rightNode, rightContains, rightChild⟩
+    have nodeEq : leftNode = rightNode :=
+      eq_of_common_mem_of_flatMap_nodup nodeChildIds childrenUnique
+        leftContains.1 rightContains.1 leftChild rightChild
+    calc
+      left = leftNode.id := leftContains.2.symm
+      _ = rightNode.id := congrArg Node.id nodeEq
+      _ = right := rightContains.2
+  have rootsHaveNoParent : RootsHaveNoParent source := by
+    intro root parent rootMem edge
+    rcases edge with ⟨node, contains, childMem⟩
+    have childGlobal :
+        root ∈ source.nodes.flatMap nodeChildIds :=
+      List.mem_flatMap.mpr ⟨node, contains.1, childMem⟩
+    exact rootsChildrenDisjoint root rootMem root childGlobal rfl
+  exact {
+    wellFormed
+    rootsUnique
+    childSlotsUnique
+    childHasUniqueParent
+    rootsHaveNoParent
+    allNodesReachable
+    acyclic := occurrenceGraphAcyclic_of_reachable_unique_parent
+      allNodesReachable childHasUniqueParent rootsHaveNoParent
+  }
 
 /-- Every reachable non-root occurrence has exactly one parent.  Existence
 comes from reachability; uniqueness is the no-sharing invariant above. -/

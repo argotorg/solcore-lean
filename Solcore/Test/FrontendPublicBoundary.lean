@@ -524,6 +524,17 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceChildrenFrom
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceChildren
+example := @Solcore.Frontend.SourceInference.TypedSource.incomingNodeIds
+example := @Solcore.Frontend.SourceInference.TypedSource.lookupNodeId?
+example := @Solcore.Frontend.SourceInference.Detail.nodeIdMember
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIncomingNodeIdsFrom
+example :=
+  @Solcore.Frontend.SourceInference.Detail.collectReachableNodeIdsFuel
+example := @Solcore.Frontend.SourceInference.Detail.sourceReachableNodeIds
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateAllSourceNodesReachedFrom
+example := @Solcore.Frontend.SourceInference.Detail.validateSourceForest
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceGraph
 example :=
   @Solcore.Frontend.SourceInference.Detail.sourceContainsNodeId_eq_true_iff
@@ -536,6 +547,14 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceChildren_success_childEdgesExist
 example :=
+  @Solcore.Frontend.SourceInference.Detail.SourceForestValidationWitness
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceForest_success_witness
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceForest_success_incomingNodeIds_nodup
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceForest_success_allNodesReached
+example :=
   @Solcore.Frontend.SourceInference.Detail.SourceGraphValidationWitness
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_witness
@@ -547,6 +566,10 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_rootsExist
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_childEdgesExist
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_incomingNodeIds_nodup
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_allNodesReached
 example :=
   @Solcore.Frontend.SourceInference.Detail.supportedIntegerTarget_eq_true_iff
 example :=

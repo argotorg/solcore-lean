@@ -71,12 +71,68 @@ def validateSourceChildrenFrom (source : TypedSource) :
 def validateSourceChildren (source : TypedSource) : Except Error Unit :=
   validateSourceChildrenFrom source source.nodes
 
-/-- Reject malformed occurrence tables and dangling graph entry/child edges
-before finalization exposes the typed source to semantic consumers. -/
+/-- Executable membership for category-preserving source-node identities. -/
+def nodeIdMember (ids : List NodeId) (id : NodeId) : Bool :=
+  ids.any fun candidate => decide (candidate = id)
+
+/-- Reject a repeated category-preserving incoming position.  Roots and child
+slots share one inventory so this excludes repeated roots, repeated operand
+slots, shared children, and roots which are also retained as children. -/
+def validateIncomingNodeIdsFrom :
+    List NodeId → List NodeId → Except Error Unit
+  | _, [] => .ok ()
+  | seen, id :: rest => do
+      if nodeIdMember seen id then
+        throw (.duplicateIncomingNode id)
+      validateIncomingNodeIdsFrom (id :: seen) rest
+
+/-- Follow a bounded exact-ID worklist, skipping identities already collected
+and malformed missing lookups.  Exact root and child validation runs before
+this collector at the final graph-validation boundary. -/
+def collectReachableNodeIdsFuel (source : TypedSource) :
+    Nat → List NodeId → List NodeId → List NodeId
+  | 0, _, visited => visited
+  | Nat.succ _, [], visited => visited
+  | Nat.succ fuel, id :: rest, visited =>
+      if nodeIdMember visited id then
+        collectReachableNodeIdsFuel source fuel rest visited
+      else
+        match source.lookupNodeId? id with
+        | none => collectReachableNodeIdsFuel source fuel rest visited
+        | some node =>
+            collectReachableNodeIdsFuel source fuel
+              (node.references ++ rest) (id :: visited)
+
+/-- Exact category-preserving identities reached from the declaration roots.
+The incoming-position inventory bounds every well-formed forest traversal. -/
+def sourceReachableNodeIds (source : TypedSource) : List NodeId :=
+  collectReachableNodeIdsFuel source (source.incomingNodeIds.length + 1)
+    source.roots []
+
+/-- Ensure every retained table node was collected by the root worklist. -/
+def validateAllSourceNodesReachedFrom (reached : List NodeId) :
+    List Node → Except Error Unit
+  | [] => .ok ()
+  | node :: rest => do
+      if nodeIdMember reached node.id then
+        validateAllSourceNodesReachedFrom reached rest
+      else
+        throw (.unreachableNode node.id)
+
+/-- Validate the unique-incoming and whole-table-reachability conditions which
+turn an existing-node graph into a rooted occurrence forest. -/
+def validateSourceForest (source : TypedSource) : Except Error Unit := do
+  validateIncomingNodeIdsFrom [] source.incomingNodeIds
+  validateAllSourceNodesReachedFrom (sourceReachableNodeIds source) source.nodes
+
+/-- Reject malformed occurrence tables, dangling graph entry/child edges, and
+non-forest occurrence structure before finalization exposes the typed source
+to semantic consumers. -/
 def validateSourceGraph (source : TypedSource) : Except Error Unit := do
   validateOccurrenceTable source
   validateSourceRoots source
   validateSourceChildren source
+  validateSourceForest source
 
 def defaultIntegerPatternTarget (state : State)
     (origin : IntegerPatternOrigin) : Except Error State :=

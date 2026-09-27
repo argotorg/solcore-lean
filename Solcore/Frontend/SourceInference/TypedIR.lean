@@ -836,6 +836,16 @@ end Node
 
 namespace TypedSource
 
+/-- Declaration entries and direct child slots, retaining expression/statement
+categories.  A closed occurrence forest names every retained node exactly once
+in this incoming-position inventory. -/
+def incomingNodeIds (source : TypedSource) : List NodeId :=
+  source.roots ++ source.nodes.flatMap Node.references
+
+/-- First node with the requested exact category-preserving identity. -/
+def lookupNodeId? (source : TypedSource) (id : NodeId) : Option Node :=
+  source.nodes.find? fun node => decide (node.id = id)
+
 /-- First node with the requested declaration-owned occurrence identity. -/
 def lookupNode? (source : TypedSource) (id : OccurrenceId) : Option Node :=
   source.nodes.find? fun node => decide (node.occurrenceId = id)

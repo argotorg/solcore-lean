@@ -47,6 +47,11 @@ private theorem occurrenceId_contains_iff_mem
       simp only [List.contains_cons, List.mem_cons]
       rw [Bool.or_eq_true, occurrenceId_beq_iff_eq, induction]
 
+private theorem nodeIdMember_eq_true_iff
+    (ids : List NodeId) (id : NodeId) :
+    nodeIdMember ids id = true ↔ id ∈ ids := by
+  simp [nodeIdMember]
+
 private theorem validateOccurrenceTableFrom_success
     {owner : Resolved.DeclarationId} {seen : List OccurrenceId}
     {nodes : List Node}
@@ -207,12 +212,125 @@ theorem validateSourceChildren_success_childEdgesExist
         child ∈ source.nodes.map Node.id := by
   exact validateSourceChildrenFrom_success success
 
+private theorem validateIncomingNodeIdsFrom_success
+    {seen ids : List NodeId}
+    (success : validateIncomingNodeIdsFrom seen ids = .ok ()) :
+    ids.Nodup ∧
+      ∀ id, id ∈ ids → id ∉ seen := by
+  induction ids generalizing seen with
+  | nil => simp
+  | cons head tail induction =>
+      cases duplicate : nodeIdMember seen head with
+      | true =>
+          simp [validateIncomingNodeIdsFrom, duplicate, bind, Except.bind]
+            at success
+      | false =>
+          have headFresh : head ∉ seen := by
+            intro member
+            have contained : nodeIdMember seen head = true :=
+              (nodeIdMember_eq_true_iff seen head).mpr member
+            rw [duplicate] at contained
+            simp at contained
+          have tailSuccess :
+              validateIncomingNodeIdsFrom (head :: seen) tail = .ok () := by
+            simpa [validateIncomingNodeIdsFrom, duplicate, bind, Except.bind]
+              using success
+          obtain ⟨tailUnique, tailFresh⟩ := induction tailSuccess
+          refine ⟨?_, ?_⟩
+          · simp only [List.nodup_cons]
+            refine ⟨?_, tailUnique⟩
+            intro member
+            exact tailFresh head member (by simp)
+          · intro id member seenMember
+            rcases List.mem_cons.mp member with rfl | tailMember
+            · exact headFresh seenMember
+            · exact tailFresh id tailMember (by simp [seenMember])
+
+/-- Successful incoming-position validation proves that every root and child
+slot is globally unique after retaining the expression/statement category. -/
+theorem validateIncomingNodeIds_success_nodup
+    {source : TypedSource}
+    (success :
+      validateIncomingNodeIdsFrom [] source.incomingNodeIds = .ok ()) :
+    source.incomingNodeIds.Nodup :=
+  (validateIncomingNodeIdsFrom_success success).1
+
+private theorem validateAllSourceNodesReachedFrom_success
+    {reached : List NodeId} {nodes : List Node}
+    (success : validateAllSourceNodesReachedFrom reached nodes = .ok ()) :
+    ∀ node, node ∈ nodes → node.id ∈ reached := by
+  induction nodes with
+  | nil => simp
+  | cons head tail induction =>
+      cases contained : nodeIdMember reached head.id with
+      | false =>
+          simp [validateAllSourceNodesReachedFrom, contained] at success
+      | true =>
+          have tailSuccess :
+              validateAllSourceNodesReachedFrom reached tail = .ok () := by
+            simpa [validateAllSourceNodesReachedFrom, contained, bind,
+              Except.bind] using success
+          intro node member
+          rcases List.mem_cons.mp member with nodeEq | tailMember
+          · subst node
+            exact (nodeIdMember_eq_true_iff reached head.id).mp contained
+          · exact induction tailSuccess node tailMember
+
+/-- Successful forest validation exposes both executable structural
+certificates used by the declarative closure bridge. -/
+structure SourceForestValidationWitness (source : TypedSource) : Prop where
+  incoming :
+    validateIncomingNodeIdsFrom [] source.incomingNodeIds = .ok ()
+  reached :
+    validateAllSourceNodesReachedFrom (sourceReachableNodeIds source)
+      source.nodes = .ok ()
+
+theorem validateSourceForest_success_witness
+    {source : TypedSource}
+    (success : validateSourceForest source = .ok ()) :
+    SourceForestValidationWitness source := by
+  unfold validateSourceForest at success
+  cases incomingResult :
+      validateIncomingNodeIdsFrom [] source.incomingNodeIds with
+  | error error =>
+      simp [incomingResult, bind, Except.bind] at success
+  | ok incomingValue =>
+      cases incomingValue
+      cases reachedResult :
+          validateAllSourceNodesReachedFrom (sourceReachableNodeIds source)
+            source.nodes with
+      | error error =>
+          simp [incomingResult, reachedResult, bind, Except.bind] at success
+      | ok reachedValue =>
+          cases reachedValue
+          exact { incoming := incomingResult, reached := reachedResult }
+
+/-- Successful forest validation proves global uniqueness of all incoming
+root and child positions. -/
+theorem validateSourceForest_success_incomingNodeIds_nodup
+    {source : TypedSource}
+    (success : validateSourceForest source = .ok ()) :
+    source.incomingNodeIds.Nodup :=
+  validateIncomingNodeIds_success_nodup
+    (validateSourceForest_success_witness success).incoming
+
+/-- Successful forest validation proves that the root worklist collected the
+exact identity of every retained table node. -/
+theorem validateSourceForest_success_allNodesReached
+    {source : TypedSource}
+    (success : validateSourceForest source = .ok ()) :
+    ∀ node, node ∈ source.nodes →
+      node.id ∈ sourceReachableNodeIds source :=
+  validateAllSourceNodesReachedFrom_success
+    (validateSourceForest_success_witness success).reached
+
 /-- Successful graph validation exposes the successful result of each
 structural validation stage. -/
 structure SourceGraphValidationWitness (source : TypedSource) : Prop where
   occurrenceTable : validateOccurrenceTable source = .ok ()
   roots : validateSourceRoots source = .ok ()
   children : validateSourceChildren source = .ok ()
+  forest : validateSourceForest source = .ok ()
 
 theorem validateSourceGraph_success_witness
     {source : TypedSource}
@@ -234,11 +352,18 @@ theorem validateSourceGraph_success_witness
                 Except.bind] at success
           | ok childrenValue =>
               cases childrenValue
-              exact {
-                occurrenceTable := occurrenceResult
-                roots := rootsResult
-                children := childrenResult
-              }
+              cases forestResult : validateSourceForest source with
+              | error error =>
+                  simp [occurrenceResult, rootsResult, childrenResult,
+                    forestResult, bind, Except.bind] at success
+              | ok forestValue =>
+                  cases forestValue
+                  exact {
+                    occurrenceTable := occurrenceResult
+                    roots := rootsResult
+                    children := childrenResult
+                    forest := forestResult
+                  }
 
 /-- Successful complete graph validation proves category-erased occurrence
 uniqueness. -/
@@ -276,6 +401,25 @@ theorem validateSourceGraph_success_childEdgesExist
         child ∈ source.nodes.map Node.id := by
   exact validateSourceChildren_success_childEdgesExist
     (validateSourceGraph_success_witness success).children
+
+/-- Successful complete graph validation proves global uniqueness of roots
+and direct child positions. -/
+theorem validateSourceGraph_success_incomingNodeIds_nodup
+    {source : TypedSource}
+    (success : validateSourceGraph source = .ok ()) :
+    source.incomingNodeIds.Nodup :=
+  validateSourceForest_success_incomingNodeIds_nodup
+    (validateSourceGraph_success_witness success).forest
+
+/-- Successful complete graph validation proves worklist coverage of every
+retained source node. -/
+theorem validateSourceGraph_success_allNodesReached
+    {source : TypedSource}
+    (success : validateSourceGraph source = .ok ()) :
+    ∀ node, node ∈ source.nodes →
+      node.id ∈ sourceReachableNodeIds source :=
+  validateSourceForest_success_allNodesReached
+    (validateSourceGraph_success_witness success).forest
 
 @[simp] theorem supportedIntegerTarget_eq_true_iff
     (type : Ty) :

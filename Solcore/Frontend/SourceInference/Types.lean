@@ -101,6 +101,8 @@ inductive Error where
   | duplicateOccurrence (occurrence : OccurrenceId)
   | missingRoot (root : NodeId)
   | missingChild (parent child : NodeId)
+  | duplicateIncomingNode (id : NodeId)
+  | unreachableNode (id : NodeId)
   | matchScrutineeArityMismatch (expected actual : Nat)
   | constructorNeedsExpectedType (name : String)
   | unknownConstructor (qualifiers : List String) (name : String)

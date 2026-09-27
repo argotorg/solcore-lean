@@ -96,7 +96,17 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_occurrenceGraphWellFormed
 example :=
+  @Solcore.SourceSemantics.OccurrenceGraphClosed.of_wellFormed_incomingUnique_reachable
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.sourceReachableNodeIds_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_allNodesReachable
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_occurrenceGraphClosed
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_occurrenceGraphWellFormed
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_occurrenceGraphClosed
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_expression_root_exists
 example :=

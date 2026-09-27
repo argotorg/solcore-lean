@@ -170,6 +170,108 @@ theorem validateSourceGraph_success_occurrenceGraphWellFormed
       simpa [ChildEdgesExist, nodeChildIds, nodeIds] using childEdges
   }
 
+private theorem lookupNodeId?_sound
+    {source : TypedSource} {id : NodeId} {node : Node}
+    (found : source.lookupNodeId? id = some node) :
+    ContainsNode source id node := by
+  have rawFound :
+      source.nodes.find? (fun candidate => decide (candidate.id = id)) =
+        some node := by
+    simpa [TypedSource.lookupNodeId?] using found
+  have member : node ∈ source.nodes :=
+    List.mem_of_find?_eq_some rawFound
+  have accepted : decide (node.id = id) = true :=
+    List.find?_some
+      (p := fun candidate : Node => decide (candidate.id = id)) rawFound
+  exact ⟨member, of_decide_eq_true accepted⟩
+
+/-- Every identity returned by the bounded root worklist is declaratively
+reachable, provided its pending and already-collected inputs are reachable. -/
+private theorem collectReachableNodeIdsFuel_sound
+    {source : TypedSource} {fuel : Nat}
+    {pending visited : List NodeId}
+    (pendingReachable :
+      ∀ id, id ∈ pending → Reachable source id)
+    (visitedReachable :
+      ∀ id, id ∈ visited → Reachable source id) :
+    ∀ id,
+      id ∈ Detail.collectReachableNodeIdsFuel source fuel pending visited →
+        Reachable source id := by
+  induction fuel generalizing pending visited with
+  | zero =>
+      simpa [Detail.collectReachableNodeIdsFuel] using visitedReachable
+  | succ fuel induction =>
+      cases pending with
+      | nil =>
+          simpa [Detail.collectReachableNodeIdsFuel] using visitedReachable
+      | cons head tail =>
+          cases alreadyVisited : Detail.nodeIdMember visited head with
+          | true =>
+              simp only [Detail.collectReachableNodeIdsFuel, alreadyVisited]
+              apply induction
+              · intro id member
+                exact pendingReachable id (by simp [member])
+              · exact visitedReachable
+          | false =>
+              cases found : source.lookupNodeId? head with
+              | none =>
+                  simp only [Detail.collectReachableNodeIdsFuel,
+                    alreadyVisited, found]
+                  apply induction
+                  · intro id member
+                    exact pendingReachable id (by simp [member])
+                  · exact visitedReachable
+              | some node =>
+                  simp only [Detail.collectReachableNodeIdsFuel,
+                    alreadyVisited, found]
+                  have headReachable : Reachable source head :=
+                    pendingReachable head (by simp)
+                  have contains : ContainsNode source head node :=
+                    lookupNodeId?_sound found
+                  apply induction
+                  · intro id member
+                    rcases List.mem_append.mp member with childMember | tailMember
+                    · exact .child headReachable
+                        ⟨node, contains, childMember⟩
+                    · exact pendingReachable id (by simp [tailMember])
+                  · intro id member
+                    rcases List.mem_cons.mp member with rfl | visitedMember
+                    · exact headReachable
+                    · exact visitedReachable id visitedMember
+
+/-- Every identity collected by the public root worklist is reachable from a
+declaration root in the declarative occurrence graph. -/
+theorem sourceReachableNodeIds_sound
+    (source : TypedSource) :
+    ∀ id, id ∈ Detail.sourceReachableNodeIds source →
+      Reachable source id := by
+  unfold Detail.sourceReachableNodeIds
+  apply collectReachableNodeIdsFuel_sound
+  · intro id member
+    exact .root member
+  · simp
+
+/-- Successful executable graph validation proves that every retained node is
+reachable from one of the exact declaration roots. -/
+theorem validateSourceGraph_success_allNodesReachable
+    {source : TypedSource}
+    (success : Detail.validateSourceGraph source = .ok ()) :
+    AllNodesReachable source := by
+  intro node member
+  exact sourceReachableNodeIds_sound source node.id
+    (Detail.validateSourceGraph_success_allNodesReached success node member)
+
+/-- Successful executable validation establishes full rooted-forest closure,
+including unique parents, total reachability, and acyclicity. -/
+theorem validateSourceGraph_success_occurrenceGraphClosed
+    {source : TypedSource}
+    (success : Detail.validateSourceGraph source = .ok ()) :
+    OccurrenceGraphClosed source :=
+  OccurrenceGraphClosed.of_wellFormed_incomingUnique_reachable
+    (validateSourceGraph_success_occurrenceGraphWellFormed success)
+    (Detail.validateSourceGraph_success_incomingNodeIds_nodup success)
+    (validateSourceGraph_success_allNodesReachable success)
+
 /-- Successful finalization emits a source whose occurrence table, roots, and
 direct child edges satisfy the declarative graph invariant. -/
 theorem finalize_occurrenceGraphWellFormed
@@ -185,6 +287,20 @@ theorem finalize_occurrenceGraphWellFormed
   rw [Detail.finalize_typedSource success]
   exact FlexibleSubstitution.OccurrenceGraphWellFormed.applySubstitution
     result.substitution inputWellFormed
+
+/-- Successful finalization emits a fully closed rooted occurrence forest. -/
+theorem finalize_occurrenceGraphClosed
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty} {state : Frontend.SourceInference.State}
+    {roots : List NodeId} {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    OccurrenceGraphClosed result.typedSource := by
+  have inputClosed : OccurrenceGraphClosed (state.toTypedSource roots) :=
+    validateSourceGraph_success_occurrenceGraphClosed
+      (Detail.finalize_validateSourceGraph success)
+  rw [Detail.finalize_typedSource success]
+  exact FlexibleSubstitution.OccurrenceGraphClosed.applySubstitution
+    result.substitution inputClosed
 
 /-- Every expression entry root supplied to successful finalization has a
 concrete expression node in the emitted source. -/
