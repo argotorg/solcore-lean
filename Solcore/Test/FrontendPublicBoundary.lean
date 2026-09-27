@@ -454,6 +454,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.recordInstantiatedFunctionReference_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.recordSelectedCallResult_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordSelectedCallResult_requirements_subset

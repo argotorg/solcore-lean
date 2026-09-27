@@ -317,6 +317,40 @@ example {source : Syntax.Expr} {id : SourceInference.ExpressionId}
   exact SourceInference.Detail.recordExpressionWithExpected_inferenceProperties
     ready typeBelow expectedBelow success
 
+/-- Instantiating and recording a top-level function reference packages
+allocator progress, readiness, and the returned expression-type bound. -/
+example {context : SourceInference.Context} {source : Syntax.Expr}
+    {id : SourceInference.ExpressionId} {name : String}
+    {signature : ProgramFunctionSignature}
+    {expected : Option TypeSystem.Ty} {state : SourceInference.State}
+    {result : SourceInference.InferredExpression × SourceInference.State}
+    (ready : state.InferenceReady)
+    (schemeBodyBelow : signature.scheme.body.VariablesBelow
+      state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success :
+      (let instantiated :=
+          signature.scheme.instantiate state.inference.next
+       let inference := {
+         state.inference with next := instantiated.next
+       }
+       let (requirements, state) :=
+         ({ state with inference }).addRequirementsWithIds
+           instantiated.predicates
+       SourceInference.Detail.recordExpressionWithExpected context source id
+         instantiated.body
+         (.reference name (.declaration
+           (SourceInference.DeclarationInstantiation.ofInstantiated
+             signature instantiated)))
+         requirements expected state) = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  exact
+    SourceInference.Detail.recordInstantiatedFunctionReference_inferenceProperties
+      ready schemeBodyBelow expectedBelow success
+
 private def solverRegressionRequirement : SourceInference.Requirement := {
   id := ⟨0⟩
   predicate := solverRegressionSource

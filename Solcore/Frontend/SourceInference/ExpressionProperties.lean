@@ -1680,6 +1680,88 @@ theorem recordExpressionWithExpected_inferenceProperties
   exact ⟨fittedProperties.1.trans recordedProgress, recordedReady,
     fittedProperties.2.2⟩
 
+/-- Instantiating one top-level function reference, allocating its predicate
+requirements, and recording the reference makes semantic inference progress,
+preserves readiness, and returns an allocator-bounded expression type. -/
+theorem recordInstantiatedFunctionReference_inferenceProperties
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {name : String} {signature : ProgramFunctionSignature}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (ready : state.InferenceReady)
+    (schemeBodyBelow : signature.scheme.body.VariablesBelow
+      state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success :
+      (let instantiated :=
+          signature.scheme.instantiate state.inference.next
+       let inference := {
+         state.inference with next := instantiated.next
+       }
+       let (requirements, state) :=
+         ({ state with inference }).addRequirementsWithIds
+           instantiated.predicates
+       recordExpressionWithExpected context source id instantiated.body
+         (.reference name (.declaration
+           (DeclarationInstantiation.ofInstantiated signature instantiated)))
+         requirements expected state) = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  let instantiated := signature.scheme.instantiate state.inference.next
+  let advancedState : State := {
+    state with inference := {
+      state.inference with next := instantiated.next
+    }
+  }
+  let allocation :=
+    advancedState.addRequirementsWithIds instantiated.predicates
+  have instantiatedNextLe :
+      state.inference.next ≤ instantiated.next := by
+    simpa only [instantiated] using
+      ConstrainedDeclarationScheme.instantiate_next_le signature.scheme
+        state.inference.next
+  have advanceProgress : state.InferenceProgress advancedState := by
+    refine State.InferenceProgress.of_substitution_eq ready.solved ?_ ?_
+    · simpa only [advancedState] using instantiatedNextLe
+    · rfl
+  have advancedReady : advancedState.InferenceReady :=
+    State.InferenceReady.of_progress_of_binderEnvironment_eq ready
+      advanceProgress rfl
+  have instantiatedBelow :
+      instantiated.body.VariablesBelow advancedState.inference.next := by
+    simpa only [instantiated, advancedState] using
+      ConstrainedDeclarationScheme.instantiate_body_variablesBelow
+        signature.scheme state.inference.next schemeBodyBelow
+  have requirementsProgress :
+      advancedState.InferenceProgress allocation.2 :=
+    State.InferenceProgress.addRequirementsWithIds advancedState
+      instantiated.predicates advancedReady.solved
+  have requirementsReady : allocation.2.InferenceReady := by
+    exact State.InferenceReady.addRequirementsWithIds
+      instantiated.predicates advancedReady
+  have bodyAtRequirements :
+      instantiated.body.VariablesBelow allocation.2.inference.next :=
+    instantiatedBelow.weaken requirementsProgress.next_le
+  have expectedAtRequirements : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow allocation.2.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken
+      (Nat.le_trans advanceProgress.next_le requirementsProgress.next_le)
+  have recordSuccess :
+      recordExpressionWithExpected context source id instantiated.body
+        (.reference name (.declaration
+          (DeclarationInstantiation.ofInstantiated signature instantiated)))
+        allocation.1 expected allocation.2 = .ok result := by
+    simpa only [instantiated, advancedState, allocation, Prod.eta] using success
+  have recordedProperties :=
+    recordExpressionWithExpected_inferenceProperties requirementsReady
+      bodyAtRequirements expectedAtRequirements recordSuccess
+  exact ⟨advanceProgress.trans
+      (requirementsProgress.trans recordedProperties.1),
+    recordedProperties.2.1, recordedProperties.2.2⟩
+
 /-- Successful source-inference unification makes the original input types
 equal under the returned inference state. -/
 theorem unify_resolve_eq
