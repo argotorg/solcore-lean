@@ -52,6 +52,148 @@ private theorem list_eq_singleton_of_length_eq_one
       | nil => exact ⟨item, rfl⟩
       | cons second tail => simp at length_eq
 
+/-- Finalized semantic schemes projected from the stable executable binder
+stack.  The list order remains the executable lookup order; alignment with a
+semantic context is therefore stated by permutation rather than equality. -/
+def closedBinderLocals (substitution : TypeSystem.Substitution)
+    (binders : List TypedBinder) :
+    Resolved.LocalScope TypeSystem.Scheme :=
+  binders.map fun binder =>
+    (binder.id, (binder.applySubstitution substitution).scheme)
+
+/-- Finalized qualified-requirement metadata paired with the same stable
+binder identities as `closedBinderLocals`. -/
+def closedBinderRequirements (substitution : TypeSystem.Substitution)
+    (binders : List TypedBinder) :
+    Resolved.LocalScope (List LocalSchemeRequirement) :=
+  binders.map fun binder =>
+    (binder.id, (binder.applySubstitution substitution).schemeRequirements)
+
+/-- Stable executable binders and the two paired semantic local scopes carry
+the same entries.  Initial parameters may be installed into the semantic
+context in reverse order, so permutation plus unique identities is the exact
+order-insensitive invariant. -/
+structure LocalEnvironmentAligned
+    (state : Frontend.SourceInference.State)
+    (substitution : TypeSystem.Substitution)
+    (context : SourceSemantics.Context) : Prop where
+  ids_nodup : (state.localBinders.map fun binder => binder.id).Nodup
+  locals_perm :
+    (closedBinderLocals substitution state.localBinders).Perm context.locals
+  requirements_perm :
+    (closedBinderRequirements substitution state.localBinders).Perm
+      context.localSchemeRequirements
+
+namespace LocalEnvironmentAligned
+
+/-- Executable first-match name lookup identifies a stable binder whose
+closed scheme and qualified metadata are both available in the aligned
+semantic context. -/
+theorem lookup_of_lookupBinder?
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    {name : String} {binder : TypedBinder}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (found : state.lookupBinder? name = some binder) :
+    context.LocalLookup binder.id
+        (binder.applySubstitution substitution).scheme ∧
+      context.LocalSchemeRequirementsLookup binder.id
+        (binder.applySubstitution substitution).schemeRequirements := by
+  have rawFound : state.localBinders.find?
+      (fun candidate => candidate.name == name) = some binder := by
+    simpa [Frontend.SourceInference.State.lookupBinder?] using found
+  have binderMember : binder ∈ state.localBinders :=
+    List.mem_of_find?_eq_some rawFound
+  have localMember :
+      (binder.id, (binder.applySubstitution substitution).scheme) ∈
+        closedBinderLocals substitution state.localBinders :=
+    List.mem_map.mpr ⟨binder, binderMember, rfl⟩
+  have requirementMember :
+      (binder.id,
+        (binder.applySubstitution substitution).schemeRequirements) ∈
+        closedBinderRequirements substitution state.localBinders :=
+    List.mem_map.mpr ⟨binder, binderMember, rfl⟩
+  have closedLocalIdsNodup :
+      ((closedBinderLocals substitution state.localBinders).map
+        Prod.fst).Nodup := by
+    simpa [closedBinderLocals, List.map_map, Function.comp_def,
+      TypedBinder.applySubstitution] using aligned.ids_nodup
+  have contextLocalIdsNodup :
+      (context.locals.map Prod.fst).Nodup :=
+    (aligned.locals_perm.map Prod.fst).nodup_iff.mp closedLocalIdsNodup
+  have closedRequirementIdsNodup :
+      ((closedBinderRequirements substitution state.localBinders).map
+        Prod.fst).Nodup := by
+    simpa [closedBinderRequirements, List.map_map, Function.comp_def,
+      TypedBinder.applySubstitution] using aligned.ids_nodup
+  have contextRequirementIdsNodup :
+      (context.localSchemeRequirements.map Prod.fst).Nodup :=
+    (aligned.requirements_perm.map Prod.fst).nodup_iff.mp
+      closedRequirementIdsNodup
+  constructor
+  · exact Resolved.LocalScope.Lookup.of_mem_of_ids_nodup
+      contextLocalIdsNodup (aligned.locals_perm.mem_iff.mp localMember)
+  · exact Resolved.LocalScope.Lookup.of_mem_of_ids_nodup
+      contextRequirementIdsNodup
+        (aligned.requirements_perm.mem_iff.mp requirementMember)
+
+/-- Forgetting executable names and semantic stable identities leaves the
+same closed scheme collection on both sides of the alignment. -/
+theorem localSchemes_perm
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (aligned : LocalEnvironmentAligned state substitution context) :
+    ((state.binderEnvironment.apply substitution).map Prod.snd).Perm
+      (context.locals.map Prod.snd) := by
+  have projected := aligned.locals_perm.map Prod.snd
+  simpa [closedBinderLocals,
+    Frontend.SourceInference.State.binderEnvironment,
+    TypeSystem.Environment.apply, List.map_map, Function.comp_def,
+    FlexibleSubstitution.applyTypedBinder_scheme] using projected
+
+/-- The executable environment and aligned semantic local scope block
+exactly the same flexible variables during local-value generalization. -/
+theorem mem_local_freeVariables_iff
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (metavariable : TypeSystem.TypeVarId) :
+    metavariable ∈
+        (state.binderEnvironment.apply substitution).freeVariables ↔
+      metavariable ∈ context.locals.flatMap
+        (fun entry => entry.2.freeVariables) := by
+  have schemesPerm := aligned.localSchemes_perm
+  constructor
+  · rw [TypeSystem.Environment.mem_freeVariables_iff]
+    rintro ⟨entry, entryMember, variableMember⟩
+    have sourceMember : entry.2 ∈
+        (state.binderEnvironment.apply substitution).map Prod.snd :=
+      List.mem_map.mpr ⟨entry, entryMember, rfl⟩
+    have targetMember : entry.2 ∈ context.locals.map Prod.snd :=
+      schemesPerm.mem_iff.mp sourceMember
+    rcases List.mem_map.mp targetMember with
+      ⟨targetEntry, targetEntryMember, schemeEq⟩
+    rw [List.mem_flatMap]
+    exact ⟨targetEntry, targetEntryMember, by
+      simpa [schemeEq] using variableMember⟩
+  · rw [List.mem_flatMap]
+    rintro ⟨entry, entryMember, variableMember⟩
+    rw [TypeSystem.Environment.mem_freeVariables_iff]
+    have targetMember : entry.2 ∈ context.locals.map Prod.snd :=
+      List.mem_map.mpr ⟨entry, entryMember, rfl⟩
+    have sourceMember : entry.2 ∈
+        (state.binderEnvironment.apply substitution).map Prod.snd :=
+      schemesPerm.mem_iff.mpr targetMember
+    rcases List.mem_map.mp sourceMember with
+      ⟨sourceEntry, sourceEntryMember, schemeEq⟩
+    exact ⟨sourceEntry, sourceEntryMember, by
+      simpa [schemeEq] using variableMember⟩
+
+end LocalEnvironmentAligned
+
 /-- Any expression node retained by an inference state is declaratively
 contained in every typed-source view of that state. -/
 theorem toTypedSource_containsExpression_of_mem

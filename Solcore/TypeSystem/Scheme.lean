@@ -442,6 +442,65 @@ def freeVariables (environment : Environment) : List TypeVarId :=
   environment.foldl
     (fun variables entry => entry.2.freeVariables.foldl insertVariable variables) []
 
+private theorem mem_foldl_insertVariable_iff
+    (metavariable : TypeVarId) (initial values : List TypeVarId) :
+    metavariable ∈ values.foldl insertVariable initial ↔
+      metavariable ∈ initial ∨ metavariable ∈ values := by
+  induction values generalizing initial with
+  | nil => simp
+  | cons head tail induction =>
+      rw [List.foldl_cons, induction]
+      unfold insertVariable
+      by_cases present : head ∈ initial
+      · simp only [if_pos present, List.mem_cons]
+        constructor
+        · rintro (member | member)
+          · exact Or.inl member
+          · exact Or.inr (Or.inr member)
+        · rintro (member | same | member)
+          · exact Or.inl member
+          · exact Or.inl (by simpa [same] using present)
+          · exact Or.inr member
+      · simp [present, or_assoc]
+
+private theorem mem_foldl_schemeFreeVariables_iff
+    (metavariable : TypeVarId) (initial : List TypeVarId)
+    (environment : Environment) :
+    metavariable ∈ environment.foldl
+        (fun variables entry =>
+          entry.2.freeVariables.foldl insertVariable variables) initial ↔
+      metavariable ∈ initial ∨
+        ∃ entry ∈ environment, metavariable ∈ entry.2.freeVariables := by
+  induction environment generalizing initial with
+  | nil => simp
+  | cons entry rest induction =>
+      rw [List.foldl_cons, induction,
+        mem_foldl_insertVariable_iff]
+      simp only [List.mem_cons]
+      constructor
+      · rintro ((initialMember | headMember) | ⟨candidate, restMember,
+          candidateMember⟩)
+        · exact Or.inl initialMember
+        · exact Or.inr ⟨entry, Or.inl rfl, headMember⟩
+        · exact Or.inr
+            ⟨candidate, Or.inr restMember, candidateMember⟩
+      · rintro (initialMember | ⟨candidate, same | restMember,
+          candidateMember⟩)
+        · exact Or.inl (Or.inl initialMember)
+        · subst candidate
+          exact Or.inl (Or.inr candidateMember)
+        · exact Or.inr ⟨candidate, restMember, candidateMember⟩
+
+/-- A flexible variable is free in an environment exactly when it is free in
+one of the environment's retained schemes. -/
+@[simp] theorem mem_freeVariables_iff
+    (metavariable : TypeVarId) (environment : Environment) :
+    metavariable ∈ environment.freeVariables ↔
+      ∃ entry ∈ environment, metavariable ∈ entry.2.freeVariables := by
+  unfold freeVariables
+  simpa using
+    (mem_foldl_schemeFreeVariables_iff metavariable [] environment)
+
 def nextVariable (environment : Environment) : Nat :=
   environment.foldl (fun next entry => max next entry.2.nextVariable) 0
 

@@ -168,6 +168,28 @@ theorem Lookup.mem {α : Type} {scope : LocalScope α} {id : LocalId} {value : �
   | head => exact List.mem_cons_self
   | tail _ _ ih => exact List.mem_cons_of_mem _ ih
 
+/-- Membership determines a first-match lookup when every stable local
+identity occurs at most once in the scope. -/
+theorem Lookup.of_mem_of_ids_nodup
+    {α : Type} {scope : LocalScope α} {id : LocalId} {value : α}
+    (ids_nodup : (scope.map Prod.fst).Nodup)
+    (member : (id, value) ∈ scope) :
+    Lookup scope id value := by
+  induction scope with
+  | nil => simp at member
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, headValue⟩
+      simp only [List.map_cons, List.nodup_cons] at ids_nodup
+      rcases List.mem_cons.mp member with same | tailMember
+      · cases same
+        exact .head
+      · apply Lookup.tail
+        · intro candidate_eq
+          subst candidate
+          exact ids_nodup.1
+            (List.mem_map.mpr ⟨(id, value), tailMember, rfl⟩)
+        · exact induction ids_nodup.2 tailMember
+
 theorem index?_eq_none_iff {scope : List LocalId} {id : LocalId} :
     index? scope id = none ↔ id ∉ scope := by
   induction scope with

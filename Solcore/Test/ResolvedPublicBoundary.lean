@@ -24,6 +24,7 @@ example := @Solcore.Resolved.LocalScope.lookup_iff_getElem?
 example := @Solcore.Resolved.LocalScope.IndexOf.getElem?
 example := @Solcore.Resolved.LocalScope.IndexOf.lt_length
 example := @Solcore.Resolved.LocalScope.Lookup.mem
+example := @Solcore.Resolved.LocalScope.Lookup.of_mem_of_ids_nodup
 example := @Solcore.Resolved.LocalScope.index?_eq_none_iff
 example := @Solcore.Resolved.LocalScope.lookup?_eq_none_iff
 example := @Solcore.Resolved.LocalScope.ids_length

@@ -207,6 +207,109 @@ private def templateTrackingAllocatedState : SourceInference.State :=
     (templateBinder 0).scheme (some testSpan) false
     [templateRequirement]).2
 
+private def reversedLocalEnvironmentState : SourceInference.State := {
+  SourceInference.State.initial testOwner with
+  localBinders := [templateBinder 0, templateBinder 1]
+}
+
+private def reversedLocalEnvironmentContext : SourceSemantics.Context :=
+  ((Context.ofSignatures emptySignatures).withLocal
+      (templateBinder 0).id (templateBinder 0).scheme
+      (templateBinder 0).schemeRequirements)
+    |>.withLocal (templateBinder 1).id (templateBinder 1).scheme
+      (templateBinder 1).schemeRequirements
+
+private theorem emptySubstitution_without
+    (variables : List TypeVarId) :
+    TypeSystem.Substitution.without [] variables = [] := by
+  induction variables with
+  | nil => rfl
+  | cons head tail ih =>
+      simpa [TypeSystem.Substitution.without,
+        TypeSystem.Substitution.erase] using ih
+
+private theorem substitution_apply_empty (type : Ty) :
+    TypeSystem.Substitution.apply [] type = type := by
+  exact TypeSystem.Substitution.empty_apply type
+
+private theorem types_map_apply_empty (types : List Ty) :
+    types.map (TypeSystem.Substitution.apply []) = types := by
+  induction types with
+  | nil => rfl
+  | cons head tail induction =>
+      simp [substitution_apply_empty, induction]
+
+private theorem scheme_apply_empty (scheme : Scheme) :
+    Scheme.apply [] scheme = scheme := by
+  cases scheme
+  simp [Scheme.apply, emptySubstitution_without, substitution_apply_empty]
+
+private theorem predicate_apply_empty (predicate : ProgramPredicate) :
+    TypedTraitResolution.applySubstitution [] predicate = predicate := by
+  cases predicate with
+  | mk trait subject arguments =>
+      simp [TypedTraitResolution.applySubstitution,
+        substitution_apply_empty, types_map_apply_empty]
+
+private theorem localSchemeRequirement_apply_empty
+    (requirement : LocalSchemeRequirement) :
+    requirement.applySubstitution [] = requirement := by
+  cases requirement
+  simp [LocalSchemeRequirement.applySubstitution,
+    predicate_apply_empty]
+
+private theorem localSchemeRequirements_map_apply_empty
+    (requirements : List LocalSchemeRequirement) :
+    requirements.map (LocalSchemeRequirement.applySubstitution []) =
+      requirements := by
+  induction requirements with
+  | nil => rfl
+  | cons requirement rest induction =>
+      simp [localSchemeRequirement_apply_empty, induction]
+
+/-- Semantic binder extension reverses the source-ordered input list, while
+the alignment invariant deliberately retains both scopes by permutation. -/
+private theorem reversedLocalEnvironmentAligned :
+    SourceInferenceSoundness.LocalEnvironmentAligned
+      reversedLocalEnvironmentState [] reversedLocalEnvironmentContext := by
+  constructor
+  · simp [reversedLocalEnvironmentState, templateBinder]
+  · simpa [SourceInferenceSoundness.closedBinderLocals,
+      reversedLocalEnvironmentState, reversedLocalEnvironmentContext,
+      Context.withLocal, Context.ofSignatures,
+      emptySubstitution_without, scheme_apply_empty] using
+      (List.Perm.swap
+        ((templateBinder 0).id, (templateBinder 0).scheme)
+        ((templateBinder 1).id, (templateBinder 1).scheme) []).symm
+  · simpa [SourceInferenceSoundness.closedBinderRequirements,
+      reversedLocalEnvironmentState, reversedLocalEnvironmentContext,
+      Context.withLocal, Context.ofSignatures,
+      emptySubstitution_without,
+      localSchemeRequirement_apply_empty,
+      localSchemeRequirements_map_apply_empty] using
+      (List.Perm.swap
+        ((templateBinder 0).id, (templateBinder 0).schemeRequirements)
+        ((templateBinder 1).id, (templateBinder 1).schemeRequirements) []).symm
+
+/-- A name selected by executable first-match lookup yields both paired
+stable-ID lookups even though the semantic list order is reversed. -/
+example :
+    reversedLocalEnvironmentContext.LocalLookup (templateBinder 0).id
+        (templateBinder 0).scheme ∧
+      reversedLocalEnvironmentContext.LocalSchemeRequirementsLookup
+        (templateBinder 0).id (templateBinder 0).schemeRequirements := by
+  exact reversedLocalEnvironmentAligned.lookup_of_lookupBinder?
+    (name := "template0") (by decide)
+
+/-- The order-independent alignment also identifies the local-scheme free
+variables used as the lexical barrier for value generalization. -/
+example :
+    templateVariable ∈
+        (reversedLocalEnvironmentState.binderEnvironment.apply []).freeVariables ↔
+      templateVariable ∈ reversedLocalEnvironmentContext.locals.flatMap
+        (fun entry => entry.2.freeVariables) :=
+  reversedLocalEnvironmentAligned.mem_local_freeVariables_iff templateVariable
+
 private def templateTrackingForNode : StatementNode := {
   id := statementId 2
   span := testSpan

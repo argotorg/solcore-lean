@@ -85,6 +85,18 @@ example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_evi
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_entails
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_retainedEvidenceValid
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.closedBinderLocals
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.closedBinderRequirements
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.lookup_of_lookupBinder?
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.localSchemes_perm
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.mem_local_freeVariables_iff
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.toTypedSource_containsExpression_of_mem
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.toTypedSource_containsStatement_of_mem

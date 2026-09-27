@@ -90,6 +90,7 @@ example := @Solcore.TypeSystem.Environment.BodiesBelow.weaken
 example := @Solcore.TypeSystem.Environment.BodiesBelow.cons
 example := @Solcore.TypeSystem.Environment.BodiesBelow.apply
 example := @Solcore.TypeSystem.Environment.lookup?_eq_some_mem
+example := @Solcore.TypeSystem.Environment.mem_freeVariables_iff
 example := @Solcore.TypeSystem.Environment.bodiesBelow_nextVariable
 example := @Solcore.TypeSystem.Expr.AnnotationsBelow
 example := @Solcore.TypeSystem.Expr.AnnotationsBelow.weaken
@@ -97,6 +98,32 @@ example := @Solcore.TypeSystem.Expr.AnnotationsBelow.weaken
 private def solvedMetavariable : Solcore.TypeSystem.TypeVarId := ⟨0⟩
 
 private def survivingMetavariable : Solcore.TypeSystem.TypeVarId := ⟨1⟩
+
+private def environmentOnlyMetavariable : Solcore.TypeSystem.TypeVarId := ⟨2⟩
+
+private def freeVariableEnvironment : Solcore.TypeSystem.Environment :=
+  [ ("generalized", {
+      quantified := [solvedMetavariable]
+      body := .product (.variable solvedMetavariable)
+        (.variable survivingMetavariable)
+    })
+  , ("monomorphic", Solcore.TypeSystem.Scheme.mono
+      (.variable environmentOnlyMetavariable))
+  ]
+
+/-- Environment membership exposes a witness scheme while respecting each
+scheme's quantified-variable boundary. -/
+example : environmentOnlyMetavariable ∈ freeVariableEnvironment.freeVariables := by
+  rw [Solcore.TypeSystem.Environment.mem_freeVariables_iff]
+  simp [freeVariableEnvironment, Solcore.TypeSystem.Scheme.mono,
+    Solcore.TypeSystem.Scheme.freeVariables,
+    Solcore.TypeSystem.Ty.freeVariables]
+
+/-- The stable environment ledger aggregates free variables from both schemes
+and removes the variable quantified by the first scheme. -/
+example : freeVariableEnvironment.freeVariables =
+    [survivingMetavariable, environmentOnlyMetavariable] := by
+  decide
 
 private def nonemptySolvedSubstitution : Solcore.TypeSystem.Substitution :=
   [(solvedMetavariable, .variable survivingMetavariable)]
