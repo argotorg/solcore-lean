@@ -2724,6 +2724,160 @@ private theorem selectFunctionCandidateFrom_state_header
       trailingCoercions state).2.header = state.header := by
   simp [recordSelectedCallResult]
 
+/-- Applying an indirectly obtained function type makes semantic inference
+progress, preserves readiness, and returns an allocator-bounded result type. -/
+theorem applyFunctionType_inferenceProperties
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Option Ty}
+    {state : State} {result : IndirectApplicationResult}
+    (ready : state.InferenceReady)
+    (calleeBelow : calleeType.VariablesBelow state.inference.next)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : applyFunctionType context call calleeType arguments expected
+      state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.result.type.VariablesBelow result.state.inference.next := by
+  have argumentTypesBelow :
+      ∀ type ∈ arguments.map (fun argument => argument.type),
+        type.VariablesBelow state.inference.next := by
+    intro type member
+    simp only [List.mem_map] at member
+    obtain ⟨argument, argumentMember, rfl⟩ := member
+    exact argumentsBelow argument argumentMember
+  have argumentTypeBelow :
+      (Ty.productMany
+        (arguments.map (fun argument => argument.type))).VariablesBelow
+          state.inference.next :=
+    Ty.variablesBelow_productMany argumentTypesBelow
+  have resolvedCalleeBelow :
+      (state.resolve calleeType).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply calleeBelow
+  unfold applyFunctionType at success
+  cases partsResult : functionParts? (state.resolve calleeType) with
+  | some parts =>
+      rcases parts with ⟨parameter, returnType⟩
+      have partsBelow := functionParts?_success_variablesBelow
+        resolvedCalleeBelow partsResult
+      simp only [partsResult] at success
+      cases argumentResult : withExpected context state
+          { id := call, type := Ty.productMany
+              (arguments.map (fun argument => argument.type)) }
+          (some parameter) with
+      | error error =>
+          simp [argumentResult, bind, Except.bind] at success
+      | ok fittedArgument =>
+          simp only [argumentResult, bind, Except.bind] at success
+          have argumentProperties := withExpected_inferenceProperties ready
+            argumentTypeBelow (by
+              intro expectedType member
+              simp at member
+              subst expectedType
+              exact partsBelow.1)
+            argumentResult
+          have returnTypeBelow :
+              returnType.VariablesBelow
+                fittedArgument.state.inference.next :=
+            partsBelow.2.weaken argumentProperties.1.next_le
+          have expectedAtArgument : ∀ expectedType ∈ expected,
+              expectedType.VariablesBelow
+                fittedArgument.state.inference.next := by
+            intro expectedType member
+            exact (expectedBelow expectedType member).weaken
+              argumentProperties.1.next_le
+          cases resultResult : withExpected context fittedArgument.state
+              { id := call, type := returnType } expected with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := fittedArgument.coercions
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              have resultProperties := withExpected_inferenceProperties
+                argumentProperties.2.1 returnTypeBelow expectedAtArgument
+                resultResult
+              exact ⟨argumentProperties.1.trans resultProperties.1,
+                resultProperties.2⟩
+  | none =>
+      simp only [partsResult] at success
+      generalize freshResultEq : state.fresh = freshResult at success
+      rcases freshResult with ⟨resultType, freshState⟩
+      have freshProgress : state.InferenceProgress freshState := by
+        have progress := State.InferenceProgress.fresh state ready.solved
+        rw [freshResultEq] at progress
+        exact progress
+      have freshReady : freshState.InferenceReady := by
+        have nextReady := State.InferenceReady.fresh ready
+        rw [freshResultEq] at nextReady
+        exact nextReady
+      have freshTypeBelow :
+          state.fresh.1.VariablesBelow state.fresh.2.inference.next := by
+        change Ty.VariablesBelow (state.inference.next + 1)
+          (.variable ⟨state.inference.next⟩)
+        exact (Ty.variablesBelow_variable_iff _ _).2 (Nat.lt_succ_self _)
+      rw [freshResultEq] at freshTypeBelow
+      have calleeAtFresh :
+          calleeType.VariablesBelow freshState.inference.next :=
+        calleeBelow.weaken freshProgress.next_le
+      have argumentTypeAtFresh :
+          (Ty.productMany
+            (arguments.map (fun argument => argument.type))).VariablesBelow
+              freshState.inference.next :=
+        argumentTypeBelow.weaken freshProgress.next_le
+      have functionTypeBelow :
+          (Ty.function
+            (Ty.productMany (arguments.map (fun argument => argument.type)))
+            resultType).VariablesBelow freshState.inference.next :=
+        (Ty.variablesBelow_function_iff _ _ _).2
+          ⟨argumentTypeAtFresh, freshTypeBelow⟩
+      cases unifyResult : unify freshState calleeType
+          (.function (Ty.productMany (arguments.map fun argument =>
+            argument.type)) resultType) with
+      | error error =>
+          simp [unifyResult, bind, Except.bind] at success
+      | ok unifiedState =>
+          simp only [unifyResult, bind, Except.bind] at success
+          have unifyProgress := unify_inferenceProgress freshReady.solved
+            calleeAtFresh functionTypeBelow unifyResult
+          have unifiedReady := unify_preserves_inferenceReady freshReady
+            calleeAtFresh functionTypeBelow unifyResult
+          have prefixProgress := freshProgress.trans unifyProgress
+          have resultTypeAtUnified :
+              resultType.VariablesBelow unifiedState.inference.next :=
+            freshTypeBelow.weaken unifyProgress.next_le
+          have expectedAtUnified : ∀ expectedType ∈ expected,
+              expectedType.VariablesBelow unifiedState.inference.next := by
+            intro expectedType member
+            exact (expectedBelow expectedType member).weaken
+              prefixProgress.next_le
+          cases resultResult : withExpected context unifiedState
+              { id := call, type := resultType } expected with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := []
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              have resultProperties := withExpected_inferenceProperties
+                unifiedReady resultTypeAtUnified expectedAtUnified resultResult
+              exact ⟨prefixProgress.trans resultProperties.1,
+                resultProperties.2⟩
+
 private theorem applyFunctionType_state_header
     {context : Context} {call : ExpressionId} {calleeType : Ty}
     {arguments : List InferredExpression} {expected : Option Ty}

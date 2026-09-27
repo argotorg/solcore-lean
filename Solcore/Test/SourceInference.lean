@@ -431,6 +431,27 @@ example {context : SourceInference.Context} {name : String}
   exact SourceInference.Detail.selectFunctionCandidateFrom_inferenceProperties
     ready argumentsBelow candidateBodiesBelow expectedBelow success
 
+/-- Applying a bounded indirect function type packages progress, readiness,
+and a final allocator bound for the inferred application result. -/
+example {context : SourceInference.Context}
+    {call : SourceInference.ExpressionId} {calleeType : TypeSystem.Ty}
+    {arguments : List SourceInference.InferredExpression}
+    {expected : Option TypeSystem.Ty} {state : SourceInference.State}
+    {result : SourceInference.Detail.IndirectApplicationResult}
+    (ready : state.InferenceReady)
+    (calleeBelow : calleeType.VariablesBelow state.inference.next)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.applyFunctionType context call calleeType
+      arguments expected state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.result.type.VariablesBelow result.state.inference.next := by
+  exact SourceInference.Detail.applyFunctionType_inferenceProperties ready
+    calleeBelow argumentsBelow expectedBelow success
+
 /-- Recording an expected expression extends the same inference guarantees
 through source-node allocation without requiring a concrete evaluator case. -/
 example {source : Syntax.Expr} {id : SourceInference.ExpressionId}
