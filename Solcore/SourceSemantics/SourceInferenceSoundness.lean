@@ -129,6 +129,43 @@ theorem coercionMethodProfile?_some_instantiates
       · rw [if_neg arity] at profile_success
         simp at profile_success
 
+/-- A profile-consistent planned coercion edge remains a declaratively valid
+`Coerce` profile after the ambient inference substitution closes its endpoint
+types and ordered method predicates. -/
+theorem plannedCoercionStep_profileInstantiatesAfterSubstitution
+    {inferenceContext : Frontend.SourceInference.Context}
+    {sourceContext targetContext : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {planned : Detail.PlannedCoercionStep}
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid substitution
+      closedVariables sourceContext targetContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (profile_success :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (consistent :
+      Detail.PlannedCoercionStep.ProfileConsistent trait profile planned) :
+    CoercionProfileInstantiates targetContext
+      (substitution.apply planned.source)
+      (substitution.apply planned.target)
+      (TypedTraitResolution.applySubstitution substitution planned.predicate)
+      (planned.methodPredicates.map
+        (TypedTraitResolution.applySubstitution substitution)) := by
+  have raw : CoercionProfileInstantiates sourceContext planned.source
+      planned.target planned.predicate planned.methodPredicates := by
+    simpa [consistent.predicate_eq] using
+      coercionMethodProfile?_some_instantiates signatures_eq trait_name
+        profile_success consistent.methodPredicates_eq
+  exact FlexibleSubstitution.CoercionProfileInstantiates.applySubstitution
+    catalog contextValid raw
+
 /-- A successful executable candidate check retains a declaratively
 admissible occurrence of the candidate signature.  Argument fitting,
 expected-type fitting, predicate validation, and ledger allocation happen

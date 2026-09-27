@@ -77,6 +77,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.selectFunctionCandidate_declarationApplicationValid
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.coercionMethodProfile?_some_instantiates
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.plannedCoercionStep_profileInstantiatesAfterSubstitution
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveNormalizedPredicate_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solvePredicate_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvidence_ordinary_sound
