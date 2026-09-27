@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.Types
 Executable validation for the type-formation fragment of the declarative
 source semantics.
 
-Unlike signature-only formation, these checks admit the flexible variables
+Unlike signature-only formation, these checks allow the flexible variables
 opened by a source context.  Nominal types are still accepted only as complete
 applications of a data or contract declaration in the resolved catalog.
 -/
