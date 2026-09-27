@@ -69,9 +69,54 @@ def validateIntegerLiteralTargets (state : State) :
       validateIntegerLiteralTarget origin state
       validateIntegerLiteralTargets state rest
 
+/-- Check the source spelling and exact inference metadata retained by one
+integer-literal expression node. -/
+def validateIntegerLiteralNode (state : State) : Node → Except Error Unit
+  | .expression node =>
+      match node.form with
+      | .integerLiteral source resolution =>
+          if Frontend.numericLiteralValue? source = some resolution.rawValue then
+            match state.integerLiterals.find? fun origin =>
+                decide (origin.expression = node.id ∧
+                  resolution.targetType = .variable origin.metavariable ∧
+                  origin.requirement = resolution.requirement) with
+            | none => .error (.missingIntegerLiteralRequirement node.id
+                resolution.requirement)
+            | some _origin =>
+                match state.requirements.find? fun requirement =>
+                    decide (requirement.id = resolution.requirement) with
+                | none => .error (.missingIntegerLiteralRequirement node.id
+                    resolution.requirement)
+                | some requirement =>
+                    if requirement.predicate = resolution.predicate then
+                      .ok ()
+                    else
+                      .error (.integerLiteralRequirementPredicateMismatch node.id
+                        resolution.requirement resolution.predicate
+                        requirement.predicate)
+          else
+            .error (.unsupportedLiteral
+              "inconsistent integer literal metadata")
+      | _ => .ok ()
+  | .statement _ => .ok ()
+
+/-- Validate integer-literal metadata for every retained source node. -/
+def validateIntegerLiteralNodes (state : State) :
+    List Node → Except Error Unit
+  | [] => .ok ()
+  | node :: rest => do
+      validateIntegerLiteralNode state node
+      validateIntegerLiteralNodes state rest
+
+/-- Validate the complete node-to-origin-to-requirement correspondence before
+finalization mutates inference substitutions. -/
+def validateIntegerLiteralLedger (state : State) : Except Error Unit :=
+  validateIntegerLiteralNodes state state.nodes
+
 def finalize (context : Context) (type : Ty) (state : State)
     (roots : List NodeId) :
     Except Error Result := do
+  validateIntegerLiteralLedger state
   let state ← defaultIntegerPatternTargets state.integerPatterns state
   let state ← defaultIntegerLiteralTargets state.integerLiterals state
   validateIntegerPatternTargets state state.integerPatterns

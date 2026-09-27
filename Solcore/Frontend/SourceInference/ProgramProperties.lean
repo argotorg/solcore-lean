@@ -108,6 +108,120 @@ theorem validateIntegerLiteralTargets_success_supported
           · exact validateIntegerLiteralTarget_success_supported headResult
           · exact induction tailResult origin tailMember
 
+private theorem validateIntegerLiteralNode_success_correspondence
+    {state : State} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (form_eq : node.form = .integerLiteral source resolution)
+    (success : validateIntegerLiteralNode state (.expression node) = .ok ()) :
+    Frontend.numericLiteralValue? source = some resolution.rawValue ∧
+      ∃ origin, origin ∈ state.integerLiterals ∧
+        origin.expression = node.id ∧
+        resolution.targetType = .variable origin.metavariable ∧
+        resolution.requirement = origin.requirement ∧
+        ({ id := resolution.requirement, predicate := resolution.predicate } :
+          Requirement) ∈ state.requirements := by
+  simp only [validateIntegerLiteralNode, form_eq] at success
+  split at success
+  next decoded =>
+    cases originResult : state.integerLiterals.find? (fun origin =>
+        decide (origin.expression = node.id ∧
+          resolution.targetType = .variable origin.metavariable ∧
+          origin.requirement = resolution.requirement)) with
+    | none =>
+        simp only [originResult] at success
+        cases success
+    | some origin =>
+        cases requirementResult : state.requirements.find? (fun requirement =>
+            decide (requirement.id = resolution.requirement)) with
+        | none =>
+            simp only [originResult, requirementResult] at success
+            cases success
+        | some requirement =>
+            simp only [originResult, requirementResult] at success
+            split at success
+            next predicateEq =>
+              have originMatches :
+                  origin.expression = node.id ∧
+                    resolution.targetType = .variable origin.metavariable ∧
+                    origin.requirement = resolution.requirement := by
+                have accepted : decide (origin.expression = node.id ∧
+                    resolution.targetType = .variable origin.metavariable ∧
+                    origin.requirement = resolution.requirement) = true :=
+                  List.find?_some (p := fun candidate : IntegerLiteralOrigin =>
+                    decide (candidate.expression = node.id ∧
+                      resolution.targetType = .variable candidate.metavariable ∧
+                      candidate.requirement = resolution.requirement))
+                    originResult
+                exact of_decide_eq_true accepted
+              rcases originMatches with
+                ⟨expressionEq, targetEq, requirementEq⟩
+              have originMem : origin ∈ state.integerLiterals :=
+                List.mem_of_find?_eq_some originResult
+              have requirementIdEq :
+                  requirement.id = resolution.requirement :=
+                of_decide_eq_true (List.find?_some
+                  (p := fun candidate : Requirement =>
+                    decide (candidate.id = resolution.requirement))
+                  requirementResult)
+              have requirementMem : requirement ∈ state.requirements :=
+                List.mem_of_find?_eq_some requirementResult
+              refine ⟨decoded, origin, originMem, expressionEq, targetEq,
+                requirementEq.symm, ?_⟩
+              cases requirement with
+              | mk id predicate =>
+                  simp only at requirementIdEq predicateEq
+                  subst id
+                  subst predicate
+                  exact requirementMem
+            next predicateNe =>
+              cases success
+  next decodedNe =>
+    cases success
+
+private theorem validateIntegerLiteralNodes_success_correspondence
+    {state : State} {nodes : List Node}
+    (success : validateIntegerLiteralNodes state nodes = .ok ()) :
+    ∀ node source resolution,
+      Node.expression node ∈ nodes →
+      node.form = .integerLiteral source resolution →
+      Frontend.numericLiteralValue? source = some resolution.rawValue ∧
+        ∃ origin, origin ∈ state.integerLiterals ∧
+          origin.expression = node.id ∧
+          resolution.targetType = .variable origin.metavariable ∧
+          resolution.requirement = origin.requirement ∧
+          ({ id := resolution.requirement, predicate := resolution.predicate } :
+            Requirement) ∈ state.requirements := by
+  induction nodes with
+  | nil =>
+      intro node source resolution member
+      simp at member
+  | cons head tail induction =>
+      simp only [validateIntegerLiteralNodes, bind, Except.bind] at success
+      cases headResult : validateIntegerLiteralNode state head with
+      | error error =>
+          simp [headResult] at success
+      | ok value =>
+          cases value
+          have tailSuccess :
+              validateIntegerLiteralNodes state tail = .ok () := by
+            simpa [headResult] using success
+          intro node source resolution member formEq
+          rcases List.mem_cons.mp member with headEq | tailMember
+          · subst head
+            exact validateIntegerLiteralNode_success_correspondence
+              formEq headResult
+          · exact induction tailSuccess node source resolution tailMember
+              formEq
+
+/-- Successful executable ledger validation exposes the complete reusable
+node-to-origin-to-requirement correspondence. -/
+theorem validateIntegerLiteralLedger_success_correspondence
+    {state : State}
+    (success : validateIntegerLiteralLedger state = .ok ()) :
+    state.IntegerLiteralLedgerCorrespondence := by
+  exact validateIntegerLiteralNodes_success_correspondence success
+
 theorem unify_localSchemeAssumptions
     {state next : State} {left right : Ty}
     (result : unify state left right = .ok next) :
@@ -554,6 +668,31 @@ private theorem defaultIntegerLiteralTargets_toTypedSource
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_toTypedSource headResult)
 
+/-- Successful finalization includes successful validation of its input
+integer-literal ledger. -/
+theorem finalize_validateIntegerLiteralLedger
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    validateIntegerLiteralLedger state = .ok () := by
+  unfold finalize at success
+  cases validation : validateIntegerLiteralLedger state with
+  | error error =>
+      simp [validation, bind, Except.bind] at success
+  | ok value =>
+      cases value
+      rfl
+
+/-- Successful finalization certifies the literal metadata and exact
+requirement row of every integer-literal node in its input state. -/
+theorem finalize_integerLiteralLedgerCorrespondence
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    state.IntegerLiteralLedgerCorrespondence := by
+  exact validateIntegerLiteralLedger_success_correspondence
+    (finalize_validateIntegerLiteralLedger success)
+
 /-- Finalization closes every retained integer-pattern origin to a carrier
 implemented by both the declarative semantics and runtime. -/
 theorem finalize_integerPatternTarget_supported
@@ -564,6 +703,8 @@ theorem finalize_integerPatternTarget_supported
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
   unfold finalize at success
+  have ledgerValidation := finalize_validateIntegerLiteralLedger success
+  simp only [ledgerValidation] at success
   cases patternResult :
       defaultIntegerPatternTargets state.integerPatterns state with
   | error error =>
@@ -627,6 +768,8 @@ theorem finalize_integerLiteralTarget_supported
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
   unfold finalize at success
+  have ledgerValidation := finalize_validateIntegerLiteralLedger success
+  simp only [ledgerValidation] at success
   cases patternResult :
       defaultIntegerPatternTargets state.integerPatterns state with
   | error error =>
@@ -690,6 +833,8 @@ theorem finalize_preserves_resolve_eq
     (success : finalize context type state roots = .ok result) :
     result.substitution.apply left = result.substitution.apply right := by
   unfold finalize at success
+  have ledgerValidation := finalize_validateIntegerLiteralLedger success
+  simp only [ledgerValidation] at success
   cases patternResult :
       defaultIntegerPatternTargets state.integerPatterns state with
   | error error =>
@@ -774,6 +919,8 @@ theorem finalize_type
     (success : finalize context type state roots = .ok result) :
     result.type = result.substitution.apply type := by
   unfold finalize at success
+  have ledgerValidation := finalize_validateIntegerLiteralLedger success
+  simp only [ledgerValidation] at success
   cases patternResult :
       defaultIntegerPatternTargets state.integerPatterns state with
   | error error =>
@@ -824,6 +971,8 @@ theorem finalize_typedSource
     result.typedSource =
       (state.toTypedSource roots).applySubstitution result.substitution := by
   unfold finalize at success
+  have ledgerValidation := finalize_validateIntegerLiteralLedger success
+  simp only [ledgerValidation] at success
   cases patternResult :
       defaultIntegerPatternTargets state.integerPatterns state with
   | error error =>

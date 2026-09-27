@@ -175,7 +175,11 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateIdsAligned
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_templateIdsAligned
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_template_evidence
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalizedRequirementContext
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_integerLiteralValid_of_mem
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_solvedRequirementsValid
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_integerLiteralValid_of_mem_ordinary
 
 example := @Solcore.SourceSemantics.ReferenceHasRawType
 example := @Solcore.SourceSemantics.ReferenceHasRawType.local_iff

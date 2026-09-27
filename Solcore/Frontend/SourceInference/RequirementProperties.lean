@@ -280,6 +280,21 @@ theorem requirementIds_nodup (state : State)
     indices ▸ List.nodup_range
   exact requirementIds_nodup_of_indices_nodup _ indicesNodup
 
+/-- Every retained integer-literal node decodes to its recorded value, owns
+matching origin metadata, and names the exact builtin-`Int` row retained in
+the canonical requirement ledger. -/
+def IntegerLiteralLedgerCorrespondence (state : State) : Prop :=
+  ∀ node source resolution,
+    Node.expression node ∈ state.nodes →
+    node.form = .integerLiteral source resolution →
+    Frontend.numericLiteralValue? source = some resolution.rawValue ∧
+      ∃ origin, origin ∈ state.integerLiterals ∧
+        origin.expression = node.id ∧
+        resolution.targetType = .variable origin.metavariable ∧
+        resolution.requirement = origin.requirement ∧
+        ({ id := resolution.requirement, predicate := resolution.predicate } :
+          Requirement) ∈ state.requirements
+
 end State
 
 /-- Ordered requirement identities that point to the corresponding predicate

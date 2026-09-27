@@ -455,6 +455,113 @@ private def testClosedUnsupportedIntegerLiteralTarget : IO Unit := do
   | .ok _ => throw (IO.userError
       "unsupported closed integer-literal target passed final validation")
 
+private def literalLedgerMetavariable : TypeSystem.TypeVarId := ⟨0⟩
+
+private def literalLedgerExpression : SourceInference.ExpressionId :=
+  ⟨⟨solverRegressionOwner, 0⟩⟩
+
+private def literalLedgerRequirement : SourceInference.RequirementId := ⟨0⟩
+
+private def literalLedgerResolution :
+    SourceInference.IntegerLiteralResolution := {
+  rawValue := 7
+  targetType := .variable literalLedgerMetavariable
+  requirement := literalLedgerRequirement
+}
+
+private def literalLedgerNode : SourceInference.ExpressionNode := {
+  id := literalLedgerExpression
+  span := solverRegressionSpan
+  type := .variable literalLedgerMetavariable
+  form := .integerLiteral (.decimal "7") literalLedgerResolution
+  requirements := [literalLedgerRequirement]
+}
+
+private def literalLedgerState : SourceInference.State := {
+  SourceInference.State.initial solverRegressionOwner with
+  inference := { next := 1 }
+  nextOccurrence := 1
+  nodes := [.expression literalLedgerNode]
+  integerLiterals := [{
+    metavariable := literalLedgerMetavariable
+    expression := literalLedgerExpression
+    requirement := literalLedgerRequirement
+  }]
+  nextRequirement := 1
+  requirements := [{
+    id := literalLedgerRequirement
+    predicate := literalLedgerResolution.predicate
+  }]
+}
+
+private def testIntegerLiteralLedgerValidation : IO Unit := do
+  match SourceInference.Detail.validateIntegerLiteralLedger literalLedgerState with
+  | .ok () => pure ()
+  | .error error => throw (IO.userError
+      s!"a consistent integer-literal ledger produced {reprStr error}")
+
+  let missingOrigin := { literalLedgerState with integerLiterals := [] }
+  match SourceInference.Detail.validateIntegerLiteralLedger missingOrigin with
+  | .error (.missingIntegerLiteralRequirement expression requirement) =>
+      assertTrue (expression == literalLedgerExpression &&
+          requirement == literalLedgerRequirement)
+        "missing integer-literal origin lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"missing integer-literal origin produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      "an integer-literal node without origin metadata passed validation")
+
+  let missingRequirement := { literalLedgerState with requirements := [] }
+  match SourceInference.Detail.validateIntegerLiteralLedger missingRequirement with
+  | .error (.missingIntegerLiteralRequirement expression requirement) =>
+      assertTrue (expression == literalLedgerExpression &&
+          requirement == literalLedgerRequirement)
+        "missing integer-literal requirement row lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"missing integer-literal requirement row produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      "an integer-literal node without its requirement row passed validation")
+
+  let wrongPredicate := ProgramSignatures.builtinIntPredicate .bool
+  let mismatchedPredicate := {
+    literalLedgerState with
+    requirements := [{
+      id := literalLedgerRequirement
+      predicate := wrongPredicate
+    }]
+  }
+  match SourceInference.Detail.validateIntegerLiteralLedger mismatchedPredicate with
+  | .error (.integerLiteralRequirementPredicateMismatch expression requirement
+      expected actual) =>
+      assertTrue (expression == literalLedgerExpression &&
+          requirement == literalLedgerRequirement &&
+          expected == literalLedgerResolution.predicate &&
+          actual == wrongPredicate)
+        "mismatched integer-literal predicate lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"mismatched integer-literal predicate produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      "an integer-literal node with a mismatched predicate passed validation")
+
+  let inconsistentResolution : SourceInference.IntegerLiteralResolution := {
+    literalLedgerResolution with rawValue := 8
+  }
+  let inconsistentNode : SourceInference.ExpressionNode := {
+    literalLedgerNode with
+    form := .integerLiteral (.decimal "7") inconsistentResolution
+  }
+  let inconsistentValue := {
+    literalLedgerState with nodes := [.expression inconsistentNode]
+  }
+  match SourceInference.Detail.validateIntegerLiteralLedger inconsistentValue with
+  | .error (.unsupportedLiteral kind) =>
+      assertTrue (kind == "inconsistent integer literal metadata")
+        "inconsistent integer-literal value lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"inconsistent integer-literal value produced {reprStr error}")
+  | .ok () => throw (IO.userError
+      "an integer-literal node with an inconsistent value passed validation")
+
 private def testClosedUnsupportedIntegerPatternTarget : IO Unit := do
   let metavariable : TypeSystem.TypeVarId := ⟨0⟩
   let origin : SourceInference.IntegerPatternOrigin := {
@@ -1250,6 +1357,7 @@ def testSourceInference : IO Unit := do
   testAmbiguousOverload
   testIntegerLiteralExpectedType
   testClosedUnsupportedIntegerLiteralTarget
+  testIntegerLiteralLedgerValidation
   testClosedUnsupportedIntegerPatternTarget
   testSourceNamedLiteralTraitsDoNotAuthorize
   testUnconstrainedIntegerLiteralDefaultsToWord

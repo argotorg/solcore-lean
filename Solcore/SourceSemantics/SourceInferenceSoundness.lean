@@ -2314,6 +2314,9 @@ theorem finalize_template_evidence
   have initialTemplate : row.id ∈ state.localSchemeAssumptions :=
     (finalize_templateIdsAligned aligned success row.id).mp template
   unfold Detail.finalize at success
+  have ledgerValidation :=
+    Detail.finalize_validateIntegerLiteralLedger success
+  simp only [ledgerValidation] at success
   cases patternResult :
       Detail.defaultIntegerPatternTargets state.integerPatterns state with
   | error error =>
@@ -2375,6 +2378,89 @@ def finalizedRequirementContext
         (TypedTraitResolution.applySubstitution result.substitution)))
     |>.withSolvedRequirements result.solvedRequirements
 
+/-- Executable finalization connects one retained integer-literal node to the
+declarative validity judgment through its exact requirement row. -/
+theorem finalize_integerLiteralValid_of_mem
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result)
+    (solvedValid :
+      SolvedRequirementsValid
+        (finalizedRequirementContext inferenceContext result)
+        result.solvedRequirements)
+    {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (member : Node.expression node ∈ state.nodes)
+    (form_eq : node.form = .integerLiteral source resolution) :
+    IntegerLiteralValid
+      (finalizedRequirementContext inferenceContext result)
+      source
+      (resolution.applySubstitution result.substitution) := by
+  have ledger := Detail.finalize_integerLiteralLedgerCorrespondence success
+  obtain ⟨decoded, origin, originMember, _, targetEq, _, requirementMember⟩ :=
+    ledger node source resolution member form_eq
+  have supported :=
+    Detail.finalize_integerLiteralTarget_supported success origin originMember
+  have ledgerValidation :=
+    Detail.finalize_validateIntegerLiteralLedger success
+  unfold Detail.finalize at success
+  simp only [ledgerValidation] at success
+  cases patternResult :
+      Detail.defaultIntegerPatternTargets state.integerPatterns state with
+  | error error =>
+      simp [patternResult, bind, Except.bind] at success
+  | ok patternState =>
+      cases literalResult :
+          Detail.defaultIntegerLiteralTargets patternState.integerLiterals
+            patternState with
+      | error error =>
+          simp [patternResult, literalResult, bind, Except.bind] at success
+      | ok finalState =>
+          have finalRequirementMember :
+              ({ id := resolution.requirement, predicate := resolution.predicate } :
+                Requirement) ∈
+                finalState.requirements := by
+            rw [Detail.defaultIntegerLiteralTargets_requirements literalResult,
+              Detail.defaultIntegerPatternTargets_requirements patternResult]
+            exact requirementMember
+          cases patternValidationResult :
+              Detail.validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
+          | error error =>
+              simp [patternResult, literalResult, patternValidationResult,
+                bind, Except.bind] at success
+          | ok patternValidation =>
+              cases patternValidation
+              cases literalValidationResult :
+                  Detail.validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
+              | error error =>
+                  simp [patternResult, literalResult,
+                    patternValidationResult, literalValidationResult,
+                    bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  cases requirementsResult :
+                      Detail.solveRequirements inferenceContext finalState
+                        finalState.requirements with
+                  | error error =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                  | ok requirements =>
+                      simp [patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        requirementsResult, bind, Except.bind] at success
+                      cases success
+                      refine integerLiteralValid_of_solved decoded ?_
+                        finalRequirementMember requirementsResult rfl
+                        solvedValid
+                      simpa [targetEq] using supported
+
 /-- When finalization starts without qualified-local templates, every emitted
 solved row has independently valid retained evidence in the finalized
 requirement context. -/
@@ -2390,6 +2476,9 @@ theorem finalize_solvedRequirementsValid
       (finalizedRequirementContext inferenceContext result)
       result.solvedRequirements := by
   unfold Detail.finalize at success
+  have ledgerValidation :=
+    Detail.finalize_validateIntegerLiteralLedger success
+  simp only [ledgerValidation] at success
   cases patternResult :
       Detail.defaultIntegerPatternTargets state.integerPatterns state with
   | error error =>
@@ -2445,6 +2534,28 @@ theorem finalize_solvedRequirementsValid
                       · rfl
                       · rfl
                       · exact requirementsResult
+
+/-- In an ordinary (non-template) source body, successful finalization alone
+supplies the retained solver evidence needed for integer-literal validity. -/
+theorem finalize_integerLiteralValid_of_mem_ordinary
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (ordinary : state.localSchemeAssumptions = [])
+    (success : Detail.finalize inferenceContext type state roots = .ok result)
+    {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (member : Node.expression node ∈ state.nodes)
+    (form_eq : node.form = .integerLiteral source resolution) :
+    IntegerLiteralValid
+      (finalizedRequirementContext inferenceContext result)
+      source
+      (resolution.applySubstitution result.substitution) := by
+  exact finalize_integerLiteralValid_of_mem success
+    (finalize_solvedRequirementsValid ordinary success) member form_eq
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
 

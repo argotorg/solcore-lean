@@ -505,6 +505,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.solveRequirements_ids_nodup
 example := @Solcore.Frontend.SourceInference.State.requirementIds_nodup
 example :=
+  @Solcore.Frontend.SourceInference.State.IntegerLiteralLedgerCorrespondence
+example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_sublist
 example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_fresh
@@ -520,10 +522,22 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralTargets_success_supported
 example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralNode
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralNodes
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralLedger
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateIntegerLiteralLedger_success_correspondence
+example :=
   @Solcore.Frontend.SourceInference.Detail.defaultIntegerPatternTargets_requirements
 example :=
   @Solcore.Frontend.SourceInference.Detail.defaultIntegerLiteralTargets_requirements
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateIntegerLiteralLedger
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_integerLiteralLedgerCorrespondence
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_integerPatternTarget_supported
 example :=
