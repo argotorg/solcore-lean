@@ -34,6 +34,70 @@ theorem buildProgramSignatures_success_implRule_mem_iff
   rw [buildProgramSignatures_success_implRules_eq success]
   simp
 
+/-- Successful collection establishes the canonical rigid-parameter contract
+simultaneously for functions, data types, traits, implementations, and
+contracts. -/
+theorem buildProgramSignatures_success_parameters_wellFormed
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures) :
+    ProgramSignatureParametersWellFormed signatures :=
+  buildProgramSignatures_success_parameter_state success
+
+/-- A collected function's rigid generic parameters are unique, owned by the
+function declaration, and numbered in source order. -/
+theorem buildProgramSignatures_success_function_parameters
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ signatures.functions) :
+    SignatureParametersWellFormed signature.id signature.scheme.parameters :=
+  (buildProgramSignatures_success_parameters_wellFormed success).functions
+    signature member
+
+/-- A collected data type's rigid generic parameters are unique, owned by the
+data declaration, and numbered in source order. -/
+theorem buildProgramSignatures_success_data_parameters
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramDataSignature}
+    (member : signature ∈ signatures.dataTypes) :
+    SignatureParametersWellFormed signature.id signature.parameters :=
+  (buildProgramSignatures_success_parameters_wellFormed success).dataTypes
+    signature member
+
+/-- A collected trait's rigid generic parameters are unique, owned by the
+trait declaration, and numbered in source order. -/
+theorem buildProgramSignatures_success_trait_parameters
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramTraitSignature}
+    (member : signature ∈ signatures.traits) :
+    SignatureParametersWellFormed signature.id signature.parameters :=
+  (buildProgramSignatures_success_parameters_wellFormed success).traits
+    signature member
+
+/-- A collected implementation's rigid generic parameters are unique, owned
+by the implementation declaration, and numbered in source order. -/
+theorem buildProgramSignatures_success_implementation_parameters
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ signatures.implementations) :
+    SignatureParametersWellFormed signature.id signature.parameters :=
+  (buildProgramSignatures_success_parameters_wellFormed success).implementations
+    signature member
+
+/-- A collected contract's rigid generic parameters are unique, owned by the
+contract declaration, and numbered in source order. -/
+theorem buildProgramSignatures_success_contract_parameters
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramContractSignature}
+    (member : signature ∈ signatures.contracts) :
+    SignatureParametersWellFormed signature.id signature.parameters :=
+  (buildProgramSignatures_success_parameters_wellFormed success).contracts
+    signature member
+
 /-- Function declaration identities are unique after successful signature
 collection from an environment with unique declaration identities. -/
 theorem buildProgramSignatures_success_function_ids_nodup

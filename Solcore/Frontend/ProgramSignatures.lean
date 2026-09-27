@@ -376,6 +376,33 @@ structure ProgramSignatures where
   contracts : List ProgramContractSignature := []
   deriving Repr
 
+/-- One declaration-owned rigid-parameter row has no duplicate identities,
+retains its declaration owner, and uses the source position as its stable
+zero-based index. -/
+structure SignatureParametersWellFormed
+    (owner : Resolved.DeclarationId)
+    (parameters : List TypeSystem.TypeParameterId) : Prop where
+  parameters_nodup : parameters.Nodup
+  parameter_owners : ∀ parameter, parameter ∈ parameters →
+    parameter.owner = owner
+  parameter_positions : ∀ index : Fin parameters.length,
+    (parameters.get index).index = index.val
+
+/-- The declaration-owned rigid parameters of every declaration-backed
+signature category satisfy the same canonical allocation contract. -/
+structure ProgramSignatureParametersWellFormed
+    (signatures : ProgramSignatures) : Prop where
+  functions : ∀ signature, signature ∈ signatures.functions →
+    SignatureParametersWellFormed signature.id signature.scheme.parameters
+  dataTypes : ∀ signature, signature ∈ signatures.dataTypes →
+    SignatureParametersWellFormed signature.id signature.parameters
+  traits : ∀ signature, signature ∈ signatures.traits →
+    SignatureParametersWellFormed signature.id signature.parameters
+  implementations : ∀ signature, signature ∈ signatures.implementations →
+    SignatureParametersWellFormed signature.id signature.parameters
+  contracts : ∀ signature, signature ∈ signatures.contracts →
+    SignatureParametersWellFormed signature.id signature.parameters
+
 namespace ProgramSignatures
 
 /-- The exact unary builtin `Int` obligation for a selected result type. -/
@@ -562,6 +589,37 @@ private def declarationParameters
     (declaration : ProgramDeclaration) : List TypeSystem.TypeParameterId :=
   declaration.genericParameters.zipIdx.map fun (_, index) =>
     { owner := declaration.id, index }
+
+private theorem declarationParameters_wellFormed
+    (declaration : ProgramDeclaration) :
+    SignatureParametersWellFormed declaration.id
+      (declarationParameters declaration) := by
+  have indices :
+      (declarationParameters declaration).map (fun parameter => parameter.index) =
+        List.range declaration.genericParameters.length := by
+    rw [declarationParameters, List.map_map]
+    change List.map Prod.snd declaration.genericParameters.zipIdx = _
+    rw [List.zipIdx_map_snd]
+    exact List.range_eq_range'.symm
+  have distinctIndices :
+      (declarationParameters declaration).Pairwise
+        (fun left right => left.index ≠ right.index) := by
+    rw [← List.pairwise_map]
+    rw [indices]
+    exact List.nodup_range
+  refine {
+    parameters_nodup := distinctIndices.imp (fun distinct equal =>
+      distinct (congrArg TypeSystem.TypeParameterId.index equal))
+    parameter_owners := ?_
+    parameter_positions := ?_
+  }
+  · intro parameter member
+    simp only [declarationParameters, List.mem_map] at member
+    obtain ⟨entry, _, rfl⟩ := member
+    rfl
+  · intro index
+    rw [List.get_eq_getElem]
+    simp [declarationParameters]
 
 private def typeContainsError : TypeSystem.Ty → Bool
   | .error => true
@@ -1194,12 +1252,13 @@ private def isContractSignatureDeclaration
   | .contract _ => true
   | _ => false
 
-private theorem traitSignatureOfDeclaration_success_id
+private theorem traitSignatureOfDeclaration_success_header
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
     {source : Syntax.TraitDecl} {signature : ProgramTraitSignature}
     (success : traitSignatureOfDeclaration environment declaration source =
       .ok signature) :
-    signature.id = declaration.id := by
+    signature.id = declaration.id ∧
+      signature.parameters = declarationParameters declaration := by
   cases scopeEq : validateProgramTypeScope
       (ProgramTypeScope.ofDeclaration declaration) with
   | error error =>
@@ -1238,14 +1297,34 @@ private theorem traitSignatureOfDeclaration_success_id
                 source
               } = Except.ok signature at success
               injection success with signatureEq
-              rw [← signatureEq]
+              subst signature
+              exact ⟨rfl, rfl⟩
 
-private theorem functionSignatureOfDeclaration_success_id
+private theorem traitSignatureOfDeclaration_success_id
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.TraitDecl} {signature : ProgramTraitSignature}
+    (success : traitSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    signature.id = declaration.id :=
+  (traitSignatureOfDeclaration_success_header success).1
+
+private theorem traitSignatureOfDeclaration_success_parameters
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.TraitDecl} {signature : ProgramTraitSignature}
+    (success : traitSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    SignatureParametersWellFormed signature.id signature.parameters := by
+  have header := traitSignatureOfDeclaration_success_header success
+  rw [header.1, header.2]
+  exact declarationParameters_wellFormed declaration
+
+private theorem functionSignatureOfDeclaration_success_header
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
     {source : Syntax.FunctionDecl} {signature : ProgramFunctionSignature}
     (success : functionSignatureOfDeclaration environment declaration source =
       .ok signature) :
-    signature.id = declaration.id := by
+    signature.id = declaration.id ∧
+      signature.scheme.parameters = declarationParameters declaration := by
   cases scopeEq : validateProgramTypeScope
       (ProgramTypeScope.ofDeclaration declaration) with
   | error error =>
@@ -1286,14 +1365,34 @@ private theorem functionSignatureOfDeclaration_success_id
               | ok predicates =>
                   simp only [predicatesEq] at success
                   injection success with signatureEq
-                  rw [← signatureEq]
+                  subst signature
+                  exact ⟨rfl, rfl⟩
 
-private theorem dataSignatureOfDeclaration_success_id
+private theorem functionSignatureOfDeclaration_success_id
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.FunctionDecl} {signature : ProgramFunctionSignature}
+    (success : functionSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    signature.id = declaration.id :=
+  (functionSignatureOfDeclaration_success_header success).1
+
+private theorem functionSignatureOfDeclaration_success_parameters
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.FunctionDecl} {signature : ProgramFunctionSignature}
+    (success : functionSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    SignatureParametersWellFormed signature.id signature.scheme.parameters := by
+  have header := functionSignatureOfDeclaration_success_header success
+  rw [header.1, header.2]
+  exact declarationParameters_wellFormed declaration
+
+private theorem dataSignatureOfDeclaration_success_header
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
     {source : Syntax.EnumDecl} {signature : ProgramDataSignature}
     (success : dataSignatureOfDeclaration environment declaration source =
       .ok signature) :
-    signature.id = declaration.id := by
+    signature.id = declaration.id ∧
+      signature.parameters = declarationParameters declaration := by
   cases scopeEq : validateProgramTypeScope
       (ProgramTypeScope.ofDeclaration declaration) with
   | error error =>
@@ -1314,14 +1413,34 @@ private theorem dataSignatureOfDeclaration_success_id
       | ok constructors =>
           simp only [constructorsEq] at success
           injection success with signatureEq
-          rw [← signatureEq]
+          subst signature
+          exact ⟨rfl, rfl⟩
 
-private theorem contractSignatureOfDeclaration_success_id
+private theorem dataSignatureOfDeclaration_success_id
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.EnumDecl} {signature : ProgramDataSignature}
+    (success : dataSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    signature.id = declaration.id :=
+  (dataSignatureOfDeclaration_success_header success).1
+
+private theorem dataSignatureOfDeclaration_success_parameters
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.EnumDecl} {signature : ProgramDataSignature}
+    (success : dataSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    SignatureParametersWellFormed signature.id signature.parameters := by
+  have header := dataSignatureOfDeclaration_success_header success
+  rw [header.1, header.2]
+  exact declarationParameters_wellFormed declaration
+
+private theorem contractSignatureOfDeclaration_success_header
     {declaration : ProgramDeclaration} {source : Syntax.ContractDecl}
     {signature : ProgramContractSignature}
     (success : contractSignatureOfDeclaration declaration source =
       .ok signature) :
-    signature.id = declaration.id := by
+    signature.id = declaration.id ∧
+      signature.parameters = declarationParameters declaration := by
   cases scopeEq : validateProgramTypeScope
       (ProgramTypeScope.ofDeclaration declaration) with
   | error error =>
@@ -1333,7 +1452,26 @@ private theorem contractSignatureOfDeclaration_success_id
       cases scopeUnit
       simp only [contractSignatureOfDeclaration, scopeEq] at success
       injection success with signatureEq
-      rw [← signatureEq]
+      subst signature
+      exact ⟨rfl, rfl⟩
+
+private theorem contractSignatureOfDeclaration_success_id
+    {declaration : ProgramDeclaration} {source : Syntax.ContractDecl}
+    {signature : ProgramContractSignature}
+    (success : contractSignatureOfDeclaration declaration source =
+      .ok signature) :
+    signature.id = declaration.id :=
+  (contractSignatureOfDeclaration_success_header success).1
+
+private theorem contractSignatureOfDeclaration_success_parameters
+    {declaration : ProgramDeclaration} {source : Syntax.ContractDecl}
+    {signature : ProgramContractSignature}
+    (success : contractSignatureOfDeclaration declaration source =
+      .ok signature) :
+    SignatureParametersWellFormed signature.id signature.parameters := by
+  have header := contractSignatureOfDeclaration_success_header success
+  rw [header.1, header.2]
+  exact declarationParameters_wellFormed declaration
 
 private def Except.SuccessSatisfies {error value : Type}
     (property : value → Prop) : Except error value → Prop
@@ -1351,16 +1489,18 @@ private def Except.SuccessSatisfies {error value : Type}
   | error error => trivial
   | ok value => exact preserves value
 
-private theorem implementationSignatureOfDeclaration_success_id
+private theorem implementationSignatureOfDeclaration_success_header
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
     {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
     {signature : ProgramImplementationSignature}
     (success : implementationSignatureOfDeclaration environment declaration
       traits source = .ok signature) :
-    signature.id = declaration.id := by
+    signature.id = declaration.id ∧
+      signature.parameters = declarationParameters declaration := by
   have satisfies : Except.SuccessSatisfies
       (fun result : ProgramImplementationSignature =>
-        result.id = declaration.id)
+        result.id = declaration.id ∧
+          result.parameters = declarationParameters declaration)
       (implementationSignatureOfDeclaration environment declaration traits
         source) := by
     cases scopeEq : validateProgramTypeScope
@@ -1401,8 +1541,222 @@ private theorem implementationSignatureOfDeclaration_success_id
                 intro methodsChecked
                 apply Except.SuccessSatisfies.bind
                 intro methods
-                rfl
+                exact ⟨rfl, rfl⟩
   simpa [success, Except.SuccessSatisfies] using satisfies
+
+private theorem implementationSignatureOfDeclaration_success_id
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
+    {signature : ProgramImplementationSignature}
+    (success : implementationSignatureOfDeclaration environment declaration
+      traits source = .ok signature) :
+    signature.id = declaration.id :=
+  (implementationSignatureOfDeclaration_success_header success).1
+
+private theorem implementationSignatureOfDeclaration_success_parameters
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
+    {signature : ProgramImplementationSignature}
+    (success : implementationSignatureOfDeclaration environment declaration
+      traits source = .ok signature) :
+    SignatureParametersWellFormed signature.id signature.parameters := by
+  have header := implementationSignatureOfDeclaration_success_header success
+  rw [header.1, header.2]
+  exact declarationParameters_wellFormed declaration
+
+private theorem all_mem_append_singleton {value : Type} {property : value → Prop}
+    {values : List value} {last : value}
+    (preceding : ∀ candidate, candidate ∈ values → property candidate)
+    (suffix : property last) :
+    ∀ candidate, candidate ∈ values ++ [last] → property candidate := by
+  intro candidate member
+  simp only [List.mem_append, List.mem_singleton] at member
+  rcases member with member | rfl
+  · exact preceding candidate member
+  · exact suffix
+
+private def TraitSignatureParametersWellFormed
+    (traits : List ProgramTraitSignature) : Prop :=
+  ∀ signature, signature ∈ traits →
+    SignatureParametersWellFormed signature.id signature.parameters
+
+private theorem collectProgramTraits_parameters_wellFormed
+    (environment : ProgramEnvironment)
+    (declarations : List ProgramDeclaration)
+    (state : ProgramTraitBuildState)
+    (initial : TraitSignatureParametersWellFormed state.traits) :
+    TraitSignatureParametersWellFormed
+      (collectProgramTraits environment declarations state).traits := by
+  induction declarations generalizing state with
+  | nil => simpa [collectProgramTraits] using initial
+  | cons declaration rest induction =>
+      cases sourceEq : declaration.source.value with
+      | trait source =>
+          simp only [collectProgramTraits, sourceEq]
+          cases signatureEq : traitSignatureOfDeclaration environment declaration
+              source with
+          | error error => exact induction _ initial
+          | ok signature =>
+              apply induction _
+              exact all_mem_append_singleton initial
+                (traitSignatureOfDeclaration_success_parameters signatureEq)
+      | importDecl _ | exportDecl _ | pragmaDecl _ | typeAlias _ | enum _
+      | impl _ | contract _ | function _ | error =>
+          simp only [collectProgramTraits, sourceEq]
+          exact induction _ initial
+
+private structure ProgramSignatureBuildParametersWellFormed
+    (state : ProgramSignatureBuildState) : Prop where
+  functions : ∀ signature, signature ∈ state.functions →
+    SignatureParametersWellFormed signature.id signature.scheme.parameters
+  dataTypes : ∀ signature, signature ∈ state.dataTypes →
+    SignatureParametersWellFormed signature.id signature.parameters
+  implementations : ∀ signature, signature ∈ state.implementations →
+    SignatureParametersWellFormed signature.id signature.parameters
+  contracts : ∀ signature, signature ∈ state.contracts →
+    SignatureParametersWellFormed signature.id signature.parameters
+
+private theorem ProgramSignatureBuildParametersWellFormed.withErrors
+    {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed state)
+    (errors : List ProgramSignatureError) :
+    ProgramSignatureBuildParametersWellFormed
+      { state with errors } := {
+  functions := initial.functions
+  dataTypes := initial.dataTypes
+  implementations := initial.implementations
+  contracts := initial.contracts
+}
+
+private theorem ProgramSignatureBuildParametersWellFormed.addFunction
+    {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {signature : ProgramFunctionSignature}
+    (wellFormed : SignatureParametersWellFormed signature.id
+      signature.scheme.parameters) :
+    ProgramSignatureBuildParametersWellFormed
+      { state with functions := state.functions ++ [signature] } := {
+  initial with
+  functions := all_mem_append_singleton initial.functions wellFormed
+}
+
+private theorem ProgramSignatureBuildParametersWellFormed.addDataType
+    {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {signature : ProgramDataSignature}
+    (wellFormed : SignatureParametersWellFormed signature.id
+      signature.parameters) :
+    ProgramSignatureBuildParametersWellFormed
+      { state with dataTypes := state.dataTypes ++ [signature] } := {
+  initial with
+  dataTypes := all_mem_append_singleton initial.dataTypes wellFormed
+}
+
+private theorem ProgramSignatureBuildParametersWellFormed.addImplementation
+    {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {signature : ProgramImplementationSignature}
+    (wellFormed : SignatureParametersWellFormed signature.id
+      signature.parameters) :
+    ProgramSignatureBuildParametersWellFormed
+      { state with
+        implementations := state.implementations ++ [signature]
+      } := {
+  initial with
+  implementations := all_mem_append_singleton initial.implementations wellFormed
+}
+
+private theorem ProgramSignatureBuildParametersWellFormed.addContract
+    {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {signature : ProgramContractSignature}
+    (wellFormed : SignatureParametersWellFormed signature.id
+      signature.parameters) :
+    ProgramSignatureBuildParametersWellFormed
+      { state with contracts := state.contracts ++ [signature] } := {
+  initial with
+  contracts := all_mem_append_singleton initial.contracts wellFormed
+}
+
+private theorem collectProgramSignatures_parameters_wellFormed
+    (environment : ProgramEnvironment) (traits : List ProgramTraitSignature)
+    (declarations : List ProgramDeclaration)
+    (state : ProgramSignatureBuildState)
+    (initial : ProgramSignatureBuildParametersWellFormed state) :
+    ProgramSignatureBuildParametersWellFormed
+      (collectProgramSignatures environment traits declarations state) := by
+  induction declarations generalizing state with
+  | nil => simpa [collectProgramSignatures] using initial
+  | cons declaration rest induction =>
+      cases sourceEq : declaration.source.value with
+      | typeAlias source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases resolveSignatureAliasBody environment declaration
+              source.value.value with
+          | error error =>
+              simpa using induction
+                { state with errors := state.errors ++ [error] }
+                (initial.withErrors (state.errors ++ [error]))
+          | ok type => simpa using induction state initial
+      | enum source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases signatureEq : dataSignatureOfDeclaration environment declaration
+              source with
+          | error error =>
+              simpa using induction
+                { state with errors := state.errors ++ [error] }
+                (initial.withErrors (state.errors ++ [error]))
+          | ok signature =>
+              simpa using induction
+                { state with dataTypes := state.dataTypes ++ [signature] }
+                (initial.addDataType
+                  (dataSignatureOfDeclaration_success_parameters signatureEq))
+      | contract source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases signatureEq : contractSignatureOfDeclaration declaration source with
+          | error error =>
+              simpa using induction
+                { state with errors := state.errors ++ [error] }
+                (initial.withErrors (state.errors ++ [error]))
+          | ok signature =>
+              simpa using induction
+                { state with contracts := state.contracts ++ [signature] }
+                (initial.addContract
+                  (contractSignatureOfDeclaration_success_parameters signatureEq))
+      | function source =>
+          simp only [collectProgramSignatures, sourceEq,
+            signatureItemOfDeclaration]
+          cases signatureEq : functionSignatureOfDeclaration environment declaration
+              source with
+          | error error =>
+              simpa [bind, Except.bind, pure, Pure.pure, Except.pure] using
+                induction { state with errors := state.errors ++ [error] }
+                  (initial.withErrors (state.errors ++ [error]))
+          | ok signature =>
+              simpa [bind, Except.bind, pure, Pure.pure, Except.pure] using induction
+                { state with functions := state.functions ++ [signature] }
+                (initial.addFunction
+                  (functionSignatureOfDeclaration_success_parameters signatureEq))
+      | impl source =>
+          simp only [collectProgramSignatures, sourceEq,
+            signatureItemOfDeclaration]
+          cases signatureEq : implementationSignatureOfDeclaration environment
+              declaration traits source with
+          | error error =>
+              simpa [bind, Except.bind, pure, Pure.pure, Except.pure] using
+                induction { state with errors := state.errors ++ [error] }
+                  (initial.withErrors (state.errors ++ [error]))
+          | ok signature =>
+              simpa [bind, Except.bind, pure, Pure.pure, Except.pure] using induction
+                { state with
+                  implementations := state.implementations ++ [signature]
+                }
+                (initial.addImplementation
+                  (implementationSignatureOfDeclaration_success_parameters signatureEq))
+      | importDecl _ | exportDecl _ | pragmaDecl _ | trait _ | error =>
+          simp only [collectProgramSignatures, sourceEq,
+            signatureItemOfDeclaration]
+          simpa using induction state initial
 
 private theorem collectProgramTraits_ids_sublist
     (environment : ProgramEnvironment)
@@ -1888,6 +2242,40 @@ theorem buildProgramSignatures_success_declaration_ids_nodup
   · injection success with signaturesEq
     subst signatures
     simpa [traitState, state] using collectedNodup
+  · simp at success
+
+/-- Internal collector boundary used by `ProgramSignaturesProperties`: every
+successful catalog retains the canonical declaration-owned parameter rows
+constructed for its five declaration-backed signature categories. -/
+theorem buildProgramSignatures_success_parameter_state
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures) :
+    ProgramSignatureParametersWellFormed signatures := by
+  let traitState := collectProgramTraits environment environment.declarations {}
+  let state := collectProgramSignatures environment traitState.traits
+    environment.declarations {}
+  have traitParameters : TraitSignatureParametersWellFormed traitState.traits := by
+    apply collectProgramTraits_parameters_wellFormed environment
+      environment.declarations ({} : ProgramTraitBuildState)
+    intro signature member
+    simp at member
+  have signatureParameters :
+      ProgramSignatureBuildParametersWellFormed state := by
+    apply collectProgramSignatures_parameters_wellFormed environment
+      traitState.traits environment.declarations
+      ({} : ProgramSignatureBuildState)
+    constructor <;> intro signature member <;> simp at member
+  simp only [buildProgramSignatures] at success
+  split at success
+  · injection success with signaturesEq
+    subst signatures
+    exact {
+      functions := signatureParameters.functions
+      dataTypes := signatureParameters.dataTypes
+      traits := traitParameters
+      implementations := signatureParameters.implementations
+      contracts := signatureParameters.contracts
+    }
   · simp at success
 
 end Solcore.Frontend

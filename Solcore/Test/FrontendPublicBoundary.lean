@@ -28,6 +28,20 @@ example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
 example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
 example := @Solcore.Frontend.ProgramContractSignature
 example := @Solcore.Frontend.ProgramSignatures.contract?
+example := @Solcore.Frontend.SignatureParametersWellFormed
+example := @Solcore.Frontend.SignatureParametersWellFormed.parameters_nodup
+example := @Solcore.Frontend.SignatureParametersWellFormed.parameter_owners
+example := @Solcore.Frontend.SignatureParametersWellFormed.parameter_positions
+example := @Solcore.Frontend.ProgramSignatureParametersWellFormed
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_parameters_wellFormed
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_function_parameters
+example := @Solcore.Frontend.buildProgramSignatures_success_data_parameters
+example := @Solcore.Frontend.buildProgramSignatures_success_trait_parameters
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_implementation_parameters
+example := @Solcore.Frontend.buildProgramSignatures_success_contract_parameters
 example :=
   @Solcore.Frontend.buildProgramSignatures_success_declaration_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_function_ids_nodup
