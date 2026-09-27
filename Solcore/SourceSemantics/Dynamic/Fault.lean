@@ -750,6 +750,46 @@ mutual
           raw reason after) :
         ExpressionFaults program context evidence source environment before id
           reason after
+    | generalizedLocalRequirement
+        {context evidence source environment heap id node name binder owned
+          location cell function substitution failed}
+        (contains : ContainsExpression source id node)
+        (form_eq : node.form = .reference name (.local binder))
+        (layout : OrdinaryRequirementLayout node.requirements node.coercions
+          owned)
+        (lookup : Environment.LooksUp environment binder location)
+        (read : Heap.Reads heap location cell)
+        (descriptor : cell.generalized = some function)
+        (context_fields : RuntimeContextFields function.definitionContext
+          context)
+        (selection : LocalSchemeRuntimeSelection context function.binder
+          node.rawType owned substitution)
+        (fault : RequirementsFault context evidence owned
+          (instantiateLocalSchemePredicates substitution function.binder)
+          failed) :
+        ExpressionFaults program context evidence source environment heap id
+          (.unsatisfiedRequirement failed) heap
+    | generalizedLocalCoercion
+        {context evidence source environment before after id node name binder
+          owned location cell function substitution produced reason}
+        (contains : ContainsExpression source id node)
+        (form_eq : node.form = .reference name (.local binder))
+        (layout : OrdinaryRequirementLayout node.requirements node.coercions
+          owned)
+        (lookup : Environment.LooksUp environment binder location)
+        (read : Heap.Reads before location cell)
+        (descriptor : cell.generalized = some function)
+        (context_fields : RuntimeContextFields function.definitionContext
+          context)
+        (instantiation : LocalSchemeRuntimeInstantiation context evidence
+          function.binder node.rawType owned substitution produced)
+        (fault : CoercionPathFaults program context evidence before
+          node.coercions
+          (.closure (function.instantiate substitution
+            (produced ++ evidence.applySubstitution substitution)))
+          reason after) :
+        ExpressionFaults program context evidence source environment before id
+          reason after
 
   /-- Fault in the raw form, before the occurrence's result coercion path. -/
   inductive ExpressionFormFaults (program : Program) :
@@ -766,16 +806,17 @@ mutual
           (.integerLiteral literal resolution) requirements coercions
           (.unsatisfiedRequirement resolution.requirement) heap
     | localUnbound
-        {context evidence source environment heap name binder requirements coercions}
-        (layout : OrdinaryRequirementLayout requirements coercions [])
+        {context evidence source environment heap name binder requirements coercions
+          owned}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
         (unbound : environment.Unbound binder) :
         ExpressionFormFaults program context evidence source environment heap
           (.reference name (.local binder)) requirements coercions
           (.unboundLocal binder) heap
     | localDangling
         {context evidence source environment heap name binder requirements coercions
-          location}
-        (layout : OrdinaryRequirementLayout requirements coercions [])
+          owned location}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
         (lookup : Environment.LooksUp environment binder location)
         (dangling : heap.Dangling location) :
         ExpressionFormFaults program context evidence source environment heap
@@ -783,8 +824,8 @@ mutual
           (.danglingLocation location) heap
     | localUninitialized
         {context evidence source environment heap name binder requirements coercions
-          location cell}
-        (layout : OrdinaryRequirementLayout requirements coercions [])
+          owned location cell}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
         (lookup : Environment.LooksUp environment binder location)
         (read : Heap.Reads heap location cell)
         (descriptor_empty : cell.generalized = none)
@@ -2091,6 +2132,10 @@ theorem contains_or_missing
       | missing absent => exact .inr absent
       | form contains _ => exact .inl ⟨_, contains⟩
       | coercion contains _ _ => exact .inl ⟨_, contains⟩
+      | generalizedLocalRequirement contains _ _ _ _ _ _ _ _ =>
+          exact .inl ⟨_, contains⟩
+      | generalizedLocalCoercion contains _ _ _ _ _ _ _ _ =>
+          exact .inl ⟨_, contains⟩
 
 end ExpressionEvaluatesOutcome
 

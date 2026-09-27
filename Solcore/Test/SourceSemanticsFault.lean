@@ -18,17 +18,81 @@ example (program : Program) (context : SourceSemantics.Context)
       (.fault (.missingExpression id)) heap :=
   .fault (.missing missing)
 
-/-- An empty lexical frame gives a positive unbound-local derivation. -/
+/-- An empty lexical frame gives a positive unbound-local derivation even
+when the occurrence owns a nonempty generalized requirement segment. -/
 example (program : Program) (context : SourceSemantics.Context)
     (evidence : EvidenceEnvironment) (source : TypedSource)
-    (heap : Heap) (binder : Resolved.LocalId) (name : String) :
+    (heap : Heap) (binder : Resolved.LocalId) (name : String)
+    (owned : RequirementId) :
     ExpressionFormFaults program context evidence source [] heap
-      (.reference name (.local binder)) [] [] (.unboundLocal binder) heap := by
-  exact .localUnbound rfl (.nil binder)
+      (.reference name (.local binder)) [owned] [] (.unboundLocal binder) heap := by
+  exact .localUnbound (owned := [owned]) rfl (.nil binder)
 
 /-- A location past the empty heap is dangling without negating heap reads. -/
 example (location : Location) : Heap.Dangling ⟨[]⟩ location := by
   exact .nil location.index
+
+/-- A nonempty generalized requirement segment does not hide a dangling
+local location. -/
+example (program : Program) (context : SourceSemantics.Context)
+    (evidence : EvidenceEnvironment) (source : TypedSource)
+    (binder : Resolved.LocalId) (name : String) (owned : RequirementId) :
+    ExpressionFormFaults program context evidence source
+      [(binder, ⟨0⟩)] ⟨[]⟩
+      (.reference name (.local binder)) [owned] []
+      (.danglingLocation ⟨0⟩) ⟨[]⟩ := by
+  exact .localDangling (owned := [owned]) rfl .head (.nil 0)
+
+/-- A generalized local reports the first failed owned requirement after its
+runtime substitution has been selected. -/
+example (program : Program) (context : SourceSemantics.Context)
+    (evidence : EvidenceEnvironment) (source : TypedSource)
+    (environment : Environment) (heap : Heap) (id : ExpressionId)
+    (node : ExpressionNode) (name : String) (binder : Resolved.LocalId)
+    (owned : List RequirementId) (location : Location) (cell : Cell)
+    (function : GeneralizedClosure) (substitution : TypeSystem.Substitution)
+    (failed : RequirementId)
+    (contains : ContainsExpression source id node)
+    (form_eq : node.form = .reference name (.local binder))
+    (layout : OrdinaryRequirementLayout node.requirements node.coercions owned)
+    (lookup : Environment.LooksUp environment binder location)
+    (read : Heap.Reads heap location cell)
+    (descriptor : cell.generalized = some function)
+    (context_fields : RuntimeContextFields function.definitionContext context)
+    (selection : LocalSchemeRuntimeSelection context function.binder
+      node.rawType owned substitution)
+    (fault : RequirementsFault context evidence owned
+      (instantiateLocalSchemePredicates substitution function.binder) failed) :
+    ExpressionFaults program context evidence source environment heap id
+      (.unsatisfiedRequirement failed) heap := by
+  exact .generalizedLocalRequirement contains form_eq layout lookup read
+    descriptor context_fields selection fault
+
+/-- Once generalized-local instantiation succeeds, its result coercion path
+can still expose a concrete semantic fault. -/
+example (program : Program) (context : SourceSemantics.Context)
+    (evidence : EvidenceEnvironment) (source : TypedSource)
+    (environment : Environment) (before after : Heap) (id : ExpressionId)
+    (node : ExpressionNode) (name : String) (binder : Resolved.LocalId)
+    (owned : List RequirementId) (location : Location) (cell : Cell)
+    (function : GeneralizedClosure) (substitution : TypeSystem.Substitution)
+    (produced : EvidenceEnvironment) (reason : SemanticFault)
+    (contains : ContainsExpression source id node)
+    (form_eq : node.form = .reference name (.local binder))
+    (layout : OrdinaryRequirementLayout node.requirements node.coercions owned)
+    (lookup : Environment.LooksUp environment binder location)
+    (read : Heap.Reads before location cell)
+    (descriptor : cell.generalized = some function)
+    (context_fields : RuntimeContextFields function.definitionContext context)
+    (instantiation : LocalSchemeRuntimeInstantiation context evidence
+      function.binder node.rawType owned substitution produced)
+    (fault : CoercionPathFaults program context evidence before node.coercions
+      (.closure (function.instantiate substitution
+        (produced ++ evidence.applySubstitution substitution))) reason after) :
+    ExpressionFaults program context evidence source environment before id
+      reason after := by
+  exact .generalizedLocalCoercion contains form_eq layout lookup read descriptor
+    context_fields instantiation fault
 
 /-- Primitive operand faults name the exact source operator. -/
 example (program : Program) (context : SourceSemantics.Context)
