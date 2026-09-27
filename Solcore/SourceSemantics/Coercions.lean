@@ -101,6 +101,23 @@ theorem requirements_valid
       · exact step_requirements_valid head id headMember
       · exact induction tailMember
 
+/-- A semantically valid output path determines the raw type recovered from
+the expression node's retained coercion list. -/
+theorem expressionNode_rawType
+    {context : Context} {source : TypeSystem.Ty}
+    {node : ExpressionNode}
+    (valid : CoercionPathValid context source node.type node.coercions) :
+    node.rawType = source := by
+  cases coercions_eq : node.coercions with
+  | nil =>
+      rw [coercions_eq] at valid
+      cases valid
+      simp [ExpressionNode.rawType, coercions_eq]
+  | cons step rest =>
+      rw [coercions_eq] at valid
+      cases valid
+      simp [ExpressionNode.rawType, coercions_eq]
+
 private theorem endpoints_of_nil
     {context : Context}
     {source target : TypeSystem.Ty}

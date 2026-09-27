@@ -539,6 +539,28 @@ private theorem solved_row_of_requirement_mem
       · obtain ⟨found, foundMember, idEq, predicateEq⟩ := induction member
         exact ⟨found, by simp [foundMember], idEq, predicateEq⟩
 
+/-- Every identity in a successfully solved input ledger names independently
+valid evidence in the corresponding declarative solved ledger. -/
+theorem solveRequirements_requirementIdsValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    RequirementIdsValid semanticContext (requirements.map (·.id)) := by
+  intro id member
+  obtain ⟨requirement, requirementMember, rfl⟩ := List.mem_map.mp member
+  obtain ⟨row, rowMember, idEq, predicateEq⟩ :=
+    solved_row_of_requirement_mem (solveRequirements_corresponds success)
+      requirementMember
+  exact ⟨Detail.applyPredicate state requirement.predicate, row,
+    ⟨by simpa [solved_eq] using rowMember, idEq⟩, predicateEq,
+    valid row rowMember⟩
+
 /-- A source-ordered predicate/identity correspondence into a successfully
 solved final ledger supplies the declarative evidence sequence for exactly
 those normalized predicates. -/

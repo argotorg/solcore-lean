@@ -85,6 +85,8 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvi
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvidence_template_eq
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_corresponds
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_requirementIdsValid
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_correspondingSequenceProves
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_committedCoercionStepSequenceProves
@@ -416,6 +418,7 @@ example := @Solcore.SourceSemantics.ReferenceUseValid
 example := @Solcore.SourceSemantics.ReferenceUseValid.raw_type
 example := @Solcore.SourceSemantics.CoercionPathValid
 example := @Solcore.SourceSemantics.CoercionPathValid.of_isValid
+example := @Solcore.SourceSemantics.CoercionPathValid.expressionNode_rawType
 example := @Solcore.SourceSemantics.IntegerLiteralValid
 example := @Solcore.SourceSemantics.WordLiteralValid
 example := @Solcore.SourceSemantics.UnaryOperatorHasType
@@ -424,6 +427,7 @@ example := @Solcore.SourceSemantics.DeclarationApplicationValid
 example := @Solcore.SourceSemantics.TypedMatchPatternHasType
 example := @Solcore.SourceSemantics.PlaceHasType
 example := @Solcore.SourceSemantics.ExpressionHasType
+example := @Solcore.SourceSemantics.ExpressionHasType.ofOrdinary
 example := @Solcore.SourceSemantics.StatementHasType
 example := @Solcore.SourceSemantics.StatementHasType.letInitializedGeneralized
 example := @Solcore.SourceSemantics.StatementsHaveType

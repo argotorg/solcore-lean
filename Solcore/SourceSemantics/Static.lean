@@ -933,6 +933,25 @@ def BodyHasType (source : TypedSource) (context : Context)
 
 namespace ExpressionHasType
 
+/-- Assemble the common expression-typing envelope for forms whose own
+requirements precede an ordinary output-coercion path. -/
+theorem ofOrdinary
+    {source : TypedSource} {context : Context}
+    {id : ExpressionId} {node : ExpressionNode}
+    {rawType : TypeSystem.Ty} {owned : List RequirementId}
+    (contains : ContainsExpression source id node)
+    (formType : ExpressionFormHasRawType source context node.form rawType
+      (.ordinary owned))
+    (rawAdmissible : TypeAdmissible context rawType)
+    (finalAdmissible : TypeAdmissible context node.type)
+    (ownedValid : RequirementIdsValid context owned)
+    (path : CoercionPathValid context rawType node.type node.coercions)
+    (layout : node.requirements =
+      owned ++ coercionRequirementIds node.coercions) :
+    ExpressionHasType source context id node.type := by
+  exact .intro contains formType path.expressionNode_rawType rawAdmissible
+    finalAdmissible (.ordinary ownedValid path layout)
+
 theorem stored_type
     {source : TypedSource} {context : Context}
     {id : ExpressionId} {type : TypeSystem.Ty}
