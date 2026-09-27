@@ -289,6 +289,33 @@ theorem unify_resolve_eq
       cases success
       exact TypeSystem.InferState.unify_resolve_eq inferenceSuccess
 
+/-- Any type equality already visible through the input inference state
+remains visible after a successful incremental unification. -/
+theorem unify_preserves_resolve_eq
+    {state next : State} {left right first second : Ty}
+    (equal : state.resolve first = state.resolve second)
+    (success : unify state left right = .ok next) :
+    next.resolve first = next.resolve second := by
+  unfold unify at success
+  cases inferenceSuccess : state.inference.unify left right with
+  | error error =>
+      simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
+  | ok inference =>
+      simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
+      cases success
+      unfold State.resolve at equal ⊢
+      unfold TypeSystem.InferState.unify at inferenceSuccess
+      cases updateSuccess : TypeSystem.Unification.unifyTypes
+          (state.inference.resolve left) (state.inference.resolve right) with
+      | error error =>
+          simp [updateSuccess, bind, Except.bind] at inferenceSuccess
+      | ok update =>
+          simp [updateSuccess, bind, Except.bind] at inferenceSuccess
+          cases inferenceSuccess
+          simpa [TypeSystem.InferState.resolve,
+            TypeSystem.Substitution.compose_apply] using
+              congrArg update.apply equal
+
 @[simp] private theorem unify_preserves_owner
     {state next : State} {left right : Ty}
     (success : unify state left right = .ok next) :

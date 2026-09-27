@@ -85,6 +85,88 @@ theorem defaultIntegerLiteralTargets_localSchemeAssumptions
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_localSchemeAssumptions headResult)
 
+/-- Defaulting one numeric pattern target preserves every type equality
+already visible through the input inference state. -/
+theorem defaultIntegerPatternTarget_preserves_resolve_eq
+    {state next : State} {origin : IntegerPatternOrigin}
+    {left right : Ty}
+    (equal : state.resolve left = state.resolve right)
+    (success : defaultIntegerPatternTarget state origin = .ok next) :
+    next.resolve left = next.resolve right := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerPatternTarget, resolved] at success
+  · exact unify_preserves_resolve_eq equal success
+  all_goals cases success
+  all_goals exact equal
+
+/-- Pattern-target defaulting preserves every previously established resolved
+type equality across the complete target list. -/
+theorem defaultIntegerPatternTargets_preserves_resolve_eq
+    {origins : List IntegerPatternOrigin} {state next : State}
+    {left right : Ty}
+    (equal : state.resolve left = state.resolve right)
+    (success : defaultIntegerPatternTargets origins state = .ok next) :
+    next.resolve left = next.resolve right := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerPatternTargets] at success
+      cases success
+      exact equal
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerPatternTarget state origin with
+      | error error =>
+          simp [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+            at success
+      | ok middle =>
+          have tailResult :
+              defaultIntegerPatternTargets rest middle = .ok next := by
+            simpa [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+              using success
+          exact induction
+            (defaultIntegerPatternTarget_preserves_resolve_eq equal headResult)
+            tailResult
+
+/-- Defaulting one integer-literal target preserves every type equality
+already visible through the input inference state. -/
+theorem defaultIntegerLiteralTarget_preserves_resolve_eq
+    {state next : State} {origin : IntegerLiteralOrigin}
+    {left right : Ty}
+    (equal : state.resolve left = state.resolve right)
+    (success : defaultIntegerLiteralTarget state origin = .ok next) :
+    next.resolve left = next.resolve right := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerLiteralTarget, resolved] at success
+  · exact unify_preserves_resolve_eq equal success
+  all_goals cases success
+  all_goals exact equal
+
+/-- Literal-target defaulting preserves every previously established resolved
+type equality across the complete target list. -/
+theorem defaultIntegerLiteralTargets_preserves_resolve_eq
+    {origins : List IntegerLiteralOrigin} {state next : State}
+    {left right : Ty}
+    (equal : state.resolve left = state.resolve right)
+    (success : defaultIntegerLiteralTargets origins state = .ok next) :
+    next.resolve left = next.resolve right := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerLiteralTargets] at success
+      cases success
+      exact equal
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerLiteralTarget state origin with
+      | error error =>
+          simp [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+            at success
+      | ok middle =>
+          have tailResult :
+              defaultIntegerLiteralTargets rest middle = .ok next := by
+            simpa [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+              using success
+          exact induction
+            (defaultIntegerLiteralTarget_preserves_resolve_eq equal headResult)
+            tailResult
+
 private theorem unify_toTypedSource
     {state next : State} {left right : Ty} {roots : List NodeId}
     (result : unify state left right = .ok next) :
@@ -160,6 +242,80 @@ private theorem defaultIntegerLiteralTargets_toTypedSource
               using result
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_toTypedSource headResult)
+
+/-- Finalization may extend the inference substitution while defaulting
+numeric targets, but it cannot invalidate a type equality already established
+by the input state. -/
+theorem finalize_preserves_resolve_eq
+    {context : Context} {type left right : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (equal : state.resolve left = state.resolve right)
+    (success : finalize context type state roots = .ok result) :
+    result.substitution.apply left = result.substitution.apply right := by
+  unfold finalize at success
+  cases patternResult :
+      defaultIntegerPatternTargets state.integerPatterns state with
+  | error error =>
+      simp [patternResult, bind, Except.bind] at success
+  | ok patternState =>
+      have patternEqual :=
+        defaultIntegerPatternTargets_preserves_resolve_eq equal patternResult
+      cases literalResult :
+          defaultIntegerLiteralTargets patternState.integerLiterals
+            patternState with
+      | error error =>
+          simp [patternResult, literalResult, bind, Except.bind] at success
+      | ok finalState =>
+          have finalEqual :=
+            defaultIntegerLiteralTargets_preserves_resolve_eq patternEqual
+              literalResult
+          cases validationResult :
+              validateIntegerLiteralTargets finalState
+                finalState.integerLiterals with
+          | error error =>
+              simp [patternResult, literalResult, validationResult, bind,
+                Except.bind] at success
+          | ok validation =>
+              cases requirementsResult :
+                  solveRequirements context finalState finalState.requirements with
+              | error error =>
+                  simp [patternResult, literalResult, validationResult,
+                    requirementsResult, bind, Except.bind] at success
+              | ok requirements =>
+                  simp [patternResult, literalResult, validationResult,
+                    requirementsResult, bind, Except.bind] at success
+                  cases success
+                  exact finalEqual
+
+/-- A unification equality survives numeric defaulting and finalization under
+the final substitution returned to callers. -/
+theorem unify_then_finalize_eq
+    {context : Context} {type left right : Ty} {state unified : State}
+    {roots : List NodeId} {result : Result}
+    (unification : unify state left right = .ok unified)
+    (finalization : finalize context type unified roots = .ok result) :
+    result.substitution.apply left = result.substitution.apply right := by
+  exact finalize_preserves_resolve_eq
+    (by simpa [State.resolve] using unify_resolve_eq unification)
+    finalization
+
+/-- When the right-hand side is a successfully resolved source annotation,
+unification followed by finalization fixes the inferred type to that exact
+rigid annotation. -/
+theorem unify_then_finalize_annotation_eq
+    {context : Context} {sourceType : Syntax.TypeExpr}
+    {annotationType inferredType resultType : Ty} {state unified : State}
+    {roots : List NodeId} {result : Result}
+    (annotation : resolveSourceType context sourceType = .ok annotationType)
+    (unification : unify state inferredType annotationType = .ok unified)
+    (finalization : finalize context resultType unified roots = .ok result) :
+    result.substitution.apply inferredType = annotationType := by
+  calc
+    result.substitution.apply inferredType =
+        result.substitution.apply annotationType :=
+      unify_then_finalize_eq unification finalization
+    _ = annotationType :=
+      resolveSourceType_success_apply_eq_self result.substitution annotation
 
 /-- A successful finalization reports the input type under its final inference
 substitution. -/

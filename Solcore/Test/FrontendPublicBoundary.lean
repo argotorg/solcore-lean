@@ -147,6 +147,7 @@ example := @Solcore.Frontend.SourceInference.State.Header
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_state_header
 example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
+example := @Solcore.Frontend.SourceInference.Detail.unify_preserves_resolve_eq
 example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_formation
 example :=
@@ -253,6 +254,11 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_fresh
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_preserves_resolve_eq
+example := @Solcore.Frontend.SourceInference.Detail.unify_then_finalize_eq
+example :=
+  @Solcore.Frontend.SourceInference.Detail.unify_then_finalize_annotation_eq
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_owner
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputs
