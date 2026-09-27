@@ -478,6 +478,90 @@ theorem solveRequirements_corresponds
               exact .cons (by simp [evidenceResult])
                 (induction tailResult)
 
+private theorem solved_row_of_requirement_mem
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    (corresponds : Forall₂ (fun requirement row =>
+      row.id = requirement.id ∧
+        row.predicate = Detail.applyPredicate state requirement.predicate ∧
+        Detail.solveRequirementEvidence inferenceContext state requirement =
+          .ok row.evidence) requirements solved)
+    {requirement : Requirement}
+    (member : requirement ∈ requirements) :
+    ∃ row, row ∈ solved ∧
+      row.id = requirement.id ∧
+      row.predicate = Detail.applyPredicate state requirement.predicate := by
+  induction corresponds with
+  | nil => simp at member
+  | @cons head row tail rows headCorresponds tailCorresponds induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · exact ⟨row, by simp, headCorresponds.1, headCorresponds.2.1⟩
+      · obtain ⟨found, foundMember, idEq, predicateEq⟩ := induction member
+        exact ⟨found, by simp [foundMember], idEq, predicateEq⟩
+
+/-- A source-ordered predicate/identity correspondence into a successfully
+solved final ledger supplies the declarative evidence sequence for exactly
+those normalized predicates. -/
+theorem solveRequirements_correspondingSequenceProves
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    {predicates : List ProgramPredicate}
+    {ids : List RequirementId}
+    (corresponds : RequirementPredicatesCorrespond requirements predicates ids)
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    RequirementSequenceProves semanticContext ids
+      (predicates.map (Detail.applyPredicate state)) := by
+  have solverCorresponds := solveRequirements_corresponds success
+  clear success
+  induction corresponds with
+  | nil => exact .nil
+  | @cons predicate id predicates ids member tail induction =>
+      apply RequirementSequenceProves.cons
+      · obtain ⟨row, rowMember, idEq, predicateEq⟩ :=
+          solved_row_of_requirement_mem solverCorresponds member
+        exact ⟨row, ⟨by simpa [solved_eq] using rowMember, idEq⟩,
+          predicateEq, valid row rowMember⟩
+      · exact induction
+
+/-- A committed coercion edge inherits the primary and method evidence rows
+owned by its planned edge, in the exact order expected by
+`CoercionStepValid`. -/
+theorem solveRequirements_committedCoercionStepSequenceProves
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    {planned : Detail.PlannedCoercionStep}
+    {committed : CoercionStep}
+    (corresponds : Detail.PlannedCoercionStep.CommitCorresponds requirements
+      planned committed)
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    RequirementSequenceProves semanticContext
+      (committed.requirement :: committed.methodRequirements)
+      (Detail.applyPredicate state planned.predicate ::
+        planned.methodPredicates.map (Detail.applyPredicate state)) := by
+  apply RequirementSequenceProves.cons
+  · have primaryCorresponds : RequirementPredicatesCorrespond requirements
+        [planned.predicate] [committed.requirement] :=
+      .cons corresponds.primary_mem .nil
+    exact (solveRequirements_correspondingSequenceProves primaryCorresponds
+      success solved_eq valid).head
+  · exact solveRequirements_correspondingSequenceProves
+      corresponds.methods success solved_eq valid
+
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
 predicate. -/
