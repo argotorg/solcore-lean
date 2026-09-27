@@ -126,6 +126,50 @@ private def testSuccessfulCollection : IO Unit := do
   | constructors => throw (IO.userError
       s!"Box constructor catalog changed: {reprStr constructors}")
 
+private def testContractCatalog : IO Unit := do
+  let source ← parsed "contracts.solc" (String.intercalate "\n" [
+    "contract Vault<T> {",
+    "  enum Inner { Empty }",
+    "  function keep(value: T) {}",
+    "}",
+    "enum Outside { Only }",
+    "contract Registry {}"
+  ])
+  let environment ← catalog [source]
+  let vault ← declarationNamed environment "Vault"
+  let outside ← declarationNamed environment "Outside"
+  let registry ← declarationNamed environment "Registry"
+  let signatures ← match buildProgramSignatures environment with
+    | .ok signatures => pure signatures
+    | .error errors => throw (IO.userError
+        s!"contract signature failure: {reprStr errors}")
+  match signatures.contracts with
+  | [vaultSignature, registrySignature] =>
+      assertTrue (decide (
+          vaultSignature.id = vault.id ∧
+          vaultSignature.name = "Vault" ∧
+          vaultSignature.parameters = [{ owner := vault.id, index := 0 }] ∧
+          vaultSignature.source.value.members.length = 2 ∧
+          registrySignature.id = registry.id ∧
+          registrySignature.name = "Registry" ∧
+          registrySignature.parameters = []))
+        "contract catalog lost source order, identity, or generic scope"
+  | contracts => throw (IO.userError
+      s!"contract catalog changed: {reprStr contracts}")
+  let catalogedVault ← match signatures.contract? vault.id with
+    | some signature => pure signature
+    | none => throw (IO.userError "contract identity lookup lost Vault")
+  assertTrue (decide (catalogedVault.id = vault.id ∧
+      catalogedVault.name = "Vault"))
+    "contract identity lookup returned the wrong signature"
+  match signatures.dataTypes with
+  | [dataType] =>
+      assertTrue (decide (dataType.id = outside.id ∧
+          dataType.name = "Outside" ∧ signatures.functions.length = 0))
+        "contract members leaked into top-level function/data catalogs"
+  | dataTypes => throw (IO.userError
+      s!"contract declarations entered the data catalog: {reprStr dataTypes}")
+
 private def testDefaultImplementationMarkerCollection : IO Unit := do
   let source ← parsed "default_implementations.solc" (String.intercalate "\n" [
     "trait Select<T> {}",
@@ -412,6 +456,11 @@ private def testFailures : IO Unit := do
       | .typeResolution _ (.duplicateGenericParameter "T" 0 1) => true
       | _ => false
   expectSingleError
+    "contract Duplicate<T, T> {}"
+    fun error => match error with
+      | .typeResolution _ (.duplicateGenericParameter "T" 0 1) => true
+      | _ => false
+  expectSingleError
     "function malformed(value) { return; }"
     fun error => match error with
       | .malformedFunctionParameter _ 0 => true
@@ -586,6 +635,7 @@ end ProgramSignatures
 /-- Run the first source-connected signature and trait-rule vertical slice. -/
 def testProgramSignatures : IO Unit := do
   ProgramSignatures.testSuccessfulCollection
+  ProgramSignatures.testContractCatalog
   ProgramSignatures.testDefaultImplementationMarkerCollection
   ProgramSignatures.testComptimeMarkerCollection
   ProgramSignatures.testBuiltinIntResolutionProfile

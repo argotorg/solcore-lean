@@ -289,6 +289,16 @@ structure ProgramDataSignature where
   source : Syntax.EnumDecl
   deriving Repr
 
+/-- A resolved top-level contract declaration. Contract members remain
+separate from the data-constructor and pattern catalogs; this carrier records
+only the declaration identity and its generic scope. -/
+structure ProgramContractSignature where
+  id : Resolved.DeclarationId
+  name : String
+  parameters : List TypeSystem.TypeParameterId
+  source : Syntax.ContractDecl
+  deriving Repr
+
 namespace ProgramImplementationSignature
 
 /-- Exact generic assumptions available while checking one implementation
@@ -363,6 +373,7 @@ structure ProgramSignatures where
   traits : List ProgramTraitSignature
   implementations : List ProgramImplementationSignature
   dataTypes : List ProgramDataSignature := []
+  contracts : List ProgramContractSignature := []
   deriving Repr
 
 namespace ProgramSignatures
@@ -438,6 +449,11 @@ def implMethod? (signatures : ProgramSignatures)
 def dataType? (signatures : ProgramSignatures)
     (id : Resolved.DeclarationId) : Option ProgramDataSignature :=
   signatures.dataTypes.find? fun dataType => decide (dataType.id = id)
+
+/-- Look up one contract declaration by stable declaration identity. -/
+def contract? (signatures : ProgramSignatures)
+    (id : Resolved.DeclarationId) : Option ProgramContractSignature :=
+  signatures.contracts.find? fun contract => decide (contract.id = id)
 
 /-- Preserve source order when finding constructors with an exact spelling. -/
 def constructorsNamed (signatures : ProgramSignatures)
@@ -634,6 +650,22 @@ private def dataSignatureOfDeclaration
     name := source.value.name.value
     parameters := declarationParameters declaration
     constructors
+    source
+  }
+
+/-- Validate and retain one contract's declaration-local generic scope.
+Contract members are intentionally not interpreted as data constructors. -/
+private def contractSignatureOfDeclaration
+    (declaration : ProgramDeclaration) (source : Syntax.ContractDecl) :
+    Except ProgramSignatureError ProgramContractSignature := do
+  let scope := ProgramTypeScope.ofDeclaration declaration
+  match validateProgramTypeScope scope with
+  | .error error => throw (.typeResolution declaration.id error)
+  | .ok () => pure ()
+  pure {
+    id := declaration.id
+    name := source.value.name.value
+    parameters := declarationParameters declaration
     source
   }
 
@@ -1064,6 +1096,7 @@ private structure ProgramSignatureBuildState where
   functions : List ProgramFunctionSignature := []
   implementations : List ProgramImplementationSignature := []
   dataTypes : List ProgramDataSignature := []
+  contracts : List ProgramContractSignature := []
 
 private def collectProgramSignatures
     (environment : ProgramEnvironment) (traits : List ProgramTraitSignature) :
@@ -1083,6 +1116,12 @@ private def collectProgramSignatures
             | .error error => { state with errors := state.errors ++ [error] }
             | .ok dataType => {
                 state with dataTypes := state.dataTypes ++ [dataType]
+              }
+        | .contract source =>
+            match contractSignatureOfDeclaration declaration source with
+            | .error error => { state with errors := state.errors ++ [error] }
+            | .ok contract => {
+                state with contracts := state.contracts ++ [contract]
               }
         | _ =>
             match signatureItemOfDeclaration environment traits declaration with
@@ -1116,6 +1155,7 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
       traits := traitState.traits
       implementations := state.implementations
       dataTypes := state.dataTypes
+      contracts := state.contracts
     }
   else
     .error errors
@@ -1146,6 +1186,12 @@ private def isImplementationSignatureDeclaration
     (declaration : ProgramDeclaration) : Bool :=
   match declaration.source.value with
   | .impl _ => true
+  | _ => false
+
+private def isContractSignatureDeclaration
+    (declaration : ProgramDeclaration) : Bool :=
+  match declaration.source.value with
+  | .contract _ => true
   | _ => false
 
 private theorem traitSignatureOfDeclaration_success_id
@@ -1269,6 +1315,25 @@ private theorem dataSignatureOfDeclaration_success_id
           simp only [constructorsEq] at success
           injection success with signatureEq
           rw [← signatureEq]
+
+private theorem contractSignatureOfDeclaration_success_id
+    {declaration : ProgramDeclaration} {source : Syntax.ContractDecl}
+    {signature : ProgramContractSignature}
+    (success : contractSignatureOfDeclaration declaration source =
+      .ok signature) :
+    signature.id = declaration.id := by
+  cases scopeEq : validateProgramTypeScope
+      (ProgramTypeScope.ofDeclaration declaration) with
+  | error error =>
+      simp only [contractSignatureOfDeclaration, scopeEq] at success
+      change Except.error (ProgramSignatureError.typeResolution
+          declaration.id error) = Except.ok signature at success
+      cases success
+  | ok scopeUnit =>
+      cases scopeUnit
+      simp only [contractSignatureOfDeclaration, scopeEq] at success
+      injection success with signatureEq
+      rw [← signatureEq]
 
 private def Except.SuccessSatisfies {error value : Type}
     (property : value → Prop) : Except error value → Prop
@@ -1508,8 +1573,23 @@ private theorem collectProgramSignatures_ids_sublist
                 induction { state with
                   implementations := state.implementations ++ [signature]
                 }
+      | contract source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases signatureEq : contractSignatureOfDeclaration declaration source with
+          | error error =>
+              simpa [List.filter, isFunctionSignatureDeclaration,
+                isDataSignatureDeclaration,
+                isImplementationSignatureDeclaration, sourceEq] using
+                induction { state with errors := state.errors ++ [error] }
+          | ok contract =>
+              simpa [List.filter, isFunctionSignatureDeclaration,
+                isDataSignatureDeclaration,
+                isImplementationSignatureDeclaration, sourceEq, signatureEq] using
+                induction { state with
+                  contracts := state.contracts ++ [contract]
+                }
       | importDecl source | exportDecl source | pragmaDecl source
-      | trait source | contract source =>
+      | trait source =>
           simp only [collectProgramSignatures, sourceEq,
             signatureItemOfDeclaration]
           simpa [List.filter, isFunctionSignatureDeclaration,
@@ -1524,6 +1604,79 @@ private theorem collectProgramSignatures_ids_sublist
             isImplementationSignatureDeclaration, sourceEq] using
             induction state
 
+private theorem collectProgramSignatures_contract_ids_sublist
+    (environment : ProgramEnvironment) (traits : List ProgramTraitSignature)
+    (declarations : List ProgramDeclaration)
+    (state : ProgramSignatureBuildState) :
+    ((collectProgramSignatures environment traits declarations state).contracts.map
+        (fun signature => signature.id)).Sublist
+      (state.contracts.map (fun signature => signature.id) ++
+        (declarations.filter isContractSignatureDeclaration).map
+          (fun declaration => declaration.id)) := by
+  induction declarations generalizing state with
+  | nil => simp [collectProgramSignatures]
+  | cons declaration rest induction =>
+      cases sourceEq : declaration.source.value with
+      | typeAlias source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases aliasEq : resolveSignatureAliasBody environment declaration
+              source.value.value with
+          | error error =>
+              simpa [List.filter, isContractSignatureDeclaration, sourceEq] using
+                induction { state with errors := state.errors ++ [error] }
+          | ok type =>
+              simpa [List.filter, isContractSignatureDeclaration, sourceEq] using
+                induction state
+      | enum source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases signatureEq : dataSignatureOfDeclaration environment declaration
+              source with
+          | error error =>
+              simpa [List.filter, isContractSignatureDeclaration, sourceEq] using
+                induction { state with errors := state.errors ++ [error] }
+          | ok signature =>
+              simpa [List.filter, isContractSignatureDeclaration, sourceEq] using
+                induction { state with
+                  dataTypes := state.dataTypes ++ [signature]
+                }
+      | contract source =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases signatureEq : contractSignatureOfDeclaration declaration source with
+          | error error =>
+              exact (induction { state with
+                errors := state.errors ++ [error]
+              }).trans (by
+                simpa only [List.filter, isContractSignatureDeclaration,
+                  sourceEq, Bool.true_eq, List.map]
+                  using append_sublist_append_cons
+                    (state.contracts.map fun signature => signature.id)
+                    ((rest.filter isContractSignatureDeclaration).map
+                      fun candidate => candidate.id)
+                    declaration.id)
+          | ok signature =>
+              have idEq := contractSignatureOfDeclaration_success_id signatureEq
+              simpa [List.filter, isContractSignatureDeclaration, sourceEq,
+                idEq, List.map_append, List.append_assoc] using
+                induction { state with
+                  contracts := state.contracts ++ [signature]
+                }
+      | importDecl _ | exportDecl _ | pragmaDecl _ | trait _
+      | impl _ | function _ | error =>
+          simp only [collectProgramSignatures, sourceEq]
+          cases itemEq : signatureItemOfDeclaration environment traits declaration with
+          | error error =>
+              simpa [List.filter, isContractSignatureDeclaration, sourceEq,
+                itemEq] using
+                induction { state with errors := state.errors ++ [error] }
+          | ok item =>
+              rcases item with ⟨function?, implementation?⟩
+              simpa [List.filter, isContractSignatureDeclaration, sourceEq,
+                itemEq] using
+                induction { state with
+                  functions := state.functions ++ function?.toList
+                  implementations :=
+                    state.implementations ++ implementation?.toList
+                }
 private theorem signature_category_ids_nodup
     (declarations : List ProgramDeclaration)
     (unique : (declarations.map fun declaration => declaration.id).Nodup) :
@@ -1534,6 +1687,8 @@ private theorem signature_category_ids_nodup
       (declarations.filter isTraitSignatureDeclaration).map
           (fun declaration => declaration.id) ++
       (declarations.filter isImplementationSignatureDeclaration).map
+          (fun declaration => declaration.id) ++
+      (declarations.filter isContractSignatureDeclaration).map
           (fun declaration => declaration.id)).Nodup := by
   induction declarations with
   | nil => simp
@@ -1557,10 +1712,12 @@ private theorem signature_category_ids_nodup
               (rest.filter isTraitSignatureDeclaration).map
                 (fun candidate => candidate.id) ++
               (rest.filter isImplementationSignatureDeclaration).map
+                (fun candidate => candidate.id) ++
+              (rest.filter isContractSignatureDeclaration).map
                 (fun candidate => candidate.id)) := by
         simp only [List.mem_append, not_or]
-        exact ⟨⟨⟨headNotFiltered _, headNotFiltered _⟩,
-          headNotFiltered _⟩, headNotFiltered _⟩
+        exact ⟨⟨⟨⟨headNotFiltered _, headNotFiltered _⟩,
+          headNotFiltered _⟩, headNotFiltered _⟩, headNotFiltered _⟩
       have inserted :
           (declaration.id ::
             ((rest.filter isFunctionSignatureDeclaration).map
@@ -1570,18 +1727,22 @@ private theorem signature_category_ids_nodup
               (rest.filter isTraitSignatureDeclaration).map
                 (fun candidate => candidate.id) ++
               (rest.filter isImplementationSignatureDeclaration).map
+                (fun candidate => candidate.id) ++
+              (rest.filter isContractSignatureDeclaration).map
                 (fun candidate => candidate.id))).Nodup :=
         List.nodup_cons.mpr ⟨headNotCategories, tailNodup⟩
       cases sourceEq : declaration.source.value with
       | function _ =>
           simpa [List.filter, isFunctionSignatureDeclaration,
             isDataSignatureDeclaration, isTraitSignatureDeclaration,
-            isImplementationSignatureDeclaration, sourceEq] using inserted
+            isImplementationSignatureDeclaration,
+            isContractSignatureDeclaration, sourceEq] using inserted
       | enum _ =>
           apply inserted.perm
           simpa [List.filter, isFunctionSignatureDeclaration,
             isDataSignatureDeclaration, isTraitSignatureDeclaration,
-            isImplementationSignatureDeclaration, sourceEq,
+            isImplementationSignatureDeclaration,
+            isContractSignatureDeclaration, sourceEq,
             List.append_assoc] using
             (List.perm_middle (α := Resolved.DeclarationId)
               (a := declaration.id)
@@ -1593,12 +1754,15 @@ private theorem signature_category_ids_nodup
                   (rest.filter isTraitSignatureDeclaration).map
                     (fun candidate => candidate.id) ++
                   (rest.filter isImplementationSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isContractSignatureDeclaration).map
                     (fun candidate => candidate.id))).symm
       | trait _ =>
           apply inserted.perm
           simpa [List.filter, isFunctionSignatureDeclaration,
             isDataSignatureDeclaration, isTraitSignatureDeclaration,
-            isImplementationSignatureDeclaration, sourceEq,
+            isImplementationSignatureDeclaration,
+            isContractSignatureDeclaration, sourceEq,
             List.append_assoc] using
             (List.perm_middle (α := Resolved.DeclarationId)
               (a := declaration.id)
@@ -1611,12 +1775,15 @@ private theorem signature_category_ids_nodup
                 (rest.filter isTraitSignatureDeclaration).map
                     (fun candidate => candidate.id) ++
                   (rest.filter isImplementationSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isContractSignatureDeclaration).map
                     (fun candidate => candidate.id))).symm
       | impl _ =>
           apply inserted.perm
           simpa [List.filter, isFunctionSignatureDeclaration,
             isDataSignatureDeclaration, isTraitSignatureDeclaration,
-            isImplementationSignatureDeclaration, sourceEq,
+            isImplementationSignatureDeclaration,
+            isContractSignatureDeclaration, sourceEq,
             List.append_assoc] using
             (List.perm_middle (α := Resolved.DeclarationId)
               (a := declaration.id)
@@ -1629,15 +1796,39 @@ private theorem signature_category_ids_nodup
                     (fun candidate => candidate.id))
               (l₂ :=
                 (rest.filter isImplementationSignatureDeclaration).map
-                  (fun candidate => candidate.id))).symm
-      | importDecl _ | exportDecl _ | pragmaDecl _ | typeAlias _
-      | contract _ | error =>
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isContractSignatureDeclaration).map
+                    (fun candidate => candidate.id))).symm
+      | contract _ =>
+          apply inserted.perm
           simpa [List.filter, isFunctionSignatureDeclaration,
             isDataSignatureDeclaration, isTraitSignatureDeclaration,
-            isImplementationSignatureDeclaration, sourceEq] using tailNodup
+            isImplementationSignatureDeclaration,
+            isContractSignatureDeclaration, sourceEq,
+            List.append_assoc] using
+            (List.perm_middle (α := Resolved.DeclarationId)
+              (a := declaration.id)
+              (l₁ :=
+                (rest.filter isFunctionSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isDataSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isTraitSignatureDeclaration).map
+                    (fun candidate => candidate.id) ++
+                  (rest.filter isImplementationSignatureDeclaration).map
+                    (fun candidate => candidate.id))
+              (l₂ :=
+                (rest.filter isContractSignatureDeclaration).map
+                  (fun candidate => candidate.id))).symm
+      | importDecl _ | exportDecl _ | pragmaDecl _ | typeAlias _
+      | error =>
+          simpa [List.filter, isFunctionSignatureDeclaration,
+            isDataSignatureDeclaration, isTraitSignatureDeclaration,
+            isImplementationSignatureDeclaration,
+            isContractSignatureDeclaration, sourceEq] using tailNodup
 
 /-- Successful collection cannot duplicate a declaration identity across or
-within the four declaration-backed signature categories when the input
+within the five declaration-backed signature categories when the input
 environment itself has unique declaration identities. -/
 theorem buildProgramSignatures_success_declaration_ids_nodup
     {environment : ProgramEnvironment} {signatures : ProgramSignatures}
@@ -1647,7 +1838,8 @@ theorem buildProgramSignatures_success_declaration_ids_nodup
     (signatures.functions.map (fun signature => signature.id) ++
       signatures.dataTypes.map (fun signature => signature.id) ++
       signatures.traits.map (fun signature => signature.id) ++
-      signatures.implementations.map (fun signature => signature.id)).Nodup := by
+      signatures.implementations.map (fun signature => signature.id) ++
+      signatures.contracts.map (fun signature => signature.id)).Nodup := by
   let traitState := collectProgramTraits environment environment.declarations {}
   let state := collectProgramSignatures environment traitState.traits
     environment.declarations {}
@@ -1677,9 +1869,17 @@ theorem buildProgramSignatures_success_declaration_ids_nodup
           isImplementationSignatureDeclaration).map
             (fun declaration => declaration.id)) := by
     simpa [state] using collected.2.2
+  have contractsSublist :
+      (state.contracts.map (fun signature => signature.id)).Sublist
+        ((environment.declarations.filter
+          isContractSignatureDeclaration).map
+            (fun declaration => declaration.id)) := by
+    simpa [state] using collectProgramSignatures_contract_ids_sublist environment
+      traitState.traits environment.declarations
+        ({} : ProgramSignatureBuildState)
   have allSublist :=
-    ((functionsSublist.append dataSublist).append traitsSublist).append
-      implementationsSublist
+    (((functionsSublist.append dataSublist).append traitsSublist).append
+      implementationsSublist).append contractsSublist
   have collectedNodup :=
     allSublist.nodup
       (signature_category_ids_nodup environment.declarations environmentIds)

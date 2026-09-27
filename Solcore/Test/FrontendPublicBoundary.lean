@@ -26,6 +26,8 @@ example :=
   @Solcore.Frontend.ProgramSignatureError.missingImplementationTraitPredicate
 example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
 example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
+example := @Solcore.Frontend.ProgramContractSignature
+example := @Solcore.Frontend.ProgramSignatures.contract?
 example :=
   @Solcore.Frontend.buildProgramSignatures_success_declaration_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_function_ids_nodup
@@ -33,6 +35,7 @@ example := @Solcore.Frontend.buildProgramSignatures_success_data_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_trait_ids_nodup
 example :=
   @Solcore.Frontend.buildProgramSignatures_success_implementation_ids_nodup
+example := @Solcore.Frontend.buildProgramSignatures_success_contract_ids_nodup
 example := @Solcore.Frontend.ProgramImplementationSignature.methodAssumptions
 example :=
   @Solcore.Frontend.ProgramImplementationSignature.functionSignatureOfMethodWithTrait

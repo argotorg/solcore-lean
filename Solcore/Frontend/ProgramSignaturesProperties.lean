@@ -44,8 +44,11 @@ theorem buildProgramSignatures_success_function_ids_nodup
     (signatures.functions.map fun signature => signature.id).Nodup := by
   have all := buildProgramSignatures_success_declaration_ids_nodup
     environmentIds success
-  exact (List.nodup_append.mp
-    (List.nodup_append.mp (List.nodup_append.mp all).1).1).1
+  have withoutContracts := (List.nodup_append.mp all).1
+  have withoutImplementations := (List.nodup_append.mp withoutContracts).1
+  have functionsAndData :=
+    (List.nodup_append.mp withoutImplementations).1
+  exact (List.nodup_append.mp functionsAndData).1
 
 /-- Data declaration identities are unique after successful signature
 collection from an environment with unique declaration identities. -/
@@ -57,8 +60,11 @@ theorem buildProgramSignatures_success_data_ids_nodup
     (signatures.dataTypes.map fun signature => signature.id).Nodup := by
   have all := buildProgramSignatures_success_declaration_ids_nodup
     environmentIds success
-  exact (List.nodup_append.mp
-    (List.nodup_append.mp (List.nodup_append.mp all).1).1).2.1
+  have withoutContracts := (List.nodup_append.mp all).1
+  have withoutImplementations := (List.nodup_append.mp withoutContracts).1
+  have functionsAndData :=
+    (List.nodup_append.mp withoutImplementations).1
+  exact (List.nodup_append.mp functionsAndData).2.1
 
 /-- Trait declaration identities are unique after successful signature
 collection from an environment with unique declaration identities. -/
@@ -70,7 +76,9 @@ theorem buildProgramSignatures_success_trait_ids_nodup
     (signatures.traits.map fun signature => signature.id).Nodup := by
   have all := buildProgramSignatures_success_declaration_ids_nodup
     environmentIds success
-  exact (List.nodup_append.mp (List.nodup_append.mp all).1).2.1
+  have withoutContracts := (List.nodup_append.mp all).1
+  have withoutImplementations := (List.nodup_append.mp withoutContracts).1
+  exact (List.nodup_append.mp withoutImplementations).2.1
 
 /-- Implementation declaration identities are unique after successful
 signature collection from an environment with unique declaration identities. -/
@@ -80,6 +88,19 @@ theorem buildProgramSignatures_success_implementation_ids_nodup
       (environment.declarations.map fun declaration => declaration.id).Nodup)
     (success : buildProgramSignatures environment = .ok signatures) :
     (signatures.implementations.map fun signature => signature.id).Nodup := by
+  have all := buildProgramSignatures_success_declaration_ids_nodup
+    environmentIds success
+  have withoutContracts := (List.nodup_append.mp all).1
+  exact (List.nodup_append.mp withoutContracts).2.1
+
+/-- Contract declaration identities are unique after successful signature
+collection from an environment with unique declaration identities. -/
+theorem buildProgramSignatures_success_contract_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.contracts.map fun signature => signature.id).Nodup := by
   have all := buildProgramSignatures_success_declaration_ids_nodup
     environmentIds success
   exact (List.nodup_append.mp all).2.1
