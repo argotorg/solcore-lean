@@ -146,6 +146,24 @@ example :
     shadowingBinderState_ready.lookupBinder?_freeVariablesBelow
       shadowingBinderState_lookup⟩
 
+/-- Instantiating the selected shadowing binder advances the allocator
+monotonically while preserving readiness and bounding the resolved body. -/
+example :
+    let instantiated :=
+      shadowingSelectedBinder.scheme.instantiateWithSubstitution
+        shadowingBinderState.inference.next
+    let inference := {
+      shadowingBinderState.inference with next := instantiated.next
+    }
+    let next : SourceInference.State := {
+      shadowingBinderState with inference
+    }
+    shadowingBinderState.InferenceProgress next ∧
+      next.InferenceReady ∧
+      (next.resolve instantiated.body).VariablesBelow next.inference.next := by
+  exact SourceInference.Detail.localBinderInstantiation_inferenceProperties
+    shadowingBinderState_ready shadowingBinderState_lookup
+
 private def unificationProgressInput : SourceInference.State :=
   (SourceInference.State.initial solverRegressionOwner).fresh.2
 

@@ -1489,6 +1489,48 @@ theorem unify_preserves_inferenceReady
       · change state.binderEnvironment.BodiesBelow inference.next
         exact ready.bindersBelow.weaken progress.next_le
 
+/-- Instantiating a successfully looked-up local binder by advancing only the
+inference allocator makes semantic progress, preserves readiness, and leaves
+the resolved instantiated body below the new allocator bound. -/
+theorem localBinderInstantiation_inferenceProperties
+    {state : State} {name : String} {binder : TypedBinder}
+    (ready : state.InferenceReady)
+    (found : state.lookupBinder? name = some binder) :
+    let instantiated :=
+      binder.scheme.instantiateWithSubstitution state.inference.next
+    let inference := { state.inference with next := instantiated.next }
+    let next : State := { state with inference }
+    state.InferenceProgress next ∧
+      next.InferenceReady ∧
+      (next.resolve instantiated.body).VariablesBelow
+        next.inference.next := by
+  let instantiated :=
+    binder.scheme.instantiateWithSubstitution state.inference.next
+  let inference := { state.inference with next := instantiated.next }
+  let next : State := { state with inference }
+  change state.InferenceProgress next ∧
+    next.InferenceReady ∧
+    (next.resolve instantiated.body).VariablesBelow next.inference.next
+  have freeBelow :
+      binder.scheme.FreeVariablesBelow state.inference.next :=
+    State.InferenceReady.lookupBinder?_freeVariablesBelow ready found
+  have nextLe : state.inference.next ≤ next.inference.next := by
+    change state.inference.next ≤ instantiated.next
+    exact Scheme.instantiateWithSubstitution_next_le
+      binder.scheme state.inference.next
+  have progress : state.InferenceProgress next :=
+    State.InferenceProgress.of_substitution_eq ready.solved nextLe rfl
+  have nextReady : next.InferenceReady :=
+    State.InferenceReady.of_progress_of_binderEnvironment_eq
+      ready progress rfl
+  have bodyBelow :
+      instantiated.body.VariablesBelow next.inference.next := by
+    change instantiated.body.VariablesBelow instantiated.next
+    exact Scheme.instantiateWithSubstitution_body_variablesBelow
+      binder.scheme state.inference.next freeBelow
+  exact ⟨progress, nextReady,
+    nextReady.solved.variablesBelow_apply bodyBelow⟩
+
 /-- Expected-type fitting makes semantic inference progress, preserves
 readiness, and returns an allocator-bounded expression type. -/
 theorem withExpected_inferenceProperties

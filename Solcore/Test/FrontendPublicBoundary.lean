@@ -95,6 +95,8 @@ example := @Solcore.Frontend.validateResolvedTypeFormation
 example := @Solcore.Frontend.validateResolvedTypeFormation_success
 example := @Solcore.Frontend.SignatureTypeFormationValidated.variablesBelow
 example := @Solcore.Frontend.SignatureTypesFormationValidated.variablesBelow
+example :=
+  @Solcore.Frontend.ProgramSignatureFormationValidated.function_scheme_body_variablesBelow
 example := @Solcore.Frontend.SignatureTypeFormationValidated.apply_eq_self
 example := @Solcore.Frontend.SignatureTypesFormationValidated.apply_eq_self
 example :=
@@ -360,6 +362,8 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.unify_inferenceProgress
 example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_inferenceReady
+example :=
+  @Solcore.Frontend.SourceInference.Detail.localBinderInstantiation_inferenceProperties
 example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
 example := @Solcore.Frontend.SourceInference.Detail.unify_preserves_resolve_eq
 example :=
