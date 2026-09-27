@@ -161,6 +161,20 @@ namespace SolvedBelow
 theorem empty (next : Nat) : SolvedBelow Substitution.empty next := by
   constructor <;> simp [Substitution.empty, Substitution.domain]
 
+/-- A solved substitution remains solved when the allocator bound grows. -/
+theorem weaken
+    {substitution : Substitution} {lower upper : Nat}
+    (solved : SolvedBelow substitution lower) (bound : lower ≤ upper) :
+    SolvedBelow substitution upper := by
+  constructor
+  · exact solved.domain_nodup
+  · intro metavariable member
+    exact Nat.lt_of_lt_of_le (solved.domain_below metavariable member) bound
+  · intro metavariable replacement member rangeVariable occurs
+    exact Nat.lt_of_lt_of_le
+      (solved.range_below member rangeVariable occurs) bound
+  · exact solved.range_outside_domain
+
 /-- One occurs-check-safe bounded binding is a solved substitution. -/
 theorem mono {metavariable : TypeVarId} {replacement : Ty} {next : Nat}
     (domain_below : metavariable.index < next)
@@ -432,6 +446,23 @@ theorem apply_variables_outside_older_domain
   | proxy inner induction => exact induction sourceOutside
   | comptime inner induction => exact induction sourceOutside
   | error => simp [Substitution.apply, Ty.freeVariables]
+
+/-- Avoidance of a fixed older domain is closed under substitution
+composition. -/
+theorem compose
+    {newer middle older : Substitution}
+    (newerAvoids : RangeAvoidsDomain newer older)
+    (middleAvoids : RangeAvoidsDomain middle older) :
+    RangeAvoidsDomain (newer.compose middle) older := by
+  intro metavariable replacement member rangeVariable occurs
+  rw [mem_compose_iff] at member
+  rcases member with
+    ⟨middleReplacement, middleMember, replacementEq⟩ |
+      ⟨newerMember, newerFresh⟩
+  · subst replacement
+    exact newerAvoids.apply_variables_outside_older_domain middleReplacement
+      (middleAvoids middleMember) rangeVariable occurs
+  · exact newerAvoids newerMember rangeVariable occurs
 
 end RangeAvoidsDomain
 

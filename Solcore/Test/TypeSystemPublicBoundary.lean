@@ -25,6 +25,7 @@ example := @Solcore.TypeSystem.Substitution.RangeAvoidsDomain
 example := @Solcore.TypeSystem.Ty.apply_eq_self_of_domain_disjoint_freeVariables
 example := @Solcore.TypeSystem.Substitution.SolvedBelow
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.empty
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.weaken
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.mono
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.lookup_range_outside_domain
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_variables_below
@@ -35,12 +36,21 @@ example :=
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.range_fixed
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_idempotent
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.compose
+example := @Solcore.TypeSystem.Substitution.RangeAvoidsDomain.compose
 example := @Solcore.TypeSystem.Constraint.VariablesBelow
 example := @Solcore.TypeSystem.Constraint.VariablesBelow.apply
+example := @Solcore.TypeSystem.Constraint.VariablesOutsideDomain
+example := @Solcore.TypeSystem.Constraint.VariablesOutsideDomain.apply
 example := @Solcore.TypeSystem.ConstraintsBelow
+example := @Solcore.TypeSystem.ConstraintsOutsideDomain
 example := @Solcore.TypeSystem.Unification.unifyWithFuel_solvedBelow
+example := @Solcore.TypeSystem.Unification.unifyWithFuel_rangeAvoidsDomain
 example := @Solcore.TypeSystem.Unification.unify_solvedBelow
+example := @Solcore.TypeSystem.Unification.unify_rangeAvoidsDomain
 example := @Solcore.TypeSystem.Unification.unifyTypes_solvedBelow
+example := @Solcore.TypeSystem.Unification.unifyTypes_rangeAvoidsDomain
+example := @Solcore.TypeSystem.Scheme.instantiate_next_le
+example := @Solcore.TypeSystem.DeclarationScheme.instantiate_next_le
 
 private def solvedMetavariable : Solcore.TypeSystem.TypeVarId := ⟨0⟩
 
@@ -150,8 +160,38 @@ example : Solcore.TypeSystem.Substitution.SolvedBelow
 example := @Solcore.TypeSystem.InferState.fresh_substitution
 example := @Solcore.TypeSystem.InferState.fresh_next
 example := @Solcore.TypeSystem.InferState.instantiate_substitution
+example := @Solcore.TypeSystem.InferState.instantiate_next_le
 example := @Solcore.TypeSystem.InferState.instantiateDeclaration_substitution
+example := @Solcore.TypeSystem.InferState.instantiateDeclaration_next_le
 example := @Solcore.TypeSystem.InferState.unify_next
 example := @Solcore.TypeSystem.InferState.solve_next
+example := @Solcore.TypeSystem.InferState.Solved
+example := @Solcore.TypeSystem.InferState.Solved.initial
+example := @Solcore.TypeSystem.InferState.Solved.fresh
+example := @Solcore.TypeSystem.InferState.Solved.instantiate
+example := @Solcore.TypeSystem.InferState.Solved.instantiateDeclaration
+example := @Solcore.TypeSystem.InferState.Solved.unify
+example := @Solcore.TypeSystem.InferState.Solved.solve
+
+private def outOfBoundMetavariable : Solcore.TypeSystem.TypeVarId := ⟨0⟩
+
+private def zeroBoundState : Solcore.TypeSystem.InferState :=
+  .initial 0
+
+private def zeroBoundSolvedResult : Solcore.TypeSystem.InferState :=
+  { next := 0
+    substitution := [(outOfBoundMetavariable, .word)] }
+
+/-- Without the resolved-input bound required by `InferState.Solved.unify`,
+unification may solve a variable which is not below the state's allocator. -/
+example : zeroBoundState.unify (.variable outOfBoundMetavariable) .word =
+    .ok zeroBoundSolvedResult := by
+  rfl
+
+example : ¬ zeroBoundSolvedResult.Solved := by
+  intro solved
+  have below := solved.domain_below outOfBoundMetavariable (by
+    simp [zeroBoundSolvedResult, Solcore.TypeSystem.Substitution.domain])
+  exact (Nat.not_lt_zero 0) below
 
 end Tests

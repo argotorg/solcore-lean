@@ -34,12 +34,38 @@ theorem VariablesBelow.apply
   exact ⟨solved.variablesBelow_apply below.1,
     solved.variablesBelow_apply below.2⟩
 
+/-- Every variable on both sides of a constraint lies outside a
+substitution's domain. -/
+def VariablesOutsideDomain (substitution : Substitution)
+    (constraint : Constraint) : Prop :=
+  (∀ metavariable, metavariable ∈ constraint.left.freeVariables →
+    metavariable ∉ substitution.domain) ∧
+  (∀ metavariable, metavariable ∈ constraint.right.freeVariables →
+    metavariable ∉ substitution.domain)
+
+/-- Applying a substitution whose range avoids an older domain preserves
+constraint-level avoidance of that domain. -/
+theorem VariablesOutsideDomain.apply
+    {constraint : Constraint} {newer older : Substitution}
+    (cross : newer.RangeAvoidsDomain older)
+    (outside : constraint.VariablesOutsideDomain older) :
+    (constraint.apply newer).VariablesOutsideDomain older := by
+  exact
+    ⟨cross.apply_variables_outside_older_domain constraint.left outside.1,
+      cross.apply_variables_outside_older_domain constraint.right outside.2⟩
+
 end Constraint
 
 /-- Every pending unification constraint is bounded by the same allocator
 limit. -/
 def ConstraintsBelow (next : Nat) (constraints : List Constraint) : Prop :=
   ∀ constraint, constraint ∈ constraints → constraint.VariablesBelow next
+
+/-- Every pending constraint avoids the domain of an older substitution. -/
+def ConstraintsOutsideDomain (substitution : Substitution)
+    (constraints : List Constraint) : Prop :=
+  ∀ constraint, constraint ∈ constraints →
+    constraint.VariablesOutsideDomain substitution
 
 namespace Unification
 
@@ -342,6 +368,310 @@ private theorem loop_solvedBelow
               · exact success
             · simp at success
 
+private theorem variablesOutside_parts
+    {older : Substitution} {whole first second : Ty}
+    (outside : ∀ metavariable, metavariable ∈ whole.freeVariables →
+      metavariable ∉ older.domain)
+    (firstMember : ∀ metavariable, metavariable ∈ first.freeVariables →
+      metavariable ∈ whole.freeVariables)
+    (secondMember : ∀ metavariable, metavariable ∈ second.freeVariables →
+      metavariable ∈ whole.freeVariables) :
+    (∀ metavariable, metavariable ∈ first.freeVariables →
+      metavariable ∉ older.domain) ∧
+    (∀ metavariable, metavariable ∈ second.freeVariables →
+      metavariable ∉ older.domain) := by
+  exact
+    ⟨fun metavariable member => outside metavariable
+        (firstMember metavariable member),
+      fun metavariable member => outside metavariable
+        (secondMember metavariable member)⟩
+
+private theorem binaryConstraintsOutsideDomain
+    {older : Substitution}
+    {leftFirst leftSecond rightFirst rightSecond : Ty}
+    {rest : List Constraint}
+    (leftFirstOutside : ∀ metavariable,
+      metavariable ∈ leftFirst.freeVariables →
+        metavariable ∉ older.domain)
+    (leftSecondOutside : ∀ metavariable,
+      metavariable ∈ leftSecond.freeVariables →
+        metavariable ∉ older.domain)
+    (rightFirstOutside : ∀ metavariable,
+      metavariable ∈ rightFirst.freeVariables →
+        metavariable ∉ older.domain)
+    (rightSecondOutside : ∀ metavariable,
+      metavariable ∈ rightSecond.freeVariables →
+        metavariable ∉ older.domain)
+    (restOutside : ConstraintsOutsideDomain older rest) :
+    ConstraintsOutsideDomain older
+      ({ left := leftFirst, right := rightFirst } ::
+       { left := leftSecond, right := rightSecond } :: rest) := by
+  intro constraint member
+  rcases List.mem_cons.mp member with rfl | member
+  · exact ⟨leftFirstOutside, rightFirstOutside⟩
+  · rcases List.mem_cons.mp member with rfl | member
+    · exact ⟨leftSecondOutside, rightSecondOutside⟩
+    · exact restOutside constraint member
+
+private theorem loop_rangeAvoidsDomain
+    {fuel : Nat} {substitution older result : Substitution}
+    {constraints : List Constraint}
+    (cross : substitution.RangeAvoidsDomain older)
+    (constraintsOutside : ConstraintsOutsideDomain older constraints)
+    (success : loop fuel substitution constraints = .ok result) :
+    result.RangeAvoidsDomain older := by
+  induction fuel generalizing substitution constraints result with
+  | zero =>
+      simp [loop] at success
+  | succ fuel induction =>
+      cases constraints with
+      | nil =>
+          simp only [loop, Except.ok.injEq] at success
+          subst result
+          exact cross
+      | cons constraint rest =>
+          have constraintOutside :
+              constraint.VariablesOutsideDomain older :=
+            constraintsOutside constraint (by simp)
+          have restOutside : ConstraintsOutsideDomain older rest := by
+            intro candidate member
+            exact constraintsOutside candidate (by simp [member])
+          have leftOutside : ∀ metavariable,
+              metavariable ∈
+                  (substitution.apply constraint.left).freeVariables →
+                metavariable ∉ older.domain :=
+            cross.apply_variables_outside_older_domain constraint.left
+              constraintOutside.1
+          have rightOutside : ∀ metavariable,
+              metavariable ∈
+                  (substitution.apply constraint.right).freeVariables →
+                metavariable ∉ older.domain :=
+            cross.apply_variables_outside_older_domain constraint.right
+              constraintOutside.2
+          simp only [loop] at success
+          split at success
+          · apply induction (substitution := substitution)
+              (constraints := rest) (result := result)
+            · exact cross
+            · exact restOutside
+            · exact success
+          · split at success
+            · rename_i _ _ metavariable leftEq
+              cases occursCheck :
+                  (substitution.apply constraint.right).containsVariable
+                    metavariable with
+              | false =>
+                  rw [occursCheck] at success
+                  have bindingAvoids :
+                      Substitution.RangeAvoidsDomain
+                        [(metavariable, substitution.apply constraint.right)]
+                        older := by
+                    intro candidate replacement member
+                    simp only [List.mem_singleton] at member
+                    cases member
+                    exact rightOutside
+                  apply induction
+                    (substitution := Substitution.compose
+                      [(metavariable, substitution.apply constraint.right)]
+                      substitution)
+                    (constraints := rest) (result := result)
+                  · exact bindingAvoids.compose cross
+                  · exact restOutside
+                  · exact success
+              | true =>
+                  simp [occursCheck] at success
+            · rename_i _ _ metavariable rightEq _
+              cases occursCheck :
+                  (substitution.apply constraint.left).containsVariable
+                    metavariable with
+              | false =>
+                  rw [occursCheck] at success
+                  have bindingAvoids :
+                      Substitution.RangeAvoidsDomain
+                        [(metavariable, substitution.apply constraint.left)]
+                        older := by
+                    intro candidate replacement member
+                    simp only [List.mem_singleton] at member
+                    cases member
+                    exact leftOutside
+                  apply induction
+                    (substitution := Substitution.compose
+                      [(metavariable, substitution.apply constraint.left)]
+                      substitution)
+                    (constraints := rest) (result := result)
+                  · exact bindingAvoids.compose cross
+                  · exact restOutside
+                  · exact success
+              | true =>
+                  simp [occursCheck] at success
+            · rename_i _ _ leftFunction leftArgument rightFunction
+                rightArgument leftEq rightEq
+              have leftParts := variablesOutside_parts
+                (whole := substitution.apply constraint.left)
+                (first := leftFunction) (second := leftArgument) leftOutside
+                (fun metavariable member => by
+                  rw [leftEq]
+                  exact (Ty.mem_freeVariables_application_iff metavariable
+                    leftFunction leftArgument).mpr (Or.inl member))
+                (fun metavariable member => by
+                  rw [leftEq]
+                  exact (Ty.mem_freeVariables_application_iff metavariable
+                    leftFunction leftArgument).mpr (Or.inr member))
+              have rightParts := variablesOutside_parts
+                (whole := substitution.apply constraint.right)
+                (first := rightFunction) (second := rightArgument) rightOutside
+                (fun metavariable member => by
+                  rw [rightEq]
+                  exact (Ty.mem_freeVariables_application_iff metavariable
+                    rightFunction rightArgument).mpr (Or.inl member))
+                (fun metavariable member => by
+                  rw [rightEq]
+                  exact (Ty.mem_freeVariables_application_iff metavariable
+                    rightFunction rightArgument).mpr (Or.inr member))
+              apply induction (substitution := substitution)
+                (constraints :=
+                  { left := leftFunction, right := rightFunction } ::
+                  { left := leftArgument, right := rightArgument } :: rest)
+                (result := result)
+              · exact cross
+              · exact binaryConstraintsOutsideDomain leftParts.1 leftParts.2
+                  rightParts.1 rightParts.2 restOutside
+              · exact success
+            · rename_i _ _ leftFunction leftArgument rightFunction
+                rightArgument leftEq rightEq
+              have leftParts := variablesOutside_parts
+                (whole := substitution.apply constraint.left)
+                (first := leftFunction) (second := leftArgument) leftOutside
+                (fun metavariable member => by
+                  rw [leftEq]
+                  exact (Ty.mem_freeVariables_function_iff metavariable
+                    leftFunction leftArgument).mpr (Or.inl member))
+                (fun metavariable member => by
+                  rw [leftEq]
+                  exact (Ty.mem_freeVariables_function_iff metavariable
+                    leftFunction leftArgument).mpr (Or.inr member))
+              have rightParts := variablesOutside_parts
+                (whole := substitution.apply constraint.right)
+                (first := rightFunction) (second := rightArgument) rightOutside
+                (fun metavariable member => by
+                  rw [rightEq]
+                  exact (Ty.mem_freeVariables_function_iff metavariable
+                    rightFunction rightArgument).mpr (Or.inl member))
+                (fun metavariable member => by
+                  rw [rightEq]
+                  exact (Ty.mem_freeVariables_function_iff metavariable
+                    rightFunction rightArgument).mpr (Or.inr member))
+              apply induction (substitution := substitution)
+                (constraints :=
+                  { left := leftFunction, right := rightFunction } ::
+                  { left := leftArgument, right := rightArgument } :: rest)
+                (result := result)
+              · exact cross
+              · exact binaryConstraintsOutsideDomain leftParts.1 leftParts.2
+                  rightParts.1 rightParts.2 restOutside
+              · exact success
+            · rename_i _ _ leftFunction leftArgument rightFunction
+                rightArgument leftEq rightEq
+              have leftParts := variablesOutside_parts
+                (whole := substitution.apply constraint.left)
+                (first := leftFunction) (second := leftArgument) leftOutside
+                (fun metavariable member => by
+                  rw [leftEq]
+                  exact (Ty.mem_freeVariables_product_iff metavariable
+                    leftFunction leftArgument).mpr (Or.inl member))
+                (fun metavariable member => by
+                  rw [leftEq]
+                  exact (Ty.mem_freeVariables_product_iff metavariable
+                    leftFunction leftArgument).mpr (Or.inr member))
+              have rightParts := variablesOutside_parts
+                (whole := substitution.apply constraint.right)
+                (first := rightFunction) (second := rightArgument) rightOutside
+                (fun metavariable member => by
+                  rw [rightEq]
+                  exact (Ty.mem_freeVariables_product_iff metavariable
+                    rightFunction rightArgument).mpr (Or.inl member))
+                (fun metavariable member => by
+                  rw [rightEq]
+                  exact (Ty.mem_freeVariables_product_iff metavariable
+                    rightFunction rightArgument).mpr (Or.inr member))
+              apply induction (substitution := substitution)
+                (constraints :=
+                  { left := leftFunction, right := rightFunction } ::
+                  { left := leftArgument, right := rightArgument } :: rest)
+                (result := result)
+              · exact cross
+              · exact binaryConstraintsOutsideDomain leftParts.1 leftParts.2
+                  rightParts.1 rightParts.2 restOutside
+              · exact success
+            · rename_i _ _ leftFunction leftArgument rightFunction
+                rightArgument leftEq rightEq
+              have leftParts := variablesOutside_parts
+                (whole := substitution.apply constraint.left)
+                (first := leftFunction) (second := leftArgument) leftOutside
+                (fun metavariable member => by
+                  rw [leftEq]
+                  exact (Ty.mem_freeVariables_mapping_iff metavariable
+                    leftFunction leftArgument).mpr (Or.inl member))
+                (fun metavariable member => by
+                  rw [leftEq]
+                  exact (Ty.mem_freeVariables_mapping_iff metavariable
+                    leftFunction leftArgument).mpr (Or.inr member))
+              have rightParts := variablesOutside_parts
+                (whole := substitution.apply constraint.right)
+                (first := rightFunction) (second := rightArgument) rightOutside
+                (fun metavariable member => by
+                  rw [rightEq]
+                  exact (Ty.mem_freeVariables_mapping_iff metavariable
+                    rightFunction rightArgument).mpr (Or.inl member))
+                (fun metavariable member => by
+                  rw [rightEq]
+                  exact (Ty.mem_freeVariables_mapping_iff metavariable
+                    rightFunction rightArgument).mpr (Or.inr member))
+              apply induction (substitution := substitution)
+                (constraints :=
+                  { left := leftFunction, right := rightFunction } ::
+                  { left := leftArgument, right := rightArgument } :: rest)
+                (result := result)
+              · exact cross
+              · exact binaryConstraintsOutsideDomain leftParts.1 leftParts.2
+                  rightParts.1 rightParts.2 restOutside
+              · exact success
+            · rename_i _ _ leftInner rightInner leftEq rightEq
+              apply induction (substitution := substitution)
+                (constraints := { left := leftInner, right := rightInner } :: rest)
+                (result := result) cross
+              · intro candidate member
+                rcases List.mem_cons.mp member with rfl | member
+                · constructor
+                  · intro metavariable occurs
+                    apply leftOutside metavariable
+                    rw [leftEq]
+                    exact occurs
+                  · intro metavariable occurs
+                    apply rightOutside metavariable
+                    rw [rightEq]
+                    exact occurs
+                · exact restOutside candidate member
+              · exact success
+            · rename_i _ _ leftInner rightInner leftEq rightEq
+              apply induction (substitution := substitution)
+                (constraints := { left := leftInner, right := rightInner } :: rest)
+                (result := result) cross
+              · intro candidate member
+                rcases List.mem_cons.mp member with rfl | member
+                · constructor
+                  · intro metavariable occurs
+                    apply leftOutside metavariable
+                    rw [leftEq]
+                    exact occurs
+                  · intro metavariable occurs
+                    apply rightOutside metavariable
+                    rw [rightEq]
+                    exact occurs
+                · exact restOutside candidate member
+              · exact success
+            · simp at success
+
 def constraintSize (constraint : Constraint) : Nat :=
   constraint.left.size + constraint.right.size
 
@@ -365,6 +695,20 @@ theorem unifyWithFuel_solvedBelow
     result.SolvedBelow next := by
   apply loop_solvedBelow (Substitution.SolvedBelow.empty next) below
   exact success
+
+/-- Successful bounded-fuel unification cannot introduce an older domain
+variable into its result range when all input constraints avoid that domain. -/
+theorem unifyWithFuel_rangeAvoidsDomain
+    {fuel : Nat} {older result : Substitution}
+    {constraints : List Constraint}
+    (outside : ConstraintsOutsideDomain older constraints)
+    (success : unifyWithFuel fuel constraints = .ok result) :
+    result.RangeAvoidsDomain older := by
+  apply loop_rangeAvoidsDomain (substitution := [])
+  · intro metavariable replacement member
+    simp at member
+  · exact outside
+  · exact success
 
 @[simp]
 theorem unifyWithFuel_empty (fuel : Nat) :
@@ -397,6 +741,15 @@ theorem unify_solvedBelow
     result.SolvedBelow next := by
   exact unifyWithFuel_solvedBelow below success
 
+/-- The default-fuel unifier preserves avoidance of an older substitution
+domain. -/
+theorem unify_rangeAvoidsDomain
+    {older result : Substitution} {constraints : List Constraint}
+    (outside : ConstraintsOutsideDomain older constraints)
+    (success : unify constraints = .ok result) :
+    result.RangeAvoidsDomain older := by
+  exact unifyWithFuel_rangeAvoidsDomain outside success
+
 def unifyTypes (left right : Ty) : Except Error Substitution :=
   unify [{ left, right }]
 
@@ -413,6 +766,24 @@ theorem unifyTypes_solvedBelow
       simpa using member
     subst constraint
     exact ⟨leftBelow, rightBelow⟩
+  · exact success
+
+/-- Binary unification cannot reintroduce an older substitution-domain
+variable when neither normalized input contains one. -/
+theorem unifyTypes_rangeAvoidsDomain
+    {older result : Substitution} {left right : Ty}
+    (leftOutside : ∀ metavariable,
+      metavariable ∈ left.freeVariables → metavariable ∉ older.domain)
+    (rightOutside : ∀ metavariable,
+      metavariable ∈ right.freeVariables → metavariable ∉ older.domain)
+    (success : unifyTypes left right = .ok result) :
+    result.RangeAvoidsDomain older := by
+  apply unify_rangeAvoidsDomain (constraints := [{ left, right }])
+  · intro constraint member
+    have same : constraint = { left, right } := by
+      simpa using member
+    subst constraint
+    exact ⟨leftOutside, rightOutside⟩
   · exact success
 
 end Unification

@@ -46,6 +46,20 @@ private def freshSubstitution :
           freshSubstitution variables (next + 1)
             ((metavariable, .variable ⟨next⟩) :: substitution)
 
+private theorem freshSubstitution_next_le
+    (variables : List TypeVarId) (next : Nat)
+    (substitution : Substitution) :
+    next ≤ (freshSubstitution variables next substitution).2 := by
+  induction variables generalizing next substitution with
+  | nil => exact Nat.le_refl next
+  | cons metavariable variables induction =>
+      simp only [freshSubstitution]
+      split
+      · exact induction next substitution
+      · exact Nat.le_trans (Nat.le_succ next)
+          (induction (next + 1)
+            ((metavariable, .variable ⟨next⟩) :: substitution))
+
 /-- Instantiate every quantified variable and expose the shared substitution. -/
 def instantiateWithSubstitution (scheme : Scheme) (next : Nat) : Instantiation :=
   let (substitution, next) := freshSubstitution scheme.quantified next []
@@ -55,6 +69,11 @@ def instantiateWithSubstitution (scheme : Scheme) (next : Nat) : Instantiation :
 def instantiate (scheme : Scheme) (next : Nat) : Ty × Nat :=
   let instantiated := scheme.instantiateWithSubstitution next
   (instantiated.body, instantiated.next)
+
+/-- Scheme instantiation never moves the fresh-variable allocator backwards. -/
+theorem instantiate_next_le (scheme : Scheme) (next : Nat) :
+    next ≤ (scheme.instantiate next).2 := by
+  exact freshSubstitution_next_le scheme.quantified next []
 
 end Scheme
 
@@ -76,11 +95,31 @@ private def freshParameterSubstitution :
           freshParameterSubstitution parameters (next + 1)
             ((parameter, .variable ⟨next⟩) :: substitution)
 
+private theorem freshParameterSubstitution_next_le
+    (parameters : List TypeParameterId) (next : Nat)
+    (substitution : ParameterSubstitution) :
+    next ≤ (freshParameterSubstitution parameters next substitution).2 := by
+  induction parameters generalizing next substitution with
+  | nil => exact Nat.le_refl next
+  | cons parameter parameters induction =>
+      simp only [freshParameterSubstitution]
+      split
+      · exact induction next substitution
+      · exact Nat.le_trans (Nat.le_succ next)
+          (induction (next + 1)
+            ((parameter, .variable ⟨next⟩) :: substitution))
+
 /-- Turn rigid declaration parameters into fresh inference metavariables. -/
 def instantiate (scheme : DeclarationScheme) (next : Nat) : Ty × Nat :=
   let (substitution, next) :=
     freshParameterSubstitution scheme.parameters next []
   (substitution.apply scheme.body, next)
+
+/-- Declaration instantiation never moves the fresh-variable allocator
+backwards. -/
+theorem instantiate_next_le (scheme : DeclarationScheme) (next : Nat) :
+    next ≤ (scheme.instantiate next).2 := by
+  exact freshParameterSubstitution_next_le scheme.parameters next []
 
 end DeclarationScheme
 
