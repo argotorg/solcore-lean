@@ -33,6 +33,11 @@ theorem fresh_preserves_requirementsWellFormed
   change state.RequirementsWellFormed
   exact wellFormed
 
+/-- Allocating a fresh type metavariable does not remove requirement rows. -/
+theorem fresh_requirements_subset (state : State) :
+    state.requirements ⊆ state.fresh.2.requirements := by
+  exact fun _ member => member
+
 /-- Replacing the compatibility-only local environment does not change the
 requirement ledger. -/
 theorem withLocals_preserves_requirementsWellFormed
@@ -314,6 +319,22 @@ theorem unify_preserves_requirementsWellFormed
       change state.RequirementsWellFormed
       exact wellFormed
 
+/-- Unification does not remove rows from the canonical requirement ledger. -/
+theorem unify_requirements_subset
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    state.requirements ⊆ next.requirements := by
+  unfold unify at success
+  cases unification : state.inference.unify left right with
+  | error error =>
+      simp [unification, liftUnification, bind, Except.bind] at success
+  | ok inference =>
+      simp only [unification, liftUnification, bind, Except.bind] at success
+      change Except.ok { state with inference } = Except.ok next at success
+      injection success with nextEq
+      subst next
+      exact fun _ member => member
+
 private theorem addRequirementWithId_requirements_subset
     (state : State) (predicate : ProgramPredicate) :
     state.requirements ⊆
@@ -584,6 +605,26 @@ theorem candidateWithExpected_preserves_requirementsWellFormed
       subst result
       exact withExpected_preserves_requirementsWellFormed fittedResult wellFormed
 
+/-- A retained expected-type candidate only retains or extends the input
+requirement ledger. -/
+theorem candidateWithExpected_requirements_subset
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : candidateWithExpected context state actual expected =
+      .ok (some result)) :
+    state.requirements ⊆ result.state.requirements := by
+  unfold candidateWithExpected at success
+  cases fittedResult : withExpected context state actual expected with
+  | error error =>
+      cases error <;> simp [fittedResult] at success
+      all_goals cases ‹Unification.Error› <;> simp_all
+  | ok fitted =>
+      simp only [fittedResult] at success
+      injection success with resultEq
+      have fittedEq : fitted = result := Option.some.inj resultEq
+      subst result
+      exact withExpected_requirements_subset fittedResult
+
 /-- Fitting an argument spine preserves the canonical requirement ledger.
 Every requirement added by an inserted coercion is committed by the
 corresponding successful `candidateWithExpected` step. -/
@@ -651,6 +692,71 @@ theorem fitArguments_preserves_requirementsWellFormed
                           exact induction (result := tail) tailResult
                             fittedWellFormed
 
+/-- Fitting an argument spine only retains or extends the input requirement
+ledger.  Each recursive step starts from the state produced by the preceding
+expected-type fit. -/
+theorem fitArguments_requirements_subset
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    state.requirements ⊆ result.state.requirements := by
+  induction arguments generalizing parameters state result with
+  | nil =>
+      cases parameters <;> simp [fitArguments] at success
+      subst result
+      exact fun _ member => member
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil =>
+          simp [fitArguments] at success
+      | cons parameter parameters =>
+          simp only [fitArguments] at success
+          cases fittedResult :
+              candidateWithExpected context state argument (some parameter) with
+          | error error =>
+              simp [fittedResult, bind, Except.bind] at success
+          | ok fitted? =>
+              cases fitted? with
+              | none =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  change Except.ok (none : Option ArgumentFitResult) =
+                    Except.ok (some result) at success
+                  simp at success
+              | some fitted =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  have fittedSubset :
+                      state.requirements ⊆ fitted.state.requirements :=
+                    candidateWithExpected_requirements_subset fittedResult
+                  cases tailResult : fitArguments context fitted.state arguments
+                      parameters with
+                  | error error =>
+                      simp [tailResult] at success
+                  | ok tail? =>
+                      cases tail? with
+                      | none =>
+                          simp only [tailResult] at success
+                          change Except.ok (none : Option ArgumentFitResult) =
+                            Except.ok (some result) at success
+                          simp at success
+                      | some tail =>
+                          simp only [tailResult] at success
+                          change Except.ok (some {
+                            state := tail.state
+                            cost := fitted.coercions.length + tail.cost
+                            coercions := {
+                              expression := argument.id
+                              coercions := fitted.coercions
+                            } :: tail.coercions
+                          }) = Except.ok (some result) at success
+                          injection success with resultEq
+                          have resultEq : _ = result :=
+                            Option.some.inj resultEq
+                          subst result
+                          exact List.Subset.trans fittedSubset
+                            (induction (result := tail) tailResult)
+
 /-- A retained function candidate preserves the canonical requirement ledger.
 The integer-literal and predicate validators return only `Bool`/`Unit`; they
 inspect the fitted state but do not construct a replacement state.  The only
@@ -683,6 +789,200 @@ theorem tryFunctionCandidate_preserves_requirementsWellFormed
       (State.addRequirementsWithIds_preserves_requirementsWellFormed _ _
         fittedResultWellFormed)
 
+/-- A retained function candidate only retains or extends the input
+requirement ledger.  Argument/result coercions and instantiated signature
+predicates are appended in execution order. -/
+theorem tryFunctionCandidate_requirements_subset
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    state.requirements ⊆ result.state.requirements := by
+  unfold tryFunctionCandidate at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try
+    have fittedArgumentsSubset :=
+      fitArguments_requirements_subset (by assumption)
+  all_goals try
+    have fittedResultSubset :=
+      candidateWithExpected_requirements_subset (by assumption)
+  all_goals
+    exact List.Subset.trans
+      (by
+        change state.requirements ⊆ state.requirements
+        exact fun _ member => member)
+      (List.Subset.trans fittedArgumentsSubset
+        (List.Subset.trans fittedResultSubset
+          (addRequirementsWithIds_requirements_subset _ _)))
+
+private theorem collectCandidateAttempts_success_requirements_subset
+    {attempt : ProgramFunctionSignature →
+      Except Error (Option CandidateAttemptResult)}
+    {state : State}
+    (attemptSubset : ∀ signature result,
+      attempt signature = .ok (some result) →
+        state.requirements ⊆ result.state.requirements) :
+    ∀ candidates success,
+      success ∈ (collectCandidateAttempts attempt candidates).successes →
+        state.requirements ⊆ success.attempt.state.requirements := by
+  intro candidates
+  induction candidates with
+  | nil => simp [collectCandidateAttempts]
+  | cons signature candidates induction =>
+      intro selected member
+      simp only [collectCandidateAttempts] at member
+      cases attemptResult : attempt signature with
+      | error error =>
+          simp only [attemptResult] at member
+          exact induction selected member
+      | ok result? =>
+          cases result? with
+          | none =>
+              simp only [attemptResult] at member
+              exact induction selected member
+          | some result =>
+              simp only [attemptResult, List.mem_cons] at member
+              cases member with
+              | inl selectedEq =>
+                  subst selected
+                  exact attemptSubset signature result attemptResult
+              | inr member => exact induction selected member
+
+private theorem bestCandidateSuccesses_requirements_subset
+    (successes : List CandidateSuccess) :
+    bestCandidateSuccesses successes ⊆ successes := by
+  intro success member
+  unfold bestCandidateSuccesses at member
+  dsimp only at member
+  split at member
+  · contradiction
+  · have preferredMember := (List.mem_filter.mp member).1
+    by_cases empty :
+        (successes.filter fun success =>
+          !success.attempt.hasDeferredIntegerLiterals).isEmpty
+    · simpa [empty] using preferredMember
+    · have groundMember :
+          success ∈ successes.filter fun success =>
+            !success.attempt.hasDeferredIntegerLiterals := by
+        simpa [empty] using preferredMember
+      exact (List.mem_filter.mp groundMember).1
+
+/-- Explicit-candidate overload selection returns a successful candidate whose
+ledger only retains or extends the shared input ledger. -/
+theorem selectFunctionCandidateFrom_requirements_subset
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  unfold selectFunctionCandidateFrom at success
+  let attempt := tryFunctionCandidate context arguments integerLiteralOrigins
+    call expected state
+  let search := collectCandidateAttempts attempt candidates
+  change selectCandidateSearch name candidates search = .ok result at success
+  unfold selectCandidateSearch at success
+  cases selected : bestCandidateSuccesses search.successes with
+  | nil =>
+      simp only [selected] at success
+      repeat' first | split at success
+      all_goals contradiction
+  | cons candidate rest =>
+      cases rest with
+      | cons second tail => simp [selected] at success
+      | nil =>
+          simp only [selected] at success
+          split at success
+          · contradiction
+          · injection success with resultEq
+            subst result
+            have member : candidate ∈ search.successes :=
+              bestCandidateSuccesses_requirements_subset search.successes
+                (by simp [selected])
+            exact collectCandidateAttempts_success_requirements_subset
+              (state := state)
+              (fun signature attemptResult attemptSuccess =>
+                tryFunctionCandidate_requirements_subset attemptSuccess)
+              candidates candidate member
+
+/-- Resolving the visible overload set does not alter the input state, so
+ordinary overload selection inherits explicit-candidate ledger monotonicity. -/
+theorem selectFunctionCandidate_requirements_subset
+    {context : Context} {name : String}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidate context name arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  unfold selectFunctionCandidate at success
+  cases candidatesResult : functionsNamed context name with
+  | error error =>
+      simp [candidatesResult, bind, Except.bind] at success
+  | ok candidates =>
+      simp only [candidatesResult, bind, Except.bind] at success
+      exact selectFunctionCandidateFrom_requirements_subset success
+
+private theorem pureState_eq
+    {state next : State}
+    (success : (pure state : Except Error State) = .ok next) :
+    state = next := by
+  change Except.ok state = Except.ok next at success
+  exact Except.ok.inj success
+
+/-- Unary-operator inference changes only unification metadata and may append
+the selected trait method's obligations. -/
+theorem inferUnaryOperator_requirements_subset
+    {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferUnaryOperator context operator operandType expected
+      integerLiterals state = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  unfold inferUnaryOperator at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try simp_all
+  all_goals try
+    have pureEq := pureState_eq (by assumption)
+    subst_vars
+  all_goals intro requirement member
+  all_goals solve_by_elim [unify_requirements_subset,
+    addRequirementsWithIds_requirements_subset]
+
+/-- Binary-operator inference changes only unification metadata and may append
+the selected trait method's obligations. -/
+theorem inferBinaryOperator_requirements_subset
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  unfold inferBinaryOperator at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try simp_all
+  all_goals try
+    have pureEq := pureState_eq (by assumption)
+    subst_vars
+  all_goals intro requirement member
+  all_goals try solve_by_elim [unify_requirements_subset,
+    addRequirementsWithIds_requirements_subset]
+  all_goals
+    apply addRequirementsWithIds_requirements_subset _ _
+    solve_by_elim [unify_requirements_subset]
+
 /-- Attaching already allocated coercion metadata changes expression nodes but
 does not change the canonical requirement ledger. -/
 theorem attachExpressionCoercions_preserves_requirementsWellFormed
@@ -699,6 +999,26 @@ theorem attachExpressionCoercions_preserves_requirementsWellFormed
         (State.modifyExpressionNode_preserves_requirementsWellFormed
           state entry.expression _ wellFormed)
 
+/-- Attaching already allocated coercion metadata does not remove requirement
+ledger rows. -/
+theorem attachExpressionCoercions_requirements_subset
+    (state : State) (entries : List ExpressionCoercions) :
+    state.requirements ⊆
+      (attachExpressionCoercions state entries).requirements := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil => exact fun _ member => member
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      exact induction
+        (state.modifyExpressionNode entry.expression fun node => {
+          node with
+          type := entry.coercions.foldl (fun _ step => step.target) node.type
+          requirements :=
+            node.requirements ++ coercionRequirements entry.coercions
+          coercions := node.coercions ++ entry.coercions
+        })
+
 /-- Recording one expression node preserves the canonical requirement
 ledger.  Requirement identities stored on the node are references to the
 existing ledger, not new allocations. -/
@@ -710,6 +1030,16 @@ theorem recordExpression_preserves_requirementsWellFormed
     State.RequirementsWellFormed
       (recordExpression source expression form requirements coercions state).2 := by
   exact State.recordNode_preserves_requirementsWellFormed state _ wellFormed
+
+/-- Recording one expression node does not remove requirement ledger rows. -/
+theorem recordExpression_requirements_subset
+    (source : Syntax.Expr) (expression : InferredExpression)
+    (form : ExpressionForm) (requirements : List RequirementId)
+    (coercions : List CoercionStep) (state : State) :
+    state.requirements ⊆
+      (recordExpression source expression form requirements coercions
+        state).2.requirements := by
+  exact fun _ member => member
 
 /-- Expected-type fitting may allocate coercion requirements; recording the
 resulting node itself leaves that fitted ledger unchanged. -/
@@ -738,6 +1068,32 @@ theorem recordExpressionWithExpected_preserves_requirementsWellFormed
         (requirements ++ coercionRequirements fitted.coercions)
         fitted.coercions fitted.state
         (withExpected_preserves_requirementsWellFormed fittedResult wellFormed)
+
+/-- Expected-type fitting may append coercion obligations; recording the
+resulting expression node does not remove any input ledger row. -/
+theorem recordExpressionWithExpected_requirements_subset
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state = .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  unfold recordExpressionWithExpected at success
+  cases fittedResult : withExpected context state { id, type } expected with
+  | error error =>
+      simp [fittedResult, bind, Except.bind] at success
+  | ok fitted =>
+      simp only [fittedResult, bind, Except.bind] at success
+      change Except.ok (recordExpression source fitted.expression form
+        (requirements ++ coercionRequirements fitted.coercions)
+        fitted.coercions fitted.state) = Except.ok result at success
+      injection success with resultEq
+      subst result
+      exact List.Subset.trans (withExpected_requirements_subset fittedResult)
+        (recordExpression_requirements_subset source fitted.expression form
+          (requirements ++ coercionRequirements fitted.coercions)
+          fitted.coercions fitted.state)
 
 /-- Recording the callee and call nodes for a selected declaration preserves
 the explicitly supplied state ledger. -/
@@ -778,6 +1134,50 @@ theorem recordSelectedCallResult_preserves_requirementsWellFormed
   exact recordExpression_preserves_requirementsWellFormed source result _ _ _ _
     calleeWellFormed
 
+/-- Recording selected-call provenance and expression nodes does not remove
+rows from the explicitly supplied requirement ledger. -/
+theorem recordSelectedCallResult_requirements_subset
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) :
+    state.requirements ⊆
+      (recordSelectedCallResult source callee name arguments attempt result
+        trailingCoercions state).2.requirements := by
+  let attachedState :=
+    attachExpressionCoercions state attempt.argumentCoercions
+  have attachedSubset :
+      state.requirements ⊆ attachedState.requirements :=
+    attachExpressionCoercions_requirements_subset
+      state attempt.argumentCoercions
+  let allocation := attachedState.allocateExpressionId
+  have allocatedSubset :
+      attachedState.requirements ⊆ allocation.2.requirements :=
+    fun _ member => member
+  let calleeExpression : InferredExpression := {
+    id := allocation.1
+    type := allocation.2.resolve attempt.instantiation.type
+  }
+  let calleeRecord := recordExpression callee calleeExpression
+    (.reference name (.declaration attempt.instantiation)) [] [] allocation.2
+  have calleeSubset :
+      allocation.2.requirements ⊆ calleeRecord.2.requirements :=
+    recordExpression_requirements_subset callee calleeExpression
+      (.reference name (.declaration attempt.instantiation)) [] [] allocation.2
+  change state.requirements ⊆
+    (recordExpression source result
+      (.call allocation.1 (arguments.map (fun argument => argument.id))
+        (.declaration attempt.instantiation))
+      (coercionRequirements attempt.callCoercions ++
+        attempt.signatureRequirements ++
+        coercionRequirements trailingCoercions)
+      (attempt.callCoercions ++ trailingCoercions) calleeRecord.2).2.requirements
+  exact List.Subset.trans attachedSubset
+    (List.Subset.trans allocatedSubset
+      (List.Subset.trans calleeSubset
+        (recordExpression_requirements_subset source result _ _ _
+          calleeRecord.2)))
+
 /-- Recording an ordinary selected call preserves the selected attempt's
 canonical requirement ledger. -/
 theorem recordSelectedCall_preserves_requirementsWellFormed
@@ -790,6 +1190,16 @@ theorem recordSelectedCall_preserves_requirementsWellFormed
     source callee name arguments attempt attempt.result [] attempt.state
     wellFormed
 
+/-- Recording an ordinary selected call does not remove rows from the
+selected attempt's requirement ledger. -/
+theorem recordSelectedCall_requirements_subset
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+    attempt.state.requirements ⊆
+      (recordSelectedCall source callee name arguments attempt).2.requirements := by
+  exact recordSelectedCallResult_requirements_subset
+    source callee name arguments attempt attempt.result [] attempt.state
+
 /-- Recording an indirect call adds one node and preserves the application
 result state's canonical requirement ledger. -/
 theorem recordIndirectCall_preserves_requirementsWellFormed
@@ -801,6 +1211,88 @@ theorem recordIndirectCall_preserves_requirementsWellFormed
   unfold recordIndirectCall
   exact recordExpression_preserves_requirementsWellFormed _ _ _ _ _ _
     wellFormed
+
+/-- Recording an indirect call does not remove rows from the application
+result's requirement ledger. -/
+theorem recordIndirectCall_requirements_subset
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult) :
+    result.state.requirements ⊆
+      (recordIndirectCall source callee arguments result).2.requirements := by
+  unfold recordIndirectCall
+  exact recordExpression_requirements_subset _ _ _ _ _ _
+
+/-- Applying an indirectly obtained function type may append coercion
+requirements while retaining every row from the input ledger. -/
+theorem applyFunctionType_requirements_subset
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Option Ty}
+    {state : State} {result : IndirectApplicationResult}
+    (success : applyFunctionType context call calleeType arguments expected
+      state = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  unfold applyFunctionType at success
+  cases partsResult : functionParts? (state.resolve calleeType) with
+  | some parts =>
+      rcases parts with ⟨parameter, returnType⟩
+      simp only [partsResult] at success
+      cases argumentResult : withExpected context state
+          { id := call, type := Ty.productMany (arguments.map (fun x => x.type)) }
+          (some parameter) with
+      | error error =>
+          simp [argumentResult, bind, Except.bind] at success
+      | ok fittedArgument =>
+          simp only [argumentResult, bind, Except.bind] at success
+          cases resultResult : withExpected context fittedArgument.state
+              { id := call, type := returnType } expected with
+          | error error =>
+              simp [resultResult] at success
+          | ok fittedResult =>
+              simp only [resultResult] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := fittedArgument.coercions
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              exact List.Subset.trans
+                (withExpected_requirements_subset argumentResult)
+                (withExpected_requirements_subset resultResult)
+  | none =>
+      simp only [partsResult] at success
+      generalize freshResultEq : state.fresh = freshResult at success
+      rcases freshResult with ⟨resultType, freshState⟩
+      cases unifyResult : unify freshState calleeType
+          (.function (Ty.productMany (arguments.map fun x => x.type))
+            resultType) with
+      | error error =>
+          simp [unifyResult, bind, Except.bind] at success
+      | ok unifiedState =>
+          simp only [unifyResult, bind, Except.bind] at success
+          cases resultResult : withExpected context unifiedState
+              { id := call, type := resultType } expected with
+          | error error =>
+              simp [resultResult] at success
+          | ok fittedResult =>
+              simp only [resultResult] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := []
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              have freshSubset :
+                  state.requirements ⊆ freshState.requirements := by
+                have subset := State.fresh_requirements_subset state
+                rw [freshResultEq] at subset
+                exact subset
+              exact List.Subset.trans freshSubset
+                (List.Subset.trans (unify_requirements_subset unifyResult)
+                  (withExpected_requirements_subset resultResult))
 
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)
