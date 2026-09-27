@@ -1992,50 +1992,6 @@ def ExpressionFormExecutionPreserves
     ValueHasType context after raw rawType /\
       HeapWellTyped context after /\ HeapTypesExtend before after
 
-namespace ExpressionEvaluates
-
-/-- Generic output coercions turn raw-form preservation into preservation for
-the complete expression occurrence judgment. -/
-theorem preservesOfForm
-    {program : Program} {context : Context} {evidence : EvidenceEnvironment}
-    {source : TypedSource} {environment : Environment}
-    {before after : Heap} {id : ExpressionId} {value : Value} {type : Ty}
-    (graph : OccurrenceGraphWellFormed source)
-    (form_preserves :
-      ExpressionFormExecutionPreserves program context evidence source environment)
-    (step_preserves : CoercionStepExecutionPreserves program context evidence)
-    (environment_agrees :
-      EnvironmentAgrees before context.locals environment)
-    (before_typed : HeapWellTyped context before)
-    (typing : ExpressionHasType source context id type)
-    (evaluation : ExpressionEvaluates program context evidence source environment
-      before id value after) :
-    ExpressionEvaluationPreserved context before after value type := by
-  cases typing with
-  | @intro _ _ typedNode rawType plan typed_contains form_type raw_type_eq
-      raw_well_formed type_well_formed requirements =>
-      cases evaluation with
-      | @intro _ _ _ _ _ middle _ _ evaluatedNode raw result evaluated_contains
-          form_evaluation coercion_evaluation =>
-          have node_eq := containsExpression_unique
-            graph.nodeOccurrencesUnique typed_contains evaluated_contains
-          subst evaluatedNode
-          rcases form_preserves _ _ _ _ _ _ _ _ _ environment_agrees
-              before_typed ⟨_, typedNode, typed_contains, rfl, raw_type_eq⟩
-              form_type requirements form_evaluation with
-            ⟨raw_typed, middle_typed, raw_extension⟩
-          rcases coercion_evaluation.preserves step_preserves
-              (ExpressionRequirementPlan.Valid.outputPath requirements)
-              middle_typed raw_typed with
-            ⟨result_typed, after_typed, coercion_extension⟩
-          exact {
-            value_typed := result_typed
-            heap_typed := after_typed
-            heap_extends := raw_extension.trans coercion_extension
-          }
-
-end ExpressionEvaluates
-
 namespace ExpressionFormEvaluates
 
 theorem referencePreserves
@@ -2889,6 +2845,90 @@ theorem instantiateHasType
         GeneralizedClosure.instantiate_resultType, resultEq] using materialized
 
 end GeneralizedClosureWellTyped
+
+namespace ExpressionEvaluates
+
+/-- Generic output coercions turn raw-form preservation into preservation for
+the complete expression occurrence judgment.  Generalized locals bypass raw
+form evaluation because their runtime substitution and evidence are selected
+at the complete occurrence boundary. -/
+theorem preservesOfForm
+    {program : Program} {context : Context} {evidence : EvidenceEnvironment}
+    {source : TypedSource} {environment : Environment}
+    {before after : Heap} {id : ExpressionId} {value : Value} {type : Ty}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (graph : OccurrenceGraphWellFormed source)
+    (form_preserves :
+      ExpressionFormExecutionPreserves program context evidence source environment)
+    (step_preserves : CoercionStepExecutionPreserves program context evidence)
+    (evidence_covers : evidence.Covers context)
+    (environment_agrees :
+      EnvironmentAgrees before context.locals environment)
+    (before_typed : HeapWellTyped context before)
+    (typing : ExpressionHasType source context id type)
+    (evaluation : ExpressionEvaluates program context evidence source environment
+      before id value after) :
+    ExpressionEvaluationPreserved context before after value type := by
+  cases typing with
+  | @intro _ _ typedNode rawType plan typed_contains form_type raw_type_eq
+      raw_well_formed type_well_formed requirements =>
+      cases evaluation with
+      | @intro _ _ _ _ _ middle _ _ evaluatedNode raw result evaluated_contains
+          form_evaluation coercion_evaluation =>
+          have node_eq := containsExpression_unique
+            graph.nodeOccurrencesUnique typed_contains evaluated_contains
+          subst evaluatedNode
+          rcases form_preserves _ _ _ _ _ _ _ _ _ environment_agrees
+              before_typed ⟨_, typedNode, typed_contains, rfl, raw_type_eq⟩
+              form_type requirements form_evaluation with
+            ⟨raw_typed, middle_typed, raw_extension⟩
+          rcases coercion_evaluation.preserves step_preserves
+              (ExpressionRequirementPlan.Valid.outputPath requirements)
+              middle_typed raw_typed with
+            ⟨result_typed, after_typed, coercion_extension⟩
+          exact {
+            value_typed := result_typed
+            heap_typed := after_typed
+            heap_extends := raw_extension.trans coercion_extension
+          }
+      | @generalizedLocal _ _ _ _ _ _ _ evaluatedNode name binder owned
+          location cell function substitution produced result evaluated_contains
+          form_eq layout lookup read descriptor context_fields instantiation
+          coercion_evaluation =>
+          have node_eq := containsExpression_unique
+            graph.nodeOccurrencesUnique typed_contains evaluated_contains
+          subst evaluatedNode
+          rw [form_eq] at form_type
+          cases form_type with
+          | reference reference_use =>
+              cases reference_use with
+              | @«local» staticBinder _ actualRequirements scheme_lookup
+                  requirements_lookup static_instantiation =>
+                  have binder_identity := environment_agrees.lookup_generalized
+                    scheme_lookup lookup read descriptor
+                  have owned_eq := ordinaryRequirementLayout_eq requirements layout
+                  subst owned
+                  have cell_typed : CellWellTyped context before cell :=
+                    before_typed cell read.member
+                  have function_typed :=
+                    (cell_typed.generalized_inv descriptor).2
+                  have definition_catalog : SignatureCatalogWellFormed
+                      function.definitionContext.signatures := by
+                    simpa only [context_fields.signatures] using catalog
+                  have raw_typed := function_typed.instantiateHasType
+                    definition_catalog context_fields evidence_covers instantiation
+                  rw [raw_type_eq] at raw_typed
+                  rcases coercion_evaluation.preserves step_preserves
+                      (ExpressionRequirementPlan.Valid.outputPath requirements)
+                      before_typed raw_typed with
+                    ⟨result_typed, after_typed, coercion_extension⟩
+                  exact {
+                    value_typed := result_typed
+                    heap_typed := after_typed
+                    heap_extends := coercion_extension
+                  }
+
+end ExpressionEvaluates
 
 /-- Static invariants shared by every successful execution rooted in one
 rigidly and lexically closed, residual-open source body.  In particular,

@@ -3,6 +3,7 @@ import Solcore.SourceSemantics.Substitution
 import Solcore.SourceSemantics.Dynamic.Default
 import Solcore.SourceSemantics.Dynamic.Evidence
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
+import Solcore.SourceSemantics.Dynamic.LocalSchemes
 import Solcore.SourceSemantics.Dynamic.Pattern
 import Solcore.SourceSemantics.Dynamic.Place
 import Solcore.SourceSemantics.Dynamic.Primitive
@@ -318,6 +319,32 @@ mutual
           node.coercions raw result after) :
         ExpressionEvaluates program context evidence source environment before
           id result after
+    | generalizedLocal
+        {context : Context} {evidence : EvidenceEnvironment}
+        {source : TypedSource} {environment : Environment}
+        {before after : Heap} {id : ExpressionId}
+        {node : ExpressionNode} {name : String} {binder : Resolved.LocalId}
+        {owned : List RequirementId} {location : Location} {cell : Cell}
+        {function : GeneralizedClosure} {substitution : Substitution}
+        {produced : EvidenceEnvironment} {value : Value}
+        (contains : ContainsExpression source id node)
+        (form_eq : node.form = .reference name (.local binder))
+        (layout : OrdinaryRequirementLayout node.requirements node.coercions
+          owned)
+        (lookup : Environment.LooksUp environment binder location)
+        (read : Heap.Reads before location cell)
+        (descriptor : cell.generalized = some function)
+        (context_fields : RuntimeContextFields function.definitionContext
+          context)
+        (instantiation : LocalSchemeRuntimeInstantiation context evidence
+          function.binder node.rawType owned substitution produced)
+        (coercions : CoercionPathExecutes program context evidence before
+          node.coercions
+          (.closure (function.instantiate substitution
+            (produced ++ evidence.applySubstitution substitution)))
+          value after) :
+        ExpressionEvaluates program context evidence source environment before
+          id value after
 
   /-- Raw evaluation of every resolved expression form. -/
   inductive ExpressionFormEvaluates (program : Program) :
@@ -1339,6 +1366,7 @@ theorem contains
     ∃ node, ContainsExpression source id node := by
   cases evaluation with
   | intro contains _ _ => exact ⟨_, contains⟩
+  | generalizedLocal contains _ _ _ _ _ _ _ _ => exact ⟨_, contains⟩
 
 end ExpressionEvaluates
 

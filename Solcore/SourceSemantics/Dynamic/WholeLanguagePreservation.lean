@@ -388,6 +388,52 @@ mutual
               heap_typed := after_typed
               heap_extends := raw_extension.trans coercion_extension
             }
+    | @ExpressionEvaluates.generalizedLocal _ _ _ _ _ _ _ _ evaluatedNode name
+        binder owned location cell function substitution produced result
+        evaluated_contains form_eq layout lookup read descriptor context_fields
+        instantiation coercion_evaluation => by
+        cases typing with
+        | @intro _ _ typedNode rawType plan typed_contains form_type raw_type_eq
+            raw_well_formed type_well_formed requirements =>
+            have node_eq := containsExpression_unique
+              runtime.graph.nodeOccurrencesUnique typed_contains
+              evaluated_contains
+            subst typedNode
+            rw [form_eq] at form_type
+            cases form_type with
+            | reference reference_use =>
+                cases reference_use with
+                | @«local» staticBinder _ actualRequirements scheme_lookup
+                    requirements_lookup static_instantiation =>
+                    have owned_eq := ordinaryRequirementLayout_eq requirements layout
+                    subst owned
+                    have binder_identity := environment_agrees.lookup_generalized
+                      scheme_lookup lookup read descriptor
+                    have cell_typed : CellWellTyped context before cell :=
+                      before_typed cell read.member
+                    have function_typed :=
+                      (cell_typed.generalized_inv descriptor).2
+                    have raw_typed := function_typed.instantiateHasType
+                      (by
+                        simpa only [← runtime.signatures,
+                          context_fields.signatures] using
+                          program_well_formed.signatures)
+                      context_fields evidence_covers instantiation
+                    have raw_typed' : ValueHasType context before
+                        (.closure (function.instantiate substitution
+                          (produced ++
+                            evidence.applySubstitution substitution))) rawType := by
+                      simpa only [raw_type_eq] using raw_typed
+                    rcases preservePathRec program_well_formed runtime
+                        before_typed raw_typed'
+                        (ExpressionRequirementPlan.Valid.outputPath requirements)
+                        coercion_evaluation with
+                      ⟨result_typed, after_typed, coercion_extension⟩
+                    exact {
+                      value_typed := result_typed
+                      heap_typed := after_typed
+                      heap_extends := coercion_extension
+                    }
     termination_by structural evaluation
 
   private theorem preserveFormRec
