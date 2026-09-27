@@ -243,6 +243,42 @@ mutual
         EvidenceClosuresFault environment (evidence :: rest)
 end
 
+mutual
+  /-- A retained evidence tree cannot both close successfully and fault while
+  closing against the same runtime environment. -/
+  theorem EvidenceCloses.excludes_fault
+      {environment : EvidenceEnvironment}
+      {openEvidence closedEvidence : TraitEvidence}
+      (closes : EvidenceCloses environment openEvidence closedEvidence)
+      (fault : EvidenceClosureFaults environment openEvidence) : False := by
+    cases closes with
+    | assumption found =>
+        cases fault with
+        | assumption missing => exact missing.excludes_lookup found
+    | implementation premises =>
+        cases fault with
+        | implementation premise =>
+            exact premise.excludes_closure premises
+
+  /-- A list of retained evidence trees cannot both close pointwise and fault
+  at one of its entries against the same runtime environment. -/
+  theorem EvidenceClosuresFault.excludes_closure
+      {environment : EvidenceEnvironment}
+      {openEvidence closedEvidence : List TraitEvidence}
+      (fault : EvidenceClosuresFault environment openEvidence)
+      (closes : Forall₂ (EvidenceCloses environment)
+        openEvidence closedEvidence) : False := by
+    cases fault with
+    | head evidenceFault =>
+        cases closes with
+        | cons evidenceCloses _ =>
+            exact evidenceCloses.excludes_fault evidenceFault
+    | tail _ restFault =>
+        cases closes with
+        | cons _ restCloses =>
+            exact restFault.excludes_closure restCloses
+end
+
 /-- A stable requirement identity is absent from the current ledger. -/
 def RequirementMissing (context : Context) (id : RequirementId) : Prop :=
   ∀ requirement, requirement ∈ context.solvedRequirements → requirement.id ≠ id
@@ -295,6 +331,75 @@ inductive RequirementsFault (context : Context)
       (fault : RequirementsFault context environment ids predicates failed) :
       RequirementsFault context environment (id :: ids)
         (predicate :: predicates) failed
+
+namespace RequirementProducesEvidence
+
+/-- An identity-unique requirement ledger cannot both close one retained
+requirement and report that same identity unavailable. -/
+theorem excludes_unavailable
+    {context : Context} {environment : EvidenceEnvironment}
+    {id : RequirementId} {predicate : ProgramPredicate}
+    {closedEvidence : TraitEvidence}
+    (unique : RequirementIdsUnique context)
+    (produces : RequirementProducesEvidence context environment id predicate
+      closedEvidence)
+    (unavailable : RequirementUnavailable context environment id) : False := by
+  cases produces with
+  | intro contains _ representation _ closes _ =>
+      cases unavailable with
+      | missing absent =>
+          exact absent _ contains.1 contains.2
+      | evidence otherContains otherRepresentation fault =>
+          have requirement_eq := unique.contains_unique contains otherContains
+          subst requirement_eq
+          have evidence_eq := representation.functional otherRepresentation
+          subst evidence_eq
+          exact closes.excludes_fault fault
+
+end RequirementProducesEvidence
+
+namespace RequirementsProduceEnvironment
+
+/-- Successful closure of a paired requirement spine excludes every
+first-fault derivation for the same identities and predicates. -/
+theorem excludes_fault
+    {context : Context} {callerEnvironment producedEnvironment :
+      EvidenceEnvironment}
+    {requirements : List RequirementId}
+    {predicates : List ProgramPredicate} {failed : RequirementId}
+    (unique : RequirementIdsUnique context)
+    (produces : RequirementsProduceEnvironment context callerEnvironment
+      requirements predicates producedEnvironment)
+    (fault : RequirementsFault context callerEnvironment requirements
+      predicates failed) : False := by
+  induction produces generalizing failed with
+  | nil => cases fault
+  | cons head _ induction =>
+      cases fault with
+      | head unavailable => exact head.excludes_unavailable unique unavailable
+      | tail _ tailFault => exact induction tailFault
+
+/-- Forgetting the predicate output does not weaken exclusion: a successfully
+closed requirement spine also excludes the predicate-independent list fault
+judgment for the same identity sequence. -/
+theorem excludes_list_fault
+    {context : Context} {callerEnvironment producedEnvironment :
+      EvidenceEnvironment}
+    {requirements : List RequirementId}
+    {predicates : List ProgramPredicate} {failed : RequirementId}
+    (unique : RequirementIdsUnique context)
+    (produces : RequirementsProduceEnvironment context callerEnvironment
+      requirements predicates producedEnvironment)
+    (fault : RequirementListFaults context callerEnvironment requirements
+      failed) : False := by
+  induction produces generalizing failed with
+  | nil => cases fault
+  | cons head _ induction =>
+      cases fault with
+      | head unavailable => exact head.excludes_unavailable unique unavailable
+      | tail _ tailFault => exact induction tailFault
+
+end RequirementsProduceEnvironment
 
 /-- Canonical shallow runtime type of every mathematical source value. -/
 inductive ValueRuntimeType : Value → Ty → Prop where

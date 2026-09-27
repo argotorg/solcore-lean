@@ -37,6 +37,26 @@ theorem length_eq {α β : Type} {relation : α → β → Prop}
   | nil => rfl
   | cons _ _ induction => simp [induction]
 
+/-- Pointwise functional relations induce functional list correspondence. -/
+theorem functional {α β : Type} {relation : α → β → Prop}
+    (relationFunctional :
+      ∀ {left : α} {first second : β},
+        relation left first → relation left second → first = second) :
+    ∀ {lefts : List α} {first second : List β},
+      Forall₂ relation lefts first →
+      Forall₂ relation lefts second →
+      first = second := by
+  intro lefts first second firstRelated secondRelated
+  induction firstRelated generalizing second with
+  | nil =>
+      cases secondRelated
+      rfl
+  | cons headRelated tailRelated induction =>
+      cases secondRelated with
+      | cons otherHeadRelated otherTailRelated =>
+          rw [relationFunctional headRelated otherHeadRelated]
+          rw [induction otherTailRelated]
+
 end Forall₂
 
 private def insertVariable (variables : List TypeSystem.TypeVarId)
@@ -624,6 +644,50 @@ inductive ImplementationEvidenceRepresents :
         (.byImpl goal implId retainedPremises)
         (.implementation goal implId semanticPremises)
 
+namespace ImplementationEvidenceRepresents
+
+mutual
+
+/-- A retained implementation-evidence tree represents at most one semantic
+tree. -/
+theorem functional
+    {retained : TypedTraitResolution.Evidence}
+    {left right : TraitEvidence}
+    (leftRepresents : ImplementationEvidenceRepresents retained left)
+    (rightRepresents : ImplementationEvidenceRepresents retained right) :
+    left = right := by
+  cases leftRepresents with
+  | byImpl premises =>
+      cases rightRepresents with
+      | byImpl otherPremises =>
+          rw [Forall₂ImplementationEvidenceRepresents.functional
+            premises otherPremises]
+
+/-- Pointwise implementation representations preserve the functionality of
+the retained premise spine. -/
+theorem Forall₂ImplementationEvidenceRepresents.functional
+    {retained : List TypedTraitResolution.Evidence}
+    {left right : List TraitEvidence}
+    (leftRepresents :
+      Forall₂ ImplementationEvidenceRepresents retained left)
+    (rightRepresents :
+      Forall₂ ImplementationEvidenceRepresents retained right) :
+    left = right := by
+  cases leftRepresents with
+  | nil =>
+      cases rightRepresents
+      rfl
+  | cons head tail =>
+      cases rightRepresents with
+      | cons otherHead otherTail =>
+          rw [ImplementationEvidenceRepresents.functional head otherHead]
+          rw [Forall₂ImplementationEvidenceRepresents.functional
+            tail otherTail]
+
+end
+
+end ImplementationEvidenceRepresents
+
 /-- The executable source-inference evidence carrier represents either a
 semantic assumption or a recursively represented implementation tree. -/
 inductive PredicateEvidenceRepresents :
@@ -637,6 +701,22 @@ inductive PredicateEvidenceRepresents :
       PredicateEvidenceRepresents (.implementation retained) semantic
 
 namespace PredicateEvidenceRepresents
+
+/-- A retained evidence value represents at most one semantic evidence tree. -/
+theorem functional
+    {retained : Frontend.SourceInference.PredicateEvidence}
+    {left right : TraitEvidence}
+    (leftRepresents : PredicateEvidenceRepresents retained left)
+    (rightRepresents : PredicateEvidenceRepresents retained right) :
+    left = right := by
+  cases leftRepresents with
+  | assumption =>
+      cases rightRepresents
+      rfl
+  | implementation implementationRepresents =>
+      cases rightRepresents with
+      | implementation otherRepresents =>
+          exact implementationRepresents.functional otherRepresents
 
 theorem goal_eq
     {retained : Frontend.SourceInference.PredicateEvidence}

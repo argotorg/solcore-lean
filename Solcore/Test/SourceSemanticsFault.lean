@@ -135,6 +135,38 @@ example (context : SourceSemantics.Context) (evidence : EvidenceEnvironment)
     RequirementUnavailable context evidence id :=
   .missing missing
 
+/-- Closing retained evidence successfully rules out a closure fault for the
+same open evidence tree. -/
+example (environment : EvidenceEnvironment)
+    (openEvidence closedEvidence : TraitEvidence)
+    (closes : EvidenceCloses environment openEvidence closedEvidence)
+    (fault : EvidenceClosureFaults environment openEvidence) : False :=
+  closes.excludes_fault fault
+
+/-- Under the static requirement-identity invariant, successful materialization
+and runtime unavailability are mutually exclusive. -/
+example (context : SourceSemantics.Context)
+    (environment : EvidenceEnvironment) (id : RequirementId)
+    (predicate : ProgramPredicate) (closedEvidence : TraitEvidence)
+    (unique : RequirementIdsUnique context)
+    (produces : RequirementProducesEvidence context environment id predicate
+      closedEvidence)
+    (unavailable : RequirementUnavailable context environment id) : False :=
+  produces.excludes_unavailable unique unavailable
+
+/-- A successfully materialized requirement spine cannot also report a first
+fault for the same ordered identity/predicate inputs. -/
+example (context : SourceSemantics.Context)
+    (caller produced : EvidenceEnvironment)
+    (requirements : List RequirementId)
+    (predicates : List ProgramPredicate) (failed : RequirementId)
+    (unique : RequirementIdsUnique context)
+    (produces : RequirementsProduceEnvironment context caller requirements
+      predicates produced)
+    (fault : RequirementsFault context caller requirements predicates failed) :
+    False :=
+  produces.excludes_fault unique fault
+
 /-- A malformed pattern is an explicit metadata fault, not a failed match. -/
 example (context : SourceSemantics.Context) (value : Value)
     (arm : TypedMatchCase) (rest : List TypedMatchCase)
