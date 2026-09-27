@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Program
+import Solcore.SourceSemantics.SourceInferenceSoundness
 
 /-!
 Boundary examples for the whole-body scoped requirement ledger.
@@ -174,6 +174,26 @@ private def ordinaryContextWithAssumption : SourceSemantics.Context :=
   ((Context.ofSignatures emptySignatures).withAssumptions [ordinaryPredicate])
     |>.withSolvedRequirements [ordinaryRow]
 
+private def templateInferenceContext : SourceInference.Context := {
+  environment := { modules := [], declarations := [] }
+  signatures := emptySignatures
+  scope := {
+    currentModule := testModule
+    genericOwner := testOwner
+    genericParameters := []
+  }
+}
+
+private def templateInputRequirement : Requirement := {
+  id := templateId
+  predicate := templatePredicate
+}
+
+private def templateSolverState : SourceInference.State := {
+  SourceInference.State.initial testOwner with
+  localSchemeAssumptions := [templateId]
+}
+
 private theorem templateOwnerContained :
     ContainsLocalSchemeTemplate scopedTemplateSource scopedTemplateOwner := by
   simp [ContainsLocalSchemeTemplate, localSchemeTemplateOwners,
@@ -190,6 +210,43 @@ private theorem templateOccursAtInitializer :
     expressionPrimaryRequirementOccurrences,
     statementPrimaryRequirementOccurrences, scopedTemplateSource,
     expressionNode, letNode]
+
+/-- Executable template solving is accepted through scoped source ownership,
+not through declaration-wide retained-evidence validity. -/
+theorem templateSolverProducesScopedEntry :
+    ScopedRequirementEntryValid templateContext scopedTemplateSource
+      templateRow := by
+  apply
+    SourceInferenceSoundness.solveRequirements_scoped_entries_sound
+      (inferenceContext := templateInferenceContext)
+      (state := templateSolverState)
+      (requirements := [templateInputRequirement])
+      (solved := [templateRow])
+  · rfl
+  · rfl
+  · intro requirement member
+    have requirement_eq : requirement = templateInputRequirement := by
+      simpa using member
+    subst requirement
+    constructor
+    · intro _
+      exact sourceLocalSchemeTemplateIds_mem_iff.mpr
+        ⟨scopedTemplateOwner, templateOwnerContained, rfl⟩
+    · intro _
+      simp [templateInputRequirement, templateSolverState]
+  · intro requirement member template
+    have requirement_eq : requirement = templateInputRequirement := by
+      simpa using member
+    subst requirement
+    simpa [templateInputRequirement, templateSolverState,
+      SourceInference.Detail.applyPredicate, SourceInference.State.initial,
+      TypedTraitResolution.applySubstitution] using
+      (LocalSchemeTemplateRowScoped.intro scopedTemplateOwner
+        templateOwnerContained rfl rfl rfl (.expression (expressionId 0))
+        templateOccursAtInitializer
+        (scopedTemplateOwner.scopes_initializer templateOwnerContained))
+  · rfl
+  · simp
 
 /-- A template assumption attached at the root of its exact initializer is a
 valid scoped ledger entry even though it is not a declaration assumption. -/

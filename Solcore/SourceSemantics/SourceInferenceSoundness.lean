@@ -248,6 +248,83 @@ theorem solveRequirements_ordinary_sound
       · exact induction (fun tailRequirement tailMember =>
           ordinary tailRequirement (by simp [tailMember])) candidate member
 
+/-- Successful ledger solving validates ordinary rows through retained trait
+evidence and qualified-local template rows through their exact
+initializer-scoped source ownership. -/
+theorem solveRequirements_scoped_entries_sound
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    {source : TypedSource}
+    (signatures_eq : semanticContext.signatures = inferenceContext.signatures)
+    (assumptions_eq : semanticContext.assumptions =
+      inferenceContext.assumptions.map (Detail.applyPredicate state))
+    (template_iff : ∀ requirement, requirement ∈ requirements →
+      (requirement.id ∈ state.localSchemeAssumptions ↔
+        requirement.id ∈ sourceLocalSchemeTemplateIds source))
+    (template_scoped : ∀ requirement, requirement ∈ requirements →
+      requirement.id ∈ state.localSchemeAssumptions →
+      LocalSchemeTemplateRowScoped source {
+        id := requirement.id
+        predicate := Detail.applyPredicate state requirement.predicate
+        evidence := .assumption
+          (Detail.applyPredicate state requirement.predicate)
+      })
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved) :
+    ∀ row, row ∈ solved →
+      ScopedRequirementEntryValid semanticContext source row := by
+  have corresponds := solveRequirements_corresponds success
+  clear success
+  revert template_iff template_scoped
+  induction corresponds with
+  | nil =>
+      intro _ _ row member
+      simp at member
+  | @cons requirement row requirements rows head tail induction =>
+      intro template_iff template_scoped candidate member
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · rcases head with ⟨id_eq, predicate_eq, evidence_success⟩
+        by_cases template : requirement.id ∈ state.localSchemeAssumptions
+        · have evidence_eq := solveRequirementEvidence_template_eq template
+            evidence_success
+          have candidate_eq : candidate = {
+              id := requirement.id
+              predicate := Detail.applyPredicate state requirement.predicate
+              evidence := .assumption
+                (Detail.applyPredicate state requirement.predicate)
+            } := by
+            cases candidate
+            simp_all
+          rw [candidate_eq]
+          exact .template (template_scoped requirement (by simp) template)
+        · have valid := solveRequirementEvidence_ordinary_sound
+            (semanticContext := semanticContext) template signatures_eq
+            assumptions_eq evidence_success
+          have not_template : requirement.id ∉
+              sourceLocalSchemeTemplateIds source := by
+            intro source_member
+            exact template ((template_iff requirement (by simp)).mpr
+              source_member)
+          have candidate_eq : candidate = {
+              id := requirement.id
+              predicate := Detail.applyPredicate state requirement.predicate
+              evidence := candidate.evidence
+            } := by
+            cases candidate
+            simp_all
+          rw [candidate_eq]
+          exact .ordinary not_template valid
+      · exact induction
+          (fun tailRequirement tailMember =>
+            template_iff tailRequirement (by simp [tailMember]))
+          (fun tailRequirement tailMember template =>
+            template_scoped tailRequirement (by simp [tailMember]) template)
+          candidate member
+
 /-- Proof-facing context for the requirement ledger emitted by finalization.
 Both declaration assumptions and solved predicates use the final inference
 substitution, while the complete solved ledger is retained for later lookup. -/
