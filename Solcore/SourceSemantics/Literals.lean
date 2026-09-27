@@ -57,6 +57,22 @@ theorem target_supported
   | word _ target_eq _ => exact .inl target_eq
   | integer _ target_eq _ => exact .inr target_eq
 
+/-- Every declaratively valid integer-literal resolution selects an
+admissible primitive target type. -/
+theorem target_type_admissible
+    {context : Context} {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (binders : TypeParameterBindersWellFormed context)
+    (valid : IntegerLiteralValid context source resolution) :
+    TypeAdmissible context resolution.targetType := by
+  cases valid with
+  | word _ targetEq _ =>
+      rw [targetEq]
+      exact TypeAdmissible.word binders
+  | integer _ targetEq _ =>
+      rw [targetEq]
+      exact TypeAdmissible.integer binders
+
 end IntegerLiteralValid
 
 /-- Compatibility literal nodes are the strict primitive-Word form. -/

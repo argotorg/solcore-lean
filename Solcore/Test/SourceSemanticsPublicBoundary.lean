@@ -435,6 +435,7 @@ example := @Solcore.SourceSemantics.CoercionPathValid
 example := @Solcore.SourceSemantics.CoercionPathValid.of_isValid
 example := @Solcore.SourceSemantics.CoercionPathValid.expressionNode_rawType
 example := @Solcore.SourceSemantics.IntegerLiteralValid
+example := @Solcore.SourceSemantics.IntegerLiteralValid.target_type_admissible
 example := @Solcore.SourceSemantics.WordLiteralValid
 example := @Solcore.SourceSemantics.UnaryOperatorHasType
 example := @Solcore.SourceSemantics.BinaryOperatorHasType
