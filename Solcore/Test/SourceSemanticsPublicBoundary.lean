@@ -408,17 +408,38 @@ example := @Solcore.SourceSemantics.FunctionDefinition.ofChecked
 example := @Solcore.SourceSemantics.MethodDefinition.ofChecked
 example := @Solcore.SourceSemantics.Program.ofChecked
 example := @Solcore.SourceSemantics.signatureDeclarationIds_nodup_ofCheckProgram
+example := @Solcore.SourceSemantics.FunctionSignatureRemainingConditions
+example := @Solcore.SourceSemantics.DataSignatureRemainingConditions
+example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions
+example := @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions
+example := @Solcore.SourceSemantics.SignatureCatalogRemainingConditions
+example := @Solcore.SourceSemantics.CheckedSignatureCatalogFacts
+example :=
+  @Solcore.SourceSemantics.FunctionSignatureRemainingConditions.complete
+example := @Solcore.SourceSemantics.DataSignatureRemainingConditions.complete
+example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions.complete
+example :=
+  @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions.complete
+example :=
+  @Solcore.SourceSemantics.checkedSignatureCatalogFacts_ofCheckProgram
+example :=
+  @Solcore.SourceSemantics.SignatureCatalogRemainingConditions.complete
+example := @Solcore.SourceSemantics.SignatureCatalogWellFormed.ofCheckProgram
 example := @Solcore.SourceSemantics.CheckedProgramWellFormedConditions
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.ofCheckLoadedProgram
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.ofCheckProgram
 example :=
+  @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.ofCheckProgramWithRemainingCatalog
+example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormed
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormedOfCheckLoadedProgram
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormedOfCheckProgram
+example :=
+  @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormedOfCheckProgramWithRemainingCatalog
 
 example := @Solcore.SourceSemantics.Dynamic.Value
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure
