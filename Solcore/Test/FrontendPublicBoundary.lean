@@ -518,6 +518,18 @@ example := @Solcore.Frontend.SourceInference.Detail.supportedIntegerTarget
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTableFrom
 example := @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTable
+example := @Solcore.Frontend.SourceInference.MatchPatternInstruction.binderIds
+example := @Solcore.Frontend.SourceInference.TypedMatchPattern.binderIds
+example := @Solcore.Frontend.SourceInference.ForItemForm.definedLocalIds
+example := @Solcore.Frontend.SourceInference.ExpressionForm.definedLocalIds
+example := @Solcore.Frontend.SourceInference.StatementForm.definedLocalIds
+example := @Solcore.Frontend.SourceInference.Node.definedLocalIds
+example := @Solcore.Frontend.SourceInference.TypedSource.definedLocalIds
+example := @Solcore.Frontend.SourceInference.Detail.localIdMember
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateLocalIdentitiesFrom
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceLocalIdentities
 example := @Solcore.Frontend.SourceInference.Detail.sourceContainsNodeId
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceRootsFrom
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceRoots
@@ -546,6 +558,10 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTable_success_nodesOwned
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTable_success_nodeOccurrencesUnique
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceLocalIdentities_success_unique
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceLocalIdentities_success_owned
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceRoots_success_rootsExist
 example :=
@@ -603,6 +619,8 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceGraph
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceLocalIdentities
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateIntegerLiteralLedger
 example :=

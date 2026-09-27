@@ -170,6 +170,19 @@ theorem validateSourceGraph_success_occurrenceGraphWellFormed
       simpa [ChildEdgesExist, nodeChildIds, nodeIds] using childEdges
   }
 
+/-- Executable local-identity validation establishes the declarative global
+binder ownership invariant over the same canonical source inventory. -/
+theorem validateSourceLocalIdentities_success_localIdentityOwnership
+    {source : TypedSource}
+    (success : Detail.validateSourceLocalIdentities source = .ok ()) :
+    LocalIdentityOwnership source := by
+  constructor
+  · simpa using
+      (Detail.validateSourceLocalIdentities_success_unique success)
+  · intro id member
+    exact Detail.validateSourceLocalIdentities_success_owned success id
+      (by simpa using member)
+
 private theorem lookupNodeId?_sound
     {source : TypedSource} {id : NodeId} {node : Node}
     (found : source.lookupNodeId? id = some node) :
@@ -301,6 +314,36 @@ theorem finalize_occurrenceGraphClosed
   rw [Detail.finalize_typedSource success]
   exact FlexibleSubstitution.OccurrenceGraphClosed.applySubstitution
     result.substitution inputClosed
+
+/-- Successful finalization validates every local definition before closing
+types, and final substitution preserves those stable identities exactly. -/
+theorem finalize_localIdentityOwnership
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty} {state : Frontend.SourceInference.State}
+    {roots : List NodeId} {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    LocalIdentityOwnership result.typedSource := by
+  rw [Detail.finalize_typedSource success]
+  exact FlexibleSubstitution.LocalIdentityOwnership.applySubstitution
+    result.substitution
+    (validateSourceLocalIdentities_success_localIdentityOwnership
+      (Detail.finalize_validateSourceLocalIdentities success))
+
+/-- Every successfully checked function body carries globally unique stable
+locals owned by that function declaration. -/
+theorem checkFunctionBody_success_localIdentityOwnership
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    LocalIdentityOwnership checked.typedBody := by
+  obtain ⟨_, _, _, _, _, _, _, finalizeSuccess, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  exact finalize_localIdentityOwnership finalizeSuccess
 
 /-- Every expression entry root supplied to successful finalization has a
 concrete expression node in the emitted source. -/

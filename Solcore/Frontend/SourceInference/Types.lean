@@ -99,6 +99,9 @@ inductive Error where
   | nodeOwnerMismatch
       (expected : Resolved.DeclarationId) (actual : OccurrenceId)
   | duplicateOccurrence (occurrence : OccurrenceId)
+  | localIdentityOwnerMismatch
+      (expected : Resolved.DeclarationId) (actual : Resolved.LocalId)
+  | duplicateLocalIdentity (id : Resolved.LocalId)
   | missingRoot (root : NodeId)
   | missingChild (parent child : NodeId)
   | duplicateIncomingNode (id : NodeId)

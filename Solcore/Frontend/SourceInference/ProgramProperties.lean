@@ -47,6 +47,11 @@ private theorem occurrenceId_contains_iff_mem
       simp only [List.contains_cons, List.mem_cons]
       rw [Bool.or_eq_true, occurrenceId_beq_iff_eq, induction]
 
+private theorem localIdMember_eq_true_iff
+    (ids : List Resolved.LocalId) (id : Resolved.LocalId) :
+    localIdMember ids id = true ↔ id ∈ ids := by
+  simp [localIdMember]
+
 private theorem nodeIdMember_eq_true_iff
     (ids : List NodeId) (id : NodeId) :
     nodeIdMember ids id = true ↔ id ∈ ids := by
@@ -119,6 +124,67 @@ theorem validateOccurrenceTable_success_nodeOccurrencesUnique
     (success : validateOccurrenceTable source = .ok ()) :
     (source.nodes.map Node.occurrenceId).Nodup := by
   exact (validateOccurrenceTableFrom_success success).2.1
+
+private theorem validateLocalIdentitiesFrom_success
+    {owner : Resolved.DeclarationId} {seen ids : List Resolved.LocalId}
+    (success : validateLocalIdentitiesFrom owner seen ids = .ok ()) :
+    ids.Nodup ∧
+      (∀ id, id ∈ ids → id.owner = owner) ∧
+      ∀ id, id ∈ ids → id ∉ seen := by
+  induction ids generalizing seen with
+  | nil => simp
+  | cons head tail induction =>
+      by_cases ownerEq : head.owner = owner
+      · have ownerMismatch : ¬ head.owner ≠ owner := by
+          simp [ownerEq]
+        cases duplicate : localIdMember seen head with
+        | true =>
+            simp [validateLocalIdentitiesFrom, ownerMismatch, duplicate,
+              bind, Except.bind] at success
+        | false =>
+            have headFresh : head ∉ seen := by
+              intro member
+              have contained : localIdMember seen head = true :=
+                (localIdMember_eq_true_iff seen head).mpr member
+              rw [duplicate] at contained
+              simp at contained
+            have tailSuccess :
+                validateLocalIdentitiesFrom owner (head :: seen) tail =
+                  .ok () := by
+              simpa [validateLocalIdentitiesFrom, ownerMismatch, duplicate,
+                bind, Except.bind] using success
+            obtain ⟨tailUnique, tailOwned, tailFresh⟩ := induction tailSuccess
+            refine ⟨?_, ?_, ?_⟩
+            · simp only [List.nodup_cons]
+              refine ⟨?_, tailUnique⟩
+              intro member
+              exact tailFresh head member (by simp)
+            · intro id member
+              rcases List.mem_cons.mp member with rfl | tailMember
+              · exact ownerEq
+              · exact tailOwned id tailMember
+            · intro id member seenMember
+              rcases List.mem_cons.mp member with rfl | tailMember
+              · exact headFresh seenMember
+              · exact tailFresh id tailMember (by simp [seenMember])
+      · have ownerMismatch : head.owner ≠ owner := ownerEq
+        simp [validateLocalIdentitiesFrom, ownerMismatch, bind, Except.bind]
+          at success
+
+/-- Successful local-identity validation proves global binder uniqueness. -/
+theorem validateSourceLocalIdentities_success_unique
+    {source : TypedSource}
+    (success : validateSourceLocalIdentities source = .ok ()) :
+    source.definedLocalIds.Nodup :=
+  (validateLocalIdentitiesFrom_success success).1
+
+/-- Successful local-identity validation proves declaration ownership for
+every retained binder. -/
+theorem validateSourceLocalIdentities_success_owned
+    {source : TypedSource}
+    (success : validateSourceLocalIdentities source = .ok ()) :
+    ∀ id, id ∈ source.definedLocalIds → id.owner = source.owner :=
+  (validateLocalIdentitiesFrom_success success).2.1
 
 private theorem validateSourceRootsFrom_success
     {source : TypedSource} {roots : List NodeId}
@@ -1129,55 +1195,66 @@ def finalize_success_witness
     | ok graphValue =>
         cases graphValue
         simp at graphResult ⊢
+  have localIdentityValidation :
+      validateSourceLocalIdentities (state.toTypedSource roots) = .ok () := by
+    cases localResult :
+        validateSourceLocalIdentities (state.toTypedSource roots) with
+    | error error =>
+        simp [graphValidation, localResult, bind, Except.bind] at success
+    | ok localValue =>
+        cases localValue
+        simp at localResult ⊢
   cases ledgerResult : validateIntegerLiteralLedger state with
   | error error =>
-      simp [graphValidation, ledgerResult, bind, Except.bind] at success
+      simp [graphValidation, localIdentityValidation, ledgerResult, bind,
+        Except.bind] at success
   | ok ledgerValue =>
       cases ledgerValue
       cases patternResult :
           defaultIntegerPatternTargets state.integerPatterns state with
       | error error =>
-          simp [graphValidation, ledgerResult, patternResult, bind,
-            Except.bind] at success
+          simp [graphValidation, localIdentityValidation, ledgerResult,
+            patternResult, bind, Except.bind] at success
       | ok patternState =>
           cases literalResult :
               defaultIntegerLiteralTargets patternState.integerLiterals
                 patternState with
           | error error =>
-              simp [graphValidation, ledgerResult, patternResult,
-                literalResult, bind, Except.bind] at success
+              simp [graphValidation, localIdentityValidation, ledgerResult,
+                patternResult, literalResult, bind, Except.bind] at success
           | ok finalState =>
               cases patternValidationResult :
                   validateIntegerPatternTargets finalState
                     finalState.integerPatterns with
               | error error =>
-                  simp [graphValidation, ledgerResult, patternResult,
-                    literalResult, patternValidationResult, bind,
-                    Except.bind] at success
+                  simp [graphValidation, localIdentityValidation, ledgerResult,
+                    patternResult, literalResult, patternValidationResult,
+                    bind, Except.bind] at success
               | ok patternValidation =>
                   cases patternValidation
                   cases literalValidationResult :
                       validateIntegerLiteralTargets finalState
                         finalState.integerLiterals with
                   | error error =>
-                      simp [graphValidation, ledgerResult, patternResult,
-                        literalResult, patternValidationResult,
-                        literalValidationResult, bind, Except.bind] at success
+                      simp [graphValidation, localIdentityValidation,
+                        ledgerResult, patternResult, literalResult,
+                        patternValidationResult, literalValidationResult, bind,
+                        Except.bind] at success
                   | ok literalValidation =>
                       cases literalValidation
                       cases requirementsResult :
                           solveRequirements context finalState
                             finalState.requirements with
                       | error error =>
-                          simp [graphValidation, ledgerResult, patternResult,
-                            literalResult, patternValidationResult,
-                            literalValidationResult, requirementsResult, bind,
-                            Except.bind] at success
+                          simp [graphValidation, localIdentityValidation,
+                            ledgerResult, patternResult, literalResult,
+                            patternValidationResult, literalValidationResult,
+                            requirementsResult, bind, Except.bind] at success
                       | ok requirements =>
-                          simp [graphValidation, ledgerResult, patternResult,
-                            literalResult, patternValidationResult,
-                            literalValidationResult, requirementsResult, bind,
-                            Except.bind] at success
+                          simp [graphValidation, localIdentityValidation,
+                            ledgerResult, patternResult, literalResult,
+                            patternValidationResult, literalValidationResult,
+                            requirementsResult, bind, Except.bind] at success
                           cases success
                           exact {
                             patternState
@@ -1201,6 +1278,26 @@ theorem finalize_validateSourceGraph
     (success : finalize context type state roots = .ok result) :
     validateSourceGraph (state.toTypedSource roots) = .ok () := by
   exact (finalize_success_witness success).graphValidation
+
+/-- Successful finalization includes successful ownership and global
+uniqueness validation for its input local binders. -/
+theorem finalize_validateSourceLocalIdentities
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    validateSourceLocalIdentities (state.toTypedSource roots) = .ok () := by
+  unfold finalize at success
+  cases graphResult : validateSourceGraph (state.toTypedSource roots) with
+  | error error => simp [graphResult, bind, Except.bind] at success
+  | ok graphValue =>
+      cases graphValue
+      cases localResult :
+          validateSourceLocalIdentities (state.toTypedSource roots) with
+      | error error =>
+          simp [graphResult, localResult, bind, Except.bind] at success
+      | ok localValue =>
+          cases localValue
+          rfl
 
 /-- Successful finalization includes successful validation of its input
 integer-literal ledger. -/

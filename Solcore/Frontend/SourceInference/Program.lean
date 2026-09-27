@@ -28,6 +28,27 @@ typed source's heterogeneous node table. -/
 def validateOccurrenceTable (source : TypedSource) : Except Error Unit :=
   validateOccurrenceTableFrom source.owner [] source.nodes
 
+/-- Executable membership for declaration-local binder identities. -/
+def localIdMember (ids : List Resolved.LocalId) (id : Resolved.LocalId) : Bool :=
+  ids.any fun candidate => decide (candidate = id)
+
+/-- Validate declaration ownership and global uniqueness for the canonical
+local-definition inventory while accumulating identities already seen. -/
+def validateLocalIdentitiesFrom (owner : Resolved.DeclarationId) :
+    List Resolved.LocalId → List Resolved.LocalId → Except Error Unit
+  | _, [] => .ok ()
+  | seen, id :: rest => do
+      if _ownerMismatch : id.owner ≠ owner then
+        throw (.localIdentityOwnerMismatch owner id)
+      if localIdMember seen id then
+        throw (.duplicateLocalIdentity id)
+      validateLocalIdentitiesFrom owner (id :: seen) rest
+
+/-- Validate every declaration input and source-node binder in one shared
+stable-identity namespace. -/
+def validateSourceLocalIdentities (source : TypedSource) : Except Error Unit :=
+  validateLocalIdentitiesFrom source.owner [] source.definedLocalIds
+
 /-- Whether the table contains a node at the exact category-preserving ID. -/
 def sourceContainsNodeId (source : TypedSource) (id : NodeId) : Bool :=
   source.nodes.any fun node => decide (node.id = id)
@@ -241,6 +262,7 @@ def finalize (context : Context) (type : Ty) (state : State)
     (roots : List NodeId) :
     Except Error Result := do
   validateSourceGraph (state.toTypedSource roots)
+  validateSourceLocalIdentities (state.toTypedSource roots)
   validateIntegerLiteralLedger state
   let state ← defaultIntegerPatternTargets state.integerPatterns state
   let state ← defaultIntegerLiteralTargets state.integerLiterals state

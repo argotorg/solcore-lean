@@ -817,6 +817,64 @@ def applySubstitution (substitution : Substitution)
 
 end StatementNode
 
+namespace MatchPatternInstruction
+
+/-- Binder identities introduced by a flat pattern instruction stream. -/
+def binderIds (instructions : List MatchPatternInstruction) :
+    List Resolved.LocalId :=
+  instructions.filterMap fun instruction =>
+    match instruction with
+    | .binder selectedBinder => some selectedBinder.id
+    | _ => none
+
+end MatchPatternInstruction
+
+namespace TypedMatchPattern
+
+/-- Binder identities introduced by a resolved pattern root and its flat
+children. -/
+def binderIds (pattern : TypedMatchPattern) : List Resolved.LocalId :=
+  match pattern.resolution with
+  | .wildcard | .integerLiteral .. => []
+  | .binder selectedBinder => [selectedBinder.id]
+  | .constructor _ arguments | .tuple arguments =>
+      MatchPatternInstruction.binderIds arguments
+
+end TypedMatchPattern
+
+namespace ForItemForm
+
+/-- Local definitions retained directly by one `for` header item. -/
+def definedLocalIds : ForItemForm → List Resolved.LocalId
+  | .letDecl selectedBinder _ => [selectedBinder.id]
+  | .expression _ | .assignValue .. | .assignBitNot _ => []
+
+end ForItemForm
+
+namespace ExpressionForm
+
+/-- Local definitions retained directly by one expression form. -/
+def definedLocalIds : ExpressionForm → List Resolved.LocalId
+  | .lambda parameters _ _ => parameters.map (fun binder => binder.id)
+  | _ => []
+
+end ExpressionForm
+
+namespace StatementForm
+
+/-- Local definitions retained directly by one statement form. -/
+def definedLocalIds : StatementForm → List Resolved.LocalId
+  | .letDecl selectedBinder _ => [selectedBinder.id]
+  | .matchWith resolution =>
+      resolution.hiddenScrutinee ::
+        resolution.cases.flatMap fun matchCase => matchCase.pattern.binderIds
+  | .forLoop initializer _ post _ =>
+      initializer.flatMap ForItemForm.definedLocalIds ++
+        post.flatMap ForItemForm.definedLocalIds
+  | _ => []
+
+end StatementForm
+
 namespace Node
 
 /-- Recover the category-preserving identity stored by one node. -/
@@ -832,9 +890,23 @@ def applySubstitution (substitution : Substitution) : Node → Node
   | .expression node => .expression (node.applySubstitution substitution)
   | .statement node => .statement (node.applySubstitution substitution)
 
+/-- Local binders introduced directly by one heterogeneous source node.
+Nested statement and expression bodies are represented by their own table
+nodes and are therefore counted when those nodes are visited. -/
+def definedLocalIds : Node → List Resolved.LocalId
+  | .expression node => node.form.definedLocalIds
+  | .statement node => node.form.definedLocalIds
+
 end Node
 
 namespace TypedSource
+
+/-- Stable local definitions in declaration-input and node-table order.  This
+is the canonical executable inventory used by finalization and mirrored by
+the declarative ownership judgment. -/
+def definedLocalIds (source : TypedSource) : List Resolved.LocalId :=
+  source.inputs.map (fun binder => binder.id) ++
+    source.nodes.flatMap Node.definedLocalIds
 
 /-- Declaration entries and direct child slots, retaining expression/statement
 categories.  A closed occurrence forest names every retained node exactly once

@@ -68,6 +68,65 @@ def definedLocalIds (source : TypedSource) : List Resolved.LocalId :=
     | .expression expression => expressionDefinedLocalIds expression.form
     | .statement statement => statementDefinedLocalIds statement.form
 
+/-- The executable carrier and the declarative semantics use one exact local
+definition inventory.  The source-semantics helper names remain public for
+proof readability, while finalization consumes the canonical carrier view. -/
+@[simp] theorem patternInstructionBinderIds_eq_carrier
+    (instructions : List MatchPatternInstruction) :
+    MatchPatternInstruction.binderIds instructions =
+      patternInstructionBinderIds instructions := by
+  rfl
+
+@[simp] theorem patternBinderIds_eq_carrier (pattern : TypedMatchPattern) :
+    pattern.binderIds = patternBinderIds pattern := by
+  cases pattern with
+  | mk source type resolution requirements =>
+      cases resolution <;> rfl
+
+@[simp] theorem forItemDefinedLocalIds_eq_carrier (item : ForItemForm) :
+    item.definedLocalIds = forItemDefinedLocalIds item := by
+  cases item <;> rfl
+
+@[simp] theorem flatMapForItemDefinedLocalIds_eq_carrier
+    (items : List ForItemForm) :
+    items.flatMap ForItemForm.definedLocalIds =
+      items.flatMap forItemDefinedLocalIds := by
+  induction items with
+  | nil => rfl
+  | cons item rest induction => simp [induction]
+
+@[simp] theorem expressionDefinedLocalIds_eq_carrier (form : ExpressionForm) :
+    form.definedLocalIds = expressionDefinedLocalIds form := by
+  cases form <;> rfl
+
+@[simp] theorem statementDefinedLocalIds_eq_carrier (form : StatementForm) :
+    form.definedLocalIds = statementDefinedLocalIds form := by
+  cases form <;> simp [StatementForm.definedLocalIds,
+    statementDefinedLocalIds]
+
+@[simp] theorem nodeDefinedLocalIds_eq_carrier (node : Node) :
+    node.definedLocalIds =
+      match node with
+      | .expression expression => expressionDefinedLocalIds expression.form
+      | .statement statement => statementDefinedLocalIds statement.form := by
+  cases node <;> simp [Node.definedLocalIds]
+
+@[simp] theorem flatMapNodeDefinedLocalIds_eq_carrier (nodes : List Node) :
+    nodes.flatMap Node.definedLocalIds =
+      nodes.flatMap (fun node =>
+        match node with
+        | .expression expression => expressionDefinedLocalIds expression.form
+        | .statement statement => statementDefinedLocalIds statement.form) := by
+  induction nodes with
+  | nil => rfl
+  | cons node rest induction => simp [induction]
+
+/-- The canonical executable inventory is definitionally aligned with the
+declarative ownership inventory. -/
+@[simp] theorem typedSourceDefinedLocalIds_eq_carrier (source : TypedSource) :
+    source.definedLocalIds = definedLocalIds source := by
+  simp [TypedSource.definedLocalIds, definedLocalIds]
+
 /-- One initialized lexical `let`, retaining both the complete binder metadata
 and the root of its initializer subtree.  Lambda parameters, declaration
 inputs, patterns, and uninitialized lets deliberately do not inhabit this
