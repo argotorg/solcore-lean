@@ -180,6 +180,14 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
 example := @Solcore.Frontend.SourceInference.Detail.unify_preserves_resolve_eq
 example :=
+  @Solcore.Frontend.SourceInference.Detail.localFunctionsNamed_subset_catalog
+example :=
+  @Solcore.Frontend.SourceInference.Detail.signaturesForDeclarations_subset_catalog
+example :=
+  @Solcore.Frontend.SourceInference.Detail.functionsNamed_success_subset_catalog
+example :=
+  @Solcore.Frontend.SourceInference.Detail.qualifiedFunctionsNamed_success_subset_catalog
+example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_requirementsWellFormed

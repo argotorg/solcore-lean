@@ -120,6 +120,56 @@ theorem selectFunctionCandidateFrom_declarationApplicationValid
   exact tryFunctionCandidate_declarationApplicationValid catalog binders
     residual (candidates_subset member) candidateSuccess
 
+/-- Ordinary unqualified overload selection inherits the same declarative
+application guarantee because successful visible-name lookup returns only
+members of the inference catalog.  Catalog equality transports that origin
+to the semantic context used by source typing. -/
+theorem selectFunctionCandidate_declarationApplicationValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {name : String} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {result : Detail.CandidateAttemptResult}
+    {semanticContext : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (binders : TypeParameterBindersWellFormed semanticContext)
+    (residual : semanticContext.residualTypeVariables = true)
+    (signatures_eq : semanticContext.signatures =
+      inferenceContext.signatures)
+    (success : Detail.selectFunctionCandidate inferenceContext name arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    ∃ signature, signature ∈ semanticContext.signatures.functions ∧
+      DeclarationApplicationValid semanticContext result.instantiation
+        (signature.parameterTypes.map
+          (TypeSystem.ParameterSubstitution.apply
+            (signature.scheme.instantiate
+              state.inference.next).parameterSubstitution))
+        ((signature.scheme.instantiate state.inference.next)
+          |>.parameterSubstitution.apply
+            (TypeSystem.Ty.productMany signature.returnTypes))
+        (signature.scheme.instantiate state.inference.next).predicates := by
+  unfold Detail.selectFunctionCandidate at success
+  cases candidatesResult : Detail.functionsNamed inferenceContext name with
+  | error error =>
+      simp [candidatesResult, bind, Except.bind] at success
+  | ok candidates =>
+      have selection : Detail.selectFunctionCandidateFrom inferenceContext
+          name candidates arguments integerLiteralOrigins call expected state =
+          .ok result := by
+        simpa [candidatesResult, bind, Except.bind] using success
+      have inferenceSubset :=
+        Detail.functionsNamed_success_subset_catalog candidatesResult
+      have semanticSubset : candidates ⊆
+          semanticContext.signatures.functions := by
+        intro signature member
+        rw [signatures_eq]
+        exact inferenceSubset member
+      obtain ⟨signature, member, valid⟩ :=
+        selectFunctionCandidateFrom_declarationApplicationValid catalog
+          binders residual semanticSubset selection
+      exact ⟨signature, semanticSubset member, valid⟩
+
 private theorem requirementId_beq_iff_eq
     (left right : RequirementId) :
     (left == right) = true ↔ left = right := by

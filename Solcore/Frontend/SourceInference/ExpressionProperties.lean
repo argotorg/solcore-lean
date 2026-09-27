@@ -12,6 +12,81 @@ namespace Solcore.Frontend.SourceInference.Detail
 
 open TypeSystem
 
+/-- Module-local name filtering never invents function signatures outside
+the whole-program catalog. -/
+theorem localFunctionsNamed_subset_catalog (context : Context) (name : String) :
+    localFunctionsNamed context name ⊆ context.signatures.functions := by
+  intro signature member
+  exact (List.mem_filter.mp member).1
+
+/-- Resolving visible declarations back to function signatures only retains
+entries found in the whole-program function catalog. -/
+theorem signaturesForDeclarations_subset_catalog (context : Context)
+    (declarations : List ProgramDeclaration) :
+    signaturesForDeclarations context declarations ⊆
+      context.signatures.functions := by
+  intro signature member
+  simp only [signaturesForDeclarations, List.mem_filterMap] at member
+  obtain ⟨declaration, _, found⟩ := member
+  exact List.mem_of_find?_eq_some found
+
+/-- Every successful unqualified function lookup returns only cataloged
+function signatures, whether it chose the local tier or imported visibility. -/
+theorem functionsNamed_success_subset_catalog
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    (success : functionsNamed context name = .ok candidates) :
+    candidates ⊆ context.signatures.functions := by
+  by_cases localEmpty : localFunctionsNamed context name = []
+  · cases imported : buildProgramImports context.environment
+      context.scope.currentModule with
+    | error errors =>
+        simp [functionsNamed, localEmpty, imported] at success
+    | ok visibility =>
+        simp [functionsNamed, localEmpty, imported] at success
+        subst candidates
+        exact signaturesForDeclarations_subset_catalog context
+          (visibility.valuesNamed name)
+  · simp [functionsNamed, localEmpty] at success
+    subst candidates
+    exact localFunctionsNamed_subset_catalog context name
+
+/-- A successful qualified lookup which resolves to a concrete candidate list
+returns only signatures found in the whole-program function catalog.  A known
+namespace with no matching value is represented by the empty subset. -/
+theorem qualifiedFunctionsNamed_success_subset_catalog
+    {context : Context} {namespacePath : List String} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    (success : qualifiedFunctionsNamed context namespacePath name =
+      .ok (some candidates)) :
+    candidates ⊆ context.signatures.functions := by
+  cases imported : buildProgramImports context.environment
+      context.scope.currentModule with
+  | error errors =>
+      simp [qualifiedFunctionsNamed, imported] at success
+  | ok visibility =>
+      cases root : visibility.hasNamespaceRoot namespacePath with
+      | false =>
+          simp [qualifiedFunctionsNamed, imported, root] at success
+      | true =>
+          cases targets : visibility.namespacePathTargets namespacePath with
+          | nil =>
+              simp [qualifiedFunctionsNamed, imported, root, targets]
+                at success
+              subst candidates
+              simp
+          | cons target rest =>
+              cases rest with
+              | nil =>
+                  simp [qualifiedFunctionsNamed, imported, root, targets]
+                    at success
+                  subst candidates
+                  exact signaturesForDeclarations_subset_catalog context
+                    (visibility.valuesInNamespacePathNamed namespacePath name)
+              | cons second tail =>
+                  simp [qualifiedFunctionsNamed, imported, root, targets]
+                    at success
+
 /-- A successfully resolved source annotation contains no flexible
 metavariables, so every inference substitution fixes it. -/
 theorem resolveSourceType_success_apply_eq_self
