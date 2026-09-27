@@ -723,6 +723,40 @@ theorem productMany
           exact product (each head (by simp))
             (induction fun type member => each type (by simp [member]))
 
+/-- Every fixed parameter type of a compiler-provided builtin function is
+admissible in any context with well-formed rigid binders. -/
+theorem builtinFunctionParameter
+    {context : Context} (binders : TypeParameterBindersWellFormed context)
+    (function : Frontend.BuiltinFunctionId) {type : TypeSystem.Ty}
+    (member : type ∈ function.parameterTypes) :
+    TypeAdmissible context type := by
+  cases function <;>
+    simp [Frontend.BuiltinFunctionId.parameterTypes] at member
+  all_goals subst type
+  all_goals first | exact integer binders | exact word binders
+
+/-- Every fixed result type of a compiler-provided builtin function is
+admissible. -/
+theorem builtinFunctionResult
+    {context : Context} (binders : TypeParameterBindersWellFormed context)
+    (function : Frontend.BuiltinFunctionId) :
+    TypeAdmissible context function.returnType := by
+  cases function <;>
+    simp [Frontend.BuiltinFunctionId.returnType] <;>
+    first | exact integer binders | exact word binders | exact bool binders
+
+/-- The complete monomorphic type advertised by every compiler-provided
+function is admissible. -/
+theorem builtinFunction
+    {context : Context} (binders : TypeParameterBindersWellFormed context)
+    (builtinFunction : Frontend.BuiltinFunctionId) :
+    TypeAdmissible context builtinFunction.type := by
+  unfold Frontend.BuiltinFunctionId.type
+  exact function
+    (productMany binders fun type member =>
+      builtinFunctionParameter binders builtinFunction member)
+    (builtinFunctionResult binders builtinFunction)
+
 theorem ofWellFormed {context : Context} {type : TypeSystem.Ty}
     (wellFormed : TypeWellFormed context type) :
     TypeAdmissible context type := {
