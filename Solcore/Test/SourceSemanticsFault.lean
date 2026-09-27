@@ -189,6 +189,31 @@ example (context : SourceSemantics.Context)
     False :=
   produces.excludes_fault unique fault
 
+/-- A well-formed requirement ledger and valid caller dictionary classify each
+stable identity as either materializable or concretely unavailable. -/
+example (context : SourceSemantics.Context)
+    (environment : EvidenceEnvironment) (id : RequirementId)
+    (ledger : RequirementLedgerWellFormed context)
+    (valid : environment.Valid context.signatures.resolutionRules) :
+    (∃ predicate evidence,
+      RequirementProducesEvidence context environment id predicate evidence) ∨
+      RequirementUnavailable context environment id :=
+  requirement_produces_or_unavailable ledger valid id
+
+/-- Static requirement sequence validity plus a covering dictionary is enough
+to materialize the exact ordered runtime evidence environment. -/
+example (context : SourceSemantics.Context)
+    (environment : EvidenceEnvironment)
+    (requirements : List RequirementId)
+    (predicates : List ProgramPredicate)
+    (covers : environment.Covers context)
+    (proves : RequirementSequenceProves context requirements predicates) :
+    ∃ produced,
+      RequirementsProduceEnvironment context environment requirements
+        predicates produced :=
+  SourceSemantics.Dynamic.RequirementSequenceProves.produces_of_covers
+    covers proves
+
 /-- A malformed pattern is an explicit metadata fault, not a failed match. -/
 example (context : SourceSemantics.Context) (value : Value)
     (arm : TypedMatchCase) (rest : List TypedMatchCase)

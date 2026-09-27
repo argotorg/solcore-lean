@@ -345,6 +345,20 @@ end
 def RequirementMissing (context : Context) (id : RequirementId) : Prop :=
   ∀ requirement, requirement ∈ context.solvedRequirements → requirement.id ≠ id
 
+/-- Every stable requirement identity either selects a retained ledger row or
+is constructively absent from the ledger. -/
+theorem requirement_contains_or_missing
+    (context : Context) (id : RequirementId) :
+    (∃ requirement, ContainsRequirement context id requirement) ∨
+      RequirementMissing context id := by
+  classical
+  by_cases contains : ∃ requirement,
+      ContainsRequirement context id requirement
+  · exact .inl contains
+  · right
+    intro requirement member equal
+    exact contains ⟨requirement, member, equal⟩
+
 /-- A requirement has a concrete structural reason it cannot close. -/
 inductive RequirementUnavailable (context : Context)
     (environment : EvidenceEnvironment) : RequirementId → Prop where
@@ -462,6 +476,89 @@ theorem excludes_list_fault
       | tail _ tailFault => exact induction tailFault
 
 end RequirementsProduceEnvironment
+
+/-- A valid retained ledger row either closes to concrete assumption-free
+evidence or exposes the exact structural reason why it is unavailable in the
+caller dictionary. -/
+theorem requirement_produces_or_unavailable
+    {context : Context} {environment : EvidenceEnvironment}
+    (ledger : RequirementLedgerWellFormed context)
+    (environmentValid : environment.Valid
+      context.signatures.resolutionRules)
+    (id : RequirementId) :
+    (∃ predicate evidence,
+      RequirementProducesEvidence context environment id predicate evidence) ∨
+      RequirementUnavailable context environment id := by
+  rcases requirement_contains_or_missing context id with
+    ⟨requirement, contains⟩ | missing
+  · have retained_valid := ledger.entriesValid requirement contains.1
+    cases retained_valid with
+    | intro evidence_valid =>
+        cases evidence_valid with
+        | intro representation open_valid =>
+            rcases EvidenceCloses.exists_or_fault environment _ with
+              ⟨closedEvidence, closes⟩ | fault
+            · left
+              exact ⟨requirement.predicate, closedEvidence,
+                .intro contains rfl representation
+                  (.intro (.intro representation open_valid)) closes
+                  (closes.preserves_valid environmentValid open_valid)⟩
+            · exact .inr (.evidence contains representation fault)
+  · exact .inr (.missing missing)
+
+/-- Closing an arbitrary identity sequence either constructs its ordered
+predicate/evidence environment or records the first unavailable identity. -/
+theorem requirements_produce_or_list_fault
+    {context : Context} {environment : EvidenceEnvironment}
+    (ledger : RequirementLedgerWellFormed context)
+    (environmentValid : environment.Valid
+      context.signatures.resolutionRules)
+    (requirements : List RequirementId) :
+    (∃ predicates producedEnvironment,
+      RequirementsProduceEnvironment context environment requirements
+        predicates producedEnvironment) ∨
+      ∃ failed, RequirementListFaults context environment requirements failed := by
+  induction requirements with
+  | nil => exact .inl ⟨[], [], .nil⟩
+  | cons id ids induction =>
+      rcases requirement_produces_or_unavailable ledger environmentValid id with
+        ⟨predicate, evidence, head⟩ | unavailable
+      · rcases induction with
+          ⟨predicates, producedEnvironment, tail⟩ | ⟨failed, fault⟩
+        · exact .inl ⟨predicate :: predicates,
+            (predicate, evidence) :: producedEnvironment, .cons head tail⟩
+        · exact .inr ⟨failed, .tail head fault⟩
+      · exact .inr ⟨id, .head unavailable⟩
+
+/-- A statically proved paired requirement spine either closes to its exact
+predicate-indexed environment or faults at its first unavailable identity. -/
+theorem requirements_produce_or_fault
+    {context : Context} {environment : EvidenceEnvironment}
+    (ledger : RequirementLedgerWellFormed context)
+    (environmentValid : environment.Valid
+      context.signatures.resolutionRules)
+    {requirements : List RequirementId}
+    {predicates : List ProgramPredicate}
+    (proves : RequirementSequenceProves context requirements predicates) :
+    (∃ producedEnvironment,
+      RequirementsProduceEnvironment context environment requirements
+        predicates producedEnvironment) ∨
+      ∃ failed,
+        RequirementsFault context environment requirements predicates failed := by
+  induction proves with
+  | nil => exact .inl ⟨[], .nil⟩
+  | @cons id predicate ids predicates head tail induction =>
+      rcases requirement_produces_or_unavailable ledger environmentValid id with
+        ⟨actualPredicate, evidence, produces⟩ | unavailable
+      · have predicate_eq : actualPredicate = predicate :=
+          ledger.idsUnique.proves_predicate_eq produces.requirement_valid head
+        subst actualPredicate
+        rcases induction with
+          ⟨producedEnvironment, tailProduces⟩ | ⟨failed, tailFault⟩
+        · exact .inl ⟨(predicate, evidence) :: producedEnvironment,
+            .cons produces tailProduces⟩
+        · exact .inr ⟨failed, .tail produces tailFault⟩
+      · exact .inr ⟨id, .head unavailable⟩
 
 /-- Canonical shallow runtime type of every mathematical source value. -/
 inductive ValueRuntimeType : Value → Ty → Prop where

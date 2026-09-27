@@ -601,6 +601,56 @@ inductive RequirementsProduceEnvironment
         (id :: ids) (predicate :: predicates)
         ((predicate, evidence) :: environment)
 
+namespace RequirementProves
+
+/-- A context-covering caller dictionary materializes every statically valid
+requirement as closed runtime evidence for its exact predicate. -/
+theorem produces_of_covers
+    {context : Context} {environment : EvidenceEnvironment}
+    {id : RequirementId} {predicate : ProgramPredicate}
+    (covers : environment.Covers context)
+    (proves : RequirementProves context id predicate) :
+    ∃ closedEvidence,
+      RequirementProducesEvidence context environment id predicate
+        closedEvidence := by
+  rcases proves with
+    ⟨requirement, contains, predicate_eq, retained_valid⟩
+  have retained_valid' := retained_valid
+  cases retained_valid' with
+  | intro evidence_valid =>
+      cases evidence_valid with
+      | intro representation open_valid =>
+          rcases EvidenceValid.close_of_covers covers open_valid with
+            ⟨closedEvidence, closes, closed_valid⟩
+          exact ⟨closedEvidence,
+            .intro contains predicate_eq representation retained_valid closes
+              (by simpa [predicate_eq] using closed_valid)⟩
+
+end RequirementProves
+
+namespace RequirementSequenceProves
+
+/-- A context-covering caller dictionary materializes an exact static
+requirement sequence into a source-ordered runtime dictionary. -/
+theorem produces_of_covers
+    {context : Context} {callerEnvironment : EvidenceEnvironment}
+    {ids : List RequirementId} {predicates : List ProgramPredicate}
+    (covers : callerEnvironment.Covers context)
+    (proves : RequirementSequenceProves context ids predicates) :
+    ∃ producedEnvironment,
+      RequirementsProduceEnvironment context callerEnvironment ids predicates
+        producedEnvironment := by
+  induction proves with
+  | nil => exact ⟨[], .nil⟩
+  | @cons id predicate ids predicates head tail induction =>
+      rcases RequirementProves.produces_of_covers covers head with
+        ⟨closedEvidence, headProduces⟩
+      rcases induction with ⟨tailEnvironment, tailProduces⟩
+      exact ⟨(predicate, closedEvidence) :: tailEnvironment,
+        .cons headProduces tailProduces⟩
+
+end RequirementSequenceProves
+
 namespace RequirementsProduceEnvironment
 
 theorem length_eq
