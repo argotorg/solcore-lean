@@ -237,6 +237,64 @@ theorem tryFunctionCandidate_declarationApplicationValid
     StructuralSubstitution.apply_function,
     StructuralSubstitution.apply_productMany]
 
+/-- Fresh generic instantiation preserves admissibility of every function
+parameter exposed to argument fitting. -/
+theorem instantiatedFunctionParameterTypesAdmissible
+    {semanticContext : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (binders : TypeParameterBindersWellFormed semanticContext)
+    (residual : semanticContext.residualTypeVariables = true)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ semanticContext.signatures.functions)
+    (next : Nat) :
+    ∀ type, type ∈ signature.parameterTypes.map
+        (TypeSystem.ParameterSubstitution.apply
+          (signature.scheme.instantiate next).parameterSubstitution) →
+      TypeAdmissible semanticContext type := by
+  intro type typeMember
+  rcases List.mem_map.mp typeMember with ⟨rawType, rawMember, rfl⟩
+  have signatureWellFormed := catalog.functions_semantic signature member
+  exact StructuralSubstitution.TypeWellScoped.applyParametersAdmissibleTo
+    (source := signatureContext semanticContext.signatures signature.id
+      signature.scheme.parameters signature.scheme.predicates)
+    (target := semanticContext)
+    (signature.scheme.instantiate next).parameterSubstitution
+    (DeclarationInstantiation.instantiate_parameterSubstitution_exact
+      signature.scheme next
+      (catalog.function_parameters signature member).1)
+    (DeclarationInstantiation.instantiate_parameterSubstitution_rangeAdmissible
+      binders residual signature.scheme next)
+    rfl binders (signatureWellFormed.parameter_types rawType rawMember).typeWellScoped
+
+/-- The bundled result of a fresh generic function instantiation is
+admissible before overload-result or contextual coercions are attached. -/
+theorem instantiatedFunctionResultTypeAdmissible
+    {semanticContext : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (binders : TypeParameterBindersWellFormed semanticContext)
+    (residual : semanticContext.residualTypeVariables = true)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ semanticContext.signatures.functions)
+    (next : Nat) :
+    TypeAdmissible semanticContext
+      ((signature.scheme.instantiate next).parameterSubstitution.apply
+        (TypeSystem.Ty.productMany signature.returnTypes)) := by
+  have signatureWellFormed := catalog.functions_semantic signature member
+  exact StructuralSubstitution.TypeWellScoped.applyParametersAdmissibleTo
+    (source := signatureContext semanticContext.signatures signature.id
+      signature.scheme.parameters signature.scheme.predicates)
+    (target := semanticContext)
+    (signature.scheme.instantiate next).parameterSubstitution
+    (DeclarationInstantiation.instantiate_parameterSubstitution_exact
+      signature.scheme next
+      (catalog.function_parameters signature member).1)
+    (DeclarationInstantiation.instantiate_parameterSubstitution_rangeAdmissible
+      binders residual signature.scheme next)
+    rfl binders
+    (StructuralSubstitution.TypesWellScoped.productMany
+      (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+        signatureWellFormed.return_types))
+
 /-- A successful overload selection comes from one semantic-catalog member
 in the supplied candidate list and retains that member's exact declarative
 application profile.  This theorem intentionally forgets ranking optimality;
