@@ -561,6 +561,24 @@ theorem solveRequirements_requirementIdsValid
     ⟨by simpa [solved_eq] using rowMember, idEq⟩, predicateEq,
     valid row rowMember⟩
 
+/-- Any occurrence-owned identity subset of a successfully solved input
+ledger is independently valid in the corresponding declarative context. -/
+theorem solveRequirements_requirementIdsValid_of_subset
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    {ids : List RequirementId}
+    (included : ids ⊆ requirements.map (·.id))
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    RequirementIdsValid semanticContext ids :=
+  RequirementIdsValid.of_subset included
+    (solveRequirements_requirementIdsValid success solved_eq valid)
+
 /-- A source-ordered predicate/identity correspondence into a successfully
 solved final ledger supplies the declarative evidence sequence for exactly
 those normalized predicates. -/

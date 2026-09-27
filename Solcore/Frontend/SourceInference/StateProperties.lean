@@ -6,6 +6,14 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend.SourceInference.State
 
+/-- Every recorded source node was allocated strictly before the next
+declaration-local occurrence identity.  This is the minimal freshness fact
+needed to distinguish a traversal's pre-existing nodes from nodes allocated by
+that traversal. -/
+def NodesBelowNextOccurrence (state : State) : Prop :=
+  ∀ node ∈ state.nodes,
+    node.occurrenceId.index < state.nextOccurrence
+
 private theorem map_mapIdx {α β γ : Type} (items : List α)
     (indexed : Nat → α → β)
     (project : β → γ) :
@@ -79,19 +87,50 @@ theorem initial_input_comptime_eq (owner : Resolved.DeclarationId)
     } := by
   rfl
 
+/-- An initial inference state has no recorded occurrence nodes. -/
+theorem initial_nodesBelowNextOccurrence (owner : Resolved.DeclarationId)
+    (locals : TypeSystem.Environment) (inputComptime : List Bool) :
+    (initial owner locals inputComptime).NodesBelowNextOccurrence := by
+  intro node member
+  simp [initial] at member
+
 @[simp] theorem fresh_header (state : State) :
     state.fresh.2.header = state.header := by
   rfl
+
+/-- Allocating a type metavariable leaves the occurrence stream unchanged. -/
+theorem fresh_preserves_nodesBelowNextOccurrence
+    (state : State) (below : state.NodesBelowNextOccurrence) :
+    state.fresh.2.NodesBelowNextOccurrence := by
+  change state.NodesBelowNextOccurrence
+  exact below
 
 @[simp] theorem withLocals_header (state : State)
     (locals : TypeSystem.Environment) :
     (state.withLocals locals).header = state.header := by
   rfl
 
+/-- Replacing the compatibility-only local environment does not affect
+occurrence allocation. -/
+theorem withLocals_preserves_nodesBelowNextOccurrence
+    (state : State) (locals : TypeSystem.Environment)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.withLocals locals).NodesBelowNextOccurrence := by
+  change state.NodesBelowNextOccurrence
+  exact below
+
 @[simp] theorem restoreLexicalScope_header (state : State)
     (scope : LexicalScope) :
     (state.restoreLexicalScope scope).header = state.header := by
   rfl
+
+/-- Restoring lexical names preserves all globally allocated occurrences. -/
+theorem restoreLexicalScope_preserves_nodesBelowNextOccurrence
+    (state : State) (scope : LexicalScope)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.restoreLexicalScope scope).NodesBelowNextOccurrence := by
+  change state.NodesBelowNextOccurrence
+  exact below
 
 @[simp] theorem allocateBinder_header (state : State) (name : String)
     (scheme : TypeSystem.Scheme) (span : Option Syntax.SourceSpan)
@@ -100,36 +139,172 @@ theorem initial_input_comptime_eq (owner : Resolved.DeclarationId)
       state.header := by
   rfl
 
+/-- Allocating a visible local binder does not affect occurrence allocation. -/
+theorem allocateBinder_preserves_nodesBelowNextOccurrence
+    (state : State) (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.allocateBinder name scheme span comptime schemeRequirements).2
+      |>.NodesBelowNextOccurrence := by
+  change state.NodesBelowNextOccurrence
+  exact below
+
 @[simp] theorem allocateHiddenLocal_header (state : State) :
     state.allocateHiddenLocal.2.header = state.header := by
   rfl
+
+/-- Reserving a hidden local identity does not affect occurrence allocation. -/
+theorem allocateHiddenLocal_preserves_nodesBelowNextOccurrence
+    (state : State) (below : state.NodesBelowNextOccurrence) :
+    state.allocateHiddenLocal.2.NodesBelowNextOccurrence := by
+  change state.NodesBelowNextOccurrence
+  exact below
 
 @[simp] theorem allocateExpressionId_header (state : State) :
     state.allocateExpressionId.2.header = state.header := by
   rfl
 
+/-- Reserving an expression occurrence advances the upper bound while leaving
+the existing node table unchanged. -/
+theorem allocateExpressionId_preserves_nodesBelowNextOccurrence
+    (state : State) (below : state.NodesBelowNextOccurrence) :
+    state.allocateExpressionId.2.NodesBelowNextOccurrence := by
+  intro node member
+  change node.occurrenceId.index < state.nextOccurrence + 1
+  exact Nat.lt_succ_of_lt (below node member)
+
 @[simp] theorem allocateStatementId_header (state : State) :
     state.allocateStatementId.2.header = state.header := by
   rfl
 
+/-- Reserving a statement occurrence advances the shared upper bound while
+leaving the existing node table unchanged. -/
+theorem allocateStatementId_preserves_nodesBelowNextOccurrence
+    (state : State) (below : state.NodesBelowNextOccurrence) :
+    state.allocateStatementId.2.NodesBelowNextOccurrence := by
+  intro node member
+  change node.occurrenceId.index < state.nextOccurrence + 1
+  exact Nat.lt_succ_of_lt (below node member)
+
 @[simp] theorem recordNode_header (state : State) (node : Node) :
     (state.recordNode node).header = state.header := by
   rfl
+
+/-- Recording one already allocated node preserves the allocation bound when
+the new node lies below the current next occurrence. -/
+theorem recordNode_preserves_nodesBelowNextOccurrence
+    (state : State) (node : Node)
+    (below : state.NodesBelowNextOccurrence)
+    (nodeBelow : node.occurrenceId.index < state.nextOccurrence) :
+    (state.recordNode node).NodesBelowNextOccurrence := by
+  intro current member
+  change current ∈ state.nodes ++ [node] at member
+  rcases List.mem_append.mp member with member | member
+  · exact below current member
+  · simp only [List.mem_singleton] at member
+    subst current
+    exact nodeBelow
+
+/-- Recording a node extends the node table by an exact suffix. -/
+theorem recordNode_nodesPrefix (state : State) (node : Node) :
+    state.nodes <+: (state.recordNode node).nodes := by
+  exact List.prefix_append state.nodes [node]
 
 @[simp] theorem modifyExpressionNode_header (state : State)
     (id : ExpressionId) (modify : ExpressionNode → ExpressionNode) :
     (state.modifyExpressionNode id modify).header = state.header := by
   rfl
 
+/-- Updating expression payload preserves occurrence identities and therefore
+the allocation bound. -/
+theorem modifyExpressionNode_preserves_nodesBelowNextOccurrence
+    (state : State) (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.modifyExpressionNode id modify).NodesBelowNextOccurrence := by
+  intro current member
+  change current ∈ state.nodes.map (fun
+    | .expression node =>
+        if node.id = id then
+          .expression { modify node with id }
+        else
+          .expression node
+    | .statement node => .statement node) at member
+  rcases List.mem_map.mp member with
+    ⟨original, originalMember, currentEq⟩
+  cases original with
+  | statement node =>
+      simp only at currentEq
+      subst current
+      exact below (.statement node) originalMember
+  | expression node =>
+      simp only at currentEq
+      split at currentEq
+      · rename_i idEq
+        subst id
+        subst current
+        exact below (.expression node) originalMember
+      · subst current
+        exact below (.expression node) originalMember
+
 @[simp] theorem modifyStatementNode_header (state : State)
     (id : StatementId) (modify : StatementNode → StatementNode) :
     (state.modifyStatementNode id modify).header = state.header := by
   rfl
 
+/-- Updating statement payload preserves occurrence identities and therefore
+the allocation bound. -/
+theorem modifyStatementNode_preserves_nodesBelowNextOccurrence
+    (state : State) (id : StatementId)
+    (modify : StatementNode → StatementNode)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.modifyStatementNode id modify).NodesBelowNextOccurrence := by
+  intro current member
+  change current ∈ state.nodes.map (fun
+    | .expression node => .expression node
+    | .statement node =>
+        if node.id = id then
+          .statement { modify node with id }
+        else
+          .statement node) at member
+  rcases List.mem_map.mp member with
+    ⟨original, originalMember, currentEq⟩
+  cases original with
+  | expression node =>
+      simp only at currentEq
+      subst current
+      exact below (.expression node) originalMember
+  | statement node =>
+      simp only at currentEq
+      split at currentEq
+      · rename_i idEq
+        subst id
+        subst current
+        exact below (.statement node) originalMember
+      · subst current
+        exact below (.statement node) originalMember
+
 @[simp] theorem addRequirementWithId_header (state : State)
     (predicate : ProgramPredicate) :
     (state.addRequirementWithId predicate).2.header = state.header := by
   rfl
+
+/-- Requirement allocation is independent of occurrence allocation. -/
+theorem addRequirementWithId_preserves_nodesBelowNextOccurrence
+    (state : State) (predicate : ProgramPredicate)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.addRequirementWithId predicate).2.NodesBelowNextOccurrence := by
+  change state.NodesBelowNextOccurrence
+  exact below
+
+/-- Adding one requirement is independent of occurrence allocation. -/
+theorem addRequirement_preserves_nodesBelowNextOccurrence
+    (state : State) (predicate : ProgramPredicate)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.addRequirement predicate).NodesBelowNextOccurrence := by
+  exact addRequirementWithId_preserves_nodesBelowNextOccurrence
+    state predicate below
 
 @[simp] theorem addRequirementsWithIds_header (state : State)
     (predicates : List ProgramPredicate) :
@@ -140,10 +315,41 @@ theorem initial_input_comptime_eq (owner : Resolved.DeclarationId)
       simpa [addRequirementsWithIds] using
         induction (state.addRequirementWithId predicate).2
 
+/-- Allocating a sequence of requirement identities leaves the occurrence
+table and its upper bound unchanged. -/
+theorem addRequirementsWithIds_preserves_nodesBelowNextOccurrence
+    (state : State) (predicates : List ProgramPredicate)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.addRequirementsWithIds predicates).2.NodesBelowNextOccurrence := by
+  induction predicates generalizing state with
+  | nil => simpa [addRequirementsWithIds] using below
+  | cons predicate rest induction =>
+      simp only [addRequirementsWithIds]
+      exact induction (state.addRequirementWithId predicate).2
+        (addRequirementWithId_preserves_nodesBelowNextOccurrence
+          state predicate below)
+
+/-- Adding a sequence of requirements is independent of occurrence
+allocation. -/
+theorem addRequirements_preserves_nodesBelowNextOccurrence
+    (state : State) (predicates : List ProgramPredicate)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.addRequirements predicates).NodesBelowNextOccurrence := by
+  exact addRequirementsWithIds_preserves_nodesBelowNextOccurrence
+    state predicates below
+
 @[simp] theorem markDirectCallRequirements_header (state : State)
     (requirements : List RequirementId) :
     (state.markDirectCallRequirements requirements).header = state.header := by
   rfl
+
+/-- Marking requirement provenance changes no occurrence state. -/
+theorem markDirectCallRequirements_preserves_nodesBelowNextOccurrence
+    (state : State) (requirements : List RequirementId)
+    (below : state.NodesBelowNextOccurrence) :
+    (state.markDirectCallRequirements requirements).NodesBelowNextOccurrence := by
+  change state.NodesBelowNextOccurrence
+  exact below
 
 @[simp] theorem allocateBinder_id (state : State) (name : String)
     (scheme : TypeSystem.Scheme) (span : Option Syntax.SourceSpan) :
@@ -177,6 +383,22 @@ theorem initial_input_comptime_eq (owner : Resolved.DeclarationId)
     (state.allocateStatementId).2.nextOccurrence =
       state.nextOccurrence + 1 := by
   rfl
+
+/-- The freshly reserved expression identity is immediately below the
+advanced occurrence bound. -/
+@[simp] theorem allocateExpressionId_index_lt_nextOccurrence (state : State) :
+    (state.allocateExpressionId).1.occurrence.index <
+      (state.allocateExpressionId).2.nextOccurrence := by
+  change state.nextOccurrence < state.nextOccurrence + 1
+  exact Nat.lt_succ_self state.nextOccurrence
+
+/-- The freshly reserved statement identity is immediately below the shared
+advanced occurrence bound. -/
+@[simp] theorem allocateStatementId_index_lt_nextOccurrence (state : State) :
+    (state.allocateStatementId).1.occurrence.index <
+      (state.allocateStatementId).2.nextOccurrence := by
+  change state.nextOccurrence < state.nextOccurrence + 1
+  exact Nat.lt_succ_self state.nextOccurrence
 
 @[simp] theorem restoreLexicalScope_nextLocal (state : State)
     (scope : LexicalScope) :

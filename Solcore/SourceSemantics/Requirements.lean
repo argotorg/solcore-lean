@@ -65,6 +65,20 @@ structure RequirementLedgerWellFormed (context : Context) : Prop where
     ∀ requirement, requirement ∈ context.solvedRequirements →
       SolvedRequirementValid context requirement
 
+namespace RequirementIdsValid
+
+/-- Any sublist of a valid identity inventory is valid, independently of its
+ordering or multiplicity. -/
+theorem of_subset
+    {context : Context} {smaller larger : List RequirementId}
+    (included : smaller ⊆ larger)
+    (valid : RequirementIdsValid context larger) :
+    RequirementIdsValid context smaller := by
+  intro id member
+  exact valid id (included member)
+
+end RequirementIdsValid
+
 namespace RequirementSequenceProves
 
 theorem length_eq

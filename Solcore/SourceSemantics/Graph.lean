@@ -17,6 +17,34 @@ namespace Solcore.SourceSemantics
 
 open Frontend.SourceInference
 
+/-- Extending the node table by a suffix preserves an exact heterogeneous
+node occurrence.  No owner or root premise is needed because `ContainsNode`
+is deliberately just typed table membership. -/
+theorem ContainsNode.of_nodes_prefix
+    {before after : TypedSource} {id : NodeId} {node : Node}
+    (nodesPrefix : before.nodes <+: after.nodes)
+    (contains : ContainsNode before id node) :
+    ContainsNode after id node := by
+  exact ⟨nodesPrefix.subset contains.1, contains.2⟩
+
+/-- Extending the node table by a suffix preserves an exact expression
+occurrence. -/
+theorem ContainsExpression.of_nodes_prefix
+    {before after : TypedSource} {id : ExpressionId} {node : ExpressionNode}
+    (nodesPrefix : before.nodes <+: after.nodes)
+    (contains : ContainsExpression before id node) :
+    ContainsExpression after id node := by
+  exact ⟨nodesPrefix.subset contains.1, contains.2⟩
+
+/-- Extending the node table by a suffix preserves an exact statement
+occurrence. -/
+theorem ContainsStatement.of_nodes_prefix
+    {before after : TypedSource} {id : StatementId} {node : StatementNode}
+    (nodesPrefix : before.nodes <+: after.nodes)
+    (contains : ContainsStatement before id node) :
+    ContainsStatement after id node := by
+  exact ⟨nodesPrefix.subset contains.1, contains.2⟩
+
 /-- One direct, category-preserving occurrence edge. -/
 def DirectChild (source : TypedSource) (parent child : NodeId) : Prop :=
   ∃ node, ContainsNode source parent node ∧ child ∈ nodeChildIds node

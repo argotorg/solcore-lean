@@ -152,9 +152,48 @@ example := @Solcore.Frontend.SourceInference.FunctionBodiesChecked
 example :=
   @Solcore.Frontend.SourceInference.FunctionBodiesChecked.exists_signature_of_function_mem
 example := @Solcore.Frontend.SourceInference.State.Header
+example := @Solcore.Frontend.SourceInference.State.NodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.initial_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.fresh_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.withLocals_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateBinder_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateHiddenLocal_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateExpressionId_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateStatementId_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateExpressionId_index_lt_nextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateStatementId_index_lt_nextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.recordNode_preserves_nodesBelowNextOccurrence
+example := @Solcore.Frontend.SourceInference.State.recordNode_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.State.modifyExpressionNode_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.modifyStatementNode_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementWithId_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirement_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementsWithIds_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirements_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.markDirectCallRequirements_preserves_nodesBelowNextOccurrence
 example :=
   @Solcore.Frontend.SourceInference.State.initial_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_preserves_requirementsWellFormed
+example := @Solcore.Frontend.SourceInference.State.fresh_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.State.withLocals_preserves_requirementsWellFormed
 example :=
@@ -204,6 +243,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_requirementsWellFormed
 example :=
+  @Solcore.Frontend.SourceInference.Detail.unify_requirements_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.RequirementPredicatesCorrespond
 example :=
@@ -227,21 +268,49 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_preserves_requirementsWellFormed
 example :=
+  @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_requirements_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.fitArguments_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.fitArguments_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_preserves_requirementsWellFormed
 example :=
+  @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidate_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferUnaryOperator_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferBinaryOperator_requirements_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.attachExpressionCoercions_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.attachExpressionCoercions_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpression_preserves_requirementsWellFormed
 example :=
+  @Solcore.Frontend.SourceInference.Detail.recordExpression_requirements_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordSelectedCallResult_preserves_requirementsWellFormed
 example :=
+  @Solcore.Frontend.SourceInference.Detail.recordSelectedCallResult_requirements_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.recordSelectedCall_preserves_requirementsWellFormed
 example :=
+  @Solcore.Frontend.SourceInference.Detail.recordSelectedCall_requirements_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.recordIndirectCall_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordIndirectCall_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.applyFunctionType_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_instantiation
 example :=

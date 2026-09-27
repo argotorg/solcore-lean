@@ -18,6 +18,9 @@ example := @Solcore.SourceSemantics.Context.HasAssumption
 example := @Solcore.SourceSemantics.ContainsNode
 example := @Solcore.SourceSemantics.ContainsExpression
 example := @Solcore.SourceSemantics.ContainsStatement
+example := @Solcore.SourceSemantics.ContainsNode.of_nodes_prefix
+example := @Solcore.SourceSemantics.ContainsExpression.of_nodes_prefix
+example := @Solcore.SourceSemantics.ContainsStatement.of_nodes_prefix
 example := @Solcore.SourceSemantics.NodeOccurrencesUnique
 example := @Solcore.SourceSemantics.OccurrenceGraphWellFormed
 example := @Solcore.SourceSemantics.OccurrenceGraphClosed
@@ -86,6 +89,8 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirementEvi
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_corresponds
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_requirementIdsValid
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_requirementIdsValid_of_subset
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_correspondingSequenceProves
 example :=
@@ -378,6 +383,7 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionVali
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed.proves_predicate_eq
 example := @Solcore.SourceSemantics.RequirementIdsUnique.proves_predicate_eq
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed.transport
+example := @Solcore.SourceSemantics.RequirementIdsValid.of_subset
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed
 example := @Solcore.SourceSemantics.LocalSchemeTemplateRowScoped
 example := @Solcore.SourceSemantics.ScopedRequirementEntryValid
