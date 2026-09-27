@@ -164,6 +164,59 @@ private def generalizationSideConditionState : SourceInference.State := {
   directCallRequirements := [solverRegressionRequirement.id]
 }
 
+private theorem generalizationSideConditionState_requirementsWellFormed :
+    generalizationSideConditionState.RequirementsWellFormed := by
+  rfl
+
+/-- Canonical ledger formation synchronizes its length and bounds every
+retained stable identity by the next fresh identity. -/
+example :
+    generalizationSideConditionState.requirements.length =
+        generalizationSideConditionState.nextRequirement ∧
+      solverRegressionRequirement.id.index <
+        generalizationSideConditionState.nextRequirement := by
+  have member : solverRegressionRequirement ∈
+      generalizationSideConditionState.requirements := by
+    simp [generalizationSideConditionState]
+  exact ⟨
+    SourceInference.State.requirements_length_eq_nextRequirement
+      generalizationSideConditionState
+      generalizationSideConditionState_requirementsWellFormed,
+    SourceInference.State.requirement_id_lt_nextRequirement
+      generalizationSideConditionState
+      generalizationSideConditionState_requirementsWellFormed member⟩
+
+/-- Canonical identity order makes take/drop cutoffs coincide exactly with
+the numerical boundary on stable requirement identities. -/
+example :
+    solverRegressionRequirement ∈
+        generalizationSideConditionState.requirements.take 1 ∧
+      solverRegressionRequirement ∉
+        generalizationSideConditionState.requirements.take 0 ∧
+      solverRegressionRequirement ∈
+        generalizationSideConditionState.requirements.drop 0 ∧
+      solverRegressionRequirement ∉
+        generalizationSideConditionState.requirements.drop 1 := by
+  constructor
+  · rw [SourceInference.State.mem_take_requirements_iff
+      generalizationSideConditionState
+      generalizationSideConditionState_requirementsWellFormed]
+    simp [generalizationSideConditionState, solverRegressionRequirement]
+  constructor
+  · rw [SourceInference.State.mem_take_requirements_iff
+      generalizationSideConditionState
+      generalizationSideConditionState_requirementsWellFormed]
+    simp [solverRegressionRequirement]
+  constructor
+  · rw [SourceInference.State.mem_drop_requirements_iff
+      generalizationSideConditionState
+      generalizationSideConditionState_requirementsWellFormed]
+    simp [generalizationSideConditionState, solverRegressionRequirement]
+  · rw [SourceInference.State.mem_drop_requirements_iff
+      generalizationSideConditionState
+      generalizationSideConditionState_requirementsWellFormed]
+    simp [solverRegressionRequirement]
+
 private def stableGeneralizationVariable : TypeSystem.TypeVarId := ⟨0⟩
 
 private def stableGeneralizationState : SourceInference.State :=

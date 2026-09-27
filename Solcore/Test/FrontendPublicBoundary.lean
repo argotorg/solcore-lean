@@ -518,6 +518,14 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.solveRequirements_ids_nodup
 example := @Solcore.Frontend.SourceInference.State.requirementIds_nodup
 example :=
+  @Solcore.Frontend.SourceInference.State.requirements_length_eq_nextRequirement
+example :=
+  @Solcore.Frontend.SourceInference.State.requirement_id_lt_nextRequirement
+example :=
+  @Solcore.Frontend.SourceInference.State.mem_take_requirements_iff
+example :=
+  @Solcore.Frontend.SourceInference.State.mem_drop_requirements_iff
+example :=
   @Solcore.Frontend.SourceInference.State.IntegerLiteralLedgerCorrespondence
 example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValueBlockingRequirements

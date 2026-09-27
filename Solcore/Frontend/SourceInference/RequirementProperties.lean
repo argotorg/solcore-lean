@@ -6,17 +6,45 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend.SourceInference
 
+private theorem nodup_of_mapped_nodup
+    {alpha beta : Type} (values : List alpha) (key : alpha → beta)
+    (mappedNodup : (values.map key).Nodup) : values.Nodup := by
+  induction values with
+  | nil => exact .nil
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at mappedNodup ⊢
+      refine ⟨?_, induction mappedNodup.2⟩
+      intro member
+      exact mappedNodup.1 (List.mem_map.mpr ⟨_, member, rfl⟩)
+
+private theorem eq_of_mem_of_mapped_nodup
+    {alpha beta : Type} {values : List alpha} (key : alpha → beta)
+    (mappedNodup : (values.map key).Nodup)
+    {left right : alpha} (leftMem : left ∈ values)
+    (rightMem : right ∈ values) (keyEq : key left = key right) :
+    left = right := by
+  induction values generalizing left right with
+  | nil => simp at leftMem
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at mappedNodup
+      rcases mappedNodup with ⟨headFresh, tailNodup⟩
+      simp only [List.mem_cons] at leftMem rightMem
+      rcases leftMem with rfl | leftMem
+      · rcases rightMem with rfl | rightMem
+        · rfl
+        · exfalso
+          apply headFresh
+          exact List.mem_map.mpr ⟨right, rightMem, keyEq.symm⟩
+      · rcases rightMem with rfl | rightMem
+        · exfalso
+          apply headFresh
+          exact List.mem_map.mpr ⟨left, leftMem, keyEq⟩
+        · exact induction tailNodup leftMem rightMem keyEq
+
 private theorem requirementIds_nodup_of_indices_nodup
     (ids : List RequirementId)
     (indices : (ids.map (fun id => id.index)).Nodup) : ids.Nodup := by
-  induction ids with
-  | nil => exact .nil
-  | cons head tail induction =>
-      simp only [List.map_cons] at indices
-      rw [List.nodup_cons] at indices ⊢
-      refine ⟨?_, induction indices.2⟩
-      intro member
-      exact indices.1 (List.mem_map.mpr ⟨_, member, rfl⟩)
+  exact nodup_of_mapped_nodup ids (fun id => id.index) indices
 
 namespace State
 
@@ -279,6 +307,114 @@ theorem requirementIds_nodup (state : State)
         (fun id => id.index)).Nodup :=
     indices ▸ List.nodup_range
   exact requirementIds_nodup_of_indices_nodup _ indicesNodup
+
+/-- Canonical allocation keeps the ledger length synchronized with the next
+fresh requirement identity. -/
+theorem requirements_length_eq_nextRequirement (state : State)
+    (wellFormed : state.RequirementsWellFormed) :
+    state.requirements.length = state.nextRequirement := by
+  change state.requirements.map (fun requirement => requirement.id.index) =
+    List.range state.nextRequirement at wellFormed
+  have lengths := congrArg List.length wellFormed
+  simpa using lengths
+
+/-- Every retained row was allocated strictly before the state's next fresh
+requirement identity. -/
+theorem requirement_id_lt_nextRequirement (state : State)
+    (wellFormed : state.RequirementsWellFormed)
+    {requirement : Requirement} (member : requirement ∈ state.requirements) :
+    requirement.id.index < state.nextRequirement := by
+  change state.requirements.map (fun candidate => candidate.id.index) =
+    List.range state.nextRequirement at wellFormed
+  have indexMember : requirement.id.index ∈
+      state.requirements.map (fun candidate => candidate.id.index) :=
+    List.mem_map.mpr ⟨requirement, member, rfl⟩
+  rw [wellFormed] at indexMember
+  exact List.mem_range.mp indexMember
+
+/-- In a canonical ledger, taking the first `cutoff` rows selects exactly the
+rows whose stable identity lies below that cutoff. -/
+theorem mem_take_requirements_iff (state : State)
+    (wellFormed : state.RequirementsWellFormed) (cutoff : Nat)
+    (requirement : Requirement) :
+    requirement ∈ state.requirements.take cutoff ↔
+      requirement ∈ state.requirements ∧ requirement.id.index < cutoff := by
+  change state.requirements.map (fun candidate => candidate.id.index) =
+    List.range state.nextRequirement at wellFormed
+  constructor
+  · intro member
+    have indexMember : requirement.id.index ∈
+        (state.requirements.take cutoff).map
+          (fun candidate => candidate.id.index) :=
+      List.mem_map.mpr ⟨requirement, member, rfl⟩
+    rw [List.map_take, wellFormed, List.take_range] at indexMember
+    have belowMinimum := List.mem_range.mp indexMember
+    exact ⟨List.mem_of_mem_take member,
+      Nat.lt_of_lt_of_le belowMinimum (Nat.min_le_left _ _)⟩
+  · rintro ⟨member, belowCutoff⟩
+    have belowNext : requirement.id.index < state.nextRequirement := by
+      have indexMember : requirement.id.index ∈
+          state.requirements.map (fun candidate => candidate.id.index) :=
+        List.mem_map.mpr ⟨requirement, member, rfl⟩
+      rw [wellFormed] at indexMember
+      exact List.mem_range.mp indexMember
+    have indexMember : requirement.id.index ∈
+        (state.requirements.take cutoff).map
+          (fun candidate => candidate.id.index) := by
+      rw [List.map_take, wellFormed, List.take_range, List.mem_range]
+      exact Nat.lt_min.mpr ⟨belowCutoff, belowNext⟩
+    rcases List.mem_map.mp indexMember with
+      ⟨candidate, candidateMember, indexEq⟩
+    have indicesNodup :
+        (state.requirements.map
+          (fun candidate => candidate.id.index)).Nodup := by
+      rw [wellFormed]
+      exact List.nodup_range
+    have candidateEq : candidate = requirement :=
+      eq_of_mem_of_mapped_nodup
+        (fun candidate : Requirement => candidate.id.index) indicesNodup
+        (List.mem_of_mem_take candidateMember) member indexEq
+    simpa [candidateEq] using candidateMember
+
+/-- Dually, dropping the first `cutoff` rows selects exactly the rows whose
+stable identity is at least that cutoff. -/
+theorem mem_drop_requirements_iff (state : State)
+    (wellFormed : state.RequirementsWellFormed) (cutoff : Nat)
+    (requirement : Requirement) :
+    requirement ∈ state.requirements.drop cutoff ↔
+      requirement ∈ state.requirements ∧ cutoff ≤ requirement.id.index := by
+  have rowsNodup : state.requirements.Nodup :=
+    nodup_of_mapped_nodup state.requirements
+      (fun candidate : Requirement => candidate.id)
+      (requirementIds_nodup state wellFormed)
+  constructor
+  · intro dropped
+    have member := (List.drop_sublist cutoff state.requirements).subset dropped
+    refine ⟨member, ?_⟩
+    apply Nat.le_of_not_gt
+    intro belowCutoff
+    have taken : requirement ∈ state.requirements.take cutoff :=
+      (mem_take_requirements_iff state wellFormed cutoff requirement).mpr
+        ⟨member, belowCutoff⟩
+    have splitNodup :
+        (state.requirements.take cutoff ++
+          state.requirements.drop cutoff).Nodup := by
+      rw [List.take_append_drop]
+      exact rowsNodup
+    have separated := (List.nodup_append.mp splitNodup).2.2
+    exact (separated requirement taken requirement dropped) rfl
+  · rintro ⟨member, atLeast⟩
+    have splitMember : requirement ∈
+        state.requirements.take cutoff ++
+          state.requirements.drop cutoff := by
+      rw [List.take_append_drop]
+      exact member
+    rcases List.mem_append.mp splitMember with taken | dropped
+    · have belowCutoff :=
+        ((mem_take_requirements_iff state wellFormed cutoff requirement).mp
+          taken).2
+      exact False.elim ((Nat.not_lt_of_ge atLeast) belowCutoff)
+    · exact dropped
 
 /-- Every retained integer-literal node decodes to its recorded value, owns
 matching origin metadata, and names the exact builtin-`Int` row retained in
