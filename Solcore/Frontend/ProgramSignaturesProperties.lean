@@ -8,6 +8,25 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
+namespace ProgramFunctionSignature
+
+/-- All three parameter projections retain the exact source parameter
+cardinality. -/
+@[simp] theorem parameterNames_length (signature : ProgramFunctionSignature) :
+    signature.parameterNames.length = signature.parameters.length := by
+  simp [parameterNames]
+
+@[simp] theorem parameterTypes_length (signature : ProgramFunctionSignature) :
+    signature.parameterTypes.length = signature.parameters.length := by
+  simp [parameterTypes]
+
+@[simp] theorem parameterComptime_length
+    (signature : ProgramFunctionSignature) :
+    signature.parameterComptime.length = signature.parameters.length := by
+  simp [parameterComptime]
+
+end ProgramFunctionSignature
+
 /-- A successfully built signature catalog stores exactly the rules projected from
 its implementation signatures. -/
 theorem buildProgramSignatures_success_implRules_eq
