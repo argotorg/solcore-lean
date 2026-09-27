@@ -396,6 +396,7 @@ example := @Solcore.SourceSemantics.FunctionDefinition
 example := @Solcore.SourceSemantics.FunctionDefinition.Valid
 example := @Solcore.SourceSemantics.MethodDefinition
 example := @Solcore.SourceSemantics.MethodDefinition.Valid
+example := @Solcore.SourceSemantics.ContractSignatureWellFormed
 example := @Solcore.SourceSemantics.SignatureCatalogWellFormed
 example := @Solcore.SourceSemantics.Program
 example := @Solcore.SourceSemantics.ProgramWellFormed

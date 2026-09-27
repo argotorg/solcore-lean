@@ -22,6 +22,7 @@ private def emptySignatures : ProgramSignatures := {
   traits := []
   implementations := []
   dataTypes := []
+  contracts := []
 }
 
 private def emptyProgram : SourceSemantics.Program := {
@@ -106,6 +107,7 @@ private def unitSignatures : ProgramSignatures := {
   traits := []
   implementations := []
   dataTypes := []
+  contracts := []
 }
 
 private def unitSource : Frontend.SourceInference.TypedSource := {
@@ -140,6 +142,7 @@ theorem unitSignatureCatalogWellFormed :
     data_ids := by simp [unitSignatures]
     trait_ids := by simp [unitSignatures]
     implementation_ids := by simp [unitSignatures]
+    contract_ids := by simp [unitSignatures]
     constructor_ids := by simp [unitSignatures]
     trait_method_ids := by simp [unitSignatures]
     implementation_method_ids := by simp [unitSignatures]
@@ -147,10 +150,12 @@ theorem unitSignatureCatalogWellFormed :
     data_parameters := by simp [unitSignatures]
     trait_parameters := by simp [unitSignatures]
     implementation_parameters := by simp [unitSignatures]
+    contract_parameters := by simp [unitSignatures]
     functions_semantic := ?_
     data_semantic := by simp [unitSignatures]
     traits_semantic := by simp [unitSignatures]
     implementations_semantic := by simp [unitSignatures]
+    contracts_semantic := by simp [unitSignatures]
   }
   intro signature member
   simp only [unitSignatures, List.mem_singleton] at member

@@ -257,7 +257,8 @@ def signatureDeclarationIds (signatures : ProgramSignatures) :
   signatures.functions.map (fun signature => signature.id) ++
     signatures.dataTypes.map (fun signature => signature.id) ++
     signatures.traits.map (fun signature => signature.id) ++
-    signatures.implementations.map (fun signature => signature.id)
+    signatures.implementations.map (fun signature => signature.id) ++
+    signatures.contracts.map (fun signature => signature.id)
 
 /-- The declarative type context used to validate one catalog signature. -/
 def signatureContext (signatures : ProgramSignatures)
@@ -309,6 +310,18 @@ structure DataSignatureWellFormed (signatures : ProgramSignatures)
       TypesWellFormed
         (signatureContext signatures signature.id signature.parameters)
         constructor.payloadTypes
+
+/-- A contract signature has a unique, canonically indexed generic scope
+owned by the contract declaration.  Contract members are deliberately not
+treated as data constructors; their semantics will be added through a
+separate contract-member catalog. -/
+structure ContractSignatureWellFormed
+    (_signatures : ProgramSignatures)
+    (signature : ProgramContractSignature) : Prop where
+  parameters_nodup : signature.parameters.Nodup
+  parameters_owned : ∀ parameter, parameter ∈ signature.parameters →
+    parameter.owner = signature.id
+  parameter_positions : TypeParameterPositionsCanonical signature.parameters
 
 /-- One trait method is closed in the enclosing trait's rigid scope. -/
 structure TraitMethodSignatureWellFormed (signatures : ProgramSignatures)
@@ -535,6 +548,7 @@ structure SignatureCatalogWellFormed (signatures : ProgramSignatures) : Prop whe
   trait_ids : (signatures.traits.map fun signature => signature.id).Nodup
   implementation_ids :
     (signatures.implementations.map fun signature => signature.id).Nodup
+  contract_ids : (signatures.contracts.map fun signature => signature.id).Nodup
   constructor_ids :
     (signatures.dataTypes.flatMap fun signature =>
       signature.constructors.map fun constructor => constructor.id).Nodup
@@ -561,6 +575,10 @@ structure SignatureCatalogWellFormed (signatures : ProgramSignatures) : Prop whe
       signature.parameters.Nodup ∧
         ∀ parameter, parameter ∈ signature.parameters →
           parameter.owner = signature.id
+  contract_parameters : ∀ signature, signature ∈ signatures.contracts →
+    signature.parameters.Nodup ∧
+      ∀ parameter, parameter ∈ signature.parameters →
+        parameter.owner = signature.id
   functions_semantic : ∀ signature, signature ∈ signatures.functions →
     FunctionSignatureWellFormed signatures signature
   data_semantic : ∀ signature, signature ∈ signatures.dataTypes →
@@ -570,6 +588,8 @@ structure SignatureCatalogWellFormed (signatures : ProgramSignatures) : Prop whe
   implementations_semantic :
     ∀ signature, signature ∈ signatures.implementations →
       ImplementationSignatureWellFormed signatures signature
+  contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
+    ContractSignatureWellFormed signatures signature
 
 /-- Every cataloged function and implementation method has exactly one valid
 semantic body, with no extra body identities. -/
