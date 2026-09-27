@@ -5,6 +5,7 @@ import Solcore.SourceSemantics.Substitution
 import Solcore.SourceSemantics.SubstitutionCorrespondence
 import Solcore.SourceSemantics.Graph
 import Solcore.SourceSemantics.Traits
+import Solcore.SourceSemantics.TraitResolutionSoundness
 import Solcore.SourceSemantics.Typing
 import Solcore.SourceSemantics.Requirements
 import Solcore.SourceSemantics.Coercions

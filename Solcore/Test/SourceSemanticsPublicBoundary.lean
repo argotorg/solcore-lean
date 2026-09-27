@@ -58,6 +58,10 @@ example := @Solcore.SourceSemantics.PredicateEvidenceRepresents
 example := @Solcore.SourceSemantics.ImplementationEvidenceRepresents.functional
 example := @Solcore.SourceSemantics.PredicateEvidenceRepresents.functional
 example := @Solcore.SourceSemantics.RetainedEvidenceValid
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.toImplSubstitution
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.toImplSubstitution_applyType
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.toImplSubstitution_applyPredicate
+example := @Solcore.SourceSemantics.TraitResolutionSoundness.matchImplHead?_sound
 
 example := @Solcore.SourceSemantics.ReferenceHasRawType
 example := @Solcore.SourceSemantics.ReferenceHasRawType.local_iff

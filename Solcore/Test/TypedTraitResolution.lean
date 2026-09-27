@@ -1,4 +1,4 @@
-import Solcore.Frontend.TypedTraitResolution
+import Solcore.SourceSemantics.TraitResolutionSoundness
 
 set_option autoImplicit false
 
@@ -88,6 +88,11 @@ example : matchImplHead? showBoxRule (showPredicate (box .word)) =
     some [equality .word] := by
   rfl
 
+example : Solcore.SourceSemantics.ImplHeadInstantiates showBoxRule
+    (showPredicate (box .word)) [equality .word] := by
+  exact Solcore.SourceSemantics.TraitResolutionSoundness.matchImplHead?_sound
+    (by rfl)
+
 example : matchImplHeadWithParameters? [showBoxParameter] showBoxRule
     (showPredicate (box .word)) = some {
       parameterSubstitution := [(showBoxParameter, .word)]
@@ -158,6 +163,12 @@ example : ∃ substitution : RuleMatchSubstitution,
 example : matchImplHead? whereOnlyRule (equality .word) =
     some [convert (.variable ⟨1⟩) (.variable ⟨2⟩)] := by
   rfl
+
+example : Solcore.SourceSemantics.ImplHeadInstantiates whereOnlyRule
+    (equality .word)
+    [convert (.variable ⟨1⟩) (.variable ⟨2⟩)] := by
+  exact Solcore.SourceSemantics.TraitResolutionSoundness.matchImplHead?_sound
+    (by rfl)
 
 example : ∃ substitution : RuleMatchSubstitution,
     substitution.parameters.map Prod.fst = [whereOnlyParameter] ∧
