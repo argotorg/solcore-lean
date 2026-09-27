@@ -596,6 +596,81 @@ theorem committedCoercionStepValid
       solveRequirements_committedCoercionStepSequenceProves corresponds
         success solved_eq valid
 
+private theorem committed_member_has_planned_correspondence
+    {requirements : List Requirement}
+    {plan : List Detail.PlannedCoercionStep}
+    {steps : List CoercionStep}
+    (corresponds : Detail.CoercionPlanCommitCorresponds requirements
+      plan steps)
+    {committed : CoercionStep}
+    (member : committed ∈ steps) :
+    ∃ planned, planned ∈ plan ∧
+      Detail.PlannedCoercionStep.CommitCorresponds requirements
+        planned committed := by
+  induction corresponds with
+  | nil => simp at member
+  | @cons planned committed plan steps head tail induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · exact ⟨planned, by simp, head⟩
+      · obtain ⟨candidate, candidateMember, candidateCorresponds⟩ :=
+          induction member
+        exact ⟨candidate, by simp [candidateMember], candidateCorresponds⟩
+
+/-- Structural search validity, exact commit correspondence, normalized
+profile validity for every planned edge, and a valid solved ledger compose to
+the declarative validity of the complete committed coercion path. -/
+theorem committedCoercionPlanValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {source target : TypeSystem.Ty}
+    {plan : List Detail.PlannedCoercionStep}
+    {solved : List SolvedRequirement}
+    {semanticContext : SourceSemantics.Context}
+    (structural : Detail.PlannedCoercionPath.isValid source target plan = true)
+    (profiles : ∀ planned, planned ∈ plan →
+      CoercionProfileInstantiates semanticContext
+        ((Detail.commitCoercionPlan state plan).2.resolve planned.source)
+        ((Detail.commitCoercionPlan state plan).2.resolve planned.target)
+        (Detail.applyPredicate (Detail.commitCoercionPlan state plan).2
+          planned.predicate)
+        (planned.methodPredicates.map
+          (Detail.applyPredicate (Detail.commitCoercionPlan state plan).2)))
+    (success : Detail.solveRequirements inferenceContext
+      (Detail.commitCoercionPlan state plan).2
+      (Detail.commitCoercionPlan state plan).2.requirements = .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    CoercionPathValid semanticContext
+      ((Detail.commitCoercionPlan state plan).2.resolve source)
+      ((Detail.commitCoercionPlan state plan).2.resolve target)
+      ((Detail.commitCoercionPlan state plan).1.map
+        (CoercionStep.applySubstitution
+          (Detail.commitCoercionPlan state plan).2.inference.substitution)) := by
+  let committed := Detail.commitCoercionPlan state plan
+  have committedStructural :
+      Frontend.SourceInference.CoercionPath.isValid source target
+        committed.1 = true :=
+    Detail.commitCoercionPlan_isValid state plan structural
+  have normalizedStructural :
+      Frontend.SourceInference.CoercionPath.isValid
+        (committed.2.resolve source) (committed.2.resolve target)
+        (committed.1.map
+          (CoercionStep.applySubstitution
+            committed.2.inference.substitution)) = true := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using
+      Frontend.SourceInference.CoercionPath.isValid_applySubstitution
+        committed.2.inference.substitution committedStructural
+  apply CoercionPathValid.of_isValid normalizedStructural
+  intro step stepMember
+  obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp stepMember
+  have correspondences := Detail.commitCoercionPlan_corresponds state plan
+  obtain ⟨planned, plannedMember, correspondence⟩ :=
+    committed_member_has_planned_correspondence correspondences originalMember
+  exact committedCoercionStepValid correspondence
+    (profiles planned plannedMember) success solved_eq valid
+
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
 predicate. -/
