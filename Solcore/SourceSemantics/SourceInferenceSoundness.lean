@@ -708,6 +708,70 @@ theorem committedCoercionPlanValid
   exact committedCoercionStepValid correspondence
     (profiles planned plannedMember) success solved_eq valid
 
+/-- Successful coercion planning, profile lookup, commit, and requirement
+solving form a declaratively valid normalized coercion path once the final
+inference substitution is a valid semantic context closure. -/
+theorem coercionPlan?_some_committedPathValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {source target : TypeSystem.Ty}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {plan : List Detail.PlannedCoercionStep}
+    {solved : List SolvedRequirement}
+    {sourceContext semanticContext : SourceSemantics.Context}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (trait_success :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profile_success :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (plan_success :
+      Detail.coercionPlan? inferenceContext state source target =
+        .ok (some plan))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      (Detail.commitCoercionPlan state plan).2.inference.substitution
+      closedVariables sourceContext semanticContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solve_success : Detail.solveRequirements inferenceContext
+      (Detail.commitCoercionPlan state plan).2
+      (Detail.commitCoercionPlan state plan).2.requirements = .ok solved)
+    (solved_eq : semanticContext.solvedRequirements = solved)
+    (valid : SolvedRequirementsValid semanticContext solved) :
+    CoercionPathValid semanticContext
+      ((Detail.commitCoercionPlan state plan).2.resolve source)
+      ((Detail.commitCoercionPlan state plan).2.resolve target)
+      ((Detail.commitCoercionPlan state plan).1.map
+        (CoercionStep.applySubstitution
+          (Detail.commitCoercionPlan state plan).2.inference.substitution)) := by
+  apply committedCoercionPlanValid
+      (Detail.coercionPlan?_some_isValid plan_success) ?_ solve_success
+      solved_eq valid
+  intro planned member
+  have consistent := Detail.coercionPlan?_some_profileConsistent
+    trait_success profile_success plan_success planned member
+  have methodPredicates_eq :
+      planned.methodPredicates.map
+          (Detail.applyPredicate (Detail.commitCoercionPlan state plan).2) =
+        planned.methodPredicates.map
+          (TypedTraitResolution.applySubstitution
+            (Detail.commitCoercionPlan state plan).2.inference.substitution) := by
+    apply List.map_congr_left
+    intro predicate predicateMember
+    rfl
+  rw [methodPredicates_eq]
+  simpa [Frontend.SourceInference.State.resolve,
+    TypeSystem.InferState.resolve, Detail.applyPredicate] using
+    plannedCoercionStep_profileInstantiatesAfterSubstitution
+      (substitution :=
+        (Detail.commitCoercionPlan state plan).2.inference.substitution)
+      catalog contextValid signatures_eq trait_name profile_success consistent
+
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
 predicate. -/
