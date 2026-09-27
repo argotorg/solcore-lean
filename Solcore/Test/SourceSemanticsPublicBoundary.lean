@@ -410,6 +410,7 @@ example := @Solcore.SourceSemantics.Program.ofChecked
 example := @Solcore.SourceSemantics.signatureDeclarationIds_nodup_ofCheckProgram
 example := @Solcore.SourceSemantics.FunctionSignatureRemainingConditions
 example := @Solcore.SourceSemantics.DataSignatureRemainingConditions
+example := @Solcore.SourceSemantics.TraitMethodSignatureRemainingConditions
 example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions
 example := @Solcore.SourceSemantics.ImplementationSignatureRemainingConditions
 example := @Solcore.SourceSemantics.SignatureCatalogRemainingConditions
@@ -420,6 +421,10 @@ example :=
   @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.data_structures
 example :=
   @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.constructor_ids
+example :=
+  @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.trait_structures
+example :=
+  @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.trait_method_ids
 example :=
   @Solcore.SourceSemantics.FunctionSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.DataSignatureRemainingConditions.complete

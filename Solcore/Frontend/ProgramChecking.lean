@@ -351,6 +351,20 @@ theorem checkLoadedProgram_success_data_signature_structure
   buildProgramSignatures_success_data_structure
     (checkLoadedProgram_success_signatures success) member
 
+/-- A successful loaded-program check retains each trait signature's
+duplicate-free method names, declaration-owned source-order IDs, and
+duplicate-free method parameter names. -/
+theorem checkLoadedProgram_success_trait_signature_structure
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked)
+    {signature : ProgramTraitSignature}
+    (member : signature ∈ checked.signatures.traits) :
+    TraitSignatureStructuralWellFormed signature :=
+  buildProgramSignatures_success_trait_structure
+    (checkLoadedProgram_success_signatures success) member
+
 /-- A successful loaded-program check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkLoadedProgram_success_ids
@@ -504,6 +518,19 @@ theorem checkProgram_success_data_signature_structure
   obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
   exact checkLoadedProgram_success_data_signature_structure checkedSuccess member
 
+/-- End-to-end checker success retains each trait signature's structural
+method guarantees. -/
+theorem checkProgram_success_trait_signature_structure
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked)
+    {signature : ProgramTraitSignature}
+    (member : signature ∈ checked.signatures.traits) :
+    TraitSignatureStructuralWellFormed signature := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_trait_signature_structure checkedSuccess member
+
 /-- End-to-end checker success assigns globally unique constructor identities
 across every collected data declaration. -/
 theorem checkProgram_success_constructor_ids_nodup
@@ -516,6 +543,21 @@ theorem checkProgram_success_constructor_ids_nodup
   obtain ⟨loaded, loadedSuccess, checkedSuccess⟩ :=
     checkProgram_success_load success
   exact buildProgramSignatures_success_constructor_ids_nodup
+    (loadProgram_success_declarations_nodup loadedSuccess)
+    (checkLoadedProgram_success_signatures checkedSuccess)
+
+/-- End-to-end checker success assigns globally unique trait-method
+identities across every collected trait declaration. -/
+theorem checkProgram_success_trait_method_ids_nodup
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    (checked.signatures.traits.flatMap fun signature =>
+      signature.methods.map fun method => method.id).Nodup := by
+  obtain ⟨loaded, loadedSuccess, checkedSuccess⟩ :=
+    checkProgram_success_load success
+  exact buildProgramSignatures_success_trait_method_ids_nodup
     (loadProgram_success_declarations_nodup loadedSuccess)
     (checkLoadedProgram_success_signatures checkedSuccess)
 

@@ -127,6 +127,78 @@ theorem buildProgramSignatures_success_data_constructor_positions
       (signature.constructors.get index).id.constructorIndex = index.val :=
   (buildProgramSignatures_success_data_structure success member).constructor_positions
 
+namespace TraitSignatureStructuralWellFormed
+
+/-- Stable method identities are unique within one structurally valid trait
+signature because their source-order indices are distinct. -/
+theorem method_ids_nodup
+    {signature : ProgramTraitSignature}
+    (shape : TraitSignatureStructuralWellFormed signature) :
+    (signature.methods.map fun method => method.id).Nodup := by
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_map,
+    List.pairwise_iff_getElem]
+  intro leftIndex rightIndex leftBound rightBound before equal
+  have leftPosition := shape.method_positions ⟨leftIndex, leftBound⟩
+  have rightPosition := shape.method_positions ⟨rightIndex, rightBound⟩
+  simp only [List.get_eq_getElem] at leftPosition rightPosition
+  have indexEqual := congrArg ProgramTraitMethodId.methodIndex equal
+  rw [leftPosition, rightPosition] at indexEqual
+  omega
+
+end TraitSignatureStructuralWellFormed
+
+/-- Successful collection retains duplicate-free method names, canonical
+trait ownership and source-order IDs, and duplicate-free local parameter
+names for every trait method. -/
+theorem buildProgramSignatures_success_trait_structure
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramTraitSignature}
+    (member : signature ∈ signatures.traits) :
+    TraitSignatureStructuralWellFormed signature :=
+  buildProgramSignatures_success_trait_structure_state success signature member
+
+/-- Successful collection rejects duplicate method names within every trait. -/
+theorem buildProgramSignatures_success_trait_method_names_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramTraitSignature}
+    (member : signature ∈ signatures.traits) :
+    (signature.methods.map fun method => method.name).Nodup :=
+  (buildProgramSignatures_success_trait_structure success member).method_names_nodup
+
+/-- Every collected trait method identity records the declaration that owns
+its trait signature. -/
+theorem buildProgramSignatures_success_trait_method_owners
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramTraitSignature}
+    (member : signature ∈ signatures.traits) :
+    ∀ method, method ∈ signature.methods → method.id.trait = signature.id :=
+  (buildProgramSignatures_success_trait_structure success member).method_owners
+
+/-- Every collected trait method identity uses its zero-based source position
+within the owning declaration. -/
+theorem buildProgramSignatures_success_trait_method_positions
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramTraitSignature}
+    (member : signature ∈ signatures.traits) :
+    ∀ index : Fin signature.methods.length,
+      (signature.methods.get index).id.methodIndex = index.val :=
+  (buildProgramSignatures_success_trait_structure success member).method_positions
+
+/-- Every collected trait method retains duplicate-free source parameter
+names from ordinary method-shape resolution. -/
+theorem buildProgramSignatures_success_trait_method_parameter_names_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramTraitSignature}
+    (member : signature ∈ signatures.traits) :
+    ∀ method, method ∈ signature.methods → method.parameterNames.Nodup :=
+  (buildProgramSignatures_success_trait_structure success member)
+    |>.method_parameter_names_nodup
+
 /-- A successfully built signature catalog stores exactly the rules projected from
 its implementation signatures. -/
 theorem buildProgramSignatures_success_implRules_eq
@@ -318,6 +390,60 @@ theorem buildProgramSignatures_success_trait_ids_nodup
   have withoutContracts := (List.nodup_append.mp all).1
   have withoutImplementations := (List.nodup_append.mp withoutContracts).1
   exact (List.nodup_append.mp withoutImplementations).2.1
+
+/-- Distinct owning trait identities plus each trait's local source-order
+allocation make trait-method identities unique across a complete catalog. -/
+theorem trait_method_ids_nodup_of_structural
+    {traits : List ProgramTraitSignature}
+    (traitIds : (traits.map fun signature => signature.id).Nodup)
+    (shapes : ∀ signature, signature ∈ traits →
+      TraitSignatureStructuralWellFormed signature) :
+    (traits.flatMap fun signature =>
+      signature.methods.map fun method => method.id).Nodup := by
+  induction traits with
+  | nil => simp
+  | cons trait rest induction =>
+      simp only [List.map_cons, List.nodup_cons] at traitIds
+      have traitShape := shapes trait (by simp)
+      have restShapes : ∀ signature, signature ∈ rest →
+          TraitSignatureStructuralWellFormed signature := by
+        intro signature member
+        exact shapes signature (by simp [member])
+      simp only [List.flatMap_cons, List.nodup_append]
+      refine ⟨traitShape.method_ids_nodup,
+        induction traitIds.2 restShapes, ?_⟩
+      intro left leftMember right rightMember equal
+      rcases List.mem_map.mp leftMember with
+        ⟨leftMethod, leftMethodMember, rfl⟩
+      rcases List.mem_flatMap.mp rightMember with
+        ⟨rightTrait, rightTraitMember, rightMember⟩
+      rcases List.mem_map.mp rightMember with
+        ⟨rightMethod, rightMethodMember, rfl⟩
+      apply traitIds.1
+      apply List.mem_map.mpr
+      refine ⟨rightTrait, rightTraitMember, ?_⟩
+      calc
+        rightTrait.id = rightMethod.id.trait :=
+          (restShapes rightTrait rightTraitMember).method_owners
+            rightMethod rightMethodMember |>.symm
+        _ = leftMethod.id.trait := by
+          exact congrArg ProgramTraitMethodId.trait equal.symm
+        _ = trait.id :=
+          traitShape.method_owners leftMethod leftMethodMember
+
+/-- Successful collection from an identity-unique environment assigns one
+globally unique stable identity to every trait method. -/
+theorem buildProgramSignatures_success_trait_method_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.traits.flatMap fun signature =>
+      signature.methods.map fun method => method.id).Nodup := by
+  apply trait_method_ids_nodup_of_structural
+    (buildProgramSignatures_success_trait_ids_nodup environmentIds success)
+  intro signature member
+  exact buildProgramSignatures_success_trait_structure success member
 
 /-- Implementation declaration identities are unique after successful
 signature collection from an environment with unique declaration identities. -/

@@ -249,6 +249,19 @@ structure ProgramTraitSignature where
   source : Syntax.TraitDecl
   deriving Repr
 
+/-- Structural facts fixed by trait-method collection itself.  These do not
+depend on the later declarative judgments for method types or predicates. -/
+structure TraitSignatureStructuralWellFormed
+    (signature : ProgramTraitSignature) : Prop where
+  method_names_nodup :
+    (signature.methods.map fun method => method.name).Nodup
+  method_owners : ∀ method, method ∈ signature.methods →
+    method.id.trait = signature.id
+  method_positions : ∀ index : Fin signature.methods.length,
+    (signature.methods.get index).id.methodIndex = index.val
+  method_parameter_names_nodup : ∀ method,
+    method ∈ signature.methods → method.parameterNames.Nodup
+
 /-- Resolved signature catalog for one implementation, preserving method source
 order and the parsed method bodies. -/
 structure ProgramImplementationSignature where
@@ -1051,6 +1064,38 @@ private def resolveMethodShape
     wherePredicates
   }
 
+/-- Method-shape resolution reuses the ordinary function-parameter collector,
+so a successful result retains its duplicate-name rejection. -/
+private theorem resolveMethodShape_success_parameter_names_nodup
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {scope : ProgramTypeScope} {source : Syntax.FunctionSignature}
+    {shape : ResolvedMethodShape}
+    (success : resolveMethodShape environment declaration scope source =
+      .ok shape) :
+    (shape.parameters.map fun parameter => parameter.name).Nodup := by
+  simp only [resolveMethodShape] at success
+  cases parametersEq : resolveFunctionParameters environment declaration scope
+      source.parameters.elements 0 [] with
+  | error error => simp [parametersEq, bind, Except.bind] at success
+  | ok parameters =>
+      have parameterNames :=
+        (resolveFunctionParameters_success_names parametersEq).1
+      simp only [parametersEq, bind, Except.bind] at success
+      cases returnsEq : resolveFunctionReturns environment declaration scope
+          ((source.returnsClause.map fun clause => clause.types.elements).getD []) with
+      | error error => simp [returnsEq] at success
+      | ok returns =>
+          rcases returns with ⟨returnTypes, returnComptime⟩
+          simp only [returnsEq] at success
+          cases predicatesEq : resolveWhereClause environment declaration scope
+              source.whereClause with
+          | error error => simp [predicatesEq] at success
+          | ok predicates =>
+              simp only [predicatesEq, pure, Pure.pure, Except.pure,
+                Except.ok.injEq] at success
+              subst shape
+              exact parameterNames
+
 private def traitMethodsOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
     (scope : ProgramTypeScope) :
@@ -1082,6 +1127,93 @@ private def traitMethodsOfDeclaration
             wherePredicates := shape.wherePredicates
             source
           } :: methods)
+
+/-- Successful trait-method collection preserves duplicate-name rejection,
+declaration ownership, source-order indices, and each method's local
+parameter-name uniqueness.  The freshness clause is the induction invariant
+relating newly collected names to the caller's `seen` ledger. -/
+private theorem traitMethodsOfDeclaration_success_structure
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {scope : ProgramTypeScope} {sources : List Syntax.TraitMethod}
+    {index : Nat} {seen : List (String × Nat)}
+    {methods : List ProgramTraitMethodSignature}
+    (success : traitMethodsOfDeclaration environment declaration scope
+      sources index seen = .ok methods) :
+    (methods.map fun method => method.name).Nodup ∧
+      (∀ name, name ∈ methods.map (fun method => method.name) →
+        ∀ previous, previous ∈ seen → name ≠ previous.1) ∧
+      (∀ method, method ∈ methods → method.id.trait = declaration.id) ∧
+      (∀ position : Fin methods.length,
+        (methods.get position).id.methodIndex = index + position.val) ∧
+      (∀ method, method ∈ methods → method.parameterNames.Nodup) := by
+  induction sources generalizing index seen methods with
+  | nil =>
+      change Except.ok [] = Except.ok methods at success
+      injection success with methodsEq
+      subst methods
+      simp
+  | cons source rest induction =>
+      simp only [traitMethodsOfDeclaration] at success
+      by_cases generics : source.value.signature.genericParameters.isSome
+      · simp [generics, bind, Except.bind] at success
+      · simp only [generics, Bool.false_eq_true, if_false] at success
+        cases duplicateEq : seen.find? fun previous =>
+            previous.1 == source.value.signature.name.value with
+        | some previous => simp [duplicateEq] at success
+        | none =>
+            simp only [duplicateEq] at success
+            cases shapeEq : resolveMethodShape environment declaration scope
+                source.value.signature with
+            | error error => simp [shapeEq, bind, Except.bind] at success
+            | ok shape =>
+                have parameterNames :=
+                  resolveMethodShape_success_parameter_names_nodup shapeEq
+                simp only [shapeEq, bind, Except.bind] at success
+                cases restEq : traitMethodsOfDeclaration environment declaration
+                    scope rest (index + 1)
+                    ((source.value.signature.name.value, index) :: seen) with
+                | error error => simp [restEq] at success
+                | ok restMethods =>
+                    simp only [restEq, pure, Pure.pure, Except.pure,
+                      Except.ok.injEq] at success
+                    subst methods
+                    have restStructure := induction restEq
+                    refine ⟨?_, ?_, ?_, ?_, ?_⟩
+                    · simp only [List.map_cons, List.nodup_cons]
+                      refine ⟨?_, restStructure.1⟩
+                      intro member
+                      exact (restStructure.2.1 source.value.signature.name.value
+                        member (source.value.signature.name.value, index)
+                        (by simp)) rfl
+                    · intro name member previous previousMember
+                      simp only [List.map_cons, List.mem_cons] at member
+                      rcases member with rfl | member
+                      · intro equal
+                        have rejected :=
+                          (List.find?_eq_none.mp duplicateEq) previous
+                            previousMember
+                        exact rejected (by simp [equal])
+                      · exact restStructure.2.1 name member previous
+                          (by simp [previousMember])
+                    · intro method member
+                      simp only [List.mem_cons] at member
+                      rcases member with rfl | member
+                      · rfl
+                      · exact restStructure.2.2.1 method member
+                    · intro position
+                      refine Fin.cases ?_ (fun restPosition => ?_) position
+                      · rfl
+                      · change
+                          (restMethods.get restPosition).id.methodIndex =
+                            index + (restPosition.val + 1)
+                        rw [restStructure.2.2.2.1 restPosition]
+                        omega
+                    · intro method member
+                      simp only [List.mem_cons] at member
+                      rcases member with rfl | member
+                      · simpa [ProgramTraitMethodSignature.parameterNames]
+                          using parameterNames
+                      · exact restStructure.2.2.2.2 method member
 
 private def traitSignatureOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -1405,7 +1537,8 @@ private theorem traitSignatureOfDeclaration_success_header
     (success : traitSignatureOfDeclaration environment declaration source =
       .ok signature) :
     signature.id = declaration.id ∧
-      signature.parameters = declarationParameters declaration := by
+      signature.parameters = declarationParameters declaration ∧
+      TraitSignatureStructuralWellFormed signature := by
   cases scopeEq : validateProgramTypeScope
       (ProgramTypeScope.ofDeclaration declaration) with
   | error error =>
@@ -1434,6 +1567,8 @@ private theorem traitSignatureOfDeclaration_success_header
               change Except.error error = Except.ok signature at success
               cases success
           | ok methods =>
+              have methodStructure :=
+                traitMethodsOfDeclaration_success_structure methodsEq
               simp only [methodsEq] at success
               change Except.ok {
                 id := declaration.id
@@ -1445,7 +1580,15 @@ private theorem traitSignatureOfDeclaration_success_header
               } = Except.ok signature at success
               injection success with signatureEq
               subst signature
-              exact ⟨rfl, rfl⟩
+              refine ⟨rfl, rfl, ?_⟩
+              exact {
+                method_names_nodup := methodStructure.1
+                method_owners := methodStructure.2.2.1
+                method_positions := by
+                  intro position
+                  simpa using methodStructure.2.2.2.1 position
+                method_parameter_names_nodup := methodStructure.2.2.2.2
+              }
 
 private theorem traitSignatureOfDeclaration_success_id
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
@@ -1462,8 +1605,16 @@ private theorem traitSignatureOfDeclaration_success_parameters
       .ok signature) :
     SignatureParametersWellFormed signature.id signature.parameters := by
   have header := traitSignatureOfDeclaration_success_header success
-  rw [header.1, header.2]
+  rw [header.1, header.2.1]
   exact declarationParameters_wellFormed declaration
+
+private theorem traitSignatureOfDeclaration_success_structure
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.TraitDecl} {signature : ProgramTraitSignature}
+    (success : traitSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    TraitSignatureStructuralWellFormed signature :=
+  (traitSignatureOfDeclaration_success_header success).2.2
 
 private theorem functionSignatureOfDeclaration_success_header
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
@@ -1785,6 +1936,36 @@ private theorem collectProgramTraits_parameters_wellFormed
               apply induction _
               exact all_mem_append_singleton initial
                 (traitSignatureOfDeclaration_success_parameters signatureEq)
+      | importDecl _ | exportDecl _ | pragmaDecl _ | typeAlias _ | enum _
+      | impl _ | contract _ | function _ | error =>
+          simp only [collectProgramTraits, sourceEq]
+          exact induction _ initial
+
+private def TraitSignaturesStructurallyWellFormed
+    (traits : List ProgramTraitSignature) : Prop :=
+  ∀ signature, signature ∈ traits →
+    TraitSignatureStructuralWellFormed signature
+
+private theorem collectProgramTraits_structurally_wellFormed
+    (environment : ProgramEnvironment)
+    (declarations : List ProgramDeclaration)
+    (state : ProgramTraitBuildState)
+    (initial : TraitSignaturesStructurallyWellFormed state.traits) :
+    TraitSignaturesStructurallyWellFormed
+      (collectProgramTraits environment declarations state).traits := by
+  induction declarations generalizing state with
+  | nil => simpa [collectProgramTraits] using initial
+  | cons declaration rest induction =>
+      cases sourceEq : declaration.source.value with
+      | trait source =>
+          simp only [collectProgramTraits, sourceEq]
+          cases signatureEq : traitSignatureOfDeclaration environment declaration
+              source with
+          | error error => exact induction _ initial
+          | ok signature =>
+              apply induction _
+              exact all_mem_append_singleton initial
+                (traitSignatureOfDeclaration_success_structure signatureEq)
       | importDecl _ | exportDecl _ | pragmaDecl _ | typeAlias _ | enum _
       | impl _ | contract _ | function _ | error =>
           simp only [collectProgramTraits, sourceEq]
@@ -2530,6 +2711,28 @@ theorem buildProgramSignatures_success_data_structure_state
   · injection success with signaturesEq
     subst signatures
     exact signatureFacts.dataShapes
+  · simp at success
+
+/-- Internal collector boundary used by `ProgramSignaturesProperties`: every
+successfully collected trait signature retains the method-name and stable
+identity structure established while traversing its source declaration. -/
+theorem buildProgramSignatures_success_trait_structure_state
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures) :
+    ∀ signature, signature ∈ signatures.traits →
+      TraitSignatureStructuralWellFormed signature := by
+  let traitState := collectProgramTraits environment environment.declarations {}
+  have traitStructures :
+      TraitSignaturesStructurallyWellFormed traitState.traits := by
+    apply collectProgramTraits_structurally_wellFormed environment
+      environment.declarations ({} : ProgramTraitBuildState)
+    intro signature member
+    simp at member
+  simp only [buildProgramSignatures] at success
+  split at success
+  · injection success with signaturesEq
+    subst signatures
+    exact traitStructures
   · simp at success
 
 end Solcore.Frontend

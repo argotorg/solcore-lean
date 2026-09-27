@@ -93,19 +93,33 @@ structure DataSignatureRemainingConditions
         (signatureContext signatures signature.id signature.parameters)
         constructor.payloadTypes
 
+/-- Type- and predicate-formation obligations for one trait method.  Method
+ownership and duplicate-free parameter names are fixed by executable trait
+method collection and therefore supplied separately by checker success. -/
+structure TraitMethodSignatureRemainingConditions
+    (signatures : ProgramSignatures)
+    (trait : ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) : Prop where
+  parameter_types : TypesWellFormed
+    (signatureContext signatures trait.id trait.parameters
+      (trait.wherePredicates ++ method.wherePredicates)) method.parameterTypes
+  return_types : TypesWellFormed
+    (signatureContext signatures trait.id trait.parameters
+      (trait.wherePredicates ++ method.wherePredicates)) method.returnTypes
+  predicates : PredicatesWellFormed
+    (signatureContext signatures trait.id trait.parameters
+      (trait.wherePredicates ++ method.wherePredicates)) method.wherePredicates
+
 /-- Semantic trait-signature obligations beyond its checker-generated generic
-parameter row. -/
+parameter row and structural method catalog. -/
 structure TraitSignatureRemainingConditions
     (signatures : ProgramSignatures)
     (signature : ProgramTraitSignature) : Prop where
-  method_names_nodup : (signature.methods.map fun method => method.name).Nodup
-  method_positions : ∀ index : Fin signature.methods.length,
-    (signature.methods.get index).id.methodIndex = index.val
   predicates : PredicatesWellFormed
     (signatureContext signatures signature.id signature.parameters
       signature.wherePredicates) signature.wherePredicates
   methods : ∀ method, method ∈ signature.methods →
-    TraitMethodSignatureWellFormed signatures signature method
+    TraitMethodSignatureRemainingConditions signatures signature method
 
 /-- Semantic implementation-signature obligations beyond its checker-generated
 generic parameter row. -/
@@ -147,12 +161,10 @@ structure ImplementationSignatureRemainingConditions
 /-- Catalog conditions not yet implied by raw `checkProgram` success.  The
 checker already supplies implementation-rule projection equality, declaration
 identity uniqueness, every generic-parameter invariant, data-constructor
-structure and identity uniqueness, and complete contract signature semantics. -/
+structure and identity uniqueness, trait-method structure and identity
+uniqueness, and complete contract signature semantics. -/
 structure SignatureCatalogRemainingConditions
     (signatures : ProgramSignatures) : Prop where
-  trait_method_ids :
-    (signatures.traits.flatMap fun signature =>
-      signature.methods.map fun method => method.id).Nodup
   implementation_method_ids :
     (signatures.implementations.flatMap fun signature =>
       signature.methods.map fun method => method.id).Nodup
@@ -181,6 +193,9 @@ structure CheckedSignatureCatalogFacts
   constructor_ids :
     (signatures.dataTypes.flatMap fun signature =>
       signature.constructors.map fun constructor => constructor.id).Nodup
+  trait_method_ids :
+    (signatures.traits.flatMap fun signature =>
+      signature.methods.map fun method => method.id).Nodup
   parameters : ProgramSignatureParametersWellFormed signatures
   function_shapes : ∀ signature, signature ∈ signatures.functions →
     signature.parameterNames.Nodup ∧
@@ -189,6 +204,8 @@ structure CheckedSignatureCatalogFacts
         (TypeSystem.Ty.productMany signature.returnTypes)
   data_structures : ∀ signature, signature ∈ signatures.dataTypes →
     DataSignatureStructuralWellFormed signature
+  trait_structures : ∀ signature, signature ∈ signatures.traits →
+    TraitSignatureStructuralWellFormed signature
   contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
     ContractSignatureWellFormed signatures signature
 
@@ -250,16 +267,27 @@ theorem complete
     {signatures : ProgramSignatures} {signature : ProgramTraitSignature}
     (remaining : TraitSignatureRemainingConditions signatures signature)
     (parameters : SignatureParametersWellFormed signature.id
-      signature.parameters) :
+      signature.parameters)
+    (structural : TraitSignatureStructuralWellFormed signature) :
     TraitSignatureWellFormed signatures signature := {
   parameters_nodup := parameters.parameters_nodup
   parameters_owned := parameters.parameter_owners
   parameter_positions := by
     simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
-  method_names_nodup := remaining.method_names_nodup
-  method_positions := remaining.method_positions
+  method_names_nodup := structural.method_names_nodup
+  method_positions := structural.method_positions
   predicates := remaining.predicates
-  methods := remaining.methods
+  methods := by
+    intro method member
+    have methodRemaining := remaining.methods method member
+    exact {
+      owner := structural.method_owners method member
+      parameter_names_nodup :=
+        structural.method_parameter_names_nodup method member
+      parameter_types := methodRemaining.parameter_types
+      return_types := methodRemaining.return_types
+      predicates := methodRemaining.predicates
+    }
 }
 
 end TraitSignatureRemainingConditions
@@ -326,6 +354,8 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
     contract_ids := Frontend.buildProgramSignatures_success_contract_ids_nodup
       environmentIds signaturesSuccess
     constructor_ids := Frontend.checkProgram_success_constructor_ids_nodup success
+    trait_method_ids :=
+      Frontend.checkProgram_success_trait_method_ids_nodup success
     parameters
     function_shapes := by
       intro signature member
@@ -333,6 +363,9 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
     data_structures := by
       intro signature member
       exact Frontend.checkProgram_success_data_signature_structure success member
+    trait_structures := by
+      intro signature member
+      exact Frontend.checkProgram_success_trait_signature_structure success member
     contracts_semantic := ?_
   }
   intro signature member
@@ -363,7 +396,7 @@ theorem complete
     implementation_ids := checked.implementation_ids
     contract_ids := checked.contract_ids
     constructor_ids := checked.constructor_ids
-    trait_method_ids := remaining.trait_method_ids
+    trait_method_ids := checked.trait_method_ids
     implementation_method_ids := remaining.implementation_method_ids
     function_parameters := ?_
     data_parameters := ?_
@@ -402,6 +435,7 @@ theorem complete
   · intro signature member
     exact (remaining.traits_semantic signature member).complete
       (checked.parameters.traits signature member)
+      (checked.trait_structures signature member)
   · intro signature member
     apply (remaining.implementations_semantic signature member).complete
       (checked.parameters.implementations signature member)
