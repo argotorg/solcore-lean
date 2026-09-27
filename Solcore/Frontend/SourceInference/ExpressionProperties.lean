@@ -1200,6 +1200,191 @@ private theorem except_map_eq_ok {ε α β : Type} {map : α → β}
       change Except.ok (map value) = Except.ok result at success
       exact Except.ok.inj success
 
+/-- Repeated fresh-variable allocation makes semantic inference progress,
+preserves readiness, and bounds every returned type by the final allocator. -/
+theorem freshTypes_inferenceProperties
+    (count : Nat) (state : State) (ready : state.InferenceReady) :
+    state.InferenceProgress (freshTypes count state).2 ∧
+      (freshTypes count state).2.InferenceReady ∧
+      ∀ type ∈ (freshTypes count state).1,
+        type.VariablesBelow (freshTypes count state).2.inference.next := by
+  induction count generalizing state with
+  | zero =>
+      simp only [freshTypes]
+      exact ⟨.refl ready.solved, ready, by simp⟩
+  | succ count induction =>
+      simp only [freshTypes]
+      have freshProgress :=
+        State.InferenceProgress.fresh state ready.solved
+      have freshReady := State.InferenceReady.fresh ready
+      have tailProperties := induction state.fresh.2 freshReady
+      have freshTypeBelow :
+          state.fresh.1.VariablesBelow state.fresh.2.inference.next := by
+        change Ty.VariablesBelow (state.inference.next + 1)
+          (.variable ⟨state.inference.next⟩)
+        exact (Ty.variablesBelow_variable_iff _ _).2 (Nat.lt_succ_self _)
+      refine ⟨freshProgress.trans tailProperties.1,
+        tailProperties.2.1, ?_⟩
+      intro type member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact freshTypeBelow.weaken tailProperties.1.next_le
+      · exact tailProperties.2.2 type member
+
+/-- Successful lambda-parameter binding makes semantic inference progress,
+preserves readiness for the extended lexical scope, and bounds every returned
+parameter type by the final allocator. -/
+theorem bindLambdaParameters_inferenceProperties
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {state : State}
+    {result : List TypedBinder × List Ty × State}
+    (ready : state.InferenceReady)
+    (success : bindLambdaParameters context parameters index seen state =
+      .ok result) :
+    state.InferenceProgress result.2.2 ∧
+      result.2.2.InferenceReady ∧
+      ∀ type ∈ result.2.1,
+        type.VariablesBelow result.2.2.inference.next := by
+  induction parameters generalizing index seen state result with
+  | nil =>
+      simp only [bindLambdaParameters] at success
+      injection success with resultEq
+      subst result
+      exact ⟨.refl ready.solved, ready, by simp⟩
+  | cons parameter rest induction =>
+      cases parameterValue : parameter.value with
+      | error =>
+          simp [bindLambdaParameters, parameterValue, bind, Except.bind,
+            pure, Pure.pure, Except.pure] at success
+      | inferred name =>
+          by_cases duplicate : name.value ∈ seen
+          · simp [bindLambdaParameters, parameterValue, duplicate, bind,
+              Except.bind, pure, Pure.pure, Except.pure] at success
+          · let type := state.fresh.1
+            let freshState := state.fresh.2
+            let binderState :=
+              (freshState.allocateBinder name.value (.mono type)
+                (some parameter.span) false []).2
+            cases tailResult : bindLambdaParameters context rest
+                (index + 1) (name.value :: seen) binderState with
+            | error error =>
+                simp [bindLambdaParameters, parameterValue, duplicate,
+                  type, freshState, binderState, tailResult, bind,
+                  Except.bind, pure, Pure.pure, Except.pure] at success
+            | ok tail =>
+                rcases tail with ⟨binders, types, finalState⟩
+                have resultEq :
+                    ((freshState.allocateBinder name.value (.mono type)
+                        (some parameter.span) false []).1 :: binders,
+                      type :: types, finalState) = result := by
+                  simpa [bindLambdaParameters, parameterValue, duplicate,
+                    type, freshState, binderState, tailResult, bind,
+                    Except.bind, pure, Pure.pure, Except.pure] using success
+                subst result
+                have freshProgress :
+                    state.InferenceProgress freshState := by
+                  simpa only [freshState] using
+                    State.InferenceProgress.fresh state ready.solved
+                have freshReady : freshState.InferenceReady := by
+                  simpa only [freshState] using
+                    State.InferenceReady.fresh ready
+                have freshTypeBelow :
+                    type.VariablesBelow freshState.inference.next := by
+                  change Ty.VariablesBelow (state.inference.next + 1)
+                    (.variable ⟨state.inference.next⟩)
+                  exact (Ty.variablesBelow_variable_iff _ _).2
+                    (Nat.lt_succ_self _)
+                have binderProgress :
+                    freshState.InferenceProgress binderState := by
+                  simpa only [binderState] using
+                    State.InferenceProgress.allocateBinder freshState
+                      name.value (.mono type) (some parameter.span) false []
+                      freshReady.solved
+                have binderReady : binderState.InferenceReady := by
+                  simpa only [binderState] using
+                    State.InferenceReady.allocateBinder name.value
+                      (.mono type) (some parameter.span) false [] freshReady
+                      (by
+                        simpa only [TypeSystem.Scheme.mono] using
+                          freshTypeBelow)
+                have tailProperties := induction
+                  (index := index + 1) (seen := name.value :: seen)
+                  (state := binderState)
+                  (result := (binders, types, finalState))
+                  binderReady tailResult
+                have headBelow :
+                    type.VariablesBelow finalState.inference.next :=
+                  freshTypeBelow.weaken
+                    (Nat.le_trans binderProgress.next_le
+                      tailProperties.1.next_le)
+                refine ⟨freshProgress.trans
+                    (binderProgress.trans tailProperties.1),
+                  tailProperties.2.1, ?_⟩
+                intro resultType member
+                rcases List.mem_cons.mp member with rfl | member
+                · exact headBelow
+                · exact tailProperties.2.2 resultType member
+      | typed marker name sourceType =>
+          cases typeResult : resolveSourceType context sourceType with
+          | error error =>
+              simp [bindLambdaParameters, parameterValue, typeResult, bind,
+                Except.bind, pure, Pure.pure, Except.pure] at success
+          | ok type =>
+              by_cases duplicate : name.value ∈ seen
+              · simp [bindLambdaParameters, parameterValue, typeResult,
+                  duplicate, bind, Except.bind, pure, Pure.pure,
+                  Except.pure] at success
+              · let binderState :=
+                  (state.allocateBinder name.value (.mono type)
+                    (some parameter.span) marker.isSome []).2
+                cases tailResult : bindLambdaParameters context rest
+                    (index + 1) (name.value :: seen) binderState with
+                | error error =>
+                    simp [bindLambdaParameters, parameterValue, typeResult,
+                      duplicate, binderState, tailResult, bind, Except.bind,
+                      pure, Pure.pure, Except.pure] at success
+                | ok tail =>
+                    rcases tail with ⟨binders, types, finalState⟩
+                    have resultEq :
+                        ((state.allocateBinder name.value (.mono type)
+                            (some parameter.span) marker.isSome []).1 ::
+                          binders,
+                          type :: types, finalState) = result := by
+                      simpa [bindLambdaParameters, parameterValue, typeResult,
+                        duplicate, binderState, tailResult, bind,
+                        Except.bind, pure, Pure.pure, Except.pure] using success
+                    subst result
+                    have typeBelow :
+                        type.VariablesBelow state.inference.next :=
+                      resolveSourceType_success_variablesBelow typeResult _
+                    have binderProgress :
+                        state.InferenceProgress binderState := by
+                      simpa only [binderState] using
+                        State.InferenceProgress.allocateBinder state
+                          name.value (.mono type) (some parameter.span)
+                          marker.isSome [] ready.solved
+                    have binderReady : binderState.InferenceReady := by
+                      simpa only [binderState] using
+                        State.InferenceReady.allocateBinder name.value
+                          (.mono type) (some parameter.span) marker.isSome []
+                          ready (by
+                            simpa only [TypeSystem.Scheme.mono] using
+                              typeBelow)
+                    have tailProperties := induction
+                      (index := index + 1) (seen := name.value :: seen)
+                      (state := binderState)
+                      (result := (binders, types, finalState))
+                      binderReady tailResult
+                    have totalProgress :=
+                      binderProgress.trans tailProperties.1
+                    have headBelow :
+                        type.VariablesBelow finalState.inference.next :=
+                      typeBelow.weaken totalProgress.next_le
+                    refine ⟨totalProgress, tailProperties.2.1, ?_⟩
+                    intro resultType member
+                    rcases List.mem_cons.mp member with rfl | member
+                    · exact headBelow
+                    · exact tailProperties.2.2 resultType member
+
 private def PreservesStateHeader {α : Type} (stateOf : α → State)
     (initial : State) (computation : Except Error α) : Prop :=
   ∀ result, computation = .ok result →

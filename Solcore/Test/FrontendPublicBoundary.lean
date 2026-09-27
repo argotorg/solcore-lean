@@ -368,6 +368,10 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_inferenceReady
 example :=
   @Solcore.Frontend.SourceInference.Detail.localBinderInstantiation_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.freshTypes_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.bindLambdaParameters_inferenceProperties
 example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
 example := @Solcore.Frontend.SourceInference.Detail.unify_preserves_resolve_eq
 example :=

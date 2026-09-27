@@ -115,6 +115,35 @@ example {outer inner : SourceInference.State}
   exact SourceInference.State.restoreLexicalScope_inferenceProperties
     ready progress
 
+/-- Repeated fresh-type allocation packages progress, readiness, and exact
+allocator bounds for every returned metavariable. -/
+example (count : Nat) (state : SourceInference.State)
+    (ready : state.InferenceReady) :
+    state.InferenceProgress
+        (SourceInference.Detail.freshTypes count state).2 ∧
+      (SourceInference.Detail.freshTypes count state).2.InferenceReady ∧
+      ∀ type ∈ (SourceInference.Detail.freshTypes count state).1,
+        type.VariablesBelow
+          (SourceInference.Detail.freshTypes count state).2.inference.next := by
+  exact SourceInference.Detail.freshTypes_inferenceProperties count state ready
+
+/-- Successful lambda-parameter binding packages progress and readiness while
+bounding every returned parameter type at the final allocator. -/
+example {context : SourceInference.Context}
+    {parameters : List Syntax.LambdaParameter} {index : Nat}
+    {seen : List String} {state : SourceInference.State}
+    {result : List SourceInference.TypedBinder × List TypeSystem.Ty ×
+      SourceInference.State}
+    (ready : state.InferenceReady)
+    (success : SourceInference.Detail.bindLambdaParameters context parameters
+      index seen state = .ok result) :
+    state.InferenceProgress result.2.2 ∧
+      result.2.2.InferenceReady ∧
+      ∀ type ∈ result.2.1,
+        type.VariablesBelow result.2.2.inference.next := by
+  exact SourceInference.Detail.bindLambdaParameters_inferenceProperties
+    ready success
+
 private def shadowingBinderEnvironment : TypeSystem.Environment :=
   [("shadowed", TypeSystem.Scheme.mono .bool),
     ("shadowed", TypeSystem.Scheme.mono .word)]
