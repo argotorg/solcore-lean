@@ -143,6 +143,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.TypesWellScoped.applyParametersTo
 example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.TypeWellScoped.applyParametersAdmissibleTo
+example :=
   @Solcore.SourceSemantics.StructuralSubstitution.TypeWellFormed.applyParametersTo
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.TypesWellFormed.applyParametersTo
@@ -494,6 +496,8 @@ example :=
   @Solcore.SourceSemantics.DeclarationInstantiation.instantiate_parameterSubstitution_exact
 example :=
   @Solcore.SourceSemantics.DeclarationInstantiation.instantiate_parameterSubstitution_rangeAdmissible
+example :=
+  @Solcore.SourceSemantics.DeclarationInstantiation.Admissible.type_admissible
 example :=
   @Solcore.SourceSemantics.DeclarationInstantiation.ofInstantiated_admissible
 example :=

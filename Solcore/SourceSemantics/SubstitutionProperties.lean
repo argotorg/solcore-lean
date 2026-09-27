@@ -1389,6 +1389,104 @@ theorem TypesWellScoped.applyParametersTo
           (go tailWellScoped)
   exact go wellScoped
 
+/-- Assemble a source-ordered row of admissible types under the admissible
+scope of one enclosing type. -/
+private theorem TypesWellScoped.ofEachAdmissibleWithin
+    {context : Context} {types : List Ty} {outer : Ty}
+    (admissible : ∀ type, type ∈ types → TypeAdmissible context type)
+    (included : ∀ type, type ∈ types →
+      ∀ metavariable, metavariable ∈ type.freeVariables →
+        metavariable ∈ outer.freeVariables) :
+    TypesWellScoped context (admissibleTypeVariables context outer) types := by
+  induction types with
+  | nil => exact .nil
+  | cons head tail induction =>
+      exact .cons
+        (TypeAdmissible.typeWellScopedWithin
+          (included head (by simp)) (admissible head (by simp)))
+        (induction
+          (fun type member => admissible type (by simp [member]))
+          (fun type member => included type (by simp [member])))
+
+/-- Exact rigid substitution of a closed signature type by admissible
+use-site arguments yields an admissible occurrence type.  Unlike
+`applyParametersTo`, replacement types may retain lexical or residual
+flexible variables. -/
+theorem TypeWellScoped.applyParametersAdmissibleTo
+    {source target : Context} {type : Ty}
+    (substitution : ParameterSubstitution)
+    (exact : SourceSemantics.ParameterSubstitution.Exact substitution
+      source.typeParameters)
+    (range : SourceSemantics.ParameterSubstitution.RangeAdmissible target
+      substitution)
+    (signatures_eq : target.signatures = source.signatures)
+    (targetBinders : TypeParameterBindersWellFormed target)
+    (wellScoped : TypeWellScoped source [] type) :
+    TypeAdmissible target (substitution.apply type) := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ =>
+      TypeAdmissible target (substitution.apply type))
+    (motive_2 := fun types _ => ∀ type, type ∈ types →
+      TypeAdmissible target (substitution.apply type))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    simp at bound
+  · intro parameter bound _
+    obtain ⟨replacement, member, lookup⟩ :=
+      ParameterSubstitution.exists_lookup?_eq_some exact bound
+    simpa [TypeSystem.ParameterSubstitution.apply, lookup] using
+      range parameter replacement member
+  · intro builtin
+    exact TypeAdmissible.builtin targetBinders builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    rw [apply_nominal]
+    refine {
+      binders := targetBinders
+      typeWellScoped := .nominal dataType
+        (arguments.map substitution.apply)
+        (by simpa [signatures_eq] using cataloged)
+        (by simpa using arity) ?_
+    }
+    apply TypesWellScoped.ofEachAdmissibleWithin
+    · intro argument member
+      rcases List.mem_map.mp member with ⟨sourceArgument, sourceMember, rfl⟩
+      exact argumentsInduction sourceArgument sourceMember
+    · intro argument member metavariable occurs
+      rw [mem_freeVariables_nominal_iff]
+      exact ⟨argument, member, occurs⟩
+  · intro contract arguments cataloged arity _ argumentsInduction
+    rw [apply_nominal]
+    refine {
+      binders := targetBinders
+      typeWellScoped := .contractNominal contract
+        (arguments.map substitution.apply)
+        (by simpa [signatures_eq] using cataloged)
+        (by simpa using arity) ?_
+    }
+    apply TypesWellScoped.ofEachAdmissibleWithin
+    · intro argument member
+      rcases List.mem_map.mp member with ⟨sourceArgument, sourceMember, rfl⟩
+      exact argumentsInduction sourceArgument sourceMember
+    · intro argument member metavariable occurs
+      rw [mem_freeVariables_nominal_iff]
+      exact ⟨argument, member, occurs⟩
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact TypeAdmissible.function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact TypeAdmissible.product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact TypeAdmissible.mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact TypeAdmissible.proxy innerInduction
+  · intro inner _ innerInduction
+    exact TypeAdmissible.comptime innerInduction
+  · intro type member
+    simp at member
+  · intro head tail _ _ headInduction tailInduction type member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact headInduction
+    · exact tailInduction type member
+
 /-- Exact substitution of every rigid binder turns a generic well-scoped type
 into a type scoped by the closed substituted context. -/
 theorem TypeWellScoped.applyParameters
@@ -5433,6 +5531,47 @@ theorem BodyDefinitionHasType.instantiate_of_body
         exact bodyAfter lexicalContext inputsExtend bodyType
 
 end Solcore.SourceSemantics.StructuralSubstitution
+
+namespace Solcore.SourceSemantics.DeclarationInstantiation.Admissible
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- Every admissible occurrence of a cataloged function carries an admissible
+instantiated function type.  The explicit binder premise is necessary for a
+zero-parameter signature, whose admissible substitution range is vacuous. -/
+theorem type_admissible
+    {context : Context}
+    {instantiation : Frontend.SourceInference.DeclarationInstantiation}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (valid : DeclarationInstantiation.Admissible context instantiation) :
+    TypeAdmissible context instantiation.type := by
+  cases valid with
+  | intro signature signatureMember _ substitutionExact substitutionRange
+      typeEq _ _ _ =>
+      have signatureWellFormed :=
+        catalog.functions_semantic signature signatureMember
+      let signatureTypingContext := signatureContext context.signatures
+        signature.id signature.scheme.parameters signature.scheme.predicates
+      have bodyScoped : TypeWellScoped signatureTypingContext []
+          signature.scheme.body := by
+        rw [signatureWellFormed.scheme_body]
+        exact .function
+          (StructuralSubstitution.TypesWellScoped.productMany
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              signatureWellFormed.parameter_types))
+          (StructuralSubstitution.TypesWellScoped.productMany
+            (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+              signatureWellFormed.return_types))
+      rw [typeEq]
+      exact StructuralSubstitution.TypeWellScoped.applyParametersAdmissibleTo
+        (source := signatureTypingContext) (target := context)
+        instantiation.parameterSubstitution substitutionExact
+        substitutionRange rfl binders bodyScoped
+
+end Solcore.SourceSemantics.DeclarationInstantiation.Admissible
 
 namespace Solcore.SourceSemantics.FlexibleSubstitution
 
