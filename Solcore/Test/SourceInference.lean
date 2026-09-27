@@ -195,6 +195,59 @@ example :
         simp)
   exact ⟨covered.nodup ledgerUnique, covered, fresh⟩
 
+/-- Canonical generalization exposes the exact scheme and predicate facts
+needed by declarative generalized-let formation. -/
+example :
+    (SourceInference.Detail.generalizeValue generalizationSideConditionState []
+      0 (.variable solverRegressionFirst)).scheme.body =
+        .variable solverRegressionFirst ∧
+    (SourceInference.Detail.generalizeValue generalizationSideConditionState []
+      0 (.variable solverRegressionFirst)).scheme.quantified.Nodup ∧
+    ∃ requirement,
+      requirement ∈
+        (SourceInference.Detail.generalizeValue
+          generalizationSideConditionState [] 0
+            (.variable solverRegressionFirst)).requirements ∧
+      (∃ metavariable,
+        metavariable ∈
+          (SourceInference.Detail.generalizeValue
+            generalizationSideConditionState [] 0
+              (.variable solverRegressionFirst)).scheme.quantified ∧
+        metavariable ∈ TypedTraitResolution.predicateVariables
+          requirement.predicate) ∧
+      ∃ rawRequirement,
+        rawRequirement ∈ generalizationSideConditionState.requirements ∧
+        rawRequirement.id = requirement.templateRequirement ∧
+        requirement.predicate =
+          SourceInference.Detail.applyPredicate generalizationSideConditionState
+            rawRequirement.predicate := by
+  have idMember : solverRegressionRequirement.id ∈
+      (SourceInference.Detail.generalizeValue generalizationSideConditionState []
+        0 (.variable solverRegressionFirst)).requirements.map
+          (fun requirement => requirement.templateRequirement) := by
+    rw [generalizationSideConditionIds]
+    simp
+  rcases List.mem_map.mp idMember with
+    ⟨requirement, requirementMember, _⟩
+  refine ⟨SourceInference.Detail.generalizeValue_scheme_body _ _ _ _,
+    SourceInference.Detail.generalizeValue_scheme_quantified_nodup _ _ _ _,
+    requirement, requirementMember, ?_, ?_⟩
+  · exact
+      SourceInference.Detail.generalizeValue_requirement_depends_on_quantified
+        generalizationSideConditionState [] 0 (.variable solverRegressionFirst)
+        requirement requirementMember
+  · exact SourceInference.Detail.generalizeValue_requirement_source
+      generalizationSideConditionState [] 0 (.variable solverRegressionFirst)
+      requirement requirementMember
+
+/-- A result with no quantified variables cannot retain qualified scheme
+requirements. -/
+example :
+    (SourceInference.Detail.generalizeValue generalizationSideConditionState []
+      0 .word).requirements = [] := by
+  apply SourceInference.Detail.generalizeValue_requirements_empty_of_quantified_eq_nil
+  rfl
+
 private def solverRegressionSolvedRow : SourceInference.SolvedRequirement := {
   id := solverRegressionRequirement.id
   predicate := solverRegressionNormalized

@@ -105,6 +105,120 @@ def generalizeValue (state : State) (locals : TypeSystem.Environment)
     requirements
   }
 
+/-- Local generalization retains the inferred value type as the scheme body. -/
+@[simp] theorem generalizeValue_scheme_body (state : State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat) (type : Ty) :
+    (generalizeValue state locals requirementStart type).scheme.body = type := by
+  rfl
+
+/-- Local generalization quantifies each flexible metavariable at most once. -/
+theorem generalizeValue_scheme_quantified_nodup (state : State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat) (type : Ty) :
+    (generalizeValue state locals requirementStart type).scheme.quantified.Nodup := by
+  simp only [generalizeValue]
+  exact (Ty.freeVariables_nodup type).filter _
+
+private theorem generalizeValue_requirement_witness
+    (state : State) (locals : TypeSystem.Environment)
+    (requirementStart : Nat) (type : Ty) (template : LocalSchemeRequirement)
+    (member : template ∈
+      (generalizeValue state locals requirementStart type).requirements) :
+    ∃ rawRequirement, rawRequirement ∈ state.requirements ∧
+      rawRequirement.id = template.templateRequirement ∧
+      template.predicate = applyPredicate state rawRequirement.predicate ∧
+      ∃ metavariable,
+        metavariable ∈
+          (generalizeValue state locals requirementStart type).scheme.quantified ∧
+        metavariable ∈
+          TypedTraitResolution.predicateVariables template.predicate := by
+  let introducedRequirements := state.requirements.drop requirementStart
+  let eligibleRequirements := introducedRequirements.filter fun requirement =>
+    state.directCallRequirements.contains requirement.id &&
+      !state.localSchemeAssumptions.contains requirement.id
+  let blockedVariables := locals.freeVariables ++
+    requirementVariables state
+      (state.requirements.take requirementStart ++
+        introducedRequirements.filter fun requirement =>
+          !state.directCallRequirements.contains requirement.id)
+  let quantified := type.freeVariables.filter fun metavariable =>
+    !(blockedVariables.contains metavariable)
+  let select : Requirement → Option LocalSchemeRequirement := fun requirement =>
+    let predicate := applyPredicate state requirement.predicate
+    let dependsOnQuantified :=
+      (TypedTraitResolution.predicateVariables predicate).any fun metavariable =>
+        quantified.contains metavariable
+    if dependsOnQuantified then
+      some { templateRequirement := requirement.id, predicate }
+    else
+      none
+  change template ∈ eligibleRequirements.filterMap select at member
+  rw [List.mem_filterMap] at member
+  obtain ⟨rawRequirement, rawMember, produced⟩ := member
+  simp only [select] at produced
+  split at produced
+  · rename_i dependsOnQuantified
+    injection produced with templateEq
+    subst template
+    obtain ⟨metavariable, predicateMember, quantifiedMember⟩ :=
+      List.any_eq_true.mp dependsOnQuantified
+    have eligibleSublist : eligibleRequirements.Sublist state.requirements :=
+      List.filter_sublist.trans (List.drop_sublist _ _)
+    refine ⟨rawRequirement, eligibleSublist.subset rawMember, rfl, rfl,
+      metavariable, ?_, predicateMember⟩
+    simpa [generalizeValue, introducedRequirements, eligibleRequirements,
+      blockedVariables, quantified]
+      using quantifiedMember
+  · contradiction
+
+/-- Every retained local-scheme row depends on a metavariable quantified by
+the generalized scheme. -/
+theorem generalizeValue_requirement_depends_on_quantified
+    (state : State) (locals : TypeSystem.Environment)
+    (requirementStart : Nat) (type : Ty) (requirement : LocalSchemeRequirement)
+    (member : requirement ∈
+      (generalizeValue state locals requirementStart type).requirements) :
+    ∃ metavariable,
+      metavariable ∈
+        (generalizeValue state locals requirementStart type).scheme.quantified ∧
+      metavariable ∈
+        TypedTraitResolution.predicateVariables requirement.predicate := by
+  obtain ⟨_, _, _, _, witness⟩ :=
+    generalizeValue_requirement_witness state locals requirementStart type
+      requirement member
+  exact witness
+
+/-- A monomorphic generalization cannot retain qualified requirements: every
+retained row must mention at least one variable quantified by the scheme. -/
+theorem generalizeValue_requirements_empty_of_quantified_eq_nil
+    (state : State) (locals : TypeSystem.Environment)
+    (requirementStart : Nat) (type : Ty)
+    (quantifiedEmpty :
+      (generalizeValue state locals requirementStart type).scheme.quantified =
+        []) :
+    (generalizeValue state locals requirementStart type).requirements = [] := by
+  apply List.eq_nil_iff_forall_not_mem.mpr
+  intro requirement member
+  obtain ⟨metavariable, quantifiedMember, _⟩ :=
+    generalizeValue_requirement_depends_on_quantified state locals
+      requirementStart type requirement member
+  rw [quantifiedEmpty] at quantifiedMember
+  simp at quantifiedMember
+
+/-- Every retained local-scheme row comes from a raw inference-ledger row
+with the same identity and its predicate under the final substitution. -/
+theorem generalizeValue_requirement_source
+    (state : State) (locals : TypeSystem.Environment)
+    (requirementStart : Nat) (type : Ty) (requirement : LocalSchemeRequirement)
+    (member : requirement ∈
+      (generalizeValue state locals requirementStart type).requirements) :
+    ∃ rawRequirement, rawRequirement ∈ state.requirements ∧
+      rawRequirement.id = requirement.templateRequirement ∧
+      requirement.predicate = applyPredicate state rawRequirement.predicate := by
+  obtain ⟨rawRequirement, rawMember, idEq, predicateEq, _⟩ :=
+    generalizeValue_requirement_witness state locals requirementStart type
+      requirement member
+  exact ⟨rawRequirement, rawMember, idEq, predicateEq⟩
+
 private theorem filterMap_templateRequirementIds_sublist
     (requirements : List Requirement)
     (select : Requirement → Option LocalSchemeRequirement)

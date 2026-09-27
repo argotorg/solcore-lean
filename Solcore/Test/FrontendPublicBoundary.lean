@@ -511,6 +511,16 @@ example := @Solcore.Frontend.SourceInference.State.requirementIds_nodup
 example :=
   @Solcore.Frontend.SourceInference.State.IntegerLiteralLedgerCorrespondence
 example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValue_scheme_body
+example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValue_scheme_quantified_nodup
+example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValue_requirement_depends_on_quantified
+example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValue_requirements_empty_of_quantified_eq_nil
+example :=
+  @Solcore.Frontend.SourceInference.Detail.generalizeValue_requirement_source
+example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_sublist
 example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_fresh
