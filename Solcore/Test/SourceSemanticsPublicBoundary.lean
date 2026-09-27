@@ -113,6 +113,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_occurrenceGraphClosed
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_occurrenceGraphClosed
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_localIdentityOwnership
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_localIdentityOwnership
@@ -201,6 +203,8 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.nodeLocalSchemeTemp
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.recordNode_sourceLocalSchemeTemplateIds
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.initial
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.ofValidation
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.replaceLocals
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.allocateBinder
 example :=
@@ -210,9 +214,18 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.re
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.ownership
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.classified_iff
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.source_ids_subset_requirements
+example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_templateTracking
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_localSchemeTemplateOwnership
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_localSchemeTemplateOwnership
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateIdsAligned
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_templateIdsAligned
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_templateIdsAligned_validated
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_template_evidence
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_template_evidence_validated
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalizedRequirementContext
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_integerLiteralValid_of_mem
@@ -536,6 +549,12 @@ example := @Solcore.SourceSemantics.validateSchemeGeneralizes
 example := @Solcore.SourceSemantics.validateSchemeGeneralizes_success
 example := @Solcore.SourceSemantics.PredicateWellFormed
 example := @Solcore.SourceSemantics.localSchemeTemplateIds
+example := @Solcore.SourceSemantics.forItemLocalSchemeTemplateIds_eq_carrier
+example :=
+  @Solcore.SourceSemantics.statementLocalSchemeTemplateIds_eq_carrier
+example := @Solcore.SourceSemantics.nodeLocalSchemeTemplateIds_eq_carrier
+example :=
+  @Solcore.SourceSemantics.typedSourceLocalSchemeTemplateIds_eq_carrier
 example := @Solcore.SourceSemantics.instantiateLocalSchemePredicates
 example := @Solcore.SourceSemantics.localSchemeInitializerContext
 example := @Solcore.SourceSemantics.LocalSchemeRequirementWellFormed

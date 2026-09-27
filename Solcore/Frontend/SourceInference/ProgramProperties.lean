@@ -318,6 +318,86 @@ theorem validateSourceRequirementOwnership_success
   exact ⟨primaryUnique, ledgerUnique,
     (List.perm_ext_iff_of_nodup primaryUnique ledgerUnique).2 exactMembership⟩
 
+/-- Successful qualified-template validation gives the exact classification
+permutation and proves that every classified identity has a raw ledger row. -/
+theorem validateSourceTemplateTracking_success
+    {source : TypedSource} {state : State}
+    (success : validateSourceTemplateTracking source state = .ok ()) :
+    source.localSchemeTemplateIds.Nodup ∧
+      state.localSchemeAssumptions.Nodup ∧
+      state.localSchemeAssumptions.Perm source.localSchemeTemplateIds ∧
+      state.localSchemeAssumptions ⊆
+        state.requirements.map (fun requirement => requirement.id) := by
+  let templates := source.localSchemeTemplateIds
+  let classified := state.localSchemeAssumptions
+  let ledger := state.requirements.map (fun requirement => requirement.id)
+  have templatesSuccess :
+      validateRequirementIdsUniqueFrom Error.duplicateLocalSchemeTemplate []
+        templates = .ok () := by
+    cases templatesResult :
+        validateRequirementIdsUniqueFrom Error.duplicateLocalSchemeTemplate []
+          templates with
+    | error error =>
+        simp [validateSourceTemplateTracking, templates, templatesResult,
+          bind, Except.bind] at success
+    | ok value =>
+        exact congrArg Except.ok (Subsingleton.elim _ _)
+  have classifiedSuccess :
+      validateRequirementIdsUniqueFrom Error.duplicateLocalSchemeAssumption []
+        classified = .ok () := by
+    cases classifiedResult :
+        validateRequirementIdsUniqueFrom Error.duplicateLocalSchemeAssumption []
+          classified with
+    | error error =>
+        simp [validateSourceTemplateTracking, templates, classified,
+          templatesSuccess, classifiedResult, bind, Except.bind] at success
+    | ok value =>
+        exact congrArg Except.ok (Subsingleton.elim _ _)
+  have templatesContained :
+      validateRequirementIdsContained Error.missingLocalSchemeAssumption
+        classified templates = .ok () := by
+    cases templatesContainedResult :
+        validateRequirementIdsContained Error.missingLocalSchemeAssumption
+          classified templates with
+    | error error =>
+        simp [validateSourceTemplateTracking, templates, classified,
+          templatesSuccess, classifiedSuccess, templatesContainedResult,
+          bind, Except.bind] at success
+    | ok value =>
+        exact congrArg Except.ok (Subsingleton.elim _ _)
+  have classifiedContained :
+      validateRequirementIdsContained Error.unownedLocalSchemeAssumption
+        templates classified = .ok () := by
+    cases classifiedContainedResult :
+        validateRequirementIdsContained Error.unownedLocalSchemeAssumption
+          templates classified with
+    | error error =>
+        simp [validateSourceTemplateTracking, templates, classified,
+          templatesSuccess, classifiedSuccess, templatesContained,
+          classifiedContainedResult, bind, Except.bind] at success
+    | ok value =>
+        exact congrArg Except.ok (Subsingleton.elim _ _)
+  have ledgerContained :
+      validateRequirementIdsContained Error.missingLocalSchemeRequirement
+        ledger classified = .ok () := by
+    simpa [validateSourceTemplateTracking, templates, classified, ledger,
+      templatesSuccess, classifiedSuccess, templatesContained,
+      classifiedContained, bind, Except.bind] using success
+  have templatesUnique : templates.Nodup :=
+    (validateRequirementIdsUniqueFrom_success templatesSuccess).1
+  have classifiedUnique : classified.Nodup :=
+    (validateRequirementIdsUniqueFrom_success classifiedSuccess).1
+  have templatesSubset : templates ⊆ classified :=
+    validateRequirementIdsContained_success templatesContained
+  have classifiedSubset : classified ⊆ templates :=
+    validateRequirementIdsContained_success classifiedContained
+  have classifiedExact : classified.Perm templates :=
+    (List.perm_ext_iff_of_nodup classifiedUnique templatesUnique).2
+      (fun _ => ⟨fun member => classifiedSubset member,
+        fun member => templatesSubset member⟩)
+  exact ⟨templatesUnique, classifiedUnique, classifiedExact,
+    validateRequirementIdsContained_success ledgerContained⟩
+
 private theorem validateSourceRootsFrom_success
     {source : TypedSource} {roots : List NodeId}
     (success : validateSourceRootsFrom source roots = .ok ()) :
@@ -1289,6 +1369,8 @@ structure FinalizeSuccessWitness
     validateSourceGraph (state.toTypedSource roots) = .ok ()
   localIdentityValidation :
     validateSourceLocalIdentities (state.toTypedSource roots) = .ok ()
+  templateTrackingValidation :
+    validateSourceTemplateTracking (state.toTypedSource roots) state = .ok ()
   ledgerValidation : validateIntegerLiteralLedger state = .ok ()
   patternDefault :
     defaultIntegerPatternTargets state.integerPatterns state =
@@ -1341,32 +1423,46 @@ def finalize_success_witness
     | ok localValue =>
         cases localValue
         simp at localResult ⊢
+  have templateTrackingValidation :
+      validateSourceTemplateTracking (state.toTypedSource roots) state =
+        .ok () := by
+    cases templateResult :
+        validateSourceTemplateTracking (state.toTypedSource roots) state with
+    | error error =>
+        simp [graphValidation, localIdentityValidation, templateResult, bind,
+          Except.bind] at success
+    | ok templateValue =>
+        cases templateValue
+        simp at templateResult ⊢
   cases ledgerResult : validateIntegerLiteralLedger state with
   | error error =>
-      simp [graphValidation, localIdentityValidation, ledgerResult, bind,
-        Except.bind] at success
+      simp [graphValidation, localIdentityValidation,
+        templateTrackingValidation, ledgerResult, bind, Except.bind] at success
   | ok ledgerValue =>
       cases ledgerValue
       cases patternResult :
           defaultIntegerPatternTargets state.integerPatterns state with
       | error error =>
-          simp [graphValidation, localIdentityValidation, ledgerResult,
-            patternResult, bind, Except.bind] at success
+          simp [graphValidation, localIdentityValidation,
+            templateTrackingValidation, ledgerResult, patternResult, bind,
+            Except.bind] at success
       | ok patternState =>
           cases literalResult :
               defaultIntegerLiteralTargets patternState.integerLiterals
                 patternState with
           | error error =>
-              simp [graphValidation, localIdentityValidation, ledgerResult,
-                patternResult, literalResult, bind, Except.bind] at success
+              simp [graphValidation, localIdentityValidation,
+                templateTrackingValidation, ledgerResult, patternResult,
+                literalResult, bind, Except.bind] at success
           | ok finalState =>
               cases patternValidationResult :
                   validateIntegerPatternTargets finalState
                     finalState.integerPatterns with
               | error error =>
-                  simp [graphValidation, localIdentityValidation, ledgerResult,
-                    patternResult, literalResult, patternValidationResult,
-                    bind, Except.bind] at success
+                  simp [graphValidation, localIdentityValidation,
+                    templateTrackingValidation, ledgerResult, patternResult,
+                    literalResult, patternValidationResult, bind, Except.bind]
+                    at success
               | ok patternValidation =>
                   cases patternValidation
                   cases literalValidationResult :
@@ -1374,9 +1470,9 @@ def finalize_success_witness
                         finalState.integerLiterals with
                   | error error =>
                       simp [graphValidation, localIdentityValidation,
-                        ledgerResult, patternResult, literalResult,
-                        patternValidationResult, literalValidationResult, bind,
-                        Except.bind] at success
+                        templateTrackingValidation, ledgerResult,
+                        patternResult, literalResult, patternValidationResult,
+                        literalValidationResult, bind, Except.bind] at success
                   | ok literalValidation =>
                       cases literalValidation
                       cases ownershipResult :
@@ -1385,7 +1481,8 @@ def finalize_success_witness
                             finalState.requirements with
                       | error error =>
                           simp [graphValidation, localIdentityValidation,
-                            ledgerResult, patternResult, literalResult,
+                            templateTrackingValidation, ledgerResult,
+                            patternResult, literalResult,
                             patternValidationResult, literalValidationResult,
                             ownershipResult, bind, Except.bind] at success
                       | ok ownershipValidation =>
@@ -1395,14 +1492,16 @@ def finalize_success_witness
                                 finalState.requirements with
                           | error error =>
                               simp [graphValidation, localIdentityValidation,
-                                ledgerResult, patternResult, literalResult,
+                                templateTrackingValidation, ledgerResult,
+                                patternResult, literalResult,
                                 patternValidationResult,
                                 literalValidationResult, ownershipResult,
                                 requirementsResult, bind, Except.bind]
                                 at success
                           | ok requirements =>
                               simp [graphValidation,
-                                localIdentityValidation, ledgerResult,
+                                localIdentityValidation,
+                                templateTrackingValidation, ledgerResult,
                                 patternResult, literalResult,
                                 patternValidationResult,
                                 literalValidationResult, ownershipResult,
@@ -1415,6 +1514,7 @@ def finalize_success_witness
                                 solvedRequirements := requirements
                                 graphValidation
                                 localIdentityValidation
+                                templateTrackingValidation
                                 ledgerValidation := ledgerResult
                                 patternDefault := patternResult
                                 literalDefault := literalResult
@@ -1442,6 +1542,16 @@ theorem finalize_validateSourceLocalIdentities
     (success : finalize context type state roots = .ok result) :
     validateSourceLocalIdentities (state.toTypedSource roots) = .ok () := by
   exact (finalize_success_witness success).localIdentityValidation
+
+/-- Successful finalization includes exact source-to-state classification and
+raw-ledger coverage for every qualified local-scheme template. -/
+theorem finalize_validateSourceTemplateTracking
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    validateSourceTemplateTracking (state.toTypedSource roots) state =
+      .ok () := by
+  exact (finalize_success_witness success).templateTrackingValidation
 
 /-- Successful finalization establishes the exact primary-to-ledger ownership
 boundary.  Numeric defaulting changes neither the source carrier nor the raw
@@ -1491,8 +1601,9 @@ theorem finalize_integerPatternTarget_supported
     ∀ origin, origin ∈ state.integerPatterns →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
-  obtain ⟨patternState, finalState, _, _, _, _, patternResult, literalResult,
-      patternValidation, _, _, _, resultEq⟩ := finalize_success_witness success
+  obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
+      literalResult, patternValidation, _, _, _, resultEq⟩ :=
+    finalize_success_witness success
   have patternOrigins :=
     defaultIntegerPatternTargets_integerPatterns patternResult
   have finalOrigins :=
@@ -1516,7 +1627,7 @@ theorem finalize_integerLiteralTarget_supported
     ∀ origin, origin ∈ state.integerLiterals →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
-  obtain ⟨patternState, finalState, _, _, _, _, patternResult,
+  obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
       literalResult, _, literalValidation, _, _, resultEq⟩ :=
     finalize_success_witness success
   have patternOrigins :=
@@ -1542,8 +1653,8 @@ theorem finalize_preserves_resolve_eq
     (equal : state.resolve left = state.resolve right)
     (success : finalize context type state roots = .ok result) :
     result.substitution.apply left = result.substitution.apply right := by
-  obtain ⟨patternState, finalState, _, _, _, _, patternResult, literalResult,
-      _, _, _, _, resultEq⟩ := finalize_success_witness success
+  obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
+      literalResult, _, _, _, _, resultEq⟩ := finalize_success_witness success
   have patternEqual :=
     defaultIntegerPatternTargets_preserves_resolve_eq equal patternResult
   have finalEqual :=
@@ -1588,7 +1699,7 @@ theorem finalize_type
     {result : Result}
     (success : finalize context type state roots = .ok result) :
     result.type = result.substitution.apply type := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, resultEq⟩ :=
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, resultEq⟩ :=
     finalize_success_witness success
   subst result
   rfl
@@ -1601,8 +1712,8 @@ theorem finalize_typedSource
     (success : finalize context type state roots = .ok result) :
     result.typedSource =
       (state.toTypedSource roots).applySubstitution result.substitution := by
-  obtain ⟨patternState, _, _, _, _, _, patternResult, literalResult, _, _,
-      _, _, resultEq⟩ := finalize_success_witness success
+  obtain ⟨patternState, _, _, _, _, _, _, patternResult, literalResult, _,
+      _, _, _, resultEq⟩ := finalize_success_witness success
   subst result
   rw [defaultIntegerLiteralTargets_toTypedSource literalResult,
     defaultIntegerPatternTargets_toTypedSource patternResult]

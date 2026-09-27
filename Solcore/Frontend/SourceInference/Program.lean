@@ -84,6 +84,23 @@ def validateSourceRequirementOwnership (source : TypedSource)
   validateRequirementIdsContained Error.missingRequirementLedgerRow ledger primary
   validateRequirementIdsContained Error.unattachedRequirementLedgerRow primary ledger
 
+/-- Validate the exact executable classification of qualified local-scheme
+templates and ensure every classified template has a raw requirement row. -/
+def validateSourceTemplateTracking (source : TypedSource) (state : State) :
+    Except Error Unit := do
+  let templates := source.localSchemeTemplateIds
+  let classified := state.localSchemeAssumptions
+  let ledger := state.requirements.map (fun requirement => requirement.id)
+  validateRequirementIdsUniqueFrom Error.duplicateLocalSchemeTemplate [] templates
+  validateRequirementIdsUniqueFrom Error.duplicateLocalSchemeAssumption []
+    classified
+  validateRequirementIdsContained Error.missingLocalSchemeAssumption classified
+    templates
+  validateRequirementIdsContained Error.unownedLocalSchemeAssumption templates
+    classified
+  validateRequirementIdsContained Error.missingLocalSchemeRequirement ledger
+    classified
+
 /-- Whether the table contains a node at the exact category-preserving ID. -/
 def sourceContainsNodeId (source : TypedSource) (id : NodeId) : Bool :=
   source.nodes.any fun node => decide (node.id = id)
@@ -298,6 +315,7 @@ def finalize (context : Context) (type : Ty) (state : State)
     Except Error Result := do
   validateSourceGraph (state.toTypedSource roots)
   validateSourceLocalIdentities (state.toTypedSource roots)
+  validateSourceTemplateTracking (state.toTypedSource roots) state
   validateIntegerLiteralLedger state
   let state ← defaultIntegerPatternTargets state.integerPatterns state
   let state ← defaultIntegerLiteralTargets state.integerLiterals state

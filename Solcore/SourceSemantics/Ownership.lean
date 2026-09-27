@@ -193,6 +193,97 @@ def sourceLocalSchemeTemplateIds (source : TypedSource) : List RequirementId :=
   (localSchemeTemplateOwners source).map fun owner =>
     owner.requirement.templateRequirement
 
+/-- The canonical carrier and declarative ownership inventory agree for one
+`for` initializer or post item. -/
+@[simp] theorem forItemLocalSchemeTemplateIds_eq_carrier
+    (item : ForItemForm) :
+    item.localSchemeTemplateIds =
+      (forItemInitializedLetBindings item).flatMap fun binding =>
+        binding.binder.schemeRequirements.map fun requirement =>
+          requirement.templateRequirement := by
+  cases item with
+  | letDecl binder initializer =>
+      cases initializer <;> simp [ForItemForm.localSchemeTemplateIds,
+        forItemInitializedLetBindings]
+  | expression expression => rfl
+  | assignValue assignment operator value => rfl
+  | assignBitNot assignment => rfl
+
+@[simp] theorem flatMapForItemLocalSchemeTemplateIds_eq_carrier
+    (items : List ForItemForm) :
+    items.flatMap ForItemForm.localSchemeTemplateIds =
+      (items.flatMap forItemInitializedLetBindings).flatMap fun binding =>
+        binding.binder.schemeRequirements.map fun requirement =>
+          requirement.templateRequirement := by
+  induction items with
+  | nil => rfl
+  | cons item rest induction => simp [induction]
+
+/-- The canonical carrier and declarative ownership inventory agree for one
+statement form. -/
+@[simp] theorem statementLocalSchemeTemplateIds_eq_carrier
+    (form : StatementForm) :
+    form.localSchemeTemplateIds =
+      (statementInitializedLetBindings form).flatMap fun binding =>
+        binding.binder.schemeRequirements.map fun requirement =>
+          requirement.templateRequirement := by
+  cases form with
+  | letDecl binder initializer =>
+      cases initializer <;> simp [StatementForm.localSchemeTemplateIds,
+        statementInitializedLetBindings]
+  | returnStmt value => rfl
+  | expression expression trailingSemicolon => rfl
+  | assignValue assignment operator value => rfl
+  | assignBitNot assignment => rfl
+  | ifThen condition thenBody elseBody => rfl
+  | block body => rfl
+  | matchWith resolution => rfl
+  | forLoop initializer condition post body =>
+      simp [StatementForm.localSchemeTemplateIds,
+        statementInitializedLetBindings]
+  | whileLoop condition body => rfl
+  | breakStmt => rfl
+  | continueStmt => rfl
+
+@[simp] theorem nodeLocalSchemeTemplateIds_eq_carrier (node : Node) :
+    node.localSchemeTemplateIds =
+      match node with
+      | .expression _ => []
+      | .statement statement =>
+          (statementInitializedLetBindings statement.form).flatMap fun binding =>
+            binding.binder.schemeRequirements.map fun requirement =>
+              requirement.templateRequirement := by
+  cases node <;> simp [Node.localSchemeTemplateIds]
+
+@[simp] theorem flatMapNodeLocalSchemeTemplateIds_eq_carrier
+    (nodes : List Node) :
+    nodes.flatMap Node.localSchemeTemplateIds =
+      nodes.flatMap fun node =>
+        match node with
+        | .expression _ => []
+        | .statement statement =>
+            (statementInitializedLetBindings statement.form).flatMap fun binding =>
+              binding.binder.schemeRequirements.map fun requirement =>
+                requirement.templateRequirement := by
+  induction nodes with
+  | nil => rfl
+  | cons node rest induction => simp [induction]
+
+/-- The canonical executable template inventory is exactly the declarative
+source ownership inventory. -/
+@[simp] theorem typedSourceLocalSchemeTemplateIds_eq_carrier
+    (source : TypedSource) :
+    source.localSchemeTemplateIds = sourceLocalSchemeTemplateIds source := by
+  cases source with
+  | mk owner inputs roots nodes =>
+      simp only [TypedSource.localSchemeTemplateIds, sourceLocalSchemeTemplateIds,
+        localSchemeTemplateOwners, initializedLetBindings, List.map_flatMap,
+        InitializedLetBinding.templateOwners, List.map_map, Function.comp_def]
+      induction nodes with
+      | nil => rfl
+      | cons node nodes induction =>
+          cases node <;> simp [induction]
+
 /-- Exact source ownership of one qualified local-scheme template. -/
 def ContainsLocalSchemeTemplate (source : TypedSource)
     (owner : LocalSchemeTemplateOwner) : Prop :=

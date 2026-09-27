@@ -325,6 +325,17 @@ private theorem templateFinalizeSuccess :
       scopedTemplateSource.roots = .ok templateFinalizedResult := by
   rfl
 
+/-- Finalization now reconstructs the complete source/state template tracker
+directly from its executable boundary validation. -/
+example : SourceInferenceSoundness.TemplateTracking templateFinalizeState [] :=
+  SourceInferenceSoundness.finalize_templateTracking templateFinalizeSuccess
+
+/-- The same successful boundary establishes globally unique ownership after
+the final flexible substitution. -/
+example : LocalSchemeTemplateOwnership templateFinalizedResult.typedSource :=
+  SourceInferenceSoundness.finalize_localSchemeTemplateOwnership
+    templateFinalizeSuccess
+
 /-- Finalization preserves the exact source/state template-ID alignment of a
 nonempty qualified-local fixture. -/
 example : ∀ id,
@@ -333,6 +344,13 @@ example : ∀ id,
   exact SourceInferenceSoundness.finalize_templateIdsAligned
     templateFinalizeStateAligned templateFinalizeSuccess
 
+/-- The executable validator supplies the alignment premise automatically. -/
+example : ∀ id,
+    id ∈ sourceLocalSchemeTemplateIds templateFinalizedResult.typedSource ↔
+      id ∈ templateFinalizeState.localSchemeAssumptions := by
+  exact SourceInferenceSoundness.finalize_templateIdsAligned_validated
+    templateFinalizeSuccess
+
 /-- A source-classified template emitted by finalization retains canonical
 assumption evidence for its normalized predicate. -/
 example : ∀ row, row ∈ templateFinalizedResult.solvedRequirements →
@@ -340,6 +358,14 @@ example : ∀ row, row ∈ templateFinalizedResult.solvedRequirements →
     row.evidence = .assumption row.predicate := by
   exact SourceInferenceSoundness.finalize_template_evidence
     templateFinalizeStateAligned templateFinalizeSuccess
+
+/-- Assumption evidence is also available without an external alignment
+premise once finalization succeeds. -/
+example : ∀ row, row ∈ templateFinalizedResult.solvedRequirements →
+    row.id ∈ sourceLocalSchemeTemplateIds templateFinalizedResult.typedSource →
+    row.evidence = .assumption row.predicate := by
+  exact SourceInferenceSoundness.finalize_template_evidence_validated
+    templateFinalizeSuccess
 
 private theorem templateOwnerContained :
     ContainsLocalSchemeTemplate scopedTemplateSource scopedTemplateOwner := by

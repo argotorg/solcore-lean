@@ -315,6 +315,22 @@ theorem finalize_occurrenceGraphClosed
   exact FlexibleSubstitution.OccurrenceGraphClosed.applySubstitution
     result.substitution inputClosed
 
+/-- Every successfully checked function body retains a closed occurrence
+forest, including exact ownership, incoming-edge uniqueness and reachability. -/
+theorem checkFunctionBody_success_occurrenceGraphClosed
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    OccurrenceGraphClosed checked.typedBody := by
+  obtain ⟨_, _, _, _, _, _, _, finalizeSuccess, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  exact finalize_occurrenceGraphClosed finalizeSuccess
+
 /-- Successful finalization validates every local definition before closing
 types, and final substitution preserves those stable identities exactly. -/
 theorem finalize_localIdentityOwnership
@@ -2311,6 +2327,21 @@ theorem initial (owner : Resolved.DeclarationId)
       sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
       initializedLetBindings]
 
+/-- Executable finalization-boundary validation reconstructs the proof-facing
+template tracking invariant with no pending binder materialization. -/
+theorem ofValidation
+    {state : Frontend.SourceInference.State} {roots : List NodeId}
+    (success : Detail.validateSourceTemplateTracking
+      (state.toTypedSource roots) state = .ok ()) :
+    TemplateTracking state [] := by
+  have validated := Detail.validateSourceTemplateTracking_success success
+  constructor
+  · simpa [Frontend.SourceInference.State.toTypedSource,
+      sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+      initializedLetBindings] using validated.2.2.1
+  · exact validated.2.1
+  · exact validated.2.2.2
+
 /-- Replacing only the executable local type environment leaves template
 classification, uniqueness, and requirement-ledger coverage unchanged.  This
 is the exact state update performed immediately before let-binder allocation. -/
@@ -2499,6 +2530,49 @@ theorem source_ids_subset_requirements
 
 end TemplateTracking
 
+/-- Every successful finalization input has a complete, unique and
+ledger-covered qualified-template classification. -/
+theorem finalize_templateTracking
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    TemplateTracking state [] :=
+  TemplateTracking.ofValidation
+    (Detail.finalize_validateSourceTemplateTracking success)
+
+/-- Final substitution preserves the globally unique ownership of every
+qualified local-scheme template retained by a finalized source. -/
+theorem finalize_localSchemeTemplateOwnership
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    LocalSchemeTemplateOwnership result.typedSource := by
+  rw [Detail.finalize_typedSource success]
+  exact FlexibleSubstitution.LocalSchemeTemplateOwnership.applySubstitution
+    result.substitution ((finalize_templateTracking success).ownership roots)
+
+/-- Successfully checked function bodies retain globally unique qualified
+local-scheme template identities. -/
+theorem checkFunctionBody_success_localSchemeTemplateOwnership
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    LocalSchemeTemplateOwnership checked.typedBody := by
+  obtain ⟨_, _, _, _, _, _, _, finalizeSuccess, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  exact finalize_localSchemeTemplateOwnership finalizeSuccess
+
 /-- The source-owned qualified-local template identities materialized from a
 state agree exactly with the state's executable template classification. -/
 def TemplateIdsAligned (state : Frontend.SourceInference.State)
@@ -2523,6 +2597,22 @@ theorem finalize_templateIdsAligned
   simp only [FlexibleSubstitution.sourceLocalSchemeTemplateIds_applySubstitution]
   exact aligned id
 
+/-- Successful finalization supplies template classification alignment without
+an external tracking premise. -/
+theorem finalize_templateIdsAligned_validated
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    ∀ id, id ∈ sourceLocalSchemeTemplateIds result.typedSource ↔
+      id ∈ state.localSchemeAssumptions := by
+  apply finalize_templateIdsAligned
+    (aligned := fun id =>
+      ((finalize_templateTracking success).classified_iff roots id).symm)
+    success
+
 /-- A template row in a successfully finalized source retains canonical
 assumption evidence whenever the input state's executable classification is
 aligned with the source-owned template identities. -/
@@ -2540,7 +2630,7 @@ theorem finalize_template_evidence
   intro row member template
   have initialTemplate : row.id ∈ state.localSchemeAssumptions :=
     (finalize_templateIdsAligned aligned success row.id).mp template
-  obtain ⟨patternState, finalState, requirements, _, _, _, patternResult,
+  obtain ⟨patternState, finalState, requirements, _, _, _, _, patternResult,
       literalResult, _, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have finalTemplate : row.id ∈ finalState.localSchemeAssumptions := by
@@ -2552,6 +2642,23 @@ theorem finalize_template_evidence
   subst result
   exact solveRequirements_template_evidence requirementsResult row member
     finalTemplate
+
+/-- Successful finalization alone supplies the ID alignment required to show
+that every emitted qualified-template row retains assumption evidence. -/
+theorem finalize_template_evidence_validated
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    ∀ row, row ∈ result.solvedRequirements →
+      row.id ∈ sourceLocalSchemeTemplateIds result.typedSource →
+      row.evidence = .assumption row.predicate := by
+  apply finalize_template_evidence
+    (aligned := fun id =>
+      ((finalize_templateTracking success).classified_iff roots id).symm)
+    success
 
 /-- Proof-facing context for the requirement ledger emitted by finalization.
 Both declaration assumptions and solved predicates use the final inference
@@ -2578,8 +2685,8 @@ theorem finalize_requirementOwnership
       semanticContext.solvedRequirements = result.solvedRequirements)
     (success : Detail.finalize inferenceContext type state roots = .ok result) :
     RequirementOwnership semanticContext result.typedSource := by
-  obtain ⟨_, finalState, solved, _, _, _, _, _, _, _, ownershipValidation,
-      requirementsSolved, resultEq⟩ :=
+  obtain ⟨_, finalState, solved, _, _, _, _, _, _, _, _,
+      ownershipValidation, requirementsSolved, resultEq⟩ :=
     Detail.finalize_success_witness success
   have validated :=
     Detail.validateSourceRequirementOwnership_success ownershipValidation
@@ -2630,7 +2737,7 @@ theorem finalize_integerLiteralValid_of_mem
       (finalizedRequirementContext inferenceContext result)
       source
       (resolution.applySubstitution result.substitution) := by
-  obtain ⟨patternState, finalState, requirements, _, _, ledgerValidation,
+  obtain ⟨patternState, finalState, requirements, _, _, _, ledgerValidation,
       patternResult, literalResult, _, literalValidation, _,
       requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
@@ -2672,7 +2779,7 @@ theorem finalize_solvedRequirementsValid
     SolvedRequirementsValid
       (finalizedRequirementContext inferenceContext result)
       result.solvedRequirements := by
-  obtain ⟨patternState, finalState, requirements, _, _, _, patternResult,
+  obtain ⟨patternState, finalState, requirements, _, _, _, _, patternResult,
       literalResult, _, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have patternOrdinary : patternState.localSchemeAssumptions = [] := by

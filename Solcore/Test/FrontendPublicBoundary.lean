@@ -525,6 +525,10 @@ example := @Solcore.Frontend.SourceInference.ExpressionForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.StatementForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.Node.definedLocalIds
 example := @Solcore.Frontend.SourceInference.TypedSource.definedLocalIds
+example := @Solcore.Frontend.SourceInference.ForItemForm.localSchemeTemplateIds
+example := @Solcore.Frontend.SourceInference.StatementForm.localSchemeTemplateIds
+example := @Solcore.Frontend.SourceInference.Node.localSchemeTemplateIds
+example := @Solcore.Frontend.SourceInference.TypedSource.localSchemeTemplateIds
 example := @Solcore.Frontend.SourceInference.ForItemForm.primaryRequirementIds
 example := @Solcore.Frontend.SourceInference.StatementForm.primaryRequirementIds
 example := @Solcore.Frontend.SourceInference.Node.primaryRequirementIds
@@ -541,6 +545,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.validateRequirementIdsContained
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceRequirementOwnership
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceTemplateTracking
 example := @Solcore.Frontend.SourceInference.Detail.sourceContainsNodeId
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceRootsFrom
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceRoots
@@ -575,6 +581,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceLocalIdentities_success_owned
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceRequirementOwnership_success
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceTemplateTracking_success
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceRoots_success_rootsExist
 example :=
@@ -634,6 +642,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceGraph
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceLocalIdentities
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceTemplateTracking
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceRequirementOwnership
 example :=

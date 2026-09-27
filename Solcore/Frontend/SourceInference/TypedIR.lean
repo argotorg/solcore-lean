@@ -849,6 +849,15 @@ def definedLocalIds : ForItemForm → List Resolved.LocalId
   | .letDecl selectedBinder _ => [selectedBinder.id]
   | .expression _ | .assignValue .. | .assignBitNot _ => []
 
+/-- Qualified-local template identities materialized by an initialized `let`
+in a `for` initializer or post clause.  Uninitialized declarations do not own
+an initializer scope and therefore contribute no templates. -/
+def localSchemeTemplateIds : ForItemForm → List RequirementId
+  | .letDecl binder (some _) =>
+      binder.schemeRequirements.map fun requirement =>
+        requirement.templateRequirement
+  | .letDecl _ none | .expression _ | .assignValue .. | .assignBitNot _ => []
+
 end ForItemForm
 
 namespace ExpressionForm
@@ -875,6 +884,20 @@ def definedLocalIds : StatementForm → List Resolved.LocalId
         post.flatMap ForItemForm.definedLocalIds
   | .returnStmt _ | .expression .. | .assignValue .. | .assignBitNot _ |
       .ifThen .. | .block _ | .whileLoop .. | .breakStmt | .continueStmt => []
+
+/-- Qualified-local template identities materialized directly by initialized
+statement lets, including initialized lets in `for` initializer and post
+clauses.  Child occurrence bodies are represented by their own table nodes. -/
+def localSchemeTemplateIds : StatementForm → List RequirementId
+  | .letDecl binder (some _) =>
+      binder.schemeRequirements.map fun requirement =>
+        requirement.templateRequirement
+  | .forLoop initializer _ post _ =>
+      initializer.flatMap ForItemForm.localSchemeTemplateIds ++
+        post.flatMap ForItemForm.localSchemeTemplateIds
+  | .letDecl _ none | .returnStmt _ | .expression .. | .assignValue .. |
+      .assignBitNot _ | .ifThen .. | .block _ | .matchWith _ | .whileLoop .. |
+      .breakStmt | .continueStmt => []
 
 end StatementForm
 
@@ -929,6 +952,12 @@ def definedLocalIds : Node → List Resolved.LocalId
   | .expression node => node.form.definedLocalIds
   | .statement node => node.form.definedLocalIds
 
+/-- Qualified-local template identities materialized directly by one
+heterogeneous source node. -/
+def localSchemeTemplateIds : Node → List RequirementId
+  | .expression _ => []
+  | .statement node => node.form.localSchemeTemplateIds
+
 /-- Primary requirement identities retained directly by one heterogeneous
 source node. -/
 def primaryRequirementIds : Node → List RequirementId
@@ -945,6 +974,11 @@ the declarative ownership judgment. -/
 def definedLocalIds (source : TypedSource) : List Resolved.LocalId :=
   source.inputs.map (fun binder => binder.id) ++
     source.nodes.flatMap Node.definedLocalIds
+
+/-- Stable qualified-local template inventory in node-table and predicate
+order.  Only initialized lexical lets own template requirements. -/
+def localSchemeTemplateIds (source : TypedSource) : List RequirementId :=
+  source.nodes.flatMap Node.localSchemeTemplateIds
 
 /-- Stable primary requirement inventory in node-table and attachment order.
 This excludes every secondary mirror of a requirement identity. -/
