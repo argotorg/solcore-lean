@@ -452,6 +452,61 @@ example {context : SourceInference.Context}
   exact SourceInference.Detail.applyFunctionType_inferenceProperties ready
     calleeBelow argumentsBelow expectedBelow success
 
+/-- Attaching delayed argument coercions preserves semantic inference progress
+and readiness. -/
+example (state : SourceInference.State)
+    (entries : List SourceInference.Detail.ExpressionCoercions)
+    (ready : state.InferenceReady) :
+    state.InferenceProgress
+        (SourceInference.Detail.attachExpressionCoercions state entries) ∧
+      (SourceInference.Detail.attachExpressionCoercions state entries).InferenceReady := by
+  exact SourceInference.Detail.attachExpressionCoercions_inferenceProperties
+    state entries ready
+
+/-- Recording a selected call result preserves inference properties and its
+caller-supplied result-type bound. -/
+example (source callee : Syntax.Expr) (name : String)
+    (arguments : List SourceInference.InferredExpression)
+    (attempt : SourceInference.Detail.CandidateAttemptResult)
+    (result : SourceInference.InferredExpression)
+    (trailingCoercions : List SourceInference.CoercionStep)
+    (state : SourceInference.State)
+    (ready : state.InferenceReady)
+    (resultBelow : result.type.VariablesBelow state.inference.next) :
+    state.InferenceProgress
+        (SourceInference.Detail.recordSelectedCallResult source callee name
+          arguments attempt result trailingCoercions state).2 ∧
+      (SourceInference.Detail.recordSelectedCallResult source callee name
+        arguments attempt result trailingCoercions state).2.InferenceReady ∧
+      (SourceInference.Detail.recordSelectedCallResult source callee name
+        arguments attempt result trailingCoercions state).1.type.VariablesBelow
+        (SourceInference.Detail.recordSelectedCallResult source callee name
+          arguments attempt result trailingCoercions state).2.inference.next := by
+  exact
+    SourceInference.Detail.recordSelectedCallResult_inferenceProperties source
+      callee name arguments attempt result trailingCoercions state ready
+      resultBelow
+
+/-- The ordinary selected-call wrapper inherits progress, readiness, and the
+returned result-type bound. -/
+example (source callee : Syntax.Expr) (name : String)
+    (arguments : List SourceInference.InferredExpression)
+    (attempt : SourceInference.Detail.CandidateAttemptResult)
+    (ready : attempt.state.InferenceReady)
+    (resultBelow : attempt.result.type.VariablesBelow
+      attempt.state.inference.next) :
+    attempt.state.InferenceProgress
+        (SourceInference.Detail.recordSelectedCall source callee name arguments
+          attempt).2 ∧
+      (SourceInference.Detail.recordSelectedCall source callee name arguments
+        attempt).2.InferenceReady ∧
+      (SourceInference.Detail.recordSelectedCall source callee name arguments
+        attempt).1.type.VariablesBelow
+        (SourceInference.Detail.recordSelectedCall source callee name arguments
+          attempt).2.inference.next := by
+  exact SourceInference.Detail.recordSelectedCall_inferenceProperties source
+    callee name arguments attempt ready resultBelow
+
 /-- Recording an expected expression extends the same inference guarantees
 through source-node allocation without requiring a concrete evaluator case. -/
 example {source : Syntax.Expr} {id : SourceInference.ExpressionId}

@@ -2026,6 +2026,160 @@ theorem tryFunctionCandidate_some_inferenceProperties
                                             directProgress))),
                                     finalReady, resolvedTypeBelow⟩
 
+/-- Attaching delayed argument-coercion metadata leaves semantic inference
+unchanged and preserves the stable-binder readiness invariant. -/
+theorem attachExpressionCoercions_inferenceProperties
+    (state : State) (entries : List ExpressionCoercions)
+    (ready : state.InferenceReady) :
+    state.InferenceProgress (attachExpressionCoercions state entries) ∧
+      (attachExpressionCoercions state entries).InferenceReady := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil =>
+      exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      let modify : ExpressionNode → ExpressionNode := fun node => {
+        node with
+        type := entry.coercions.foldl (fun _ step => step.target) node.type
+        requirements := node.requirements ++
+          coercionRequirements entry.coercions
+        coercions := node.coercions ++ entry.coercions
+      }
+      let modifiedState :=
+        state.modifyExpressionNode entry.expression modify
+      have modifiedProgress : state.InferenceProgress modifiedState := by
+        exact State.InferenceProgress.modifyExpressionNode state
+          entry.expression modify ready.solved
+      have modifiedReady : modifiedState.InferenceReady := by
+        exact State.InferenceReady.modifyExpressionNode entry.expression modify
+          ready
+      have tailProperties := induction modifiedState modifiedReady
+      exact ⟨modifiedProgress.trans tailProperties.1, tailProperties.2⟩
+
+/-- Recording the synthetic callee and selected call changes only typed-source
+metadata.  It therefore makes reflexive semantic inference progress, preserves
+readiness, and retains the caller-supplied bound for the returned expression. -/
+theorem recordSelectedCallResult_inferenceProperties
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State)
+    (ready : state.InferenceReady)
+    (resultBelow : result.type.VariablesBelow state.inference.next) :
+    state.InferenceProgress
+        (recordSelectedCallResult source callee name arguments attempt result
+          trailingCoercions state).2 ∧
+      (recordSelectedCallResult source callee name arguments attempt result
+        trailingCoercions state).2.InferenceReady ∧
+      (recordSelectedCallResult source callee name arguments attempt result
+        trailingCoercions state).1.type.VariablesBelow
+        (recordSelectedCallResult source callee name arguments attempt result
+          trailingCoercions state).2.inference.next := by
+  let attachedState :=
+    attachExpressionCoercions state attempt.argumentCoercions
+  have attachedProperties :
+      state.InferenceProgress attachedState ∧ attachedState.InferenceReady :=
+    attachExpressionCoercions_inferenceProperties state
+      attempt.argumentCoercions ready
+  let allocation := attachedState.allocateExpressionId
+  have allocatedProgress :
+      attachedState.InferenceProgress allocation.2 :=
+    State.InferenceProgress.allocateExpressionId attachedState
+      attachedProperties.2.solved
+  have allocatedReady : allocation.2.InferenceReady :=
+    State.InferenceReady.allocateExpressionId attachedProperties.2
+  let calleeExpression : InferredExpression := {
+    id := allocation.1
+    type := allocation.2.resolve attempt.instantiation.type
+  }
+  let calleeRecord := recordExpression callee calleeExpression
+    (.reference name (.declaration attempt.instantiation)) [] [] allocation.2
+  have calleeProgress :
+      allocation.2.InferenceProgress calleeRecord.2 := by
+    simpa only [calleeRecord, recordExpression] using
+      State.InferenceProgress.recordNode allocation.2 (.expression {
+        id := calleeExpression.id
+        span := callee.span
+        type := calleeExpression.type
+        form := .reference name (.declaration attempt.instantiation)
+        requirements := []
+        coercions := []
+      }) allocatedReady.solved
+  have calleeReady : calleeRecord.2.InferenceReady := by
+    simpa only [calleeRecord, recordExpression] using
+      State.InferenceReady.recordNode (.expression {
+        id := calleeExpression.id
+        span := callee.span
+        type := calleeExpression.type
+        form := .reference name (.declaration attempt.instantiation)
+        requirements := []
+        coercions := []
+      }) allocatedReady
+  let callRecord := recordExpression source result
+    (.call allocation.1 (arguments.map (fun argument => argument.id))
+      (.declaration attempt.instantiation))
+    (coercionRequirements attempt.callCoercions ++
+      attempt.signatureRequirements ++
+      coercionRequirements trailingCoercions)
+    (attempt.callCoercions ++ trailingCoercions) calleeRecord.2
+  have callProgress : calleeRecord.2.InferenceProgress callRecord.2 := by
+    simpa only [callRecord, recordExpression] using
+      State.InferenceProgress.recordNode calleeRecord.2 (.expression {
+        id := result.id
+        span := source.span
+        type := result.type
+        form := .call allocation.1
+          (arguments.map (fun argument => argument.id))
+          (.declaration attempt.instantiation)
+        requirements := coercionRequirements attempt.callCoercions ++
+          attempt.signatureRequirements ++
+          coercionRequirements trailingCoercions
+        coercions := attempt.callCoercions ++ trailingCoercions
+      }) calleeReady.solved
+  have callReady : callRecord.2.InferenceReady := by
+    simpa only [callRecord, recordExpression] using
+      State.InferenceReady.recordNode (.expression {
+        id := result.id
+        span := source.span
+        type := result.type
+        form := .call allocation.1
+          (arguments.map (fun argument => argument.id))
+          (.declaration attempt.instantiation)
+        requirements := coercionRequirements attempt.callCoercions ++
+          attempt.signatureRequirements ++
+          coercionRequirements trailingCoercions
+        coercions := attempt.callCoercions ++ trailingCoercions
+      }) calleeReady
+  have totalProgress : state.InferenceProgress callRecord.2 :=
+    attachedProperties.1.trans
+      (allocatedProgress.trans (calleeProgress.trans callProgress))
+  have returnedBelow :
+      callRecord.1.type.VariablesBelow callRecord.2.inference.next := by
+    simpa only [callRecord, recordExpression] using
+      resultBelow.weaken totalProgress.next_le
+  change state.InferenceProgress callRecord.2 ∧
+    callRecord.2.InferenceReady ∧
+    callRecord.1.type.VariablesBelow callRecord.2.inference.next
+  exact ⟨totalProgress, callReady, returnedBelow⟩
+
+/-- The ordinary selected-call wrapper inherits the inference guarantees of
+the general result-recording operation. -/
+theorem recordSelectedCall_inferenceProperties
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (ready : attempt.state.InferenceReady)
+    (resultBelow : attempt.result.type.VariablesBelow
+      attempt.state.inference.next) :
+    attempt.state.InferenceProgress
+        (recordSelectedCall source callee name arguments attempt).2 ∧
+      (recordSelectedCall source callee name arguments attempt).2.InferenceReady ∧
+      (recordSelectedCall source callee name arguments attempt).1.type.VariablesBelow
+        (recordSelectedCall source callee name arguments attempt).2.inference.next := by
+  simpa only [recordSelectedCall] using
+    recordSelectedCallResult_inferenceProperties source callee name arguments
+      attempt attempt.result [] attempt.state ready resultBelow
+
 /-- Expected-type fitting followed by expression recording has the same
 inference guarantees; recording the typed node leaves inference unchanged. -/
 theorem recordExpressionWithExpected_inferenceProperties
