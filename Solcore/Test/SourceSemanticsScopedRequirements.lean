@@ -535,7 +535,8 @@ private theorem initializerHasNoChildren
   rcases contains with ⟨nodeMem, nodeId⟩
   simp [wrongScopeSource, expressionNode, letNode] at nodeMem
   rcases nodeMem with rfl | rfl | rfl
-  · simp [nodeChildIds, expressionChildIds] at childMem
+  · simp [nodeChildIds, Node.references, ExpressionForm.references]
+      at childMem
   · simp [Node.id, statementId, expressionId] at nodeId
   · simp [Node.id, expressionId] at nodeId
 
