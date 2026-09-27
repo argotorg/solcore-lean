@@ -1101,4 +1101,32 @@ theorem requirements_valid
 
 end ExpressionHasType
 
+namespace ExpressionsHaveTypes
+
+/-- Pointwise expression typing exposes an admissible type for every entry in
+the retained source-ordered type row. -/
+theorem each_type_admissible
+    {source : TypedSource} {context : Context}
+    {expressions : List ExpressionId} {types : List TypeSystem.Ty}
+    (typing : ExpressionsHaveTypes source context expressions types) :
+    ∀ type, type ∈ types → TypeAdmissible context type :=
+  fun type member => match typing with
+    | .nil _ => by simp at member
+    | .cons head tail => by
+        rcases List.mem_cons.mp member with rfl | tailMember
+        · exact head.type_admissible
+        · exact each_type_admissible tail type tailMember
+termination_by types.length
+
+/-- A typed expression row has an admissible bundled product type. -/
+theorem product_type_admissible
+    {source : TypedSource} {context : Context}
+    {expressions : List ExpressionId} {types : List TypeSystem.Ty}
+    (binders : TypeParameterBindersWellFormed context)
+    (typing : ExpressionsHaveTypes source context expressions types) :
+    TypeAdmissible context (TypeSystem.Ty.productMany types) :=
+  TypeAdmissible.productMany binders typing.each_type_admissible
+
+end ExpressionsHaveTypes
+
 end Solcore.SourceSemantics
