@@ -1007,6 +1007,33 @@ theorem stored_type
   cases typing with
   | intro contains => exact ⟨_, contains, rfl⟩
 
+/-- Declarative expression typing always exposes an admissible retained result
+type to enclosing expression and statement rules. -/
+theorem type_admissible
+    {source : TypedSource} {context : Context}
+    {id : ExpressionId} {type : TypeSystem.Ty}
+    (typing : ExpressionHasType source context id type) :
+    TypeAdmissible context type := by
+  cases typing with
+  | intro _ _ _ _ admissible _ => exact admissible
+
+/-- Recover the admissible pre-coercion type and its complete semantic output
+path from a typed expression occurrence. -/
+theorem raw_type_and_output_path
+    {source : TypedSource} {context : Context}
+    {id : ExpressionId} {type : TypeSystem.Ty}
+    (typing : ExpressionHasType source context id type) :
+    ∃ node rawType,
+      ContainsExpression source id node ∧
+        node.type = type ∧
+        node.rawType = rawType ∧
+        TypeAdmissible context rawType ∧
+        CoercionPathValid context rawType type node.coercions := by
+  cases typing with
+  | @intro _ _ node rawType plan contains _ rawTypeEq rawAdmissible _ valid =>
+      exact ⟨node, rawType, contains, rfl, rawTypeEq, rawAdmissible,
+        valid.outputPath⟩
+
 theorem requirements_valid
     {source : TypedSource} {context : Context}
     {id : ExpressionId} {type : TypeSystem.Ty}
