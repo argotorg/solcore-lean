@@ -557,6 +557,172 @@ end TypeWellFormed
 
 namespace TypeAdmissible
 
+/-- Re-scope one admissible component under an enclosing type which contains
+all of that component's flexible variables.  This is the common operation
+behind admissibility of compound expression types. -/
+theorem typeWellScopedWithin
+    {context : Context} {inner outer : TypeSystem.Ty}
+    (included : ∀ metavariable, metavariable ∈ inner.freeVariables →
+      metavariable ∈ outer.freeVariables)
+    (admissible : TypeAdmissible context inner) :
+    TypeWellScoped context (admissibleTypeVariables context outer) inner := by
+  apply TypeWellScoped.weakenTo ?_ admissible.typeWellScoped
+  intro metavariable member
+  cases residual : context.residualTypeVariables with
+  | false =>
+      simpa [admissibleTypeVariables, residual] using member
+  | true =>
+      simp only [admissibleTypeVariables, residual, if_true] at member ⊢
+      rcases List.mem_append.mp member with contextMember | occurrence
+      · exact List.mem_append.mpr (Or.inl contextMember)
+      · exact List.mem_append.mpr (Or.inr
+          (included metavariable occurrence))
+
+/-- A flexible variable already admitted by the occurrence scope is an
+admissible type. -/
+theorem variableType
+    {context : Context} {metavariable : TypeSystem.TypeVarId}
+    (binders : TypeParameterBindersWellFormed context)
+    (bound : metavariable ∈
+      admissibleTypeVariables context (.variable metavariable)) :
+    TypeAdmissible context (.variable metavariable) := {
+  binders
+  typeWellScoped := .variable bound
+}
+
+/-- Ambient lexical inference variables are admissible at every occurrence. -/
+theorem variableOfContext
+    {context : Context} {metavariable : TypeSystem.TypeVarId}
+    (binders : TypeParameterBindersWellFormed context)
+    (bound : metavariable ∈ context.typeVariables) :
+    TypeAdmissible context (.variable metavariable) := by
+  apply variableType binders
+  simp [admissibleTypeVariables, bound]
+
+/-- In a residually open body, a freshly allocated inference variable is
+admissible at its own occurrence. -/
+theorem variableOfResidual
+    {context : Context} (binders : TypeParameterBindersWellFormed context)
+    (residual : context.residualTypeVariables = true)
+    (metavariable : TypeSystem.TypeVarId) :
+    TypeAdmissible context (.variable metavariable) := by
+  apply variableType binders
+  simp [admissibleTypeVariables, residual, TypeSystem.Ty.freeVariables]
+
+/-- Every builtin type is admissible once the surrounding rigid binders are
+well formed. -/
+theorem builtin
+    {context : Context} (binders : TypeParameterBindersWellFormed context)
+    (builtin : TypeSystem.BuiltinType) :
+    TypeAdmissible context (.constructor (.builtin builtin)) := {
+  binders
+  typeWellScoped := .builtin builtin
+}
+
+theorem unit
+    {context : Context} (binders : TypeParameterBindersWellFormed context) :
+    TypeAdmissible context .unit := by
+  simpa [TypeSystem.Ty.unit] using builtin binders .unit
+
+theorem bool
+    {context : Context} (binders : TypeParameterBindersWellFormed context) :
+    TypeAdmissible context .bool := by
+  simpa [TypeSystem.Ty.bool] using builtin binders .bool
+
+theorem word
+    {context : Context} (binders : TypeParameterBindersWellFormed context) :
+    TypeAdmissible context .word := by
+  simpa [TypeSystem.Ty.word] using builtin binders .word
+
+theorem integer
+    {context : Context} (binders : TypeParameterBindersWellFormed context) :
+    TypeAdmissible context .integer := by
+  simpa [TypeSystem.Ty.integer] using builtin binders .integer
+
+/-- Admissibility is compositional for function types. -/
+theorem function
+    {context : Context} {parameter result : TypeSystem.Ty}
+    (parameterAdmissible : TypeAdmissible context parameter)
+    (resultAdmissible : TypeAdmissible context result) :
+    TypeAdmissible context (.function parameter result) := {
+  binders := parameterAdmissible.binders
+  typeWellScoped := .function
+    (parameterAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_function_iff metavariable
+        parameter result).mpr (Or.inl member))
+    (resultAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_function_iff metavariable
+        parameter result).mpr (Or.inr member))
+}
+
+/-- Admissibility is compositional for product types. -/
+theorem product
+    {context : Context} {left right : TypeSystem.Ty}
+    (leftAdmissible : TypeAdmissible context left)
+    (rightAdmissible : TypeAdmissible context right) :
+    TypeAdmissible context (.product left right) := {
+  binders := leftAdmissible.binders
+  typeWellScoped := .product
+    (leftAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_product_iff metavariable left right).mpr
+        (Or.inl member))
+    (rightAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_product_iff metavariable left right).mpr
+        (Or.inr member))
+}
+
+/-- Admissibility is compositional for mapping types. -/
+theorem mapping
+    {context : Context} {key value : TypeSystem.Ty}
+    (keyAdmissible : TypeAdmissible context key)
+    (valueAdmissible : TypeAdmissible context value) :
+    TypeAdmissible context (.mapping key value) := {
+  binders := keyAdmissible.binders
+  typeWellScoped := .mapping
+    (keyAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_mapping_iff metavariable key value).mpr
+        (Or.inl member))
+    (valueAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_mapping_iff metavariable key value).mpr
+        (Or.inr member))
+}
+
+/-- Admissibility is compositional for proxy types. -/
+theorem proxy
+    {context : Context} {inner : TypeSystem.Ty}
+    (innerAdmissible : TypeAdmissible context inner) :
+    TypeAdmissible context (.proxy inner) := {
+  binders := innerAdmissible.binders
+  typeWellScoped := .proxy
+    (innerAdmissible.typeWellScopedWithin fun _ member => member)
+}
+
+/-- Admissibility is compositional for compile-time wrappers. -/
+theorem comptime
+    {context : Context} {inner : TypeSystem.Ty}
+    (innerAdmissible : TypeAdmissible context inner) :
+    TypeAdmissible context (.comptime inner) := {
+  binders := innerAdmissible.binders
+  typeWellScoped := .comptime
+    (innerAdmissible.typeWellScopedWithin fun _ member => member)
+}
+
+/-- A source-ordered row of admissible element types has an admissible
+right-associated product. -/
+theorem productMany
+    {context : Context} (binders : TypeParameterBindersWellFormed context)
+    {types : List TypeSystem.Ty}
+    (each : ∀ type, type ∈ types → TypeAdmissible context type) :
+    TypeAdmissible context (TypeSystem.Ty.productMany types) := by
+  induction types with
+  | nil => simpa [TypeSystem.Ty.productMany] using unit binders
+  | cons head tail induction =>
+      cases tail with
+      | nil => simpa [TypeSystem.Ty.productMany] using each head (by simp)
+      | cons next rest =>
+          exact product (each head (by simp))
+            (induction fun type member => each type (by simp [member]))
+
 theorem ofWellFormed {context : Context} {type : TypeSystem.Ty}
     (wellFormed : TypeWellFormed context type) :
     TypeAdmissible context type := {
