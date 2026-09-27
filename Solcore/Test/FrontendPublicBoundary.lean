@@ -192,6 +192,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.coercionPlan?_some_isValid
 example :=
+  @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_resolve
+example :=
+  @Solcore.Frontend.SourceInference.Detail.withExpected_success_coercions_isValid
+example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_requirementsWellFormed

@@ -514,6 +514,83 @@ theorem coercionPlan?_some_isValid
                                       simp [PlannedCoercionPath.isValid])
                                     searchResult
 
+@[simp] private theorem addRequirementsWithIds_resolve
+    (state : State) (predicates : List ProgramPredicate) (type : Ty) :
+    (state.addRequirementsWithIds predicates).2.resolve type =
+      state.resolve type := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate rest induction =>
+      simp only [State.addRequirementsWithIds]
+      rw [induction]
+      rfl
+
+/-- Allocating coercion requirement identities leaves type resolution
+unchanged. -/
+@[simp] theorem commitCoercionPlan_resolve
+    (state : State) (plan : List PlannedCoercionStep) (type : Ty) :
+    (commitCoercionPlan state plan).2.resolve type = state.resolve type := by
+  induction plan generalizing state with
+  | nil => rfl
+  | cons step rest induction =>
+      simp only [commitCoercionPlan]
+      rw [induction]
+      exact addRequirementsWithIds_resolve
+        (state.addRequirementWithId step.predicate).2
+        step.methodPredicates type
+
+/-- Every successful expected-type fit returns either the empty equality path
+or a committed coercion path with exact resolved endpoints and adjacency. -/
+theorem withExpected_success_coercions_isValid
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    CoercionPath.isValid (result.state.resolve actual.type)
+      result.expression.type result.coercions = true := by
+  cases expected with
+  | none =>
+      simp only [withExpected] at success
+      injection success with resultEq
+      subst result
+      simp [CoercionPath.isValid]
+  | some expected =>
+      cases unification : state.inference.unify actual.type expected with
+      | ok inference =>
+          simp only [withExpected, unification] at success
+          injection success with resultEq
+          subst result
+          apply beq_iff_eq.mpr
+          exact TypeSystem.InferState.unify_resolve_eq unification
+      | error error =>
+          cases error with
+          | occursCheck metavariable type =>
+              simp [withExpected, unification] at success
+          | exhausted =>
+              simp [withExpected, unification] at success
+          | mismatch left right =>
+              simp only [withExpected, unification] at success
+              cases planResult : coercionPlan? context state
+                  (state.resolve actual.type) (state.resolve expected) with
+              | error error =>
+                  simp [planResult, bind, Except.bind] at success
+              | ok planOption =>
+                  cases planOption with
+                  | none =>
+                      simp [planResult, bind, Except.bind] at success
+                  | some plan =>
+                      simp only [planResult, bind, Except.bind] at success
+                      change Except.ok _ = Except.ok result at success
+                      injection success with resultEq
+                      subst result
+                      have planValid : PlannedCoercionPath.isValid
+                          (state.resolve actual.type) (state.resolve expected)
+                          plan = true :=
+                        coercionPlan?_some_isValid planResult
+                      have committedValid :=
+                        commitCoercionPlan_isValid state plan planValid
+                      simpa only [commitCoercionPlan_resolve] using
+                        committedValid
+
 /-- A successfully resolved source annotation contains no flexible
 metavariables, so every inference substitution fixes it. -/
 theorem resolveSourceType_success_apply_eq_self
