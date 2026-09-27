@@ -94,6 +94,22 @@ theorem function_scheme_body_variablesBelow
     Ty.variablesBelow_productMany (parameterTypes.variablesBelow next),
     Ty.variablesBelow_productMany (returnTypes.variablesBelow next)⟩
 
+/-- Every payload type of a cataloged constructor in a formation-validated
+data signature lies below every flexible-metavariable bound. -/
+theorem data_constructor_payloadTypes_variablesBelow
+    {signatures : ProgramSignatures}
+    (validated : ProgramSignatureFormationValidated signatures)
+    {dataType : ProgramDataSignature}
+    (dataMember : dataType ∈ signatures.dataTypes)
+    {constructor : ProgramDataConstructorSignature}
+    (constructorMember : constructor ∈ dataType.constructors)
+    (next : Nat) :
+    ∀ payload ∈ constructor.payloadTypes,
+      payload.VariablesBelow next :=
+  SignatureTypesFormationValidated.variablesBelow
+    (validated.dataTypes dataType dataMember constructor constructorMember)
+    next
+
 end ProgramSignatureFormationValidated
 
 /-- A frontend-validated signature type contains no flexible metavariables,
