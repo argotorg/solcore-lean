@@ -1038,6 +1038,18 @@ theorem attachExpressionCoercions_occurrenceBoundExtends
           coercions := node.coercions ++ entry.coercions
         }))
 
+@[simp] theorem attachExpressionCoercions_nextOccurrence
+    (state : State) (entries : List ExpressionCoercions) :
+    (attachExpressionCoercions state entries).nextOccurrence =
+      state.nextOccurrence := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil => rfl
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      rw [induction]
+      exact State.modifyExpressionNode_nextOccurrence state _ _
+
 /-- Coercion attachment preserves an older exact node prefix when every
 target expression was allocated at or after that prefix's cutoff. -/
 theorem attachExpressionCoercions_preserves_nodesPrefix_of_fresh
@@ -1601,6 +1613,20 @@ theorem recordSelectedCallResult_success_nodes
   simp [recordSelectedCallResult, recordExpression, State.recordNode,
     List.append_assoc]
 
+/-- Selected-call recording allocates exactly the synthetic callee occurrence;
+the call occurrence itself was allocated by the enclosing traversal. -/
+@[simp] theorem recordSelectedCallResult_nextOccurrence
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) :
+    (recordSelectedCallResult source callee name arguments attempt result
+      trailingCoercions state).2.nextOccurrence = state.nextOccurrence + 1 := by
+  unfold recordSelectedCallResult recordExpression
+  simp only [State.recordNode_nextOccurrence,
+    State.allocateExpressionId_nextOccurrence,
+    attachExpressionCoercions_nextOccurrence]
+
 @[simp] theorem recordSelectedCallResult_fst
     (source callee : Syntax.Expr) (name : String)
     (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
@@ -1617,11 +1643,28 @@ theorem recordSelectedCallResult_success_nodes
       attempt.result := by
   simp [recordSelectedCall]
 
+@[simp] theorem recordSelectedCall_nextOccurrence
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+    (recordSelectedCall source callee name arguments attempt).2.nextOccurrence =
+      attempt.state.nextOccurrence + 1 := by
+  unfold recordSelectedCall
+  exact recordSelectedCallResult_nextOccurrence source callee name arguments
+    attempt attempt.result [] attempt.state
+
 @[simp] theorem recordIndirectCall_fst
     (source : Syntax.Expr) (callee : InferredExpression)
     (arguments : List InferredExpression) (result : IndirectApplicationResult) :
     (recordIndirectCall source callee arguments result).1 = result.result := by
   simp [recordIndirectCall, recordExpression, State.recordNode]
+
+@[simp] theorem recordIndirectCall_nextOccurrence
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult) :
+    (recordIndirectCall source callee arguments result).2.nextOccurrence =
+      result.state.nextOccurrence := by
+  unfold recordIndirectCall recordExpression
+  exact State.recordNode_nextOccurrence _ _
 
 /-- Builtin-function argument unification allocates no source occurrences. -/
 theorem unifyBuiltinFunctionArgumentsEqual_occurrenceState_eq

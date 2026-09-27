@@ -569,6 +569,24 @@ advanced occurrence bound. -/
     (state.recordNode node).nodes = state.nodes ++ [node] := by
   rfl
 
+@[simp] theorem recordNode_nextOccurrence (state : State) (node : Node) :
+    (state.recordNode node).nextOccurrence = state.nextOccurrence := by
+  rfl
+
+@[simp] theorem modifyExpressionNode_nextOccurrence
+    (state : State) (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode) :
+    (state.modifyExpressionNode id modify).nextOccurrence =
+      state.nextOccurrence := by
+  rfl
+
+@[simp] theorem modifyStatementNode_nextOccurrence
+    (state : State) (id : StatementId)
+    (modify : StatementNode → StatementNode) :
+    (state.modifyStatementNode id modify).nextOccurrence =
+      state.nextOccurrence := by
+  rfl
+
 namespace OccurrenceBoundExtends
 
 /-- Type-metavariable allocation is an occurrence-bound extension. -/
