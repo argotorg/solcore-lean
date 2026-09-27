@@ -350,6 +350,28 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordBuiltinFunctionCall_requirements_subset
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorApplicationFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorArgumentsFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferPlaceFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferAssignedValueFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_requirements_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_instantiation
 example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_success_candidate

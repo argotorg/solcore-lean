@@ -1611,6 +1611,595 @@ theorem recordBuiltinFunctionCall_requirements_subset
       State.allocateExpressionId_requirements_subset,
       recordExpression_requirements_subset]
 
+@[simp] private theorem fresh_requirements_eq (state : State) :
+    state.fresh.2.requirements = state.requirements := by
+  rfl
+
+@[simp] private theorem restoreLexicalScope_requirements_eq
+    (state : State) (scope : LexicalScope) :
+    (state.restoreLexicalScope scope).requirements = state.requirements := by
+  rfl
+
+@[simp] private theorem allocateBinder_requirements_eq
+    (state : State) (name : String) (scheme : Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement) :
+    (state.allocateBinder name scheme span comptime
+      schemeRequirements).2.requirements = state.requirements := by
+  rfl
+
+@[simp] private theorem allocateHiddenLocal_requirements_eq (state : State) :
+    state.allocateHiddenLocal.2.requirements = state.requirements := by
+  rfl
+
+@[simp] private theorem allocateExpressionId_requirements_eq (state : State) :
+    state.allocateExpressionId.2.requirements = state.requirements := by
+  rfl
+
+@[simp] private theorem allocateStatementId_requirements_eq (state : State) :
+    state.allocateStatementId.2.requirements = state.requirements := by
+  rfl
+
+@[simp] private theorem recordNode_requirements_eq
+    (state : State) (node : Node) :
+    (state.recordNode node).requirements = state.requirements := by
+  rfl
+
+private theorem pair_success_requirements_subset {alpha : Type}
+    {operation : alpha × State} {value : alpha} {next initial : State}
+    (operationSubset : initial.requirements ⊆ operation.2.requirements)
+    (success : operation = (value, next)) :
+    initial.requirements ⊆ next.requirements := by
+  simpa [success] using operationSubset
+
+private theorem pair_eq_property {alpha beta : Type} {result : alpha × beta}
+    {property : beta → Prop}
+    (invariant : ∀ value state, result = (value, state) → property state) :
+    property result.2 := by
+  rcases result with ⟨value, state⟩
+  exact invariant value state rfl
+
+private theorem pair_except_property {epsilon alpha beta : Type}
+    {computation : Except epsilon (alpha × beta)} {result : alpha × beta}
+    {property : beta → Prop}
+    (invariant : ∀ value state,
+      computation = .ok (value, state) → property state)
+    (success : computation = .ok result) :
+    property result.2 := by
+  rcases result with ⟨value, state⟩
+  exact invariant value state success
+
+private theorem anchored_pair_except_property {epsilon alpha beta : Type}
+    {anchor : alpha × State}
+    {computation : alpha → State → Except epsilon (beta × State)}
+    {initial state : State} {result : beta × State}
+    (_anchorInvariant : ∀ value next,
+      (Except.ok anchor : Except epsilon (alpha × State)) =
+          Except.ok (value, next) →
+        initial.requirements ⊆ next.requirements)
+    (invariant : ∀ value state result next,
+      computation value state = .ok (result, next) →
+        state.requirements ⊆ next.requirements)
+    (success : computation anchor.1 state = .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  rcases anchor with ⟨value, anchorState⟩
+  rcases result with ⟨result, next⟩
+  exact invariant value state result next success
+
+private theorem mem_addRequirementsWithIds
+    {requirement : Requirement} {state : State}
+    {predicates : List ProgramPredicate}
+    (member : requirement ∈ state.requirements) :
+    requirement ∈
+      (state.addRequirementsWithIds predicates).2.requirements :=
+  State.addRequirementsWithIds_requirements_subset state predicates member
+
+private theorem allocateExpressionId_success_requirements_subset
+    {state next : State} {id : ExpressionId}
+    (success : state.allocateExpressionId = (id, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset
+    (State.allocateExpressionId_requirements_subset state) success
+
+private theorem allocateStatementId_success_requirements_subset
+    {state next : State} {id : StatementId}
+    (success : state.allocateStatementId = (id, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset
+    (State.allocateStatementId_requirements_subset state) success
+
+private theorem state_fresh_success_requirements_subset
+    {state next : State} {type : Ty}
+    (success : state.fresh = (type, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset (State.fresh_requirements_subset state)
+    success
+
+private theorem allocateHiddenLocal_success_requirements_subset
+    {state next : State} {id : Resolved.LocalId}
+    (success : state.allocateHiddenLocal = (id, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset
+    (State.allocateHiddenLocal_requirements_subset state) success
+
+private theorem addRequirementWithId_success_requirements_subset
+    {state next : State} {predicate : ProgramPredicate}
+    {requirement : RequirementId}
+    (success : state.addRequirementWithId predicate = (requirement, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset
+    (State.addRequirementWithId_requirements_subset state predicate) success
+
+private theorem addRequirementsWithIds_success_requirements_subset
+    {state next : State} {predicates : List ProgramPredicate}
+    {requirements : List RequirementId}
+    (success : state.addRequirementsWithIds predicates = (requirements, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset
+    (State.addRequirementsWithIds_requirements_subset state predicates) success
+
+private theorem allocateBinder_success_requirements_subset
+    {state next : State} {name : String} {scheme : Scheme}
+    {span : Option Syntax.SourceSpan} {comptime : Bool}
+    {schemeRequirements : List LocalSchemeRequirement} {binder : TypedBinder}
+    (success : state.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset
+    (State.allocateBinder_requirements_subset state name scheme span comptime
+      schemeRequirements) success
+
+private theorem freshDataConstructorInstantiation_success_requirements_subset
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    {state next : State} {instantiation : DataConstructorInstantiation}
+    (success : freshDataConstructorInstantiation dataType constructor state =
+      (instantiation, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset
+    (freshDataConstructorInstantiation_requirements_subset dataType constructor
+      state) success
+
+private theorem freshTypes_success_requirements_subset
+    {count : Nat} {state next : State} {types : List Ty}
+    (success : freshTypes count state = (types, next)) :
+    state.requirements ⊆ next.requirements :=
+  pair_success_requirements_subset
+    (freshTypes_requirements_subset count state) success
+
+private theorem syntheticTuple_result_requirements_subset
+    {elements : List InferredExpression} {span : Syntax.SourceSpan}
+    {state : State} {result : InferredExpression × State}
+    (success : (pure ({
+        id := state.allocateExpressionId.fst
+        type := Ty.productMany (elements.map (·.type))
+      }, state.allocateExpressionId.snd.recordNode (.expression {
+        id := state.allocateExpressionId.fst
+        span
+        type := Ty.productMany (elements.map (·.type))
+        form := .tuple (elements.map (·.id))
+      })) : Except Error (InferredExpression × State)) = .ok result) :
+    state.requirements ⊆ result.snd.requirements := by
+  have resultEq : ({
+      id := state.allocateExpressionId.fst
+      type := Ty.productMany (elements.map (·.type))
+    }, state.allocateExpressionId.snd.recordNode (.expression {
+      id := state.allocateExpressionId.fst
+      span
+      type := Ty.productMany (elements.map (·.type))
+      form := .tuple (elements.map (·.id))
+    })) = result := by
+    simpa only [exceptPure_eq_ok] using success
+  rw [← resultEq]
+  exact List.Subset.trans
+    (State.allocateExpressionId_requirements_subset state)
+    (State.recordNode_requirements_subset state.allocateExpressionId.snd _)
+
+private theorem syntheticTuple_pair_requirements_subset
+    {elements : List InferredExpression} {span : Syntax.SourceSpan}
+    {state : State} {result : InferredExpression × State}
+    (success : ({
+        id := state.allocateExpressionId.fst
+        type := Ty.productMany (elements.map (·.type))
+      }, state.allocateExpressionId.snd.recordNode (.expression {
+        id := state.allocateExpressionId.fst
+        span
+        type := Ty.productMany (elements.map (·.type))
+        form := .tuple (elements.map (·.id))
+      })) = result) :
+    state.requirements ⊆ result.snd.requirements := by
+  rw [← success]
+  exact List.Subset.trans
+    (State.allocateExpressionId_requirements_subset state)
+    (State.recordNode_requirements_subset state.allocateExpressionId.snd _)
+
+private theorem pure_pair_result_requirements_subset {epsilon alpha : Type}
+    {value : alpha} {next initial : State} {result : alpha × State}
+    (nextSubset : initial.requirements ⊆ next.requirements)
+    (success : (pure (value, next) : Except epsilon (alpha × State)) =
+      .ok result) :
+    initial.requirements ⊆ result.snd.requirements := by
+  have resultEq : (value, next) = result := by
+    simpa only [exceptPure_eq_ok] using success
+  rw [← resultEq]
+  exact nextSubset
+
+private theorem restored_pair_result_requirements_subset {alpha : Type}
+    {value : alpha} {state initial : State} {scope : LexicalScope}
+    {result : alpha × State}
+    (subset : initial.requirements ⊆ state.requirements)
+    (success : (value, state.restoreLexicalScope scope) = result) :
+    initial.requirements ⊆ result.snd.requirements := by
+  rw [← success]
+  exact List.Subset.trans subset
+    (State.restoreLexicalScope_requirements_subset state scope)
+
+set_option maxHeartbeats 2000000 in
+private theorem inferFuel_preserves_requirements_internal :
+    (∀ fuel context expression expected state,
+      PreservesRequirements Prod.snd state
+        (inferExprFuel fuel context expression expected state)) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      PreservesRequirements Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state)) ∧
+    (∀ fuel context sources expected state,
+      PreservesRequirements Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state)) ∧
+    (∀ fuel context statements expectedReturn state,
+      PreservesRequirements BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state)) ∧
+    (∀ fuel context statement expectedReturn state,
+      PreservesRequirements StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state)) ∧
+    (∀ fuel context items state,
+      PreservesRequirements InferredForItems.state state
+        (inferForItemsFuel fuel context items state)) ∧
+    (∀ fuel context item state,
+      PreservesRequirements Prod.snd state
+        (inferForItemFuel fuel context item state)) ∧
+    (∀ fuel context target state,
+      PreservesRequirements Prod.snd state
+        (inferPlaceFuel fuel context target state)) ∧
+    (∀ fuel context target operator value state,
+      PreservesRequirements (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state)) ∧
+    (∀ fuel context expressions state,
+      PreservesRequirements Prod.snd state
+        (inferExprsFuel fuel context expressions state)) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      PreservesRequirements MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state)) := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := fun fuel context expression expected state =>
+      PreservesRequirements Prod.snd state
+        (inferExprFuel fuel context expression expected state))
+    (motive2 := fun fuel context source id instantiation arguments expected
+        state =>
+      PreservesRequirements Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state))
+    (motive3 := fun fuel context sources expected state =>
+      PreservesRequirements Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state))
+    (motive4 := fun fuel context statements expectedReturn state =>
+      PreservesRequirements BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state))
+    (motive5 := fun fuel context statement expectedReturn state =>
+      PreservesRequirements StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state))
+    (motive6 := fun fuel context items state =>
+      PreservesRequirements InferredForItems.state state
+        (inferForItemsFuel fuel context items state))
+    (motive7 := fun fuel context item state =>
+      PreservesRequirements Prod.snd state
+        (inferForItemFuel fuel context item state))
+    (motive8 := fun fuel context target state =>
+      PreservesRequirements Prod.snd state
+        (inferPlaceFuel fuel context target state))
+    (motive9 := fun fuel context target operator value state =>
+      PreservesRequirements (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state))
+    (motive10 := fun fuel context expressions state =>
+      PreservesRequirements Prod.snd state
+        (inferExprsFuel fuel context expressions state))
+    (motive11 := fun fuel context scrutineeType expectedReturn outerScope
+        cases state =>
+      PreservesRequirements MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state))
+  case case44 =>
+    intros context statement expectedReturn state fuel id stateAfterId
+      statementIdEq scrutinees arms statementEq sources notSingleton
+      casesInduction bodyInduction expressionsInduction
+    unfold PreservesRequirements at *
+    intro result success
+    have statementIdSubset :=
+      allocateStatementId_success_requirements_subset statementIdEq
+    unfold inferStatementFuel at success
+    simp only [statementIdEq, statementEq, bind, Except.bind] at success
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try exact (notSingleton _ (by assumption)).elim
+    all_goals try have expressionsSubset :=
+      expressionsInduction _ (by assumption)
+    all_goals try have casesSubset :=
+      casesInduction _ _ _ (by assumption)
+    all_goals try have bodySubset :=
+      bodyInduction _ _ _ (by assumption)
+    all_goals try have tupleSubset :=
+      syntheticTuple_result_requirements_subset (by assumption)
+    all_goals try have tupleSubset :=
+      syntheticTuple_pair_requirements_subset (by assumption)
+    all_goals try have defaultSubset :=
+      pure_pair_result_requirements_subset casesSubset (by assumption)
+    all_goals simp_all only [exceptPure_eq_ok]
+    all_goals try have restoredSubset :=
+      restored_pair_result_requirements_subset bodySubset (by assumption)
+    all_goals try simp_all
+    all_goals intro requirement member
+    all_goals try solve_by_elim (maxDepth := 30)
+  case case70 =>
+    intros fuel context target operator value state placeInduction valueInduction
+    unfold PreservesRequirements at *
+    intro result success
+    unfold inferAssignedValueFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try simp_all only [exceptPure_eq_ok]
+    all_goals try rcases v with ⟨place, placeState⟩
+    all_goals try rcases v_2 with ⟨inferred, resultState⟩
+    all_goals
+      have placeSubset := pair_except_property placeInduction rfl
+    all_goals try have valueSubset :=
+      valueInduction place v_1 inferred resultState (by assumption)
+    all_goals try
+      have valueSubset := anchored_pair_except_property placeInduction
+        valueInduction (by assumption)
+    all_goals try have valueSubset :=
+      pair_except_property (valueInduction _ _) (by assumption)
+    all_goals try have unifiedSubset :=
+      unify_requirements_subset (by assumption)
+    all_goals simp_all
+    all_goals intro requirement member
+    all_goals grind
+  case case67 =>
+    unfold PreservesRequirements at *
+    intros
+    simp_all only [inferPlaceFuel]
+  all_goals
+    intros
+    unfold PreservesRequirements at *
+    intro result success
+    first
+      | unfold inferExprFuel at success
+      | unfold inferConstructorApplicationFuel at success
+      | unfold inferConstructorArgumentsFuel at success
+      | unfold inferStatementsFuel at success
+      | unfold inferStatementFuel at success
+      | unfold inferForItemsFuel at success
+      | unfold inferForItemFuel at success
+      | unfold inferPlaceFuel at success
+      | unfold inferAssignedValueFuel at success
+      | unfold inferExprsFuel at success
+      | unfold inferMatchCasesFuel at success
+    try simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try simp_all only [exceptPure_eq_ok]
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals first
+      | specialize ih1 _ _ (by assumption)
+      | specialize ih1 _ _ _ (by assumption)
+      | specialize ih1 _ _ _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih2 _ _ (by assumption)
+      | specialize ih2 _ _ _ (by assumption)
+      | specialize ih2 _ _ _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih3 _ _ (by assumption)
+      | specialize ih3 _ _ _ (by assumption)
+      | specialize ih3 _ _ _ _ (by assumption)
+      | skip
+    all_goals first
+      | have ih1Subset := pair_eq_property ih1
+      | have ih1Subset := pair_except_property ih1 (by assumption)
+      | have ih1Subset := pair_except_property (ih1 _ _) (by assumption)
+      | skip
+    all_goals first
+      | have ih2Subset := pair_eq_property ih2
+      | have ih2Subset := pair_except_property ih2 (by assumption)
+      | have ih2Subset := pair_except_property (ih2 _ _) (by assumption)
+      | skip
+    all_goals first
+      | have ih3Subset := pair_eq_property ih3
+      | have ih3Subset := pair_except_property ih3 (by assumption)
+      | have ih3Subset := pair_except_property (ih3 _ _) (by assumption)
+      | skip
+    all_goals try have unifiedSubset :=
+      unify_requirements_subset (by assumption)
+    all_goals try have expressionIdSubset :=
+      allocateExpressionId_success_requirements_subset (by assumption)
+    all_goals try have statementIdSubset :=
+      allocateStatementId_success_requirements_subset (by assumption)
+    all_goals try have freshSubset :=
+      state_fresh_success_requirements_subset (by assumption)
+    all_goals try have hiddenLocalSubset :=
+      allocateHiddenLocal_success_requirements_subset (by assumption)
+    all_goals try have requirementSubset :=
+      addRequirementWithId_success_requirements_subset (by assumption)
+    all_goals try have requirementsSubset :=
+      addRequirementsWithIds_success_requirements_subset (by assumption)
+    all_goals try have binderSubset :=
+      allocateBinder_success_requirements_subset (by assumption)
+    all_goals try have constructorSubset :=
+      freshDataConstructorInstantiation_success_requirements_subset (by
+        assumption)
+    all_goals try have typesSubset :=
+      freshTypes_success_requirements_subset (by assumption)
+    all_goals try have recordSubset :=
+      recordExpressionWithExpected_requirements_subset (by assumption)
+    all_goals try have lambdaSubset :=
+      bindLambdaParameters_requirements_subset (by assumption)
+    all_goals try
+      have afterLambdaSubset := List.Subset.trans lambdaSubset
+        (unify_requirements_subset (by assumption))
+    all_goals try have patternSubset :=
+      inferMatchPatternFuel_requirements_subset (by assumption)
+    all_goals try have unarySubset :=
+      inferUnaryOperator_requirements_subset (by assumption)
+    all_goals try have binarySubset :=
+      inferBinaryOperator_requirements_subset (by assumption)
+    all_goals try have selectionSubset :=
+      selectFunctionCandidateFrom_requirements_subset (by assumption)
+    all_goals try have expectedSubset :=
+      withExpected_requirements_subset (by assumption)
+    all_goals try have applicationSubset :=
+      applyFunctionType_requirements_subset (by assumption)
+    all_goals try have builtinSubset :=
+      recordBuiltinFunctionCall_requirements_subset (by assumption)
+    all_goals try simp_all
+    all_goals try simp_all [State.addRequirementWithId]
+    all_goals try obtain ⟨recordSubset, recordMember⟩ := recordSubset
+    all_goals intro requirement member
+    all_goals grind
+      [inferMatchPatternFuel_requirements_subset,
+        fresh_requirements_eq,
+        restoreLexicalScope_requirements_eq,
+        allocateBinder_requirements_eq,
+        allocateHiddenLocal_requirements_eq,
+        allocateExpressionId_requirements_eq,
+        allocateStatementId_requirements_eq,
+        recordNode_requirements_eq,
+        mem_addRequirementsWithIds,
+        unify_requirements_subset,
+        State.addRequirementWithId_requirements_subset,
+        State.addRequirementsWithIds_requirements_subset,
+        freshDataConstructorInstantiation_requirements_subset,
+        freshTypes_requirements_subset,
+        recordExpression_requirements_subset,
+        recordExpressionWithExpected_requirements_subset,
+        recordSelectedCallResult_requirements_subset,
+        recordSelectedCall_requirements_subset,
+        recordIndirectCall_requirements_subset,
+        bindLambdaParameters_requirements_subset,
+        inferUnaryOperator_requirements_subset,
+        inferBinaryOperator_requirements_subset,
+        selectFunctionCandidateFrom_requirements_subset,
+        withExpected_requirements_subset,
+        applyFunctionType_requirements_subset,
+      recordBuiltinFunctionCall_requirements_subset]
+
+theorem inferExprFuel_requirements_subset
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  exact inferFuel_preserves_requirements_internal.1 fuel context expression
+    expected state result success
+
+theorem inferConstructorApplicationFuel_requirements_subset
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.1 fuel context source id
+    instantiation arguments expected state result success
+
+theorem inferConstructorArgumentsFuel_requirements_subset
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {expected : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expected
+      state = .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.1 fuel context sources
+    expected state result success
+
+theorem inferStatementsFuel_requirements_subset
+    {fuel : Nat} {context : Context} {statements : List Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : BlockResult}
+    (success : inferStatementsFuel fuel context statements expectedReturn state =
+      .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.2.1 fuel context
+    statements expectedReturn state result success
+
+theorem inferStatementFuel_requirements_subset
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.2.2.1 fuel context
+    statement expectedReturn state result success
+
+theorem inferForItemsFuel_requirements_subset
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.2.2.2.1 fuel context
+    items state result success
+
+theorem inferForItemFuel_requirements_subset
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.2.2.2.2.1 fuel context
+    item state result success
+
+theorem inferPlaceFuel_requirements_subset
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.2.2.2.2.2.1 fuel
+    context target state result success
+
+theorem inferAssignedValueFuel_requirements_subset
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr} {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result) :
+    state.requirements ⊆ result.2.2.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.2.2.2.2.2.2.1 fuel
+    context target operator value state result success
+
+theorem inferExprsFuel_requirements_subset
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    state.requirements ⊆ result.2.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.2.2.2.2.2.2.2.1 fuel
+    context expressions state result success
+
+theorem inferMatchCasesFuel_requirements_subset
+    {fuel : Nat} {context : Context} {scrutineeType expectedReturn : Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : State} {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  exact inferFuel_preserves_requirements_internal.2.2.2.2.2.2.2.2.2.2 fuel
+    context scrutineeType expectedReturn outerScope cases state result success
+
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)
     (solved : List SolvedRequirement)
