@@ -397,6 +397,7 @@ example := @Solcore.SourceSemantics.LocalSchemeInstantiationValid.toSchemeInstan
 example := @Solcore.SourceSemantics.ReferenceUseValid
 example := @Solcore.SourceSemantics.ReferenceUseValid.raw_type
 example := @Solcore.SourceSemantics.CoercionPathValid
+example := @Solcore.SourceSemantics.CoercionPathValid.of_isValid
 example := @Solcore.SourceSemantics.IntegerLiteralValid
 example := @Solcore.SourceSemantics.WordLiteralValid
 example := @Solcore.SourceSemantics.UnaryOperatorHasType

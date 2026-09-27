@@ -118,6 +118,36 @@ theorem endpoints_of_singleton
   cases valid with
   | cons _ tail => exact ⟨rfl, endpoints_of_nil tail⟩
 
+/-- Structural endpoint checking plus semantic validity of every retained
+edge is sufficient to construct the declarative path judgment.  This is the
+small bridge used by executable coercion producers: path search and commit
+establish adjacency, while the solved requirement ledger justifies each
+individual edge. -/
+theorem of_isValid
+    {context : Context} {source target : TypeSystem.Ty}
+    {steps : List CoercionStep}
+    (structural : CoercionPath.isValid source target steps = true)
+    (stepsValid : ∀ step, step ∈ steps → CoercionStepValid context step) :
+    CoercionPathValid context source target steps := by
+  induction steps generalizing source with
+  | nil =>
+      simp only [CoercionPath.isValid, beq_iff_eq] at structural
+      subst target
+      exact .nil source
+  | cons step rest induction =>
+      have structural_eq :
+          CoercionPath.isValid source target (step :: rest) =
+            ((step.source == source) &&
+              CoercionPath.isValid step.target target rest) := by
+        cases rest <;> rfl
+      rw [structural_eq, Bool.and_eq_true] at structural
+      have source_eq : step.source = source :=
+        beq_iff_eq.mp structural.1
+      subst source
+      exact .cons (stepsValid step (by simp))
+        (induction structural.2 fun candidate member =>
+          stepsValid candidate (by simp [member]))
+
 end CoercionPathValid
 
 end Solcore.SourceSemantics
