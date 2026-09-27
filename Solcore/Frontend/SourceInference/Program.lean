@@ -153,6 +153,117 @@ theorem checkFunctionBody_success_declaration
       subst checked
       rfl
 
+/-- A successful body check exposes the declaration lookup, statement
+inference, return-type unification, and finalization results which produced the
+checked function. -/
+theorem checkFunctionBody_success_witness
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    ∃ declaration body finalState result,
+      environment.declaration? signature.id = some declaration ∧
+        Detail.inferStatementsFuel fuel
+            {
+              environment
+              signatures
+              scope := .ofDeclaration declaration
+              assumptions := signature.scheme.predicates
+            }
+            signature.source.value.body.value
+            (Ty.productMany signature.returnTypes)
+            (State.initial declaration.id
+              ((signature.parameterNames.zip signature.parameterTypes).map
+                fun parameter => (parameter.1, Scheme.mono parameter.2))
+              signature.parameterComptime) = .ok body ∧
+          Detail.unify body.state body.type
+              (Ty.productMany signature.returnTypes) = .ok finalState ∧
+            Detail.finalize
+                {
+                  environment
+                  signatures
+                  scope := .ofDeclaration declaration
+                  assumptions := signature.scheme.predicates
+                }
+                (Ty.productMany signature.returnTypes) finalState
+                (body.statements.map NodeId.statement) = .ok result ∧
+              checked = {
+                declaration := signature.id
+                type := signature.scheme.body
+                inferredBodyType := result.type
+                returnComptime := signature.returnComptime
+                substitution := result.substitution
+                solvedRequirements := result.solvedRequirements
+                typedBody := result.typedSource
+              } := by
+  unfold checkFunctionBody at success
+  cases resultEq :
+      checkFunctionBodyResult environment signatures signature fuel with
+  | error error => simp [resultEq, bind, Except.bind] at success
+  | ok result =>
+      simp only [resultEq, bind, Except.bind] at success
+      injection success with checkedEq
+      unfold checkFunctionBodyResult at resultEq
+      unfold functionDeclaration? at resultEq
+      cases declarationEq : environment.declaration? signature.id with
+      | none => simp [declarationEq, bind, Except.bind] at resultEq
+      | some declaration =>
+          simp [declarationEq, functionLocals, pure, Except.pure, bind,
+            Except.bind] at resultEq
+          cases bodyEq :
+              Detail.inferStatementsFuel fuel
+                {
+                  environment
+                  signatures
+                  scope := .ofDeclaration declaration
+                  assumptions := signature.scheme.predicates
+                }
+                signature.source.value.body.value
+                (Ty.productMany signature.returnTypes)
+                (State.initial
+                  (ProgramTypeScope.ofDeclaration declaration).genericOwner
+                  ((signature.parameterNames.zip signature.parameterTypes).map
+                    fun parameter => (parameter.1, Scheme.mono parameter.2))
+                  signature.parameterComptime) with
+          | error error =>
+              rw [bodyEq] at resultEq
+              contradiction
+          | ok body =>
+              rw [bodyEq] at resultEq
+              simp only at resultEq
+              cases unifyEq : Detail.unify body.state body.type
+                  (Ty.productMany signature.returnTypes) with
+              | error error =>
+                  rw [unifyEq] at resultEq
+                  contradiction
+              | ok finalState =>
+                  rw [unifyEq] at resultEq
+                  simp only at resultEq
+                  cases finalizeEq :
+                      Detail.finalize
+                        {
+                          environment
+                          signatures
+                          scope := .ofDeclaration declaration
+                          assumptions := signature.scheme.predicates
+                        }
+                        (Ty.productMany signature.returnTypes) finalState
+                        (body.statements.map NodeId.statement) with
+                  | error error =>
+                      rw [finalizeEq] at resultEq
+                      contradiction
+                  | ok finalResult =>
+                      rw [finalizeEq] at resultEq
+                      simp only [Except.ok.injEq] at resultEq
+                      subst result
+                      refine ⟨declaration, body, finalState, finalResult,
+                        rfl, ?_, unifyEq, finalizeEq, ?_⟩
+                      · simpa [ProgramTypeScope.ofDeclaration] using bodyEq
+                      · simpa [checkedFunctionOfResult] using checkedEq.symm
+
 private def checkFunctionBodiesAux (environment : ProgramEnvironment)
     (signatures : ProgramSignatures) (fuel : Nat) :
     List ProgramFunctionSignature → List CheckedFunction → List FunctionError →

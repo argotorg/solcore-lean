@@ -22,6 +22,51 @@ example
 example
     {environment : ProgramEnvironment}
     {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : SourceInference.CheckedFunction}
+    (success : SourceInference.checkFunctionBody environment signatures signature
+      fuel = .ok checked) :
+    ∃ declaration body finalState result,
+      environment.declaration? signature.id = some declaration ∧
+        SourceInference.Detail.inferStatementsFuel fuel
+            {
+              environment
+              signatures
+              scope := .ofDeclaration declaration
+              assumptions := signature.scheme.predicates
+            }
+            signature.source.value.body.value
+            (TypeSystem.Ty.productMany signature.returnTypes)
+            (SourceInference.State.initial declaration.id
+              ((signature.parameterNames.zip signature.parameterTypes).map
+                fun parameter =>
+                  (parameter.1, TypeSystem.Scheme.mono parameter.2))
+              signature.parameterComptime) = .ok body ∧
+          SourceInference.Detail.unify body.state body.type
+              (TypeSystem.Ty.productMany signature.returnTypes) =
+            .ok finalState ∧
+            SourceInference.Detail.finalize
+                {
+                  environment
+                  signatures
+                  scope := .ofDeclaration declaration
+                  assumptions := signature.scheme.predicates
+                }
+                (TypeSystem.Ty.productMany signature.returnTypes) finalState
+                (body.statements.map SourceInference.NodeId.statement) =
+              .ok result ∧
+              checked.inferredBodyType = result.type := by
+  obtain ⟨declaration, body, finalState, result, declarationEq, bodyEq,
+    unifyEq, finalizeEq, checkedEq⟩ :=
+    SourceInference.checkFunctionBody_success_witness success
+  refine ⟨declaration, body, finalState, result, declarationEq, bodyEq,
+    unifyEq, finalizeEq, ?_⟩
+  simp [checkedEq]
+
+example
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
     {fuel : Nat}
     {functions : List SourceInference.CheckedFunction}
     (success : SourceInference.checkFunctionBodies environment signatures fuel =

@@ -41,6 +41,8 @@ example := @Solcore.Frontend.CheckedProgram.methods
 example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_declaration
 example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_witness
+example :=
   @Solcore.Frontend.SourceInference.checkFunctionBodies_success_declaration_ids
 example := @Solcore.Frontend.checkImplementationMethodBodies
 example := @Solcore.Frontend.checkImplementationMethodBodies_success_ids
