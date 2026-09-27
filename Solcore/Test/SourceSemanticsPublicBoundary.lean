@@ -454,6 +454,14 @@ example :=
 example :=
   @Solcore.SourceSemantics.SignatureParametersWellFormed.declarationContextBinders
 example :=
+  @Solcore.SourceSemantics.DeclarationInstantiation.instantiate_parameterSubstitution_exact
+example :=
+  @Solcore.SourceSemantics.DeclarationInstantiation.instantiate_parameterSubstitution_rangeAdmissible
+example :=
+  @Solcore.SourceSemantics.DeclarationInstantiation.ofInstantiated_admissible
+example :=
+  @Solcore.SourceSemantics.DeclarationInstantiation.ofInstantiated_declarationAdmissible
+example :=
   @Solcore.SourceSemantics.SignaturePredicateFormationValidated.predicateWellFormed
 example :=
   @Solcore.SourceSemantics.SignaturePredicatesFormationValidated.predicatesWellFormed

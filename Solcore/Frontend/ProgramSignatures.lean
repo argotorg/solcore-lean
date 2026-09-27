@@ -118,6 +118,84 @@ private def freshParameterSubstitution :
           freshParameterSubstitution parameters (next + 1)
             ((parameter, .variable ⟨next⟩) :: substitution)
 
+private theorem perm_append_cons {α : Type} (head : α) (left right : List α) :
+    (left ++ head :: right).Perm (head :: left ++ right) := by
+  induction left with
+  | nil => simp
+  | cons first rest induction =>
+      exact (List.Perm.cons first induction).trans
+        (List.Perm.swap head first (rest ++ right))
+
+private theorem freshParameterSubstitution_domain_permutation
+    (parameters : List TypeSystem.TypeParameterId) (next : Nat)
+    (substitution : TypeSystem.ParameterSubstitution)
+    (parametersUnique : parameters.Nodup)
+    (substitutionUnique : (substitution.map Prod.fst).Nodup)
+    (disjoint : ∀ parameter, parameter ∈ parameters →
+      parameter ∉ substitution.map Prod.fst) :
+    ((freshParameterSubstitution parameters next substitution).1.map Prod.fst).Perm
+      (parameters ++ substitution.map Prod.fst) := by
+  induction parameters generalizing next substitution with
+  | nil => simp [freshParameterSubstitution]
+  | cons parameter parameters induction =>
+      simp only [List.nodup_cons] at parametersUnique
+      rcases parametersUnique with ⟨parameterFresh, parametersUnique⟩
+      have parameterAbsent : parameter ∉ substitution.map Prod.fst :=
+        disjoint parameter (by simp)
+      have lookupNone : substitution.lookup? parameter = none := by
+        cases found : substitution.lookup? parameter with
+        | none => rfl
+        | some replacement =>
+            have member :=
+              TypeSystem.ParameterSubstitution.lookup?_eq_some_mem found
+            exact False.elim (parameterAbsent
+              (List.mem_map.mpr ⟨(parameter, replacement), member, rfl⟩))
+      simp only [freshParameterSubstitution, lookupNone]
+      have extendedUnique :
+          (((parameter, TypeSystem.Ty.variable ⟨next⟩) :: substitution).map
+              Prod.fst).Nodup := by
+        simpa using And.intro parameterAbsent substitutionUnique
+      have tailDisjoint : ∀ candidate, candidate ∈ parameters →
+          candidate ∉
+            (((parameter, TypeSystem.Ty.variable ⟨next⟩) :: substitution).map
+              Prod.fst) := by
+        intro candidate candidateMember
+        intro member
+        simp only [List.map_cons, List.mem_cons] at member
+        rcases member with same | oldMember
+        · exact parameterFresh (same.symm ▸ candidateMember)
+        · exact disjoint candidate (by simp [candidateMember]) oldMember
+      have result := induction (next + 1)
+        ((parameter, TypeSystem.Ty.variable ⟨next⟩) :: substitution)
+        parametersUnique extendedUnique tailDisjoint
+      exact result.trans
+        (perm_append_cons parameter parameters (substitution.map Prod.fst))
+
+private theorem freshParameterSubstitution_range_is_variable
+    (parameters : List TypeSystem.TypeParameterId) (next : Nat)
+    (substitution : TypeSystem.ParameterSubstitution)
+    (rangeIsVariable : ∀ parameter replacement,
+      (parameter, replacement) ∈ substitution →
+        ∃ metavariable, replacement = .variable metavariable) :
+    ∀ parameter replacement,
+      (parameter, replacement) ∈
+          (freshParameterSubstitution parameters next substitution).1 →
+        ∃ metavariable, replacement = .variable metavariable := by
+  induction parameters generalizing next substitution with
+  | nil =>
+      simpa [freshParameterSubstitution] using rangeIsVariable
+  | cons parameter parameters induction =>
+      simp only [freshParameterSubstitution]
+      split
+      · exact induction next substitution rangeIsVariable
+      · apply induction (next + 1)
+          ((parameter, TypeSystem.Ty.variable ⟨next⟩) :: substitution)
+        intro candidate replacement member
+        rcases List.mem_cons.mp member with same | member
+        · cases same
+          exact ⟨⟨next⟩, rfl⟩
+        · exact rangeIsVariable candidate replacement member
+
 /-- Instantiate body and constraints with one shared fresh-variable mapping. -/
 def instantiate (scheme : ConstrainedDeclarationScheme) (next : Nat) :
     InstantiatedConstrainedDeclaration :=
@@ -129,6 +207,50 @@ def instantiate (scheme : ConstrainedDeclarationScheme) (next : Nat) :
     body := substitution.apply scheme.body
     next
   }
+
+/-- A canonical constrained declaration instantiation covers every rigid
+parameter exactly once.  Entry order is intentionally abstracted by
+permutation because substitution lookup, rather than list order, is the
+semantic interface. -/
+theorem instantiate_parameterSubstitution_domain_permutation
+    (scheme : ConstrainedDeclarationScheme) (next : Nat)
+    (parametersUnique : scheme.parameters.Nodup) :
+    ((scheme.instantiate next).parameterSubstitution.map Prod.fst).Perm
+      scheme.parameters := by
+  change
+    ((freshParameterSubstitution scheme.parameters next []).1.map Prod.fst).Perm
+      scheme.parameters
+  simpa using freshParameterSubstitution_domain_permutation
+    scheme.parameters next [] parametersUnique (by simp) (by simp)
+
+/-- Every rigid-parameter replacement generated by declaration instantiation
+is a fresh flexible metavariable.  Later unification may solve it, but the
+initial shared substitution cannot contain recovery or malformed types. -/
+theorem instantiate_parameterSubstitution_range_is_variable
+    (scheme : ConstrainedDeclarationScheme) (next : Nat) :
+    ∀ parameter replacement,
+      (parameter, replacement) ∈
+          (scheme.instantiate next).parameterSubstitution →
+        ∃ metavariable, replacement = .variable metavariable := by
+  change ∀ parameter replacement,
+    (parameter, replacement) ∈
+        (freshParameterSubstitution scheme.parameters next []).1 →
+      ∃ metavariable, replacement = .variable metavariable
+  exact freshParameterSubstitution_range_is_variable
+    scheme.parameters next [] (by simp)
+
+@[simp] theorem instantiate_predicates
+    (scheme : ConstrainedDeclarationScheme) (next : Nat) :
+    (scheme.instantiate next).predicates =
+      scheme.predicates.map (ProgramPredicate.applyParameters
+        (scheme.instantiate next).parameterSubstitution) := by
+  rfl
+
+@[simp] theorem instantiate_body
+    (scheme : ConstrainedDeclarationScheme) (next : Nat) :
+    (scheme.instantiate next).body =
+      (scheme.instantiate next).parameterSubstitution.apply scheme.body := by
+  rfl
 
 end ConstrainedDeclarationScheme
 

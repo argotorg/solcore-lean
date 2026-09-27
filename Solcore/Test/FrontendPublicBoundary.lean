@@ -37,6 +37,14 @@ example := @Solcore.Frontend.ProgramSignatures.contract?
 example := @Solcore.Frontend.ProgramFunctionSignature.parameterNames_length
 example := @Solcore.Frontend.ProgramFunctionSignature.parameterTypes_length
 example := @Solcore.Frontend.ProgramFunctionSignature.parameterComptime_length
+example :=
+  @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_parameterSubstitution_domain_permutation
+example :=
+  @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_parameterSubstitution_range_is_variable
+example :=
+  @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_body
+example :=
+  @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_predicates
 example := @Solcore.Frontend.buildProgramSignatures_success_function_shape
 example :=
   @Solcore.Frontend.buildProgramSignatures_success_function_parameter_names_nodup

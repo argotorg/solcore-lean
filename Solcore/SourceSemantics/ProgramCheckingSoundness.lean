@@ -206,6 +206,99 @@ theorem declarationContextBinders
 
 end SignatureParametersWellFormed
 
+namespace DeclarationInstantiation
+
+/-- The frontend's fresh generic instantiation covers its rigid parameter
+list exactly once. -/
+theorem instantiate_parameterSubstitution_exact
+    (scheme : ConstrainedDeclarationScheme)
+    (next : Nat)
+    (parametersUnique : scheme.parameters.Nodup) :
+    ParameterSubstitution.Exact
+      (scheme.instantiate next).parameterSubstitution scheme.parameters := {
+  parameters_nodup := parametersUnique
+  domain_permutation := by
+    exact
+      Frontend.ConstrainedDeclarationScheme.instantiate_parameterSubstitution_domain_permutation
+        scheme next parametersUnique
+}
+
+/-- Every replacement allocated by the frontend's fresh generic
+instantiation is admissible in a residually open context. -/
+theorem instantiate_parameterSubstitution_rangeAdmissible
+    {context : Context}
+    (binders : TypeParameterBindersWellFormed context)
+    (residual : context.residualTypeVariables = true)
+    (scheme : ConstrainedDeclarationScheme)
+    (next : Nat) :
+    ParameterSubstitution.RangeAdmissible context
+      (scheme.instantiate next).parameterSubstitution := by
+  intro parameter replacement replacementMember
+  obtain ⟨metavariable, rfl⟩ :=
+    Frontend.ConstrainedDeclarationScheme.instantiate_parameterSubstitution_range_is_variable
+      scheme next parameter replacement replacementMember
+  exact {
+    binders
+    typeWellScoped := .variable (by
+      simp [admissibleTypeVariables, residual, TypeSystem.Ty.freeVariables])
+  }
+
+/-- The frontend's canonical generic-function instantiation is an admissible
+declarative occurrence in any residually open semantic context with valid
+rigid binders and the same well-formed signature catalog.  The executable
+allocator supplies an exact rigid-parameter domain and uses only fresh
+flexible variables in its replacement range. -/
+theorem ofInstantiated_admissible
+    {context : Context}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (residual : context.residualTypeVariables = true)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ context.signatures.functions)
+    (next : Nat) :
+    DeclarationInstantiation.Admissible context
+      (Frontend.SourceInference.DeclarationInstantiation.ofInstantiated
+        signature (signature.scheme.instantiate next)) := by
+  refine .intro signature member rfl ?_ ?_ ?_ ?_ rfl rfl
+  · change ParameterSubstitution.Exact
+      (signature.scheme.instantiate next).parameterSubstitution
+      signature.scheme.parameters
+    exact instantiate_parameterSubstitution_exact signature.scheme next
+      (catalog.function_parameters signature member).1
+  · change ParameterSubstitution.RangeAdmissible context
+      (signature.scheme.instantiate next).parameterSubstitution
+    exact instantiate_parameterSubstitution_rangeAdmissible binders residual
+      signature.scheme next
+  · exact Frontend.ConstrainedDeclarationScheme.instantiate_body
+      signature.scheme next
+  · exact Frontend.ConstrainedDeclarationScheme.instantiate_predicates
+      signature.scheme next
+
+/-- Declaration-body specialization of `ofInstantiated_admissible`.  The
+signature collector's canonical rigid-binder witness and the declaration
+context's residual scope discharge all context-side premises. -/
+theorem ofInstantiated_declarationAdmissible
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {assumptions : List ProgramPredicate}
+    {requirements : List SolvedRequirement}
+    (catalog : SignatureCatalogWellFormed signatures)
+    (canonical : SignatureParametersWellFormed owner parameters)
+    {signature : ProgramFunctionSignature}
+    (member : signature ∈ signatures.functions)
+    (next : Nat) :
+    DeclarationInstantiation.Admissible
+      (declarationContext signatures owner parameters assumptions requirements)
+      (Frontend.SourceInference.DeclarationInstantiation.ofInstantiated
+        signature (signature.scheme.instantiate next)) := by
+  exact ofInstantiated_admissible catalog
+    (Solcore.SourceSemantics.SignatureParametersWellFormed.declarationContextBinders
+      canonical assumptions requirements) rfl member
+    next
+
+end DeclarationInstantiation
+
 namespace SignatureTypeFormationValidated
 
 /-- Close a validated frontend type with the signature collector's canonical
