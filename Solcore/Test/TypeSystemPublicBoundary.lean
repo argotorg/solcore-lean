@@ -8,6 +8,13 @@ example := @Solcore.TypeSystem.Ty.mem_freeVariables_application_iff
 example := @Solcore.TypeSystem.Ty.mem_freeVariables_function_iff
 example := @Solcore.TypeSystem.Ty.mem_freeVariables_product_iff
 example := @Solcore.TypeSystem.Ty.mem_freeVariables_mapping_iff
+example := @Solcore.TypeSystem.Ty.VariablesBelow
+example := @Solcore.TypeSystem.Ty.variablesBelow_variable_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_application_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_function_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_product_iff
+example := @Solcore.TypeSystem.Ty.variablesBelow_mapping_iff
+example := @Solcore.TypeSystem.Ty.containsVariable_eq_false_iff
 example := @Solcore.TypeSystem.Substitution.lookup?_eq_none_iff_not_mem_domain
 example := @Solcore.TypeSystem.Substitution.lookup?_eq_some_mem
 example := @Solcore.TypeSystem.Substitution.domain_compose
@@ -21,12 +28,19 @@ example := @Solcore.TypeSystem.Substitution.SolvedBelow.empty
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.mono
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.lookup_range_outside_domain
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_variables_below
+example := @Solcore.TypeSystem.Substitution.SolvedBelow.variablesBelow_apply
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_variables_outside_domain
 example :=
   @Solcore.TypeSystem.Substitution.RangeAvoidsDomain.apply_variables_outside_older_domain
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.range_fixed
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.apply_idempotent
 example := @Solcore.TypeSystem.Substitution.SolvedBelow.compose
+example := @Solcore.TypeSystem.Constraint.VariablesBelow
+example := @Solcore.TypeSystem.Constraint.VariablesBelow.apply
+example := @Solcore.TypeSystem.ConstraintsBelow
+example := @Solcore.TypeSystem.Unification.unifyWithFuel_solvedBelow
+example := @Solcore.TypeSystem.Unification.unify_solvedBelow
+example := @Solcore.TypeSystem.Unification.unifyTypes_solvedBelow
 
 private def solvedMetavariable : Solcore.TypeSystem.TypeVarId := ⟨0⟩
 
@@ -100,6 +114,38 @@ example : ¬ Solcore.TypeSystem.Substitution.RangeAvoidsDomain
     (by simp [Solcore.TypeSystem.Ty.freeVariables])
   apply outside
   simp [nonemptySolvedSubstitution, Solcore.TypeSystem.Substitution.domain]
+
+private def nestedConstraints : List Solcore.TypeSystem.Constraint := [{
+  left := .product (.variable solvedMetavariable)
+    (.variable survivingMetavariable)
+  right := .product (.variable survivingMetavariable) .word
+}]
+
+private def nestedSolvedSubstitution : Solcore.TypeSystem.Substitution :=
+  [(solvedMetavariable, .word), (survivingMetavariable, .word)]
+
+/-- Composite decomposition followed by an occurs-safe variable alias closes
+both ranges before the successful unifier returns. -/
+example : Solcore.TypeSystem.Unification.unify nestedConstraints =
+    .ok nestedSolvedSubstitution := by
+  rfl
+
+example : Solcore.TypeSystem.Substitution.SolvedBelow
+    nestedSolvedSubstitution 2 := by
+  apply Solcore.TypeSystem.Unification.unify_solvedBelow
+    (constraints := nestedConstraints)
+  · intro constraint member
+    have same : constraint = {
+        left := .product (.variable solvedMetavariable)
+          (.variable survivingMetavariable)
+        right := .product (.variable survivingMetavariable) .word
+      } := by
+      simpa [nestedConstraints] using member
+    subst constraint
+    constructor <;>
+      simp [Solcore.TypeSystem.Ty.VariablesBelow,
+        Solcore.TypeSystem.Ty.freeVariables] <;> decide
+  · rfl
 
 example := @Solcore.TypeSystem.InferState.fresh_substitution
 example := @Solcore.TypeSystem.InferState.fresh_next

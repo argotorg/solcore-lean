@@ -287,6 +287,14 @@ theorem apply_variables_below
       exact induction sourceBelow
   | error => simp [Substitution.apply, Ty.freeVariables]
 
+/-- Type-level form of `apply_variables_below`. -/
+theorem variablesBelow_apply
+    {substitution : Substitution} {next : Nat}
+    (solved : SolvedBelow substitution next) {type : Ty}
+    (below : Ty.VariablesBelow next type) :
+    Ty.VariablesBelow next (substitution.apply type) :=
+  solved.apply_variables_below type below
+
 /-- Every variable surviving application of a solved substitution lies
 outside that substitution's domain. -/
 theorem apply_variables_outside_domain

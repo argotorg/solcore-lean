@@ -155,6 +155,11 @@ theorem freeVariables_nodup (type : Ty) : type.freeVariables.Nodup := by
   | proxy inner induction
   | comptime inner induction => exact induction
 
+/-- Every flexible variable in a type lies below the allocator bound. -/
+def VariablesBelow (next : Nat) (type : Ty) : Prop :=
+  ∀ metavariable, metavariable ∈ type.freeVariables →
+    metavariable.index < next
+
 private theorem mem_unionVariables_iff (metavariable : TypeVarId)
     (left right : List TypeVarId) :
     metavariable ∈ unionVariables left right ↔
@@ -206,9 +211,119 @@ private theorem mem_unionVariables_iff (metavariable : TypeVarId)
         metavariable ∈ value.freeVariables := by
   exact mem_unionVariables_iff metavariable _ _
 
+@[simp] theorem variablesBelow_variable_iff
+    (next : Nat) (metavariable : TypeVarId) :
+    VariablesBelow next (.variable metavariable) ↔
+      metavariable.index < next := by
+  simp [VariablesBelow, freeVariables]
+
+@[simp] theorem variablesBelow_parameter
+    (next : Nat) (parameter : TypeParameterId) :
+    VariablesBelow next (.parameter parameter) := by
+  simp [VariablesBelow, freeVariables]
+
+@[simp] theorem variablesBelow_constructor
+    (next : Nat) (constructor : TypeConstructorId) :
+    VariablesBelow next (.constructor constructor) := by
+  simp [VariablesBelow, freeVariables]
+
+@[simp] theorem variablesBelow_application_iff
+    (next : Nat) (function argument : Ty) :
+    VariablesBelow next (.application function argument) ↔
+      VariablesBelow next function ∧ VariablesBelow next argument := by
+  constructor
+  · intro below
+    constructor
+    · intro metavariable member
+      exact below metavariable
+        ((mem_freeVariables_application_iff metavariable function argument).mpr
+          (Or.inl member))
+    · intro metavariable member
+      exact below metavariable
+        ((mem_freeVariables_application_iff metavariable function argument).mpr
+          (Or.inr member))
+  · rintro ⟨functionBelow, argumentBelow⟩ metavariable member
+    rw [mem_freeVariables_application_iff] at member
+    exact member.elim (functionBelow metavariable) (argumentBelow metavariable)
+
+@[simp] theorem variablesBelow_function_iff
+    (next : Nat) (parameter result : Ty) :
+    VariablesBelow next (.function parameter result) ↔
+      VariablesBelow next parameter ∧ VariablesBelow next result := by
+  constructor
+  · intro below
+    constructor
+    · intro metavariable member
+      exact below metavariable
+        ((mem_freeVariables_function_iff metavariable parameter result).mpr
+          (Or.inl member))
+    · intro metavariable member
+      exact below metavariable
+        ((mem_freeVariables_function_iff metavariable parameter result).mpr
+          (Or.inr member))
+  · rintro ⟨parameterBelow, resultBelow⟩ metavariable member
+    rw [mem_freeVariables_function_iff] at member
+    exact member.elim (parameterBelow metavariable) (resultBelow metavariable)
+
+@[simp] theorem variablesBelow_product_iff
+    (next : Nat) (left right : Ty) :
+    VariablesBelow next (.product left right) ↔
+      VariablesBelow next left ∧ VariablesBelow next right := by
+  constructor
+  · intro below
+    constructor
+    · intro metavariable member
+      exact below metavariable
+        ((mem_freeVariables_product_iff metavariable left right).mpr
+          (Or.inl member))
+    · intro metavariable member
+      exact below metavariable
+        ((mem_freeVariables_product_iff metavariable left right).mpr
+          (Or.inr member))
+  · rintro ⟨leftBelow, rightBelow⟩ metavariable member
+    rw [mem_freeVariables_product_iff] at member
+    exact member.elim (leftBelow metavariable) (rightBelow metavariable)
+
+@[simp] theorem variablesBelow_mapping_iff
+    (next : Nat) (key value : Ty) :
+    VariablesBelow next (.mapping key value) ↔
+      VariablesBelow next key ∧ VariablesBelow next value := by
+  constructor
+  · intro below
+    constructor
+    · intro metavariable member
+      exact below metavariable
+        ((mem_freeVariables_mapping_iff metavariable key value).mpr
+          (Or.inl member))
+    · intro metavariable member
+      exact below metavariable
+        ((mem_freeVariables_mapping_iff metavariable key value).mpr
+          (Or.inr member))
+  · rintro ⟨keyBelow, valueBelow⟩ metavariable member
+    rw [mem_freeVariables_mapping_iff] at member
+    exact member.elim (keyBelow metavariable) (valueBelow metavariable)
+
+@[simp] theorem variablesBelow_proxy_iff (next : Nat) (inner : Ty) :
+    VariablesBelow next (.proxy inner) ↔ VariablesBelow next inner := by
+  rfl
+
+@[simp] theorem variablesBelow_comptime_iff (next : Nat) (inner : Ty) :
+    VariablesBelow next (.comptime inner) ↔ VariablesBelow next inner := by
+  rfl
+
+@[simp] theorem variablesBelow_error (next : Nat) :
+    VariablesBelow next .error := by
+  simp [VariablesBelow, freeVariables]
+
 /-- Whether a flexible metavariable occurs in a type. -/
 def containsVariable (type : Ty) (metavariable : TypeVarId) : Bool :=
   type.freeVariables.contains metavariable
+
+@[simp] theorem containsVariable_eq_false_iff
+    (type : Ty) (metavariable : TypeVarId) :
+    type.containsVariable metavariable = false ↔
+      metavariable ∉ type.freeVariables := by
+  simp [containsVariable]
 
 /-- A fresh-variable lower bound strictly above every flexible variable. -/
 def nextVariable (type : Ty) : Nat :=
