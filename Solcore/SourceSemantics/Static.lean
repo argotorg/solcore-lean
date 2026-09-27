@@ -980,6 +980,23 @@ def BodyHasType (source : TypedSource) (context : Context)
 
 namespace ExpressionHasType
 
+/-- Assemble the common expression-typing envelope once a shape-specific
+requirement plan and its output path have been validated. -/
+theorem ofPlan
+    {source : TypedSource} {context : Context}
+    {id : ExpressionId} {node : ExpressionNode}
+    {rawType : TypeSystem.Ty} {plan : ExpressionRequirementPlan}
+    (contains : ContainsExpression source id node)
+    (formType : ExpressionFormHasRawType source context node.form rawType plan)
+    (rawAdmissible : TypeAdmissible context rawType)
+    (finalAdmissible : TypeAdmissible context node.type)
+    (requirements : ExpressionRequirementPlan.Valid context rawType node.type
+      plan node.requirements node.coercions) :
+    ExpressionHasType source context id node.type := by
+  exact .intro contains formType
+    requirements.outputPath.expressionNode_rawType rawAdmissible
+    finalAdmissible requirements
+
 /-- Assemble the common expression-typing envelope for forms whose own
 requirements precede an ordinary output-coercion path. -/
 theorem ofOrdinary
@@ -996,8 +1013,8 @@ theorem ofOrdinary
     (layout : node.requirements =
       owned ++ coercionRequirementIds node.coercions) :
     ExpressionHasType source context id node.type := by
-  exact .intro contains formType path.expressionNode_rawType rawAdmissible
-    finalAdmissible (.ordinary ownedValid path layout)
+  exact ofPlan contains formType rawAdmissible finalAdmissible
+    (.ordinary ownedValid path layout)
 
 theorem stored_type
     {source : TypedSource} {context : Context}
