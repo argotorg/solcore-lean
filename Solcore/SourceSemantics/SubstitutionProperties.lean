@@ -5573,6 +5573,95 @@ theorem type_admissible
 
 end Solcore.SourceSemantics.DeclarationInstantiation.Admissible
 
+namespace Solcore.SourceSemantics.DeclarationApplicationValid
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- Every parameter type exposed by a valid direct-call application is
+admissible at the call site. -/
+theorem parameter_types_admissible
+    {context : Context} {instantiation : DeclarationInstantiation}
+    {parameterTypes : List Ty} {resultType : Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (valid : DeclarationApplicationValid context instantiation parameterTypes
+      resultType predicates) :
+    ∀ type, type ∈ parameterTypes → TypeAdmissible context type := by
+  cases valid with
+  | intro signatureMem instantiationValid declarationEq parameterTypesEq
+      resultTypeEq functionTypeEq predicatesEq =>
+      rename_i signature
+      cases instantiationValid with
+      | intro selectedSignature selectedMem selectedDeclarationEq
+          substitutionExact substitutionRange typeEq instantiationPredicatesEq
+          parameterComptimeEq returnComptimeEq =>
+          have selectedEq : selectedSignature = signature :=
+            StructuralSubstitution.eq_of_mem_of_mapped_nodup
+              catalog.function_ids selectedMem signatureMem
+              (by rw [← selectedDeclarationEq, declarationEq])
+          subst selectedSignature
+          have signatureWellFormed :=
+            catalog.functions_semantic signature signatureMem
+          intro type typeMember
+          rw [← parameterTypesEq] at typeMember
+          rcases List.mem_map.mp typeMember with
+            ⟨rawType, rawMember, rfl⟩
+          have rawScoped : TypeWellScoped
+              (signatureContext context.signatures signature.id
+                signature.scheme.parameters signature.scheme.predicates)
+              [] rawType :=
+            TypesWellScoped.member
+              (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+                signatureWellFormed.parameter_types)
+              rawMember
+          exact StructuralSubstitution.TypeWellScoped.applyParametersAdmissibleTo
+            (source := signatureContext context.signatures signature.id
+              signature.scheme.parameters signature.scheme.predicates)
+            (target := context) instantiation.parameterSubstitution
+            substitutionExact substitutionRange rfl binders
+            rawScoped
+
+/-- The bundled result type exposed by a valid direct-call application is
+admissible at the call site. -/
+theorem result_type_admissible
+    {context : Context} {instantiation : DeclarationInstantiation}
+    {parameterTypes : List Ty} {resultType : Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (valid : DeclarationApplicationValid context instantiation parameterTypes
+      resultType predicates) :
+    TypeAdmissible context resultType := by
+  cases valid with
+  | intro signatureMem instantiationValid declarationEq parameterTypesEq
+      resultTypeEq functionTypeEq predicatesEq =>
+      rename_i signature
+      cases instantiationValid with
+      | intro selectedSignature selectedMem selectedDeclarationEq
+          substitutionExact substitutionRange typeEq instantiationPredicatesEq
+          parameterComptimeEq returnComptimeEq =>
+          have selectedEq : selectedSignature = signature :=
+            StructuralSubstitution.eq_of_mem_of_mapped_nodup
+              catalog.function_ids selectedMem signatureMem
+              (by rw [← selectedDeclarationEq, declarationEq])
+          subst selectedSignature
+          have signatureWellFormed :=
+            catalog.functions_semantic signature signatureMem
+          rw [← resultTypeEq]
+          exact StructuralSubstitution.TypeWellScoped.applyParametersAdmissibleTo
+            (source := signatureContext context.signatures signature.id
+              signature.scheme.parameters signature.scheme.predicates)
+            (target := context) instantiation.parameterSubstitution
+            substitutionExact substitutionRange rfl binders
+            (StructuralSubstitution.TypesWellScoped.productMany
+              (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+                signatureWellFormed.return_types))
+
+end Solcore.SourceSemantics.DeclarationApplicationValid
+
 namespace Solcore.SourceSemantics.FlexibleSubstitution
 
 open Frontend

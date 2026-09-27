@@ -440,6 +440,10 @@ example := @Solcore.SourceSemantics.WordLiteralValid
 example := @Solcore.SourceSemantics.UnaryOperatorHasType
 example := @Solcore.SourceSemantics.BinaryOperatorHasType
 example := @Solcore.SourceSemantics.DeclarationApplicationValid
+example :=
+  @Solcore.SourceSemantics.DeclarationApplicationValid.parameter_types_admissible
+example :=
+  @Solcore.SourceSemantics.DeclarationApplicationValid.result_type_admissible
 example := @Solcore.SourceSemantics.UniformMemberProjection.base_type_admissible
 example := @Solcore.SourceSemantics.UniformMemberProjection.member_type_admissible
 example := @Solcore.SourceSemantics.TypedMatchPatternHasType
