@@ -1272,6 +1272,27 @@ theorem TypeWellFormed.transportContext
     signatures_eq parameters_eq declaration_eq wellFormed.typeWellScoped
 }
 
+/-- Occurrence-level admissibility is insensitive to lexical and evidence
+fields when both rigid and flexible type scopes agree. -/
+theorem TypeAdmissible.transportContext
+    {source target : Context} {type : Ty}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (variables_eq : target.typeVariables = source.typeVariables)
+    (residualVariables_eq :
+      target.residualTypeVariables = source.residualTypeVariables)
+    (admissible : TypeAdmissible source type) :
+    TypeAdmissible target type := {
+  binders := StructuralSubstitution.TypeParameterBindersWellFormed.transportContext
+    parameters_eq declaration_eq admissible.binders
+  typeWellScoped := by
+    unfold admissibleTypeVariables
+    rw [variables_eq, residualVariables_eq]
+    exact StructuralSubstitution.TypeWellScoped.transportContext signatures_eq
+      parameters_eq declaration_eq admissible.typeWellScoped
+}
+
 /-- Pointwise closed formation is insensitive to lexical, assumption, solved
 requirement, and residual-variable fields when the signature catalog and rigid
 declaration scope agree. -/
@@ -5590,6 +5611,54 @@ theorem BodyDefinitionHasType.instantiate_of_body
         exact bodyAfter lexicalContext inputsExtend bodyType
 
 end Solcore.SourceSemantics.StructuralSubstitution
+
+namespace Solcore.SourceSemantics.MonoBindersExtend
+
+open Frontend.SourceInference
+open TypeSystem
+
+/-- Every monomorphic parameter type installed by a binder extension was
+already admissible in the context preceding the complete extension.  Later
+binders are transported back across earlier lexical-only context growth. -/
+theorem each_type_admissible
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder} {types : List Ty}
+    (extension : MonoBindersExtend owner context binders types final) :
+    ∀ type, type ∈ types → TypeAdmissible context type := by
+  induction extension with
+  | nil =>
+      intro type member
+      simp at member
+  | cons schemeEq head tail induction =>
+      intro candidate member
+      rcases List.mem_cons.mp member with rfl | tailMember
+      · cases head with
+        | intro binderWellFormed _ =>
+            have schemeWellFormed := binderWellFormed.scheme
+            rw [schemeEq] at schemeWellFormed
+            exact {
+              binders := schemeWellFormed.binders
+              typeWellScoped := by
+                simpa [TypeSystem.Scheme.mono] using schemeWellFormed.body
+            }
+      · have tailAdmissible := induction candidate tailMember
+        have fields := head.context_fields
+        exact StructuralSubstitution.TypeAdmissible.transportContext
+          fields.1.symm fields.2.2.1.symm fields.2.1.symm
+          head.typeVariables_eq.symm head.residualTypeVariables_eq.symm
+          tailAdmissible
+
+/-- The parameter product retained by a monomorphic extension is admissible
+in its original context. -/
+theorem product_type_admissible
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder} {types : List Ty}
+    (contextBinders : TypeParameterBindersWellFormed context)
+    (extension : MonoBindersExtend owner context binders types final) :
+    TypeAdmissible context (Ty.productMany types) :=
+  TypeAdmissible.productMany contextBinders extension.each_type_admissible
+
+end Solcore.SourceSemantics.MonoBindersExtend
 
 namespace Solcore.SourceSemantics.TypeAdmissible
 

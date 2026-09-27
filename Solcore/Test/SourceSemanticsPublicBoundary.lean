@@ -74,6 +74,34 @@ example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_evi
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_entails
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_retainedEvidenceValid
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.binaryOperatorDispatch_traitMethod
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.unaryOperatorDispatch_traitMethod
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.UnaryOperatorInferenceCase
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.BinaryOperatorInferenceCase
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.binaryBuiltin_hasType
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.binaryInteger_hasType
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.addRequirementsWithIds_resolve
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.addRequirementsWithIds_correspond
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferUnaryOperator_success_case
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferBinaryOperator_success_case
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.operatorTraitPredicates_instantiates
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.operatorTraitPredicates_instantiatesAfterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.unaryOperatorTrait_hasTypeAfterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.binaryOperatorTrait_hasTypeAfterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_instantiationAdmissible
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_declarationApplicationValid
@@ -153,6 +181,8 @@ example :=
   @Solcore.SourceSemantics.StructuralSubstitution.TypesWellFormed.applyParametersTo
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.TypesWellFormed.transportContext
+example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.TypeAdmissible.transportContext
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.PredicateWellFormed.applyParametersTo
 example :=
@@ -464,6 +494,8 @@ example := @Solcore.SourceSemantics.StatementHasType
 example := @Solcore.SourceSemantics.StatementHasType.letInitializedGeneralized
 example := @Solcore.SourceSemantics.StatementsHaveType
 example := @Solcore.SourceSemantics.MonoBindersExtend.functional
+example := @Solcore.SourceSemantics.MonoBindersExtend.each_type_admissible
+example := @Solcore.SourceSemantics.MonoBindersExtend.product_type_admissible
 example := @Solcore.SourceSemantics.MonomorphicBinders
 example := @Solcore.SourceSemantics.MonoBindersExtend.exists_of_monomorphic
 example := @Solcore.SourceSemantics.MonoBindersExtend.initialInputs
