@@ -415,6 +415,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordSelectedCall_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_coercions_isValid
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_cases

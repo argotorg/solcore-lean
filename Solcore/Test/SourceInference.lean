@@ -278,6 +278,29 @@ example {signatures : ProgramSignatures}
     ProgramSignatureFormationValidated.data_constructor_payloadTypes_variablesBelow
       validated dataMember constructorMember next
 
+/-- Fresh constructor instantiation packages allocator progress, readiness,
+bounded parameter replacements, bounded payloads, and a bounded nominal
+result without relying on a concrete constructor fixture. -/
+example (dataType : ProgramDataSignature)
+    (constructor : ProgramDataConstructorSignature)
+    (state : SourceInference.State)
+    (ready : state.InferenceReady)
+    (payloadTypesBelow : ∀ payload ∈ constructor.payloadTypes,
+      payload.VariablesBelow state.inference.next) :
+    let result := SourceInference.Detail.freshDataConstructorInstantiation
+      dataType constructor state
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      (∀ parameter replacement,
+        (parameter, replacement) ∈ result.1.parameterSubstitution →
+          replacement.VariablesBelow result.2.inference.next) ∧
+      (∀ payload ∈ result.1.payloadTypes,
+        payload.VariablesBelow result.2.inference.next) ∧
+      result.1.resultType.VariablesBelow result.2.inference.next := by
+  exact
+    SourceInference.Detail.freshDataConstructorInstantiation_inferenceProperties
+      dataType constructor state ready payloadTypesBelow
+
 /-- Formation validation rejects the recovery sentinel independently of how
 the resolved type was produced. -/
 example : validateResolvedTypeFormation solverRegressionContext.signatures

@@ -2362,6 +2362,119 @@ theorem unify_preserves_resolve_eq
   exact congrArg (fun header : State.Header => header.inputs)
     (unify_state_header success)
 
+private theorem freshDataConstructorInstantiation_fold_inferenceProperties
+    (parameters : List TypeParameterId) (arguments : List Ty) (state : State)
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.VariablesBelow state.inference.next) :
+    let result := parameters.foldl
+      (fun (result : List Ty × State) _ =>
+        (result.1 ++ [result.2.fresh.1], result.2.fresh.2))
+      (arguments, state)
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      ∀ argument ∈ result.1,
+        argument.VariablesBelow result.2.inference.next := by
+  induction parameters generalizing arguments state with
+  | nil =>
+      simp only [List.foldl_nil]
+      exact ⟨State.InferenceProgress.refl ready.solved, ready,
+        argumentsBelow⟩
+  | cons parameter parameters induction =>
+      simp only [List.foldl_cons]
+      let allocation := state.fresh
+      have allocationProgress : state.InferenceProgress allocation.2 := by
+        simpa only [allocation] using
+          State.InferenceProgress.fresh state ready.solved
+      have allocationReady : allocation.2.InferenceReady := by
+        simpa only [allocation] using State.InferenceReady.fresh ready
+      have freshTypeBelow :
+          allocation.1.VariablesBelow allocation.2.inference.next := by
+        have below :
+            state.fresh.1.VariablesBelow state.fresh.2.inference.next := by
+          change Ty.VariablesBelow (state.inference.next + 1)
+            (.variable ⟨state.inference.next⟩)
+          exact (Ty.variablesBelow_variable_iff _ _).2
+            (Nat.lt_succ_self _)
+        simpa only [allocation] using below
+      have extendedArgumentsBelow :
+          ∀ argument ∈ arguments ++ [allocation.1],
+            argument.VariablesBelow allocation.2.inference.next := by
+        intro argument member
+        rcases List.mem_append.mp member with member | member
+        · exact (argumentsBelow argument member).weaken
+            allocationProgress.next_le
+        · simp only [List.mem_singleton] at member
+          subst argument
+          exact freshTypeBelow
+      have tailProperties := induction (arguments ++ [allocation.1])
+        allocation.2 allocationReady extendedArgumentsBelow
+      exact ⟨allocationProgress.trans tailProperties.1,
+        tailProperties.2.1, tailProperties.2.2⟩
+
+/-- Freshly instantiating a data constructor advances semantic inference,
+preserves readiness, and bounds every generated replacement and instantiated
+constructor type at the returned allocator. -/
+theorem freshDataConstructorInstantiation_inferenceProperties
+    (dataType : ProgramDataSignature)
+    (constructor : ProgramDataConstructorSignature) (state : State)
+    (ready : state.InferenceReady)
+    (payloadTypesBelow : ∀ payload ∈ constructor.payloadTypes,
+      payload.VariablesBelow state.inference.next) :
+    let result := freshDataConstructorInstantiation dataType constructor state
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      (∀ parameter replacement,
+        (parameter, replacement) ∈ result.1.parameterSubstitution →
+          replacement.VariablesBelow result.2.inference.next) ∧
+      (∀ payload ∈ result.1.payloadTypes,
+        payload.VariablesBelow result.2.inference.next) ∧
+      result.1.resultType.VariablesBelow result.2.inference.next := by
+  let allocation := dataType.parameters.foldl
+    (fun (result : List Ty × State) _ =>
+      (result.1 ++ [result.2.fresh.1], result.2.fresh.2))
+    ([], state)
+  have allocationProperties :
+      state.InferenceProgress allocation.2 ∧
+        allocation.2.InferenceReady ∧
+        ∀ argument ∈ allocation.1,
+          argument.VariablesBelow allocation.2.inference.next := by
+    simpa only [allocation] using
+      freshDataConstructorInstantiation_fold_inferenceProperties
+        dataType.parameters [] state ready (by simp)
+  change state.InferenceProgress allocation.2 ∧
+    allocation.2.InferenceReady ∧
+    (∀ parameter replacement,
+      (parameter, replacement) ∈ dataType.parameters.zip allocation.1 →
+        replacement.VariablesBelow allocation.2.inference.next) ∧
+    (∀ payload ∈ constructor.payloadTypes.map
+      (ParameterSubstitution.apply
+        (dataType.parameters.zip allocation.1)),
+      payload.VariablesBelow allocation.2.inference.next) ∧
+    (Ty.nominal dataType.id allocation.1).VariablesBelow
+      allocation.2.inference.next
+  have rangeBelow : ∀ parameter replacement,
+      (parameter, replacement) ∈ dataType.parameters.zip allocation.1 →
+        replacement.VariablesBelow allocation.2.inference.next := by
+    intro parameter replacement member
+    exact allocationProperties.2.2 replacement (List.of_mem_zip member).2
+  have instantiatedPayloadsBelow : ∀ payload ∈
+      constructor.payloadTypes.map
+        (ParameterSubstitution.apply
+          (dataType.parameters.zip allocation.1)),
+      payload.VariablesBelow allocation.2.inference.next := by
+    intro payload member
+    rcases List.mem_map.mp member with
+      ⟨sourcePayload, sourceMember, rfl⟩
+    apply ParameterSubstitution.apply_variables_below
+    · intro parameter replacement entryMember
+      exact rangeBelow parameter replacement entryMember
+    · exact (payloadTypesBelow sourcePayload sourceMember).weaken
+        allocationProperties.1.next_le
+  exact ⟨allocationProperties.1, allocationProperties.2.1, rangeBelow,
+    instantiatedPayloadsBelow,
+    Ty.variablesBelow_nominal allocationProperties.2.2⟩
+
 @[simp] private theorem freshTypes_preserves_header
     (count : Nat) (state : State) :
     (freshTypes count state).2.header = state.header := by
