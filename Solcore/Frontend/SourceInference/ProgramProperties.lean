@@ -8,6 +8,78 @@ namespace Solcore.Frontend.SourceInference.Detail
 
 open TypeSystem
 
+theorem unify_localSchemeAssumptions
+    {state next : State} {left right : Ty}
+    (result : unify state left right = .ok next) :
+    next.localSchemeAssumptions = state.localSchemeAssumptions := by
+  unfold unify at result
+  cases unified : state.inference.unify left right <;>
+    simp [liftUnification, unified, bind, Except.bind] at result
+  cases result
+  rfl
+
+theorem defaultIntegerPatternTarget_localSchemeAssumptions
+    {state next : State} {origin : IntegerPatternOrigin}
+    (result : defaultIntegerPatternTarget state origin = .ok next) :
+    next.localSchemeAssumptions = state.localSchemeAssumptions := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerPatternTarget, resolved] at result
+  · exact unify_localSchemeAssumptions result
+  all_goals cases result <;> rfl
+
+theorem defaultIntegerPatternTargets_localSchemeAssumptions
+    {origins : List IntegerPatternOrigin} {state next : State}
+    (result : defaultIntegerPatternTargets origins state = .ok next) :
+    next.localSchemeAssumptions = state.localSchemeAssumptions := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerPatternTargets] at result
+      cases result
+      rfl
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerPatternTarget state origin with
+      | error error =>
+          simp [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+            at result
+      | ok middle =>
+          have tailResult :
+              defaultIntegerPatternTargets rest middle = .ok next := by
+            simpa [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+              using result
+          exact (induction tailResult).trans
+            (defaultIntegerPatternTarget_localSchemeAssumptions headResult)
+
+theorem defaultIntegerLiteralTarget_localSchemeAssumptions
+    {state next : State} {origin : IntegerLiteralOrigin}
+    (result : defaultIntegerLiteralTarget state origin = .ok next) :
+    next.localSchemeAssumptions = state.localSchemeAssumptions := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerLiteralTarget, resolved] at result
+  · exact unify_localSchemeAssumptions result
+  all_goals cases result <;> rfl
+
+theorem defaultIntegerLiteralTargets_localSchemeAssumptions
+    {origins : List IntegerLiteralOrigin} {state next : State}
+    (result : defaultIntegerLiteralTargets origins state = .ok next) :
+    next.localSchemeAssumptions = state.localSchemeAssumptions := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerLiteralTargets] at result
+      cases result
+      rfl
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerLiteralTarget state origin with
+      | error error =>
+          simp [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+            at result
+      | ok middle =>
+          have tailResult :
+              defaultIntegerLiteralTargets rest middle = .ok next := by
+            simpa [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+              using result
+          exact (induction tailResult).trans
+            (defaultIntegerLiteralTarget_localSchemeAssumptions headResult)
+
 private theorem unify_toTypedSource
     {state next : State} {left right : Ty} {roots : List NodeId}
     (result : unify state left right = .ok next) :

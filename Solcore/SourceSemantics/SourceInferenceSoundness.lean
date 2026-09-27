@@ -248,6 +248,78 @@ theorem solveRequirements_ordinary_sound
       · exact induction (fun tailRequirement tailMember =>
           ordinary tailRequirement (by simp [tailMember])) candidate member
 
+/-- Proof-facing context for the requirement ledger emitted by finalization.
+Both declaration assumptions and solved predicates use the final inference
+substitution, while the complete solved ledger is retained for later lookup. -/
+def finalizedRequirementContext
+    (inferenceContext : Frontend.SourceInference.Context)
+    (result : Frontend.SourceInference.Result) : SourceSemantics.Context :=
+  ((SourceSemantics.Context.ofSignatures inferenceContext.signatures)
+    |>.withAssumptions
+      (inferenceContext.assumptions.map
+        (TypedTraitResolution.applySubstitution result.substitution)))
+    |>.withSolvedRequirements result.solvedRequirements
+
+/-- When finalization starts without qualified-local templates, every emitted
+solved row has independently valid retained evidence in the finalized
+requirement context. -/
+theorem finalize_solvedRequirementsValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (ordinary : state.localSchemeAssumptions = [])
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    SolvedRequirementsValid
+      (finalizedRequirementContext inferenceContext result)
+      result.solvedRequirements := by
+  unfold Detail.finalize at success
+  cases patternResult :
+      Detail.defaultIntegerPatternTargets state.integerPatterns state with
+  | error error =>
+      simp [patternResult, bind, Except.bind] at success
+  | ok patternState =>
+      have patternOrdinary : patternState.localSchemeAssumptions = [] := by
+        rw [Detail.defaultIntegerPatternTargets_localSchemeAssumptions
+          patternResult, ordinary]
+      cases literalResult :
+          Detail.defaultIntegerLiteralTargets patternState.integerLiterals
+            patternState with
+      | error error =>
+          simp [patternResult, literalResult, bind, Except.bind] at success
+      | ok finalState =>
+          have finalOrdinary : finalState.localSchemeAssumptions = [] := by
+            rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
+              literalResult, patternOrdinary]
+          cases validationResult :
+              Detail.validateIntegerLiteralTargets finalState
+                finalState.integerLiterals with
+          | error error =>
+              simp [patternResult, literalResult, validationResult, bind,
+                Except.bind] at success
+          | ok validation =>
+              cases requirementsResult :
+                  Detail.solveRequirements inferenceContext finalState
+                    finalState.requirements with
+              | error error =>
+                  simp [patternResult, literalResult, validationResult,
+                    requirementsResult, bind, Except.bind] at success
+              | ok requirements =>
+                  simp [patternResult, literalResult, validationResult,
+                    requirementsResult, bind, Except.bind] at success
+                  cases success
+                  apply solveRequirements_ordinary_sound
+                    (inferenceContext := inferenceContext)
+                    (state := finalState)
+                    (requirements := finalState.requirements)
+                  · intro requirement member
+                    rw [finalOrdinary]
+                    simp
+                  · rfl
+                  · rfl
+                  · exact requirementsResult
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
 
 namespace Solcore.SourceSemantics.FlexibleSubstitution

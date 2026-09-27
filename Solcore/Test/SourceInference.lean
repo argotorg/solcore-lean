@@ -112,6 +112,26 @@ private def solverRegressionTemplateState : SourceInference.State := {
   localSchemeAssumptions := [solverRegressionRequirement.id]
 }
 
+private def solverRegressionFinalizeState : SourceInference.State := {
+  solverRegressionState with
+  requirements := [solverRegressionRequirement]
+}
+
+private def solverRegressionSolvedRow : SourceInference.SolvedRequirement := {
+  id := solverRegressionRequirement.id
+  predicate := solverRegressionNormalized
+  evidence := .assumption solverRegressionNormalized
+}
+
+private def solverRegressionFinalizedResult : SourceInference.Result := {
+  type := .word
+  substitution := solverRegressionFinalizeState.inference.substitution
+  solvedRequirements := [solverRegressionSolvedRow]
+  typedSource :=
+    (solverRegressionFinalizeState.toTypedSource []).applySubstitution
+      solverRegressionFinalizeState.inference.substitution
+}
+
 /-- This equation fails if the already-normalized head is passed through
 `solvePredicate` and receives the inference substitution a second time. -/
 example : SourceInference.Detail.solvePredicates solverRegressionContext
@@ -195,6 +215,21 @@ example : Solcore.SourceSemantics.SolvedRequirementsValid
     change solverRegressionRequirement.id ∉ []
     simp
   · rfl
+  · rfl
+  · rfl
+
+/-- Finalizing a nonempty ordinary ledger exposes a declarative context in
+which every emitted solved row has valid retained evidence. -/
+example : Solcore.SourceSemantics.SolvedRequirementsValid
+    (Solcore.SourceSemantics.SourceInferenceSoundness.finalizedRequirementContext
+      solverRegressionContext solverRegressionFinalizedResult)
+    solverRegressionFinalizedResult.solvedRequirements := by
+  apply
+    Solcore.SourceSemantics.SourceInferenceSoundness.finalize_solvedRequirementsValid
+      (inferenceContext := solverRegressionContext)
+      (type := .word)
+      (state := solverRegressionFinalizeState)
+      (roots := [])
   · rfl
   · rfl
 
