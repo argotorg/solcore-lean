@@ -67,6 +67,8 @@ example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolutionPremisesV
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_evidenceValid
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_entails
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_retainedEvidenceValid
+example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveNormalizedPredicate_sound
+example := @Solcore.SourceSemantics.SourceInferenceSoundness.solvePredicate_sound
 
 example := @Solcore.SourceSemantics.ReferenceHasRawType
 example := @Solcore.SourceSemantics.ReferenceHasRawType.local_iff

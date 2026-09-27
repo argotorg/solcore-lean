@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceInference
+import Solcore.SourceSemantics.SourceInferenceSoundness
 
 /-! Focused parsed-source regressions for the source inference slice. -/
 
@@ -103,6 +103,32 @@ example : SourceInference.Detail.solvePredicates solverRegressionContext
     .ok ([solverRegressionNormalized],
       [.assumption solverRegressionNormalized]) := by
   rfl
+
+example : Solcore.SourceSemantics.RetainedEvidenceValid
+    [solverRegressionNormalized]
+    solverRegressionContext.signatures.resolutionRules
+    solverRegressionNormalized
+    (.assumption solverRegressionNormalized) := by
+  exact
+    Solcore.SourceSemantics.SourceInferenceSoundness.solvePredicate_sound
+      (context := solverRegressionContext)
+      (state := solverRegressionState)
+      (source := solverRegressionSource)
+      (by rfl)
+
+example : Solcore.SourceSemantics.RetainedEvidenceValid
+    [solverRegressionNormalized]
+    solverRegressionContext.signatures.resolutionRules
+    (ProgramSignatures.builtinIntPredicate .word)
+    (.implementation (.byImpl
+      (ProgramSignatures.builtinIntPredicate .word)
+      (.builtin .intWord) [])) := by
+  exact
+    Solcore.SourceSemantics.SourceInferenceSoundness.solveNormalizedPredicate_sound
+      (context := solverRegressionContext)
+      (state := solverRegressionState)
+      (goal := ProgramSignatures.builtinIntPredicate .word)
+      (by rfl)
 
 private def integerLiteralRows
     (function : SourceInference.CheckedFunction) :
