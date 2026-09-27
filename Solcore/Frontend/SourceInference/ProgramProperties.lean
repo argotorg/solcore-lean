@@ -1,4 +1,5 @@
 import Solcore.Frontend.ProgramEnvironmentProperties
+import Solcore.Frontend.ProgramSignatureFormationProperties
 import Solcore.Frontend.ProgramSignaturesProperties
 import Solcore.Frontend.SourceInference.ExpressionProperties
 import Solcore.Frontend.SourceInference.Program
@@ -340,6 +341,22 @@ theorem checkFunctionBody_success_inferredBodyType
     checkFunctionBody_success_witness success
   subst checked
   exact Detail.finalize_type finalizeEq
+
+/-- Once executable formation has closed the signature's return row, final
+inference substitution cannot change its declared return bundle. -/
+theorem checkFunctionBody_success_inferredBodyType_eq_declared
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (formation : SignatureTypesFormationValidated signatures signature.id
+      signature.scheme.parameters signature.returnTypes)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.inferredBodyType = Ty.productMany signature.returnTypes := by
+  rw [checkFunctionBody_success_inferredBodyType success,
+    formation.apply_productMany_eq_self checked.substitution]
 
 /-- Successful body inference and finalization retain the source declaration
 that owns the checked function. -/

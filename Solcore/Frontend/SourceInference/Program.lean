@@ -264,6 +264,26 @@ theorem checkFunctionBody_success_witness
                       · simpa [ProgramTypeScope.ofDeclaration] using bodyEq
                       · simpa [checkedFunctionOfResult] using checkedEq.symm
 
+/-- Source-ordered evidence that every retained checked function is exactly
+the successful result of checking its corresponding catalog signature. -/
+inductive FunctionBodiesChecked
+    (environment : ProgramEnvironment)
+    (signatures : ProgramSignatures)
+    (fuel : Nat) :
+    List ProgramFunctionSignature → List CheckedFunction → Prop where
+  | nil : FunctionBodiesChecked environment signatures fuel [] []
+  | cons
+      {signature : ProgramFunctionSignature}
+      {remaining : List ProgramFunctionSignature}
+      {function : CheckedFunction}
+      {functions : List CheckedFunction}
+      (head : checkFunctionBody environment signatures signature fuel =
+        .ok function)
+      (tail : FunctionBodiesChecked environment signatures fuel remaining
+        functions) :
+      FunctionBodiesChecked environment signatures fuel
+        (signature :: remaining) (function :: functions)
+
 private def checkFunctionBodiesAux (environment : ProgramEnvironment)
     (signatures : ProgramSignatures) (fuel : Nat) :
     List ProgramFunctionSignature → List CheckedFunction → List FunctionError →
@@ -314,6 +334,46 @@ private theorem checkFunctionBodiesAux_success_declaration_ids
           have resultId := checkFunctionBody_success_declaration bodyResult
           simpa [List.map_append, resultId, List.append_assoc] using tail.2
 
+/-- Successful accumulation retains the exact per-signature body-checking
+equation for every result appended after the input prefix. -/
+private theorem checkFunctionBodiesAux_success_corresponds
+    (environment : ProgramEnvironment)
+    (signatures : ProgramSignatures)
+    (fuel : Nat) :
+    ∀ remaining checked errors finalChecked,
+      checkFunctionBodiesAux environment signatures fuel remaining checked
+          errors = (finalChecked, []) →
+        errors = [] ∧
+          ∃ produced,
+            finalChecked = checked ++ produced ∧
+              FunctionBodiesChecked environment signatures fuel remaining
+                produced := by
+  intro remaining
+  induction remaining with
+  | nil =>
+      intro checked errors finalChecked success
+      have checkedEq := congrArg Prod.fst success
+      have errorsEq := congrArg Prod.snd success
+      simp only [checkFunctionBodiesAux] at checkedEq errorsEq
+      subst finalChecked
+      exact ⟨errorsEq, [], by simp, .nil⟩
+  | cons signature rest induction =>
+      intro checked errors finalChecked success
+      cases bodyResult :
+          checkFunctionBody environment signatures signature fuel with
+      | error error =>
+          have tail := induction checked
+            (errors ++ [{ declaration := signature.id, error }]) finalChecked (by
+              simpa [checkFunctionBodiesAux, bodyResult] using success)
+          simp at tail
+      | ok result =>
+          obtain ⟨errorsEq, produced, finalEq, corresponds⟩ :=
+            induction (checked ++ [result]) errors finalChecked (by
+              simpa [checkFunctionBodiesAux, bodyResult] using success)
+          refine ⟨errorsEq, result :: produced, ?_, ?_⟩
+          · simpa [List.append_assoc] using finalEq
+          · exact .cons bodyResult corresponds
+
 /-- Check every top-level source function, accumulating independent failures. -/
 def checkFunctionBodies (environment : ProgramEnvironment)
     (signatures : ProgramSignatures) (fuel : Nat := 1024) :
@@ -350,6 +410,37 @@ theorem checkFunctionBodies_success_declaration_ids
           (checkFunctionBodiesAux_success_declaration_ids environment signatures
             fuel signatures.functions [] [] functions resultEq).2
         simpa using ids
+      · simp [errorsEmpty] at success
+
+/-- Successful whole-catalog checking preserves the exact body-checking
+derivation for every function in catalog order, rather than only retaining
+its declaration identity. -/
+theorem checkFunctionBodies_success_corresponds
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {fuel : Nat}
+    {functions : List CheckedFunction}
+    (success : checkFunctionBodies environment signatures fuel =
+      .ok functions) :
+    FunctionBodiesChecked environment signatures fuel signatures.functions
+      functions := by
+  unfold checkFunctionBodies at success
+  cases resultEq :
+      checkFunctionBodiesAux environment signatures fuel signatures.functions
+        [] [] with
+  | mk checked errors =>
+      rw [resultEq] at success
+      change (if errors.isEmpty then Except.ok checked else Except.error errors) =
+        Except.ok functions at success
+      by_cases errorsEmpty : errors.isEmpty = true
+      · simp only [errorsEmpty, if_true, Except.ok.injEq] at success
+        have errorsEq : errors = [] := List.isEmpty_iff.mp errorsEmpty
+        subst checked
+        subst errors
+        obtain ⟨_, produced, functionsEq, corresponds⟩ :=
+          checkFunctionBodiesAux_success_corresponds environment signatures fuel
+            signatures.functions [] [] functions resultEq
+        simpa using functionsEq ▸ corresponds
       · simp [errorsEmpty] at success
 
 /-- Resolve signatures and check all bodies of an already loaded program. -/

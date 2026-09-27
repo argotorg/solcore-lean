@@ -77,19 +77,22 @@ private def classifyMethodError (method : ProgramImplMethodId) :
   | .inconclusiveTrait reason => .methodInconclusive method reason
   | error => .methodInference method error
 
-private structure ImplementationMethodContext where
+/-- One implementation/method pair selected in whole-program catalog order
+for independent body checking. -/
+structure ImplementationMethodCheckTarget where
   implementation : ProgramImplementationSignature
   method : ProgramImplMethodSignature
 
-private def implementationMethodContexts
-    (signatures : ProgramSignatures) : List ImplementationMethodContext :=
+/-- Flatten the implementation-method catalog into its body-checking order. -/
+def implementationMethodCheckTargets
+    (signatures : ProgramSignatures) : List ImplementationMethodCheckTarget :=
   signatures.implementations.flatMap fun implementation =>
     implementation.methods.map fun method => { implementation, method }
 
 private def checkImplementationMethodBody
     (environment : ProgramEnvironment)
     (signatures : ProgramSignatures)
-    (context : ImplementationMethodContext)
+    (context : ImplementationMethodCheckTarget)
     (fuel : Nat) : Except ProgramCheckError CheckedImplementationMethod := do
   let traitId := context.method.traitMethod.trait
   let trait ← match signatures.trait? traitId with
@@ -106,7 +109,7 @@ private def checkImplementationMethodBodiesAux
     (environment : ProgramEnvironment)
     (signatures : ProgramSignatures)
     (fuel : Nat) :
-    List ImplementationMethodContext → List CheckedImplementationMethod →
+    List ImplementationMethodCheckTarget → List CheckedImplementationMethod →
       List ProgramCheckError →
       List CheckedImplementationMethod × List ProgramCheckError
   | [], checked, errors => (checked, errors)
@@ -122,7 +125,7 @@ private def checkImplementationMethodBodiesAux
 private theorem checkImplementationMethodBody_success_id
     {environment : ProgramEnvironment}
     {signatures : ProgramSignatures}
-    {context : ImplementationMethodContext}
+    {context : ImplementationMethodCheckTarget}
     {fuel : Nat}
     {checked : CheckedImplementationMethod}
     (success : checkImplementationMethodBody environment signatures context fuel =
@@ -140,6 +143,69 @@ private theorem checkImplementationMethodBody_success_id
           simp [traitResult, bodyResult] at success
           subst checked
           rfl
+
+/-- Exact executable provenance for one successfully checked implementation
+method, including the selected trait catalog entry and synthetic signature. -/
+inductive ImplementationMethodBodyChecked
+    (environment : ProgramEnvironment)
+    (signatures : ProgramSignatures)
+    (fuel : Nat)
+    (target : ImplementationMethodCheckTarget)
+    (checked : CheckedImplementationMethod) : Prop where
+  | intro
+      {trait : ProgramTraitSignature}
+      (id_eq : checked.id = target.method.id)
+      (trait_lookup : signatures.trait? target.method.traitMethod.trait =
+        some trait)
+      (body_success : SourceInference.checkFunctionBody environment signatures
+        (target.implementation.functionSignatureOfMethodWithTrait trait
+          target.method) fuel = .ok checked.checked) :
+      ImplementationMethodBodyChecked environment signatures fuel target
+        checked
+
+private theorem checkImplementationMethodBody_success_provenance
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {target : ImplementationMethodCheckTarget}
+    {fuel : Nat}
+    {checked : CheckedImplementationMethod}
+    (success : checkImplementationMethodBody environment signatures target fuel =
+      .ok checked) :
+    ImplementationMethodBodyChecked environment signatures fuel target
+      checked := by
+  unfold checkImplementationMethodBody at success
+  cases traitResult : signatures.trait? target.method.traitMethod.trait with
+  | none => simp [traitResult, bind, Except.bind] at success
+  | some trait =>
+      cases bodyResult : SourceInference.checkFunctionBody environment signatures
+          (target.implementation.functionSignatureOfMethodWithTrait trait
+            target.method) fuel with
+      | error error => simp [traitResult, bodyResult] at success
+      | ok function =>
+          simp [traitResult, bodyResult] at success
+          subst checked
+          exact .intro rfl traitResult bodyResult
+
+/-- Source-ordered provenance for every implementation method accepted by the
+whole-program checker. -/
+inductive ImplementationMethodBodiesChecked
+    (environment : ProgramEnvironment)
+    (signatures : ProgramSignatures)
+    (fuel : Nat) :
+    List ImplementationMethodCheckTarget →
+      List CheckedImplementationMethod → Prop where
+  | nil : ImplementationMethodBodiesChecked environment signatures fuel [] []
+  | cons
+      {target : ImplementationMethodCheckTarget}
+      {remaining : List ImplementationMethodCheckTarget}
+      {method : CheckedImplementationMethod}
+      {methods : List CheckedImplementationMethod}
+      (head : ImplementationMethodBodyChecked environment signatures fuel
+        target method)
+      (tail : ImplementationMethodBodiesChecked environment signatures fuel
+        remaining methods) :
+      ImplementationMethodBodiesChecked environment signatures fuel
+        (target :: remaining) (method :: methods)
 
 private theorem checkImplementationMethodBodiesAux_success_ids
     (environment : ProgramEnvironment)
@@ -176,6 +242,47 @@ private theorem checkImplementationMethodBodiesAux_success_ids
           have resultId := checkImplementationMethodBody_success_id bodyResult
           simpa [List.map_append, resultId, List.append_assoc] using tail.2
 
+/-- Successful accumulation preserves exact method-check provenance after the
+input result prefix. -/
+private theorem checkImplementationMethodBodiesAux_success_corresponds
+    (environment : ProgramEnvironment)
+    (signatures : ProgramSignatures)
+    (fuel : Nat) :
+    ∀ targets checked errors finalChecked,
+      checkImplementationMethodBodiesAux environment signatures fuel targets
+          checked errors = (finalChecked, []) →
+        errors = [] ∧
+          ∃ produced,
+            finalChecked = checked ++ produced ∧
+              ImplementationMethodBodiesChecked environment signatures fuel
+                targets produced := by
+  intro targets
+  induction targets with
+  | nil =>
+      intro checked errors finalChecked success
+      have checkedEq := congrArg Prod.fst success
+      have errorsEq := congrArg Prod.snd success
+      simp only [checkImplementationMethodBodiesAux] at checkedEq errorsEq
+      subst finalChecked
+      exact ⟨errorsEq, [], by simp, .nil⟩
+  | cons target rest induction =>
+      intro checked errors finalChecked success
+      cases bodyResult :
+          checkImplementationMethodBody environment signatures target fuel with
+      | error error =>
+          have tail := induction checked (errors ++ [error]) finalChecked (by
+            simpa [checkImplementationMethodBodiesAux, bodyResult] using success)
+          simp at tail
+      | ok result =>
+          obtain ⟨errorsEq, produced, finalEq, corresponds⟩ :=
+            induction (checked ++ [result]) errors finalChecked (by
+              simpa [checkImplementationMethodBodiesAux, bodyResult] using success)
+          refine ⟨errorsEq, result :: produced, ?_, ?_⟩
+          · simpa [List.append_assoc] using finalEq
+          · exact .cons
+              (checkImplementationMethodBody_success_provenance bodyResult)
+              corresponds
+
 /-- Check every implementation method independently in implementation and
 method source order, retaining all independent failures. -/
 def checkImplementationMethodBodies
@@ -184,7 +291,7 @@ def checkImplementationMethodBodies
     (fuel : Nat := 1024) :
     Except (List ProgramCheckError) (List CheckedImplementationMethod) :=
   let (checked, errors) := checkImplementationMethodBodiesAux environment
-    signatures fuel (implementationMethodContexts signatures) [] []
+    signatures fuel (implementationMethodCheckTargets signatures) [] []
   if errors.isEmpty then .ok checked else .error errors
 
 /-- Successful implementation-method checking retains every cataloged method
@@ -202,7 +309,7 @@ theorem checkImplementationMethodBodies_success_ids
   unfold checkImplementationMethodBodies at success
   cases resultEq :
       checkImplementationMethodBodiesAux environment signatures fuel
-        (implementationMethodContexts signatures) [] [] with
+        (implementationMethodCheckTargets signatures) [] [] with
   | mk checked errors =>
       rw [resultEq] at success
       change (if errors.isEmpty then Except.ok checked else Except.error errors) =
@@ -213,10 +320,41 @@ theorem checkImplementationMethodBodies_success_ids
         subst checked
         subst errors
         have ids := (checkImplementationMethodBodiesAux_success_ids environment
-          signatures fuel (implementationMethodContexts signatures) [] [] methods
+          signatures fuel (implementationMethodCheckTargets signatures) [] [] methods
           resultEq).2
-        simpa [implementationMethodContexts, List.map_flatMap,
+        simpa [implementationMethodCheckTargets, List.map_flatMap,
           Function.comp_def] using ids
+      · simp [errorsEmpty] at success
+
+/-- Successful implementation-method checking retains exact executable
+provenance for every catalog method in implementation/method source order. -/
+theorem checkImplementationMethodBodies_success_corresponds
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {fuel : Nat}
+    {methods : List CheckedImplementationMethod}
+    (success : checkImplementationMethodBodies environment signatures fuel =
+      .ok methods) :
+    ImplementationMethodBodiesChecked environment signatures fuel
+      (implementationMethodCheckTargets signatures) methods := by
+  unfold checkImplementationMethodBodies at success
+  cases resultEq :
+      checkImplementationMethodBodiesAux environment signatures fuel
+        (implementationMethodCheckTargets signatures) [] [] with
+  | mk checked errors =>
+      rw [resultEq] at success
+      change (if errors.isEmpty then Except.ok checked else Except.error errors) =
+        Except.ok methods at success
+      by_cases errorsEmpty : errors.isEmpty = true
+      · simp only [errorsEmpty, if_true, Except.ok.injEq] at success
+        have errorsEq : errors = [] := List.isEmpty_iff.mp errorsEmpty
+        subst checked
+        subst errors
+        obtain ⟨_, produced, methodsEq, corresponds⟩ :=
+          checkImplementationMethodBodiesAux_success_corresponds environment
+            signatures fuel (implementationMethodCheckTargets signatures) [] []
+              methods resultEq
+        simpa using methodsEq ▸ corresponds
       · simp [errorsEmpty] at success
 
 /-- Check an already loaded program while retaining its environment and the
@@ -451,6 +589,26 @@ theorem checkLoadedProgram_success_ids
     checkImplementationMethodBodies_success_ids methodsResult
   ⟩
 
+/-- A successful loaded-program check retains the exact executable body-check
+provenance for every top-level function and implementation method. -/
+theorem checkLoadedProgram_success_body_checks
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    SourceInference.FunctionBodiesChecked checked.environment
+        checked.signatures fuel checked.signatures.functions checked.functions ∧
+      ImplementationMethodBodiesChecked checked.environment checked.signatures
+        fuel (implementationMethodCheckTargets checked.signatures)
+          checked.methods := by
+  obtain ⟨_, _, _, _, _, functionsResult, methodsResult, checkedEq⟩ :=
+    checkLoadedProgram_success_components success
+  subst checked
+  exact ⟨
+    SourceInference.checkFunctionBodies_success_corresponds functionsResult,
+    checkImplementationMethodBodies_success_corresponds methodsResult
+  ⟩
+
 /-- Validate, parse, catalog, resolve, and check every top-level function and
 implementation-method body in canonical declaration order. -/
 def checkProgram (raw : Workspace.RawWorkspace) (fuel : Nat := 1024) :
@@ -500,6 +658,21 @@ theorem checkProgram_success_ids
           implementation.methods.map (fun method => method.id) := by
   obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
   exact checkLoadedProgram_success_ids checkedSuccess
+
+/-- End-to-end checker success preserves exact per-body executable
+provenance for both functions and implementation methods. -/
+theorem checkProgram_success_body_checks
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    SourceInference.FunctionBodiesChecked checked.environment
+        checked.signatures fuel checked.signatures.functions checked.functions ∧
+      ImplementationMethodBodiesChecked checked.environment checked.signatures
+        fuel (implementationMethodCheckTargets checked.signatures)
+          checked.methods := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_body_checks checkedSuccess
 
 /-- A successfully checked raw workspace retains pairwise distinct declaration
 identities in its checked environment. -/

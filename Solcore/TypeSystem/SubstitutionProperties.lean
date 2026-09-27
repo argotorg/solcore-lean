@@ -42,6 +42,33 @@ theorem lookup?_eq_some_mem
           simpa [lookup?, same] using found
         exact List.mem_cons_of_mem _ (induction tailFound)
 
+/-- Flexible substitution distributes through a left-associated application
+spine. -/
+theorem apply_applyMany (substitution : Substitution) (head : Ty)
+    (arguments : List Ty) :
+    substitution.apply (Ty.applyMany head arguments) =
+      Ty.applyMany (substitution.apply head)
+        (arguments.map substitution.apply) := by
+  induction arguments generalizing head with
+  | nil => rfl
+  | cons argument rest induction =>
+      exact induction (.application head argument)
+
+/-- Flexible substitution distributes through a right-associated product
+spine. -/
+theorem apply_productMany (substitution : Substitution) (types : List Ty) :
+    substitution.apply (Ty.productMany types) =
+      Ty.productMany (types.map substitution.apply) := by
+  induction types with
+  | nil => rfl
+  | cons head tail induction =>
+      cases tail with
+      | nil => rfl
+      | cons next rest =>
+          simp only [Ty.productMany, Substitution.apply, List.map_cons]
+          rw [induction]
+          rfl
+
 /-- Applying a substitution is allocator-bounded when every stored range is
 bounded and every surviving source variable is bounded. -/
 theorem apply_variables_below_of_range
