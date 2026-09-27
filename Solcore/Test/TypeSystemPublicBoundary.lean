@@ -79,6 +79,12 @@ example := @Solcore.TypeSystem.Unification.unify_rangeAvoidsDomain
 example := @Solcore.TypeSystem.Unification.unifyTypes_solvedBelow
 example := @Solcore.TypeSystem.Unification.unifyTypes_sound
 example := @Solcore.TypeSystem.Unification.unifyTypes_rangeAvoidsDomain
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_next_le
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_range_variablesBelow
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_body_variablesBelow
 example := @Solcore.TypeSystem.Scheme.instantiate_next_le
 example := @Solcore.TypeSystem.Scheme.matchInstance?
 example := @Solcore.TypeSystem.Scheme.matchInstance?_sound
@@ -348,6 +354,51 @@ example : (quantifiedOnlyScheme.instantiate 0).1.VariablesBelow
       simp [Solcore.TypeSystem.Scheme.FreeVariablesBelow,
         Solcore.TypeSystem.Scheme.freeVariables, quantifiedOnlyScheme,
         Solcore.TypeSystem.Ty.freeVariables])
+
+private def quantifiedFreeScheme : Solcore.TypeSystem.Scheme :=
+  { quantified := [⟨7⟩]
+    body := .product (.variable ⟨7⟩) (.variable ⟨1⟩) }
+
+/-- Shared-substitution instantiation bounds its advanced allocator, mixed
+quantified/free body, and every generated replacement in one result. -/
+example :
+    let instantiated := quantifiedFreeScheme.instantiateWithSubstitution 2
+    2 ≤ instantiated.next ∧
+      instantiated.body.VariablesBelow instantiated.next ∧
+      ∀ {metavariable replacement},
+        (metavariable, replacement) ∈ instantiated.substitution →
+          replacement.VariablesBelow instantiated.next := by
+  dsimp only
+  have freeBelow : quantifiedFreeScheme.FreeVariablesBelow 2 := by
+    intro metavariable member
+    change metavariable ∈ quantifiedFreeScheme.body.freeVariables.filter
+      (fun candidate => !(candidate ∈ quantifiedFreeScheme.quantified)) at member
+    have bodyMember : metavariable ∈
+        quantifiedFreeScheme.body.freeVariables :=
+      (List.mem_filter.mp member).1
+    have notQuantified : metavariable ∉ quantifiedFreeScheme.quantified := by
+      simpa using (List.mem_filter.mp member).2
+    rw [show quantifiedFreeScheme.body =
+        (.product (.variable ⟨7⟩) (.variable ⟨1⟩) :
+          Solcore.TypeSystem.Ty) from rfl,
+      Solcore.TypeSystem.Ty.mem_freeVariables_product_iff] at bodyMember
+    have same : metavariable = ⟨1⟩ := by
+      rcases bodyMember with quantified | free
+      · have sameQuantified : metavariable = ⟨7⟩ := by
+          simpa [Solcore.TypeSystem.Ty.freeVariables] using quantified
+        subst metavariable
+        exfalso
+        exact notQuantified (by simp [quantifiedFreeScheme])
+      · simpa [Solcore.TypeSystem.Ty.freeVariables] using free
+    subst metavariable
+    decide
+  exact
+    ⟨Solcore.TypeSystem.Scheme.instantiateWithSubstitution_next_le
+        quantifiedFreeScheme 2,
+      Solcore.TypeSystem.Scheme.instantiateWithSubstitution_body_variablesBelow
+        quantifiedFreeScheme 2 freeBelow,
+      Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_range_variablesBelow
+        quantifiedFreeScheme 2⟩
 
 private def unboundedFreeScheme : Solcore.TypeSystem.Scheme :=
   { quantified := []
