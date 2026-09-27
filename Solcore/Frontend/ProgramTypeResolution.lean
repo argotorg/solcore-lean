@@ -466,4 +466,900 @@ def resolveProgramTypeExprList
   resolveProgramTypeExprListWithFuel environment scope
     defaultProgramTypeResolutionFuel sources
 
+/-! Successful source-type resolution cannot manufacture flexible inference
+metavariables.  This is the algorithmic closedness premise needed before a
+resolved type can be related to the declaration-owned binders and nominal
+catalogs of `SourceSemantics.TypeWellScoped`. -/
+
+private def ProgramTypesVariablesBelow
+    (next : Nat) (types : List TypeSystem.Ty) : Prop :=
+  ∀ type ∈ types, type.VariablesBelow next
+
+private theorem programTypesVariablesBelow_nil (next : Nat) :
+    ProgramTypesVariablesBelow next [] := by
+  simp [ProgramTypesVariablesBelow]
+
+private theorem programTypesVariablesBelow_cons
+    {next : Nat} {head : TypeSystem.Ty} {tail : List TypeSystem.Ty}
+    (headBelow : head.VariablesBelow next)
+    (tailBelow : ProgramTypesVariablesBelow next tail) :
+    ProgramTypesVariablesBelow next (head :: tail) := by
+  simpa [ProgramTypesVariablesBelow] using ⟨headBelow, tailBelow⟩
+
+private theorem applyMany_variablesBelow
+    {next : Nat} {head : TypeSystem.Ty} {arguments : List TypeSystem.Ty}
+    (headBelow : head.VariablesBelow next)
+    (argumentsBelow : ProgramTypesVariablesBelow next arguments) :
+    (TypeSystem.Ty.applyMany head arguments).VariablesBelow next := by
+  induction arguments generalizing head with
+  | nil => simpa [TypeSystem.Ty.applyMany] using headBelow
+  | cons argument arguments induction =>
+      apply induction
+      · simp only [TypeSystem.Ty.variablesBelow_application_iff]
+        exact ⟨headBelow, argumentsBelow argument (by simp)⟩
+      · intro type member
+        exact argumentsBelow type (by simp [member])
+
+private theorem nominal_variablesBelow
+    {next : Nat} {declaration : Resolved.DeclarationId}
+    {arguments : List TypeSystem.Ty}
+    (argumentsBelow : ProgramTypesVariablesBelow next arguments) :
+    (TypeSystem.Ty.nominal declaration arguments).VariablesBelow next := by
+  apply applyMany_variablesBelow
+  · simp
+  · exact argumentsBelow
+
+private theorem tupleProgramType_variablesBelow
+    {next : Nat} {types : List TypeSystem.Ty}
+    (typesBelow : ProgramTypesVariablesBelow next types) :
+    (tupleProgramType types).VariablesBelow next := by
+  induction types with
+  | nil => simp [tupleProgramType]
+  | cons head tail induction =>
+      cases tail with
+      | nil => exact typesBelow head (by simp)
+      | cons nextHead rest =>
+          simp only [tupleProgramType,
+            TypeSystem.Ty.variablesBelow_product_iff]
+          exact ⟨typesBelow head (by simp), induction (by
+            intro type member
+            exact typesBelow type (by simp [member]))⟩
+
+private theorem parameterSubstitution_lookup_mem
+    {substitution : TypeSystem.ParameterSubstitution}
+    {parameter : TypeSystem.TypeParameterId} {replacement : TypeSystem.Ty}
+    (found : substitution.lookup? parameter = some replacement) :
+    (parameter, replacement) ∈ substitution := by
+  induction substitution with
+  | nil => simp [TypeSystem.ParameterSubstitution.lookup?] at found
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, candidateReplacement⟩
+      by_cases same : candidate = parameter
+      · subst candidate
+        simp [TypeSystem.ParameterSubstitution.lookup?] at found
+        cases found
+        simp
+      · have tailFound :
+            TypeSystem.ParameterSubstitution.lookup? rest parameter =
+              some replacement := by
+          simpa [TypeSystem.ParameterSubstitution.lookup?, same] using found
+        exact List.mem_cons_of_mem _ (induction tailFound)
+
+private theorem parameterSubstitution_variablesBelow
+    {next : Nat} {substitution : TypeSystem.ParameterSubstitution}
+    {type : TypeSystem.Ty}
+    (rangesBelow : ProgramTypesVariablesBelow next (substitution.map Prod.snd))
+    (typeBelow : type.VariablesBelow next) :
+    (substitution.apply type).VariablesBelow next := by
+  induction type with
+  | «variable» metavariable =>
+      simpa [TypeSystem.ParameterSubstitution.apply] using typeBelow
+  | parameter candidate =>
+      cases found : substitution.lookup? candidate with
+      | none => simp [TypeSystem.ParameterSubstitution.apply, found]
+      | some replacement =>
+          simp only [TypeSystem.ParameterSubstitution.apply, found,
+            Option.getD_some]
+          exact rangesBelow replacement (List.mem_map.mpr
+            ⟨(candidate, replacement), parameterSubstitution_lookup_mem found,
+              rfl⟩)
+  | constructor constructor => simp [TypeSystem.ParameterSubstitution.apply]
+  | application left right leftInduction rightInduction =>
+      have parts := (TypeSystem.Ty.variablesBelow_application_iff
+        next left right).mp typeBelow
+      simp only [TypeSystem.ParameterSubstitution.apply,
+        TypeSystem.Ty.variablesBelow_application_iff]
+      exact ⟨leftInduction parts.1, rightInduction parts.2⟩
+  | function parameter result parameterInduction resultInduction =>
+      have parts := (TypeSystem.Ty.variablesBelow_function_iff
+        next parameter result).mp typeBelow
+      simp only [TypeSystem.ParameterSubstitution.apply,
+        TypeSystem.Ty.variablesBelow_function_iff]
+      exact ⟨parameterInduction parts.1, resultInduction parts.2⟩
+  | product left right leftInduction rightInduction =>
+      have parts := (TypeSystem.Ty.variablesBelow_product_iff
+        next left right).mp typeBelow
+      simp only [TypeSystem.ParameterSubstitution.apply,
+        TypeSystem.Ty.variablesBelow_product_iff]
+      exact ⟨leftInduction parts.1, rightInduction parts.2⟩
+  | mapping key value keyInduction valueInduction =>
+      have parts := (TypeSystem.Ty.variablesBelow_mapping_iff
+        next key value).mp typeBelow
+      simp only [TypeSystem.ParameterSubstitution.apply,
+        TypeSystem.Ty.variablesBelow_mapping_iff]
+      exact ⟨keyInduction parts.1, valueInduction parts.2⟩
+  | proxy inner induction =>
+      simpa [TypeSystem.ParameterSubstitution.apply] using induction typeBelow
+  | comptime inner induction =>
+      simpa [TypeSystem.ParameterSubstitution.apply] using induction typeBelow
+  | error => simp [TypeSystem.ParameterSubstitution.apply]
+
+private theorem declaredType_variablesBelow
+    {next : Nat} {components : List String}
+    {declaration : ProgramDeclaration} {arguments : List TypeSystem.Ty}
+    {resolved : TypeSystem.Ty}
+    (argumentsBelow : ProgramTypesVariablesBelow next arguments)
+    (success : declaredType components declaration arguments = .ok resolved) :
+    resolved.VariablesBelow next := by
+  simp only [declaredType] at success
+  split at success
+  · injection success with resolvedEq
+    subst resolved
+    exact nominal_variablesBelow argumentsBelow
+  · simp at success
+
+private theorem uniqueDeclaredType_variablesBelow
+    {next : Nat} {components : List String} {arguments : List TypeSystem.Ty}
+    {declarations : List ProgramDeclaration} {resolved : TypeSystem.Ty}
+    (argumentsBelow : ProgramTypesVariablesBelow next arguments)
+    (success : uniqueDeclaredType components arguments declarations =
+      .ok resolved) :
+    resolved.VariablesBelow next := by
+  cases declarations with
+  | nil => simp [uniqueDeclaredType] at success
+  | cons declaration rest =>
+      cases rest with
+      | nil =>
+          exact declaredType_variablesBelow argumentsBelow
+            (by simpa [uniqueDeclaredType] using success)
+      | cons nextDeclaration tail =>
+          simp [uniqueDeclaredType] at success
+
+private theorem resolveIntegerFallback_variablesBelow
+    {next : Nat} {components : List String} {name : String}
+    {arguments : List TypeSystem.Ty} {resolved : TypeSystem.Ty}
+    (success : resolveIntegerFallback components name arguments =
+      .ok resolved) :
+    resolved.VariablesBelow next := by
+  simp only [resolveIntegerFallback] at success
+  split at success
+  · split at success
+    · injection success with resolvedEq
+      subst resolved
+      exact TypeSystem.Ty.variablesBelow_constructor next
+        (.builtin .integer)
+    · simp at success
+  · simp at success
+
+private theorem resolveNamedProgramType_variablesBelow
+    {next : Nat} {environment : ProgramEnvironment}
+    {scope : ProgramTypeScope} {components : List String}
+    {arguments : List TypeSystem.Ty} {resolved : TypeSystem.Ty}
+    (argumentsBelow : ProgramTypesVariablesBelow next arguments)
+    (success : resolveNamedProgramType environment scope components arguments =
+      .ok resolved) :
+    resolved.VariablesBelow next := by
+  cases components with
+  | nil => simp [resolveNamedProgramType] at success
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          simp only [resolveNamedProgramType] at success
+          split at success
+          · split at success
+            · injection success with resolvedEq
+              subst resolved
+              simp
+            · simp at success
+          · split at success
+            · split at success
+              · injection success with resolvedEq
+                subst resolved
+                simp
+              · simp at success
+            · split at success
+              · split at success
+                · simp at success
+                · split at success
+                  · exact resolveIntegerFallback_variablesBelow success
+                  · exact uniqueDeclaredType_variablesBelow argumentsBelow success
+              · exact uniqueDeclaredType_variablesBelow argumentsBelow success
+      | cons second tail =>
+          simp only [resolveNamedProgramType] at success
+          split at success
+          · simp at success
+          · split at success
+            · exact uniqueDeclaredType_variablesBelow argumentsBelow success
+            · simp at success
+
+private theorem resolveProgramTypeFuel_variablesBelow
+    (next : Nat) (environment : ProgramEnvironment) (scope : ProgramTypeScope)
+    (fuel : Nat) :
+    (∀ source resolved,
+      resolveProgramTypeExprFuel environment scope fuel source = .ok resolved →
+        resolved.VariablesBelow next) ∧
+    (∀ sources resolved,
+      resolveProgramTypeExprListFuel environment scope fuel sources =
+          .ok resolved →
+        ProgramTypesVariablesBelow next resolved) := by
+  induction fuel with
+  | zero =>
+      constructor
+      · intro source resolved success
+        simp [resolveProgramTypeExprFuel] at success
+      · intro sources resolved success
+        cases sources with
+        | nil =>
+            simp [resolveProgramTypeExprListFuel, pure, Pure.pure,
+              Except.pure] at success
+            subst resolved
+            exact programTypesVariablesBelow_nil next
+        | cons source rest =>
+            simp [resolveProgramTypeExprListFuel] at success
+  | succ fuel induction =>
+      rcases induction with ⟨resolveInduction, listInduction⟩
+      constructor
+      · intro source resolved success
+        rcases source with ⟨span, source⟩
+        cases source with
+        | named name arguments =>
+            cases arguments with
+            | none =>
+                exact resolveNamedProgramType_variablesBelow
+                  (programTypesVariablesBelow_nil next)
+                  (by simpa [resolveProgramTypeExprFuel] using success)
+            | some arguments =>
+                cases argumentsResult : resolveProgramTypeExprListFuel
+                    environment scope fuel arguments.elements.toList with
+                | error error =>
+                    simp [resolveProgramTypeExprFuel, argumentsResult, bind,
+                      Except.bind] at success
+                | ok resolvedArguments =>
+                    apply resolveNamedProgramType_variablesBelow
+                      (listInduction _ _ argumentsResult)
+                    simpa [resolveProgramTypeExprFuel, argumentsResult, bind,
+                      Except.bind] using success
+        | mapping keyword argumentsSpan key value =>
+            cases keyResult : resolveProgramTypeExprFuel environment scope fuel key with
+            | error error =>
+                simp [resolveProgramTypeExprFuel, keyResult, bind,
+                  Except.bind] at success
+            | ok resolvedKey =>
+                cases valueResult : resolveProgramTypeExprFuel environment scope fuel value with
+                | error error =>
+                    simp [resolveProgramTypeExprFuel, keyResult, valueResult,
+                      bind, Except.bind] at success
+                | ok resolvedValue =>
+                    simp [resolveProgramTypeExprFuel, keyResult, valueResult,
+                      bind, Except.bind, pure, Pure.pure, Except.pure] at success
+                    subst resolved
+                    simp only [TypeSystem.Ty.variablesBelow_mapping_iff]
+                    exact ⟨resolveInduction _ _ keyResult,
+                      resolveInduction _ _ valueResult⟩
+        | proxy marker inner =>
+            cases innerResult : resolveProgramTypeExprFuel environment scope fuel inner with
+            | error error =>
+                simp [resolveProgramTypeExprFuel, innerResult, bind,
+                  Except.bind] at success
+            | ok resolvedInner =>
+                simp [resolveProgramTypeExprFuel, innerResult, bind,
+                  Except.bind, pure, Pure.pure, Except.pure] at success
+                subst resolved
+                simpa using resolveInduction _ _ innerResult
+        | function keyword parameters returns =>
+            cases parametersResult : resolveProgramTypeExprListFuel
+                environment scope fuel parameters.elements with
+            | error error =>
+                simp [resolveProgramTypeExprFuel, parametersResult, bind,
+                  Except.bind] at success
+            | ok resolvedParameters =>
+                cases returns with
+                | none =>
+                    simp [resolveProgramTypeExprFuel, parametersResult, bind,
+                      Except.bind, pure, Pure.pure, Except.pure] at success
+                    subst resolved
+                    simp only [TypeSystem.Ty.variablesBelow_function_iff]
+                    exact ⟨tupleProgramType_variablesBelow
+                        (listInduction _ _ parametersResult),
+                      tupleProgramType_variablesBelow
+                        (programTypesVariablesBelow_nil next)⟩
+                | some returns =>
+                    cases returnsResult : resolveProgramTypeExprListFuel
+                        environment scope fuel returns.elements with
+                    | error error =>
+                        simp [resolveProgramTypeExprFuel, parametersResult,
+                          returnsResult, bind, Except.bind] at success
+                    | ok resolvedReturns =>
+                        simp [resolveProgramTypeExprFuel, parametersResult,
+                          returnsResult, bind, Except.bind, pure, Pure.pure,
+                          Except.pure] at success
+                        subst resolved
+                        simp only [TypeSystem.Ty.variablesBelow_function_iff]
+                        exact ⟨tupleProgramType_variablesBelow
+                            (listInduction _ _ parametersResult),
+                          tupleProgramType_variablesBelow
+                            (listInduction _ _ returnsResult)⟩
+        | comptime keyword argumentsSpan inner =>
+            cases innerResult : resolveProgramTypeExprFuel environment scope fuel inner with
+            | error error =>
+                simp [resolveProgramTypeExprFuel, innerResult, bind,
+                  Except.bind] at success
+            | ok resolvedInner =>
+                simp [resolveProgramTypeExprFuel, innerResult, bind,
+                  Except.bind, pure, Pure.pure, Except.pure] at success
+                subst resolved
+                simpa using resolveInduction _ _ innerResult
+        | tuple elements =>
+            cases elementsResult : resolveProgramTypeExprListFuel
+                environment scope fuel elements with
+            | error error =>
+                simp [resolveProgramTypeExprFuel, elementsResult, bind,
+                  Except.bind] at success
+            | ok resolvedElements =>
+                simp [resolveProgramTypeExprFuel, elementsResult, bind,
+                  Except.bind, pure, Pure.pure, Except.pure] at success
+                subst resolved
+                exact tupleProgramType_variablesBelow
+                  (listInduction _ _ elementsResult)
+        | error =>
+            simp [resolveProgramTypeExprFuel, pure, Pure.pure,
+              Except.pure] at success
+            subst resolved
+            exact TypeSystem.Ty.variablesBelow_error next
+      · intro sources resolved success
+        cases sources with
+        | nil =>
+            simp [resolveProgramTypeExprListFuel, pure, Pure.pure,
+              Except.pure] at success
+            subst resolved
+            exact programTypesVariablesBelow_nil next
+        | cons source rest =>
+            cases headResult : resolveProgramTypeExprFuel
+                environment scope fuel source with
+            | error error =>
+                simp [resolveProgramTypeExprListFuel, headResult, bind,
+                  Except.bind] at success
+            | ok resolvedHead =>
+                cases tailResult : resolveProgramTypeExprListFuel
+                    environment scope fuel rest with
+                | error error =>
+                    simp [resolveProgramTypeExprListFuel, headResult,
+                      tailResult, bind, Except.bind] at success
+                | ok resolvedTail =>
+                    simp [resolveProgramTypeExprListFuel, headResult,
+                      tailResult, bind, Except.bind, pure, Pure.pure,
+                      Except.pure] at success
+                    subst resolved
+                    exact programTypesVariablesBelow_cons
+                      (resolveInduction _ _ headResult)
+                      (listInduction _ _ tailResult)
+
+private theorem programTypesVariablesBelow_append
+    {next : Nat} {left right : List TypeSystem.Ty}
+    (leftBelow : ProgramTypesVariablesBelow next left)
+    (rightBelow : ProgramTypesVariablesBelow next right) :
+    ProgramTypesVariablesBelow next (left ++ right) := by
+  intro type member
+  rcases List.mem_append.mp member with member | member
+  · exact leftBelow type member
+  · exact rightBelow type member
+
+private theorem programTypeApplicationSpine_variablesBelow
+    {next : Nat} {type head : TypeSystem.Ty}
+    {arguments : List TypeSystem.Ty}
+    (typeBelow : type.VariablesBelow next)
+    (spine : programTypeApplicationSpine type = (head, arguments)) :
+    head.VariablesBelow next ∧
+      ProgramTypesVariablesBelow next arguments := by
+  induction type generalizing head arguments with
+  | application function argument induction =>
+      simp only [programTypeApplicationSpine] at spine
+      cases functionSpine : programTypeApplicationSpine function with
+      | mk functionHead functionArguments =>
+          simp only [functionSpine] at spine
+          injection spine with headEq argumentsEq
+          subst head
+          subst arguments
+          have parts := (TypeSystem.Ty.variablesBelow_application_iff
+            next function argument).mp typeBelow
+          have functionParts := induction parts.1 functionSpine
+          exact ⟨functionParts.1, programTypesVariablesBelow_append
+            functionParts.2 (programTypesVariablesBelow_cons parts.2
+              (programTypesVariablesBelow_nil next))⟩
+  | «variable» metavariable
+  | parameter metavariable
+  | constructor metavariable
+  | error =>
+      simp only [programTypeApplicationSpine] at spine
+      injection spine with headEq argumentsEq
+      subst head
+      subst arguments
+      exact ⟨typeBelow, programTypesVariablesBelow_nil next⟩
+  | function left right leftInduction rightInduction
+  | product left right leftInduction rightInduction
+  | mapping left right leftInduction rightInduction =>
+      simp only [programTypeApplicationSpine] at spine
+      injection spine with headEq argumentsEq
+      subst head
+      subst arguments
+      exact ⟨typeBelow, programTypesVariablesBelow_nil next⟩
+  | proxy inner induction
+  | comptime inner induction =>
+      simp only [programTypeApplicationSpine] at spine
+      injection spine with headEq argumentsEq
+      subst head
+      subst arguments
+      exact ⟨typeBelow, programTypesVariablesBelow_nil next⟩
+
+private theorem programTypeAliasApplication_arguments_variablesBelow
+    {next : Nat} {environment : ProgramEnvironment} {type : TypeSystem.Ty}
+    {application : ProgramTypeAliasApplication}
+    (typeBelow : type.VariablesBelow next)
+    (found : programTypeAliasApplication? environment type = some application) :
+    ProgramTypesVariablesBelow next application.arguments := by
+  simp only [programTypeAliasApplication?] at found
+  cases spine : programTypeApplicationSpine type with
+  | mk head arguments =>
+      have spineBelow := programTypeApplicationSpine_variablesBelow
+        typeBelow spine
+      simp only [spine] at found
+      cases head with
+      | constructor constructor =>
+          cases constructor with
+          | declaration id =>
+              cases declarationResult : environment.declaration? id with
+              | none => simp [declarationResult] at found
+              | some declaration =>
+                  simp only [declarationResult] at found
+                  cases kindEq : declaration.kind <;>
+                    cases sourceEq : declaration.source.value <;>
+                    simp [kindEq, sourceEq] at found
+                  case typeAlias.typeAlias alias =>
+                    subst application
+                    exact spineBelow.2
+          | builtin builtin => simp at found
+      | «variable» metavariable
+      | parameter metavariable
+      | application function argument
+      | function parameter result
+      | product left right
+      | mapping key value
+      | proxy inner
+      | comptime inner
+      | error => simp at found
+
+private theorem stateTExcept_bind_success
+    {σ α β ε : Type} {first : StateT σ (Except ε) α}
+    {next : α → StateT σ (Except ε) β}
+    {initial final : σ} {result : β}
+    (success : (first >>= next).run initial = .ok (result, final)) :
+    ∃ value middle,
+      first.run initial = .ok (value, middle) ∧
+        (next value).run middle = .ok (result, final) := by
+  simp only [StateT.run, bind, StateT.bind, Except.bind] at success
+  cases firstResult : first initial with
+  | error error => simp [firstResult] at success
+  | ok pair =>
+      rcases pair with ⟨value, middle⟩
+      refine ⟨value, middle, by simpa [StateT.run] using firstResult, ?_⟩
+      simpa [StateT.run, firstResult] using success
+
+private theorem stateTExcept_lift_success
+    {σ α ε : Type} {computation : Except ε α}
+    {initial final : σ} {result : α}
+    (success : (liftM computation : StateT σ (Except ε) α).run initial =
+      .ok (result, final)) :
+    computation = .ok result ∧ final = initial := by
+  change (StateT.lift computation).run initial =
+    .ok (result, final) at success
+  cases computation with
+  | error error =>
+      change Except.error error = Except.ok (result, final) at success
+      simp at success
+  | ok value =>
+      change Except.ok (value, initial) = Except.ok (result, final) at success
+      injection success with pairEq
+      injection pairEq with resultEq finalEq
+      exact ⟨congrArg (Except.ok (ε := ε)) resultEq, finalEq.symm⟩
+
+private theorem programTypesVariablesBelow_zip_snd
+    {next : Nat} {parameters : List TypeSystem.TypeParameterId}
+    {arguments : List TypeSystem.Ty}
+    (argumentsBelow : ProgramTypesVariablesBelow next arguments) :
+    ProgramTypesVariablesBelow next ((parameters.zip arguments).map Prod.snd) := by
+  intro type member
+  simp only [List.mem_map] at member
+  obtain ⟨entry, entryMember, typeEq⟩ := member
+  subst type
+  exact argumentsBelow entry.2 (List.of_mem_zip entryMember).2
+
+private theorem consumeProgramTypeAliasNode_then_success
+    {α : Type} {continuation : ProgramTypeAliasNormalizationM α}
+    {nodeBudget remaining : Nat} {resolved : α}
+    (success : (do
+      consumeProgramTypeAliasNode
+      continuation).run (nodeBudget + 1) = .ok (resolved, remaining)) :
+    continuation.run nodeBudget = .ok (resolved, remaining) := by
+  exact success
+
+private theorem consumeProgramTypeAliasNode_zero_impossible
+    {α : Type} {continuation : ProgramTypeAliasNormalizationM α}
+    {remaining : Nat} {resolved : α}
+    (success : (do
+      consumeProgramTypeAliasNode
+      continuation).run 0 = .ok (resolved, remaining)) : False := by
+  change Except.error ProgramTypeResolutionError.aliasExpansionLimit =
+    .ok (resolved, remaining) at success
+  simp at success
+
+private theorem stateTExcept_pure_success
+    {σ α ε : Type} {value result : α} {initial final : σ}
+    (success : (pure value : StateT σ (Except ε) α).run initial =
+      .ok (result, final)) :
+    result = value ∧ final = initial := by
+  change Except.ok (value, initial) = Except.ok (result, final) at success
+  injection success with pairEq
+  injection pairEq with valueEq stateEq
+  exact ⟨valueEq.symm, stateEq.symm⟩
+
+private theorem stateTExcept_throw_impossible
+    {σ α ε : Type} {error : ε} {initial final : σ} {result : α}
+    (success : (throw error : StateT σ (Except ε) α).run initial =
+      .ok (result, final)) : False := by
+  change Except.error error = Except.ok (result, final) at success
+  simp at success
+
+private theorem stateTExcept_throw_then_impossible
+    {σ α β ε : Type} {error : ε}
+    {continuation : α → StateT σ (Except ε) β}
+    {initial final : σ} {result : β}
+    (success : (do
+      let value ← (throw error : StateT σ (Except ε) α)
+      continuation value).run initial = .ok (result, final)) : False := by
+  obtain ⟨value, middle, thrown, continued⟩ :=
+    stateTExcept_bind_success success
+  exact stateTExcept_throw_impossible thrown
+
+private theorem stateTExcept_map_success
+    {σ α β ε : Type} {computation : StateT σ (Except ε) α}
+    {transform : α → β} {initial final : σ} {result : β}
+    (success : (do
+      let value ← computation
+      pure (transform value)).run initial = .ok (result, final)) :
+    ∃ value, computation.run initial = .ok (value, final) ∧
+      result = transform value := by
+  obtain ⟨value, middle, computationSuccess, pureSuccess⟩ :=
+    stateTExcept_bind_success success
+  have pureProperties := stateTExcept_pure_success pureSuccess
+  refine ⟨value, ?_, pureProperties.1⟩
+  rw [pureProperties.2]
+  exact computationSuccess
+
+private theorem stateTExcept_map₂_success
+    {σ α β γ ε : Type} {left : StateT σ (Except ε) α}
+    {right : StateT σ (Except ε) β} {combine : α → β → γ}
+    {initial final : σ} {result : γ}
+    (success : (do
+      let leftValue ← left
+      let rightValue ← right
+      pure (combine leftValue rightValue)).run initial =
+        .ok (result, final)) :
+    ∃ leftValue middle rightValue,
+      left.run initial = .ok (leftValue, middle) ∧
+        right.run middle = .ok (rightValue, final) ∧
+          result = combine leftValue rightValue := by
+  obtain ⟨leftValue, middle, leftSuccess, restSuccess⟩ :=
+    stateTExcept_bind_success success
+  obtain ⟨rightValue, rightSuccess, resultEq⟩ :=
+    stateTExcept_map_success restSuccess
+  exact ⟨leftValue, middle, rightValue, leftSuccess, rightSuccess, resultEq⟩
+
+private theorem normalizeProgramTypeAliasesFuel_variablesBelow_mutual
+    (next : Nat) (environment : ProgramEnvironment) :
+    (∀ structuralFuel aliasDepth stack type nodeBudget resolved remaining,
+        type.VariablesBelow next →
+        (normalizeProgramTypeAliasesFuel environment structuralFuel aliasDepth
+            stack type).run nodeBudget = .ok (resolved, remaining) →
+        resolved.VariablesBelow next) ∧
+      (∀ structuralFuel aliasDepth stack types nodeBudget resolved remaining,
+        ProgramTypesVariablesBelow next types →
+        (normalizeProgramTypeAliasListFuel environment structuralFuel aliasDepth
+            stack types).run nodeBudget = .ok (resolved, remaining) →
+        ProgramTypesVariablesBelow next resolved) := by
+  apply normalizeProgramTypeAliasesFuel.mutual_induct
+    (motive2 := fun structuralFuel aliasDepth stack types =>
+      ∀ nodeBudget resolved remaining,
+        ProgramTypesVariablesBelow next types →
+        (normalizeProgramTypeAliasListFuel environment structuralFuel aliasDepth
+            stack types).run nodeBudget = .ok (resolved, remaining) →
+        ProgramTypesVariablesBelow next resolved)
+  · intro aliasDepth stack type nodeBudget resolved remaining typeBelow success
+    unfold normalizeProgramTypeAliasesFuel at success
+    change Except.error ProgramTypeResolutionError.nestingLimit =
+      .ok (resolved, remaining) at success
+    simp at success
+  · intro structuralFuel aliasDepth stack type aliasInduction typeInduction
+      nodeBudget resolved remaining typeBelow success
+    unfold normalizeProgramTypeAliasesFuel at success
+    cases nodeBudget with
+    | zero => exact (consumeProgramTypeAliasNode_zero_impossible success).elim
+    | succ nodeBudget =>
+        have continued := consumeProgramTypeAliasNode_then_success success
+        cases applicationEq : programTypeAliasApplication? environment type with
+        | some application =>
+            simp only [applicationEq] at continued
+            cases aliasDepth with
+            | zero => exact (stateTExcept_throw_impossible continued).elim
+            | succ remainingAliasDepth =>
+                have aliasParts := aliasInduction application
+                by_cases cyclic :
+                    (stack.any fun active =>
+                      decide (active = application.declaration.id)) = true
+                · simp only [cyclic] at continued
+                  exact (stateTExcept_throw_then_impossible continued).elim
+                · simp only [cyclic] at continued
+                  by_cases arityMismatch :
+                      (application.declaration.genericParameters.length !=
+                        application.arguments.length) = true
+                  · simp only [arityMismatch] at continued
+                    exact (stateTExcept_throw_then_impossible continued).elim
+                  · simp only [arityMismatch] at continued
+                    obtain ⟨normalizedArguments, afterArguments,
+                        argumentsSuccess, afterArgumentsSuccess⟩ :=
+                      stateTExcept_bind_success continued
+                    obtain ⟨validated, afterValidation, validationSuccess,
+                        afterValidationSuccess⟩ :=
+                      stateTExcept_bind_success afterArgumentsSuccess
+                    obtain ⟨rawBody, afterRaw, rawLiftSuccess,
+                        normalizedSuccess⟩ :=
+                      stateTExcept_bind_success afterValidationSuccess
+                    have _validationResult :=
+                      stateTExcept_lift_success validationSuccess
+                    have rawResult := stateTExcept_lift_success rawLiftSuccess
+                    have sourceArgumentsBelow :=
+                      programTypeAliasApplication_arguments_variablesBelow
+                        typeBelow applicationEq
+                    have normalizedArgumentsBelow := aliasParts.1
+                      nodeBudget normalizedArguments afterArguments
+                      sourceArgumentsBelow argumentsSuccess
+                    have rawBodyBelow :=
+                      (resolveProgramTypeFuel_variablesBelow next environment
+                        (ProgramTypeScope.ofDeclaration application.declaration)
+                        (structuralFuel + 1)).1 _ _ rawResult.1
+                    have substitutionBelow := parameterSubstitution_variablesBelow
+                      (substitution :=
+                        (programTypeAliasParameters application.declaration).zip
+                          normalizedArguments)
+                      (programTypesVariablesBelow_zip_snd
+                        (parameters :=
+                          programTypeAliasParameters application.declaration)
+                        normalizedArgumentsBelow)
+                      rawBodyBelow
+                    exact aliasParts.2 normalizedArguments rawBody afterRaw
+                      resolved remaining substitutionBelow normalizedSuccess
+        | none =>
+            simp only [applicationEq] at continued
+            cases type with
+            | «variable» metavariable
+            | parameter metavariable
+            | constructor metavariable
+            | error =>
+                have resultProperties := stateTExcept_pure_success continued
+                rw [resultProperties.1]
+                exact typeBelow
+            | application function argument =>
+                obtain ⟨normalizedFunction, middle, normalizedArgument,
+                    functionSuccess, argumentSuccess, resultEq⟩ :=
+                  stateTExcept_map₂_success continued
+                rw [resultEq]
+                have parts := (TypeSystem.Ty.variablesBelow_application_iff
+                  next function argument).mp typeBelow
+                exact (TypeSystem.Ty.variablesBelow_application_iff
+                  next normalizedFunction normalizedArgument).mpr
+                    ⟨typeInduction.1 _ _ _ parts.1 functionSuccess,
+                      typeInduction.2 _ _ _ parts.2 argumentSuccess⟩
+            | function parameter result =>
+                obtain ⟨normalizedParameter, middle, normalizedResult,
+                    parameterSuccess, resultSuccess, resultEq⟩ :=
+                  stateTExcept_map₂_success continued
+                rw [resultEq]
+                have parts := (TypeSystem.Ty.variablesBelow_function_iff
+                  next parameter result).mp typeBelow
+                exact (TypeSystem.Ty.variablesBelow_function_iff
+                  next normalizedParameter normalizedResult).mpr
+                    ⟨typeInduction.1 _ _ _ parts.1 parameterSuccess,
+                      typeInduction.2 _ _ _ parts.2 resultSuccess⟩
+            | product left right =>
+                obtain ⟨normalizedLeft, middle, normalizedRight,
+                    leftSuccess, rightSuccess, resultEq⟩ :=
+                  stateTExcept_map₂_success continued
+                rw [resultEq]
+                have parts := (TypeSystem.Ty.variablesBelow_product_iff
+                  next left right).mp typeBelow
+                exact (TypeSystem.Ty.variablesBelow_product_iff
+                  next normalizedLeft normalizedRight).mpr
+                    ⟨typeInduction.1 _ _ _ parts.1 leftSuccess,
+                      typeInduction.2 _ _ _ parts.2 rightSuccess⟩
+            | mapping key value =>
+                obtain ⟨normalizedKey, middle, normalizedValue,
+                    keySuccess, valueSuccess, resultEq⟩ :=
+                  stateTExcept_map₂_success continued
+                rw [resultEq]
+                have parts := (TypeSystem.Ty.variablesBelow_mapping_iff
+                  next key value).mp typeBelow
+                exact (TypeSystem.Ty.variablesBelow_mapping_iff
+                  next normalizedKey normalizedValue).mpr
+                    ⟨typeInduction.1 _ _ _ parts.1 keySuccess,
+                      typeInduction.2 _ _ _ parts.2 valueSuccess⟩
+            | proxy inner =>
+                obtain ⟨normalizedInner, innerSuccess, resultEq⟩ :=
+                  stateTExcept_map_success continued
+                rw [resultEq]
+                simpa using typeInduction nodeBudget normalizedInner remaining
+                  typeBelow innerSuccess
+            | comptime inner =>
+                obtain ⟨normalizedInner, innerSuccess, resultEq⟩ :=
+                  stateTExcept_map_success continued
+                rw [resultEq]
+                simpa using typeInduction nodeBudget normalizedInner remaining
+                  typeBelow innerSuccess
+  · intro structuralFuel aliasDepth stack nodeBudget resolved remaining
+      typesBelow success
+    unfold normalizeProgramTypeAliasListFuel at success
+    have resultProperties := stateTExcept_pure_success success
+    rw [resultProperties.1]
+    exact programTypesVariablesBelow_nil next
+  · intro aliasDepth stack head tail nodeBudget resolved remaining
+      typesBelow success
+    unfold normalizeProgramTypeAliasListFuel at success
+    change Except.error ProgramTypeResolutionError.nestingLimit =
+      .ok (resolved, remaining) at success
+    simp at success
+  · intro structuralFuel aliasDepth stack type rest typeInduction restInduction
+      nodeBudget resolved remaining typesBelow success
+    rw [normalizeProgramTypeAliasListFuel] at success
+    obtain ⟨normalizedHead, middle, normalizedTail, headSuccess,
+        tailSuccess, resultEq⟩ := stateTExcept_map₂_success success
+    rw [resultEq]
+    exact programTypesVariablesBelow_cons
+      (typeInduction _ _ _ (typesBelow type (by simp)) headSuccess)
+      (restInduction _ _ _ (by
+        intro candidate member
+        exact typesBelow candidate (by simp [member])) tailSuccess)
+
+private theorem normalizeProgramTypeAliasesFuel_variablesBelow
+    (next : Nat) (environment : ProgramEnvironment) :
+    ∀ structuralFuel aliasDepth stack type nodeBudget resolved remaining,
+      type.VariablesBelow next →
+      (normalizeProgramTypeAliasesFuel environment structuralFuel aliasDepth
+          stack type).run nodeBudget = .ok (resolved, remaining) →
+      resolved.VariablesBelow next :=
+  (normalizeProgramTypeAliasesFuel_variablesBelow_mutual next environment).1
+
+private theorem normalizeProgramTypeAliasListFuel_variablesBelow
+    (next : Nat) (environment : ProgramEnvironment) :
+    ∀ structuralFuel aliasDepth stack types nodeBudget resolved remaining,
+      ProgramTypesVariablesBelow next types →
+      (normalizeProgramTypeAliasListFuel environment structuralFuel aliasDepth
+          stack types).run nodeBudget = .ok (resolved, remaining) →
+      ProgramTypesVariablesBelow next resolved :=
+  (normalizeProgramTypeAliasesFuel_variablesBelow_mutual next environment).2
+
+private theorem runProgramTypeAliasNormalization_success
+    {α : Type} {nodeBudget : Nat}
+    {computation : ProgramTypeAliasNormalizationM α} {resolved : α}
+    (success : runProgramTypeAliasNormalization nodeBudget computation =
+      .ok resolved) :
+    ∃ remaining, computation.run nodeBudget = .ok (resolved, remaining) := by
+  unfold runProgramTypeAliasNormalization at success
+  cases computationResult : computation.run nodeBudget with
+  | error error =>
+      simp [computationResult, bind, Except.bind] at success
+  | ok pair =>
+      rcases pair with ⟨value, remaining⟩
+      simp [computationResult, bind, Except.bind, pure, Pure.pure,
+        Except.pure] at success
+      refine ⟨remaining, ?_⟩
+      rw [← success]
+
+/-- Successful resolution of one source type never manufactures a flexible
+inference metavariable.  The arbitrary `next` bound makes this stronger than
+mere closedness (`next = 0`) and suitable for later source-semantics bridges. -/
+theorem resolveProgramTypeExprWithBudgets_success_variablesBelow
+    (next : Nat) (environment : ProgramEnvironment) (scope : ProgramTypeScope)
+    (structuralFuel aliasExpansionFuel : Nat) (source : Syntax.TypeExpr)
+    {resolved : TypeSystem.Ty}
+    (success : resolveProgramTypeExprWithBudgets environment scope
+      structuralFuel aliasExpansionFuel source = .ok resolved) :
+    resolved.VariablesBelow next := by
+  unfold resolveProgramTypeExprWithBudgets at success
+  cases validationResult : validateProgramTypeScope scope with
+  | error error =>
+      simp [validationResult, bind, Except.bind] at success
+  | ok _unit =>
+      cases rawResult :
+          resolveProgramTypeExprFuel environment scope structuralFuel source with
+      | error error =>
+          simp [validationResult, rawResult, bind, Except.bind] at success
+      | ok raw =>
+          simp only [validationResult, rawResult, bind, Except.bind] at success
+          obtain ⟨remaining, normalizedResult⟩ :=
+            runProgramTypeAliasNormalization_success success
+          exact normalizeProgramTypeAliasesFuel_variablesBelow next environment
+            structuralFuel aliasExpansionFuel [] raw aliasExpansionFuel resolved
+            remaining
+            ((resolveProgramTypeFuel_variablesBelow next environment scope
+              structuralFuel).1 source raw rawResult)
+            normalizedResult
+
+/-- Successful list resolution preserves the source-order list while proving
+that every resolved element is free of flexible inference metavariables. -/
+theorem resolveProgramTypeExprListWithBudgets_success_variablesBelow
+    (next : Nat) (environment : ProgramEnvironment) (scope : ProgramTypeScope)
+    (structuralFuel aliasExpansionFuel : Nat)
+    (sources : List Syntax.TypeExpr) {resolved : List TypeSystem.Ty}
+    (success : resolveProgramTypeExprListWithBudgets environment scope
+      structuralFuel aliasExpansionFuel sources = .ok resolved) :
+    ∀ type ∈ resolved, type.VariablesBelow next := by
+  unfold resolveProgramTypeExprListWithBudgets at success
+  cases validationResult : validateProgramTypeScope scope with
+  | error error =>
+      simp [validationResult, bind, Except.bind] at success
+  | ok _unit =>
+      cases rawResult :
+          resolveProgramTypeExprListFuel environment scope structuralFuel sources with
+      | error error =>
+          simp [validationResult, rawResult, bind, Except.bind] at success
+      | ok raw =>
+          simp only [validationResult, rawResult, bind, Except.bind] at success
+          obtain ⟨remaining, normalizedResult⟩ :=
+            runProgramTypeAliasNormalization_success success
+          exact normalizeProgramTypeAliasListFuel_variablesBelow next environment
+            structuralFuel aliasExpansionFuel [] raw aliasExpansionFuel resolved
+            remaining
+            ((resolveProgramTypeFuel_variablesBelow next environment scope
+              structuralFuel).2 sources raw rawResult)
+            normalizedResult
+
+/-- Alias-body resolution, including declaration-rooted cycle tracking and
+transparent expansion, cannot introduce a flexible inference metavariable. -/
+theorem resolveProgramTypeAliasBodyWithBudgets_success_variablesBelow
+    (next : Nat) (environment : ProgramEnvironment)
+    (declaration : ProgramDeclaration)
+    (structuralFuel aliasExpansionFuel : Nat) (source : Syntax.TypeExpr)
+    {resolved : TypeSystem.Ty}
+    (success : resolveProgramTypeAliasBodyWithBudgets environment declaration
+      structuralFuel aliasExpansionFuel source = .ok resolved) :
+    resolved.VariablesBelow next := by
+  unfold resolveProgramTypeAliasBodyWithBudgets at success
+  let scope := ProgramTypeScope.ofDeclaration declaration
+  cases validationResult : validateProgramTypeScope scope with
+  | error error =>
+      simp [scope, validationResult, bind, Except.bind] at success
+  | ok _unit =>
+      cases rawResult :
+          resolveProgramTypeExprFuel environment scope structuralFuel source with
+      | error error =>
+          simp [scope, validationResult, rawResult, bind, Except.bind] at success
+      | ok raw =>
+          simp only [scope, validationResult, rawResult, bind, Except.bind] at success
+          obtain ⟨remaining, normalizedResult⟩ :=
+            runProgramTypeAliasNormalization_success success
+          exact normalizeProgramTypeAliasesFuel_variablesBelow next environment
+            structuralFuel aliasExpansionFuel [declaration.id] raw
+            aliasExpansionFuel resolved remaining
+            ((resolveProgramTypeFuel_variablesBelow next environment scope
+              structuralFuel).1 source raw rawResult)
+            normalizedResult
+
 end Solcore.Frontend

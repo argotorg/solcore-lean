@@ -21,6 +21,12 @@ example :=
 example :=
   @Solcore.Frontend.buildProgramEnvironment_success_declaration?_eq_some_iff
 example :=
+  @Solcore.Frontend.resolveProgramTypeExprWithBudgets_success_variablesBelow
+example :=
+  @Solcore.Frontend.resolveProgramTypeExprListWithBudgets_success_variablesBelow
+example :=
+  @Solcore.Frontend.resolveProgramTypeAliasBodyWithBudgets_success_variablesBelow
+example :=
   @Solcore.Frontend.ProgramSignatureError.implementationParameterNotInHead
 example :=
   @Solcore.Frontend.ProgramSignatureError.missingImplementationTraitPredicate
