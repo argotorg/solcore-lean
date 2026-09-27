@@ -1008,8 +1008,11 @@ private theorem nextUnseen_some_key_not_mem (program : CheckedProgram)
               | true =>
                   exact False.elim (present
                     ((any_key_eq_true_iff seen currentSpecialized.key).1 choice))
-            simp [resolved, selected, bind, Except.bind] at result
-            cases result
+            have selectedResult :
+                (current, currentSpecialized, tail) =
+                  (request, specialized, rest) := by
+              simpa [resolved, selected, bind, Except.bind] using result
+            cases selectedResult
             exact present
 
 private theorem nextUnseen_none_resolved_mem (program : CheckedProgram)
@@ -1104,8 +1107,11 @@ private theorem nextUnseen_some_resolved_covered (program : CheckedProgram)
               | true =>
                   exact False.elim (present
                     ((any_key_eq_true_iff seen currentSpecialized.key).1 choice))
-            simp [resolved, chosen, bind, Except.bind] at result
-            cases result
+            have selectedResult :
+                (current, currentSpecialized, tail) =
+                  (selectedRequest, selected, rest) := by
+              simpa [resolved, chosen, bind, Except.bind] using result
+            cases selectedResult
             simp only [List.mem_cons] at requestMember
             rcases requestMember with rfl | requestMember
             · rw [resolved] at resolvedRequest
