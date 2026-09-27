@@ -417,6 +417,193 @@ theorem solveRequirements_scoped_ledger_sound
     rcases List.mem_map.mp outputMember with ⟨row, member, id_eq⟩
     exact ⟨row, member, id_eq⟩
 
+/-- Qualified-local template identities materialized directly by one source
+node.  Expression nodes never materialize binders; statement nodes may retain
+an initialized `let` directly or in a `for` header. -/
+def nodeLocalSchemeTemplateIds : Node → List RequirementId
+  | .expression _ => []
+  | .statement statement =>
+      (statementInitializedLetBindings statement.form).flatMap fun binding =>
+        binding.binder.schemeRequirements.map
+          (fun requirement => requirement.templateRequirement)
+
+/-- Appending one node appends exactly that node's qualified-local template
+identity inventory. -/
+theorem recordNode_sourceLocalSchemeTemplateIds
+    (state : Frontend.SourceInference.State) (node : Node)
+    (roots : List NodeId) :
+    sourceLocalSchemeTemplateIds ((state.recordNode node).toTypedSource roots) =
+      sourceLocalSchemeTemplateIds (state.toTypedSource roots) ++
+        nodeLocalSchemeTemplateIds node := by
+  cases node with
+  | expression expression =>
+      simp [Frontend.SourceInference.State.recordNode,
+        Frontend.SourceInference.State.toTypedSource,
+        sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+        initializedLetBindings, nodeLocalSchemeTemplateIds]
+  | statement statement =>
+      simp [Frontend.SourceInference.State.recordNode,
+        Frontend.SourceInference.State.toTypedSource,
+        sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+        initializedLetBindings, InitializedLetBinding.templateOwners,
+        nodeLocalSchemeTemplateIds, List.map_flatMap,
+        List.map_map, Function.comp_def]
+
+/-- ID-only ghost invariant for source-inference template tracking.  The
+`pending` suffix contains template identities allocated into binders whose
+owning statement node has not yet been recorded. -/
+structure TemplateTracking (state : Frontend.SourceInference.State)
+    (pending : List RequirementId) : Prop where
+  classified : state.localSchemeAssumptions.Perm
+    (sourceLocalSchemeTemplateIds (state.toTypedSource []) ++ pending)
+  unique : state.localSchemeAssumptions.Nodup
+  covered : ∀ id, id ∈ state.localSchemeAssumptions →
+    id ∈ state.requirements.map (fun requirement => requirement.id)
+
+namespace TemplateTracking
+
+/-- Initial inference states contain neither source-owned nor pending local
+scheme templates. -/
+theorem initial (owner : Resolved.DeclarationId)
+    (locals : TypeSystem.Environment := [])
+    (comptime : List Bool := []) :
+    TemplateTracking
+      (Frontend.SourceInference.State.initial owner locals comptime) [] := by
+  constructor <;>
+    simp [Frontend.SourceInference.State.initial,
+      Frontend.SourceInference.State.toTypedSource,
+      sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+      initializedLetBindings]
+
+/-- Allocating a binder moves its qualified requirement identities into the
+pending suffix.  Canonical generalization supplies the three side conditions:
+new identities are distinct, fresh for the classification, and already occur
+in the input requirement ledger. -/
+theorem allocateBinder
+    {state : Frontend.SourceInference.State}
+    {pending : List RequirementId}
+    (tracked : TemplateTracking state pending)
+    (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false)
+    (schemeRequirements : List LocalSchemeRequirement := [])
+    (newUnique :
+      (schemeRequirements.map (fun requirement =>
+        requirement.templateRequirement)).Nodup)
+    (newFresh : ∀ id, id ∈ schemeRequirements.map (fun requirement =>
+        requirement.templateRequirement) →
+      id ∉ state.localSchemeAssumptions)
+    (newCovered : ∀ id, id ∈ schemeRequirements.map (fun requirement =>
+        requirement.templateRequirement) →
+      id ∈ state.requirements.map (fun requirement => requirement.id)) :
+    TemplateTracking
+      (state.allocateBinder name scheme span comptime schemeRequirements).2
+      (pending ++ schemeRequirements.map (fun requirement =>
+        requirement.templateRequirement)) := by
+  let added := schemeRequirements.map (fun requirement =>
+    requirement.templateRequirement)
+  constructor
+  · change (state.localSchemeAssumptions ++ added).Perm
+      (sourceLocalSchemeTemplateIds (state.toTypedSource []) ++
+        (pending ++ added))
+    simpa only [List.append_assoc] using tracked.classified.append_right added
+  · change (state.localSchemeAssumptions ++ added).Nodup
+    rw [List.nodup_append]
+    refine ⟨tracked.unique, (by simpa [added] using newUnique), ?_⟩
+    intro old oldMember new newMember same
+    subst new
+    exact newFresh old (by simpa [added] using newMember) oldMember
+  · intro id member
+    change id ∈ state.requirements.map (fun requirement => requirement.id)
+    change id ∈ state.localSchemeAssumptions ++ added at member
+    rcases List.mem_append.mp member with oldMember | addedMember
+    · exact tracked.covered id oldMember
+    · exact newCovered id (by simpa [added] using addedMember)
+
+/-- Recording a node materializes a pending suffix matching that node's exact
+template inventory; older ambient pending identities remain pending. -/
+theorem recordNode
+    {state : Frontend.SourceInference.State}
+    {ambient : List RequirementId} {node : Node}
+    (tracked : TemplateTracking state
+      (ambient ++ nodeLocalSchemeTemplateIds node)) :
+    TemplateTracking (state.recordNode node) ambient := by
+  constructor
+  · change state.localSchemeAssumptions.Perm
+      (sourceLocalSchemeTemplateIds ((state.recordNode node).toTypedSource []) ++
+        ambient)
+    rw [recordNode_sourceLocalSchemeTemplateIds]
+    have swapped :
+        (sourceLocalSchemeTemplateIds (state.toTypedSource []) ++
+            (ambient ++ nodeLocalSchemeTemplateIds node)).Perm
+          (sourceLocalSchemeTemplateIds (state.toTypedSource []) ++
+            (nodeLocalSchemeTemplateIds node ++ ambient)) :=
+      List.Perm.append_left _ List.perm_append_comm
+    simpa only [List.append_assoc] using tracked.classified.trans swapped
+  · change state.localSchemeAssumptions.Nodup
+    exact tracked.unique
+  · change ∀ id, id ∈ state.localSchemeAssumptions →
+      id ∈ state.requirements.map (fun requirement => requirement.id)
+    exact tracked.covered
+
+/-- Lexical restoration changes neither the emitted node table nor executable
+template classification and therefore preserves every pending suffix. -/
+theorem restoreLexicalScope
+    {state : Frontend.SourceInference.State}
+    {pending : List RequirementId}
+    (tracked : TemplateTracking state pending)
+    (scope : Frontend.SourceInference.LexicalScope) :
+    TemplateTracking (state.restoreLexicalScope scope) pending := by
+  constructor
+  · change state.localSchemeAssumptions.Perm
+      (sourceLocalSchemeTemplateIds (state.toTypedSource []) ++ pending)
+    exact tracked.classified
+  · change state.localSchemeAssumptions.Nodup
+    exact tracked.unique
+  · change ∀ id, id ∈ state.localSchemeAssumptions →
+      id ∈ state.requirements.map (fun requirement => requirement.id)
+    exact tracked.covered
+
+/-- Once no template identity remains pending, the materialized source owns
+globally unique qualified-template identities. -/
+theorem ownership
+    {state : Frontend.SourceInference.State}
+    (tracked : TemplateTracking state []) (roots : List NodeId := []) :
+    LocalSchemeTemplateOwnership (state.toTypedSource roots) := by
+  constructor
+  have sourceUnique :
+      (sourceLocalSchemeTemplateIds (state.toTypedSource [])).Nodup := by
+    simpa using tracked.classified.nodup_iff.mp tracked.unique
+  simpa [Frontend.SourceInference.State.toTypedSource,
+    sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+    initializedLetBindings] using sourceUnique
+
+/-- With an empty pending suffix, executable classification and materialized
+source ownership classify exactly the same stable identities. -/
+theorem classified_iff
+    {state : Frontend.SourceInference.State}
+    (tracked : TemplateTracking state []) (roots : List NodeId := [])
+    (id : RequirementId) :
+    id ∈ state.localSchemeAssumptions ↔
+      id ∈ sourceLocalSchemeTemplateIds (state.toTypedSource roots) := by
+  have aligned : id ∈ state.localSchemeAssumptions ↔
+      id ∈ sourceLocalSchemeTemplateIds (state.toTypedSource []) ++ [] :=
+    tracked.classified.mem_iff
+  simpa [Frontend.SourceInference.State.toTypedSource,
+    sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
+    initializedLetBindings] using aligned
+
+/-- Every fully materialized source template identity comes from an input
+requirement row. -/
+theorem source_ids_subset_requirements
+    {state : Frontend.SourceInference.State}
+    (tracked : TemplateTracking state []) (roots : List NodeId := []) :
+    sourceLocalSchemeTemplateIds (state.toTypedSource roots) ⊆
+      state.requirements.map (fun requirement => requirement.id) := by
+  intro id sourceMember
+  exact tracked.covered id ((tracked.classified_iff roots id).mpr sourceMember)
+
+end TemplateTracking
+
 /-- The source-owned qualified-local template identities materialized from a
 state agree exactly with the state's executable template classification. -/
 def TemplateIdsAligned (state : Frontend.SourceInference.State)

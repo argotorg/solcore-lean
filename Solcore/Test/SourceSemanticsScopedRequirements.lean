@@ -196,6 +196,71 @@ private def templateSolverState : SourceInference.State := {
   localSchemeAssumptions := [templateId]
 }
 
+private def templateTrackingBaseState : SourceInference.State := {
+  SourceInference.State.initial testOwner with
+  nextRequirement := 1
+  requirements := [templateInputRequirement]
+}
+
+private def templateTrackingAllocatedState : SourceInference.State :=
+  (templateTrackingBaseState.allocateBinder "template0"
+    (templateBinder 0).scheme (some testSpan) false
+    [templateRequirement]).2
+
+private def templateTrackingForNode : StatementNode := {
+  id := statementId 2
+  span := testSpan
+  type := .unit
+  form := .forLoop
+    [.letDecl (templateBinder 0) (some (expressionId 0))]
+    (expressionId 1) [] []
+}
+
+private theorem templateTrackingBase :
+    SourceInferenceSoundness.TemplateTracking templateTrackingBaseState [] := by
+  constructor <;>
+    simp [templateTrackingBaseState, SourceInference.State.initial,
+      SourceInference.State.toTypedSource, sourceLocalSchemeTemplateIds,
+      localSchemeTemplateOwners, initializedLetBindings]
+
+private theorem templateTrackingAllocated :
+    SourceInferenceSoundness.TemplateTracking templateTrackingAllocatedState
+      [templateId] := by
+  apply SourceInferenceSoundness.TemplateTracking.allocateBinder
+      templateTrackingBase "template0" (templateBinder 0).scheme
+      (some testSpan) false [templateRequirement]
+  · simp [templateRequirement]
+  · intro id member
+    have id_eq : id = templateId := by
+      simpa [templateRequirement] using member
+    subst id
+    change templateId ∉ []
+    simp
+  · simp [templateRequirement, templateTrackingBaseState,
+      templateInputRequirement]
+
+/-- A regular initialized let discharges the binder's pending template ID
+when its owner node is recorded. -/
+example : SourceInferenceSoundness.TemplateTracking
+    (templateTrackingAllocatedState.recordNode
+      (.statement (letNode 1 0 0))) [] := by
+  apply SourceInferenceSoundness.TemplateTracking.recordNode
+  simpa [SourceInferenceSoundness.nodeLocalSchemeTemplateIds,
+    statementInitializedLetBindings, InitializedLetBinding.templateOwners,
+    letNode, templateBinder, templateRequirement] using
+    templateTrackingAllocated
+
+/-- A for-loop node discharges the initialized header item's pending template
+ID by the same node-local collector used for ordinary lets. -/
+example : SourceInferenceSoundness.TemplateTracking
+    (templateTrackingAllocatedState.recordNode
+      (.statement templateTrackingForNode)) [] := by
+  apply SourceInferenceSoundness.TemplateTracking.recordNode
+  simpa [SourceInferenceSoundness.nodeLocalSchemeTemplateIds,
+    templateTrackingForNode, statementInitializedLetBindings,
+    forItemInitializedLetBindings, InitializedLetBinding.templateOwners,
+    templateBinder, templateRequirement] using templateTrackingAllocated
+
 private def templateFinalizeState : SourceInference.State := {
   templateSolverState with
   nodes := scopedTemplateSource.nodes
