@@ -87,6 +87,24 @@ def applySubstitution (substitution : Substitution)
     subject := substitution.apply predicate.subject
     arguments := predicate.arguments.map substitution.apply }
 
+/-- Reapplying an earlier substitution before a semantic extension does not
+change any type carried by a trait predicate. -/
+theorem applySubstitution_semanticallyExtends
+    {earlier later : Substitution}
+    (extension : later.SemanticallyExtends earlier)
+    (predicate : Predicate) :
+    applySubstitution later (applySubstitution earlier predicate) =
+      applySubstitution later predicate := by
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [applySubstitution]
+      congr 1
+      · exact extension subject
+      · rw [List.map_map]
+        apply List.map_congr_left
+        intro argument _
+        exact extension argument
+
 /-- Instantiate every rigid type position in a predicate with one shared
 declaration-parameter substitution. -/
 def applyParameterSubstitution (substitution : ParameterSubstitution)

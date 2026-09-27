@@ -46,6 +46,44 @@ private def box (argument : Ty) : Ty :=
 
 private def variable0 : Ty := .variable ⟨0⟩
 
+private def earlierPredicateSubstitution : Substitution :=
+  [(⟨20⟩, .variable ⟨21⟩)]
+
+private def predicateSubstitutionUpdate : Substitution :=
+  [(⟨21⟩, .word)]
+
+private def laterPredicateSubstitution : Substitution :=
+  predicateSubstitutionUpdate.compose earlierPredicateSubstitution
+
+private theorem earlierPredicateSubstitution_solved :
+    earlierPredicateSubstitution.SolvedBelow 22 := by
+  apply Substitution.SolvedBelow.mono
+  · decide
+  · intro rangeVariable member
+    have same : rangeVariable = ⟨21⟩ := by
+      simpa [earlierPredicateSubstitution, Ty.freeVariables] using member
+    subst rangeVariable
+    decide
+  · simp [Ty.freeVariables]
+
+private def composedSubstitutionPredicate : Predicate :=
+  convert (box (.variable ⟨20⟩))
+    (.product (.variable ⟨21⟩) (.variable ⟨20⟩))
+
+/-- A composed solution collapses both the original variable and its
+intermediate replacement throughout a predicate. -/
+example :
+    applySubstitution laterPredicateSubstitution
+        (applySubstitution earlierPredicateSubstitution
+          composedSubstitutionPredicate) =
+      convert (box .word) (.product .word .word) := by
+  have extension : laterPredicateSubstitution.SemanticallyExtends
+      earlierPredicateSubstitution := by
+    exact Substitution.SemanticallyExtends.compose_left
+      predicateSubstitutionUpdate earlierPredicateSubstitution_solved
+  rw [applySubstitution_semanticallyExtends extension]
+  rfl
+
 private def showBoxParameter : TypeParameterId :=
   { owner := showBoxImpl, index := 0 }
 
