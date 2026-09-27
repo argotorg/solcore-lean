@@ -5722,6 +5722,223 @@ theorem apply_productMany (substitution : Substitution) (types : List Ty) :
           rw [induction]
           rfl
 
+/-- Exact instantiation of a scoped flexible-variable suffix by admissible
+types yields an admissible occurrence type.  Variables outside the exact
+suffix are either lexical variables of the context or are admitted by the
+residual-variable policy. -/
+theorem TypeWellScoped.applyExactAdmissible
+    {context : Context} {substitution : Substitution}
+    {substitutedVariables : List TypeVarId} {type : Ty}
+    (binders : TypeParameterBindersWellFormed context)
+    (exact : SourceSemantics.ExactSubstitution substitution
+      substitutedVariables)
+    (range : SourceSemantics.SubstitutionRangeAdmissible context substitution)
+    (wellScoped : TypeWellScoped context
+      (admissibleTypeVariables context type ++ substitutedVariables) type) :
+    TypeAdmissible context (substitution.apply type) := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun current _ =>
+      TypeAdmissible context (substitution.apply current))
+    (motive_2 := fun types _ => ∀ current, current ∈ types →
+      TypeAdmissible context (substitution.apply current))
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    by_cases substituted : metavariable ∈ substitution.domain
+    · rcases List.mem_map.mp substituted with
+        ⟨⟨candidate, replacement⟩, member, keyEq⟩
+      simp only at keyEq
+      subst candidate
+      have lookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_some_of_mem_of_domain_nodup
+          exact.domain_nodup member
+      simpa [TypeSystem.Substitution.apply, lookup] using
+        range metavariable replacement member
+    · have notQuantified : metavariable ∉ substitutedVariables := by
+        intro quantified
+        exact substituted ((exact.mem_domain_iff metavariable).mpr quantified)
+      have ambient : metavariable ∈ admissibleTypeVariables context type :=
+        (List.mem_append.mp bound).resolve_right notQuantified
+      have lookup :=
+        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+          substituted
+      simp only [TypeSystem.Substitution.apply, lookup, Option.getD_none]
+      cases residual : context.residualTypeVariables with
+      | false =>
+          apply TypeAdmissible.variableOfContext binders
+          simpa [admissibleTypeVariables, residual] using ambient
+      | true =>
+          exact TypeAdmissible.variableOfResidual binders residual metavariable
+  · intro parameter bound owned
+    exact {
+      binders
+      typeWellScoped := .parameter bound owned
+    }
+  · intro builtin
+    exact TypeAdmissible.builtin binders builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    rw [StructuralSubstitution.applyFlexible_nominal]
+    refine {
+      binders
+      typeWellScoped := .nominal dataType
+        (arguments.map substitution.apply) cataloged (by simpa using arity) ?_
+    }
+    apply StructuralSubstitution.TypesWellScoped.ofEachAdmissibleWithin
+    · intro argument member
+      rcases List.mem_map.mp member with ⟨sourceArgument, sourceMember, rfl⟩
+      exact argumentsInduction sourceArgument sourceMember
+    · intro argument member metavariable occurs
+      rw [StructuralSubstitution.mem_freeVariables_nominal_iff]
+      exact ⟨argument, member, occurs⟩
+  · intro contract arguments cataloged arity _ argumentsInduction
+    rw [StructuralSubstitution.applyFlexible_nominal]
+    refine {
+      binders
+      typeWellScoped := .contractNominal contract
+        (arguments.map substitution.apply) cataloged (by simpa using arity) ?_
+    }
+    apply StructuralSubstitution.TypesWellScoped.ofEachAdmissibleWithin
+    · intro argument member
+      rcases List.mem_map.mp member with ⟨sourceArgument, sourceMember, rfl⟩
+      exact argumentsInduction sourceArgument sourceMember
+    · intro argument member metavariable occurs
+      rw [StructuralSubstitution.mem_freeVariables_nominal_iff]
+      exact ⟨argument, member, occurs⟩
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact TypeAdmissible.function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact TypeAdmissible.product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact TypeAdmissible.mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact TypeAdmissible.proxy innerInduction
+  · intro inner _ innerInduction
+    exact TypeAdmissible.comptime innerInduction
+  · intro current member
+    simp at member
+  · intro head tail _ _ headInduction tailInduction current member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact headInduction
+    · exact tailInduction current member
+
+end Solcore.SourceSemantics.FlexibleSubstitution
+
+namespace Solcore.SourceSemantics.SchemeInstantiatesAt
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- Every use-site-valid rank-1 scheme instance has an admissible result
+type. -/
+theorem type_admissible
+    {context : Context} {scheme : Scheme} {type : Ty}
+    (instantiates : SourceSemantics.SchemeInstantiatesAt context scheme type) :
+    TypeAdmissible context type := by
+  cases instantiates with
+  | intro schemeWellFormed substitution exact range result =>
+      rw [← result]
+      exact FlexibleSubstitution.TypeWellScoped.applyExactAdmissible
+        schemeWellFormed.binders exact range schemeWellFormed.body
+
+end Solcore.SourceSemantics.SchemeInstantiatesAt
+
+namespace Solcore.SourceSemantics.LocalSchemeInstantiationValid
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- A valid local qualified-scheme use produces an admissible raw type. -/
+theorem type_admissible
+    {context : Context} {binder : TypedBinder} {type : Ty}
+    {actualRequirements : List RequirementId}
+    (valid : SourceSemantics.LocalSchemeInstantiationValid context binder type
+      actualRequirements) :
+    TypeAdmissible context type :=
+  valid.toSchemeInstantiatesAt.type_admissible
+
+end Solcore.SourceSemantics.LocalSchemeInstantiationValid
+
+namespace Solcore.SourceSemantics.ReferenceUseValid
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- Every statically valid reference occurrence exposes an admissible raw
+type, independently of whether it names a local, a source declaration, or a
+compiler-provided builtin. -/
+theorem type_admissible
+    {context : Context} {resolution : ReferenceResolution} {type : Ty}
+    {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (valid : SourceSemantics.ReferenceUseValid context resolution type
+      requirements) :
+    TypeAdmissible context type := by
+  cases valid with
+  | «local» _ _ instantiation =>
+      exact instantiation.type_admissible
+  | declaration instantiation _ =>
+      exact instantiation.type_admissible catalog binders
+  | builtinFunction function =>
+      exact TypeAdmissible.builtinFunction binders function
+  | builtinBoolean _ =>
+      exact TypeAdmissible.bool binders
+
+end Solcore.SourceSemantics.ReferenceUseValid
+
+namespace Solcore.SourceSemantics.DataConstructorInstantiation.Admissible
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- The nominal result of every admissible constructor instantiation is an
+admissible occurrence type.  Exact parameter coverage supplies the nominal
+arity, while the admissible range supplies each retained type argument. -/
+theorem result_type_admissible
+    {context : Context}
+    {instantiation : Frontend.SourceInference.DataConstructorInstantiation}
+    (binders : TypeParameterBindersWellFormed context)
+    (valid : SourceSemantics.DataConstructorInstantiation.Admissible context
+      instantiation) :
+    TypeAdmissible context instantiation.resultType := by
+  cases valid with
+  | intro dataType _ dataTypeMember _ _ _ substitutionExact
+      substitutionRange _ resultTypeEq =>
+      rw [resultTypeEq]
+      refine {
+        binders
+        typeWellScoped := .nominal dataType
+          (ParameterSubstitution.orderedArguments
+            instantiation.parameterSubstitution dataType.parameters)
+          dataTypeMember ?_ ?_
+      }
+      · simp [ParameterSubstitution.orderedArguments]
+      · apply StructuralSubstitution.TypesWellScoped.ofEachAdmissibleWithin
+        · intro argument member
+          unfold ParameterSubstitution.orderedArguments at member
+          rcases List.mem_map.mp member with
+            ⟨parameter, parameterMember, argumentEq⟩
+          obtain ⟨replacement, replacementMember, lookup⟩ :=
+            StructuralSubstitution.ParameterSubstitution.exists_lookup?_eq_some
+              substitutionExact parameterMember
+          subst argument
+          simpa [lookup] using
+            substitutionRange parameter replacement replacementMember
+        · intro argument member metavariable occurs
+          rw [StructuralSubstitution.mem_freeVariables_nominal_iff]
+          exact ⟨argument, member, occurs⟩
+
+end Solcore.SourceSemantics.DataConstructorInstantiation.Admissible
+
+namespace Solcore.SourceSemantics.FlexibleSubstitution
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
 /-- Flexible substitution preserves the ordered requirement identities owned
 by a coercion path. -/
 @[simp] theorem coercionRequirementIds_applySubstitution

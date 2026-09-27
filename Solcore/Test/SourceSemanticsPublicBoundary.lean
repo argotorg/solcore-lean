@@ -30,6 +30,7 @@ example := @Solcore.SourceSemantics.lookupExpression?_complete
 example := @Solcore.SourceSemantics.ExactSubstitution
 example := @Solcore.SourceSemantics.SchemeInstantiates
 example := @Solcore.SourceSemantics.SchemeInstantiatesAt
+example := @Solcore.SourceSemantics.SchemeInstantiatesAt.type_admissible
 example := @Solcore.SourceSemantics.SubstitutionRangeWellFormed
 example := @Solcore.SourceSemantics.SubstitutionRangeAdmissible
 example := @Solcore.SourceSemantics.SubstitutionRangeAdmissible.toWellFormed
@@ -45,6 +46,8 @@ example := @Solcore.SourceSemantics.DataConstructorInstantiation.Valid
 example := @Solcore.SourceSemantics.DataConstructorInstantiation.Admissible
 example := @Solcore.SourceSemantics.DataConstructorInstantiation.Valid.toAdmissible
 example := @Solcore.SourceSemantics.DataConstructorInstantiation.Admissible.toValid
+example :=
+  @Solcore.SourceSemantics.DataConstructorInstantiation.Admissible.result_type_admissible
 
 example := @Solcore.SourceSemantics.Forall₂
 example := @Solcore.SourceSemantics.Forall₂.functional
@@ -251,6 +254,8 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.applyDataConstructorIns
 example := @Solcore.SourceSemantics.FlexibleSubstitution.localSchemeTemplateIds_applySubstitution
 example := @Solcore.SourceSemantics.FlexibleSubstitution.applyLocalSchemeRequirement_templateRequirement
 example := @Solcore.SourceSemantics.FlexibleSubstitution.TypeWellScoped.applySubstitution
+example :=
+  @Solcore.SourceSemantics.FlexibleSubstitution.TypeWellScoped.applyExactAdmissible
 example := @Solcore.SourceSemantics.FlexibleSubstitution.TypeWellScoped.applyFlexible_compose
 example := @Solcore.SourceSemantics.FlexibleSubstitution.TypeWellScoped.applyFlexible_composeParameters
 example := @Solcore.SourceSemantics.FlexibleSubstitution.TypesWellScoped.applyFlexible_composeParameters
@@ -422,8 +427,10 @@ example := @Solcore.SourceSemantics.LocalSchemeInstantiationValid.actual_require
 example := @Solcore.SourceSemantics.LocalSchemeInstantiationValid.has_shared_substitution
 example := @Solcore.SourceSemantics.LocalSchemeInstantiationValid.requirements_length_eq
 example := @Solcore.SourceSemantics.LocalSchemeInstantiationValid.toSchemeInstantiatesAt
+example := @Solcore.SourceSemantics.LocalSchemeInstantiationValid.type_admissible
 example := @Solcore.SourceSemantics.ReferenceUseValid
 example := @Solcore.SourceSemantics.ReferenceUseValid.raw_type
+example := @Solcore.SourceSemantics.ReferenceUseValid.type_admissible
 example := @Solcore.SourceSemantics.CoercionPathValid
 example := @Solcore.SourceSemantics.CoercionPathValid.of_isValid
 example := @Solcore.SourceSemantics.CoercionPathValid.expressionNode_rawType
