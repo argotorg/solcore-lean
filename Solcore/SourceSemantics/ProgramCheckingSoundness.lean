@@ -159,30 +159,16 @@ structure ImplMethodSignatureRemainingConditions
     method.wherePredicates
 
 /-- Semantic implementation-signature obligations beyond its checker-generated
-generic parameter row and structural method catalog. -/
+generic parameter row, validated head catalog, and structural method catalog. -/
 structure ImplementationSignatureRemainingConditions
     (signatures : ProgramSignatures)
     (signature : ProgramImplementationSignature) : Prop where
-  parameters_in_head : ∀ parameter, parameter ∈ signature.parameters →
-    TypeParameterOccursInPredicate parameter signature.head
   head : PredicateWellFormed
     (signatureContext signatures signature.id signature.parameters
       signature.wherePredicates) signature.head
   predicates : PredicatesWellFormed
     (signatureContext signatures signature.id signature.parameters
       signature.wherePredicates) signature.wherePredicates
-  trait_catalog : ∃ trait ∈ signatures.traits,
-    signature.head.trait = .declaration trait.id ∧
-    let substitution : TypeSystem.ParameterSubstitution :=
-      trait.parameters.zip
-        (signature.head.subject :: signature.head.arguments)
-    ParameterSubstitution.Exact substitution trait.parameters ∧
-      ParameterSubstitution.RangeWellFormed
-        (signatureContext signatures signature.id signature.parameters
-          signature.wherePredicates) substitution ∧
-      ∀ predicate, predicate ∈ trait.wherePredicates.map
-        (ProgramPredicate.applyParameters substitution) →
-        predicate ∈ signature.wherePredicates
   methods : ∀ method, method ∈ signature.methods →
     ImplMethodSignatureRemainingConditions signatures signature method
   methods_complete : ∀ trait method,
@@ -196,8 +182,9 @@ structure ImplementationSignatureRemainingConditions
 checker already supplies implementation-rule projection equality, declaration
 identity uniqueness, every generic-parameter invariant, data-constructor
 structure and identity uniqueness, trait-method structure and identity
-uniqueness, implementation-method structure and identity uniqueness, and
-complete contract signature semantics. -/
+uniqueness, implementation-head parameter/catalog validation,
+implementation-method structure and identity uniqueness, and complete
+contract signature semantics. -/
 structure SignatureCatalogRemainingConditions
     (signatures : ProgramSignatures) : Prop where
   functions_semantic : ∀ signature, signature ∈ signatures.functions →
@@ -244,6 +231,9 @@ structure CheckedSignatureCatalogFacts
   implementation_structures : ∀ signature,
     signature ∈ signatures.implementations →
       ImplementationSignatureStructuralWellFormed signature
+  implementation_heads : ∀ signature,
+    signature ∈ signatures.implementations →
+      Frontend.ImplementationSignatureHeadValidated signatures.traits signature
   contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
     ContractSignatureWellFormed signatures signature
 
@@ -353,6 +343,89 @@ theorem complete
 
 end ImplMethodSignatureRemainingConditions
 
+namespace ImplementationSignatureHeadValidated
+
+/-- The collector's syntactic parameter-occurrence witness is exactly the
+semantic non-phantom-parameter condition. -/
+theorem semantic_parameters_in_head
+    {signatures : ProgramSignatures}
+    {signature : ProgramImplementationSignature}
+    (validated : Frontend.ImplementationSignatureHeadValidated
+      signatures.traits signature) :
+    ∀ parameter, parameter ∈ signature.parameters →
+      TypeParameterOccursInPredicate parameter signature.head := by
+  intro parameter member
+  have occurs := TypedTraitResolution.mem_predicateParameters_iff.mp
+    (validated.parameters_in_head parameter member)
+  simpa [TypeParameterOccursInPredicate,
+    TypedTraitResolution.ParameterOccursInPredicate] using occurs
+
+/-- The selected trait witness, semantic head formation, and the checker's
+global trait invariants jointly supply the exact, well-formed substitution
+required by the declarative implementation judgment. -/
+theorem semantic_trait_catalog
+    {signatures : ProgramSignatures}
+    {signature : ProgramImplementationSignature}
+    (validated : Frontend.ImplementationSignatureHeadValidated
+      signatures.traits signature)
+    (head : PredicateWellFormed
+      (signatureContext signatures signature.id signature.parameters
+        signature.wherePredicates) signature.head)
+    (traitIds :
+      (signatures.traits.map fun trait => trait.id).Nodup)
+    (traitParameters : ∀ trait, trait ∈ signatures.traits →
+      SignatureParametersWellFormed trait.id trait.parameters) :
+    ∃ trait ∈ signatures.traits,
+      signature.head.trait = .declaration trait.id ∧
+      let substitution : TypeSystem.ParameterSubstitution :=
+        trait.parameters.zip
+          (signature.head.subject :: signature.head.arguments)
+      ParameterSubstitution.Exact substitution trait.parameters ∧
+        ParameterSubstitution.RangeWellFormed
+          (signatureContext signatures signature.id signature.parameters
+            signature.wherePredicates) substitution ∧
+        ∀ predicate, predicate ∈ trait.wherePredicates.map
+          (ProgramPredicate.applyParameters substitution) →
+          predicate ∈ signature.wherePredicates := by
+  rcases validated.trait_catalog with
+    ⟨trait, traitMember, headTraitEq, requiredPredicates⟩
+  refine ⟨trait, traitMember, headTraitEq, ?_⟩
+  have headCatalog := head.trait
+  rw [headTraitEq] at headCatalog
+  rcases headCatalog with
+    ⟨headTrait, headTraitMember, headTraitId, headArity⟩
+  have headTraitEqSelected : headTrait = trait :=
+    Frontend.trait_signature_eq_of_mem_of_id_eq traitIds
+      headTraitMember traitMember headTraitId
+  subst headTrait
+  let substitution : TypeSystem.ParameterSubstitution :=
+    trait.parameters.zip
+      (signature.head.subject :: signature.head.arguments)
+  have exact : ParameterSubstitution.Exact substitution trait.parameters := by
+    refine {
+      parameters_nodup :=
+        (traitParameters trait traitMember).parameters_nodup
+      domain_permutation := ?_
+    }
+    simp only [substitution, ParameterSubstitution.domain]
+    have lengthLe : trait.parameters.length ≤
+        (signature.head.subject :: signature.head.arguments).length := by
+      simp only [List.length_cons]
+      omega
+    rw [List.map_fst_zip lengthLe]
+  have range : ParameterSubstitution.RangeWellFormed
+      (signatureContext signatures signature.id signature.parameters
+        signature.wherePredicates) substitution := by
+    intro parameter replacement member
+    have replacementMember := (List.of_mem_zip member).2
+    simp only [List.mem_cons] at replacementMember
+    rcases replacementMember with rfl | replacementMember
+    · exact head.subject
+    · exact head.arguments replacement replacementMember
+  exact ⟨exact, range, requiredPredicates⟩
+
+end ImplementationSignatureHeadValidated
+
 namespace ImplementationSignatureRemainingConditions
 
 /-- Combine canonical declaration parameters with the remaining
@@ -364,19 +437,28 @@ theorem complete
     (parameters : SignatureParametersWellFormed signature.id
       signature.parameters)
     (structural : ImplementationSignatureStructuralWellFormed signature)
+    (validated : Frontend.ImplementationSignatureHeadValidated
+      signatures.traits signature)
+    (traitIds :
+      (signatures.traits.map fun trait => trait.id).Nodup)
+    (traitParameters : ∀ trait, trait ∈ signatures.traits →
+      SignatureParametersWellFormed trait.id trait.parameters)
     (ruleProjection : signature.implRule ∈ signatures.implRules) :
     ImplementationSignatureWellFormed signatures signature := {
   parameters_nodup := parameters.parameters_nodup
   parameters_owned := parameters.parameter_owners
   parameter_positions := by
     simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
-  parameters_in_head := remaining.parameters_in_head
+  parameters_in_head :=
+    ImplementationSignatureHeadValidated.semantic_parameters_in_head validated
   method_names_nodup := structural.method_names_nodup
   method_positions := structural.method_positions
   head := remaining.head
   predicates := remaining.predicates
   rule_projection := ruleProjection
-  trait_catalog := remaining.trait_catalog
+  trait_catalog :=
+    ImplementationSignatureHeadValidated.semantic_trait_catalog validated
+      remaining.head traitIds traitParameters
   methods := by
     intro method member
     exact (remaining.methods method member).complete
@@ -437,6 +519,10 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
     implementation_structures := by
       intro signature member
       exact Frontend.checkProgram_success_implementation_signature_structure
+        success member
+    implementation_heads := by
+      intro signature member
+      exact Frontend.checkProgram_success_implementation_head_validated
         success member
     contracts_semantic := ?_
   }
@@ -512,6 +598,8 @@ theorem complete
     apply (remaining.implementations_semantic signature member).complete
       (checked.parameters.implementations signature member)
       (checked.implementation_structures signature member)
+      (checked.implementation_heads signature member)
+      checked.trait_ids checked.parameters.traits
     rw [checked.impl_rules_eq]
     exact List.mem_map.mpr ⟨signature, member, rfl⟩
 

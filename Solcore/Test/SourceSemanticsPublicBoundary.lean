@@ -431,6 +431,12 @@ example :=
 example :=
   @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.implementation_structures
 example :=
+  @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.implementation_heads
+example :=
+  @Solcore.SourceSemantics.ImplementationSignatureHeadValidated.semantic_parameters_in_head
+example :=
+  @Solcore.SourceSemantics.ImplementationSignatureHeadValidated.semantic_trait_catalog
+example :=
   @Solcore.SourceSemantics.FunctionSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.DataSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions.complete

@@ -289,6 +289,24 @@ structure ImplementationSignatureStructuralWellFormed
   method_parameter_names_nodup : ∀ method,
     method ∈ signature.methods → method.parameterNames.Nodup
 
+/-- Head-level checks fixed by implementation signature collection.  This
+retains the exact trait entry selected by the collector so later semantic
+proofs can recover arity, substitution, and method-catalog facts without
+replaying name resolution. -/
+structure ImplementationSignatureHeadValidated
+    (traits : List ProgramTraitSignature)
+    (signature : ProgramImplementationSignature) : Prop where
+  parameters_in_head : ∀ parameter, parameter ∈ signature.parameters →
+    parameter ∈ TypedTraitResolution.predicateParameters signature.head
+  trait_catalog : ∃ trait ∈ traits,
+    signature.head.trait = .declaration trait.id ∧
+    let substitution : TypeSystem.ParameterSubstitution :=
+      trait.parameters.zip
+        (signature.head.subject :: signature.head.arguments)
+    ∀ predicate, predicate ∈ trait.wherePredicates.map
+      (ProgramPredicate.applyParameters substitution) →
+      predicate ∈ signature.wherePredicates
+
 /-- Stable source identity of one constructor within an algebraic data
 declaration.  Constructor order is semantic because Core data values retain
 the same zero-based tag. -/
@@ -1565,6 +1583,38 @@ private theorem attachTraitMethods_success_structure
                 · exact restStructure.method_parameter_names_nodup method member
               · simp [restResult.2]
 
+/-- Check a source-ordered list of required values against an available list,
+returning the caller-provided error for the first missing value. -/
+private def validateContained {value : Type} [DecidableEq value]
+    (missing : value → ProgramSignatureError) (available : List value) :
+    List value → Except ProgramSignatureError Unit
+  | [] => .ok ()
+  | value :: rest =>
+      if value ∈ available then
+        validateContained missing available rest
+      else
+        .error (missing value)
+
+/-- Successful containment validation is an exact subset witness. -/
+private theorem validateContained_success
+    {value : Type} [DecidableEq value]
+    {missing : value → ProgramSignatureError}
+    {available required : List value}
+    (success : validateContained missing available required = .ok ()) :
+    ∀ candidate, candidate ∈ required → candidate ∈ available := by
+  induction required with
+  | nil => simp
+  | cons head tail induction =>
+      simp only [validateContained] at success
+      by_cases member : head ∈ available
+      · simp only [member, if_true] at success
+        intro candidate candidateMember
+        simp only [List.mem_cons] at candidateMember
+        rcases candidateMember with rfl | candidateMember
+        · exact member
+        · exact induction success candidate candidateMember
+      · simp [member] at success
+
 private def implementationSignatureOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
     (traits : List ProgramTraitSignature) (source : Syntax.ImplDecl) :
@@ -1583,9 +1633,9 @@ private def implementationSignatureOfDeclaration
   let parameters := declarationParameters declaration
   let head : ProgramPredicate := { trait, subject, arguments }
   let headParameters := TypedTraitResolution.predicateParameters head
-  for parameter in parameters do
-    unless headParameters.contains parameter do
-      throw (.implementationParameterNotInHead declaration.id parameter)
+  validateContained
+    (ProgramSignatureError.implementationParameterNotInHead declaration.id)
+    headParameters parameters
   let wherePredicates ← resolveWhereClause environment declaration scope
     source.value.whereClause
   let some traitSignature := traits.find? fun signature =>
@@ -1595,9 +1645,9 @@ private def implementationSignatureOfDeclaration
     traitSignature.parameters.zip (subject :: arguments)
   let requiredPredicates := traitSignature.wherePredicates.map
     (ProgramPredicate.applyParameters substitution)
-  for predicate in requiredPredicates do
-    unless wherePredicates.contains predicate do
-      throw (.missingImplementationTraitPredicate declaration.id predicate)
+  validateContained
+    (ProgramSignatureError.missingImplementationTraitPredicate declaration.id)
+    wherePredicates requiredPredicates
   let unmatchedMethods ← unmatchedImplMethodsOfDeclaration environment
     declaration scope source.value.methods 0 []
   validateRequiredImplMethods declaration.id substitution
@@ -2078,12 +2128,14 @@ private theorem implementationSignatureOfDeclaration_success_header
       traits source = .ok signature) :
     signature.id = declaration.id ∧
       signature.parameters = declarationParameters declaration ∧
-      ImplementationSignatureStructuralWellFormed signature := by
+      ImplementationSignatureStructuralWellFormed signature ∧
+      ImplementationSignatureHeadValidated traits signature := by
   have satisfies : Except.SuccessSatisfies
       (fun result : ProgramImplementationSignature =>
         result.id = declaration.id ∧
           result.parameters = declarationParameters declaration ∧
-          ImplementationSignatureStructuralWellFormed result)
+          ImplementationSignatureStructuralWellFormed result ∧
+          ImplementationSignatureHeadValidated traits result)
       (implementationSignatureOfDeclaration environment declaration traits
         source) := by
     cases scopeEq : validateProgramTypeScope
@@ -2104,10 +2156,22 @@ private theorem implementationSignatureOfDeclaration_success_header
         | cons subject arguments =>
             apply Except.SuccessSatisfies.bind
             intro head
+            rcases head with ⟨resolvedSubject, resolvedArguments⟩
             apply Except.SuccessSatisfies.bind
             intro trait
-            apply Except.SuccessSatisfies.bind
-            intro parametersChecked
+            apply Except.SuccessSatisfies.bind_property
+              (validateContained
+                (ProgramSignatureError.implementationParameterNotInHead
+                  declaration.id)
+                (TypedTraitResolution.predicateParameters {
+                  trait
+                  subject := resolvedSubject
+                  arguments := resolvedArguments
+                })
+                (declarationParameters declaration)) _
+              (Except.SuccessSatisfies.of_success _
+                (fun _ resultEq => validateContained_success resultEq))
+            intro parametersChecked parametersContained
             apply Except.SuccessSatisfies.bind
             intro wherePredicates
             cases traitEq : traits.find? fun candidate =>
@@ -2116,8 +2180,19 @@ private theorem implementationSignatureOfDeclaration_success_header
                 change True
                 trivial
             | some traitSignature =>
-                apply Except.SuccessSatisfies.bind
-                intro predicatesChecked
+                let substitution : TypeSystem.ParameterSubstitution :=
+                  traitSignature.parameters.zip
+                    (resolvedSubject :: resolvedArguments)
+                let requiredPredicates := traitSignature.wherePredicates.map
+                  (ProgramPredicate.applyParameters substitution)
+                apply Except.SuccessSatisfies.bind_property
+                  (validateContained
+                    (ProgramSignatureError.missingImplementationTraitPredicate
+                      declaration.id)
+                    wherePredicates requiredPredicates) _
+                  (Except.SuccessSatisfies.of_success _
+                    (fun _ resultEq => validateContained_success resultEq))
+                intro predicatesChecked predicatesContained
                 apply Except.SuccessSatisfies.bind_property
                   (unmatchedImplMethodsOfDeclaration environment declaration
                     (ProgramTypeScope.ofDeclaration declaration)
@@ -2133,7 +2208,7 @@ private theorem implementationSignatureOfDeclaration_success_header
                     (attachTraitMethods_success_structure resultEq
                       unmatchedStructure).1))
                 intro methods methodsStructure
-                exact ⟨rfl, rfl, {
+                refine ⟨rfl, rfl, {
                   method_names_nodup := methodsStructure.method_names_nodup
                   method_owners := methodsStructure.method_owners
                   method_positions := by
@@ -2141,7 +2216,19 @@ private theorem implementationSignatureOfDeclaration_success_header
                     simpa using methodsStructure.method_positions position
                   method_parameter_names_nodup :=
                     methodsStructure.method_parameter_names_nodup
-                }⟩
+                }, ?_⟩
+                have traitMember : traitSignature ∈ traits :=
+                  List.mem_of_find?_eq_some traitEq
+                have traitId : traitSignature.id = trait := by
+                  have traitMatches : decide (traitSignature.id = trait) = true :=
+                    List.find?_some (p := fun candidate : ProgramTraitSignature =>
+                      decide (candidate.id = trait)) traitEq
+                  exact of_decide_eq_true traitMatches
+                exact {
+                  parameters_in_head := parametersContained
+                  trait_catalog := ⟨traitSignature, traitMember, by
+                    simp [traitId], predicatesContained⟩
+                }
   simpa [success, Except.SuccessSatisfies] using satisfies
 
 private theorem implementationSignatureOfDeclaration_success_id
@@ -2171,7 +2258,16 @@ private theorem implementationSignatureOfDeclaration_success_structure
     (success : implementationSignatureOfDeclaration environment declaration
       traits source = .ok signature) :
     ImplementationSignatureStructuralWellFormed signature :=
-  (implementationSignatureOfDeclaration_success_header success).2.2
+  (implementationSignatureOfDeclaration_success_header success).2.2.1
+
+private theorem implementationSignatureOfDeclaration_success_head_validated
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {traits : List ProgramTraitSignature} {source : Syntax.ImplDecl}
+    {signature : ProgramImplementationSignature}
+    (success : implementationSignatureOfDeclaration environment declaration
+      traits source = .ok signature) :
+    ImplementationSignatureHeadValidated traits signature :=
+  (implementationSignatureOfDeclaration_success_header success).2.2.2
 
 private theorem all_mem_append_singleton {value : Type} {property : value → Prop}
     {values : List value} {last : value}
@@ -2245,6 +2341,7 @@ private theorem collectProgramTraits_structurally_wellFormed
           exact induction _ initial
 
 private structure ProgramSignatureBuildParametersWellFormed
+    (traits : List ProgramTraitSignature)
     (state : ProgramSignatureBuildState) : Prop where
   functions : ∀ signature, signature ∈ state.functions →
     SignatureParametersWellFormed signature.id signature.scheme.parameters
@@ -2261,14 +2358,16 @@ private structure ProgramSignatureBuildParametersWellFormed
     SignatureParametersWellFormed signature.id signature.parameters
   implementationShapes : ∀ signature, signature ∈ state.implementations →
     ImplementationSignatureStructuralWellFormed signature
+  implementationHeads : ∀ signature, signature ∈ state.implementations →
+    ImplementationSignatureHeadValidated traits signature
   contracts : ∀ signature, signature ∈ state.contracts →
     SignatureParametersWellFormed signature.id signature.parameters
 
 private theorem ProgramSignatureBuildParametersWellFormed.withErrors
-    {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed traits state)
     (errors : List ProgramSignatureError) :
-    ProgramSignatureBuildParametersWellFormed
+    ProgramSignatureBuildParametersWellFormed traits
       { state with errors } := {
   functions := initial.functions
   functionShapes := initial.functionShapes
@@ -2276,12 +2375,13 @@ private theorem ProgramSignatureBuildParametersWellFormed.withErrors
   dataShapes := initial.dataShapes
   implementations := initial.implementations
   implementationShapes := initial.implementationShapes
+  implementationHeads := initial.implementationHeads
   contracts := initial.contracts
 }
 
 private theorem ProgramSignatureBuildParametersWellFormed.addFunction
-    {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed traits state)
     {signature : ProgramFunctionSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
       signature.scheme.parameters)
@@ -2289,7 +2389,7 @@ private theorem ProgramSignatureBuildParametersWellFormed.addFunction
       signature.scheme.body = .function
         (TypeSystem.Ty.productMany signature.parameterTypes)
         (TypeSystem.Ty.productMany signature.returnTypes)) :
-    ProgramSignatureBuildParametersWellFormed
+    ProgramSignatureBuildParametersWellFormed traits
       { state with functions := state.functions ++ [signature] } := {
   initial with
   functions := all_mem_append_singleton initial.functions wellFormed
@@ -2297,13 +2397,13 @@ private theorem ProgramSignatureBuildParametersWellFormed.addFunction
 }
 
 private theorem ProgramSignatureBuildParametersWellFormed.addDataType
-    {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed traits state)
     {signature : ProgramDataSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
       signature.parameters)
     (shape : DataSignatureStructuralWellFormed signature) :
-    ProgramSignatureBuildParametersWellFormed
+    ProgramSignatureBuildParametersWellFormed traits
       { state with dataTypes := state.dataTypes ++ [signature] } := {
   initial with
   dataTypes := all_mem_append_singleton initial.dataTypes wellFormed
@@ -2311,13 +2411,14 @@ private theorem ProgramSignatureBuildParametersWellFormed.addDataType
 }
 
 private theorem ProgramSignatureBuildParametersWellFormed.addImplementation
-    {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed traits state)
     {signature : ProgramImplementationSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
       signature.parameters)
-    (shape : ImplementationSignatureStructuralWellFormed signature) :
-    ProgramSignatureBuildParametersWellFormed
+    (shape : ImplementationSignatureStructuralWellFormed signature)
+    (head : ImplementationSignatureHeadValidated traits signature) :
+    ProgramSignatureBuildParametersWellFormed traits
       { state with
         implementations := state.implementations ++ [signature]
       } := {
@@ -2325,15 +2426,17 @@ private theorem ProgramSignatureBuildParametersWellFormed.addImplementation
   implementations := all_mem_append_singleton initial.implementations wellFormed
   implementationShapes :=
     all_mem_append_singleton initial.implementationShapes shape
+  implementationHeads :=
+    all_mem_append_singleton initial.implementationHeads head
 }
 
 private theorem ProgramSignatureBuildParametersWellFormed.addContract
-    {state : ProgramSignatureBuildState}
-    (initial : ProgramSignatureBuildParametersWellFormed state)
+    {traits : List ProgramTraitSignature} {state : ProgramSignatureBuildState}
+    (initial : ProgramSignatureBuildParametersWellFormed traits state)
     {signature : ProgramContractSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
       signature.parameters) :
-    ProgramSignatureBuildParametersWellFormed
+    ProgramSignatureBuildParametersWellFormed traits
       { state with contracts := state.contracts ++ [signature] } := {
   initial with
   contracts := all_mem_append_singleton initial.contracts wellFormed
@@ -2343,8 +2446,8 @@ private theorem collectProgramSignatures_parameters_wellFormed
     (environment : ProgramEnvironment) (traits : List ProgramTraitSignature)
     (declarations : List ProgramDeclaration)
     (state : ProgramSignatureBuildState)
-    (initial : ProgramSignatureBuildParametersWellFormed state) :
-    ProgramSignatureBuildParametersWellFormed
+    (initial : ProgramSignatureBuildParametersWellFormed traits state) :
+    ProgramSignatureBuildParametersWellFormed traits
       (collectProgramSignatures environment traits declarations state) := by
   induction declarations generalizing state with
   | nil => simpa [collectProgramSignatures] using initial
@@ -2416,7 +2519,9 @@ private theorem collectProgramSignatures_parameters_wellFormed
                 }
                 (initial.addImplementation
                   (implementationSignatureOfDeclaration_success_parameters signatureEq)
-                  (implementationSignatureOfDeclaration_success_structure signatureEq))
+                  (implementationSignatureOfDeclaration_success_structure signatureEq)
+                  (implementationSignatureOfDeclaration_success_head_validated
+                    signatureEq))
       | importDecl _ | exportDecl _ | pragmaDecl _ | trait _ | error =>
           simp only [collectProgramSignatures, sourceEq,
             signatureItemOfDeclaration]
@@ -2924,7 +3029,7 @@ theorem buildProgramSignatures_success_parameter_state
     intro signature member
     simp at member
   have signatureParameters :
-      ProgramSignatureBuildParametersWellFormed state := by
+      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
     apply collectProgramSignatures_parameters_wellFormed environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
@@ -2957,7 +3062,7 @@ theorem buildProgramSignatures_success_function_shape_state
   let state := collectProgramSignatures environment traitState.traits
     environment.declarations {}
   have signatureFacts :
-      ProgramSignatureBuildParametersWellFormed state := by
+      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
     apply collectProgramSignatures_parameters_wellFormed environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
@@ -2981,7 +3086,7 @@ theorem buildProgramSignatures_success_data_structure_state
   let state := collectProgramSignatures environment traitState.traits
     environment.declarations {}
   have signatureFacts :
-      ProgramSignatureBuildParametersWellFormed state := by
+      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
     apply collectProgramSignatures_parameters_wellFormed environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
@@ -3005,7 +3110,7 @@ theorem buildProgramSignatures_success_implementation_structure_state
   let state := collectProgramSignatures environment traitState.traits
     environment.declarations {}
   have signatureFacts :
-      ProgramSignatureBuildParametersWellFormed state := by
+      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
     apply collectProgramSignatures_parameters_wellFormed environment
       traitState.traits environment.declarations
       ({} : ProgramSignatureBuildState)
@@ -3015,6 +3120,30 @@ theorem buildProgramSignatures_success_implementation_structure_state
   · injection success with signaturesEq
     subst signatures
     exact signatureFacts.implementationShapes
+  · simp at success
+
+/-- Internal collector boundary used by `ProgramSignaturesProperties`: every
+successfully collected implementation retains its generic-parameter occurrence,
+selected trait, and required-trait-predicate checks. -/
+theorem buildProgramSignatures_success_implementation_head_validated_state
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures) :
+    ∀ signature, signature ∈ signatures.implementations →
+      ImplementationSignatureHeadValidated signatures.traits signature := by
+  let traitState := collectProgramTraits environment environment.declarations {}
+  let state := collectProgramSignatures environment traitState.traits
+    environment.declarations {}
+  have signatureFacts :
+      ProgramSignatureBuildParametersWellFormed traitState.traits state := by
+    apply collectProgramSignatures_parameters_wellFormed environment
+      traitState.traits environment.declarations
+      ({} : ProgramSignatureBuildState)
+    constructor <;> intro signature member <;> simp at member
+  simp only [buildProgramSignatures] at success
+  split at success
+  · injection success with signaturesEq
+    subst signatures
+    exact signatureFacts.implementationHeads
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every

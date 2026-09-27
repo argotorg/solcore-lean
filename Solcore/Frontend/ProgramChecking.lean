@@ -379,6 +379,19 @@ theorem checkLoadedProgram_success_implementation_signature_structure
   buildProgramSignatures_success_implementation_structure
     (checkLoadedProgram_success_signatures success) member
 
+/-- A successful loaded-program check retains the selected trait entry and
+the containment checks performed for every implementation head. -/
+theorem checkLoadedProgram_success_implementation_head_validated
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ checked.signatures.implementations) :
+    ImplementationSignatureHeadValidated checked.signatures.traits signature :=
+  buildProgramSignatures_success_implementation_head_validated
+    (checkLoadedProgram_success_signatures success) member
+
 /-- A successful loaded-program check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkLoadedProgram_success_ids
@@ -557,6 +570,20 @@ theorem checkProgram_success_implementation_signature_structure
     ImplementationSignatureStructuralWellFormed signature := by
   obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
   exact checkLoadedProgram_success_implementation_signature_structure
+    checkedSuccess member
+
+/-- End-to-end checker success retains the selected trait entry and the
+containment checks performed for every implementation head. -/
+theorem checkProgram_success_implementation_head_validated
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ checked.signatures.implementations) :
+    ImplementationSignatureHeadValidated checked.signatures.traits signature := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_implementation_head_validated
     checkedSuccess member
 
 /-- End-to-end checker success assigns globally unique constructor identities

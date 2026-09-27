@@ -231,6 +231,17 @@ theorem buildProgramSignatures_success_implementation_structure
   buildProgramSignatures_success_implementation_structure_state success
     signature member
 
+/-- Successful collection retains the exact trait-catalog entry and
+containment checks used to admit every implementation head. -/
+theorem buildProgramSignatures_success_implementation_head_validated
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramImplementationSignature}
+    (member : signature ∈ signatures.implementations) :
+    ImplementationSignatureHeadValidated signatures.traits signature :=
+  buildProgramSignatures_success_implementation_head_validated_state success
+    signature member
+
 /-- Successful collection rejects duplicate method names within every
 implementation. -/
 theorem buildProgramSignatures_success_implementation_method_names_nodup
@@ -468,6 +479,31 @@ theorem buildProgramSignatures_success_trait_ids_nodup
   have withoutContracts := (List.nodup_append.mp all).1
   have withoutImplementations := (List.nodup_append.mp withoutContracts).1
   exact (List.nodup_append.mp withoutImplementations).2.1
+
+/-- In a trait catalog with unique stable identities, two retained entries
+with the same identity are the same signature. -/
+theorem trait_signature_eq_of_mem_of_id_eq
+    {traits : List ProgramTraitSignature}
+    {left right : ProgramTraitSignature}
+    (unique : (traits.map fun signature => signature.id).Nodup)
+    (leftMember : left ∈ traits) (rightMember : right ∈ traits)
+    (idEq : left.id = right.id) : left = right := by
+  induction traits generalizing left right with
+  | nil => simp at leftMember
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at unique
+      simp only [List.mem_cons] at leftMember rightMember
+      rcases leftMember with rfl | leftMember
+      · rcases rightMember with rfl | rightMember
+        · rfl
+        · exfalso
+          exact unique.1
+            (List.mem_map.mpr ⟨right, rightMember, idEq.symm⟩)
+      · rcases rightMember with rfl | rightMember
+        · exfalso
+          exact unique.1
+            (List.mem_map.mpr ⟨left, leftMember, idEq⟩)
+        · exact induction unique.2 leftMember rightMember idEq
 
 /-- Distinct owning trait identities plus each trait's local source-order
 allocation make trait-method identities unique across a complete catalog. -/
