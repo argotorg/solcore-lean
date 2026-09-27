@@ -52,6 +52,44 @@ def ofChecked (checked : CheckedProgram) : Program := {
 
 end Program
 
+/-- Declaration context used by the semantic header recovered from one
+successful executable body check. -/
+def checkedBodyContext (signatures : ProgramSignatures)
+    (signature : ProgramFunctionSignature) (checked : CheckedFunction) :
+    Context :=
+  declarationContext signatures signature.id signature.scheme.parameters
+    signature.scheme.predicates checked.solvedRequirements
+
+/-- Every interface-level component of `BodyDefinitionHasType` which follows
+from signature formation and executable body-check provenance alone.  Graph,
+requirement-ledger, and deep statement typing remain deliberately separate. -/
+structure CheckedBodyHeaderWellFormed
+    (signatures : ProgramSignatures)
+    (signature : ProgramFunctionSignature)
+    (checked : CheckedFunction) : Prop where
+  declaration_eq : checked.declaration = signature.id
+  source_owner : checked.typedBody.owner = checked.declaration
+  parameter_binders : TypeParameterBindersWellFormed
+    (checkedBodyContext signatures signature checked)
+  parameter_types : TypesWellFormed
+    (checkedBodyContext signatures signature checked) signature.parameterTypes
+  return_types : TypesWellFormed
+    (checkedBodyContext signatures signature checked) signature.returnTypes
+  callable_type : checked.type = .function
+    (TypeSystem.Ty.productMany signature.parameterTypes)
+    (TypeSystem.Ty.productMany signature.returnTypes)
+  result_type : checked.inferredBodyType =
+    TypeSystem.Ty.productMany signature.returnTypes
+  return_comptime : checked.returnComptime = signature.returnComptime
+  input_names : checked.typedBody.inputs.map (fun binder => binder.name) =
+    signature.parameterNames
+  input_comptime : checked.typedBody.inputs.map (fun binder => binder.comptime) =
+    signature.parameterComptime
+  inputs_extend : ∃ lexicalContext,
+    MonoBindersExtend signature.id
+      (checkedBodyContext signatures signature checked)
+      checked.typedBody.inputs signature.parameterTypes lexicalContext
+
 /-- Raw-workspace checker success discharges the cross-category declaration
 identity component of semantic signature-catalog well-formedness. -/
 theorem signatureDeclarationIds_nodup_ofCheckProgram
@@ -148,6 +186,26 @@ private theorem signatureContext_typeParameterBinders
     simp [signatureContext, Context.withAssumptions,
       Context.forDeclaration, owned]
 
+namespace SignatureParametersWellFormed
+
+/-- Canonical declaration parameters remain valid after installing solved
+requirements and opening the residual body-inference scope. -/
+theorem declarationContextBinders
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    (canonical : SignatureParametersWellFormed owner parameters)
+    (assumptions : List ProgramPredicate)
+    (requirements : List SolvedRequirement) :
+    TypeParameterBindersWellFormed
+      (declarationContext signatures owner parameters assumptions
+        requirements) := by
+  exact StructuralSubstitution.TypeParameterBindersWellFormed.transportContext
+    rfl rfl (signatureContext_typeParameterBinders
+      (signatures := signatures) canonical assumptions)
+
+end SignatureParametersWellFormed
+
 namespace SignatureTypeFormationValidated
 
 /-- Close a validated frontend type with the signature collector's canonical
@@ -191,6 +249,29 @@ theorem typesWellFormed
       (SignatureTypesFormationValidated.typesWellScoped validated assumptions)
         |>.member member
   }
+
+/-- Validated signature types remain well formed after installing the solved
+requirement ledger and opening the declaration's residual inference scope. -/
+theorem declarationTypesWellFormed
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {types : List TypeSystem.Ty}
+    (validated : Frontend.SignatureTypesFormationValidated signatures owner
+      parameters types)
+    (canonical : SignatureParametersWellFormed owner parameters)
+    (assumptions : List ProgramPredicate)
+    (requirements : List SolvedRequirement) :
+    TypesWellFormed
+      (declarationContext signatures owner parameters assumptions requirements)
+      types := by
+  exact StructuralSubstitution.TypesWellFormed.transportContext
+    (source := signatureContext signatures owner parameters assumptions)
+    (target := declarationContext signatures owner parameters assumptions
+      requirements)
+    rfl rfl rfl
+    (Solcore.SourceSemantics.SignatureTypesFormationValidated.typesWellFormed
+      validated canonical assumptions)
 
 end SignatureTypesFormationValidated
 
@@ -239,6 +320,189 @@ theorem predicatesWellFormed
     (validated predicate member) canonical assumptions
 
 end SignaturePredicatesFormationValidated
+
+/-- Closed semantic return formation is sufficient to remove the final
+inference substitution from a successful checked body's reported result. -/
+theorem checkFunctionBody_success_result_type_eq
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    {context : Context}
+    (returnTypes : TypesWellFormed context signature.returnTypes)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.inferredBodyType = TypeSystem.Ty.productMany signature.returnTypes := by
+  rw [Frontend.SourceInference.checkFunctionBody_success_inferredBodyType success]
+  exact StructuralSubstitution.TypeWellScoped.applySubstitution_eq_self
+    checked.substitution
+    (StructuralSubstitution.TypesWellScoped.productMany
+      (StructuralSubstitution.TypesWellFormed.toTypesWellScoped returnTypes))
+
+/-- Closed parameter formation and successful body checking construct the
+exact semantic lexical context obtained by installing the finalized input
+binders.  This theorem is independent of frontend formation witnesses, so it
+also applies to synthetic implementation-method signatures. -/
+theorem checkFunctionBody_success_inputs_extend
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    {context : Context}
+    (locals_empty : context.locals = [])
+    (local_requirements_empty : context.localSchemeRequirements = [])
+    (parameterTypes : TypesWellFormed context signature.parameterTypes)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    ∃ lexicalContext,
+      MonoBindersExtend signature.id context checked.typedBody.inputs
+        signature.parameterTypes lexicalContext := by
+  have typesFixed :
+      signature.parameterTypes.map checked.substitution.apply =
+        signature.parameterTypes :=
+    StructuralSubstitution.TypesWellScoped.applySubstitution_eq_self
+      checked.substitution
+      (StructuralSubstitution.TypesWellFormed.toTypesWellScoped parameterTypes)
+  have inputsEq :=
+    Frontend.SourceInference.checkFunctionBody_success_typedBody_inputs_eq_initial_of_types_fixed
+      typesFixed success
+  obtain ⟨lexicalContext, extension⟩ := MonoBindersExtend.initialInputs
+    signature.id context signature.parameterNames signature.parameterTypes
+      signature.parameterComptime
+      (signature.parameterNames_length.trans
+        signature.parameterTypes_length.symm)
+      locals_empty local_requirements_empty parameterTypes
+  rw [inputsEq]
+  exact ⟨lexicalContext, extension⟩
+
+namespace CheckedBodyHeaderWellFormed
+
+/-- Recover the complete checker-derived body header from canonical generic
+parameters, closed signature types, callable shape, and one exact body-check
+success equation.  The theorem also applies to synthetic method signatures. -/
+theorem ofCheckFunctionBody
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (parameters : SignatureParametersWellFormed signature.id
+      signature.scheme.parameters)
+    (parameterTypes : TypesWellFormed
+      (signatureContext signatures signature.id signature.scheme.parameters
+        signature.scheme.predicates) signature.parameterTypes)
+    (returnTypes : TypesWellFormed
+      (signatureContext signatures signature.id signature.scheme.parameters
+        signature.scheme.predicates) signature.returnTypes)
+    (schemeBody : signature.scheme.body = .function
+      (TypeSystem.Ty.productMany signature.parameterTypes)
+      (TypeSystem.Ty.productMany signature.returnTypes))
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    CheckedBodyHeaderWellFormed signatures signature checked := by
+  have parameterTypesBody : TypesWellFormed
+      (checkedBodyContext signatures signature checked)
+      signature.parameterTypes :=
+    StructuralSubstitution.TypesWellFormed.transportContext
+      (source := signatureContext signatures signature.id
+        signature.scheme.parameters signature.scheme.predicates)
+      (target := checkedBodyContext signatures signature checked)
+      rfl rfl rfl parameterTypes
+  have returnTypesBody : TypesWellFormed
+      (checkedBodyContext signatures signature checked)
+      signature.returnTypes :=
+    StructuralSubstitution.TypesWellFormed.transportContext
+      (source := signatureContext signatures signature.id
+        signature.scheme.parameters signature.scheme.predicates)
+      (target := checkedBodyContext signatures signature checked)
+      rfl rfl rfl returnTypes
+  refine {
+    declaration_eq := checkFunctionBody_success_declaration success
+    source_owner := ?_
+    parameter_binders := ?_
+    parameter_types := parameterTypesBody
+    return_types := returnTypesBody
+    callable_type := ?_
+    result_type := checkFunctionBody_success_result_type_eq returnTypes success
+    return_comptime := checkFunctionBody_success_returnComptime success
+    input_names := checkFunctionBody_success_typedBody_inputNames success
+    input_comptime := checkFunctionBody_success_typedBody_inputComptime success
+    inputs_extend := ?_
+  }
+  · exact (checkFunctionBody_success_typedBody_owner success).trans
+      (checkFunctionBody_success_declaration success).symm
+  · exact
+      Solcore.SourceSemantics.SignatureParametersWellFormed.declarationContextBinders
+        parameters signature.scheme.predicates checked.solvedRequirements
+  · exact (checkFunctionBody_success_type success).trans schemeBody
+  · exact checkFunctionBody_success_inputs_extend
+      (context := checkedBodyContext signatures signature checked)
+      (by rfl)
+      (by rfl)
+      parameterTypesBody success
+
+/-- Implementation-method signature semantics supply the same body header for
+the synthetic ordinary-function view used by executable checking.  This local
+bridge is intentionally parametric in the selected trait; callers relating it
+to a program catalog retain the corresponding `trait?` lookup equation. -/
+theorem ofCheckImplementationMethod
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {implementation : ProgramImplementationSignature}
+    {method : ProgramImplMethodSignature}
+    {trait : ProgramTraitSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (implementationWellFormed : ImplementationSignatureWellFormed signatures
+      implementation)
+    (methodWellFormed : ImplMethodSignatureWellFormed signatures implementation
+      method)
+    (success : checkFunctionBody environment signatures
+      (implementation.functionSignatureOfMethodWithTrait trait method) fuel =
+        .ok checked) :
+    CheckedBodyHeaderWellFormed signatures
+      (implementation.functionSignatureOfMethodWithTrait trait method)
+      checked := by
+  let signature := implementation.functionSignatureOfMethodWithTrait trait method
+  let parameters : SignatureParametersWellFormed implementation.id
+      implementation.parameters := {
+    parameters_nodup := implementationWellFormed.parameters_nodup
+    parameter_owners := implementationWellFormed.parameters_owned
+    parameter_positions := implementationWellFormed.parameter_positions
+  }
+  have parameterTypes : TypesWellFormed
+      (signatureContext signatures signature.id signature.scheme.parameters
+        signature.scheme.predicates) signature.parameterTypes := by
+    change TypesWellFormed
+      (signatureContext signatures implementation.id implementation.parameters
+        (implementation.methodAssumptions trait method)) method.parameterTypes
+    exact StructuralSubstitution.TypesWellFormed.transportContext
+      (source := signatureContext signatures implementation.id
+        implementation.parameters
+        (implementation.wherePredicates ++ method.wherePredicates))
+      (target := signatureContext signatures implementation.id
+        implementation.parameters (implementation.methodAssumptions trait method))
+      rfl rfl rfl methodWellFormed.parameter_types
+  have returnTypes : TypesWellFormed
+      (signatureContext signatures signature.id signature.scheme.parameters
+        signature.scheme.predicates) signature.returnTypes := by
+    change TypesWellFormed
+      (signatureContext signatures implementation.id implementation.parameters
+        (implementation.methodAssumptions trait method)) method.returnTypes
+    exact StructuralSubstitution.TypesWellFormed.transportContext
+      (source := signatureContext signatures implementation.id
+        implementation.parameters
+        (implementation.wherePredicates ++ method.wherePredicates))
+      (target := signatureContext signatures implementation.id
+        implementation.parameters (implementation.methodAssumptions trait method))
+      rfl rfl rfl methodWellFormed.return_types
+  apply ofCheckFunctionBody parameters parameterTypes returnTypes
+  · rfl
+  · exact success
+
+end CheckedBodyHeaderWellFormed
 
 /-- Catalog facts retained by successful checking.  Loaded-program checking
 requires a separate declaration-identity uniqueness premise because its input
@@ -873,6 +1137,108 @@ theorem ofCheckProgram
   (checkedSignatureCatalogFacts_ofCheckProgram success).complete
 
 end SignatureCatalogWellFormed
+
+/-- Loaded checker success automatically validates every interface-level
+semantic field of any retained top-level function body. -/
+theorem checkedFunctionHeaderWellFormed_ofCheckLoadedProgram
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkLoadedProgram loaded fuel = .ok checked)
+    {function : CheckedFunction}
+    (member : function ∈ checked.functions) :
+    ∃ signature, signature ∈ checked.signatures.functions ∧
+      CheckedBodyHeaderWellFormed checked.signatures signature function := by
+  obtain ⟨signature, signatureMember, bodySuccess⟩ :=
+    Frontend.checkLoadedProgram_success_function_body success member
+  have formation := Frontend.checkLoadedProgram_success_signature_formation
+    success
+  rcases formation.functions signature signatureMember with
+    ⟨parameterFormation, returnFormation, _⟩
+  have parameters :=
+    (Frontend.checkLoadedProgram_success_signature_parameters_wellFormed
+      success).functions signature signatureMember
+  have parameterTypes :=
+    Solcore.SourceSemantics.SignatureTypesFormationValidated.typesWellFormed
+      parameterFormation parameters signature.scheme.predicates
+  have returnTypes :=
+    Solcore.SourceSemantics.SignatureTypesFormationValidated.typesWellFormed
+      returnFormation parameters signature.scheme.predicates
+  have schemeBody :=
+    (Frontend.checkLoadedProgram_success_function_signature_shape success
+      signatureMember).2
+  exact ⟨signature, signatureMember,
+    CheckedBodyHeaderWellFormed.ofCheckFunctionBody parameters parameterTypes
+      returnTypes schemeBody bodySuccess⟩
+
+/-- Raw checker success carries the same complete function-body header
+certificate through validation and loading. -/
+theorem checkedFunctionHeaderWellFormed_ofCheckProgram
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkProgram raw fuel = .ok checked)
+    {function : CheckedFunction}
+    (member : function ∈ checked.functions) :
+    ∃ signature, signature ∈ checked.signatures.functions ∧
+      CheckedBodyHeaderWellFormed checked.signatures signature function := by
+  obtain ⟨_, _, checkedSuccess⟩ := Frontend.checkProgram_success_load success
+  exact checkedFunctionHeaderWellFormed_ofCheckLoadedProgram checkedSuccess member
+
+/-- Loaded checker success validates the complete interface-level body header
+of every implementation method once the forgeable environment's declaration
+identities are known to be unique. -/
+theorem checkedMethodHeaderWellFormed_ofCheckLoadedProgram
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkLoadedProgram loaded fuel = .ok checked)
+    (environmentIds :
+      (loaded.environment.declarations.map fun declaration => declaration.id).Nodup)
+    {checkedMethod : CheckedImplementationMethod}
+    (member : checkedMethod ∈ checked.methods) :
+    ∃ implementation method trait,
+      implementation ∈ checked.signatures.implementations ∧
+        method ∈ implementation.methods ∧
+          checked.signatures.trait? method.traitMethod.trait = some trait ∧
+            checkedMethod.id = method.id ∧
+              CheckedBodyHeaderWellFormed checked.signatures
+                (implementation.functionSignatureOfMethodWithTrait trait method)
+                checkedMethod.checked := by
+  obtain ⟨implementation, method, trait, implementationMember, methodMember,
+    traitLookup, methodId, bodySuccess⟩ :=
+    Frontend.checkLoadedProgram_success_method_body success member
+  have catalog := SignatureCatalogWellFormed.ofCheckLoadedProgram success
+    environmentIds
+  have implementationWellFormed :=
+    catalog.implementations_semantic implementation implementationMember
+  have methodWellFormed := implementationWellFormed.methods method methodMember
+  exact ⟨implementation, method, trait, implementationMember, methodMember,
+    traitLookup, methodId,
+    CheckedBodyHeaderWellFormed.ofCheckImplementationMethod
+      implementationWellFormed methodWellFormed bodySuccess⟩
+
+/-- Raw checker success supplies environment identity uniqueness itself, so
+every retained implementation method has a complete semantic body header. -/
+theorem checkedMethodHeaderWellFormed_ofCheckProgram
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkProgram raw fuel = .ok checked)
+    {checkedMethod : CheckedImplementationMethod}
+    (member : checkedMethod ∈ checked.methods) :
+    ∃ implementation method trait,
+      implementation ∈ checked.signatures.implementations ∧
+        method ∈ implementation.methods ∧
+          checked.signatures.trait? method.traitMethod.trait = some trait ∧
+            checkedMethod.id = method.id ∧
+              CheckedBodyHeaderWellFormed checked.signatures
+                (implementation.functionSignatureOfMethodWithTrait trait method)
+                checkedMethod.checked := by
+  obtain ⟨loaded, loadedSuccess, checkedSuccess⟩ :=
+    Frontend.checkProgram_success_load success
+  exact checkedMethodHeaderWellFormed_ofCheckLoadedProgram checkedSuccess
+    (Frontend.loadProgram_success_declarations_nodup loadedSuccess) member
 
 /-- The remaining proof obligations for promoting a forgeable checked-program
 carrier to a declaratively well-formed source program.  Exact ID alignment

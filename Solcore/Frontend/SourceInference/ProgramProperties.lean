@@ -246,6 +246,17 @@ theorem finalize_typedSource_owner
   rw [finalize_typedSource success]
   rfl
 
+/-- A successful finalization applies its final inference substitution
+pointwise to the exact input binders retained by the input state. -/
+theorem finalize_typedSource_inputs
+    {context : Context} {type : Ty} {state : State} {roots : List NodeId}
+    {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    result.typedSource.inputs =
+      state.inputs.map (TypedBinder.applySubstitution result.substitution) := by
+  rw [finalize_typedSource success]
+  rfl
+
 /-- Final substitution preserves the stable identities of every input. -/
 theorem finalize_typedSource_inputIds
     {context : Context} {type : Ty} {state : State} {roots : List NodeId}
@@ -292,6 +303,69 @@ private theorem functionParameterEnvironment_names
   induction parameters with
   | nil => rfl
   | cons parameter rest induction => simp [induction]
+
+private theorem functionParameterEnvironment_eq
+    (parameters : List ProgramFunctionParameter) :
+    (((parameters.map (fun parameter => parameter.name)).zip
+        (parameters.map (fun parameter => parameter.type))).map
+      fun parameter => (parameter.1, Scheme.mono parameter.2)) =
+        parameters.map fun parameter =>
+          (parameter.name, Scheme.mono parameter.type) := by
+  induction parameters with
+  | nil => rfl
+  | cons parameter rest induction => simp [induction]
+
+private theorem map_mapIdx {alpha beta gamma : Type}
+    (items : List alpha) (prepare : alpha → beta)
+    (indexed : Nat → beta → gamma) :
+    (items.map prepare).mapIdx indexed =
+      items.mapIdx fun index item => indexed index (prepare item) := by
+  induction items generalizing indexed with
+  | nil => rfl
+  | cons item rest induction =>
+      simp only [List.map_cons, List.mapIdx_cons]
+      exact congrArg (indexed 0 (prepare item) :: ·)
+        (induction (fun index item => indexed (index + 1) item))
+
+/-- Pointwise substitution invariance of every parameter type makes a
+source-ordered row of monomorphic parameter binders invariant too.  The
+indexed constructor is abstract so the result also covers the stable IDs,
+names, staging markers, and spans assigned by `State.initial`. -/
+private theorem functionParameterBinders_applySubstitution_eq_self
+    {parameters : List ProgramFunctionParameter}
+    (substitution : Substitution)
+    (typesFixed :
+      (parameters.map fun parameter => parameter.type).map
+          substitution.apply =
+        parameters.map fun parameter => parameter.type)
+    (indexed : Nat → ProgramFunctionParameter → TypedBinder)
+    (schemes : ∀ index parameter,
+      (indexed index parameter).scheme = Scheme.mono parameter.type)
+    (requirements : ∀ index parameter,
+      (indexed index parameter).schemeRequirements = []) :
+    (parameters.mapIdx indexed).map
+        (TypedBinder.applySubstitution substitution) =
+      parameters.mapIdx indexed := by
+  induction parameters generalizing indexed with
+  | nil => rfl
+  | cons parameter parameters induction =>
+      simp only [List.map_cons, List.cons.injEq] at typesFixed
+      rcases typesFixed with ⟨headFixed, tailFixed⟩
+      simp only [List.mapIdx_cons, List.map_cons, List.cons.injEq]
+      constructor
+      · have schemeEq := schemes 0 parameter
+        have requirementsEq := requirements 0 parameter
+        cases binderEq : indexed 0 parameter with
+        | mk id name scheme schemeRequirements comptime span =>
+            simp only [binderEq] at schemeEq requirementsEq
+            subst scheme
+            subst schemeRequirements
+            simp [TypedBinder.applySubstitution, Scheme.apply,
+              Scheme.mono, Substitution.without, headFixed]
+      · exact induction tailFixed
+          (fun index parameter => indexed (index + 1) parameter)
+          (fun index parameter => schemes (index + 1) parameter)
+          (fun index parameter => requirements (index + 1) parameter)
 
 /-- Successful checking retains the callable type assembled by the signature
 builder. -/
@@ -382,6 +456,89 @@ theorem checkFunctionBody_success_typedBody_owner
   exact (Detail.finalize_typedSource_owner finalizeEq).trans
     (finalOwner.trans
       (ProgramEnvironment.declaration?_sound declarationEq).2)
+
+/-- Successful body inference retains the exact initial function-parameter
+binders and applies only the final flexible inference substitution to them. -/
+theorem checkFunctionBody_success_typedBody_inputs
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.typedBody.inputs =
+      (State.initial signature.id
+        ((signature.parameterNames.zip signature.parameterTypes).map
+          fun parameter => (parameter.1, Scheme.mono parameter.2))
+        signature.parameterComptime).inputs.map
+          (TypedBinder.applySubstitution checked.substitution) := by
+  obtain ⟨declaration, body, finalState, result, declarationEq, bodyEq,
+    unifyEq, finalizeEq, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  have bodyHeader := Detail.inferStatementsFuel_state_header bodyEq
+  have finalHeader := Detail.unify_state_header unifyEq
+  have finalInputs : finalState.inputs =
+      (State.initial declaration.id
+        ((signature.parameterNames.zip signature.parameterTypes).map
+          fun parameter => (parameter.1, Scheme.mono parameter.2))
+        signature.parameterComptime).inputs := by
+    exact congrArg (fun header : State.Header => header.inputs)
+      (finalHeader.trans bodyHeader)
+  rw [Detail.finalize_typedSource_inputs finalizeEq, finalInputs,
+    (ProgramEnvironment.declaration?_sound declarationEq).2]
+
+/-- If the final inference substitution fixes every declared parameter type,
+it leaves the complete initial monomorphic input-binder row unchanged. -/
+theorem checkFunctionBody_success_typedBody_inputs_eq_initial_of_types_fixed
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (typesFixed : signature.parameterTypes.map checked.substitution.apply =
+      signature.parameterTypes)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.typedBody.inputs =
+      (State.initial signature.id
+        ((signature.parameterNames.zip signature.parameterTypes).map
+          fun parameter => (parameter.1, Scheme.mono parameter.2))
+        signature.parameterComptime).inputs := by
+  rw [checkFunctionBody_success_typedBody_inputs success]
+  rw [State.initial_inputs_definition]
+  simp only [ProgramFunctionSignature.parameterNames,
+    ProgramFunctionSignature.parameterTypes,
+    ProgramFunctionSignature.parameterComptime,
+    functionParameterEnvironment_eq, map_mapIdx]
+  apply functionParameterBinders_applySubstitution_eq_self
+  · simpa [ProgramFunctionSignature.parameterTypes] using typesFixed
+  · intro index parameter
+    rfl
+  · intro index parameter
+    rfl
+
+/-- Once executable signature formation has closed all declared parameter
+types, the final inference substitution leaves the complete initial input
+binder row unchanged. -/
+theorem checkFunctionBody_success_typedBody_inputs_eq_initial
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (formation : SignatureTypesFormationValidated signatures signature.id
+      signature.scheme.parameters signature.parameterTypes)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.typedBody.inputs =
+      (State.initial signature.id
+        ((signature.parameterNames.zip signature.parameterTypes).map
+          fun parameter => (parameter.1, Scheme.mono parameter.2))
+        signature.parameterComptime).inputs := by
+  exact checkFunctionBody_success_typedBody_inputs_eq_initial_of_types_fixed
+    (formation.apply_eq_self checked.substitution) success
 
 /-- Successful checking preserves the exact source-order input names from the
 function signature in the finalized typed body. -/

@@ -158,6 +158,12 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_owner
 example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_inputs
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_inputs_eq_initial_of_types_fixed
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_inputs_eq_initial
+example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_inputNames
 example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_inputComptime
@@ -242,6 +248,7 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_owner
+example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputs
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputIds
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputNames
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputComptime

@@ -343,6 +343,48 @@ theorem weakenTo
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
 
+/-- Extending only the lexical local table preserves type scoping. -/
+theorem withLocal
+    {context : Context} {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (wellScoped : TypeWellScoped context flexibleVariables type)
+    (id : Resolved.LocalId) (scheme : TypeSystem.Scheme)
+    (requirements : List Frontend.SourceInference.LocalSchemeRequirement := []) :
+    TypeWellScoped (context.withLocal id scheme requirements)
+      flexibleVariables type := by
+  refine TypeWellScoped.rec
+    (motive_1 := fun type _ => TypeWellScoped
+      (context.withLocal id scheme requirements) flexibleVariables type)
+    (motive_2 := fun types _ => TypesWellScoped
+      (context.withLocal id scheme requirements) flexibleVariables types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound owned
+    exact .parameter (by simpa [Context.withLocal] using bound)
+      (by simpa [Context.withLocal] using owned)
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments
+      (by simpa [Context.withLocal] using cataloged) arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments
+      (by simpa [Context.withLocal] using cataloged) arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
 /-- Strip type arguments from the left of an application spine. -/
 private def applicationHead : TypeSystem.Ty → TypeSystem.Ty
   | .application left _ => applicationHead left
@@ -487,6 +529,17 @@ theorem variable_iff {context : Context}
 end TypeWellScoped
 
 namespace TypeWellFormed
+
+/-- Closed type formation is insensitive to lexical local extension. -/
+theorem withLocal
+    {context : Context} {type : TypeSystem.Ty}
+    (wellFormed : TypeWellFormed context type)
+    (id : Resolved.LocalId) (scheme : TypeSystem.Scheme)
+    (requirements : List Frontend.SourceInference.LocalSchemeRequirement := []) :
+    TypeWellFormed (context.withLocal id scheme requirements) type := {
+  binders := wellFormed.binders.withLocal id scheme requirements
+  typeWellScoped := wellFormed.typeWellScoped.withLocal id scheme requirements
+}
 
 theorem ne_error {context : Context} {type : TypeSystem.Ty}
     (wellFormed : TypeWellFormed context type) :

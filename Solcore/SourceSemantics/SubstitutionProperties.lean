@@ -1272,6 +1272,20 @@ theorem TypeWellFormed.transportContext
     signatures_eq parameters_eq declaration_eq wellFormed.typeWellScoped
 }
 
+/-- Pointwise closed formation is insensitive to lexical, assumption, solved
+requirement, and residual-variable fields when the signature catalog and rigid
+declaration scope agree. -/
+theorem TypesWellFormed.transportContext
+    {source target : Context} {types : List Ty}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (wellFormed : TypesWellFormed source types) :
+    TypesWellFormed target types := by
+  intro type member
+  exact StructuralSubstitution.TypeWellFormed.transportContext signatures_eq
+    parameters_eq declaration_eq (wellFormed type member)
+
 theorem SchemeWellFormed.transportContext
     {source target : Context} {scheme : Scheme}
     (signatures_eq : target.signatures = source.signatures)

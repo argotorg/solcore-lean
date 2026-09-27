@@ -114,6 +114,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.TypesWellFormed.applyParametersTo
 example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.TypesWellFormed.transportContext
+example :=
   @Solcore.SourceSemantics.StructuralSubstitution.PredicateWellFormed.applyParametersTo
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.PredicatesWellFormed.applyParametersTo
@@ -359,7 +361,9 @@ example := @Solcore.SourceSemantics.RequirementOwnership
 example := @Solcore.SourceSemantics.TypeWellScoped
 example := @Solcore.SourceSemantics.TypesWellScoped
 example := @Solcore.SourceSemantics.TypeWellScoped.contractNominal
+example := @Solcore.SourceSemantics.TypeWellScoped.withLocal
 example := @Solcore.SourceSemantics.TypeWellFormed
+example := @Solcore.SourceSemantics.TypeWellFormed.withLocal
 example := @Solcore.SourceSemantics.TypeAdmissible
 example := @Solcore.SourceSemantics.admissibleTypeVariables
 example := @Solcore.SourceSemantics.TypeAdmissible.toWellFormed
@@ -397,6 +401,9 @@ example := @Solcore.SourceSemantics.StatementHasType
 example := @Solcore.SourceSemantics.StatementHasType.letInitializedGeneralized
 example := @Solcore.SourceSemantics.StatementsHaveType
 example := @Solcore.SourceSemantics.MonoBindersExtend.functional
+example := @Solcore.SourceSemantics.MonomorphicBinders
+example := @Solcore.SourceSemantics.MonoBindersExtend.exists_of_monomorphic
+example := @Solcore.SourceSemantics.MonoBindersExtend.initialInputs
 example := @Solcore.SourceSemantics.BinderExtends.fresh
 example := @Solcore.SourceSemantics.BinderExtends.local_fresh
 example := @Solcore.SourceSemantics.BinderExtends.local_scheme_requirements_fresh
@@ -421,6 +428,12 @@ example := @Solcore.SourceSemantics.ProgramWellFormed
 example := @Solcore.SourceSemantics.FunctionDefinition.ofChecked
 example := @Solcore.SourceSemantics.MethodDefinition.ofChecked
 example := @Solcore.SourceSemantics.Program.ofChecked
+example := @Solcore.SourceSemantics.checkedBodyContext
+example := @Solcore.SourceSemantics.CheckedBodyHeaderWellFormed
+example :=
+  @Solcore.SourceSemantics.CheckedBodyHeaderWellFormed.ofCheckFunctionBody
+example :=
+  @Solcore.SourceSemantics.CheckedBodyHeaderWellFormed.ofCheckImplementationMethod
 example := @Solcore.SourceSemantics.signatureDeclarationIds_nodup_ofCheckProgram
 example :=
   @Solcore.SourceSemantics.SignatureTypeFormationValidated.typeWellScoped
@@ -431,9 +444,23 @@ example :=
 example :=
   @Solcore.SourceSemantics.SignatureTypesFormationValidated.typesWellFormed
 example :=
+  @Solcore.SourceSemantics.SignatureTypesFormationValidated.declarationTypesWellFormed
+example :=
+  @Solcore.SourceSemantics.SignatureParametersWellFormed.declarationContextBinders
+example :=
   @Solcore.SourceSemantics.SignaturePredicateFormationValidated.predicateWellFormed
 example :=
   @Solcore.SourceSemantics.SignaturePredicatesFormationValidated.predicatesWellFormed
+example := @Solcore.SourceSemantics.checkFunctionBody_success_result_type_eq
+example := @Solcore.SourceSemantics.checkFunctionBody_success_inputs_extend
+example :=
+  @Solcore.SourceSemantics.checkedFunctionHeaderWellFormed_ofCheckLoadedProgram
+example :=
+  @Solcore.SourceSemantics.checkedFunctionHeaderWellFormed_ofCheckProgram
+example :=
+  @Solcore.SourceSemantics.checkedMethodHeaderWellFormed_ofCheckLoadedProgram
+example :=
+  @Solcore.SourceSemantics.checkedMethodHeaderWellFormed_ofCheckProgram
 example := @Solcore.SourceSemantics.CheckedSignatureCatalogFacts
 example := @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.formation
 example :=
