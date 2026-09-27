@@ -94,6 +94,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.committedCoercionPlanValid
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.coercionPlan?_some_committedPathValid
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.coercionPlan?_some_committedPathValid_at
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_template_evidence
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_ordinary_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_scoped_entries_sound
