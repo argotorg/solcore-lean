@@ -173,7 +173,82 @@ theorem requirementIds_nodup (state : State)
 
 end State
 
+/-- Ordered requirement identities that point to the corresponding predicate
+rows of one final inference ledger. -/
+inductive RequirementPredicatesCorrespond (requirements : List Requirement) :
+    List ProgramPredicate → List RequirementId → Prop where
+  | nil : RequirementPredicatesCorrespond requirements [] []
+  | cons {predicate id predicates ids}
+      (head : ({ id, predicate } : Requirement) ∈ requirements)
+      (tail : RequirementPredicatesCorrespond requirements predicates ids) :
+      RequirementPredicatesCorrespond requirements
+        (predicate :: predicates) (id :: ids)
+
+namespace RequirementPredicatesCorrespond
+
+/-- Ledger extension preserves every established predicate/identity
+correspondence. -/
+theorem mono {smaller larger : List Requirement}
+    {predicates : List ProgramPredicate} {ids : List RequirementId}
+    (included : smaller ⊆ larger)
+    (corresponds : RequirementPredicatesCorrespond smaller predicates ids) :
+    RequirementPredicatesCorrespond larger predicates ids := by
+  induction corresponds with
+  | nil => exact .nil
+  | cons head tail induction =>
+      exact .cons (included head) induction
+
+end RequirementPredicatesCorrespond
+
+namespace Detail.PlannedCoercionStep
+
+/-- One committed coercion step retains the selected edge and gives every
+predicate owned by that edge a stable row in the final requirement ledger. -/
+structure CommitCorresponds (requirements : List Requirement)
+    (planned : PlannedCoercionStep) (committed : CoercionStep) : Prop where
+  source_eq : committed.source = planned.source
+  target_eq : committed.target = planned.target
+  primary_mem :
+    ({ id := committed.requirement, predicate := planned.predicate } :
+      Requirement) ∈ requirements
+  methods : RequirementPredicatesCorrespond requirements
+    planned.methodPredicates committed.methodRequirements
+
+namespace CommitCorresponds
+
+/-- Extending the final ledger preserves one committed-edge correspondence. -/
+theorem mono {smaller larger : List Requirement}
+    {planned : PlannedCoercionStep} {committed : CoercionStep}
+    (included : smaller ⊆ larger)
+    (corresponds : CommitCorresponds smaller planned committed) :
+    CommitCorresponds larger planned committed := {
+  source_eq := corresponds.source_eq
+  target_eq := corresponds.target_eq
+  primary_mem := included corresponds.primary_mem
+  methods := corresponds.methods.mono included
+}
+
+end CommitCorresponds
+
+/-- Predicates allocated by one selected edge, in their ledger order. -/
+def predicates (step : PlannedCoercionStep) : List ProgramPredicate :=
+  step.predicate :: step.methodPredicates
+
+end Detail.PlannedCoercionStep
+
 namespace Detail
+
+/-- The committed coercion spine has exactly one output step for each planned
+edge, in the same order, and every output step points into the final ledger. -/
+inductive CoercionPlanCommitCorresponds (requirements : List Requirement) :
+    List PlannedCoercionStep → List CoercionStep → Prop where
+  | nil : CoercionPlanCommitCorresponds requirements [] []
+  | cons {planned committed plan steps}
+      (head : PlannedCoercionStep.CommitCorresponds requirements
+        planned committed)
+      (tail : CoercionPlanCommitCorresponds requirements plan steps) :
+      CoercionPlanCommitCorresponds requirements
+        (planned :: plan) (committed :: steps)
 
 open TypeSystem
 
@@ -195,6 +270,72 @@ theorem unify_preserves_requirementsWellFormed
       subst next
       change state.RequirementsWellFormed
       exact wellFormed
+
+private theorem addRequirementWithId_requirements_subset
+    (state : State) (predicate : ProgramPredicate) :
+    state.requirements ⊆
+      (state.addRequirementWithId predicate).2.requirements := by
+  intro requirement member
+  simp only [State.addRequirementWithId, List.mem_append, List.mem_cons,
+    List.mem_nil_iff, or_false]
+  exact Or.inl member
+
+private theorem addRequirementsWithIds_requirements_subset
+    (state : State) (predicates : List ProgramPredicate) :
+    state.requirements ⊆
+      (state.addRequirementsWithIds predicates).2.requirements := by
+  induction predicates generalizing state with
+  | nil => exact fun _ member => member
+  | cons predicate rest induction =>
+      simp only [State.addRequirementsWithIds]
+      exact List.Subset.trans
+        (addRequirementWithId_requirements_subset state predicate)
+        (induction (state.addRequirementWithId predicate).2)
+
+private theorem addRequirementsWithIds_correspond
+    (state : State) (predicates : List ProgramPredicate) :
+    RequirementPredicatesCorrespond
+      (state.addRequirementsWithIds predicates).2.requirements
+      predicates (state.addRequirementsWithIds predicates).1 := by
+  induction predicates generalizing state with
+  | nil => exact .nil
+  | cons predicate rest induction =>
+      simp only [State.addRequirementsWithIds]
+      apply RequirementPredicatesCorrespond.cons
+      · exact addRequirementsWithIds_requirements_subset
+          (state.addRequirementWithId predicate).2 rest
+          (by simp [State.addRequirementWithId])
+      · exact induction (state.addRequirementWithId predicate).2
+
+private theorem addRequirementsWithIds_predicates
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.requirements.map
+        (fun requirement => requirement.predicate) =
+      state.requirements.map (fun requirement => requirement.predicate) ++
+        predicates := by
+  induction predicates generalizing state with
+  | nil => simp [State.addRequirementsWithIds]
+  | cons predicate rest induction =>
+      simp only [State.addRequirementsWithIds]
+      rw [induction]
+      simp [State.addRequirementWithId, List.append_assoc]
+
+private theorem commitCoercionPlan_requirements_subset
+    (state : State) (plan : List PlannedCoercionStep) :
+    state.requirements ⊆ (commitCoercionPlan state plan).2.requirements := by
+  induction plan generalizing state with
+  | nil => exact fun _ member => member
+  | cons step rest induction =>
+      simp only [commitCoercionPlan]
+      exact List.Subset.trans
+        (addRequirementWithId_requirements_subset state step.predicate)
+        (List.Subset.trans
+          (addRequirementsWithIds_requirements_subset
+            (state.addRequirementWithId step.predicate).2
+            step.methodPredicates)
+          (induction
+            ((state.addRequirementWithId step.predicate).2
+              |>.addRequirementsWithIds step.methodPredicates).2))
 
 /-- Committing a chosen coercion path allocates its primary and method
 requirements in canonical append order. -/
@@ -222,6 +363,89 @@ theorem commitCoercionPlan_preserves_requirementsWellFormed
                     afterPrimary step.methodPredicates primaryWellFormed
               simpa [commitCoercionPlan, primaryResult, methodResult] using
                 induction afterMethods methodsWellFormed
+
+/-- Committing a selected coercion path preserves edge order and endpoints,
+and every primary or method requirement identity stored on the committed path
+points to the corresponding predicate row in the final ledger. -/
+theorem commitCoercionPlan_corresponds
+    (state : State) (plan : List PlannedCoercionStep) :
+    CoercionPlanCommitCorresponds
+      (commitCoercionPlan state plan).2.requirements
+      plan (commitCoercionPlan state plan).1 := by
+  induction plan generalizing state with
+  | nil => exact .nil
+  | cons step rest induction =>
+      simp only [commitCoercionPlan]
+      apply CoercionPlanCommitCorresponds.cons
+      · refine {
+          source_eq := rfl
+          target_eq := rfl
+          primary_mem := ?_
+          methods := ?_
+        }
+        · apply commitCoercionPlan_requirements_subset
+            (((state.addRequirementWithId step.predicate).2
+              |>.addRequirementsWithIds step.methodPredicates).2) rest
+          apply addRequirementsWithIds_requirements_subset
+            (state.addRequirementWithId step.predicate).2
+            step.methodPredicates
+          simp [State.addRequirementWithId]
+        · apply RequirementPredicatesCorrespond.mono
+            (commitCoercionPlan_requirements_subset
+              (((state.addRequirementWithId step.predicate).2
+                |>.addRequirementsWithIds step.methodPredicates).2) rest)
+          exact addRequirementsWithIds_correspond
+            (state.addRequirementWithId step.predicate).2
+            step.methodPredicates
+      · exact induction
+          (((state.addRequirementWithId step.predicate).2
+            |>.addRequirementsWithIds step.methodPredicates).2)
+
+/-- Allocation changes only requirement identities: a structurally valid
+planned path remains structurally valid after it is committed. -/
+theorem commitCoercionPlan_isValid
+    (state : State) {source target : Ty}
+    (plan : List PlannedCoercionStep)
+    (valid : PlannedCoercionPath.isValid source target plan = true) :
+    CoercionPath.isValid source target (commitCoercionPlan state plan).1 =
+      true := by
+  induction plan generalizing state source with
+  | nil =>
+      simpa [PlannedCoercionPath.isValid, CoercionPath.isValid,
+        commitCoercionPlan] using valid
+  | cons step rest induction =>
+      cases rest with
+      | nil =>
+          simpa [PlannedCoercionPath.isValid, CoercionPath.isValid,
+            commitCoercionPlan] using valid
+      | cons next tail =>
+          simp only [PlannedCoercionPath.isValid, Bool.and_eq_true] at valid
+          simp only [commitCoercionPlan, CoercionPath.isValid,
+            Bool.and_eq_true]
+          refine ⟨valid.1, ?_⟩
+          simpa [commitCoercionPlan, CoercionPath.isValid] using
+            (induction
+              (((state.addRequirementWithId step.predicate).2
+                |>.addRequirementsWithIds step.methodPredicates).2)
+              (by simpa [PlannedCoercionPath.isValid] using valid.2))
+
+/-- No hidden obligations are introduced while committing a path: the final
+ledger appends exactly each edge's primary predicate and then its method
+predicates, preserving both edge order and method declaration order. -/
+theorem commitCoercionPlan_requirementPredicates
+    (state : State) (plan : List PlannedCoercionStep) :
+    (commitCoercionPlan state plan).2.requirements.map
+        (fun requirement => requirement.predicate) =
+      state.requirements.map (fun requirement => requirement.predicate) ++
+        plan.flatMap PlannedCoercionStep.predicates := by
+  induction plan generalizing state with
+  | nil => simp [commitCoercionPlan]
+  | cons step rest induction =>
+      simp only [commitCoercionPlan]
+      rw [induction]
+      rw [addRequirementsWithIds_predicates]
+      simp [State.addRequirementWithId, PlannedCoercionStep.predicates,
+        List.append_assoc]
 
 /-- Successful expected-type fitting preserves the canonical requirement
 ledger, including the coercion path allocated by its mismatch fallback. -/

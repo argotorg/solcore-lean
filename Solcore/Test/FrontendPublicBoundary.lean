@@ -195,6 +195,17 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_requirementsWellFormed
+example := @Solcore.Frontend.SourceInference.RequirementPredicatesCorrespond
+example :=
+  @Solcore.Frontend.SourceInference.Detail.PlannedCoercionStep.CommitCorresponds
+example :=
+  @Solcore.Frontend.SourceInference.Detail.CoercionPlanCommitCorresponds
+example :=
+  @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_corresponds
+example :=
+  @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_isValid
+example :=
+  @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_requirementPredicates
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_preserves_requirementsWellFormed
 example :=
