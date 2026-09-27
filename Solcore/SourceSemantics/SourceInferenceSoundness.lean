@@ -12,6 +12,123 @@ namespace Solcore.SourceSemantics.SourceInferenceSoundness
 
 open Frontend SourceInference
 
+private theorem trait?_eq_some_facts
+    {signatures : ProgramSignatures} {id : Resolved.DeclarationId}
+    {signature : ProgramTraitSignature}
+    (found : signatures.trait? id = some signature) :
+    signature ∈ signatures.traits ∧ signature.id = id := by
+  have rawFound : signatures.traits.find?
+      (fun candidate => decide (candidate.id = id)) = some signature := by
+    simpa [ProgramSignatures.trait?] using found
+  have accepted : decide (signature.id = id) = true :=
+    List.find?_some
+      (p := fun candidate : ProgramTraitSignature =>
+        decide (candidate.id = id)) rawFound
+  exact ⟨List.mem_of_find?_eq_some rawFound,
+    of_decide_eq_true accepted⟩
+
+private theorem list_eq_pair_of_length_eq_two
+    {value : Type} {values : List value}
+    (length_eq : values.length = 2) :
+    ∃ first second, values = [first, second] := by
+  cases values with
+  | nil => simp at length_eq
+  | cons first rest =>
+      cases rest with
+      | nil => simp at length_eq
+      | cons second tail =>
+          cases tail with
+          | nil => exact ⟨first, second, rfl⟩
+          | cons third tail => simp at length_eq
+
+/-- A successfully loaded coercion-method profile and its successfully
+instantiated predicate row supply the declarative `Coerce` profile used by
+source typing.  The explicit name premise isolates the remaining
+environment-to-signature catalog alignment obligation; independently assembled
+inference contexts are not otherwise required to keep those names aligned. -/
+theorem coercionMethodProfile?_some_instantiates
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {source target : TypeSystem.Ty}
+    {methodPredicates : List ProgramPredicate}
+    (signatures_eq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (profile_success :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (predicates_success :
+      Detail.coercionMethodPredicates (some profile) source target =
+        .ok methodPredicates) :
+    CoercionProfileInstantiates semanticContext source target {
+      trait := .declaration trait
+      subject := source
+      arguments := [target]
+    } methodPredicates := by
+  cases signature_lookup : inferenceContext.signatures.trait? trait with
+  | none =>
+      simp [signature_lookup] at trait_name
+  | some signature =>
+      have signature_name : signature.name = "Coerce" := by
+        simpa [signature_lookup] using trait_name
+      have signature_facts := trait?_eq_some_facts signature_lookup
+      simp only [Detail.coercionMethodProfile?, signature_lookup, pure,
+        Pure.pure, Except.pure, bind, Except.bind] at profile_success
+      by_cases arity : signature.parameters.length = 2
+      · rw [if_pos arity] at profile_success
+        obtain ⟨fromParameter, toParameter, parameters_eq⟩ :=
+          list_eq_pair_of_length_eq_two arity
+        cases methods_eq : signature.methods.filter
+            (fun candidate => candidate.name == "coerce") with
+        | nil =>
+            rw [methods_eq] at profile_success
+            simp at profile_success
+        | cons method rest =>
+            cases rest with
+            | nil =>
+                rw [methods_eq] at profile_success
+                simp only [Except.ok.injEq, Option.some.injEq] at profile_success
+                subst profile
+                by_cases parameter_types_eq :
+                    method.parameterTypes.map
+                        (TypeSystem.ParameterSubstitution.apply
+                          [(fromParameter, source), (toParameter, target)]) =
+                      [source]
+                · by_cases return_types_eq :
+                      method.returnTypes.map
+                          (TypeSystem.ParameterSubstitution.apply
+                            [(fromParameter, source), (toParameter, target)]) =
+                        [target]
+                  · have predicate_eq :
+                        method.wherePredicates.map
+                            (ProgramPredicate.applyParameters
+                              [(fromParameter, source),
+                                (toParameter, target)]) =
+                          methodPredicates := by
+                      simpa [Detail.coercionMethodPredicates, parameters_eq,
+                        parameter_types_eq, return_types_eq] using
+                          predicates_success
+                    rw [← signature_facts.2, ← predicate_eq]
+                    exact .intro
+                      (by rw [signatures_eq]; exact signature_facts.1)
+                      signature_name parameters_eq methods_eq
+                      parameter_types_eq return_types_eq
+                  · simp [Detail.coercionMethodPredicates, parameters_eq,
+                      parameter_types_eq, return_types_eq, bind, Except.bind]
+                      at predicates_success
+                · simp [Detail.coercionMethodPredicates, parameters_eq,
+                    parameter_types_eq, bind, Except.bind]
+                    at predicates_success
+            | cons second tail =>
+                rw [methods_eq] at profile_success
+                simp at profile_success
+      · rw [if_neg arity] at profile_success
+        simp at profile_success
+
 /-- A successful executable candidate check retains a declaratively
 admissible occurrence of the candidate signature.  Argument fitting,
 expected-type fitting, predicate validation, and ledger allocation happen
