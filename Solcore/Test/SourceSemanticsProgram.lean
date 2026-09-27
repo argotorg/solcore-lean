@@ -87,6 +87,75 @@ private def unitSyntax : Syntax.FunctionDecl := {
   }
 }
 
+private def genericContractOwner : Resolved.DeclarationId :=
+  ⟨unitModule, 1⟩
+
+private def genericContractSyntax : Syntax.ContractDecl := {
+  span := unitSpan
+  value := {
+    name := ⟨unitSpan, "Vault"⟩
+    genericParameters := some
+      ⟨unitSpan, ⟨⟨unitSpan, "T"⟩, []⟩⟩
+    bodySpan := unitSpan
+    members := []
+  }
+}
+
+private def genericContractSignature : ProgramContractSignature := {
+  id := genericContractOwner
+  name := "Vault"
+  parameters := [{ owner := genericContractOwner, index := 0 }]
+  source := genericContractSyntax
+}
+
+private def genericContractSignatures : ProgramSignatures := {
+  functions := []
+  implRules := []
+  traits := []
+  implementations := []
+  dataTypes := []
+  contracts := [genericContractSignature]
+}
+
+theorem genericContractSignatureWellFormed :
+    ContractSignatureWellFormed genericContractSignatures
+      genericContractSignature := by
+  refine {
+    parameters_nodup := by simp [genericContractSignature]
+    parameters_owned := ?_
+    parameter_positions := ?_
+  }
+  · intro parameter member
+    simp only [genericContractSignature, List.mem_singleton] at member
+    subst parameter
+    rfl
+  · intro index
+    have bound : index.val < 1 := by
+      simpa [genericContractSignature] using index.isLt
+    have value_eq : index.val = 0 :=
+      Nat.eq_zero_of_le_zero (Nat.le_of_lt_succ bound)
+    have index_eq :
+        index = ⟨0, by simp [genericContractSignature]⟩ := by
+      apply Fin.ext
+      exact value_eq
+    subst index
+    rfl
+
+/-- Generic contracts form nominal source types through their own catalog,
+without borrowing data-constructor status. -/
+theorem genericContractNominalWellScoped :
+    TypeWellScoped (Context.ofSignatures genericContractSignatures) []
+      (Ty.nominal genericContractOwner [.word]) := by
+  exact .contractNominal genericContractSignature [.word]
+    (by simp [Context.ofSignatures, genericContractSignatures])
+    (by simp [genericContractSignature])
+    (.cons (.builtin .word) .nil)
+
+theorem genericContractNotCatalogedAsData :
+    ¬ ∃ dataType ∈ genericContractSignatures.dataTypes,
+      dataType.id = genericContractOwner := by
+  simp [genericContractSignatures]
+
 private def unitSignature : ProgramFunctionSignature := {
   id := unitOwner
   name := "unitMain"

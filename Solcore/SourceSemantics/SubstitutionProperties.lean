@@ -912,7 +912,7 @@ theorem TypeWellScoped.weakenFlexible
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped context larger type)
     (motive_2 := fun types _ => TypesWellScoped context larger types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable (included metavariable bound)
   · intro parameter bound owned
@@ -921,6 +921,8 @@ theorem TypeWellScoped.weakenFlexible
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments cataloged arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments cataloged arity argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     exact .function parameterInduction resultInduction
   · intro left right _ _ leftInduction rightInduction
@@ -944,7 +946,7 @@ theorem TypesWellScoped.weakenFlexible
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped context larger type)
     (motive_2 := fun types _ => TypesWellScoped context larger types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable (included metavariable bound)
   · intro parameter bound owned
@@ -953,6 +955,8 @@ theorem TypesWellScoped.weakenFlexible
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments cataloged arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments cataloged arity argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     exact .function parameterInduction resultInduction
   · intro left right _ _ leftInduction rightInduction
@@ -1016,7 +1020,7 @@ theorem TypeWellScoped.freeVariable_mem
       ∀ type, type ∈ types → ∀ metavariable,
         metavariable ∈ type.freeVariables →
           metavariable ∈ flexibleVariables)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound candidate member
     simp [Ty.freeVariables] at member
     subst candidate
@@ -1026,6 +1030,10 @@ theorem TypeWellScoped.freeVariable_mem
   · intro builtin metavariable member
     simp [Ty.freeVariables] at member
   · intro dataType arguments _ _ _ argumentsInduction metavariable member
+    rw [mem_freeVariables_nominal_iff] at member
+    rcases member with ⟨argument, argumentMember, occurs⟩
+    exact argumentsInduction argument argumentMember metavariable occurs
+  · intro contract arguments _ _ _ argumentsInduction metavariable member
     rw [mem_freeVariables_nominal_iff] at member
     rcases member with ⟨argument, argumentMember, occurs⟩
     exact argumentsInduction argument argumentMember metavariable occurs
@@ -1081,7 +1089,7 @@ theorem TypeWellScoped.ofSignatures_transport
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound
@@ -1090,6 +1098,10 @@ theorem TypeWellScoped.ofSignatures_transport
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments
+      (by simpa [Context.ofSignatures, signatures_eq] using cataloged)
+      arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments
       (by simpa [Context.ofSignatures, signatures_eq] using cataloged)
       arity argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
@@ -1116,7 +1128,7 @@ theorem TypesWellScoped.ofSignatures_transport
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound
@@ -1125,6 +1137,10 @@ theorem TypesWellScoped.ofSignatures_transport
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments
+      (by simpa [Context.ofSignatures, signatures_eq] using cataloged)
+      arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments
       (by simpa [Context.ofSignatures, signatures_eq] using cataloged)
       arity argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
@@ -1163,7 +1179,7 @@ theorem TypeWellScoped.transportContext
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -1173,6 +1189,9 @@ theorem TypeWellScoped.transportContext
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments
+      (by simpa [signatures_eq] using cataloged) arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments
       (by simpa [signatures_eq] using cataloged) arity argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     exact .function parameterInduction resultInduction
@@ -1199,7 +1218,7 @@ theorem TypesWellScoped.transportContext
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -1209,6 +1228,9 @@ theorem TypesWellScoped.transportContext
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments
+      (by simpa [signatures_eq] using cataloged) arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments
       (by simpa [signatures_eq] using cataloged) arity argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     exact .function parameterInduction resultInduction
@@ -1289,7 +1311,7 @@ theorem TypeWellScoped.applyParameters
     (motive_2 := fun types _ =>
       TypesWellScoped (applyContext substitution context) flexibleVariables
         (types.map substitution.apply))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound _
@@ -1305,6 +1327,11 @@ theorem TypeWellScoped.applyParameters
   · intro dataType arguments cataloged arity _ argumentsInduction
     rw [apply_nominal]
     exact .nominal dataType (arguments.map substitution.apply)
+      (by simpa [applyContext] using cataloged)
+      (by simpa using arity) argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    rw [apply_nominal]
+    exact .contractNominal contract (arguments.map substitution.apply)
       (by simpa [applyContext] using cataloged)
       (by simpa using arity) argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
@@ -1339,7 +1366,7 @@ theorem TypesWellScoped.applyParameters
     (motive_2 := fun types _ =>
       TypesWellScoped (applyContext substitution context) flexibleVariables
         (types.map substitution.apply))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound _
@@ -1355,6 +1382,11 @@ theorem TypesWellScoped.applyParameters
   · intro dataType arguments cataloged arity _ argumentsInduction
     rw [apply_nominal]
     exact .nominal dataType (arguments.map substitution.apply)
+      (by simpa [applyContext] using cataloged)
+      (by simpa using arity) argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    rw [apply_nominal]
+    exact .contractNominal contract (arguments.map substitution.apply)
       (by simpa [applyContext] using cataloged)
       (by simpa using arity) argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
@@ -1569,7 +1601,7 @@ theorem TypeWellScoped.applySubstitution_eq_self
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => substitution.apply type = type)
     (motive_2 := fun types _ => types.map substitution.apply = types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter _ _
@@ -1577,6 +1609,8 @@ theorem TypeWellScoped.applySubstitution_eq_self
   · intro builtin
     rfl
   · intro dataType arguments _ _ _ argumentsInduction
+    rw [applyFlexible_nominal, argumentsInduction]
+  · intro contract arguments _ _ _ argumentsInduction
     rw [applyFlexible_nominal, argumentsInduction]
   · intro parameter result _ _ parameterInduction resultInduction
     simp only [TypeSystem.Substitution.apply]
@@ -1606,7 +1640,7 @@ theorem TypesWellScoped.applySubstitution_eq_self
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => substitution.apply type = type)
     (motive_2 := fun types _ => types.map substitution.apply = types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter _ _
@@ -1614,6 +1648,8 @@ theorem TypesWellScoped.applySubstitution_eq_self
   · intro builtin
     rfl
   · intro dataType arguments _ _ _ argumentsInduction
+    rw [applyFlexible_nominal, argumentsInduction]
+  · intro contract arguments _ _ _ argumentsInduction
     rw [applyFlexible_nominal, argumentsInduction]
   · intro parameter result _ _ parameterInduction resultInduction
     simp only [TypeSystem.Substitution.apply]
@@ -1655,7 +1691,7 @@ theorem TypeWellScoped.applyMixed_compose
       (types.map inner.apply).map outer.apply =
         (types.map outer.apply).map
           (Substitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable _
     by_cases substituted : metavariable ∈ substitutedVariables
     · obtain ⟨replacement, member, innerLookup⟩ :=
@@ -1701,6 +1737,11 @@ theorem TypeWellScoped.applyMixed_compose
     rw [applyFlexible_nominal, apply_nominal, apply_nominal,
       applyFlexible_nominal]
     exact congrArg (fun arguments => Ty.nominal dataType.id arguments)
+      argumentsInduction
+  · intro contract arguments _ _ _ argumentsInduction
+    rw [applyFlexible_nominal, apply_nominal, apply_nominal,
+      applyFlexible_nominal]
+    exact congrArg (fun arguments => Ty.nominal contract.id arguments)
       argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     simp only [TypeSystem.Substitution.apply,
@@ -1774,7 +1815,7 @@ theorem TypeWellScoped.applyParameters_compose
     (motive_2 := fun types _ =>
       (types.map inner.apply).map outer.apply =
         types.map (ParameterSubstitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable _
     rfl
   · intro parameter bound _
@@ -1794,6 +1835,10 @@ theorem TypeWellScoped.applyParameters_compose
   · intro dataType arguments _ _ _ argumentsInduction
     rw [apply_nominal, apply_nominal, apply_nominal]
     exact congrArg (fun arguments => Ty.nominal dataType.id arguments)
+      argumentsInduction
+  · intro contract arguments _ _ _ argumentsInduction
+    rw [apply_nominal, apply_nominal, apply_nominal]
+    exact congrArg (fun arguments => Ty.nominal contract.id arguments)
       argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     simp only [TypeSystem.ParameterSubstitution.apply]
@@ -1831,7 +1876,7 @@ theorem TypesWellScoped.applyParameters_compose
     (motive_2 := fun types _ =>
       (types.map inner.apply).map outer.apply =
         types.map (ParameterSubstitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable _
     rfl
   · intro parameter bound _
@@ -1851,6 +1896,10 @@ theorem TypesWellScoped.applyParameters_compose
   · intro dataType arguments _ _ _ argumentsInduction
     rw [apply_nominal, apply_nominal, apply_nominal]
     exact congrArg (fun arguments => Ty.nominal dataType.id arguments)
+      argumentsInduction
+  · intro contract arguments _ _ _ argumentsInduction
+    rw [apply_nominal, apply_nominal, apply_nominal]
+    exact congrArg (fun arguments => Ty.nominal contract.id arguments)
       argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     simp only [TypeSystem.ParameterSubstitution.apply]
@@ -3153,7 +3202,7 @@ theorem TypeWellScoped.applyParameters_eq_of_orderedArguments_eq
     (motive_1 := fun type _ => left.apply type = right.apply type)
     (motive_2 := fun types _ =>
       types.map left.apply = types.map right.apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     rfl
   · intro parameter bound owned
@@ -3168,6 +3217,9 @@ theorem TypeWellScoped.applyParameters_eq_of_orderedArguments_eq
   · intro builtin
     rfl
   · intro dataType arguments cataloged arity argumentsWellScoped induction
+    rw [StructuralSubstitution.apply_nominal,
+      StructuralSubstitution.apply_nominal, induction]
+  · intro contract arguments cataloged arity argumentsWellScoped induction
     rw [StructuralSubstitution.apply_nominal,
       StructuralSubstitution.apply_nominal, induction]
   · intro parameter result parameterWellScoped resultWellScoped
@@ -6238,7 +6290,7 @@ theorem TypeWellScoped.applyFlexible_composeParameters
     (motive_2 := fun types _ =>
       (types.map inner.apply).map outer.apply =
         types.map (ParameterSubstitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter bound _
@@ -6261,6 +6313,12 @@ theorem TypeWellScoped.applyFlexible_composeParameters
       StructuralSubstitution.applyFlexible_nominal,
       StructuralSubstitution.apply_nominal]
     exact congrArg (fun mapped => Ty.nominal dataType.id mapped)
+      argumentsInduction
+  · intro contract arguments _ _ _ argumentsInduction
+    rw [StructuralSubstitution.apply_nominal,
+      StructuralSubstitution.applyFlexible_nominal,
+      StructuralSubstitution.apply_nominal]
+    exact congrArg (fun mapped => Ty.nominal contract.id mapped)
       argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     simp only [TypeSystem.Substitution.apply,
@@ -6302,7 +6360,7 @@ theorem TypesWellScoped.applyFlexible_composeParameters
     (motive_2 := fun types _ =>
       (types.map inner.apply).map outer.apply =
         types.map (ParameterSubstitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter bound _
@@ -6325,6 +6383,12 @@ theorem TypesWellScoped.applyFlexible_composeParameters
       StructuralSubstitution.applyFlexible_nominal,
       StructuralSubstitution.apply_nominal]
     exact congrArg (fun mapped => Ty.nominal dataType.id mapped)
+      argumentsInduction
+  · intro contract arguments _ _ _ argumentsInduction
+    rw [StructuralSubstitution.apply_nominal,
+      StructuralSubstitution.applyFlexible_nominal,
+      StructuralSubstitution.apply_nominal]
+    exact congrArg (fun mapped => Ty.nominal contract.id mapped)
       argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     simp only [TypeSystem.Substitution.apply,
@@ -6446,7 +6510,7 @@ theorem TypeWellScoped.applyFlexible_compose
       (types.map inner.apply).map outer.apply =
         (types.map outer.apply).map
           (Substitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable _
     by_cases substituted : metavariable ∈ substitutedVariables
     · obtain ⟨replacement, member, innerLookup⟩ :=
@@ -6499,6 +6563,10 @@ theorem TypeWellScoped.applyFlexible_compose
   · intro dataType arguments _ _ _ argumentsInduction
     simp only [StructuralSubstitution.applyFlexible_nominal]
     exact congrArg (fun mapped => Ty.nominal dataType.id mapped)
+      argumentsInduction
+  · intro contract arguments _ _ _ argumentsInduction
+    simp only [StructuralSubstitution.applyFlexible_nominal]
+    exact congrArg (fun mapped => Ty.nominal contract.id mapped)
       argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     simp only [TypeSystem.Substitution.apply]
@@ -6701,7 +6769,7 @@ theorem TypeWellScoped.applySubstitution
     (motive_2 := fun types _ =>
       TypesWellScoped target targetVariables
         (types.map substitution.apply))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     by_cases member : metavariable ∈ substitution.domain
     · rcases List.mem_map.mp member with ⟨entry, entryMember, keyEq⟩
@@ -6728,6 +6796,11 @@ theorem TypeWellScoped.applySubstitution
   · intro dataType arguments cataloged arity _ argumentsInduction
     rw [StructuralSubstitution.applyFlexible_nominal]
     exact .nominal dataType (arguments.map substitution.apply)
+      (by simpa [signatures_eq] using cataloged)
+      (by simpa using arity) argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    rw [StructuralSubstitution.applyFlexible_nominal]
+    exact .contractNominal contract (arguments.map substitution.apply)
       (by simpa [signatures_eq] using cataloged)
       (by simpa using arity) argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction

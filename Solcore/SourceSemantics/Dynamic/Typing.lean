@@ -474,7 +474,7 @@ theorem TypeWellScoped.transportContext
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexible type)
     (motive_2 := fun types _ => TypesWellScoped target flexible types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -484,6 +484,10 @@ theorem TypeWellScoped.transportContext
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments
+      (by simpa [supports.signatures] using cataloged) arity
+      argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments
       (by simpa [supports.signatures] using cataloged) arity
       argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
@@ -508,7 +512,7 @@ theorem TypesWellScoped.transportContext
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexible type)
     (motive_2 := fun types _ => TypesWellScoped target flexible types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -518,6 +522,10 @@ theorem TypesWellScoped.transportContext
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments
+      (by simpa [supports.signatures] using cataloged) arity
+      argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments
       (by simpa [supports.signatures] using cataloged) arity
       argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction

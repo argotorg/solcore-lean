@@ -5,8 +5,10 @@ Algorithm-independent well-formedness for source types.
 
 The judgment treats flexible inference variables and rigid declaration
 parameters as distinct binders.  Nominal applications are accepted only as a
-complete application of a cataloged data declaration; arbitrary type-level
-application and recovery types are deliberately absent from the rules.
+complete application of a cataloged data or contract declaration; the two
+catalogs remain distinct so contract types cannot acquire data-constructor
+semantics.  Arbitrary type-level application and recovery types are
+deliberately absent from the rules.
 -/
 
 set_option autoImplicit false
@@ -48,6 +50,15 @@ inductive TypeWellScoped (context : Context)
         TypesWellScoped context flexibleVariables arguments) :
       TypeWellScoped context flexibleVariables
         (TypeSystem.Ty.nominal dataType.id arguments)
+  | contractNominal
+      (contract : Frontend.ProgramContractSignature)
+      (arguments : List TypeSystem.Ty)
+      (cataloged : contract ∈ context.signatures.contracts)
+      (arity : arguments.length = contract.parameters.length)
+      (argumentsWellScoped :
+        TypesWellScoped context flexibleVariables arguments) :
+      TypeWellScoped context flexibleVariables
+        (TypeSystem.Ty.nominal contract.id arguments)
   | function
       {parameter result : TypeSystem.Ty}
       (parameterWellScoped :
@@ -307,7 +318,7 @@ theorem weakenTo
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped context larger type)
     (motive_2 := fun types _ => TypesWellScoped context larger types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable (included metavariable bound)
   · intro parameter bound owned
@@ -316,6 +327,8 @@ theorem weakenTo
     exact .builtin builtin
   · intro dataType arguments cataloged arity _ argumentsInduction
     exact .nominal dataType arguments cataloged arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments cataloged arity argumentsInduction
   · intro parameter result _ _ parameterInduction resultInduction
     exact .function parameterInduction resultInduction
   · intro left right _ _ leftInduction rightInduction
@@ -402,6 +415,10 @@ theorem variable_mem {context : Context}
   | .nominal dataType arguments _ _ _ => by
       intro metavariable equal
       exact False.elim (nominal_ne_variable dataType.id arguments metavariable equal)
+  | .contractNominal contract arguments _ _ _ => by
+      intro metavariable equal
+      exact False.elim
+        (nominal_ne_variable contract.id arguments metavariable equal)
   | .function _ _ => by intro _ equal; cases equal
   | .product _ _ => by intro _ equal; cases equal
   | .mapping _ _ => by intro _ equal; cases equal
@@ -427,6 +444,10 @@ theorem parameter_scope {context : Context}
   | .nominal dataType arguments _ _ _ => by
       intro parameter equal
       exact False.elim (nominal_ne_parameter dataType.id arguments parameter equal)
+  | .contractNominal contract arguments _ _ _ => by
+      intro parameter equal
+      exact False.elim
+        (nominal_ne_parameter contract.id arguments parameter equal)
   | .function _ _ => by intro _ equal; cases equal
   | .product _ _ => by intro _ equal; cases equal
   | .mapping _ _ => by intro _ equal; cases equal
@@ -445,6 +466,8 @@ theorem ne_error {context : Context}
   | .builtin _ => by intro equal; cases equal
   | .nominal dataType arguments _ _ _ =>
       nominal_ne_error dataType.id arguments
+  | .contractNominal contract arguments _ _ _ =>
+      nominal_ne_error contract.id arguments
   | .function _ _ => by intro equal; cases equal
   | .product _ _ => by intro equal; cases equal
   | .mapping _ _ => by intro equal; cases equal

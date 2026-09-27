@@ -591,6 +591,38 @@ structure SignatureCatalogWellFormed (signatures : ProgramSignatures) : Prop whe
   contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
     ContractSignatureWellFormed signatures signature
 
+namespace SignatureCatalogWellFormed
+
+/-- A well-formed catalog cannot assign one declaration identity both
+data-constructor semantics and contract semantics. -/
+theorem data_contract_ids_ne
+    {signatures : ProgramSignatures}
+    (catalog : SignatureCatalogWellFormed signatures)
+    {dataType : ProgramDataSignature}
+    (data_mem : dataType ∈ signatures.dataTypes)
+    {contract : ProgramContractSignature}
+    (contract_mem : contract ∈ signatures.contracts) :
+    dataType.id ≠ contract.id := by
+  have ids := catalog.declaration_ids
+  simp only [signatureDeclarationIds] at ids
+  have separated := (List.nodup_append.mp ids).2.2
+  have dataIdMem :
+      dataType.id ∈
+        signatures.functions.map (fun signature => signature.id) ++
+          signatures.dataTypes.map (fun signature => signature.id) ++
+          signatures.traits.map (fun signature => signature.id) ++
+          signatures.implementations.map (fun signature => signature.id) := by
+    exact List.mem_append_left _
+      (List.mem_append_left _
+        (List.mem_append_right _
+          (List.mem_map.mpr ⟨dataType, data_mem, rfl⟩)))
+  have contractIdMem :
+      contract.id ∈ signatures.contracts.map (fun signature => signature.id) :=
+    List.mem_map.mpr ⟨contract, contract_mem, rfl⟩
+  exact separated dataType.id dataIdMem contract.id contractIdMem
+
+end SignatureCatalogWellFormed
+
 /-- Every cataloged function and implementation method has exactly one valid
 semantic body, with no extra body identities. -/
 structure ProgramWellFormed (program : Program) : Prop where
