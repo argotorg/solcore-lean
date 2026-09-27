@@ -1663,6 +1663,81 @@ theorem candidateWithExpected_some_inferenceProperties
       exact withExpected_inferenceProperties ready actualBelow expectedBelow
         fittedResult
 
+/-- Fitting an argument spine makes semantic inference progress and preserves
+readiness when every argument and parameter type is allocator-bounded. -/
+theorem fitArguments_some_inferenceProperties
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (parametersBelow : ∀ parameter ∈ parameters,
+      parameter.VariablesBelow state.inference.next)
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady := by
+  induction arguments generalizing parameters state result with
+  | nil =>
+      cases parameters <;> simp [fitArguments] at success
+      subst result
+      exact ⟨.refl ready.solved, ready⟩
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil => simp [fitArguments] at success
+      | cons parameter parameters =>
+          have argumentBelow := argumentsBelow argument (by simp)
+          have parameterBelow := parametersBelow parameter (by simp)
+          simp only [fitArguments] at success
+          cases fittedResult :
+              candidateWithExpected context state argument (some parameter) with
+          | error error =>
+              simp [fittedResult, bind, Except.bind] at success
+          | ok fitted? =>
+              cases fitted? with
+              | none => simp [fittedResult, bind, Except.bind] at success
+              | some fitted =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  have fittedProperties :=
+                    candidateWithExpected_some_inferenceProperties ready
+                      argumentBelow (by
+                        intro expectedType member
+                        simp at member
+                        subst expectedType
+                        exact parameterBelow)
+                      fittedResult
+                  have tailArgumentsBelow : ∀ tailArgument ∈ arguments,
+                      tailArgument.type.VariablesBelow
+                        fitted.state.inference.next := by
+                    intro tailArgument member
+                    exact (argumentsBelow tailArgument (by simp [member])).weaken
+                      fittedProperties.1.next_le
+                  have tailParametersBelow : ∀ tailParameter ∈ parameters,
+                      tailParameter.VariablesBelow
+                        fitted.state.inference.next := by
+                    intro tailParameter member
+                    exact (parametersBelow tailParameter (by simp [member])).weaken
+                      fittedProperties.1.next_le
+                  cases tailResult : fitArguments context fitted.state arguments
+                      parameters with
+                  | error error =>
+                      simp [tailResult, bind, Except.bind] at success
+                  | ok tail? =>
+                      cases tail? with
+                      | none => simp [tailResult, bind, Except.bind] at success
+                      | some tail =>
+                          simp only [tailResult, bind, Except.bind,
+                            except_pure_eq_ok] at success
+                          have resultEq : _ = result := Option.some.inj success
+                          clear success
+                          subst result
+                          have tailProperties := induction
+                            fittedProperties.2.1 tailArgumentsBelow
+                            tailParametersBelow tailResult
+                          exact ⟨fittedProperties.1.trans tailProperties.1,
+                            tailProperties.2⟩
+
 /-- Expected-type fitting followed by expression recording has the same
 inference guarantees; recording the typed node leaves inference unchanged. -/
 theorem recordExpressionWithExpected_inferenceProperties

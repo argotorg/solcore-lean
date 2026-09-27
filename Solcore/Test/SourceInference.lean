@@ -327,6 +327,24 @@ example {context : SourceInference.Context}
     SourceInference.Detail.candidateWithExpected_some_inferenceProperties
       ready actualBelow expectedBelow success
 
+/-- Successfully fitting a bounded argument spine against bounded parameters
+makes semantic inference progress and preserves readiness. -/
+example {context : SourceInference.Context} {state : SourceInference.State}
+    {arguments : List SourceInference.InferredExpression}
+    {parameters : List TypeSystem.Ty}
+    {result : SourceInference.Detail.ArgumentFitResult}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (parametersBelow : ∀ parameter ∈ parameters,
+      parameter.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.fitArguments context state arguments
+      parameters = .ok (some result)) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady := by
+  exact SourceInference.Detail.fitArguments_some_inferenceProperties
+    ready argumentsBelow parametersBelow success
+
 /-- Recording an expected expression extends the same inference guarantees
 through source-node allocation without requiring a concrete evaluator case. -/
 example {source : Syntax.Expr} {id : SourceInference.ExpressionId}
