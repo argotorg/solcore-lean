@@ -338,6 +338,19 @@ theorem checkLoadedProgram_success_function_signature_shape
   buildProgramSignatures_success_function_shape
     (checkLoadedProgram_success_signatures success) member
 
+/-- A successful loaded-program check retains each data signature's
+duplicate-free constructor names and declaration-owned source-order IDs. -/
+theorem checkLoadedProgram_success_data_signature_structure
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked)
+    {signature : ProgramDataSignature}
+    (member : signature ∈ checked.signatures.dataTypes) :
+    DataSignatureStructuralWellFormed signature :=
+  buildProgramSignatures_success_data_structure
+    (checkLoadedProgram_success_signatures success) member
+
 /-- A successful loaded-program check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkLoadedProgram_success_ids
@@ -477,5 +490,33 @@ theorem checkProgram_success_function_signature_shape
         (TypeSystem.Ty.productMany signature.returnTypes) := by
   obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
   exact checkLoadedProgram_success_function_signature_shape checkedSuccess member
+
+/-- End-to-end checker success retains each data signature's structural
+constructor guarantees. -/
+theorem checkProgram_success_data_signature_structure
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked)
+    {signature : ProgramDataSignature}
+    (member : signature ∈ checked.signatures.dataTypes) :
+    DataSignatureStructuralWellFormed signature := by
+  obtain ⟨_, _, checkedSuccess⟩ := checkProgram_success_load success
+  exact checkLoadedProgram_success_data_signature_structure checkedSuccess member
+
+/-- End-to-end checker success assigns globally unique constructor identities
+across every collected data declaration. -/
+theorem checkProgram_success_constructor_ids_nodup
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    (checked.signatures.dataTypes.flatMap fun signature =>
+      signature.constructors.map fun constructor => constructor.id).Nodup := by
+  obtain ⟨loaded, loadedSuccess, checkedSuccess⟩ :=
+    checkProgram_success_load success
+  exact buildProgramSignatures_success_constructor_ids_nodup
+    (loadProgram_success_declarations_nodup loadedSuccess)
+    (checkLoadedProgram_success_signatures checkedSuccess)
 
 end Solcore.Frontend

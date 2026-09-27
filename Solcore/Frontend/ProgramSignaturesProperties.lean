@@ -62,6 +62,71 @@ theorem buildProgramSignatures_success_function_scheme_body
       (TypeSystem.Ty.productMany signature.returnTypes) :=
   (buildProgramSignatures_success_function_shape success member).2
 
+namespace DataSignatureStructuralWellFormed
+
+/-- Stable constructor identities are unique within one structurally valid
+data signature because their source-order indices are distinct. -/
+theorem constructor_ids_nodup
+    {signature : ProgramDataSignature}
+    (shape : DataSignatureStructuralWellFormed signature) :
+    (signature.constructors.map fun constructor => constructor.id).Nodup := by
+  rw [List.nodup_iff_pairwise_ne, List.pairwise_map,
+    List.pairwise_iff_getElem]
+  intro leftIndex rightIndex leftBound rightBound before equal
+  have leftPosition := shape.constructor_positions
+    ⟨leftIndex, leftBound⟩
+  have rightPosition := shape.constructor_positions
+    ⟨rightIndex, rightBound⟩
+  simp only [List.get_eq_getElem] at leftPosition rightPosition
+  have indexEqual := congrArg ProgramDataConstructorId.constructorIndex equal
+  rw [leftPosition, rightPosition] at indexEqual
+  omega
+
+end DataSignatureStructuralWellFormed
+
+/-- Successful collection retains duplicate-free constructor names and the
+canonical declaration-owned constructor identity allocation for every data
+signature. -/
+theorem buildProgramSignatures_success_data_structure
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramDataSignature}
+    (member : signature ∈ signatures.dataTypes) :
+    DataSignatureStructuralWellFormed signature :=
+  buildProgramSignatures_success_data_structure_state success signature member
+
+/-- Successful collection rejects duplicate constructor names within every
+data declaration. -/
+theorem buildProgramSignatures_success_data_constructor_names_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramDataSignature}
+    (member : signature ∈ signatures.dataTypes) :
+    (signature.constructors.map fun constructor => constructor.name).Nodup :=
+  (buildProgramSignatures_success_data_structure success member).constructor_names_nodup
+
+/-- Every collected constructor identity records the declaration that owns
+its data signature. -/
+theorem buildProgramSignatures_success_data_constructor_owners
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramDataSignature}
+    (member : signature ∈ signatures.dataTypes) :
+    ∀ constructor, constructor ∈ signature.constructors →
+      constructor.id.dataType = signature.id :=
+  (buildProgramSignatures_success_data_structure success member).constructor_owners
+
+/-- Every collected constructor identity uses its zero-based source position
+within the owning declaration. -/
+theorem buildProgramSignatures_success_data_constructor_positions
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures)
+    {signature : ProgramDataSignature}
+    (member : signature ∈ signatures.dataTypes) :
+    ∀ index : Fin signature.constructors.length,
+      (signature.constructors.get index).id.constructorIndex = index.val :=
+  (buildProgramSignatures_success_data_structure success member).constructor_positions
+
 /-- A successfully built signature catalog stores exactly the rules projected from
 its implementation signatures. -/
 theorem buildProgramSignatures_success_implRules_eq
@@ -183,6 +248,62 @@ theorem buildProgramSignatures_success_data_ids_nodup
   have functionsAndData :=
     (List.nodup_append.mp withoutImplementations).1
   exact (List.nodup_append.mp functionsAndData).2.1
+
+/-- Distinct owning declaration identities plus each data signature's local
+source-order allocation make constructor identities unique across the whole
+catalog. -/
+theorem data_constructor_ids_nodup_of_structural
+    {dataTypes : List ProgramDataSignature}
+    (dataIds : (dataTypes.map fun signature => signature.id).Nodup)
+    (shapes : ∀ signature, signature ∈ dataTypes →
+      DataSignatureStructuralWellFormed signature) :
+    (dataTypes.flatMap fun signature =>
+      signature.constructors.map fun constructor => constructor.id).Nodup := by
+  induction dataTypes with
+  | nil => simp
+  | cons dataType rest induction =>
+      simp only [List.map_cons, List.nodup_cons] at dataIds
+      have dataTypeShape := shapes dataType (by simp)
+      have restShapes : ∀ signature, signature ∈ rest →
+          DataSignatureStructuralWellFormed signature := by
+        intro signature member
+        exact shapes signature (by simp [member])
+      simp only [List.flatMap_cons, List.nodup_append]
+      refine ⟨dataTypeShape.constructor_ids_nodup,
+        induction dataIds.2 restShapes, ?_⟩
+      intro left leftMember right rightMember equal
+      rcases List.mem_map.mp leftMember with
+        ⟨leftConstructor, leftConstructorMember, rfl⟩
+      rcases List.mem_flatMap.mp rightMember with
+        ⟨rightDataType, rightDataTypeMember, rightMember⟩
+      rcases List.mem_map.mp rightMember with
+        ⟨rightConstructor, rightConstructorMember, rfl⟩
+      apply dataIds.1
+      apply List.mem_map.mpr
+      refine ⟨rightDataType, rightDataTypeMember, ?_⟩
+      calc
+        rightDataType.id = rightConstructor.id.dataType :=
+          (restShapes rightDataType rightDataTypeMember).constructor_owners
+            rightConstructor rightConstructorMember |>.symm
+        _ = leftConstructor.id.dataType := by
+          exact congrArg ProgramDataConstructorId.dataType equal.symm
+        _ = dataType.id :=
+          dataTypeShape.constructor_owners leftConstructor
+            leftConstructorMember
+
+/-- Successful collection from an identity-unique environment assigns one
+globally unique stable identity to every data constructor. -/
+theorem buildProgramSignatures_success_constructor_ids_nodup
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (environmentIds :
+      (environment.declarations.map fun declaration => declaration.id).Nodup)
+    (success : buildProgramSignatures environment = .ok signatures) :
+    (signatures.dataTypes.flatMap fun signature =>
+      signature.constructors.map fun constructor => constructor.id).Nodup := by
+  apply data_constructor_ids_nodup_of_structural
+    (buildProgramSignatures_success_data_ids_nodup environmentIds success)
+  intro signature member
+  exact buildProgramSignatures_success_data_structure success member
 
 /-- Trait declaration identities are unique after successful signature
 collection from an environment with unique declaration identities. -/

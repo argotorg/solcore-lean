@@ -41,6 +41,16 @@ example := @Solcore.Frontend.buildProgramSignatures_success_function_shape
 example :=
   @Solcore.Frontend.buildProgramSignatures_success_function_parameter_names_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_function_scheme_body
+example := @Solcore.Frontend.DataSignatureStructuralWellFormed
+example :=
+  @Solcore.Frontend.DataSignatureStructuralWellFormed.constructor_ids_nodup
+example := @Solcore.Frontend.buildProgramSignatures_success_data_structure
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_data_constructor_names_nodup
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_data_constructor_owners
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_data_constructor_positions
 example := @Solcore.Frontend.SignatureParametersWellFormed
 example := @Solcore.Frontend.SignatureParametersWellFormed.parameters_nodup
 example := @Solcore.Frontend.SignatureParametersWellFormed.parameter_owners
@@ -59,6 +69,9 @@ example :=
   @Solcore.Frontend.buildProgramSignatures_success_declaration_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_function_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_data_ids_nodup
+example := @Solcore.Frontend.data_constructor_ids_nodup_of_structural
+example :=
+  @Solcore.Frontend.buildProgramSignatures_success_constructor_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_trait_ids_nodup
 example :=
   @Solcore.Frontend.buildProgramSignatures_success_implementation_ids_nodup
@@ -100,6 +113,8 @@ example :=
   @Solcore.Frontend.checkLoadedProgram_success_signature_parameters_wellFormed
 example :=
   @Solcore.Frontend.checkLoadedProgram_success_function_signature_shape
+example :=
+  @Solcore.Frontend.checkLoadedProgram_success_data_signature_structure
 example := @Solcore.Frontend.checkLoadedProgram_success_ids
 example := @Solcore.Frontend.checkProgram_success_load
 example := @Solcore.Frontend.checkProgram_success_ids
@@ -108,6 +123,8 @@ example := @Solcore.Frontend.checkProgram_success_signature_declaration_ids_nodu
 example :=
   @Solcore.Frontend.checkProgram_success_signature_parameters_wellFormed
 example := @Solcore.Frontend.checkProgram_success_function_signature_shape
+example := @Solcore.Frontend.checkProgram_success_data_signature_structure
+example := @Solcore.Frontend.checkProgram_success_constructor_ids_nodup
 example := @Solcore.Frontend.ProgramCheckError.methodInference
 example := @Solcore.Frontend.ProgramCheckError.methodNoSolution
 example := @Solcore.Frontend.ProgramCheckError.methodInconclusive

@@ -417,6 +417,10 @@ example := @Solcore.SourceSemantics.CheckedSignatureCatalogFacts
 example :=
   @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.function_shapes
 example :=
+  @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.data_structures
+example :=
+  @Solcore.SourceSemantics.CheckedSignatureCatalogFacts.constructor_ids
+example :=
   @Solcore.SourceSemantics.FunctionSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.DataSignatureRemainingConditions.complete
 example := @Solcore.SourceSemantics.TraitSignatureRemainingConditions.complete

@@ -81,17 +81,12 @@ structure FunctionSignatureRemainingConditions
     (signatureContext signatures signature.id signature.scheme.parameters
       signature.scheme.predicates) signature.scheme.predicates
 
-/-- Semantic data-signature obligations beyond its checker-generated generic
-parameter row. -/
+/-- The constructor-payload typing obligation not yet discharged by executable
+data-signature collection.  Generic parameters, constructor names, owners, and
+source-order positions are supplied separately by checker success. -/
 structure DataSignatureRemainingConditions
     (signatures : ProgramSignatures)
     (signature : ProgramDataSignature) : Prop where
-  constructor_names_nodup :
-    (signature.constructors.map fun constructor => constructor.name).Nodup
-  constructor_owners : ∀ constructor, constructor ∈ signature.constructors →
-    constructor.id.dataType = signature.id
-  constructor_positions : ∀ index : Fin signature.constructors.length,
-    (signature.constructors.get index).id.constructorIndex = index.val
   constructor_payloads : ∀ constructor,
     constructor ∈ signature.constructors →
       TypesWellFormed
@@ -151,13 +146,10 @@ structure ImplementationSignatureRemainingConditions
 
 /-- Catalog conditions not yet implied by raw `checkProgram` success.  The
 checker already supplies implementation-rule projection equality, declaration
-identity uniqueness, every generic-parameter invariant, and complete contract
-signature semantics. -/
+identity uniqueness, every generic-parameter invariant, data-constructor
+structure and identity uniqueness, and complete contract signature semantics. -/
 structure SignatureCatalogRemainingConditions
     (signatures : ProgramSignatures) : Prop where
-  constructor_ids :
-    (signatures.dataTypes.flatMap fun signature =>
-      signature.constructors.map fun constructor => constructor.id).Nodup
   trait_method_ids :
     (signatures.traits.flatMap fun signature =>
       signature.methods.map fun method => method.id).Nodup
@@ -186,12 +178,17 @@ structure CheckedSignatureCatalogFacts
   implementation_ids :
     (signatures.implementations.map fun signature => signature.id).Nodup
   contract_ids : (signatures.contracts.map fun signature => signature.id).Nodup
+  constructor_ids :
+    (signatures.dataTypes.flatMap fun signature =>
+      signature.constructors.map fun constructor => constructor.id).Nodup
   parameters : ProgramSignatureParametersWellFormed signatures
   function_shapes : ∀ signature, signature ∈ signatures.functions →
     signature.parameterNames.Nodup ∧
       signature.scheme.body = .function
         (TypeSystem.Ty.productMany signature.parameterTypes)
         (TypeSystem.Ty.productMany signature.returnTypes)
+  data_structures : ∀ signature, signature ∈ signatures.dataTypes →
+    DataSignatureStructuralWellFormed signature
   contracts_semantic : ∀ signature, signature ∈ signatures.contracts →
     ContractSignatureWellFormed signatures signature
 
@@ -230,15 +227,16 @@ theorem complete
     {signatures : ProgramSignatures} {signature : ProgramDataSignature}
     (remaining : DataSignatureRemainingConditions signatures signature)
     (parameters : SignatureParametersWellFormed signature.id
-      signature.parameters) :
+      signature.parameters)
+    (structural : DataSignatureStructuralWellFormed signature) :
     DataSignatureWellFormed signatures signature := {
   parameters_nodup := parameters.parameters_nodup
   parameters_owned := parameters.parameter_owners
   parameter_positions := by
     simpa [TypeParameterPositionsCanonical] using parameters.parameter_positions
-  constructor_names_nodup := remaining.constructor_names_nodup
-  constructor_owners := remaining.constructor_owners
-  constructor_positions := remaining.constructor_positions
+  constructor_names_nodup := structural.constructor_names_nodup
+  constructor_owners := structural.constructor_owners
+  constructor_positions := structural.constructor_positions
   constructor_payloads := remaining.constructor_payloads
 }
 
@@ -327,10 +325,14 @@ theorem checkedSignatureCatalogFacts_ofCheckProgram
         environmentIds signaturesSuccess
     contract_ids := Frontend.buildProgramSignatures_success_contract_ids_nodup
       environmentIds signaturesSuccess
+    constructor_ids := Frontend.checkProgram_success_constructor_ids_nodup success
     parameters
     function_shapes := by
       intro signature member
       exact Frontend.checkProgram_success_function_signature_shape success member
+    data_structures := by
+      intro signature member
+      exact Frontend.checkProgram_success_data_signature_structure success member
     contracts_semantic := ?_
   }
   intro signature member
@@ -360,7 +362,7 @@ theorem complete
     trait_ids := checked.trait_ids
     implementation_ids := checked.implementation_ids
     contract_ids := checked.contract_ids
-    constructor_ids := remaining.constructor_ids
+    constructor_ids := checked.constructor_ids
     trait_method_ids := remaining.trait_method_ids
     implementation_method_ids := remaining.implementation_method_ids
     function_parameters := ?_
@@ -396,6 +398,7 @@ theorem complete
   · intro signature member
     exact (remaining.data_semantic signature member).complete
       (checked.parameters.dataTypes signature member)
+      (checked.data_structures signature member)
   · intro signature member
     exact (remaining.traits_semantic signature member).complete
       (checked.parameters.traits signature member)

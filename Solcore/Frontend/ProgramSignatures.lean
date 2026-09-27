@@ -289,6 +289,17 @@ structure ProgramDataSignature where
   source : Syntax.EnumDecl
   deriving Repr
 
+/-- Structural facts fixed by data-constructor collection itself.  These do
+not depend on the later declarative judgment for constructor payload types. -/
+structure DataSignatureStructuralWellFormed
+    (signature : ProgramDataSignature) : Prop where
+  constructor_names_nodup :
+    (signature.constructors.map fun constructor => constructor.name).Nodup
+  constructor_owners : ∀ constructor, constructor ∈ signature.constructors →
+    constructor.id.dataType = signature.id
+  constructor_positions : ∀ index : Fin signature.constructors.length,
+    (signature.constructors.get index).id.constructorIndex = index.val
+
 /-- A resolved top-level contract declaration. Contract members remain
 separate from the data-constructor and pattern catalogs; this carrier records
 only the declaration identity and its generic scope. -/
@@ -692,6 +703,81 @@ private def dataConstructorsOfDeclaration
             payloadTypes
             source
           } :: constructors)
+
+/-- Successful constructor collection preserves the duplicate-name check and
+the declaration-owned, source-order constructor identity allocation.  The
+freshness clause is the induction invariant needed to relate the output to the
+names already seen by its caller. -/
+private theorem dataConstructorsOfDeclaration_success_structure
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {scope : ProgramTypeScope} {sources : List Syntax.EnumConstructor}
+    {index : Nat} {seen : List (String × Nat)}
+    {constructors : List ProgramDataConstructorSignature}
+    (success : dataConstructorsOfDeclaration environment declaration scope
+      sources index seen = .ok constructors) :
+    (constructors.map fun constructor => constructor.name).Nodup ∧
+      (∀ name, name ∈ constructors.map (fun constructor => constructor.name) →
+        ∀ previous, previous ∈ seen → name ≠ previous.1) ∧
+      (∀ constructor, constructor ∈ constructors →
+        constructor.id.dataType = declaration.id) ∧
+      (∀ position : Fin constructors.length,
+        (constructors.get position).id.constructorIndex =
+          index + position.val) := by
+  induction sources generalizing index seen constructors with
+  | nil =>
+      change Except.ok [] = Except.ok constructors at success
+      injection success with constructorsEq
+      subst constructors
+      simp
+  | cons source rest induction =>
+      simp only [dataConstructorsOfDeclaration] at success
+      cases duplicateEq : seen.find? fun previous =>
+          previous.1 == source.value.name.value with
+      | some previous => simp [duplicateEq] at success
+      | none =>
+          simp only [duplicateEq] at success
+          cases payloadEq : resolveSignatureTypes environment declaration scope
+              ((source.value.fields.map fun fields => fields.elements).getD []) with
+          | error error => simp [payloadEq, bind, Except.bind] at success
+          | ok payloadTypes =>
+              simp only [payloadEq, bind, Except.bind] at success
+              cases restEq : dataConstructorsOfDeclaration environment declaration
+                  scope rest (index + 1)
+                  ((source.value.name.value, index) :: seen) with
+              | error error => simp [restEq] at success
+              | ok restConstructors =>
+                  simp only [restEq, pure, Pure.pure, Except.pure,
+                    Except.ok.injEq] at success
+                  subst constructors
+                  have restStructure := induction restEq
+                  refine ⟨?_, ?_, ?_, ?_⟩
+                  · simp only [List.map_cons, List.nodup_cons]
+                    refine ⟨?_, restStructure.1⟩
+                    intro member
+                    exact (restStructure.2.1 source.value.name.value member
+                      (source.value.name.value, index) (by simp)) rfl
+                  · intro name member previous previousMember
+                    simp only [List.map_cons, List.mem_cons] at member
+                    rcases member with rfl | member
+                    · intro equal
+                      have rejected :=
+                        (List.find?_eq_none.mp duplicateEq) previous previousMember
+                      exact rejected (by simp [equal])
+                    · exact restStructure.2.1 name member previous
+                        (by simp [previousMember])
+                  · intro constructor member
+                    simp only [List.mem_cons] at member
+                    rcases member with rfl | member
+                    · rfl
+                    · exact restStructure.2.2.1 constructor member
+                  · intro position
+                    refine Fin.cases ?_ (fun restPosition => ?_) position
+                    · rfl
+                    · change
+                        (restConstructors.get restPosition).id.constructorIndex =
+                          index + (restPosition.val + 1)
+                      rw [restStructure.2.2.2 restPosition]
+                      omega
 
 private def dataSignatureOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -1473,7 +1559,8 @@ private theorem dataSignatureOfDeclaration_success_header
     (success : dataSignatureOfDeclaration environment declaration source =
       .ok signature) :
     signature.id = declaration.id ∧
-      signature.parameters = declarationParameters declaration := by
+      signature.parameters = declarationParameters declaration ∧
+      DataSignatureStructuralWellFormed signature := by
   cases scopeEq : validateProgramTypeScope
       (ProgramTypeScope.ofDeclaration declaration) with
   | error error =>
@@ -1492,10 +1579,19 @@ private theorem dataSignatureOfDeclaration_success_header
           change Except.error error = Except.ok signature at success
           cases success
       | ok constructors =>
+          have constructorStructure :=
+            dataConstructorsOfDeclaration_success_structure constructorsEq
           simp only [constructorsEq] at success
           injection success with signatureEq
           subst signature
-          exact ⟨rfl, rfl⟩
+          refine ⟨rfl, rfl, ?_⟩
+          exact {
+            constructor_names_nodup := constructorStructure.1
+            constructor_owners := constructorStructure.2.2.1
+            constructor_positions := by
+              intro position
+              simpa using constructorStructure.2.2.2 position
+          }
 
 private theorem dataSignatureOfDeclaration_success_id
     {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
@@ -1512,8 +1608,16 @@ private theorem dataSignatureOfDeclaration_success_parameters
       .ok signature) :
     SignatureParametersWellFormed signature.id signature.parameters := by
   have header := dataSignatureOfDeclaration_success_header success
-  rw [header.1, header.2]
+  rw [header.1, header.2.1]
   exact declarationParameters_wellFormed declaration
+
+private theorem dataSignatureOfDeclaration_success_structure
+    {environment : ProgramEnvironment} {declaration : ProgramDeclaration}
+    {source : Syntax.EnumDecl} {signature : ProgramDataSignature}
+    (success : dataSignatureOfDeclaration environment declaration source =
+      .ok signature) :
+    DataSignatureStructuralWellFormed signature :=
+  (dataSignatureOfDeclaration_success_header success).2.2
 
 private theorem contractSignatureOfDeclaration_success_header
     {declaration : ProgramDeclaration} {source : Syntax.ContractDecl}
@@ -1697,6 +1801,8 @@ private structure ProgramSignatureBuildParametersWellFormed
         (TypeSystem.Ty.productMany signature.returnTypes)
   dataTypes : ∀ signature, signature ∈ state.dataTypes →
     SignatureParametersWellFormed signature.id signature.parameters
+  dataShapes : ∀ signature, signature ∈ state.dataTypes →
+    DataSignatureStructuralWellFormed signature
   implementations : ∀ signature, signature ∈ state.implementations →
     SignatureParametersWellFormed signature.id signature.parameters
   contracts : ∀ signature, signature ∈ state.contracts →
@@ -1711,6 +1817,7 @@ private theorem ProgramSignatureBuildParametersWellFormed.withErrors
   functions := initial.functions
   functionShapes := initial.functionShapes
   dataTypes := initial.dataTypes
+  dataShapes := initial.dataShapes
   implementations := initial.implementations
   contracts := initial.contracts
 }
@@ -1737,11 +1844,13 @@ private theorem ProgramSignatureBuildParametersWellFormed.addDataType
     (initial : ProgramSignatureBuildParametersWellFormed state)
     {signature : ProgramDataSignature}
     (wellFormed : SignatureParametersWellFormed signature.id
-      signature.parameters) :
+      signature.parameters)
+    (shape : DataSignatureStructuralWellFormed signature) :
     ProgramSignatureBuildParametersWellFormed
       { state with dataTypes := state.dataTypes ++ [signature] } := {
   initial with
   dataTypes := all_mem_append_singleton initial.dataTypes wellFormed
+  dataShapes := all_mem_append_singleton initial.dataShapes shape
 }
 
 private theorem ProgramSignatureBuildParametersWellFormed.addImplementation
@@ -1802,7 +1911,8 @@ private theorem collectProgramSignatures_parameters_wellFormed
               simpa using induction
                 { state with dataTypes := state.dataTypes ++ [signature] }
                 (initial.addDataType
-                  (dataSignatureOfDeclaration_success_parameters signatureEq))
+                  (dataSignatureOfDeclaration_success_parameters signatureEq)
+                  (dataSignatureOfDeclaration_success_structure signatureEq))
       | contract source =>
           simp only [collectProgramSignatures, sourceEq]
           cases signatureEq : contractSignatureOfDeclaration declaration source with
@@ -2396,6 +2506,30 @@ theorem buildProgramSignatures_success_function_shape_state
   · injection success with signaturesEq
     subst signatures
     exact signatureFacts.functionShapes
+  · simp at success
+
+/-- Internal collector boundary used by `ProgramSignaturesProperties`: every
+successfully collected data signature retains the constructor-name and stable
+identity structure established while traversing its source declaration. -/
+theorem buildProgramSignatures_success_data_structure_state
+    {environment : ProgramEnvironment} {signatures : ProgramSignatures}
+    (success : buildProgramSignatures environment = .ok signatures) :
+    ∀ signature, signature ∈ signatures.dataTypes →
+      DataSignatureStructuralWellFormed signature := by
+  let traitState := collectProgramTraits environment environment.declarations {}
+  let state := collectProgramSignatures environment traitState.traits
+    environment.declarations {}
+  have signatureFacts :
+      ProgramSignatureBuildParametersWellFormed state := by
+    apply collectProgramSignatures_parameters_wellFormed environment
+      traitState.traits environment.declarations
+      ({} : ProgramSignatureBuildState)
+    constructor <;> intro signature member <;> simp at member
+  simp only [buildProgramSignatures] at success
+  split at success
+  · injection success with signaturesEq
+    subst signatures
+    exact signatureFacts.dataShapes
   · simp at success
 
 end Solcore.Frontend
