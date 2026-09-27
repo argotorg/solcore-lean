@@ -264,6 +264,33 @@ theorem mono {smaller larger : List Requirement}
   | cons head tail induction =>
       exact .cons (head.mono included) induction
 
+/-- Exact commit correspondence transports endpoint and adjacency validity
+from the planned path to the retained path, independently of which later
+requirement ledger contains the referenced identities. -/
+theorem isValid
+    {requirements : List Requirement}
+    {source target : TypeSystem.Ty}
+    {plan : List PlannedCoercionStep} {steps : List CoercionStep}
+    (corresponds : CoercionPlanCommitCorresponds requirements plan steps)
+    (valid : PlannedCoercionPath.isValid source target plan = true) :
+    CoercionPath.isValid source target steps = true := by
+  induction corresponds generalizing source with
+  | nil =>
+      exact valid
+  | @cons planned committed plan steps head tail induction =>
+      cases tail with
+      | nil =>
+          simpa [PlannedCoercionPath.isValid, CoercionPath.isValid,
+            head.source_eq, head.target_eq] using valid
+      | @cons nextPlanned nextCommitted rest remaining nextHead nextTail =>
+          simp only [PlannedCoercionPath.isValid, Bool.and_eq_true] at valid
+          simp only [CoercionPath.isValid, Bool.and_eq_true]
+          constructor
+          · simpa [head.source_eq] using valid.1
+          · have restValid := induction (by
+              simpa [PlannedCoercionPath.isValid] using valid.2)
+            simpa [head.target_eq, CoercionPath.isValid] using restValid
+
 end CoercionPlanCommitCorresponds
 
 open TypeSystem
@@ -425,25 +452,7 @@ theorem commitCoercionPlan_isValid
     (valid : PlannedCoercionPath.isValid source target plan = true) :
     CoercionPath.isValid source target (commitCoercionPlan state plan).1 =
       true := by
-  induction plan generalizing state source with
-  | nil =>
-      simpa [PlannedCoercionPath.isValid, CoercionPath.isValid,
-        commitCoercionPlan] using valid
-  | cons step rest induction =>
-      cases rest with
-      | nil =>
-          simpa [PlannedCoercionPath.isValid, CoercionPath.isValid,
-            commitCoercionPlan] using valid
-      | cons next tail =>
-          simp only [PlannedCoercionPath.isValid, Bool.and_eq_true] at valid
-          simp only [commitCoercionPlan, CoercionPath.isValid,
-            Bool.and_eq_true]
-          refine ⟨valid.1, ?_⟩
-          simpa [commitCoercionPlan, CoercionPath.isValid] using
-            (induction
-              (((state.addRequirementWithId step.predicate).2
-                |>.addRequirementsWithIds step.methodPredicates).2)
-              (by simpa [PlannedCoercionPath.isValid] using valid.2))
+  exact (commitCoercionPlan_corresponds state plan).isValid valid
 
 /-- No hidden obligations are introduced while committing a path: the final
 ledger appends exactly each edge's primary predicate and then its method

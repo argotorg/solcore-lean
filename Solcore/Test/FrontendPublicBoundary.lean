@@ -211,6 +211,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.CoercionPlanCommitCorresponds.mono
 example :=
+  @Solcore.Frontend.SourceInference.Detail.CoercionPlanCommitCorresponds.isValid
+example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_corresponds
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_isValid
