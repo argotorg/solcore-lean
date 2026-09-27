@@ -189,6 +189,49 @@ private theorem generalizationSideConditionState_requirementsWellFormed :
     generalizationSideConditionState.RequirementsWellFormed := by
   rfl
 
+private def ledgerExtensionRequirement : SourceInference.Requirement := {
+  id := ⟨1⟩
+  predicate := solverRegressionNormalized
+}
+
+private def generalizationSideConditionExtendedState :
+    SourceInference.State := {
+  generalizationSideConditionState with
+  nextRequirement := 2
+  requirements := [solverRegressionRequirement, ledgerExtensionRequirement]
+}
+
+private theorem
+    generalizationSideConditionExtendedState_requirementsWellFormed :
+    generalizationSideConditionExtendedState.RequirementsWellFormed := by
+  rfl
+
+private theorem generalizationSideCondition_requirements_subset_extended :
+    generalizationSideConditionState.requirements ⊆
+      generalizationSideConditionExtendedState.requirements := by
+  intro requirement member
+  change requirement ∈ [solverRegressionRequirement] at member
+  change requirement ∈
+    [solverRegressionRequirement, ledgerExtensionRequirement]
+  simp only [List.mem_cons, List.mem_nil_iff, or_false] at member ⊢
+  exact Or.inl member
+
+/-- A canonical ledger extension preserves the exact predicate payload of a
+row allocated before the prior fresh-identity boundary. -/
+example :
+    solverRegressionRequirement ∈
+        generalizationSideConditionExtendedState.requirements.take
+          generalizationSideConditionState.nextRequirement ↔
+      solverRegressionRequirement ∈
+        generalizationSideConditionState.requirements := by
+  exact SourceInference.State.mem_take_prior_requirements_iff
+    generalizationSideConditionState
+    generalizationSideConditionExtendedState
+    generalizationSideConditionState_requirementsWellFormed
+    generalizationSideConditionExtendedState_requirementsWellFormed
+    generalizationSideCondition_requirements_subset_extended
+    solverRegressionRequirement
+
 /-- Canonical ledger formation synchronizes its length and bounds every
 retained stable identity by the next fresh identity. -/
 example :

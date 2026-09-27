@@ -560,6 +560,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.mem_take_requirements_iff
 example :=
+  @Solcore.Frontend.SourceInference.State.mem_take_prior_requirements_iff
+example :=
   @Solcore.Frontend.SourceInference.State.mem_drop_requirements_iff
 example :=
   @Solcore.Frontend.SourceInference.State.IntegerLiteralLedgerCorrespondence

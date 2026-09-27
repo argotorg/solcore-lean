@@ -376,6 +376,57 @@ theorem mem_take_requirements_iff (state : State)
         (List.mem_of_mem_take candidateMember) member indexEq
     simpa [candidateEq] using candidateMember
 
+/-- A canonical ledger extension retains exactly the prior rows below the
+prior state's fresh-identity boundary, including each row's predicate
+payload. -/
+theorem mem_take_prior_requirements_iff
+    (before after : State)
+    (beforeWellFormed : before.RequirementsWellFormed)
+    (afterWellFormed : after.RequirementsWellFormed)
+    (included : before.requirements ⊆ after.requirements)
+    (requirement : Requirement) :
+    requirement ∈ after.requirements.take before.nextRequirement ↔
+      requirement ∈ before.requirements := by
+  constructor
+  · intro taken
+    have takenCharacterization :=
+      (mem_take_requirements_iff after afterWellFormed
+        before.nextRequirement requirement).mp taken
+    rcases takenCharacterization with ⟨afterMember, belowBefore⟩
+    have beforeIndices :
+        before.requirements.map
+            (fun candidate => candidate.id.index) =
+          List.range before.nextRequirement := by
+      exact beforeWellFormed
+    have beforeIndexMember : requirement.id.index ∈
+        before.requirements.map
+          (fun candidate => candidate.id.index) := by
+      rw [beforeIndices, List.mem_range]
+      exact belowBefore
+    rcases List.mem_map.mp beforeIndexMember with
+      ⟨candidate, candidateBefore, indexEq⟩
+    have afterIndices :
+        after.requirements.map
+            (fun candidate => candidate.id.index) =
+          List.range after.nextRequirement := by
+      exact afterWellFormed
+    have afterIndicesNodup :
+        (after.requirements.map
+          (fun candidate => candidate.id.index)).Nodup := by
+      rw [afterIndices]
+      exact List.nodup_range
+    have candidateEq : candidate = requirement :=
+      eq_of_mem_of_mapped_nodup
+        (fun candidate : Requirement => candidate.id.index)
+        afterIndicesNodup (included candidateBefore) afterMember indexEq
+    simpa [candidateEq] using candidateBefore
+  · intro beforeMember
+    exact (mem_take_requirements_iff after afterWellFormed
+      before.nextRequirement requirement).mpr
+        ⟨included beforeMember,
+          requirement_id_lt_nextRequirement before beforeWellFormed
+            beforeMember⟩
+
 /-- Dually, dropping the first `cutoff` rows selects exactly the rows whose
 stable identity is at least that cutoff. -/
 theorem mem_drop_requirements_iff (state : State)
