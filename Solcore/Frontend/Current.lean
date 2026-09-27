@@ -1,4 +1,5 @@
 import Solcore.Frontend.ProgramIdentity
+import Solcore.Frontend.TraitResolutionProperties
 import Solcore.Frontend.ProgramChecking
 import Solcore.Frontend.ExecutableImplMethods
 import Solcore.Frontend.SourceStageAnalysis

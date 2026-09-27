@@ -4,6 +4,10 @@ set_option autoImplicit false
 
 namespace Tests
 
+example := @Solcore.Frontend.TraitResolution.ResolutionEvidenceValid
+example := @Solcore.Frontend.TraitResolution.ResolutionPremisesValid
+example := @Solcore.Frontend.TraitResolution.resolve_success_sound
+
 example :=
   @Solcore.Frontend.SourceInference.Detail.solveRequirements_ids_nodup
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
