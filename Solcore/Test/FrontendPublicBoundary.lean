@@ -45,6 +45,11 @@ example :=
   @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_parameterSubstitution_domain_permutation
 example :=
   @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_parameterSubstitution_range_is_variable
+example := @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_next_le
+example :=
+  @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_parameterSubstitution_range_variablesBelow
+example :=
+  @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_body_variablesBelow
 example :=
   @Solcore.Frontend.ConstrainedDeclarationScheme.instantiate_body
 example :=

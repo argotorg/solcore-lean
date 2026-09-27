@@ -12,6 +12,36 @@ open Solcore Solcore.Frontend
 
 namespace ProgramSignatures
 
+private def boundedGenericScheme (owner : Resolved.DeclarationId) :
+    ConstrainedDeclarationScheme :=
+  let first : TypeSystem.TypeParameterId := { owner, index := 0 }
+  let second : TypeSystem.TypeParameterId := { owner, index := 1 }
+  {
+    parameters := [first, second]
+    predicates := []
+    body := .function (.parameter first)
+      (.product (.parameter second) .word)
+  }
+
+example (owner : Resolved.DeclarationId) (next : Nat) :
+    next ≤ ((boundedGenericScheme owner).instantiate next).next :=
+  ConstrainedDeclarationScheme.instantiate_next_le _ _
+
+example (owner : Resolved.DeclarationId) (next : Nat) :
+    ∀ {parameter replacement},
+      (parameter, replacement) ∈
+          ((boundedGenericScheme owner).instantiate next).parameterSubstitution →
+        replacement.VariablesBelow
+          ((boundedGenericScheme owner).instantiate next).next :=
+  ConstrainedDeclarationScheme.instantiate_parameterSubstitution_range_variablesBelow
+    _ _
+
+example (owner : Resolved.DeclarationId) (next : Nat) :
+    ((boundedGenericScheme owner).instantiate next).body.VariablesBelow
+      ((boundedGenericScheme owner).instantiate next).next := by
+  apply ConstrainedDeclarationScheme.instantiate_body_variablesBelow
+  simp [boundedGenericScheme, TypeSystem.Ty.word]
+
 private def assertTrue (condition : Bool) (label : String) : IO Unit := do
   unless condition do
     throw (IO.userError label)
