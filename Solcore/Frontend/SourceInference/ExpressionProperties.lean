@@ -542,6 +542,26 @@ private theorem fitArguments_some_state_header
                           exact (induction tailResult).trans
                             (candidateWithExpected_some_state_header fittedResult)
 
+/-- A successful function-candidate attempt retains exactly the generic
+instantiation allocated before argument fitting, expected-type fitting, and
+predicate validation.  None of those later checks may replace the selected
+declaration or its shared parameter substitution. -/
+theorem tryFunctionCandidate_some_instantiation
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    result.instantiation =
+      DeclarationInstantiation.ofInstantiated signature
+        (signature.scheme.instantiate state.inference.next) := by
+  unfold tryFunctionCandidate at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals simp_all
+
 private theorem tryFunctionCandidate_some_state_header
     {context : Context} {arguments : List InferredExpression}
     {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}

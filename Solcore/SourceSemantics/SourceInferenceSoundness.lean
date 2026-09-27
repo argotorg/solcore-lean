@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceInference.ProgramProperties
 import Solcore.Frontend.SourceInference.RequirementProperties
+import Solcore.SourceSemantics.ProgramCheckingSoundness
 import Solcore.SourceSemantics.TraitSubstitutionProperties
 import Solcore.SourceSemantics.TraitResolutionSoundness
 
@@ -10,6 +11,77 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.SourceInferenceSoundness
 
 open Frontend SourceInference
+
+/-- A successful executable candidate check retains a declaratively
+admissible occurrence of the candidate signature.  Argument fitting,
+expected-type fitting, predicate validation, and ledger allocation happen
+after the canonical fresh generic instantiation and cannot replace it. -/
+theorem tryFunctionCandidate_instantiationAdmissible
+    {inferenceContext : Frontend.SourceInference.Context}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {signature : ProgramFunctionSignature}
+    {result : Detail.CandidateAttemptResult}
+    {semanticContext : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (binders : TypeParameterBindersWellFormed semanticContext)
+    (residual : semanticContext.residualTypeVariables = true)
+    (member : signature ∈ semanticContext.signatures.functions)
+    (success : Detail.tryFunctionCandidate inferenceContext arguments
+      integerLiteralOrigins call expected state signature = .ok (some result)) :
+    DeclarationInstantiation.Admissible semanticContext
+      result.instantiation := by
+  rw [Detail.tryFunctionCandidate_some_instantiation success]
+  exact DeclarationInstantiation.ofInstantiated_admissible catalog binders
+    residual member state.inference.next
+
+/-- The retained candidate instantiation also supplies the exact declarative
+application profile needed by the direct-call typing rule.  Its parameter row
+and result are the catalog projections under the one shared fresh rigid
+substitution; later argument/result fitting is deliberately outside this raw
+application fact. -/
+theorem tryFunctionCandidate_declarationApplicationValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {signature : ProgramFunctionSignature}
+    {result : Detail.CandidateAttemptResult}
+    {semanticContext : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (binders : TypeParameterBindersWellFormed semanticContext)
+    (residual : semanticContext.residualTypeVariables = true)
+    (member : signature ∈ semanticContext.signatures.functions)
+    (success : Detail.tryFunctionCandidate inferenceContext arguments
+      integerLiteralOrigins call expected state signature = .ok (some result)) :
+    DeclarationApplicationValid semanticContext result.instantiation
+      (signature.parameterTypes.map
+        (TypeSystem.ParameterSubstitution.apply
+          (signature.scheme.instantiate
+            state.inference.next).parameterSubstitution))
+      ((signature.scheme.instantiate state.inference.next)
+        |>.parameterSubstitution.apply
+          (TypeSystem.Ty.productMany signature.returnTypes))
+      (signature.scheme.instantiate state.inference.next).predicates := by
+  rw [Detail.tryFunctionCandidate_some_instantiation success]
+  let instantiated := signature.scheme.instantiate state.inference.next
+  refine .intro member
+    (DeclarationInstantiation.ofInstantiated_admissible catalog binders
+      residual member state.inference.next) rfl rfl rfl ?_ rfl
+  change instantiated.body = .function
+    (TypeSystem.Ty.productMany
+      (signature.parameterTypes.map
+        (TypeSystem.ParameterSubstitution.apply
+          instantiated.parameterSubstitution)))
+    (instantiated.parameterSubstitution.apply
+      (TypeSystem.Ty.productMany signature.returnTypes))
+  rw [Frontend.ConstrainedDeclarationScheme.instantiate_body,
+    (catalog.functions_semantic signature member).scheme_body,
+    StructuralSubstitution.apply_function,
+    StructuralSubstitution.apply_productMany]
 
 private theorem requirementId_beq_iff_eq
     (left right : RequirementId) :
