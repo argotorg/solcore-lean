@@ -533,6 +533,10 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.defaultIntegerPatternTargets_requirements
 example :=
   @Solcore.Frontend.SourceInference.Detail.defaultIntegerLiteralTargets_requirements
+example :=
+  @Solcore.Frontend.SourceInference.Detail.FinalizeSuccessWitness
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_success_witness
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateIntegerLiteralLedger

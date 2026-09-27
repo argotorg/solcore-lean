@@ -668,6 +668,108 @@ private theorem defaultIntegerLiteralTargets_toTypedSource
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_toTypedSource headResult)
 
+/-- The complete successful execution trace of `finalize`.
+
+Keeping the intermediate states and their exact equations together gives
+downstream soundness proofs one stable inversion point instead of requiring
+each proof to unfold the whole executable pipeline. -/
+structure FinalizeSuccessWitness
+    (context : Context) (type : Ty) (state : State)
+    (roots : List NodeId) (result : Result) where
+  patternState : State
+  finalState : State
+  solvedRequirements : List SolvedRequirement
+  ledgerValidation : validateIntegerLiteralLedger state = .ok ()
+  patternDefault :
+    defaultIntegerPatternTargets state.integerPatterns state =
+      .ok patternState
+  literalDefault :
+    defaultIntegerLiteralTargets patternState.integerLiterals patternState =
+      .ok finalState
+  patternValidation :
+    validateIntegerPatternTargets finalState finalState.integerPatterns =
+      .ok ()
+  literalValidation :
+    validateIntegerLiteralTargets finalState finalState.integerLiterals =
+      .ok ()
+  requirementsSolved :
+    solveRequirements context finalState finalState.requirements =
+      .ok solvedRequirements
+  result_eq : result = {
+    type := finalState.resolve type
+    substitution := finalState.inference.substitution
+    solvedRequirements
+    typedSource := (finalState.toTypedSource roots).applySubstitution
+      finalState.inference.substitution
+  }
+
+/-- Invert one successful `finalize` call into all successful pipeline stages
+and the exact result assembled from the final state. -/
+def finalize_success_witness
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    FinalizeSuccessWitness context type state roots result := by
+  unfold finalize at success
+  cases ledgerResult : validateIntegerLiteralLedger state with
+  | error error =>
+      simp [ledgerResult, bind, Except.bind] at success
+  | ok ledgerValue =>
+      cases ledgerValue
+      cases patternResult :
+          defaultIntegerPatternTargets state.integerPatterns state with
+      | error error =>
+          simp [ledgerResult, patternResult, bind, Except.bind] at success
+      | ok patternState =>
+          cases literalResult :
+              defaultIntegerLiteralTargets patternState.integerLiterals
+                patternState with
+          | error error =>
+              simp [ledgerResult, patternResult, literalResult, bind,
+                Except.bind] at success
+          | ok finalState =>
+              cases patternValidationResult :
+                  validateIntegerPatternTargets finalState
+                    finalState.integerPatterns with
+              | error error =>
+                  simp [ledgerResult, patternResult, literalResult,
+                    patternValidationResult, bind, Except.bind] at success
+              | ok patternValidation =>
+                  cases patternValidation
+                  cases literalValidationResult :
+                      validateIntegerLiteralTargets finalState
+                        finalState.integerLiterals with
+                  | error error =>
+                      simp [ledgerResult, patternResult, literalResult,
+                        patternValidationResult, literalValidationResult,
+                        bind, Except.bind] at success
+                  | ok literalValidation =>
+                      cases literalValidation
+                      cases requirementsResult :
+                          solveRequirements context finalState
+                            finalState.requirements with
+                      | error error =>
+                          simp [ledgerResult, patternResult, literalResult,
+                            patternValidationResult, literalValidationResult,
+                            requirementsResult, bind, Except.bind] at success
+                      | ok requirements =>
+                          simp [ledgerResult, patternResult, literalResult,
+                            patternValidationResult, literalValidationResult,
+                            requirementsResult, bind, Except.bind] at success
+                          cases success
+                          exact {
+                            patternState
+                            finalState
+                            solvedRequirements := requirements
+                            ledgerValidation := ledgerResult
+                            patternDefault := patternResult
+                            literalDefault := literalResult
+                            patternValidation := patternValidationResult
+                            literalValidation := literalValidationResult
+                            requirementsSolved := requirementsResult
+                            result_eq := rfl
+                          }
+
 /-- Successful finalization includes successful validation of its input
 integer-literal ledger. -/
 theorem finalize_validateIntegerLiteralLedger
@@ -675,13 +777,7 @@ theorem finalize_validateIntegerLiteralLedger
     {roots : List NodeId} {result : Result}
     (success : finalize context type state roots = .ok result) :
     validateIntegerLiteralLedger state = .ok () := by
-  unfold finalize at success
-  cases validation : validateIntegerLiteralLedger state with
-  | error error =>
-      simp [validation, bind, Except.bind] at success
-  | ok value =>
-      cases value
-      rfl
+  exact (finalize_success_witness success).ledgerValidation
 
 /-- Successful finalization certifies the literal metadata and exact
 requirement row of every integer-literal node in its input state. -/
@@ -702,61 +798,21 @@ theorem finalize_integerPatternTarget_supported
     ∀ origin, origin ∈ state.integerPatterns →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
-  unfold finalize at success
-  have ledgerValidation := finalize_validateIntegerLiteralLedger success
-  simp only [ledgerValidation] at success
-  cases patternResult :
-      defaultIntegerPatternTargets state.integerPatterns state with
-  | error error =>
-      simp [patternResult, bind, Except.bind] at success
-  | ok patternState =>
-      have patternOrigins :=
-        defaultIntegerPatternTargets_integerPatterns patternResult
-      cases literalResult :
-          defaultIntegerLiteralTargets patternState.integerLiterals
-            patternState with
-      | error error =>
-          simp [patternResult, literalResult, bind, Except.bind] at success
-      | ok finalState =>
-          have finalOrigins :=
-            defaultIntegerLiteralTargets_integerPatterns literalResult
-          cases patternValidationResult :
-              validateIntegerPatternTargets finalState
-                finalState.integerPatterns with
-          | error error =>
-              simp [patternResult, literalResult, patternValidationResult,
-                bind, Except.bind] at success
-          | ok patternValidation =>
-              cases patternValidation
-              have supported :=
-                validateIntegerPatternTargets_success_supported
-                  patternValidationResult
-              cases literalValidationResult :
-                  validateIntegerLiteralTargets finalState
-                    finalState.integerLiterals with
-              | error error =>
-                  simp [patternResult, literalResult, patternValidationResult,
-                    literalValidationResult, bind, Except.bind] at success
-              | ok literalValidation =>
-                  cases literalValidation
-                  cases requirementsResult :
-                      solveRequirements context finalState
-                        finalState.requirements with
-                  | error error =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                  | ok requirements =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                      cases success
-                      intro origin member
-                      have finalMember : origin ∈ finalState.integerPatterns := by
-                        rw [finalOrigins, patternOrigins]
-                        exact member
-                      simpa [State.resolve, TypeSystem.InferState.resolve] using
-                        supported origin finalMember
+  obtain ⟨patternState, finalState, _, _, patternResult, literalResult,
+      patternValidation, _, _, resultEq⟩ := finalize_success_witness success
+  have patternOrigins :=
+    defaultIntegerPatternTargets_integerPatterns patternResult
+  have finalOrigins :=
+    defaultIntegerLiteralTargets_integerPatterns literalResult
+  have supported :=
+    validateIntegerPatternTargets_success_supported patternValidation
+  subst result
+  intro origin member
+  have finalMember : origin ∈ finalState.integerPatterns := by
+    rw [finalOrigins, patternOrigins]
+    exact member
+  simpa [State.resolve, TypeSystem.InferState.resolve] using
+    supported origin finalMember
 
 /-- Finalization closes every retained integer-literal origin to a carrier
 implemented by both the declarative semantics and runtime. -/
@@ -767,61 +823,21 @@ theorem finalize_integerLiteralTarget_supported
     ∀ origin, origin ∈ state.integerLiterals →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer := by
-  unfold finalize at success
-  have ledgerValidation := finalize_validateIntegerLiteralLedger success
-  simp only [ledgerValidation] at success
-  cases patternResult :
-      defaultIntegerPatternTargets state.integerPatterns state with
-  | error error =>
-      simp [patternResult, bind, Except.bind] at success
-  | ok patternState =>
-      have patternOrigins :=
-        defaultIntegerPatternTargets_integerLiterals patternResult
-      cases literalResult :
-          defaultIntegerLiteralTargets patternState.integerLiterals
-            patternState with
-      | error error =>
-          simp [patternResult, literalResult, bind, Except.bind] at success
-      | ok finalState =>
-          have finalOrigins :=
-            defaultIntegerLiteralTargets_integerLiterals literalResult
-          cases patternValidationResult :
-              validateIntegerPatternTargets finalState
-                finalState.integerPatterns with
-          | error error =>
-              simp [patternResult, literalResult, patternValidationResult,
-                bind, Except.bind] at success
-          | ok patternValidation =>
-              cases patternValidation
-              cases literalValidationResult :
-                  validateIntegerLiteralTargets finalState
-                    finalState.integerLiterals with
-              | error error =>
-                  simp [patternResult, literalResult, patternValidationResult,
-                    literalValidationResult, bind, Except.bind] at success
-              | ok literalValidation =>
-                  cases literalValidation
-                  have supported :=
-                    validateIntegerLiteralTargets_success_supported
-                      literalValidationResult
-                  cases requirementsResult :
-                      solveRequirements context finalState
-                        finalState.requirements with
-                  | error error =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                  | ok requirements =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                      cases success
-                      intro origin member
-                      have finalMember : origin ∈ finalState.integerLiterals := by
-                        rw [finalOrigins, patternOrigins]
-                        exact member
-                      simpa [State.resolve, TypeSystem.InferState.resolve] using
-                        supported origin finalMember
+  obtain ⟨patternState, finalState, _, _, patternResult, literalResult, _,
+      literalValidation, _, resultEq⟩ := finalize_success_witness success
+  have patternOrigins :=
+    defaultIntegerPatternTargets_integerLiterals patternResult
+  have finalOrigins :=
+    defaultIntegerLiteralTargets_integerLiterals literalResult
+  have supported :=
+    validateIntegerLiteralTargets_success_supported literalValidation
+  subst result
+  intro origin member
+  have finalMember : origin ∈ finalState.integerLiterals := by
+    rw [finalOrigins, patternOrigins]
+    exact member
+  simpa [State.resolve, TypeSystem.InferState.resolve] using
+    supported origin finalMember
 
 /-- Finalization may extend the inference substitution while defaulting
 numeric targets, but it cannot invalidate a type equality already established
@@ -832,54 +848,14 @@ theorem finalize_preserves_resolve_eq
     (equal : state.resolve left = state.resolve right)
     (success : finalize context type state roots = .ok result) :
     result.substitution.apply left = result.substitution.apply right := by
-  unfold finalize at success
-  have ledgerValidation := finalize_validateIntegerLiteralLedger success
-  simp only [ledgerValidation] at success
-  cases patternResult :
-      defaultIntegerPatternTargets state.integerPatterns state with
-  | error error =>
-      simp [patternResult, bind, Except.bind] at success
-  | ok patternState =>
-      have patternEqual :=
-        defaultIntegerPatternTargets_preserves_resolve_eq equal patternResult
-      cases literalResult :
-          defaultIntegerLiteralTargets patternState.integerLiterals
-            patternState with
-      | error error =>
-          simp [patternResult, literalResult, bind, Except.bind] at success
-      | ok finalState =>
-          have finalEqual :=
-            defaultIntegerLiteralTargets_preserves_resolve_eq patternEqual
-              literalResult
-          cases patternValidationResult :
-              validateIntegerPatternTargets finalState
-                finalState.integerPatterns with
-          | error error =>
-              simp [patternResult, literalResult, patternValidationResult,
-                bind, Except.bind] at success
-          | ok patternValidation =>
-              cases patternValidation
-              cases literalValidationResult :
-                  validateIntegerLiteralTargets finalState
-                    finalState.integerLiterals with
-              | error error =>
-                  simp [patternResult, literalResult, patternValidationResult,
-                    literalValidationResult, bind, Except.bind] at success
-              | ok literalValidation =>
-                  cases literalValidation
-                  cases requirementsResult :
-                      solveRequirements context finalState
-                        finalState.requirements with
-                  | error error =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                  | ok requirements =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                      cases success
-                      exact finalEqual
+  obtain ⟨patternState, finalState, _, _, patternResult, literalResult,
+      _, _, _, resultEq⟩ := finalize_success_witness success
+  have patternEqual :=
+    defaultIntegerPatternTargets_preserves_resolve_eq equal patternResult
+  have finalEqual :=
+    defaultIntegerLiteralTargets_preserves_resolve_eq patternEqual literalResult
+  subst result
+  exact finalEqual
 
 /-- A unification equality survives numeric defaulting and finalization under
 the final substitution returned to callers. -/
@@ -918,49 +894,10 @@ theorem finalize_type
     {result : Result}
     (success : finalize context type state roots = .ok result) :
     result.type = result.substitution.apply type := by
-  unfold finalize at success
-  have ledgerValidation := finalize_validateIntegerLiteralLedger success
-  simp only [ledgerValidation] at success
-  cases patternResult :
-      defaultIntegerPatternTargets state.integerPatterns state with
-  | error error =>
-      simp [patternResult, bind, Except.bind] at success
-  | ok patternState =>
-      cases literalResult :
-          defaultIntegerLiteralTargets patternState.integerLiterals
-            patternState with
-      | error error =>
-          simp [patternResult, literalResult, bind, Except.bind] at success
-      | ok finalState =>
-          cases patternValidationResult :
-              validateIntegerPatternTargets finalState
-                finalState.integerPatterns with
-          | error error =>
-              simp [patternResult, literalResult, patternValidationResult,
-                bind, Except.bind] at success
-          | ok patternValidation =>
-              cases patternValidation
-              cases literalValidationResult :
-                  validateIntegerLiteralTargets finalState
-                    finalState.integerLiterals with
-              | error error =>
-                  simp [patternResult, literalResult, patternValidationResult,
-                    literalValidationResult, bind, Except.bind] at success
-              | ok literalValidation =>
-                  cases literalValidation
-                  cases requirementsResult :
-                      solveRequirements context finalState
-                        finalState.requirements with
-                  | error error =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                  | ok requirements =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                      cases success
-                      rfl
+  obtain ⟨_, _, _, _, _, _, _, _, _, resultEq⟩ :=
+    finalize_success_witness success
+  subst result
+  rfl
 
 /-- Finalization changes only inference metadata before applying the final
 substitution to the source carrier supplied by its input state. -/
@@ -970,50 +907,11 @@ theorem finalize_typedSource
     (success : finalize context type state roots = .ok result) :
     result.typedSource =
       (state.toTypedSource roots).applySubstitution result.substitution := by
-  unfold finalize at success
-  have ledgerValidation := finalize_validateIntegerLiteralLedger success
-  simp only [ledgerValidation] at success
-  cases patternResult :
-      defaultIntegerPatternTargets state.integerPatterns state with
-  | error error =>
-      simp [patternResult, bind, Except.bind] at success
-  | ok patternState =>
-      cases literalResult :
-          defaultIntegerLiteralTargets patternState.integerLiterals
-            patternState with
-      | error error =>
-          simp [patternResult, literalResult, bind, Except.bind] at success
-      | ok finalState =>
-          cases patternValidationResult :
-              validateIntegerPatternTargets finalState
-                finalState.integerPatterns with
-          | error error =>
-              simp [patternResult, literalResult, patternValidationResult,
-                bind, Except.bind] at success
-          | ok patternValidation =>
-              cases patternValidation
-              cases literalValidationResult :
-                  validateIntegerLiteralTargets finalState
-                    finalState.integerLiterals with
-              | error error =>
-                  simp [patternResult, literalResult, patternValidationResult,
-                    literalValidationResult, bind, Except.bind] at success
-              | ok literalValidation =>
-                  cases literalValidation
-                  cases requirementsResult :
-                      solveRequirements context finalState
-                        finalState.requirements with
-                  | error error =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                  | ok requirements =>
-                      simp [patternResult, literalResult,
-                        patternValidationResult, literalValidationResult,
-                        requirementsResult, bind, Except.bind] at success
-                      cases success
-                      rw [defaultIntegerLiteralTargets_toTypedSource literalResult,
-                        defaultIntegerPatternTargets_toTypedSource patternResult]
+  obtain ⟨patternState, _, _, _, patternResult, literalResult, _, _, _,
+      resultEq⟩ := finalize_success_witness success
+  subst result
+  rw [defaultIntegerLiteralTargets_toTypedSource literalResult,
+    defaultIntegerPatternTargets_toTypedSource patternResult]
 
 /-- Finalization preserves the declaration owning the inferred source. -/
 theorem finalize_typedSource_owner
