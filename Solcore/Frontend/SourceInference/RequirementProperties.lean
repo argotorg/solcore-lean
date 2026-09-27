@@ -519,6 +519,50 @@ theorem withExpected_preserves_requirementsWellFormed
                       exact commitCoercionPlan_preserves_requirementsWellFormed
                         state plan wellFormed
 
+/-- Successful expected-type fitting only retains or extends the input
+requirement ledger.  In the mismatch branch the extension consists exactly of
+the selected coercion path's primary and method obligations. -/
+theorem withExpected_requirements_subset
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  cases expected with
+  | none =>
+      simp only [withExpected] at success
+      injection success with resultEq
+      subst result
+      exact fun _ member => member
+  | some expected =>
+      cases unification : state.inference.unify actual.type expected with
+      | ok inference =>
+          simp only [withExpected, unification] at success
+          injection success with resultEq
+          subst result
+          exact fun _ member => member
+      | error error =>
+          cases error with
+          | occursCheck metavariable type =>
+              simp [withExpected, unification] at success
+          | exhausted =>
+              simp [withExpected, unification] at success
+          | mismatch left right =>
+              simp only [withExpected, unification] at success
+              cases planResult : coercionPlan? context state
+                  (state.resolve actual.type) (state.resolve expected) with
+              | error error =>
+                  simp [planResult, bind, Except.bind] at success
+              | ok plan? =>
+                  cases plan? with
+                  | none =>
+                      simp [planResult, bind, Except.bind] at success
+                  | some plan =>
+                      simp only [planResult, bind, Except.bind] at success
+                      change Except.ok _ = Except.ok result at success
+                      injection success with resultEq
+                      subst result
+                      exact commitCoercionPlan_requirements_subset state plan
+
 /-- A retained expected-type candidate has the same well-formed requirement
 ledger as its input state. -/
 theorem candidateWithExpected_preserves_requirementsWellFormed

@@ -200,6 +200,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_coercions_isValid
 example :=
+  @Solcore.Frontend.SourceInference.Detail.withExpected_success_cases
+example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_requirementsWellFormed
@@ -212,6 +214,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.CoercionPlanCommitCorresponds.mono
 example :=
   @Solcore.Frontend.SourceInference.Detail.CoercionPlanCommitCorresponds.isValid
+example :=
+  @Solcore.Frontend.SourceInference.Detail.withExpected_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_corresponds
 example :=

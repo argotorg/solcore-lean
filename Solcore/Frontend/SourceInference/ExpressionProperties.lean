@@ -1069,6 +1069,65 @@ theorem withExpected_success_coercions_isValid
                       simpa only [commitCoercionPlan_resolve] using
                         committedValid
 
+/-- Invert successful expected-type fitting into the two shapes needed by
+semantic consumers.  The no-coercion branch covers both an absent expectation
+and successful unification.  The coercion branch exposes the exact plan and
+commit result retained by the returned expression. -/
+theorem withExpected_success_cases
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    (result.coercions = [] ∧
+        result.state.requirements = state.requirements ∧
+        result.state.resolve actual.type = result.expression.type) ∨
+      ∃ expectedType plan,
+        expected = some expectedType ∧
+          coercionPlan? context state (state.resolve actual.type)
+              (state.resolve expectedType) = .ok (some plan) ∧
+            result = {
+              expression := {
+                actual with type := state.resolve expectedType
+              }
+              coercions := (commitCoercionPlan state plan).1
+              state := (commitCoercionPlan state plan).2
+            } := by
+  cases expected with
+  | none =>
+      simp only [withExpected] at success
+      injection success with resultEq
+      subst result
+      exact .inl ⟨rfl, rfl, rfl⟩
+  | some expectedType =>
+      cases unification : state.inference.unify actual.type expectedType with
+      | ok inference =>
+          simp only [withExpected, unification] at success
+          injection success with resultEq
+          subst result
+          refine .inl ⟨rfl, rfl, ?_⟩
+          exact TypeSystem.InferState.unify_resolve_eq unification
+      | error error =>
+          cases error with
+          | occursCheck metavariable type =>
+              simp [withExpected, unification] at success
+          | exhausted =>
+              simp [withExpected, unification] at success
+          | mismatch left right =>
+              simp only [withExpected, unification] at success
+              cases planResult : coercionPlan? context state
+                  (state.resolve actual.type) (state.resolve expectedType) with
+              | error error =>
+                  simp [planResult, bind, Except.bind] at success
+              | ok planOption =>
+                  cases planOption with
+                  | none =>
+                      simp [planResult, bind, Except.bind] at success
+                  | some plan =>
+                      simp only [planResult, bind, Except.bind] at success
+                      change Except.ok _ = Except.ok result at success
+                      injection success with resultEq
+                      subst result
+                      exact .inr ⟨expectedType, plan, rfl, planResult, rfl⟩
+
 /-- A successfully resolved source annotation contains no flexible
 metavariables, so every inference substitution fixes it. -/
 theorem resolveSourceType_success_apply_eq_self
