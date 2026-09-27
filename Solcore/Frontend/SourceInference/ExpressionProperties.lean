@@ -1663,6 +1663,59 @@ theorem candidateWithExpected_some_inferenceProperties
       exact withExpected_inferenceProperties ready actualBelow expectedBelow
         fittedResult
 
+/-- Successfully recognizing a function type transfers its allocator bound to
+both the bundled parameter type and result type. -/
+theorem functionParts?_success_variablesBelow
+    {type parameter result : Ty} {next : Nat}
+    (typeBelow : type.VariablesBelow next)
+    (success : functionParts? type = some (parameter, result)) :
+    parameter.VariablesBelow next ∧ result.VariablesBelow next := by
+  cases type <;>
+    simp_all [functionParts?, Ty.variablesBelow_function_iff]
+
+/-- Recovering source parameters from their bundled type preserves allocator
+bounds pointwise.  In particular, the arity-one case keeps a product-valued
+parameter intact. -/
+theorem parameterTypesForArity?_success_variablesBelow
+    {arity next : Nat} {parameter : Ty} {parameters : List Ty}
+    (parameterBelow : parameter.VariablesBelow next)
+    (success : parameterTypesForArity? arity parameter = some parameters) :
+    ∀ type ∈ parameters, type.VariablesBelow next := by
+  induction arity generalizing parameter parameters with
+  | zero =>
+      simp only [parameterTypesForArity?] at success
+      split at success
+      · injection success with parametersEq
+        subst parameters
+        simp
+      · contradiction
+  | succ arity induction =>
+      cases arity with
+      | zero =>
+          simp only [parameterTypesForArity?] at success
+          injection success with parametersEq
+          subst parameters
+          intro type member
+          have typeEq : type = parameter := by simpa using member
+          subst type
+          exact parameterBelow
+      | succ arity =>
+          cases parameter <;>
+            simp [parameterTypesForArity?] at success
+          case product head rest =>
+            have productBelow :=
+              (Ty.variablesBelow_product_iff next head rest).mp parameterBelow
+            cases tailResult :
+                parameterTypesForArity? (arity + 1) rest with
+            | none => simp [tailResult] at success
+            | some tail =>
+                simp [tailResult] at success
+                subst parameters
+                intro type member
+                rcases List.mem_cons.mp member with rfl | member
+                · exact productBelow.1
+                · exact induction productBelow.2 tailResult type member
+
 /-- Fitting an argument spine makes semantic inference progress and preserves
 readiness when every argument and parameter type is allocator-bounded. -/
 theorem fitArguments_some_inferenceProperties

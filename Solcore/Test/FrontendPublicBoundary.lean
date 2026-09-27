@@ -395,6 +395,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_some_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.functionParts?_success_variablesBelow
+example :=
+  @Solcore.Frontend.SourceInference.Detail.parameterTypesForArity?_success_variablesBelow
+example :=
   @Solcore.Frontend.SourceInference.Detail.fitArguments_some_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_coercions_isValid

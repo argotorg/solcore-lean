@@ -327,6 +327,28 @@ example {context : SourceInference.Context}
     SourceInference.Detail.candidateWithExpected_some_inferenceProperties
       ready actualBelow expectedBelow success
 
+/-- Recognizing a bounded function type bounds both its parameter bundle and
+its result type. -/
+example {type parameter result : TypeSystem.Ty} {next : Nat}
+    (typeBelow : type.VariablesBelow next)
+    (success : SourceInference.Detail.functionParts? type =
+      some (parameter, result)) :
+    parameter.VariablesBelow next ∧ result.VariablesBelow next := by
+  exact SourceInference.Detail.functionParts?_success_variablesBelow
+    typeBelow success
+
+/-- Recovering an arity-indexed parameter row from a bounded bundle preserves
+the allocator bound for every recovered parameter. -/
+example {arity next : Nat} {parameter : TypeSystem.Ty}
+    {parameters : List TypeSystem.Ty}
+    (parameterBelow : parameter.VariablesBelow next)
+    (success : SourceInference.Detail.parameterTypesForArity? arity parameter =
+      some parameters) :
+    ∀ type ∈ parameters, type.VariablesBelow next := by
+  exact
+    SourceInference.Detail.parameterTypesForArity?_success_variablesBelow
+      parameterBelow success
+
 /-- Successfully fitting a bounded argument spine against bounded parameters
 makes semantic inference progress and preserves readiness. -/
 example {context : SourceInference.Context} {state : SourceInference.State}
