@@ -190,7 +190,11 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.PlannedCoercionPath.isValid
 example :=
+  @Solcore.Frontend.SourceInference.Detail.PlannedCoercionStep.ProfileConsistent
+example :=
   @Solcore.Frontend.SourceInference.Detail.coercionPlan?_some_isValid
+example :=
+  @Solcore.Frontend.SourceInference.Detail.coercionPlan?_some_profileConsistent
 example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_resolve
 example :=
