@@ -108,6 +108,14 @@ example
   checkLoadedProgram_success_environment success
 
 example
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    buildProgramSignatures loaded.environment = .ok checked.signatures :=
+  checkLoadedProgram_success_signatures success
+
+example
     {raw : Workspace.RawWorkspace}
     {fuel : Nat}
     {checked : CheckedProgram}
@@ -136,6 +144,18 @@ example
     (success : checkProgram raw fuel = .ok checked) :
     (checked.environment.declarations.map (·.id)).Nodup :=
   checkProgram_success_declarations_nodup success
+
+example
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    ((checked.signatures.functions.map fun signature => signature.id) ++
+      (checked.signatures.dataTypes.map fun signature => signature.id) ++
+      (checked.signatures.traits.map fun signature => signature.id) ++
+      (checked.signatures.implementations.map fun signature => signature.id) ++
+      (checked.signatures.contracts.map fun signature => signature.id)).Nodup :=
+  checkProgram_success_signature_declaration_ids_nodup success
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do

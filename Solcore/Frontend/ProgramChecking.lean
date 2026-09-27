@@ -275,6 +275,41 @@ theorem checkLoadedProgram_success_environment
               subst checked
               rfl
 
+/-- A successful loaded-program check retains the exact signature-builder
+result used by body checking. -/
+theorem checkLoadedProgram_success_signatures
+    {loaded : LoadedProgram}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkLoadedProgram loaded fuel = .ok checked) :
+    buildProgramSignatures loaded.environment = .ok checked.signatures := by
+  cases signaturesResult : buildProgramSignatures loaded.environment with
+  | error signatureErrors =>
+      simp [checkLoadedProgram, signaturesResult] at success
+  | ok signatures =>
+      cases functionsResult : SourceInference.checkFunctionBodies
+          loaded.environment signatures fuel with
+      | error functionErrors =>
+          cases methodsResult : checkImplementationMethodBodies
+              loaded.environment signatures fuel with
+          | error methodErrors =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+          | ok methods =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+      | ok functions =>
+          cases methodsResult : checkImplementationMethodBodies
+              loaded.environment signatures fuel with
+          | error methodErrors =>
+              simp [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult] at success
+          | ok methods =>
+              simp only [checkLoadedProgram, signaturesResult, functionsResult,
+                methodsResult, Except.ok.injEq] at success
+              subst checked
+              rfl
+
 /-- A successful loaded-program check preserves the exact function and method
 identity order of the resolved signature catalog. -/
 theorem checkLoadedProgram_success_ids
@@ -369,5 +404,23 @@ theorem checkProgram_success_declarations_nodup
     checkProgram_success_load success
   rw [checkLoadedProgram_success_environment checkedSuccess]
   exact loadProgram_success_declarations_nodup loadedSuccess
+
+/-- A successfully checked raw workspace retains pairwise distinct identities
+across every declaration category represented by its signature catalog. -/
+theorem checkProgram_success_signature_declaration_ids_nodup
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    ((checked.signatures.functions.map fun signature => signature.id) ++
+      (checked.signatures.dataTypes.map fun signature => signature.id) ++
+      (checked.signatures.traits.map fun signature => signature.id) ++
+      (checked.signatures.implementations.map fun signature => signature.id) ++
+      (checked.signatures.contracts.map fun signature => signature.id)).Nodup := by
+  obtain ⟨loaded, loadedSuccess, checkedSuccess⟩ :=
+    checkProgram_success_load success
+  exact buildProgramSignatures_success_declaration_ids_nodup
+    (loadProgram_success_declarations_nodup loadedSuccess)
+    (checkLoadedProgram_success_signatures checkedSuccess)
 
 end Solcore.Frontend
