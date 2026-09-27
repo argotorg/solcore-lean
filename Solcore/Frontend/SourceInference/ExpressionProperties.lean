@@ -1391,6 +1391,61 @@ the declaration owner and original input binders. -/
       subst next
       rfl
 
+/-- Successful source-inference unification makes semantic inference progress
+when both raw operands lie below the input allocator. -/
+theorem unify_inferenceProgress
+    {state next : State} {left right : Ty}
+    (solved : state.inference.Solved)
+    (leftBelow : left.VariablesBelow state.inference.next)
+    (rightBelow : right.VariablesBelow state.inference.next)
+    (success : unify state left right = .ok next) :
+    state.InferenceProgress next := by
+  have leftResolvedBelow :
+      (state.inference.resolve left).VariablesBelow state.inference.next := by
+    simpa [TypeSystem.InferState.resolve] using
+      solved.variablesBelow_apply leftBelow
+  have rightResolvedBelow :
+      (state.inference.resolve right).VariablesBelow state.inference.next := by
+    simpa [TypeSystem.InferState.resolve] using
+      solved.variablesBelow_apply rightBelow
+  unfold unify at success
+  cases inferenceSuccess : state.inference.unify left right with
+  | error error =>
+      simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
+  | ok inference =>
+      simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
+      cases success
+      constructor
+      · rw [TypeSystem.InferState.unify_next inferenceSuccess]
+        exact Nat.le_refl _
+      · exact TypeSystem.InferState.Solved.unify solved leftResolvedBelow
+          rightResolvedBelow inferenceSuccess
+      · exact TypeSystem.InferState.Solved.unify_semanticallyExtends solved
+          inferenceSuccess
+
+/-- Successful source-inference unification preserves readiness when both
+operands lie below the input allocator. -/
+theorem unify_preserves_inferenceReady
+    {state next : State} {left right : Ty}
+    (ready : state.InferenceReady)
+    (leftBelow : left.VariablesBelow state.inference.next)
+    (rightBelow : right.VariablesBelow state.inference.next)
+    (success : unify state left right = .ok next) :
+    next.InferenceReady := by
+  have progress := unify_inferenceProgress ready.solved leftBelow rightBelow
+    success
+  unfold unify at success
+  cases inferenceSuccess : state.inference.unify left right with
+  | error error =>
+      simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
+  | ok inference =>
+      simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
+      cases success
+      constructor
+      · exact progress.solved
+      · change state.binderEnvironment.BodiesBelow inference.next
+        exact ready.bindersBelow.weaken progress.next_le
+
 /-- Successful source-inference unification makes the original input types
 equal under the returned inference state. -/
 theorem unify_resolve_eq

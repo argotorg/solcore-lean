@@ -104,6 +104,51 @@ example :
     freshReady (by
       simpa [TypeSystem.Scheme.mono] using freshTypeBelow)
 
+private def unificationProgressInput : SourceInference.State :=
+  (SourceInference.State.initial solverRegressionOwner).fresh.2
+
+private def unificationProgressVariable : TypeSystem.Ty :=
+  (SourceInference.State.initial solverRegressionOwner).fresh.1
+
+private def unificationProgressResult : SourceInference.State := {
+  unificationProgressInput with
+  inference := {
+    next := 1
+    substitution := [(⟨0⟩, .word)]
+  }
+}
+
+private theorem unificationProgress_success :
+    SourceInference.Detail.unify unificationProgressInput
+      unificationProgressVariable .word = .ok unificationProgressResult := by
+  rfl
+
+/-- Binding a freshly allocated variable to `Word` produces a genuine
+semantic substitution extension while preserving inference readiness. -/
+example :
+    unificationProgressResult.inference.substitution.SemanticallyExtends
+        unificationProgressInput.inference.substitution ∧
+      unificationProgressResult.InferenceReady ∧
+      unificationProgressResult.resolve unificationProgressVariable = .word := by
+  have inputReady : unificationProgressInput.InferenceReady := by
+    exact SourceInference.State.InferenceReady.fresh
+      (SourceInference.State.InferenceReady.initial
+        solverRegressionOwner [] [])
+  have variableBelow : unificationProgressVariable.VariablesBelow
+      unificationProgressInput.inference.next := by
+    simp [unificationProgressVariable, unificationProgressInput,
+      SourceInference.State.fresh, TypeSystem.InferState.fresh]
+  have wordBelow : TypeSystem.Ty.word.VariablesBelow
+      unificationProgressInput.inference.next := by
+    simp [TypeSystem.Ty.word, TypeSystem.Ty.VariablesBelow,
+      TypeSystem.Ty.freeVariables]
+  have progress := SourceInference.Detail.unify_inferenceProgress
+    inputReady.solved variableBelow wordBelow unificationProgress_success
+  have resultReady :=
+    SourceInference.Detail.unify_preserves_inferenceReady inputReady
+      variableBelow wordBelow unificationProgress_success
+  exact ⟨progress.substitution_extends, resultReady, rfl⟩
+
 private def solverRegressionFirst : TypeSystem.TypeVarId := ⟨0⟩
 private def solverRegressionSecond : TypeSystem.TypeVarId := ⟨1⟩
 

@@ -345,6 +345,9 @@ example :=
   @Solcore.Frontend.SourceInference.State.markDirectCallRequirements_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_state_header
+example := @Solcore.Frontend.SourceInference.Detail.unify_inferenceProgress
+example :=
+  @Solcore.Frontend.SourceInference.Detail.unify_preserves_inferenceReady
 example := @Solcore.Frontend.SourceInference.Detail.unify_resolve_eq
 example := @Solcore.Frontend.SourceInference.Detail.unify_preserves_resolve_eq
 example :=
