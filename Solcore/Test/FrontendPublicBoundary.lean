@@ -217,6 +217,8 @@ example := @Solcore.Frontend.SourceInference.State.InferenceReady.fresh
 example := @Solcore.Frontend.SourceInference.State.InferenceReady.withLocals
 example :=
   @Solcore.Frontend.SourceInference.State.InferenceReady.restoreLexicalScope
+example :=
+  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_inferenceProperties
 example := @Solcore.Frontend.SourceInference.State.InferenceReady.allocateBinder
 example :=
   @Solcore.Frontend.SourceInference.State.InferenceReady.allocateHiddenLocal
@@ -390,6 +392,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_inferenceReady
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_some_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_coercions_isValid
 example :=

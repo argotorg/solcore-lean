@@ -1636,6 +1636,33 @@ theorem withExpected_inferenceProperties
                       simpa only [commitCoercionPlan_resolve] using
                         resolvedExpectedBelow
 
+/-- A candidate retained after expected-type fitting inherits its semantic
+inference progress, readiness, and allocator-bounded result type. -/
+theorem candidateWithExpected_some_inferenceProperties
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (ready : state.InferenceReady)
+    (actualBelow : actual.type.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : candidateWithExpected context state actual expected =
+      .ok (some result)) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.expression.type.VariablesBelow result.state.inference.next := by
+  unfold candidateWithExpected at success
+  cases fittedResult : withExpected context state actual expected with
+  | error error =>
+      cases error <;> simp [fittedResult] at success
+      all_goals cases ‹Unification.Error› <;> simp_all [fittedResult]
+  | ok fitted =>
+      simp only [fittedResult] at success
+      injection success with resultEq
+      have fittedEq : fitted = result := Option.some.inj resultEq
+      subst result
+      exact withExpected_inferenceProperties ready actualBelow expectedBelow
+        fittedResult
+
 /-- Expected-type fitting followed by expression recording has the same
 inference guarantees; recording the typed node leaves inference unchanged. -/
 theorem recordExpressionWithExpected_inferenceProperties

@@ -104,6 +104,17 @@ example :
     freshReady (by
       simpa [TypeSystem.Scheme.mono] using freshTypeBelow)
 
+/-- Restoring an outer lexical scope after inner inference preserves the
+inner semantic progress while re-establishing outer-binder readiness. -/
+example {outer inner : SourceInference.State}
+    (ready : outer.InferenceReady)
+    (progress : outer.InferenceProgress inner) :
+    outer.InferenceProgress
+        (inner.restoreLexicalScope outer.lexicalScope) ∧
+      (inner.restoreLexicalScope outer.lexicalScope).InferenceReady := by
+  exact SourceInference.State.restoreLexicalScope_inferenceProperties
+    ready progress
+
 private def shadowingBinderEnvironment : TypeSystem.Environment :=
   [("shadowed", TypeSystem.Scheme.mono .bool),
     ("shadowed", TypeSystem.Scheme.mono .word)]
@@ -295,6 +306,26 @@ example {actual : SourceInference.InferredExpression}
       result.expression.type.VariablesBelow result.state.inference.next := by
   exact SourceInference.Detail.withExpected_inferenceProperties ready
     actualBelow expectedBelow success
+
+/-- A candidate retained by expected-type fitting exposes the same inference
+progress, readiness, and allocator-bounded result type as the underlying fit. -/
+example {context : SourceInference.Context}
+    {state : SourceInference.State}
+    {actual : SourceInference.InferredExpression}
+    {expected : Option TypeSystem.Ty}
+    {result : SourceInference.Detail.ExpectationResult}
+    (ready : state.InferenceReady)
+    (actualBelow : actual.type.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.candidateWithExpected context state
+      actual expected = .ok (some result)) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.expression.type.VariablesBelow result.state.inference.next := by
+  exact
+    SourceInference.Detail.candidateWithExpected_some_inferenceProperties
+      ready actualBelow expectedBelow success
 
 /-- Recording an expected expression extends the same inference guarantees
 through source-node allocation without requiring a concrete evaluator case. -/
