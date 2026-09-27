@@ -1154,4 +1154,26 @@ theorem markDirectCallRequirements {state : State}
 
 end InferenceReady
 
+/-- Restoring the outer lexical scope after inner inference preserves the
+inner inference result while re-establishing readiness from the outer binder
+bound.  No readiness premise is needed for the un-restored inner state. -/
+theorem restoreLexicalScope_inferenceProperties
+    {outer inner : State}
+    (ready : outer.InferenceReady)
+    (progress : outer.InferenceProgress inner) :
+    outer.InferenceProgress
+        (inner.restoreLexicalScope outer.lexicalScope) ∧
+      (inner.restoreLexicalScope outer.lexicalScope).InferenceReady := by
+  have restoreProgress :
+      inner.InferenceProgress
+        (inner.restoreLexicalScope outer.lexicalScope) :=
+    InferenceProgress.restoreLexicalScope inner outer.lexicalScope
+      progress.solved
+  refine ⟨progress.trans restoreProgress, ?_⟩
+  constructor
+  · change inner.inference.Solved
+    exact progress.solved
+  · change outer.binderEnvironment.BodiesBelow inner.inference.next
+    exact ready.bindersBelow.weaken progress.next_le
+
 end Solcore.Frontend.SourceInference.State
