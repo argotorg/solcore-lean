@@ -35,6 +35,7 @@ example :=
 example := @Solcore.Frontend.checkImplementationMethodBodies
 example := @Solcore.Frontend.checkImplementationMethodBodies_success_ids
 example := @Solcore.Frontend.checkLoadedProgram_success_ids
+example := @Solcore.Frontend.checkProgram_success_ids
 example := @Solcore.Frontend.ProgramCheckError.methodInference
 example := @Solcore.Frontend.ProgramCheckError.methodNoSolution
 example := @Solcore.Frontend.ProgramCheckError.methodInconclusive

@@ -406,9 +406,13 @@ example := @Solcore.SourceSemantics.CheckedProgramWellFormedConditions
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.ofCheckLoadedProgram
 example :=
+  @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.ofCheckProgram
+example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormed
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormedOfCheckLoadedProgram
+example :=
+  @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.programWellFormedOfCheckProgram
 
 example := @Solcore.SourceSemantics.Dynamic.Value
 example := @Solcore.SourceSemantics.Dynamic.GeneralizedClosure

@@ -54,6 +54,18 @@ example
           implementation.methods.map (fun method => method.id) :=
   checkLoadedProgram_success_ids success
 
+example
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    checked.functions.map (fun function => function.declaration) =
+        checked.signatures.functions.map (fun signature => signature.id) ∧
+      checked.methods.map (fun method => method.id) =
+        checked.signatures.implementations.flatMap fun implementation =>
+          implementation.methods.map (fun method => method.id) :=
+  checkProgram_success_ids success
+
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do
     throw (IO.userError message)

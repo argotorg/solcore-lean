@@ -291,4 +291,23 @@ def checkProgram (raw : Workspace.RawWorkspace) (fuel : Nat := 1024) :
   | .error errors => .error (errors.map ProgramCheckError.loading)
   | .ok loaded => checkLoadedProgram loaded fuel
 
+/-- A successful raw-workspace check preserves the exact function and method
+identity order of the resolved signature catalog. -/
+theorem checkProgram_success_ids
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : checkProgram raw fuel = .ok checked) :
+    checked.functions.map (fun function => function.declaration) =
+        checked.signatures.functions.map (fun signature => signature.id) ∧
+      checked.methods.map (fun method => method.id) =
+        checked.signatures.implementations.flatMap fun implementation =>
+          implementation.methods.map (fun method => method.id) := by
+  cases loadedResult : loadProgram raw with
+  | error errors =>
+      simp [checkProgram, loadedResult] at success
+  | ok loaded =>
+      apply checkLoadedProgram_success_ids
+      simpa [checkProgram, loadedResult] using success
+
 end Solcore.Frontend

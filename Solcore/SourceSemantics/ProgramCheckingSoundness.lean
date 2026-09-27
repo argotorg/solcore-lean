@@ -99,6 +99,30 @@ theorem ofCheckLoadedProgram
     methods_valid := methodsValid
   }
 
+/-- Successful checking from a raw workspace likewise discharges exact body
+identity alignment; callers retain only the semantic catalog/body premises. -/
+theorem ofCheckProgram
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkProgram raw fuel = Except.ok checked)
+    (signatures : SignatureCatalogWellFormed checked.signatures)
+    (functionsValid : ∀ function, function ∈ checked.functions →
+      FunctionDefinition.Valid checked.signatures
+        (FunctionDefinition.ofChecked function))
+    (methodsValid : ∀ method, method ∈ checked.methods →
+      MethodDefinition.Valid checked.signatures
+        (MethodDefinition.ofChecked method)) :
+    CheckedProgramWellFormedConditions checked := by
+  obtain ⟨functionIds, methodIds⟩ := Frontend.checkProgram_success_ids success
+  exact {
+    signatures
+    function_ids := functionIds
+    method_ids := methodIds
+    functions_valid := functionsValid
+    methods_valid := methodsValid
+  }
+
 /-- Assemble whole-program declarative well-formedness from the explicit
 checker-to-semantics bridge obligations. -/
 theorem programWellFormed
@@ -166,6 +190,25 @@ theorem programWellFormedOfCheckLoadedProgram
         (MethodDefinition.ofChecked method)) :
     ProgramWellFormed (Program.ofChecked checked) :=
   (CheckedProgramWellFormedConditions.ofCheckLoadedProgram success signatures
+    functionsValid methodsValid).programWellFormed
+
+/-- Promote raw-workspace checker success directly to declarative
+whole-program well-formedness once the remaining semantic premises are
+supplied. -/
+theorem programWellFormedOfCheckProgram
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkProgram raw fuel = Except.ok checked)
+    (signatures : SignatureCatalogWellFormed checked.signatures)
+    (functionsValid : ∀ function, function ∈ checked.functions →
+      FunctionDefinition.Valid checked.signatures
+        (FunctionDefinition.ofChecked function))
+    (methodsValid : ∀ method, method ∈ checked.methods →
+      MethodDefinition.Valid checked.signatures
+        (MethodDefinition.ofChecked method)) :
+    ProgramWellFormed (Program.ofChecked checked) :=
+  (CheckedProgramWellFormedConditions.ofCheckProgram success signatures
     functionsValid methodsValid).programWellFormed
 
 end CheckedProgramWellFormedConditions
