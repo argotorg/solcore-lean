@@ -1,3 +1,6 @@
+import Solcore.Frontend.ProgramEnvironmentProperties
+import Solcore.Frontend.ProgramSignaturesProperties
+import Solcore.Frontend.SourceInference.ExpressionProperties
 import Solcore.Frontend.SourceInference.Program
 import Solcore.Frontend.SourceInference.TypedIRProperties
 
@@ -278,6 +281,17 @@ namespace Solcore.Frontend.SourceInference
 
 open TypeSystem
 
+private theorem functionParameterEnvironment_names
+    (parameters : List ProgramFunctionParameter) :
+    ((((parameters.map (fun parameter => parameter.name)).zip
+        (parameters.map (fun parameter => parameter.type))).map
+          fun parameter => (parameter.1, Scheme.mono parameter.2)).map
+      fun entry => entry.1) =
+        parameters.map (fun parameter => parameter.name) := by
+  induction parameters with
+  | nil => rfl
+  | cons parameter rest induction => simp [induction]
+
 /-- Successful checking retains the callable type assembled by the signature
 builder. -/
 theorem checkFunctionBody_success_type
@@ -326,5 +340,88 @@ theorem checkFunctionBody_success_inferredBodyType
     checkFunctionBody_success_witness success
   subst checked
   exact Detail.finalize_type finalizeEq
+
+/-- Successful body inference and finalization retain the source declaration
+that owns the checked function. -/
+theorem checkFunctionBody_success_typedBody_owner
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.typedBody.owner = signature.id := by
+  obtain ⟨declaration, body, finalState, result, declarationEq, bodyEq,
+    unifyEq, finalizeEq, checkedEq⟩ :=
+    checkFunctionBody_success_witness success
+  subst checked
+  have bodyHeader := Detail.inferStatementsFuel_state_header bodyEq
+  have finalHeader := Detail.unify_state_header unifyEq
+  have finalOwner : finalState.owner = declaration.id := by
+    have headerOwner := congrArg (fun header : State.Header => header.owner)
+      (finalHeader.trans bodyHeader)
+    simpa [State.header] using headerOwner
+  exact (Detail.finalize_typedSource_owner finalizeEq).trans
+    (finalOwner.trans
+      (ProgramEnvironment.declaration?_sound declarationEq).2)
+
+/-- Successful checking preserves the exact source-order input names from the
+function signature in the finalized typed body. -/
+theorem checkFunctionBody_success_typedBody_inputNames
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.typedBody.inputs.map (fun binder => binder.name) =
+      signature.parameterNames := by
+  obtain ⟨declaration, body, finalState, result, _, bodyEq, unifyEq,
+    finalizeEq, checkedEq⟩ := checkFunctionBody_success_witness success
+  subst checked
+  have bodyHeader := Detail.inferStatementsFuel_state_header bodyEq
+  have finalHeader := Detail.unify_state_header unifyEq
+  have finalInputs : finalState.inputs =
+      (State.initial declaration.id
+        ((signature.parameterNames.zip signature.parameterTypes).map
+          fun parameter => (parameter.1, Scheme.mono parameter.2))
+        signature.parameterComptime).inputs := by
+    exact congrArg (fun header : State.Header => header.inputs)
+      (finalHeader.trans bodyHeader)
+  rw [Detail.finalize_typedSource_inputNames finalizeEq, finalInputs,
+    State.initial_input_names]
+  simpa [ProgramFunctionSignature.parameterNames,
+    ProgramFunctionSignature.parameterTypes] using
+      functionParameterEnvironment_names signature.parameters
+
+/-- Successful checking preserves the exact source-order staging markers from
+the function signature in the finalized typed body. -/
+theorem checkFunctionBody_success_typedBody_inputComptime
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    checked.typedBody.inputs.map (fun binder => binder.comptime) =
+      signature.parameterComptime := by
+  obtain ⟨declaration, body, finalState, result, _, bodyEq, unifyEq,
+    finalizeEq, checkedEq⟩ := checkFunctionBody_success_witness success
+  subst checked
+  have bodyHeader := Detail.inferStatementsFuel_state_header bodyEq
+  have finalHeader := Detail.unify_state_header unifyEq
+  have finalInputs : finalState.inputs =
+      (State.initial declaration.id
+        ((signature.parameterNames.zip signature.parameterTypes).map
+          fun parameter => (parameter.1, Scheme.mono parameter.2))
+        signature.parameterComptime).inputs := by
+    exact congrArg (fun header : State.Header => header.inputs)
+      (finalHeader.trans bodyHeader)
+  rw [Detail.finalize_typedSource_inputComptime finalizeEq, finalInputs]
+  apply State.initial_input_comptime_eq
+  simp
 
 end Solcore.Frontend.SourceInference

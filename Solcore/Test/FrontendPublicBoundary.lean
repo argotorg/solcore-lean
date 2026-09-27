@@ -28,6 +28,9 @@ example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
 example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
 example := @Solcore.Frontend.ProgramContractSignature
 example := @Solcore.Frontend.ProgramSignatures.contract?
+example := @Solcore.Frontend.ProgramFunctionSignature.parameterNames_length
+example := @Solcore.Frontend.ProgramFunctionSignature.parameterTypes_length
+example := @Solcore.Frontend.ProgramFunctionSignature.parameterComptime_length
 example := @Solcore.Frontend.SignatureParametersWellFormed
 example := @Solcore.Frontend.SignatureParametersWellFormed.parameters_nodup
 example := @Solcore.Frontend.SignatureParametersWellFormed.parameter_owners
@@ -59,6 +62,24 @@ example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_declaration
 example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_witness
+example := @Solcore.Frontend.SourceInference.State.Header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_inputs
+example := @Solcore.Frontend.SourceInference.checkFunctionBody_success_type
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_returnComptime
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_inferredBodyType
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_owner
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_inputNames
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_typedBody_inputComptime
 example :=
   @Solcore.Frontend.SourceInference.checkFunctionBodies_success_declaration_ids
 example := @Solcore.Frontend.checkImplementationMethodBodies
