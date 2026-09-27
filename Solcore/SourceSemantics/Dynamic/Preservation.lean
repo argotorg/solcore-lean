@@ -2,6 +2,8 @@ import Solcore.SourceSemantics.Dynamic.Default
 import Solcore.SourceSemantics.Dynamic.GeneralizedClosure
 import Solcore.SourceSemantics.Dynamic.Pattern
 import Solcore.SourceSemantics.Dynamic.Place
+import Solcore.SourceSemantics.Dynamic.EvidenceSubstitutionProperties
+import Solcore.SourceSemantics.Dynamic.LocalSchemes
 import Solcore.SourceSemantics.Dynamic.Evaluation
 import Solcore.SourceSemantics.Operators
 import Solcore.SourceSemantics.TraitSubstitutionProperties
@@ -2608,6 +2610,285 @@ theorem runtimeRequirementLedger
       (ledger.implementationEntries row evidence sourceMember implementationEq)
 
 end RuntimeContextFields
+
+namespace LocalSchemeRuntimeInstantiation
+
+/-- Materializing one generalized local combines its freshly produced
+qualified evidence with the caller dictionary after applying the same
+flexible substitution.  The combined dictionary covers the fully closed
+initializer context, including both outer and scheme-local assumptions. -/
+theorem materializedEvidenceCovers
+    {context : Context} {callerEvidence producedEvidence : EvidenceEnvironment}
+    {function : GeneralizedClosure} {type : Ty}
+    {actualRequirements : List RequirementId}
+    {substitution : Substitution}
+    (fields : RuntimeContextFields function.definitionContext context)
+    (callerCovers : callerEvidence.Covers context)
+    (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
+      function.binder type actualRequirements substitution producedEvidence) :
+    (producedEvidence ++ callerEvidence.applySubstitution substitution).Covers
+      (FlexibleSubstitution.closeContext substitution
+        (localSchemeInitializerContext function.definitionContext
+          function.binder)) := by
+  have definitionCovers :
+      callerEvidence.Covers function.definitionContext :=
+    fields.symm.covers callerCovers
+  have substitutedCovers :=
+    definitionCovers.applySubstitution substitution
+  have producedValid :
+      producedEvidence.Valid
+        (FlexibleSubstitution.closeContext substitution
+          function.definitionContext).signatures.resolutionRules := by
+    simpa [fields.signatures] using instantiation.produced_evidence_valid
+  rw [FlexibleSubstitution.closeContext_localSchemeInitializerContext]
+  constructor
+  · exact producedValid.append substitutedCovers.1
+  · apply (instantiation.produces.supplies.append
+      substitutedCovers.2).of_subset
+    intro predicate member
+    rcases List.mem_append.mp member with member | member
+    · exact List.mem_append.mpr (.inr member)
+    · exact List.mem_append.mpr (.inl member)
+
+end LocalSchemeRuntimeInstantiation
+
+namespace GeneralizedClosureCodeValid
+
+/-- Closing a generalized local's initializer context with one valid flexible
+substitution turns its retained principal code into ordinary closure code.
+The evidence payload is operational data only; code validity depends on the
+shared substitution used for the context, source graph, and lambda header. -/
+theorem instantiateCode
+    {function : GeneralizedClosure} {substitution : Substitution}
+    {evidence : EvidenceEnvironment} {closedVariables : List TypeVarId}
+    (catalog : SignatureCatalogWellFormed
+      function.definitionContext.signatures)
+    (valid : GeneralizedClosureCodeValid function)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid substitution
+      closedVariables
+      (localSchemeInitializerContext function.definitionContext
+        function.binder)
+      (FlexibleSubstitution.closeContext substitution
+        (localSchemeInitializerContext function.definitionContext
+          function.binder))) :
+    ClosureCodeValid
+      (FlexibleSubstitution.closeContext substitution
+        (localSchemeInitializerContext function.definitionContext
+          function.binder))
+      (function.instantiate substitution evidence) := by
+  rcases valid.occurrence with
+    ⟨node, contains, formEq, rawTypeEq, _typeEq, _requirementsEmpty,
+      _coercionsEmpty, formTyping⟩
+  have initializerCatalog :
+      SignatureCatalogWellFormed
+        (localSchemeInitializerContext function.definitionContext
+          function.binder).signatures := by
+    simpa [localSchemeInitializerContext, Context.withTypeVariables,
+      Context.withAssumptions] using catalog
+  have mappedFormTyping :=
+    FlexibleSubstitution.ExpressionFormHasRawType.applySubstitution_lambda
+      initializerCatalog contextValid (by simpa [formEq] using formTyping)
+  rw [formEq] at formTyping
+  generalize retainedRawTypeEq : function.binder.scheme.body = retainedRawType
+    at formTyping
+  cases formTyping with
+  | @lambda _ lambdaContext finalContext _ parameterTypes _ _ bodyFacts
+      namesUnique parametersExtend bodyType bodyCompletes =>
+      have mappedParametersExtend :=
+        FlexibleSubstitution.MonoBindersExtend.applySubstitution
+          contextValid.closes parametersExtend
+      have sourceParameterBodies :=
+        Solcore.SourceSemantics.Dynamic.MonoBindersExtend.bodyTypes_eq
+          parametersExtend
+      have targetParameterBodies :=
+        Solcore.SourceSemantics.Dynamic.MonoBindersExtend.bodyTypes_eq
+          mappedParametersExtend
+      have mappedParameterBodies :
+          (function.parameters.map
+              (TypedBinder.applySubstitution substitution)).map
+              (fun binder => binder.scheme.body) =
+            (function.parameters.map
+              (fun binder => binder.scheme.body)).map substitution.apply := by
+        rw [targetParameterBodies, sourceParameterBodies]
+      have mappedFunctionType :=
+        congrArg substitution.apply valid.functionType_eq
+      have mappedRawTypeEq :
+          substitution.apply function.binder.scheme.body =
+            .function
+              (Ty.productMany
+                ((function.parameters.map
+                  (TypedBinder.applySubstitution substitution)).map
+                    (fun binder => binder.scheme.body)))
+              (substitution.apply function.resultType) := by
+        rw [mappedParameterBodies]
+        simpa [FlexibleSubstitution.apply_productMany, List.map_map,
+          Function.comp_def] using mappedFunctionType
+      refine {
+        owner := by
+          simpa [GeneralizedClosure.instantiate,
+            localSchemeInitializerContext, Context.withTypeVariables,
+            Context.withAssumptions] using valid.owner
+        closed := by
+          simpa [GeneralizedClosure.instantiate,
+            localSchemeInitializerContext, Context.withTypeVariables,
+            Context.withAssumptions] using valid.closed
+        variables_closed := by
+          exact FlexibleSubstitution.closeContext_typeVariables _ _
+        residual_variables_open := by
+          simpa [GeneralizedClosure.instantiate,
+            localSchemeInitializerContext, Context.withTypeVariables,
+            Context.withAssumptions] using valid.residual_variables_open
+        graph :=
+          FlexibleSubstitution.OccurrenceGraphWellFormed.applySubstitution
+            substitution valid.graph
+        requirement_ledger :=
+          FlexibleSubstitution.RuntimeRequirementLedgerValid.applySubstitution
+            contextValid.closes valid.requirement_ledger.localSchemeInitializer
+        occurrence := ⟨function.initializer, node.applySubstitution substitution,
+          FlexibleSubstitution.ContainsExpression.applySubstitution substitution
+            contains, by
+              simp [GeneralizedClosure.instantiate,
+                ExpressionNode.applySubstitution, formEq,
+                ExpressionForm.applySubstitution], ?_, ?_⟩
+      }
+      · rw [Frontend.SourceInference.ExpressionNode.applySubstitution_rawType,
+          rawTypeEq]
+        simpa only [GeneralizedClosure.instantiate_parameters,
+          GeneralizedClosure.instantiate_resultType] using mappedRawTypeEq
+      · simpa [GeneralizedClosure.instantiate,
+          ExpressionNode.applySubstitution, formEq,
+          ExpressionForm.applySubstitution,
+          FlexibleSubstitution.applyExpressionRequirementPlan,
+          mappedRawTypeEq] using
+          mappedFormTyping
+
+end GeneralizedClosureCodeValid
+
+namespace GeneralizedClosureWellTyped
+
+/-- A runtime instance of a deeply typed generalized closure is an ordinary
+closure at the exact type selected by the use-site substitution.  The same
+substitution closes code, assumptions, and caller evidence, while
+generalization ensures that older captured schemes remain unchanged. -/
+theorem instantiateHasType
+    {context : Context} {heap : Heap} {function : GeneralizedClosure}
+    {callerEvidence producedEvidence : EvidenceEnvironment} {type : Ty}
+    {actualRequirements : List RequirementId}
+    {substitution : Substitution}
+    (catalog : SignatureCatalogWellFormed
+      function.definitionContext.signatures)
+    (typed : GeneralizedClosureWellTyped context heap function)
+    (fields : RuntimeContextFields function.definitionContext context)
+    (callerCovers : callerEvidence.Covers context)
+    (instantiation : LocalSchemeRuntimeInstantiation context callerEvidence
+      function.binder type actualRequirements substitution producedEvidence) :
+    ValueHasType context heap
+      (.closure (function.instantiate substitution
+        (producedEvidence ++
+          callerEvidence.applySubstitution substitution))) type := by
+  have range : SubstitutionRangeWellFormed
+      (FlexibleSubstitution.closeContext substitution
+        (localSchemeInitializerContext function.definitionContext
+          function.binder)) substitution := by
+    intro metavariable replacement member
+    exact StructuralSubstitution.TypeWellFormed.transportContext
+      (source := context)
+      (target := FlexibleSubstitution.closeContext substitution
+        (localSchemeInitializerContext function.definitionContext
+          function.binder))
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using fields.signatures.symm)
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using fields.typeParameters.symm)
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using fields.currentDeclaration.symm)
+      (instantiation.range metavariable replacement member)
+  have exactInitializer :=
+    FlexibleSubstitution.ExactSubstitution.localSchemeInitializerContext
+      typed.code.variables_closed instantiation.exact
+  have closes :=
+    FlexibleSubstitution.ContextCloses.close exactInitializer range
+  have baseFresh :=
+    FlexibleSubstitution.LocalSchemesFreshFor.ofBinderWellFormed
+      typed.code.binder_well_formed instantiation.exact
+  have initializerFresh : FlexibleSubstitution.LocalSchemesFreshFor
+      (localSchemeInitializerContext function.definitionContext
+        function.binder) substitution := by
+    simpa [FlexibleSubstitution.LocalSchemesFreshFor,
+      localSchemeInitializerContext, Context.withTypeVariables,
+      Context.withAssumptions] using baseFresh
+  have contextValid :=
+    FlexibleSubstitution.ContextSubstitutionValid.ofRuntimeRequirementLedger
+      closes initializerFresh
+      typed.code.requirement_ledger.localSchemeInitializer
+  have code := typed.code.instantiateCode
+    (evidence := producedEvidence ++
+      callerEvidence.applySubstitution substitution)
+    catalog contextValid
+  have covers :=
+    instantiation.materializedEvidenceCovers fields callerCovers
+  have localsFixed :=
+    FlexibleSubstitution.applyLocals_eq_self_of_generalizes
+      typed.code.generalizes instantiation.exact
+  have captures : EnvironmentAgrees heap
+      (function.instantiate substitution
+        (producedEvidence ++
+          callerEvidence.applySubstitution substitution)).context.locals
+      (function.instantiate substitution
+        (producedEvidence ++
+          callerEvidence.applySubstitution substitution)).captured := by
+    simpa [GeneralizedClosure.instantiate, localSchemeInitializerContext,
+      Context.withTypeVariables, Context.withAssumptions, localsFixed] using
+      typed.captures
+  have sameSignatures :
+      (function.instantiate substitution
+        (producedEvidence ++
+          callerEvidence.applySubstitution substitution)).context.signatures =
+        context.signatures := by
+    simpa [GeneralizedClosure.instantiate, localSchemeInitializerContext,
+      Context.withTypeVariables, Context.withAssumptions] using
+      typed.same_signatures
+  rcases typed.code.occurrence with
+    ⟨node, _contains, formEq, _rawTypeEq, _typeEq, _requirementsEmpty,
+      _coercionsEmpty, formTyping⟩
+  rw [formEq] at formTyping
+  generalize retainedRawTypeEq :
+    function.binder.scheme.body = retainedRawType at formTyping
+  cases formTyping with
+  | @lambda _ lambdaContext finalContext _ parameterTypes _ _ bodyFacts
+      namesUnique parametersExtend bodyType bodyCompletes =>
+      have mappedExtend :=
+        FlexibleSubstitution.MonoBindersExtend.applySubstitution
+          contextValid.closes parametersExtend
+      have sourceBodies := MonoBindersExtend.bodyTypes_eq parametersExtend
+      have targetBodies := MonoBindersExtend.bodyTypes_eq mappedExtend
+      have mappedBodies :
+          (function.parameters.map
+            (TypedBinder.applySubstitution substitution)).map
+              (fun binder => binder.scheme.body) =
+            (function.parameters.map
+              (fun binder => binder.scheme.body)).map substitution.apply := by
+        rw [targetBodies, sourceBodies]
+      have mappedFunctionType :=
+        congrArg substitution.apply typed.code.functionType_eq
+      have mappedRawTypeEq :
+          substitution.apply function.binder.scheme.body =
+            .function
+              (Ty.productMany
+                ((function.parameters.map
+                  (TypedBinder.applySubstitution substitution)).map
+                    (fun binder => binder.scheme.body)))
+              (substitution.apply function.resultType) := by
+        rw [mappedBodies]
+        simpa [FlexibleSubstitution.apply_productMany, List.map_map,
+          Function.comp_def] using mappedFunctionType
+      have resultEq := mappedRawTypeEq.symm.trans instantiation.result
+      have materialized :=
+        ValueHasType.closure sameSignatures code covers captures
+      simpa only [GeneralizedClosure.instantiate_parameters,
+        GeneralizedClosure.instantiate_resultType, resultEq] using materialized
+
+end GeneralizedClosureWellTyped
 
 /-- Static invariants shared by every successful execution rooted in one
 rigidly and lexically closed, residual-open source body.  In particular,
