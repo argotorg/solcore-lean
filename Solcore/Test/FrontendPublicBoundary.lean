@@ -204,6 +204,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_success_candidate
 example :=
+  @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_preserves_requirementsWellFormed
+example :=
+  @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidate_preserves_requirementsWellFormed
+example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_formation
 example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_apply_eq_self

@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Expression
+import Solcore.Frontend.SourceInference.RequirementProperties
 import Solcore.Frontend.SourceInference.StateProperties
 import Solcore.Frontend.ProgramSignatureFormationProperties
 import Solcore.TypeSystem.InferenceProperties
@@ -788,6 +789,45 @@ theorem selectFunctionCandidateFrom_success_candidate
             simpa [attempt] using
               (collectCandidateAttempts_success_provenance
                 candidates candidate member)
+
+/-- Overload ranking returns one unchanged successful candidate attempt, so
+its requirement ledger is canonical whenever the shared input ledger is. -/
+theorem selectFunctionCandidateFrom_preserves_requirementsWellFormed
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result)
+    (wellFormed : state.RequirementsWellFormed) :
+    result.state.RequirementsWellFormed := by
+  obtain ⟨signature, _, candidateSuccess⟩ :=
+    selectFunctionCandidateFrom_success_candidate success
+  exact tryFunctionCandidate_preserves_requirementsWellFormed
+    candidateSuccess wellFormed
+
+/-- Resolving the visible overload set is state-free; successful ordinary
+selection therefore inherits the explicit-candidate ledger guarantee. -/
+theorem selectFunctionCandidate_preserves_requirementsWellFormed
+    {context : Context} {name : String}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidate context name arguments
+      integerLiteralOrigins call expected state = .ok result)
+    (wellFormed : state.RequirementsWellFormed) :
+    result.state.RequirementsWellFormed := by
+  unfold selectFunctionCandidate at success
+  cases candidatesResult : functionsNamed context name with
+  | error error =>
+      simp [candidatesResult, bind, Except.bind] at success
+  | ok candidates =>
+      simp only [candidatesResult, bind, Except.bind] at success
+      exact selectFunctionCandidateFrom_preserves_requirementsWellFormed
+        success wellFormed
 
 private theorem selectFunctionCandidateFrom_state_header
     {context : Context} {name : String}
