@@ -263,6 +263,21 @@ example {source : Syntax.TypeExpr} {type : TypeSystem.Ty}
   SourceInference.Detail.resolveSourceType_success_variablesBelow
     success next
 
+/-- Formation validation bounds every payload of a cataloged data constructor
+at any flexible-variable allocator position. -/
+example {signatures : ProgramSignatures}
+    (validated : ProgramSignatureFormationValidated signatures)
+    {dataType : ProgramDataSignature}
+    (dataMember : dataType ∈ signatures.dataTypes)
+    {constructor : ProgramDataConstructorSignature}
+    (constructorMember : constructor ∈ dataType.constructors)
+    (next : Nat) :
+    ∀ payload ∈ constructor.payloadTypes,
+      payload.VariablesBelow next := by
+  exact
+    ProgramSignatureFormationValidated.data_constructor_payloadTypes_variablesBelow
+      validated dataMember constructorMember next
+
 /-- Formation validation rejects the recovery sentinel independently of how
 the resolved type was produced. -/
 example : validateResolvedTypeFormation solverRegressionContext.signatures
@@ -366,6 +381,30 @@ example {context : SourceInference.Context} {state : SourceInference.State}
       result.state.InferenceReady := by
   exact SourceInference.Detail.fitArguments_some_inferenceProperties
     ready argumentsBelow parametersBelow success
+
+/-- A retained function-candidate attempt packages progress, readiness, and a
+final allocator bound for its inferred result type. -/
+example {context : SourceInference.Context}
+    {arguments : List SourceInference.InferredExpression}
+    {integerLiteralOrigins : List SourceInference.IntegerLiteralOrigin}
+    {call : SourceInference.ExpressionId}
+    {expected : Option TypeSystem.Ty} {state : SourceInference.State}
+    {signature : ProgramFunctionSignature}
+    {result : SourceInference.Detail.CandidateAttemptResult}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (schemeBodyBelow : signature.scheme.body.VariablesBelow
+      state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.tryFunctionCandidate context arguments
+      integerLiteralOrigins call expected state signature = .ok (some result)) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.result.type.VariablesBelow result.state.inference.next := by
+  exact SourceInference.Detail.tryFunctionCandidate_some_inferenceProperties
+    ready argumentsBelow schemeBodyBelow expectedBelow success
 
 /-- Recording an expected expression extends the same inference guarantees
 through source-node allocation without requiring a concrete evaluator case. -/

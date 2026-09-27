@@ -97,6 +97,8 @@ example := @Solcore.Frontend.SignatureTypeFormationValidated.variablesBelow
 example := @Solcore.Frontend.SignatureTypesFormationValidated.variablesBelow
 example :=
   @Solcore.Frontend.ProgramSignatureFormationValidated.function_scheme_body_variablesBelow
+example :=
+  @Solcore.Frontend.ProgramSignatureFormationValidated.data_constructor_payloadTypes_variablesBelow
 example := @Solcore.Frontend.SignatureTypeFormationValidated.apply_eq_self
 example := @Solcore.Frontend.SignatureTypesFormationValidated.apply_eq_self
 example :=
@@ -400,6 +402,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.parameterTypesForArity?_success_variablesBelow
 example :=
   @Solcore.Frontend.SourceInference.Detail.fitArguments_some_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_coercions_isValid
 example :=

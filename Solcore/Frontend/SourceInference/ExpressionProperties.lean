@@ -1791,6 +1791,241 @@ theorem fitArguments_some_inferenceProperties
                           exact ⟨fittedProperties.1.trans tailProperties.1,
                             tailProperties.2⟩
 
+/-- A retained overload candidate makes semantic inference progress through
+declaration instantiation, argument fitting, result fitting, and requirement
+allocation.  The final resolved result type remains below the final allocator. -/
+theorem tryFunctionCandidate_some_inferenceProperties
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (schemeBodyBelow : signature.scheme.body.VariablesBelow
+      state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.result.type.VariablesBelow result.state.inference.next := by
+  let instantiated := signature.scheme.instantiate state.inference.next
+  let advancedState : State := {
+    state with inference := {
+      state.inference with next := instantiated.next
+    }
+  }
+  have instantiatedNextLe :
+      state.inference.next ≤ instantiated.next := by
+    simpa only [instantiated] using
+      ConstrainedDeclarationScheme.instantiate_next_le signature.scheme
+        state.inference.next
+  have advanceProgress : state.InferenceProgress advancedState := by
+    refine State.InferenceProgress.of_substitution_eq ready.solved ?_ ?_
+    · simpa only [advancedState] using instantiatedNextLe
+    · rfl
+  have advancedReady : advancedState.InferenceReady :=
+    State.InferenceReady.of_progress_of_binderEnvironment_eq ready
+      advanceProgress rfl
+  have instantiatedBodyBelow :
+      instantiated.body.VariablesBelow instantiated.next := by
+    simpa only [instantiated] using
+      ConstrainedDeclarationScheme.instantiate_body_variablesBelow
+        signature.scheme state.inference.next schemeBodyBelow
+  have argumentsAtAdvanced : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow advancedState.inference.next := by
+    intro argument member
+    exact (argumentsBelow argument member).weaken advanceProgress.next_le
+  unfold tryFunctionCandidate at success
+  dsimp only at success
+  cases partsResult : functionParts?
+      (signature.scheme.instantiate state.inference.next).body with
+  | none =>
+      rw [partsResult] at success
+      simp at success
+  | some parts =>
+      rcases parts with ⟨parameterType, resultType⟩
+      rw [partsResult] at success
+      have localPartsResult :
+          functionParts? instantiated.body =
+            some (parameterType, resultType) := by
+        simpa only [instantiated] using partsResult
+      have partsBelow := functionParts?_success_variablesBelow
+        instantiatedBodyBelow localPartsResult
+      cases parametersResult : parameterTypesForArity?
+          signature.parameterTypes.length parameterType with
+      | none => simp [parametersResult] at success
+      | some parameterTypes =>
+          simp only [parametersResult] at success
+          have parameterTypesBelowAtInstantiation :=
+            parameterTypesForArity?_success_variablesBelow partsBelow.1
+              parametersResult
+          have parameterTypesBelow : ∀ parameter ∈ parameterTypes,
+              parameter.VariablesBelow advancedState.inference.next := by
+            simpa only [advancedState] using
+              parameterTypesBelowAtInstantiation
+          cases argumentsResult : fitArguments context advancedState arguments
+              parameterTypes with
+          | error error =>
+              simp [instantiated, advancedState, argumentsResult, bind,
+                Except.bind] at success
+          | ok fittedArguments? =>
+              cases fittedArguments? with
+              | none =>
+                  simp [instantiated, advancedState, argumentsResult, bind,
+                    Except.bind] at success
+              | some fittedArguments =>
+                  simp only [instantiated, advancedState, argumentsResult, bind,
+                    Except.bind] at success
+                  have fittedArgumentsProperties :=
+                    fitArguments_some_inferenceProperties advancedReady
+                      argumentsAtAdvanced parameterTypesBelow argumentsResult
+                  have resultTypeAtAdvanced :
+                      resultType.VariablesBelow
+                        advancedState.inference.next := by
+                    simpa only [advancedState] using partsBelow.2
+                  have resultTypeAtArguments :
+                      resultType.VariablesBelow
+                        fittedArguments.state.inference.next :=
+                    resultTypeAtAdvanced.weaken
+                      fittedArgumentsProperties.1.next_le
+                  have expectedAtArguments : ∀ expectedType ∈ expected,
+                      expectedType.VariablesBelow
+                        fittedArguments.state.inference.next := by
+                    intro expectedType member
+                    exact (expectedBelow expectedType member).weaken
+                      (Nat.le_trans advanceProgress.next_le
+                        fittedArgumentsProperties.1.next_le)
+                  cases fittedResultResult : candidateWithExpected context
+                      fittedArguments.state { id := call, type := resultType }
+                      expected with
+                  | error error =>
+                      simp [fittedResultResult, bind, Except.bind] at success
+                  | ok fittedResult? =>
+                      cases fittedResult? with
+                      | none =>
+                          simp [fittedResultResult, bind, Except.bind] at success
+                      | some fittedResult =>
+                          simp only [fittedResultResult, bind, Except.bind]
+                            at success
+                          have fittedResultProperties :=
+                            candidateWithExpected_some_inferenceProperties
+                              fittedArgumentsProperties.2 resultTypeAtArguments
+                              expectedAtArguments fittedResultResult
+                          cases integerValidation :
+                              validateCandidateIntegerLiterals context
+                                fittedResult.state integerLiteralOrigins with
+                          | error error =>
+                              simp [integerValidation, bind, Except.bind] at success
+                          | ok hasDeferredIntegerLiterals =>
+                              simp only [integerValidation, bind, Except.bind]
+                                at success
+                              cases predicateValidation :
+                                  validateCandidatePredicates context
+                                    fittedResult.state
+                                    (instantiated.predicates ++
+                                      fittedResult.state.requirements.map
+                                        (fun requirement =>
+                                          requirement.predicate)) with
+                              | error error =>
+                                  have expandedPredicateValidation :
+                                      validateCandidatePredicates context
+                                          fittedResult.state
+                                          ((signature.scheme.instantiate
+                                                state.inference.next).predicates ++
+                                            fittedResult.state.requirements.map
+                                              (fun requirement =>
+                                                requirement.predicate)) =
+                                        .error error := by
+                                    simpa only [instantiated] using
+                                      predicateValidation
+                                  rw [expandedPredicateValidation] at success
+                                  simp at success
+                              | ok validated =>
+                                  cases validated
+                                  have expandedPredicateValidation :
+                                      validateCandidatePredicates context
+                                          fittedResult.state
+                                          ((signature.scheme.instantiate
+                                                state.inference.next).predicates ++
+                                            fittedResult.state.requirements.map
+                                              (fun requirement =>
+                                                requirement.predicate)) =
+                                        .ok () := by
+                                    simpa only [instantiated] using
+                                      predicateValidation
+                                  rw [expandedPredicateValidation] at success
+                                  simp at success
+                                  let allocation :=
+                                    fittedResult.state.addRequirementsWithIds
+                                      instantiated.predicates
+                                  let finalState :=
+                                    allocation.2.markDirectCallRequirements
+                                      allocation.1
+                                  have requirementsProgress :
+                                      fittedResult.state.InferenceProgress
+                                        allocation.2 :=
+                                    State.InferenceProgress.addRequirementsWithIds
+                                      fittedResult.state instantiated.predicates
+                                      fittedResultProperties.2.1.solved
+                                  have requirementsReady :
+                                      allocation.2.InferenceReady :=
+                                    State.InferenceReady.addRequirementsWithIds
+                                      instantiated.predicates
+                                      fittedResultProperties.2.1
+                                  have directProgress :
+                                      allocation.2.InferenceProgress finalState :=
+                                    State.InferenceProgress.markDirectCallRequirements
+                                      allocation.2
+                                      allocation.1 requirementsReady.solved
+                                  have finalReady : finalState.InferenceReady :=
+                                    State.InferenceReady.markDirectCallRequirements
+                                      allocation.1
+                                      requirementsReady
+                                  have fittedTypeAtFinal :
+                                      fittedResult.expression.type.VariablesBelow
+                                        finalState.inference.next :=
+                                    fittedResultProperties.2.2.weaken
+                                      (Nat.le_trans requirementsProgress.next_le
+                                        directProgress.next_le)
+                                  have resolvedTypeBelow :
+                                      (finalState.resolve
+                                        fittedResult.expression.type).VariablesBelow
+                                          finalState.inference.next :=
+                                    finalReady.solved.variablesBelow_apply
+                                      fittedTypeAtFinal
+                                  have resultEq : ({
+                                      instantiation :=
+                                        DeclarationInstantiation.ofInstantiated
+                                          signature instantiated
+                                      result := {
+                                        fittedResult.expression with
+                                        type := finalState.resolve
+                                          fittedResult.expression.type
+                                      }
+                                      argumentCoercions :=
+                                        fittedArguments.coercions
+                                      callCoercions := fittedResult.coercions
+                                      signatureRequirements := allocation.1
+                                      hasDeferredIntegerLiterals
+                                      state := finalState
+                                      cost := fittedArguments.cost +
+                                        fittedResult.coercions.length
+                                    } : CandidateAttemptResult) = result := by
+                                    simpa only [instantiated, allocation,
+                                      finalState,
+                                      ConstrainedDeclarationScheme.instantiate_predicates]
+                                      using success
+                                  subst result
+                                  exact ⟨advanceProgress.trans
+                                      (fittedArgumentsProperties.1.trans
+                                        (fittedResultProperties.1.trans
+                                          (requirementsProgress.trans
+                                            directProgress))),
+                                    finalReady, resolvedTypeBelow⟩
+
 /-- Expected-type fitting followed by expression recording has the same
 inference guarantees; recording the typed node leaves inference unchanged. -/
 theorem recordExpressionWithExpected_inferenceProperties
