@@ -160,6 +160,14 @@ def VariablesBelow (next : Nat) (type : Ty) : Prop :=
   ∀ metavariable, metavariable ∈ type.freeVariables →
     metavariable.index < next
 
+/-- A type remains allocator-bounded when the bound grows. -/
+theorem VariablesBelow.weaken
+    {type : Ty} {lower upper : Nat}
+    (below : VariablesBelow lower type) (bound : lower ≤ upper) :
+    VariablesBelow upper type := by
+  intro metavariable member
+  exact Nat.lt_of_lt_of_le (below metavariable member) bound
+
 private theorem mem_unionVariables_iff (metavariable : TypeVarId)
     (left right : List TypeVarId) :
     metavariable ∈ unionVariables left right ↔
@@ -328,6 +336,40 @@ def containsVariable (type : Ty) (metavariable : TypeVarId) : Bool :=
 /-- A fresh-variable lower bound strictly above every flexible variable. -/
 def nextVariable (type : Ty) : Nat :=
   type.freeVariables.foldl (fun next metavariable => max next (metavariable.index + 1)) 0
+
+private theorem foldl_nextVariable_mono
+    (variables : List TypeVarId) (initial : Nat) :
+    initial ≤ variables.foldl
+      (fun next metavariable => max next (metavariable.index + 1)) initial := by
+  induction variables generalizing initial with
+  | nil => exact Nat.le_refl initial
+  | cons metavariable variables induction =>
+      exact Nat.le_trans (Nat.le_max_left initial (metavariable.index + 1))
+        (induction (max initial (metavariable.index + 1)))
+
+private theorem mem_index_lt_foldl_nextVariable
+    (variables : List TypeVarId) (initial : Nat) {metavariable : TypeVarId}
+    (member : metavariable ∈ variables) :
+    metavariable.index < variables.foldl
+      (fun next candidate => max next (candidate.index + 1)) initial := by
+  induction variables generalizing initial with
+  | nil => simp at member
+  | cons head variables induction =>
+      rw [List.foldl_cons]
+      rcases List.mem_cons.mp member with same | member
+      · subst head
+        exact Nat.lt_of_lt_of_le (Nat.lt_succ_self metavariable.index)
+          (foldl_nextVariable_mono variables
+            (max initial (metavariable.index + 1)) |>
+              Nat.le_trans (Nat.le_max_right initial
+                (metavariable.index + 1)))
+      · exact induction (max initial (head.index + 1)) member
+
+/-- `nextVariable` is strictly above every flexible variable in the type. -/
+theorem variablesBelow_nextVariable (type : Ty) :
+    type.VariablesBelow type.nextVariable := by
+  intro metavariable member
+  exact mem_index_lt_foldl_nextVariable type.freeVariables 0 member
 
 /-- Constructor-node size, used to choose a conservative unification budget. -/
 def size : Ty → Nat

@@ -42,6 +42,112 @@ theorem lookup?_eq_some_mem
           simpa [lookup?, same] using found
         exact List.mem_cons_of_mem _ (induction tailFound)
 
+/-- Applying a substitution is allocator-bounded when every stored range is
+bounded and every surviving source variable is bounded. -/
+theorem apply_variables_below_of_range
+    {substitution : Substitution} {next : Nat} {type : Ty}
+    (rangeBelow : ∀ {metavariable replacement},
+      (metavariable, replacement) ∈ substitution →
+        replacement.VariablesBelow next)
+    (sourceBelow : ∀ metavariable,
+      metavariable ∈ type.freeVariables →
+        metavariable ∉ substitution.domain →
+          metavariable.index < next) :
+    (substitution.apply type).VariablesBelow next := by
+  induction type with
+  | «variable» candidate =>
+      cases found : substitution.lookup? candidate with
+      | none =>
+          simp only [Substitution.apply, found, Option.getD_none,
+            Ty.variablesBelow_variable_iff]
+          exact sourceBelow candidate (by simp [Ty.freeVariables])
+            ((lookup?_eq_none_iff_not_mem_domain substitution candidate).mp
+              found)
+      | some replacement =>
+          simp only [Substitution.apply, found, Option.getD_some]
+          exact rangeBelow (lookup?_eq_some_mem found)
+  | parameter parameter => simp [Substitution.apply]
+  | constructor constructor => simp [Substitution.apply]
+  | application left right leftInduction rightInduction =>
+      simp only [Substitution.apply, Ty.variablesBelow_application_iff]
+      constructor
+      · apply leftInduction
+        intro metavariable member outside
+        exact sourceBelow metavariable
+          ((Ty.mem_freeVariables_application_iff metavariable left right).mpr
+            (Or.inl member)) outside
+      · apply rightInduction
+        intro metavariable member outside
+        exact sourceBelow metavariable
+          ((Ty.mem_freeVariables_application_iff metavariable left right).mpr
+            (Or.inr member)) outside
+  | function parameter result parameterInduction resultInduction =>
+      simp only [Substitution.apply, Ty.variablesBelow_function_iff]
+      constructor
+      · apply parameterInduction
+        intro metavariable member outside
+        exact sourceBelow metavariable
+          ((Ty.mem_freeVariables_function_iff
+            metavariable parameter result).mpr (Or.inl member)) outside
+      · apply resultInduction
+        intro metavariable member outside
+        exact sourceBelow metavariable
+          ((Ty.mem_freeVariables_function_iff
+            metavariable parameter result).mpr (Or.inr member)) outside
+  | product left right leftInduction rightInduction =>
+      simp only [Substitution.apply, Ty.variablesBelow_product_iff]
+      constructor
+      · apply leftInduction
+        intro metavariable member outside
+        exact sourceBelow metavariable
+          ((Ty.mem_freeVariables_product_iff metavariable left right).mpr
+            (Or.inl member)) outside
+      · apply rightInduction
+        intro metavariable member outside
+        exact sourceBelow metavariable
+          ((Ty.mem_freeVariables_product_iff metavariable left right).mpr
+            (Or.inr member)) outside
+  | mapping key value keyInduction valueInduction =>
+      simp only [Substitution.apply, Ty.variablesBelow_mapping_iff]
+      constructor
+      · apply keyInduction
+        intro metavariable member outside
+        exact sourceBelow metavariable
+          ((Ty.mem_freeVariables_mapping_iff metavariable key value).mpr
+            (Or.inl member)) outside
+      · apply valueInduction
+        intro metavariable member outside
+        exact sourceBelow metavariable
+          ((Ty.mem_freeVariables_mapping_iff metavariable key value).mpr
+            (Or.inr member)) outside
+  | proxy inner induction =>
+      simp only [Substitution.apply, Ty.variablesBelow_proxy_iff]
+      exact induction sourceBelow
+  | comptime inner induction =>
+      simp only [Substitution.apply, Ty.variablesBelow_comptime_iff]
+      exact induction sourceBelow
+  | error => simp [Substitution.apply]
+
+/-- Erasing one domain key never creates a new substitution entry. -/
+theorem mem_of_mem_erase
+    {substitution : Substitution} {erased : TypeVarId}
+    {entry : TypeVarId × Ty}
+    (member : entry ∈ substitution.erase erased) :
+    entry ∈ substitution := by
+  exact (List.mem_filter.mp member).1
+
+/-- Removing quantified keys never creates a new substitution entry. -/
+theorem mem_of_mem_without
+    {substitution : Substitution} {variables : List TypeVarId}
+    {entry : TypeVarId × Ty}
+    (member : entry ∈ substitution.without variables) :
+    entry ∈ substitution := by
+  induction variables generalizing substitution with
+  | nil => simpa [without] using member
+  | cons erased variables induction =>
+      rw [without, List.foldl_cons] at member
+      exact mem_of_mem_erase (induction member)
+
 private theorem map_fst_filter_not_mem_domain
     (substitution : Substitution) (excluded : List TypeVarId) :
     (substitution.filter fun entry => !(entry.1 ∈ excluded)).map Prod.fst =
@@ -467,6 +573,85 @@ theorem compose
 end RangeAvoidsDomain
 
 end Substitution
+
+namespace ParameterSubstitution
+
+/-- Every successful rigid-parameter lookup names an actual substitution
+entry. -/
+theorem lookup?_eq_some_mem
+    {substitution : ParameterSubstitution}
+    {parameter : TypeParameterId} {replacement : Ty}
+    (found : substitution.lookup? parameter = some replacement) :
+    (parameter, replacement) ∈ substitution := by
+  induction substitution with
+  | nil => simp [lookup?] at found
+  | cons entry rest induction =>
+      rcases entry with ⟨candidate, candidateReplacement⟩
+      by_cases same : candidate = parameter
+      · subst candidate
+        simp [lookup?] at found
+        cases found
+        simp
+      · have tailFound :
+            ParameterSubstitution.lookup? rest parameter =
+              some replacement := by
+          simpa [lookup?, same] using found
+        exact List.mem_cons_of_mem _ (induction tailFound)
+
+/-- Instantiating rigid parameters preserves an allocator bound when every
+replacement range and every flexible source variable are bounded. -/
+theorem apply_variables_below
+    {substitution : ParameterSubstitution} {next : Nat} {type : Ty}
+    (rangeBelow : ∀ {parameter replacement},
+      (parameter, replacement) ∈ substitution →
+        replacement.VariablesBelow next)
+    (sourceBelow : type.VariablesBelow next) :
+    (substitution.apply type).VariablesBelow next := by
+  induction type with
+  | «variable» metavariable =>
+      simpa [ParameterSubstitution.apply] using sourceBelow
+  | parameter candidate =>
+      cases found : substitution.lookup? candidate with
+      | none => simp [ParameterSubstitution.apply, found]
+      | some replacement =>
+          simp only [ParameterSubstitution.apply, found, Option.getD_some]
+          exact rangeBelow (lookup?_eq_some_mem found)
+  | constructor constructor => simp [ParameterSubstitution.apply]
+  | application left right leftInduction rightInduction =>
+      have parts := (Ty.variablesBelow_application_iff next left right).mp
+        sourceBelow
+      simp only [ParameterSubstitution.apply,
+        Ty.variablesBelow_application_iff]
+      exact ⟨leftInduction parts.1, rightInduction parts.2⟩
+  | function parameter result parameterInduction resultInduction =>
+      have parts := (Ty.variablesBelow_function_iff next parameter result).mp
+        sourceBelow
+      simp only [ParameterSubstitution.apply,
+        Ty.variablesBelow_function_iff]
+      exact ⟨parameterInduction parts.1, resultInduction parts.2⟩
+  | product left right leftInduction rightInduction =>
+      have parts := (Ty.variablesBelow_product_iff next left right).mp
+        sourceBelow
+      simp only [ParameterSubstitution.apply,
+        Ty.variablesBelow_product_iff]
+      exact ⟨leftInduction parts.1, rightInduction parts.2⟩
+  | mapping key value keyInduction valueInduction =>
+      have parts := (Ty.variablesBelow_mapping_iff next key value).mp
+        sourceBelow
+      simp only [ParameterSubstitution.apply,
+        Ty.variablesBelow_mapping_iff]
+      exact ⟨keyInduction parts.1, valueInduction parts.2⟩
+  | proxy inner induction =>
+      simp only [ParameterSubstitution.apply,
+        Ty.variablesBelow_proxy_iff]
+      exact induction sourceBelow
+  | comptime inner induction =>
+      simp only [ParameterSubstitution.apply,
+        Ty.variablesBelow_comptime_iff]
+      exact induction sourceBelow
+  | error => simp [ParameterSubstitution.apply]
+
+end ParameterSubstitution
 
 namespace Ty
 

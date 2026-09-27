@@ -57,6 +57,43 @@ inductive Expr where
   | annotation (expression : Expr) (type : Ty)
   deriving Repr, DecidableEq
 
+namespace Expr
+
+/-- Every flexible variable written explicitly in an annotation lies below a
+shared allocator bound. -/
+def AnnotationsBelow (next : Nat) : Expr → Prop
+  | .unit
+  | .bool _
+  | .word _
+  | .variable _ => True
+  | .pair left right
+  | .application left right =>
+      left.AnnotationsBelow next ∧ right.AnnotationsBelow next
+  | .lambda _ body => body.AnnotationsBelow next
+  | .letE _ value body =>
+      value.AnnotationsBelow next ∧ body.AnnotationsBelow next
+  | .annotation expression type =>
+      expression.AnnotationsBelow next ∧ type.VariablesBelow next
+
+/-- Annotation bounds are monotone in the allocator limit. -/
+theorem AnnotationsBelow.weaken
+    {expression : Expr} {lower upper : Nat}
+    (below : expression.AnnotationsBelow lower) (bound : lower ≤ upper) :
+    expression.AnnotationsBelow upper := by
+  induction expression with
+  | unit | bool | word | «variable» => trivial
+  | pair left right leftInduction rightInduction
+  | application left right leftInduction rightInduction =>
+      exact ⟨leftInduction below.1, rightInduction below.2⟩
+  | lambda parameter body induction =>
+      exact induction below
+  | letE name value body valueInduction bodyInduction =>
+      exact ⟨valueInduction below.1, bodyInduction below.2⟩
+  | annotation expression type induction =>
+      exact ⟨induction below.1, below.2.weaken bound⟩
+
+end Expr
+
 namespace Inference
 
 inductive Error where
@@ -69,12 +106,17 @@ structure Result where
   state : InferState
   deriving Repr, DecidableEq
 
-private def liftUnification {α : Type} :
+@[simp] private def liftUnification {α : Type} :
     Except Unification.Error α → Except Error α
   | .ok value => .ok value
   | .error error => .error (.unification error)
 
-private def inferFrom (environment : Environment) :
+namespace Detail
+
+/-- Internal recursive inference worker exposed only so the adjacent
+properties module can establish structural invariants.  Ordinary callers use
+`infer`. -/
+def inferFrom (environment : Environment) :
     Expr → InferState → Except Error Result
   | .unit, state => .ok { type := .unit, state }
   | .bool _, state => .ok { type := .bool, state }
@@ -119,9 +161,12 @@ private def inferFrom (environment : Environment) :
       let state ← liftUnification <| result.state.unify result.type expected
       pure { type := state.resolve expected, state }
 
+end Detail
+
 /-- Infer a type and retain the final state for incremental consumers. -/
 def infer (environment : Environment) (expression : Expr) : Except Error Result := do
-  let result ← inferFrom environment expression (.initial environment.nextVariable)
+  let result ← Detail.inferFrom environment expression
+    (.initial environment.nextVariable)
   pure { result with type := result.state.resolve result.type }
 
 /-- The compact API used by callers which need only the inferred type. -/
