@@ -210,6 +210,7 @@ private def templateTrackingAllocatedState : SourceInference.State :=
 private def reversedLocalEnvironmentState : SourceInference.State := {
   SourceInference.State.initial testOwner with
   localBinders := [templateBinder 0, templateBinder 1]
+  nextLocal := 2
 }
 
 private def reversedLocalEnvironmentContext : SourceSemantics.Context :=
@@ -290,6 +291,32 @@ private theorem reversedLocalEnvironmentAligned :
       (List.Perm.swap
         ((templateBinder 0).id, (templateBinder 0).schemeRequirements)
         ((templateBinder 1).id, (templateBinder 1).schemeRequirements) []).symm
+
+/-- Replacing stale compatibility locals leaves stable-binder alignment
+unchanged. -/
+example :
+    SourceInferenceSoundness.LocalEnvironmentAligned
+      (reversedLocalEnvironmentState.withLocals
+        [("stale", .mono .word)])
+      [] reversedLocalEnvironmentContext :=
+  reversedLocalEnvironmentAligned.withLocals [("stale", .mono .word)]
+
+private def alignedLifecycleAllocation : TypedBinder × SourceInference.State :=
+  reversedLocalEnvironmentState.allocateBinder "fresh" (.mono .unit)
+
+private def alignedLifecycleContext : SourceSemantics.Context :=
+  reversedLocalEnvironmentContext.withLocal
+    alignedLifecycleAllocation.1.id
+    (alignedLifecycleAllocation.1.applySubstitution []).scheme
+    (alignedLifecycleAllocation.1.applySubstitution []).schemeRequirements
+
+/-- A genuinely fresh stable identity extends both paired semantic scopes in
+lockstep with executable binder allocation. -/
+example :
+    SourceInferenceSoundness.LocalEnvironmentAligned
+      alignedLifecycleAllocation.2 [] alignedLifecycleContext := by
+  exact reversedLocalEnvironmentAligned.allocateBinder
+    "fresh" (.mono .unit) none false [] rfl (by decide)
 
 /-- A name selected by executable first-match lookup yields both paired
 stable-ID lookups even though the semantic list order is reversed. -/

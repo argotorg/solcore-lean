@@ -52,6 +52,17 @@ private theorem list_eq_singleton_of_length_eq_one
       | nil => exact ⟨item, rfl⟩
       | cons second tail => simp at length_eq
 
+private theorem list_perm_reverse {value : Type} (values : List value) :
+    values.Perm values.reverse := by
+  induction values with
+  | nil => exact .nil
+  | cons head tail induction =>
+      rw [List.reverse_cons]
+      exact (List.Perm.cons head induction).trans (by
+        simpa only [List.singleton_append] using
+          (List.perm_append_comm :
+            ([head] ++ tail.reverse).Perm (tail.reverse ++ [head])))
+
 /-- Finalized semantic schemes projected from the stable executable binder
 stack.  The list order remains the executable lookup order; alignment with a
 semantic context is therefore stated by permutation rather than equality. -/
@@ -85,6 +96,121 @@ structure LocalEnvironmentAligned
       context.localSchemeRequirements
 
 namespace LocalEnvironmentAligned
+
+/-- A monomorphic semantic binder extension over an empty lexical base
+constructs the order-insensitive alignment for the corresponding closed
+executable binders. -/
+theorem ofMonoBindersExtend
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context final : SourceSemantics.Context}
+    {owner : Resolved.DeclarationId} {types : List TypeSystem.Ty}
+    (ids_nodup : (state.localBinders.map fun binder => binder.id).Nodup)
+    (locals_empty : context.locals = [])
+    (requirements_empty : context.localSchemeRequirements = [])
+    (extension : MonoBindersExtend owner context
+      (state.localBinders.map
+        (TypedBinder.applySubstitution substitution)) types final) :
+    LocalEnvironmentAligned state substitution final := by
+  constructor
+  · exact ids_nodup
+  · rw [MonoBindersExtend.locals_eq extension, locals_empty,
+      List.append_nil]
+    simpa [closedBinderLocals, List.map_reverse, List.map_map,
+      Function.comp_def, TypedBinder.applySubstitution] using
+      list_perm_reverse (closedBinderLocals substitution state.localBinders)
+  · rw [MonoBindersExtend.localSchemeRequirements_eq extension,
+      requirements_empty, List.append_nil]
+    simpa [closedBinderRequirements, List.map_reverse, List.map_map,
+      Function.comp_def, TypedBinder.applySubstitution] using
+      list_perm_reverse
+        (closedBinderRequirements substitution state.localBinders)
+
+/-- The stable input identities produced by `State.initial` discharge the
+uniqueness premise of `ofMonoBindersExtend`. -/
+theorem ofInitialMonoBindersExtend
+    (owner : Resolved.DeclarationId) (locals : TypeSystem.Environment)
+    (comptime : List Bool) (substitution : TypeSystem.Substitution)
+    {context final : SourceSemantics.Context} {types : List TypeSystem.Ty}
+    (locals_empty : context.locals = [])
+    (requirements_empty : context.localSchemeRequirements = [])
+    (extension : MonoBindersExtend owner context
+      ((Frontend.SourceInference.State.initial owner locals comptime
+          ).localBinders.map
+        (TypedBinder.applySubstitution substitution)) types final) :
+    LocalEnvironmentAligned
+      (Frontend.SourceInference.State.initial owner locals comptime)
+      substitution final := by
+  apply ofMonoBindersExtend
+    (locals_empty := locals_empty)
+    (requirements_empty := requirements_empty)
+    (extension := extension)
+  simpa only [← Frontend.SourceInference.State.initial_inputs_eq_localBinders]
+    using MonoBindersExtend.initialInputIds_nodup owner locals comptime
+
+/-- Replacing the legacy name-keyed local cache cannot affect the stable
+binder alignment used by source semantics. -/
+theorem withLocals
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (locals : TypeSystem.Environment) :
+    LocalEnvironmentAligned (state.withLocals locals) substitution context := by
+  constructor
+  · exact aligned.ids_nodup
+  · exact aligned.locals_perm
+  · exact aligned.requirements_perm
+
+/-- Allocating a fresh stable binder extends both executable and semantic
+local scopes in lockstep.  The semantic entry is the closed view of the
+newly allocated executable binder. -/
+theorem allocateBinder
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false)
+    (schemeRequirements : List LocalSchemeRequirement := [])
+    {binder : TypedBinder} {final : Frontend.SourceInference.State}
+    (allocated : state.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, final))
+    (fresh : binder.id ∉ state.localBinders.map fun retained => retained.id) :
+    LocalEnvironmentAligned final substitution
+      (context.withLocal binder.id
+        (binder.applySubstitution substitution).scheme
+        (binder.applySubstitution substitution).schemeRequirements) := by
+  have binder_eq :
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).1 = binder :=
+    congrArg Prod.fst allocated
+  have final_eq :
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).2 = final :=
+    congrArg Prod.snd allocated
+  subst binder
+  subst final
+  constructor
+  · simpa [Frontend.SourceInference.State.allocateBinder] using
+      (List.nodup_cons.mpr ⟨fresh, aligned.ids_nodup⟩)
+  · simpa [closedBinderLocals,
+      Frontend.SourceInference.State.allocateBinder,
+      SourceSemantics.Context.withLocal] using
+      aligned.locals_perm.cons
+        ((state.allocateBinder name scheme span comptime
+          schemeRequirements).1.id,
+          ((state.allocateBinder name scheme span comptime
+            schemeRequirements).1.applySubstitution substitution).scheme)
+  · simpa [closedBinderRequirements,
+      Frontend.SourceInference.State.allocateBinder,
+      SourceSemantics.Context.withLocal] using
+      aligned.requirements_perm.cons
+        ((state.allocateBinder name scheme span comptime
+          schemeRequirements).1.id,
+          ((state.allocateBinder name scheme span comptime
+            schemeRequirements).1.applySubstitution
+              substitution).schemeRequirements)
 
 /-- Executable first-match name lookup identifies a stable binder whose
 closed scheme and qualified metadata are both available in the aligned

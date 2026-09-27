@@ -241,7 +241,77 @@ theorem residualTypeVariables_eq
 
 end BinderExtends
 
+namespace BindersExtend
+
+/-- Source-ordered binder installation prepends semantic locals in reverse
+order, leaving the ambient lexical scope as the suffix. -/
+theorem locals_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder}
+    (extension : BindersExtend owner context binders final) :
+    final.locals =
+      (binders.reverse.map fun binder => (binder.id, binder.scheme)) ++
+        context.locals := by
+  induction extension with
+  | nil => rfl
+  | cons head _ induction =>
+      cases head
+      simpa [Context.withLocal, List.reverse_cons, List.map_append,
+        List.append_assoc] using induction
+
+/-- Qualified local-scheme metadata follows exactly the same reverse-prefix
+layout as the corresponding semantic local schemes. -/
+theorem localSchemeRequirements_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder}
+    (extension : BindersExtend owner context binders final) :
+    final.localSchemeRequirements =
+      (binders.reverse.map fun binder =>
+        (binder.id, binder.schemeRequirements)) ++
+        context.localSchemeRequirements := by
+  induction extension with
+  | nil => rfl
+  | cons head _ induction =>
+      cases head
+      simpa [Context.withLocal, List.reverse_cons, List.map_append,
+        List.append_assoc] using induction
+
+end BindersExtend
+
 namespace MonoBindersExtend
+
+/-- Monomorphic binder installation has the same reverse-prefix layout as
+general binder installation. -/
+theorem locals_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder} {types : List TypeSystem.Ty}
+    (extension : MonoBindersExtend owner context binders types final) :
+    final.locals =
+      (binders.reverse.map fun binder => (binder.id, binder.scheme)) ++
+        context.locals := by
+  induction extension with
+  | nil => rfl
+  | cons _ head _ induction =>
+      cases head
+      simpa [Context.withLocal, List.reverse_cons, List.map_append,
+        List.append_assoc] using induction
+
+/-- Monomorphic binder installation extends qualified metadata in lockstep
+with the local-scheme scope. -/
+theorem localSchemeRequirements_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder} {types : List TypeSystem.Ty}
+    (extension : MonoBindersExtend owner context binders types final) :
+    final.localSchemeRequirements =
+      (binders.reverse.map fun binder =>
+        (binder.id, binder.schemeRequirements)) ++
+        context.localSchemeRequirements := by
+  induction extension with
+  | nil => rfl
+  | cons _ head _ induction =>
+      cases head
+      simpa [Context.withLocal, List.reverse_cons, List.map_append,
+        List.append_assoc] using induction
 
 /-- A source-ordered list of fresh monomorphic binders can always be installed
 in the lexical context.  This is the algorithm-independent constructor used
@@ -317,7 +387,9 @@ private theorem localIds_nodup_of_indices_nodup
       intro member
       exact indices.1 (List.mem_map.mpr ⟨_, member, rfl⟩)
 
-private theorem initial_input_ids_nodup
+/-- Stable identities allocated for an initial function-input environment are
+pairwise distinct. -/
+theorem initialInputIds_nodup
     (owner : Resolved.DeclarationId) (locals : TypeSystem.Environment)
     (comptime : List Bool) :
     (((Frontend.SourceInference.State.initial owner locals comptime).inputs.map
@@ -394,7 +466,7 @@ theorem initialInputs
         types lexicalContext := by
   apply exists_of_monomorphic
   · exact initial_input_alignment owner names types comptime length_eq
-  · exact initial_input_ids_nodup owner _ comptime
+  · exact initialInputIds_nodup owner _ comptime
   · intro binder member
     simp [LocalFresh, locals_empty, requirements_empty]
   · exact types_well_formed

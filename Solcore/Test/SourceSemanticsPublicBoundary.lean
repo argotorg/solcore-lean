@@ -91,6 +91,14 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.ofMonoBindersExtend
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.ofInitialMonoBindersExtend
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.withLocals
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.allocateBinder
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.lookup_of_lookupBinder?
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.localSchemes_perm
@@ -634,11 +642,17 @@ example := @Solcore.SourceSemantics.ExpressionsHaveTypes.product_type_admissible
 example := @Solcore.SourceSemantics.StatementHasType
 example := @Solcore.SourceSemantics.StatementHasType.letInitializedGeneralized
 example := @Solcore.SourceSemantics.StatementsHaveType
+example := @Solcore.SourceSemantics.BindersExtend.locals_eq
+example := @Solcore.SourceSemantics.BindersExtend.localSchemeRequirements_eq
+example := @Solcore.SourceSemantics.MonoBindersExtend.locals_eq
+example :=
+  @Solcore.SourceSemantics.MonoBindersExtend.localSchemeRequirements_eq
 example := @Solcore.SourceSemantics.MonoBindersExtend.functional
 example := @Solcore.SourceSemantics.MonoBindersExtend.each_type_admissible
 example := @Solcore.SourceSemantics.MonoBindersExtend.product_type_admissible
 example := @Solcore.SourceSemantics.MonomorphicBinders
 example := @Solcore.SourceSemantics.MonoBindersExtend.exists_of_monomorphic
+example := @Solcore.SourceSemantics.MonoBindersExtend.initialInputIds_nodup
 example := @Solcore.SourceSemantics.MonoBindersExtend.initialInputs
 example := @Solcore.SourceSemantics.BinderExtends.fresh
 example := @Solcore.SourceSemantics.BinderExtends.local_fresh
