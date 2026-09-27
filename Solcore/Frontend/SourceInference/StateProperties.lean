@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Types
+import Solcore.TypeSystem.InferenceProperties
 
 /-! Allocation and lexical-restoration laws for the typed source state. -/
 
@@ -22,6 +23,17 @@ structure OccurrenceBoundExtends (before after : State) : Prop where
   nextOccurrence_le : before.nextOccurrence ≤ after.nextOccurrence
   nodesBelowNextOccurrence :
     before.NodesBelowNextOccurrence → after.NodesBelowNextOccurrence
+
+/-- The type-inference portion of a source state has made monotone semantic
+progress.  This is intentionally independent of lexical, typed-source, and
+requirement-ledger evolution so traversal proofs can compose those invariants
+separately. -/
+structure InferenceProgress (before after : State) : Prop where
+  next_le : before.inference.next ≤ after.inference.next
+  solved : after.inference.Solved
+  substitution_extends :
+    after.inference.substitution.SemanticallyExtends
+      before.inference.substitution
 
 namespace OccurrenceBoundExtends
 
@@ -53,6 +65,41 @@ theorem trans {first second third : State}
       (left.nodesBelowNextOccurrence below)⟩
 
 end OccurrenceBoundExtends
+
+namespace InferenceProgress
+
+/-- Unchanged inference state is progress whenever its substitution is
+already solved. -/
+theorem refl {state : State} (solved : state.inference.Solved) :
+    state.InferenceProgress state :=
+  ⟨Nat.le_refl _, solved,
+    TypeSystem.Substitution.SemanticallyExtends.refl_of_solved solved⟩
+
+/-- Equality of the inference projections is enough to lift reflexive
+progress across a source-state-only update. -/
+theorem of_inference_eq {before after : State}
+    (solved : before.inference.Solved)
+    (inferenceEq : after.inference = before.inference) :
+    before.InferenceProgress after := by
+  constructor
+  · rw [inferenceEq]
+    exact Nat.le_refl _
+  · rw [inferenceEq]
+    exact solved
+  · rw [inferenceEq]
+    exact TypeSystem.Substitution.SemanticallyExtends.refl_of_solved solved
+
+/-- Inference progress composes across sequential source traversals. -/
+theorem trans {first second third : State}
+    (firstSecond : first.InferenceProgress second)
+    (secondThird : second.InferenceProgress third) :
+    first.InferenceProgress third :=
+  ⟨Nat.le_trans firstSecond.next_le secondThird.next_le,
+    secondThird.solved,
+    TypeSystem.Substitution.SemanticallyExtends.trans
+      secondThird.substitution_extends firstSecond.substitution_extends⟩
+
+end InferenceProgress
 
 private theorem map_mapIdx {α β γ : Type} (items : List α)
     (indexed : Nat → α → β)
@@ -737,5 +784,118 @@ theorem markDirectCallRequirements (state : State)
       state requirements below⟩
 
 end OccurrenceBoundExtends
+
+namespace InferenceProgress
+
+/-- Allocating a fresh type metavariable advances the inference allocator,
+preserves solvedness, and leaves the existing substitution meaning intact. -/
+theorem fresh (state : State) (solved : state.inference.Solved) :
+    state.InferenceProgress state.fresh.2 := by
+  constructor
+  · change state.inference.next ≤ state.inference.next + 1
+    exact Nat.le_succ _
+  · change state.inference.fresh.2.Solved
+    exact TypeSystem.InferState.Solved.fresh solved
+  · change state.inference.substitution.SemanticallyExtends
+      state.inference.substitution
+    exact TypeSystem.Substitution.SemanticallyExtends.refl_of_solved solved
+
+/-- Replacing compatibility locals leaves type inference unchanged. -/
+theorem withLocals (state : State) (locals : TypeSystem.Environment)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress (state.withLocals locals) :=
+  of_inference_eq solved rfl
+
+/-- Restoring lexical scope leaves type inference unchanged. -/
+theorem restoreLexicalScope (state : State) (scope : LexicalScope)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress (state.restoreLexicalScope scope) :=
+  of_inference_eq solved rfl
+
+/-- Stable-binder allocation leaves type inference unchanged. -/
+theorem allocateBinder (state : State) (name : String)
+    (scheme : TypeSystem.Scheme) (span : Option Syntax.SourceSpan)
+    (comptime : Bool) (schemeRequirements : List LocalSchemeRequirement)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress
+      (state.allocateBinder name scheme span comptime schemeRequirements).2 :=
+  of_inference_eq solved rfl
+
+/-- Hidden-local allocation leaves type inference unchanged. -/
+theorem allocateHiddenLocal (state : State)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress state.allocateHiddenLocal.2 :=
+  of_inference_eq solved rfl
+
+/-- Expression-identity allocation leaves type inference unchanged. -/
+theorem allocateExpressionId (state : State)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress state.allocateExpressionId.2 :=
+  of_inference_eq solved rfl
+
+/-- Statement-identity allocation leaves type inference unchanged. -/
+theorem allocateStatementId (state : State)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress state.allocateStatementId.2 :=
+  of_inference_eq solved rfl
+
+/-- Recording a typed-source node leaves type inference unchanged. -/
+theorem recordNode (state : State) (node : Node)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress (state.recordNode node) :=
+  of_inference_eq solved rfl
+
+/-- Refining an expression node leaves type inference unchanged. -/
+theorem modifyExpressionNode (state : State) (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress (state.modifyExpressionNode id modify) :=
+  of_inference_eq solved rfl
+
+/-- Refining a statement node leaves type inference unchanged. -/
+theorem modifyStatementNode (state : State) (id : StatementId)
+    (modify : StatementNode → StatementNode)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress (state.modifyStatementNode id modify) :=
+  of_inference_eq solved rfl
+
+/-- Allocating one requirement leaves type inference unchanged. -/
+theorem addRequirementWithId (state : State)
+    (predicate : ProgramPredicate) (solved : state.inference.Solved) :
+    state.InferenceProgress (state.addRequirementWithId predicate).2 :=
+  of_inference_eq solved rfl
+
+/-- Adding one requirement leaves type inference unchanged. -/
+theorem addRequirement (state : State) (predicate : ProgramPredicate)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress (state.addRequirement predicate) :=
+  of_inference_eq solved rfl
+
+/-- Allocating a list of requirements leaves type inference unchanged. -/
+theorem addRequirementsWithIds (state : State)
+    (predicates : List ProgramPredicate) (solved : state.inference.Solved) :
+    state.InferenceProgress (state.addRequirementsWithIds predicates).2 := by
+  induction predicates generalizing state with
+  | nil => exact .refl solved
+  | cons predicate rest induction =>
+      simpa only [State.addRequirementsWithIds] using
+        (addRequirementWithId state predicate solved).trans
+          (induction (state.addRequirementWithId predicate).2
+            (addRequirementWithId state predicate solved).solved)
+
+/-- Adding a list of requirements leaves type inference unchanged. -/
+theorem addRequirements (state : State) (predicates : List ProgramPredicate)
+    (solved : state.inference.Solved) :
+    state.InferenceProgress (state.addRequirements predicates) :=
+  addRequirementsWithIds state predicates solved
+
+/-- Marking direct-call provenance leaves type inference unchanged. -/
+theorem markDirectCallRequirements (state : State)
+    (requirements : List RequirementId) (solved : state.inference.Solved) :
+    state.InferenceProgress
+      (state.markDirectCallRequirements requirements) :=
+  of_inference_eq solved rfl
+
+end InferenceProgress
 
 end Solcore.Frontend.SourceInference.State

@@ -60,6 +60,27 @@ private def solverRegressionModule : Workspace.ModuleId :=
 private def solverRegressionOwner : Resolved.DeclarationId :=
   ⟨solverRegressionModule, 0⟩
 
+/-- A solved initial state supports reflexive progress, fresh-variable
+allocation, and a following source-state-only update as one composable
+inference-progress chain. -/
+example :
+    let initial := SourceInference.State.initial solverRegressionOwner
+    let fresh := initial.fresh.2
+    initial.InferenceProgress (fresh.withLocals []) := by
+  dsimp only
+  have initialSolved :
+      (SourceInference.State.initial solverRegressionOwner).inference.Solved := by
+    change (TypeSystem.InferState.initial 0).Solved
+    exact TypeSystem.InferState.Solved.initial 0
+  have reflexive :=
+    SourceInference.State.InferenceProgress.refl initialSolved
+  have freshProgress := SourceInference.State.InferenceProgress.fresh
+    (SourceInference.State.initial solverRegressionOwner) reflexive.solved
+  have stateOnlyProgress := SourceInference.State.InferenceProgress.withLocals
+    (SourceInference.State.initial solverRegressionOwner).fresh.2 []
+    freshProgress.solved
+  exact reflexive.trans (freshProgress.trans stateOnlyProgress)
+
 private def solverRegressionFirst : TypeSystem.TypeVarId := ⟨0⟩
 private def solverRegressionSecond : TypeSystem.TypeVarId := ⟨1⟩
 

@@ -158,6 +158,38 @@ example :=
 example := @Solcore.Frontend.SourceInference.State.Header
 example := @Solcore.Frontend.SourceInference.State.binderEnvironment
 example := @Solcore.Frontend.SourceInference.State.NodesBelowNextOccurrence
+example := @Solcore.Frontend.SourceInference.State.InferenceProgress
+example := @Solcore.Frontend.SourceInference.State.InferenceProgress.refl
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.of_inference_eq
+example := @Solcore.Frontend.SourceInference.State.InferenceProgress.trans
+example := @Solcore.Frontend.SourceInference.State.InferenceProgress.fresh
+example := @Solcore.Frontend.SourceInference.State.InferenceProgress.withLocals
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.restoreLexicalScope
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.allocateBinder
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.allocateHiddenLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.allocateExpressionId
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.allocateStatementId
+example := @Solcore.Frontend.SourceInference.State.InferenceProgress.recordNode
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.modifyExpressionNode
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.modifyStatementNode
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.addRequirementWithId
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.addRequirement
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.addRequirementsWithIds
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.addRequirements
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.markDirectCallRequirements
 example :=
   @Solcore.Frontend.SourceInference.State.initial_binderEnvironment
 example :=
