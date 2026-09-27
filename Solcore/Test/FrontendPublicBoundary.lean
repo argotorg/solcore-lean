@@ -81,6 +81,14 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.generalizeValue_templateIds_fresh
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource
+example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_owner
+example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputIds
+example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputNames
+example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputComptime
+example := @Solcore.Frontend.SourceInference.TypedBinder.applySubstitution_name
+example := @Solcore.Frontend.SourceInference.TypedBinder.applySubstitution_comptime
+example := @Solcore.Frontend.SourceInference.TypedSource.applySubstitution_inputNames
+example := @Solcore.Frontend.SourceInference.TypedSource.applySubstitution_inputComptime
 
 example := @Solcore.Frontend.LocalNameTable
 example := @Solcore.Frontend.LocalNameTable.lookup?

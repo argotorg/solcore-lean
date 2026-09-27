@@ -6,6 +6,21 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend.SourceInference
 
+@[simp] theorem TypedBinder.applySubstitution_id
+    (substitution : TypeSystem.Substitution) (binder : TypedBinder) :
+    (binder.applySubstitution substitution).id = binder.id := by
+  rfl
+
+@[simp] theorem TypedBinder.applySubstitution_name
+    (substitution : TypeSystem.Substitution) (binder : TypedBinder) :
+    (binder.applySubstitution substitution).name = binder.name := by
+  rfl
+
+@[simp] theorem TypedBinder.applySubstitution_comptime
+    (substitution : TypeSystem.Substitution) (binder : TypedBinder) :
+    (binder.applySubstitution substitution).comptime = binder.comptime := by
+  rfl
+
 @[simp] theorem IntegerLiteralResolution.applySubstitution_rawValue
     (substitution : TypeSystem.Substitution)
     (resolution : IntegerLiteralResolution) :
@@ -109,6 +124,26 @@ theorem IntegerLiteralResolution.applySubstitution_predicate
     (substitution : TypeSystem.Substitution) (source : TypedSource) :
     (source.applySubstitution substitution).roots = source.roots := by
   rfl
+
+@[simp] theorem TypedSource.applySubstitution_inputIds
+    (substitution : TypeSystem.Substitution) (source : TypedSource) :
+    (source.applySubstitution substitution).inputs.map (fun binder => binder.id) =
+      source.inputs.map (fun binder => binder.id) := by
+  simp [TypedSource.applySubstitution]
+
+@[simp] theorem TypedSource.applySubstitution_inputNames
+    (substitution : TypeSystem.Substitution) (source : TypedSource) :
+    (source.applySubstitution substitution).inputs.map
+        (fun binder => binder.name) =
+      source.inputs.map (fun binder => binder.name) := by
+  simp [TypedSource.applySubstitution]
+
+@[simp] theorem TypedSource.applySubstitution_inputComptime
+    (substitution : TypeSystem.Substitution) (source : TypedSource) :
+    (source.applySubstitution substitution).inputs.map
+        (fun binder => binder.comptime) =
+      source.inputs.map (fun binder => binder.comptime) := by
+  simp [TypedSource.applySubstitution]
 
 @[simp] theorem TypedSource.applySubstitution_nodeIds
     (substitution : TypeSystem.Substitution) (source : TypedSource) :

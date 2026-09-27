@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Program
+import Solcore.Frontend.SourceInference.TypedIRProperties
 
 /-! Success projections for source-inference finalization. -/
 
@@ -231,5 +232,44 @@ theorem finalize_typedSource
                   cases success
                   rw [defaultIntegerLiteralTargets_toTypedSource literalResult,
                     defaultIntegerPatternTargets_toTypedSource patternResult]
+
+/-- Finalization preserves the declaration owning the inferred source. -/
+theorem finalize_typedSource_owner
+    {context : Context} {type : Ty} {state : State} {roots : List NodeId}
+    {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    result.typedSource.owner = state.owner := by
+  rw [finalize_typedSource success]
+  rfl
+
+/-- Final substitution preserves the stable identities of every input. -/
+theorem finalize_typedSource_inputIds
+    {context : Context} {type : Ty} {state : State} {roots : List NodeId}
+    {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    result.typedSource.inputs.map (fun binder => binder.id) =
+      state.inputs.map (fun binder => binder.id) := by
+  rw [finalize_typedSource success]
+  simp [State.toTypedSource]
+
+/-- Final substitution cannot rename the inputs retained by finalization. -/
+theorem finalize_typedSource_inputNames
+    {context : Context} {type : Ty} {state : State} {roots : List NodeId}
+    {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    result.typedSource.inputs.map (fun binder => binder.name) =
+      state.inputs.map (fun binder => binder.name) := by
+  rw [finalize_typedSource success]
+  simp [State.toTypedSource]
+
+/-- Final substitution cannot change input staging markers. -/
+theorem finalize_typedSource_inputComptime
+    {context : Context} {type : Ty} {state : State} {roots : List NodeId}
+    {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    result.typedSource.inputs.map (fun binder => binder.comptime) =
+      state.inputs.map (fun binder => binder.comptime) := by
+  rw [finalize_typedSource success]
+  simp [State.toTypedSource]
 
 end Solcore.Frontend.SourceInference.Detail
