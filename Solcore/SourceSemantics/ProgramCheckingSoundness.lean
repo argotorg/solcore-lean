@@ -51,6 +51,17 @@ def ofChecked (checked : CheckedProgram) : Program := {
 
 end Program
 
+/-- Raw-workspace checker success discharges the cross-category declaration
+identity component of semantic signature-catalog well-formedness. -/
+theorem signatureDeclarationIds_nodup_ofCheckProgram
+    {raw : Workspace.RawWorkspace}
+    {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkProgram raw fuel = .ok checked) :
+    (signatureDeclarationIds checked.signatures).Nodup := by
+  simpa [signatureDeclarationIds] using
+    Frontend.checkProgram_success_signature_declaration_ids_nodup success
+
 /-- The remaining proof obligations for promoting a forgeable checked-program
 carrier to a declaratively well-formed source program.  Exact ID alignment
 rules out missing and extra bodies; semantic body validity is deliberately an

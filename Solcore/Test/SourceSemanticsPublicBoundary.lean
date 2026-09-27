@@ -403,6 +403,7 @@ example := @Solcore.SourceSemantics.ProgramWellFormed
 example := @Solcore.SourceSemantics.FunctionDefinition.ofChecked
 example := @Solcore.SourceSemantics.MethodDefinition.ofChecked
 example := @Solcore.SourceSemantics.Program.ofChecked
+example := @Solcore.SourceSemantics.signatureDeclarationIds_nodup_ofCheckProgram
 example := @Solcore.SourceSemantics.CheckedProgramWellFormedConditions
 example :=
   @Solcore.SourceSemantics.CheckedProgramWellFormedConditions.ofCheckLoadedProgram
