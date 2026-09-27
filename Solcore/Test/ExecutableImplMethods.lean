@@ -32,6 +32,28 @@ private def onlyImplementation (program : CheckedProgram) :
   | implementations => throw (IO.userError
       s!"expected one implementation, found {implementations.length}")
 
+private def implementationForTrait (program : CheckedProgram)
+    (name : String) : IO ProgramImplementationSignature := do
+  let trait ← match program.signatures.traits.filter fun trait =>
+      trait.name == name with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one {name} trait, found {traits.length}")
+  match program.signatures.implementations.filter fun implementation =>
+      decide (implementation.head.trait = ProgramTraitId.declaration trait.id) with
+  | [implementation] => pure implementation
+  | implementations => throw (IO.userError
+      s!"expected one {name} implementation, found {implementations.length}")
+
+private def selectedEvidenceFor (program : CheckedProgram)
+    (implementation : ProgramImplementationSignature) :
+    IO TypedTraitResolution.Evidence := do
+  match (TypedTraitResolution.resolve program.signatures.resolutionRules 32
+      implementation.head).outcome with
+  | .success evidence => pure evidence
+  | outcome => throw (IO.userError
+      s!"implementation evidence was unavailable: {reprStr outcome}")
+
 private def evidenceFor (implementation : ProgramImplementationSignature) :
     TypedTraitResolution.Evidence :=
   .byImpl implementation.head implementation.id []
@@ -310,11 +332,13 @@ private def testTraitPredicateInstantiation : IO Unit := do
     "trait Ord<T> where T: Eq {",
     "  function gt(left: T, right: T) returns (Bool);",
     "}",
-    "impl Ord<Word> {",
+    "impl Eq<Word> {}",
+    "impl Ord<Word> where Word: Eq {",
     "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
     "}"
   ])
-  let implementation ← onlyImplementation program
+  let implementation ← implementationForTrait program "Ord"
+  let evidence ← selectedEvidenceFor program implementation
   let eq ← match program.signatures.traits.filter fun trait =>
       trait.name == "Eq" with
     | [trait] => pure trait
@@ -331,15 +355,15 @@ private def testTraitPredicateInstantiation : IO Unit := do
     arguments := []
   }
   let method ← match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity
-      program (evidenceFor implementation) 1 "gt" with
+      program evidence 1 "gt" with
     | .ok method => pure method
     | .error error => throw (IO.userError
         s!"trait-constrained Ord.gt method was rejected: {reprStr error}")
   assertTrue (decide (implementation.head.trait = ord.id ∧
       implementation.head.subject = .word ∧
-      implementation.wherePredicates = [] ∧
+      implementation.wherePredicates = [eqWord] ∧
       method.synthetic.scheme.parameters = [] ∧
-      method.synthetic.scheme.predicates = [eqWord] ∧
+      method.synthetic.scheme.predicates = [eqWord, eqWord] ∧
       method.synthetic.parameterTypes = [.word, .word] ∧
       method.synthetic.returnTypes = [.bool] ∧
       method.checked.type = .function (.product .word .word) .bool ∧
@@ -361,11 +385,13 @@ private def testTraitPredicateParameterOrder : IO Unit := do
     "trait Route<From, To> where From: Rel<To> {",
     "  function route(value: From) returns (To);",
     "}",
-    "impl Route<Word, Bool> {",
+    "impl Rel<Word, Bool> {}",
+    "impl Route<Word, Bool> where Word: Rel<Bool> {",
     "  function route(value: Word) returns (Bool) { return true; }",
     "}"
   ])
-  let implementation ← onlyImplementation program
+  let implementation ← implementationForTrait program "Route"
+  let evidence ← selectedEvidenceFor program implementation
   let rel ← match program.signatures.traits.filter fun trait =>
       trait.name == "Rel" with
     | [trait] => pure trait
@@ -377,13 +403,13 @@ private def testTraitPredicateParameterOrder : IO Unit := do
     arguments := [.bool]
   }
   let method ← match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity
-      program (evidenceFor implementation) 2 "route" with
+      program evidence 2 "route" with
     | .ok method => pure method
     | .error error => throw (IO.userError
         s!"two-parameter trait predicate was rejected: {reprStr error}")
   assertTrue (decide (implementation.head.subject = .word ∧
       implementation.head.arguments = [.bool] ∧
-      method.synthetic.scheme.predicates = [relWordBool]))
+      method.synthetic.scheme.predicates = [relWordBool, relWordBool]))
     "trait subject and argument parameters were instantiated out of order"
 
 private def testUnclosedTraitPredicateRejection : IO Unit := do
@@ -392,11 +418,13 @@ private def testUnclosedTraitPredicateRejection : IO Unit := do
     "trait Ord<T> where T: Eq {",
     "  function gt(left: T, right: T) returns (Bool);",
     "}",
-    "impl Ord<Word> {",
+    "impl Eq<Word> {}",
+    "impl Ord<Word> where Word: Eq {",
     "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
     "}"
   ])
-  let implementation ← onlyImplementation program
+  let implementation ← implementationForTrait program "Ord"
+  let evidence ← selectedEvidenceFor program implementation
   let ord ← match program.signatures.traits.filter fun trait =>
       trait.name == "Ord" with
     | [trait] => pure trait
@@ -420,7 +448,7 @@ private def testUnclosedTraitPredicateRejection : IO Unit := do
     }
   }
   match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity
-      tamperedProgram (evidenceFor implementation) 1 "gt" with
+      tamperedProgram evidence 1 "gt" with
   | .error (.traitPredicateNotClosed trait predicate (.rigid parameter)) =>
       assertTrue (decide (trait = ord.id ∧ predicate = openPredicate ∧
           parameter = foreignParameter))

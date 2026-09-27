@@ -279,6 +279,29 @@ private def testPhantomImplementationParameterRejection : IO Unit := do
   | .ok _ => throw (IO.userError
       "a phantom implementation parameter reached body checking")
 
+private def testMissingImplementationTraitPredicateRejection : IO Unit := do
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
+      "trait Marker<T> {}",
+      "trait Required<T> where T: Marker {}",
+      "impl Required<Word> {}"
+    ])) with
+  | .error [.signature
+        (.missingImplementationTraitPredicate implementation predicate)] =>
+      match predicate.trait with
+      | .declaration trait =>
+          assertTrue (decide (
+              implementation.declarationIndex = 2 ∧
+              trait.declarationIndex = 0 ∧
+              trait.moduleId = implementation.moduleId ∧
+              predicate.subject = .word ∧ predicate.arguments = []))
+            "missing trait predicate lost its instantiated stable identities"
+      | .builtin _ => throw (IO.userError
+          "source trait requirement was reported as a builtin predicate")
+  | .error errors => throw (IO.userError
+      s!"missing trait predicate had the wrong pipeline error: {reprStr errors}")
+  | .ok _ => throw (IO.userError
+      "an implementation missing a trait-level requirement reached body checking")
+
 /-- Exercise the complete raw-workspace pipeline, including generics,
 overloads, calls, predicates, implementation evidence, and integer literals. -/
 def testProgramChecking : IO Unit := do
@@ -289,5 +312,6 @@ def testProgramChecking : IO Unit := do
   testDefaultImplementationPriority
   testStageClassification
   testPhantomImplementationParameterRejection
+  testMissingImplementationTraitPredicateRejection
 
 end Tests.ProgramChecking

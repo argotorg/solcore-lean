@@ -137,6 +137,19 @@ private def functionFor (program : CheckedProgram)
   | functions => throw (IO.userError
       s!"expected one body named `{signature.name}`, found {functions.length}")
 
+private def implementationForTrait (program : CheckedProgram)
+    (name : String) : IO ProgramImplementationSignature := do
+  let trait ← match program.signatures.traits.filter fun trait =>
+      trait.name == name with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"expected one trait named `{name}`, found {traits.length}")
+  match program.signatures.implementations.filter fun implementation =>
+      decide (implementation.head.trait = ProgramTraitId.declaration trait.id) with
+  | [implementation] => pure implementation
+  | implementations => throw (IO.userError
+      s!"expected one `{name}` implementation, found {implementations.length}")
+
 private def replaceFunction (program : CheckedProgram)
     (replacement : CheckedFunction) : CheckedProgram := {
   program with
@@ -976,7 +989,7 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
     "impl Eq<Word> {",
     "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
     "}",
-    "impl Ord<Word> {",
+    "impl Ord<Word> where Word: Eq {",
     "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
     "}",
     "function ne<T>(left: T, right: T) returns (Bool) where T: Eq {",
@@ -1152,7 +1165,10 @@ private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
     "trait Ord<T> where T: Eq {",
     "  function gt(left: T, right: T) returns (Bool);",
     "}",
-    "impl Ord<Word> {",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
+    "}",
+    "impl Ord<Word> where Word: Eq {",
     "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
     "}",
     "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
@@ -1174,15 +1190,23 @@ private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
     | [solved] => pure solved
     | requirements => throw (IO.userError
         s!"trait-predicate fixture expected one Ord requirement, found {requirements.length}")
-  let implementation ← match program.signatures.implementations with
-    | [implementation] => pure implementation
-    | implementations => throw (IO.userError
-        s!"trait-predicate fixture expected one Ord impl, found {implementations.length}")
+  let implementation ← implementationForTrait program "Ord"
+  let eq ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Eq" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"trait-predicate fixture expected one Eq trait, found {traits.length}")
+  let eqWord : ProgramPredicate := {
+    trait := eq.id
+    subject := .word
+    arguments := []
+  }
   let evidenceMatches := match solved.evidence with
     | .assumption predicate => decide (predicate = solved.predicate)
     | _ => false
-  assertTrue (evidenceMatches && decide (implementation.wherePredicates = []))
-    "generic > did not retain its premise-free Ord assumption"
+  assertTrue (evidenceMatches &&
+      decide (implementation.wherePredicates = [eqWord]))
+    "generic > did not retain its explicit Ord and Eq assumptions"
   let outcome ← runOrThrow "static trait predicate assumption" program
     [monomorphicRequest entry] 2
   let plan ← match outcome with
@@ -1206,7 +1230,7 @@ private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
   assertTrue (decide (linkedEntry.run?
       [.word (word 9), .word (word 1)] 2048 =
         some (.done (.bool true) [])))
-    "Ord.gt required an Eq implementation even though its body did not consume Eq"
+    "Ord.gt did not preserve its required Eq implementation evidence"
 
 private def testMissingConsumedTraitPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -1216,8 +1240,11 @@ private def testMissingConsumedTraitPredicateEvidence : IO Unit := do
     "trait Ord<T> where T: Eq {",
     "  function gt(left: T, right: T) returns (Bool);",
     "}",
+    "impl Eq<Word> {",
+    "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
+    "}",
     "function consumeEq<T>(value: T) returns (Bool) where T: Eq { return true; }",
-    "impl Ord<Word> {",
+    "impl Ord<Word> where Word: Eq {",
     "  function gt(left: Word, right: Word) returns (Bool) { return consumeEq(left); }",
     "}",
     "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
@@ -1233,13 +1260,38 @@ private def testMissingConsumedTraitPredicateEvidence : IO Unit := do
     | [trait] => pure trait
     | traits => throw (IO.userError
         s!"consumed trait predicate: expected one Eq trait, found {traits.length}")
-  let implementation ← match program.signatures.implementations with
-    | [implementation] => pure implementation
-    | implementations => throw (IO.userError
-        s!"consumed trait predicate: expected one Ord impl, found {implementations.length}")
-  let outcome ← runOrThrow "consumed trait predicate boundary" program
+  let implementation ← implementationForTrait program "Ord"
+  let forgedImplementation := { implementation with wherePredicates := [] }
+  let forgedProgram : CheckedProgram := {
+    program with
+    signatures := {
+      program.signatures with
+      implementations := program.signatures.implementations.filterMap fun candidate =>
+        if candidate.head.trait = ProgramTraitId.declaration eq.id then none
+        else if candidate.id = implementation.id then some forgedImplementation
+        else some candidate
+      implRules := program.signatures.implRules.filterMap fun rule =>
+        if rule.head.trait = ProgramTraitId.declaration eq.id then none
+        else if rule.id = ProgramImplId.declaration implementation.id then
+          some { rule with wherePredicates := [] }
+        else some rule
+    }
+    functions := program.functions.map fun function => {
+      function with
+      solvedRequirements := function.solvedRequirements.map fun row =>
+        match row.evidence with
+        | .implementation (.byImpl goal (.declaration id) _) =>
+            if id = implementation.id then
+              let stripped : PredicateEvidence :=
+                .implementation (.byImpl goal (.declaration id) [])
+              { row with evidence := stripped }
+            else row
+        | _ => row
+    }
+  }
+  let outcome ← runOrThrow "consumed trait predicate boundary" forgedProgram
     [monomorphicRequest entry] 2
-  match SourceCoreDirectLinking.link program outcome with
+  match SourceCoreDirectLinking.link forgedProgram outcome with
   | .error (.missingAssumptionEvidence key _ _ predicate) =>
       assertTrue (decide (key.declaration = implementation.id ∧
           predicate.trait = eq.id ∧ predicate.subject = .word ∧
@@ -1262,7 +1314,7 @@ private def testConsumedTraitPredicateEvidence : IO Unit := do
     "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
     "  return left == right;",
     "}",
-    "impl Ord<Word> {",
+    "impl Ord<Word> where Word: Eq {",
     "  function gt(left: Word, right: Word) returns (Bool) {",
     "    return equalWithEvidence(left, right);",
     "  }",
@@ -1310,7 +1362,7 @@ private def testGenericTraitPredicateEvidence : IO Unit := do
     "impl Eq<Word> {",
     "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
     "}",
-    "impl<T> Ord<T> {",
+    "impl<T> Ord<T> where T: Eq {",
     "  function gt(left: T, right: T) returns (Bool) {",
     "    return left == right;",
     "  }",

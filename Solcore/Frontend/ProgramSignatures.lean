@@ -477,6 +477,9 @@ inductive ProgramSignatureError where
   | implementationParameterNotInHead
       (implementation : Resolved.DeclarationId)
       (parameter : TypeSystem.TypeParameterId)
+  | missingImplementationTraitPredicate
+      (implementation : Resolved.DeclarationId)
+      (predicate : ProgramPredicate)
   | duplicateDataConstructor
       (dataType : Resolved.DeclarationId) (name : String)
       (firstIndex duplicateIndex : Nat)
@@ -505,6 +508,7 @@ private def programSignatureErrorDeclaration :
   | .implMethodPredicateMismatch method _ _ _ => method.implementation
   | .traitCatalogUnavailable implementation _ => implementation
   | .implementationParameterNotInHead implementation _ => implementation
+  | .missingImplementationTraitPredicate implementation _ => implementation
   | .duplicateDataConstructor dataType _ _ _ => dataType
 
 private def declarationParameters
@@ -965,10 +969,15 @@ private def implementationSignatureOfDeclaration
   let some traitSignature := traits.find? fun signature =>
       decide (signature.id = trait)
     | throw (.traitCatalogUnavailable declaration.id trait)
-  let unmatchedMethods ← unmatchedImplMethodsOfDeclaration environment
-    declaration scope source.value.methods 0 []
   let substitution : TypeSystem.ParameterSubstitution :=
     traitSignature.parameters.zip (subject :: arguments)
+  let requiredPredicates := traitSignature.wherePredicates.map
+    (ProgramPredicate.applyParameters substitution)
+  for predicate in requiredPredicates do
+    unless wherePredicates.contains predicate do
+      throw (.missingImplementationTraitPredicate declaration.id predicate)
+  let unmatchedMethods ← unmatchedImplMethodsOfDeclaration environment
+    declaration scope source.value.methods 0 []
   validateRequiredImplMethods declaration.id substitution
     traitSignature.methods unmatchedMethods
   let methods ← attachTraitMethods traitSignature.methods unmatchedMethods

@@ -454,6 +454,37 @@ private def testFailures : IO Unit := do
     | .implementationParameterNotInHead implementation parameter =>
         decide (parameter.owner = implementation ∧ parameter.index = 1)
     | _ => false
+  expectSingleError (String.intercalate "\n" [
+    "trait Marker<T> {}",
+    "trait Required<T> where T: Marker {}",
+    "impl Required<Word> {}"
+  ]) fun error => match error with
+    | .missingImplementationTraitPredicate implementation predicate =>
+        match predicate.trait with
+        | .declaration trait => decide (
+            implementation.declarationIndex = 2 ∧
+            trait.declarationIndex = 0 ∧
+            trait.moduleId = implementation.moduleId ∧
+            predicate.subject = .word ∧ predicate.arguments = [])
+        | .builtin _ => false
+    | _ => false
+
+private def testTraitPredicateContainmentAllowsReorderingAndExtras : IO Unit := do
+  let source ← parsed "predicates.solc"
+    (String.intercalate "\n" [
+      "trait First<T> {}",
+      "trait Second<T> {}",
+      "trait Extra<T> {}",
+      "trait Required<T> where T: First, T: Second {}",
+      "impl Required<Word> where Word: Extra, Word: Second, Word: First {}"
+    ])
+  let environment ← catalog [source]
+  match buildProgramSignatures environment with
+  | .ok signatures =>
+      assertTrue (signatures.implementations.length == 1)
+        "reordered required predicates plus an extra predicate changed collection"
+  | .error errors => throw (IO.userError
+      s!"valid reordered implementation predicates were rejected: {reprStr errors}")
 
 private def testMethodFailures : IO Unit := do
   expectSingleError (String.intercalate "\n" [
@@ -560,6 +591,7 @@ def testProgramSignatures : IO Unit := do
   ProgramSignatures.testBuiltinIntResolutionProfile
   ProgramSignatures.testMethodCatalog
   ProgramSignatures.testFailures
+  ProgramSignatures.testTraitPredicateContainmentAllowsReorderingAndExtras
   ProgramSignatures.testMethodFailures
   ProgramSignatures.testAmbiguousTrait
   ProgramSignatures.testStrictTraitVisibility
