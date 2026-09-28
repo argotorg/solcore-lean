@@ -201,7 +201,11 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedUninitialized_facts
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.annotatedUninitializedBinderFacts_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.letAnnotatedUninitializedStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letUnannotatedInitialized_facts
 example :=
