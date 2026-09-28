@@ -3480,6 +3480,51 @@ theorem committedCoercionStepValid
       solveRequirements_committedCoercionStepSequenceProves corresponds
         success solved_eq valid
 
+/-- A committed coercion edge is also valid against a scoped solved ledger at
+one covered source occurrence.  This form admits qualified local-scheme rows:
+their evidence is justified by the occurrence-local template assumptions
+rather than by declaration-wide solved-row validity. -/
+theorem committedCoercionStepValidAt
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement} {solved : List SolvedRequirement}
+    {base active : SourceSemantics.Context} {ledgerSource : TypedSource}
+    {occurrence : NodeId} {planned : Detail.PlannedCoercionStep}
+    {committed : CoercionStep}
+    (corresponds : Detail.PlannedCoercionStep.CommitCorresponds requirements
+      planned committed)
+    (profile : CoercionProfileInstantiates active
+      (state.resolve planned.source) (state.resolve planned.target)
+      (Detail.applyPredicate state planned.predicate)
+      (planned.methodPredicates.map (Detail.applyPredicate state)))
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (signaturesEq : active.signatures = base.signatures)
+    (requirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered ledgerSource active occurrence)
+    (occurs : ∀ id, id ∈ committed.requirements →
+      PrimaryRequirementOccursAt ledgerSource occurrence id) :
+    CoercionStepValid active
+      (committed.applySubstitution state.inference.substitution) := by
+  apply CoercionStepValid.intro
+      (primary := Detail.applyPredicate state planned.predicate)
+      (methodPredicates :=
+        planned.methodPredicates.map (Detail.applyPredicate state))
+  · simpa [CoercionStep.applySubstitution, State.resolve,
+      TypeSystem.InferState.resolve, corresponds.source_eq,
+      corresponds.target_eq] using profile
+  · have sequence := solveRequirements_correspondingSequenceProvesAt
+        (.cons corresponds.primary_mem corresponds.methods) success solvedEq
+        ledger ownership signaturesEq requirementsEq assumptionsMono covered
+        (fun id member => occurs id (by
+          simpa [CoercionStep.requirements] using member))
+    simpa [CoercionStep.applySubstitution] using sequence
+
 private theorem committed_member_has_planned_correspondence
     {requirements : List Requirement}
     {plan : List Detail.PlannedCoercionStep}
@@ -3706,6 +3751,109 @@ theorem coercionPlan?_some_committedPathValid_at
   exact committedCoercionStepValid (state := later) correspondence
     normalizedProfile solve_success solved_eq valid
 
+/-- The later-state coercion bridge with occurrence-scoped evidence.  Every
+edge obligation is discharged at the expression occurrence that owns the
+committed path, so qualified local-scheme rows remain valid inside their
+initializer scope without requiring global solved-row validity. -/
+theorem coercionPlan?_some_committedPathValid_at_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state later : Frontend.SourceInference.State}
+    {source target : TypeSystem.Ty}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {plan : List Detail.PlannedCoercionStep}
+    {solved : List SolvedRequirement}
+    {sourceContext base semanticContext : SourceSemantics.Context}
+    {ledgerSource : TypedSource} {occurrence : NodeId}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (planSuccess :
+      Detail.coercionPlan? inferenceContext state source target =
+        .ok (some plan))
+    (requirementsSubset :
+      (Detail.commitCoercionPlan state plan).2.requirements ⊆
+        later.requirements)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext
+        semanticContext)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : semanticContext.signatures = base.signatures)
+    (activeRequirementsEq :
+      semanticContext.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ semanticContext.assumptions)
+    (covered : TemplateScopeCovered ledgerSource semanticContext occurrence)
+    (occurs : ∀ id,
+      id ∈ coercionRequirementIds
+        (Detail.commitCoercionPlan state plan).1 →
+      PrimaryRequirementOccursAt ledgerSource occurrence id) :
+    CoercionPathValid semanticContext
+      (later.inference.substitution.apply source)
+      (later.inference.substitution.apply target)
+      ((Detail.commitCoercionPlan state plan).1.map
+        (CoercionStep.applySubstitution later.inference.substitution)) := by
+  have corresponds : Detail.CoercionPlanCommitCorresponds later.requirements
+      plan (Detail.commitCoercionPlan state plan).1 :=
+    (Detail.commitCoercionPlan_corresponds state plan).mono
+      requirementsSubset
+  have retainedStructural : Frontend.SourceInference.CoercionPath.isValid
+      source target (Detail.commitCoercionPlan state plan).1 = true :=
+    corresponds.isValid (Detail.coercionPlan?_some_isValid planSuccess)
+  have normalizedStructural : Frontend.SourceInference.CoercionPath.isValid
+      (later.inference.substitution.apply source)
+      (later.inference.substitution.apply target)
+      ((Detail.commitCoercionPlan state plan).1.map
+        (CoercionStep.applySubstitution later.inference.substitution)) = true :=
+    Frontend.SourceInference.CoercionPath.isValid_applySubstitution
+      later.inference.substitution retainedStructural
+  apply CoercionPathValid.of_isValid normalizedStructural
+  intro step stepMember
+  obtain ⟨committed, committedMember, rfl⟩ := List.mem_map.mp stepMember
+  obtain ⟨planned, plannedMember, correspondence⟩ :=
+    committed_member_has_planned_correspondence corresponds committedMember
+  have consistent := Detail.coercionPlan?_some_profileConsistent
+    traitSuccess profileSuccess planSuccess planned plannedMember
+  have methodPredicatesEq :
+      planned.methodPredicates.map (Detail.applyPredicate later) =
+        planned.methodPredicates.map
+          (TypedTraitResolution.applySubstitution
+            later.inference.substitution) := by
+    apply List.map_congr_left
+    intro predicate predicateMember
+    rfl
+  have profileInstantiates :=
+    plannedCoercionStep_profileInstantiatesAfterSubstitution
+      (substitution := later.inference.substitution) catalog contextValid
+      signaturesEq traitName profileSuccess consistent
+  have normalizedProfile : CoercionProfileInstantiates semanticContext
+      (later.resolve planned.source) (later.resolve planned.target)
+      (Detail.applyPredicate later planned.predicate)
+      (planned.methodPredicates.map (Detail.applyPredicate later)) := by
+    rw [methodPredicatesEq]
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve, Detail.applyPredicate] using
+      profileInstantiates
+  apply committedCoercionStepValidAt (state := later) correspondence
+    normalizedProfile solveSuccess solvedEq ledger ownership
+    activeSignaturesEq activeRequirementsEq assumptionsMono covered
+  intro id member
+  apply occurs id
+  unfold coercionRequirementIds
+  exact List.mem_flatMap.mpr ⟨committed, committedMember, member⟩
+
 /-- Expected-type fitting yields a semantically valid output-coercion path
 after the enclosing inference traversal has finished.  An absent expectation
 or successful unification gives the empty path; a mismatch reuses the exact
@@ -3767,6 +3915,78 @@ theorem withExpected_success_coercionPathValid_afterFinalization
     exact coercionPlan?_some_committedPathValid_at trait_success
       profile_success plan_success requirements_subset catalog contextValid
       signatures_eq trait_name solve_success solved_eq valid
+
+/-- Expected-type fitting with occurrence-scoped final evidence.  Unlike the
+global solved-row variant, this theorem remains applicable inside generalized
+local initializers whose qualified template rows are valid only at covered
+source occurrences. -/
+theorem withExpected_success_coercionPathValid_afterFinalization_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state later : Frontend.SourceInference.State}
+    {actual : InferredExpression}
+    {expected : Option TypeSystem.Ty}
+    {result : Detail.ExpectationResult}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base semanticContext : SourceSemantics.Context}
+    {ledgerSource : TypedSource} {occurrence : NodeId}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.withExpected inferenceContext state actual expected =
+      .ok result)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (requirementsSubset : result.state.requirements ⊆ later.requirements)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext
+        semanticContext)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : semanticContext.signatures = base.signatures)
+    (activeRequirementsEq :
+      semanticContext.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ semanticContext.assumptions)
+    (covered : TemplateScopeCovered ledgerSource semanticContext occurrence)
+    (occurs : ∀ id, id ∈ coercionRequirementIds result.coercions →
+      PrimaryRequirementOccursAt ledgerSource occurrence id) :
+    CoercionPathValid semanticContext
+      (later.inference.substitution.apply
+        (result.state.resolve actual.type))
+      (later.inference.substitution.apply result.expression.type)
+      (result.coercions.map
+        (CoercionStep.applySubstitution later.inference.substitution)) := by
+  rcases Detail.withExpected_success_cases success with
+    ⟨coercionsEq, requirementsEq, typeEq⟩ |
+      ⟨expectedType, plan, expectedEq, planSuccess, resultEq⟩
+  · rw [coercionsEq]
+    simp only [List.map_nil]
+    rw [typeEq]
+    exact .nil _
+  · subst expected
+    subst result
+    change CoercionPathValid semanticContext
+      (later.inference.substitution.apply
+        ((Detail.commitCoercionPlan state plan).2.resolve actual.type))
+      (later.inference.substitution.apply (state.resolve expectedType))
+      ((Detail.commitCoercionPlan state plan).1.map
+        (CoercionStep.applySubstitution later.inference.substitution))
+    rw [Detail.commitCoercionPlan_resolve]
+    exact coercionPlan?_some_committedPathValid_at_scoped traitSuccess
+      profileSuccess planSuccess requirementsSubset catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered occurs
 
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
