@@ -1997,6 +1997,63 @@ private theorem inferMatchPatternFlatFuel_preserves_requirements
         freshDataConstructorInstantiation_requirements_subset,
         freshTypes_requirements_subset]
 
+/-- Successful flat pattern inference only retains or extends the input
+requirement ledger. -/
+theorem inferMatchPatternFlatFuel_requirements_subset
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {seen : List String} {state : State}
+    {result : InferredPattern}
+    (success : inferMatchPatternFlatFuel fuel context pattern expected seen state =
+      .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  exact inferMatchPatternFlatFuel_preserves_requirements fuel context pattern
+    expected seen state result success
+
+/-- Successful source-ordered flat pattern-list inference likewise retains
+every requirement row present at entry. -/
+theorem inferMatchPatternsFlatFuel_requirements_subset
+    {fuel : Nat} {context : Context} {patterns : List Syntax.Pattern}
+    {expected : List Ty} {seen : List String} {state : State}
+    {result : InferredPatterns}
+    (success : inferMatchPatternsFlatFuel fuel context patterns expected seen
+      state = .ok result) :
+    state.requirements ⊆ result.state.requirements := by
+  induction patterns generalizing expected seen state result with
+  | nil =>
+      cases expected with
+      | nil =>
+          simp only [inferMatchPatternsFlatFuel, pure, Pure.pure, Except.pure]
+            at success
+          injection success with resultEq
+          subst result
+          exact fun _ member => member
+      | cons type types =>
+          simp [inferMatchPatternsFlatFuel] at success
+  | cons pattern patterns induction =>
+      cases expected with
+      | nil => simp [inferMatchPatternsFlatFuel] at success
+      | cons type types =>
+          simp only [inferMatchPatternsFlatFuel, bind, Except.bind] at success
+          cases headSuccess : inferMatchPatternFlatFuel fuel context pattern type
+              seen state with
+          | error error => simp [headSuccess] at success
+          | ok head =>
+              simp only [headSuccess] at success
+              cases tailSuccess : inferMatchPatternsFlatFuel fuel context patterns
+                  types head.names head.state with
+              | error error => simp [tailSuccess] at success
+              | ok tail =>
+                  simp only [tailSuccess, pure, Pure.pure, Except.pure]
+                    at success
+                  injection success with resultEq
+                  subst result
+                  have tailSubset :
+                      head.state.requirements ⊆ tail.state.requirements :=
+                    induction tailSuccess
+                  exact List.Subset.trans
+                    (inferMatchPatternFlatFuel_requirements_subset headSuccess)
+                    tailSubset
+
 /-- Successful pattern inference only retains or extends the input requirement
 ledger. -/
 theorem inferMatchPatternFuel_requirements_subset
@@ -2108,6 +2165,67 @@ theorem inferMatchPatternFlatFuel_integerLiteral_metadata
                 requirement := ⟨state.nextRequirement⟩
               } : IntegerPatternOrigin), ?_⟩
             simp
+
+/-- Re-index the direct integer-pattern metadata by the concrete resolution
+already exposed by a successful result.  This is the callback-facing form:
+decoding and both ledger memberships follow from success rather than being
+supplied separately by the caller. -/
+theorem inferMatchPatternFlatFuel_integerLiteral_metadata_of_resolution
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {literal : Syntax.CoreLiteral} {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    {expected : Ty} {seen : List String} {state : State}
+    {result : InferredPattern}
+    (patternValue : pattern.value = .literal literal)
+    (success : inferMatchPatternFlatFuel fuel context pattern expected seen state =
+      .ok result)
+    (resolutionEq : result.resolution =
+      .integerLiteral source resolution) :
+    ∃ origin,
+      Frontend.numericLiteralValue? source = some resolution.rawValue ∧
+      resolution.targetType = .variable origin.metavariable ∧
+      resolution.requirement = origin.requirement ∧
+      origin.span = pattern.span ∧
+      origin ∈ result.state.integerPatterns ∧
+      ({ id := origin.requirement,
+          predicate := ProgramSignatures.builtinIntPredicate
+            (.variable origin.metavariable) } : Requirement) ∈
+        result.state.requirements ∧
+      resolution.requirement ∈ result.requirements := by
+  cases fuel with
+  | zero => simp [inferMatchPatternFlatFuel] at success
+  | succ fuel =>
+      cases literalValue : literal.value with
+      | string spelling =>
+          simp [inferMatchPatternFlatFuel, patternValue, literalValue] at success
+      | decimal spelling | hexadecimal spelling =>
+          cases decoded : Frontend.numericLiteralValue? literal.value with
+          | none =>
+              rw [literalValue] at decoded
+              unfold inferMatchPatternFlatFuel at success
+              simp only [patternValue, literalValue, bind, Except.bind]
+                at success
+              rw [decoded] at success
+              simp at success
+          | some rawValue =>
+              obtain ⟨actualResolution, origin, actualResolutionEq,
+                  requirementsEq, rawValueEq, targetEq, requirementEq, spanEq,
+                  originMember, requirementMember⟩ :=
+                inferMatchPatternFlatFuel_integerLiteral_metadata patternValue
+                  rfl decoded success
+              have resolutionIdentity :
+                  MatchPatternResolution.integerLiteral literal.value
+                      actualResolution =
+                    .integerLiteral source resolution :=
+                actualResolutionEq.symm.trans resolutionEq
+              injection resolutionIdentity with sourceEq resolutionValueEq
+              subst source
+              subst resolution
+              refine ⟨origin, ?_, targetEq, requirementEq, spanEq,
+                originMember, requirementMember, ?_⟩
+              · simpa [rawValueEq] using decoded
+              · rw [requirementsEq]
+                simp
 
 /-- Public-wrapper form of
 `inferMatchPatternFlatFuel_integerLiteral_metadata` for a root numeric
@@ -3717,6 +3835,18 @@ private theorem inferFuel_preserves_integerPatterns_internal :
         applyFunctionType_integerPatterns_eq,
         recordBuiltinFunctionCall_integerPatterns_eq]
 
+/-- Whole-expression inference retains every numeric-pattern origin already
+present in its input state. -/
+theorem inferExprFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    state.integerPatterns ⊆ result.2.integerPatterns := by
+  exact inferFuel_preserves_integerPatterns_internal.1 fuel context expression
+    expected state result success
+
 /-- Whole-block inference retains every numeric-pattern origin already present
 in its input state. -/
 theorem inferStatementsFuel_integerPatterns_subset
@@ -3727,6 +3857,49 @@ theorem inferStatementsFuel_integerPatterns_subset
     state.integerPatterns ⊆ result.state.integerPatterns := by
   exact inferFuel_preserves_integerPatterns_internal.2.2.2.1 fuel context
     statements expectedReturn state result success
+
+/-- Single-statement inference retains every numeric-pattern origin already
+present in its input state. -/
+theorem inferStatementFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    state.integerPatterns ⊆ result.state.integerPatterns := by
+  exact inferFuel_preserves_integerPatterns_internal.2.2.2.2.1 fuel context
+    statement expectedReturn state result success
+
+/-- Source-ordered `for` items retain every numeric-pattern origin already
+present in their input state. -/
+theorem inferForItemsFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    state.integerPatterns ⊆ result.state.integerPatterns := by
+  exact inferFuel_preserves_integerPatterns_internal.2.2.2.2.2.1 fuel context
+    items state result success
+
+/-- Single `for`-item inference retains every numeric-pattern origin already
+present in its input state. -/
+theorem inferForItemFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    state.integerPatterns ⊆ result.2.integerPatterns := by
+  exact inferFuel_preserves_integerPatterns_internal.2.2.2.2.2.2.1 fuel context
+    item state result success
+
+/-- Source-ordered expression-list inference retains every numeric-pattern
+origin already present in its input state. -/
+theorem inferExprsFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context}
+    {expressions : List Syntax.Expr} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    state.integerPatterns ⊆ result.2.integerPatterns := by
+  exact
+    inferFuel_preserves_integerPatterns_internal.2.2.2.2.2.2.2.2.2.1 fuel
+      context expressions state result success
 
 /-- Match-arm inference retains the input origin ledger while carrying every
 origin introduced by an earlier arm through later bodies and cases. -/
@@ -3739,6 +3912,62 @@ theorem inferMatchCasesFuel_integerPatterns_subset
     state.integerPatterns ⊆ result.state.integerPatterns := by
   exact inferFuel_preserves_integerPatterns_internal.2.2.2.2.2.2.2.2.2.2 fuel
     context scrutineeType expectedReturn outerScope cases state result success
+
+/-- The state immediately after checking the head arm's pattern remains a
+sub-ledger of the final match-case state, for both numeric-pattern origins and
+canonical requirements.  This is the transport needed by callbacks that
+establish metadata at the pattern boundary and consume it after the complete
+arm list has been inferred. -/
+theorem inferMatchCasesFuel_headPatternState_metadata_subset
+    {fuel : Nat} {context : Context} {scrutineeType expectedReturn : Ty}
+    {outerScope : LexicalScope} {arm : Syntax.MatchCase}
+    {rest : List Syntax.MatchCase} {state patternState : State}
+    {pattern : TypedMatchPattern} {body : BlockResult}
+    {result : MatchCasesResult}
+    (patternSuccess : inferMatchPatternFuel fuel context arm.value.pattern
+      scrutineeType state = .ok (pattern, patternState))
+    (bodySuccess : inferStatementsFuel fuel context arm.value.body.value
+      expectedReturn patternState = .ok body)
+    (success : inferMatchCasesFuel (fuel + 1) context scrutineeType
+      expectedReturn outerScope (arm :: rest) state = .ok result) :
+    patternState.integerPatterns ⊆ result.state.integerPatterns ∧
+      patternState.requirements ⊆ result.state.requirements := by
+  unfold inferMatchCasesFuel at success
+  simp only [bind, Except.bind, patternSuccess, bodySuccess] at success
+  cases tailSuccess : inferMatchCasesFuel fuel context scrutineeType
+      expectedReturn outerScope rest
+      (body.state.restoreLexicalScope outerScope) with
+  | error error => simp [tailSuccess] at success
+  | ok tail =>
+      simp only [tailSuccess, pure, Pure.pure, Except.pure] at success
+      injection success with resultEq
+      subst result
+      constructor
+      · have bodySubset :
+            patternState.integerPatterns ⊆ body.state.integerPatterns :=
+          inferStatementsFuel_integerPatterns_subset bodySuccess
+        have restoredSubset :
+            patternState.integerPatterns ⊆
+              (body.state.restoreLexicalScope outerScope).integerPatterns := by
+          simpa only [restoreLexicalScope_integerPatterns_eq] using bodySubset
+        have tailSubset :
+            (body.state.restoreLexicalScope outerScope).integerPatterns ⊆
+              tail.state.integerPatterns :=
+          inferMatchCasesFuel_integerPatterns_subset (result := tail)
+            tailSuccess
+        exact List.Subset.trans restoredSubset tailSubset
+      · have bodySubset :
+            patternState.requirements ⊆ body.state.requirements :=
+          inferStatementsFuel_requirements_subset bodySuccess
+        have restoredSubset :
+            patternState.requirements ⊆
+              (body.state.restoreLexicalScope outerScope).requirements := by
+          simpa only [restoreLexicalScope_requirements_eq] using bodySubset
+        have tailSubset :
+            (body.state.restoreLexicalScope outerScope).requirements ⊆
+              tail.state.requirements :=
+          inferMatchCasesFuel_requirements_subset (result := tail) tailSuccess
+        exact List.Subset.trans restoredSubset tailSubset
 
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)

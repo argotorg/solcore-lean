@@ -647,13 +647,31 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_integerPatterns_subset
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_integerPatterns_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_integerPatterns_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_integerPatterns_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_integerPatterns_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_integerPatterns_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_integerPatterns_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_integerPatterns_subset
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_headPatternState_metadata_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_integerLiteral_metadata
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_integerLiteral_metadata_of_resolution
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_integerLiteral_metadata
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_requirements_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternsFlatFuel_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_requirements_subset
 example :=
