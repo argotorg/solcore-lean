@@ -1179,6 +1179,88 @@ theorem recordExpressionWithExpected_success_containsExpression
   rw [resultState, resultExpression]
   exact recordNode_containsExpression fitted.state _ roots
 
+/-- A successful grouped-expression branch exposes both recursive inference
+and the exact parent recording operation.  The retained parent points to the
+child occurrence returned by that recursive call and owns only requirements
+introduced by its fitted output-coercion path. -/
+theorem inferExprFuel_success_group_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression inner : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .group inner)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) context expression expected
+      initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ innerResult innerState coercions,
+      Detail.inferExprFuel fuel context inner expected allocated =
+        .ok (innerResult, innerState) ∧
+      Detail.recordExpressionWithExpected context expression id
+        innerResult.type (.group innerResult.id) [] expected innerState =
+          .ok result ∧
+      ContainsExpression (result.2.toTypedSource roots) result.1.id {
+        id := result.1.id
+        span := expression.span
+        type := result.1.type
+        form := .group innerResult.id
+        requirements := Detail.coercionRequirements coercions
+        coercions
+      } := by
+  unfold Detail.inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases innerSuccess :
+      Detail.inferExprFuel fuel context inner expected allocated with
+  | error error =>
+      simp [innerSuccess] at success
+  | ok innerPair =>
+      rcases innerPair with ⟨innerResult, innerState⟩
+      simp only [innerSuccess] at success
+      obtain ⟨coercions, contains⟩ :=
+        recordExpressionWithExpected_success_containsExpression success roots
+      exact ⟨innerResult, innerState, coercions, rfl, success,
+        by simpa using contains⟩
+
+/-- A grouped expression inherits its raw type from its already typed child.
+After final substitution, validating the parent's fitted output path is enough
+to type the retained group occurrence. -/
+theorem groupBranchExpressionHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {expression : Syntax.Expr} {result innerResult : InferredExpression}
+    {coercions : List CoercionStep}
+    (contains : ContainsExpression source result.id {
+      id := result.id
+      span := expression.span
+      type := result.type
+      form := .group innerResult.id
+      requirements := Detail.coercionRequirements coercions
+      coercions
+    })
+    (innerType : ExpressionHasType (source.applySubstitution outer) target
+      innerResult.id (outer.apply innerResult.type))
+    (finalAdmissible : TypeAdmissible target (outer.apply result.type))
+    (path : CoercionPathValid target (outer.apply innerResult.type)
+      (outer.apply result.type)
+      (coercions.map (CoercionStep.applySubstitution outer))) :
+    ExpressionHasType (source.applySubstitution outer) target result.id
+      (outer.apply result.type) := by
+  apply ExpressionHasType.ofOrdinary
+    (rawType := outer.apply innerResult.type) (owned := [])
+    (FlexibleSubstitution.ContainsExpression.applySubstitution outer contains)
+  · exact .group innerType
+  · exact innerType.type_admissible
+  · exact finalAdmissible
+  · intro requirement member
+    simp at member
+  · exact path
+  · change Detail.coercionRequirements coercions =
+      coercionRequirementIds
+        (coercions.map (CoercionStep.applySubstitution outer))
+    rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
+    rfl
+
 /-- A successful local-identifier branch materializes the exact local
 reference node used by source semantics.  In particular, the node retains the
 canonical allocator position from immediately before scheme instantiation and
