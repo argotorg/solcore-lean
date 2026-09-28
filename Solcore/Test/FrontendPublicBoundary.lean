@@ -741,6 +741,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_nextLocal_le
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_nextLocal_le
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_localBindersBelowNextLocal
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_nextLocal_le

@@ -12254,6 +12254,18 @@ theorem inferExprFuel_nextLocal_le
   inferFuel_advances_nextLocal_internal.1 fuel context expression expected
     state result success
 
+/-- Successful source-ordered statement inference monotonically advances the
+shared declaration-local identity cutoff. -/
+theorem inferStatementsFuel_nextLocal_le
+    {fuel : Nat} {context : Context}
+    {statements : List Syntax.Statement} {expectedReturn : Ty}
+    {state : State} {result : BlockResult}
+    (success : inferStatementsFuel fuel context statements expectedReturn
+      state = .ok result) :
+    state.nextLocal ≤ result.state.nextLocal :=
+  inferFuel_advances_nextLocal_internal.2.2.2.1
+    fuel context statements expectedReturn state result success
+
 /-- Expression inference preserves the stable-binder allocation bound: it
 restores the caller's visible binders and never moves the shared cutoff
 backwards. -/
