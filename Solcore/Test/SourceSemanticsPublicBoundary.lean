@@ -241,6 +241,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letUnannotatedInitialized_facts
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.UnannotatedInitializedLetCertificate
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letUnannotatedInitialized_sound
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedInitialized_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedInitialized_sound
@@ -274,6 +278,12 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_continue_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_block_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchScrutineesFuel
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithoutDefault_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithDefault_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_forLoop_facts
 example :=

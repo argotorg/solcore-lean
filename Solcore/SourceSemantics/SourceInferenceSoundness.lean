@@ -2873,6 +2873,253 @@ theorem inferStatementFuel_success_letUnannotatedInitialized_facts
         binding, rfl, rfl, rfl, rfl, rfl, rfl,
         recordNode_containsStatement binding.2 _ roots⟩
 
+/-- The semantic obligations deliberately left at the unannotated
+initialized-`let` boundary.  A producer supplies typing in the generalized
+initializer context, qualified-requirement formation, exact generalization,
+and quantifier freshness; the compositional wrapper below handles the
+executable branch inversion and lexical-state bookkeeping. -/
+structure UnannotatedInitializedLetCertificate
+    (source : TypedSource) (target : SourceSemantics.Context)
+    (outer : TypeSystem.Substitution) (binder : TypedBinder)
+    (initializer : ExpressionId) : Prop where
+  initializer_type : ExpressionHasType (source.applySubstitution outer)
+    (localSchemeInitializerContext target
+      (binder.applySubstitution outer))
+    initializer (binder.applySubstitution outer).scheme.body
+  requirements_well_formed : LocalSchemeRequirementsWellFormed target
+    (binder.applySubstitution outer)
+  generalizes : SchemeGeneralizesExcept target
+    (localSchemeTemplateIds (binder.applySubstitution outer))
+    (binder.applySubstitution outer).scheme
+  quantified_fresh : SchemeQuantifiersFresh target
+    (binder.applySubstitution outer).scheme
+
+/-- Successful unannotated initialized declaration inference is sound once
+the genuinely semantic generalization obligations are supplied by an
+`UnannotatedInitializedLetCertificate`.  The wrapper derives scheme
+formation and the monomorphic qualified-requirement restriction from the
+exact executable generalization, installs the allocated binder, and returns
+the active context needed by following statements. -/
+theorem inferStatementFuel_success_letUnannotatedInitialized_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {initializer : Syntax.Expr} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .letDecl name none (some initializer))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (below : initial.LocalBindersBelowNextLocal)
+    (roots : List NodeId := [])
+    (certificate :
+      ∀ {inferred initializerState locals valueType generalized binding},
+        Detail.inferExprFuel fuel inferenceContext initializer none allocated =
+          .ok (inferred, initializerState) →
+        locals = initializerState.binderEnvironment.apply
+          initializerState.inference.substitution →
+        valueType = initializerState.resolve inferred.type →
+        generalized = Detail.generalizeValue initializerState locals
+          allocated.nextRequirement valueType →
+        (initializerState.withLocals locals).allocateBinder name.value
+          generalized.scheme (some name.span) false
+          generalized.requirements = binding →
+        UnannotatedInitializedLetCertificate
+          (result.state.toTypedSource roots) target outer binding.1
+          inferred.id) :
+    ∃ finalContext facts,
+      ActiveLocalContextInvariant result.state outer finalContext ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id finalContext facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+    have preserved :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+        initial below
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [finalEq] at preserved
+    exact preserved
+  obtain ⟨inferred, initializerState, locals, valueType, generalized,
+      binding, initializerSuccess, localsEq, valueTypeEq, generalizedEq,
+      bindingEq, resultEq, contains⟩ :=
+    inferStatementFuel_success_letUnannotatedInitialized_facts statementEq
+      allocationEq success roots
+  have initializerInvariant :
+      ActiveLocalContextInvariant initializerState outer target :=
+    allocatedInvariant.inferExprFuel initializerSuccess
+  have initializerBelow : initializerState.LocalBindersBelowNextLocal :=
+    Detail.inferExprFuel_preserves_localBindersBelowNextLocal allocatedBelow
+      initializerSuccess
+  have semanticCertificate := certificate initializerSuccess localsEq
+    valueTypeEq generalizedEq bindingEq
+  subst result
+  have binderEq :
+      ((initializerState.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements).1 = binding.1 :=
+    congrArg Prod.fst bindingEq
+  have bindingStateEq :
+      ((initializerState.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements).2 = binding.2 :=
+    congrArg Prod.snd bindingEq
+  have rawSchemeEq : binding.1.scheme = generalized.scheme := by
+    rw [← binderEq]
+    rfl
+  have rawRequirementsEq :
+      binding.1.schemeRequirements = generalized.requirements := by
+    rw [← binderEq]
+    rfl
+  have rawQuantifiedNodup : binding.1.scheme.quantified.Nodup := by
+    rw [rawSchemeEq, generalizedEq]
+    exact Detail.generalizeValue_scheme_quantified_nodup initializerState
+      locals allocated.nextRequirement valueType
+  have closedQuantifiedNodup :
+      (binding.1.applySubstitution outer).scheme.quantified.Nodup := by
+    simpa using rawQuantifiedNodup
+  have schemeWellFormed : SchemeWellFormed target
+      (binding.1.applySubstitution outer).scheme :=
+    StructuralSubstitution.SchemeWellFormed.ofLocalSchemeInitializerAdmissible
+      semanticCertificate.initializer_type.type_admissible
+      closedQuantifiedNodup
+  have monomorphicRequirementsEmpty :
+      (binding.1.applySubstitution outer).scheme.quantified = [] →
+        (binding.1.applySubstitution outer).schemeRequirements = [] := by
+    intro closedQuantifiedEmpty
+    have rawQuantifiedEmpty : binding.1.scheme.quantified = [] := by
+      simpa using closedQuantifiedEmpty
+    have generalizedQuantifiedEmpty : generalized.scheme.quantified = [] := by
+      rw [← rawSchemeEq]
+      exact rawQuantifiedEmpty
+    have canonicalQuantifiedEmpty :
+        (Detail.generalizeValue initializerState locals
+          allocated.nextRequirement valueType).scheme.quantified = [] := by
+      rw [← generalizedEq]
+      exact generalizedQuantifiedEmpty
+    have canonicalRequirementsEmpty :=
+      Detail.generalizeValue_requirements_empty_of_quantified_eq_nil
+        initializerState locals allocated.nextRequirement valueType
+        canonicalQuantifiedEmpty
+    have generalizedRequirementsEmpty : generalized.requirements = [] := by
+      rw [generalizedEq]
+      exact canonicalRequirementsEmpty
+    have rawRequirementsEmpty : binding.1.schemeRequirements = [] := by
+      rw [rawRequirementsEq, generalizedRequirementsEmpty]
+    simp [rawRequirementsEmpty]
+  let finalContext := target.withLocal binding.1.id
+    (binding.1.applySubstitution outer).scheme
+    (binding.1.applySubstitution outer).schemeRequirements
+  have bindingInvariant : ActiveLocalContextInvariant binding.2 outer
+      finalContext := by
+    exact (initializerInvariant.withLocals locals)
+      |>.allocateBinder_of_localBindersBelowNextLocal name.value
+        generalized.scheme (some name.span) false generalized.requirements
+        bindingEq
+        (Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+          initializerState locals initializerBelow)
+        schemeWellFormed semanticCertificate.requirements_well_formed
+  have extended : BinderExtends
+      (initializerState.withLocals locals).owner target
+      (binding.1.applySubstitution outer) finalContext := by
+    exact (initializerInvariant.aligned.withLocals locals)
+      |>.binderExtends_of_allocateBinder
+        (Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+          initializerState locals initializerBelow)
+        bindingEq schemeWellFormed semanticCertificate.quantified_fresh
+        monomorphicRequirementsEmpty
+  have recordedInvariant : ActiveLocalContextInvariant
+      (binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 (some inferred.id)
+      })) outer finalContext :=
+    bindingInvariant.recordNode _
+  have sourceOwner :
+      ((binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 (some inferred.id)
+      })).toTypedSource roots).owner = initializerState.owner := by
+    change binding.2.owner = initializerState.owner
+    rw [← bindingStateEq]
+    rfl
+  have semanticExtension : BinderExtends
+      ((binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 (some inferred.id)
+      })).toTypedSource roots).owner target
+      (binding.1.applySubstitution outer) finalContext := by
+    rw [sourceOwner]
+    simpa [Frontend.SourceInference.State.withLocals] using extended
+  have typing : StatementHasType
+      (((binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 (some inferred.id)
+      })).toTypedSource roots).applySubstitution outer)
+      control target id finalContext {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+    by_cases monomorphic :
+        (binding.1.applySubstitution outer).scheme.quantified = []
+    · have requirementsEmpty := monomorphicRequirementsEmpty monomorphic
+      have initializerContextEq :
+          localSchemeInitializerContext target
+              (binding.1.applySubstitution outer) = target := by
+        rw [localSchemeInitializerContext_eq_withTypeVariables target _
+          requirementsEmpty, monomorphic]
+        exact SourceSemantics.Context.withTypeVariables_nil target
+      have ordinaryInitializerType : ExpressionHasType
+          (((binding.2.recordNode (.statement {
+            id
+            span := statement.span
+            type := .unit
+            form := .letDecl binding.1 (some inferred.id)
+          })).toTypedSource roots).applySubstitution outer)
+          target inferred.id
+          (binding.1.applySubstitution outer).scheme.body := by
+        simpa only [initializerContextEq] using
+          semanticCertificate.initializer_type
+      have ordinaryGeneralizes : SchemeGeneralizes target
+          (binding.1.applySubstitution outer).scheme := by
+        have exactGeneralizes := semanticCertificate.generalizes
+        have templateIdsEmpty : localSchemeTemplateIds
+            (binding.1.applySubstitution outer) = [] :=
+          localSchemeTemplateIds_eq_nil _ requirementsEmpty
+        rw [templateIdsEmpty] at exactGeneralizes
+        exact (SchemeGeneralizesExcept_nil target _).mp exactGeneralizes
+      exact letInitializedMonomorphicStatementHasType_afterSubstitution
+        contains ordinaryInitializerType monomorphic ordinaryGeneralizes
+        semanticExtension
+    · exact letInitializedGeneralizedStatementHasType_afterSubstitution
+        contains monomorphic semanticCertificate.requirements_well_formed
+        semanticCertificate.generalizes semanticCertificate.initializer_type
+        semanticExtension
+  refine ⟨finalContext, {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    }, recordedInvariant, typing, ?_⟩
+  constructor <;> rfl
+
 /-- A successful annotated initialized declaration exposes both source-type
 resolution and expected-type initializer inference before the same exact
 generalization and binder-allocation pipeline.  Generalization still starts
@@ -3665,6 +3912,579 @@ theorem inferStatementFuel_success_block_facts
         recordNode_containsStatement
           (bodyResult.state.restoreLexicalScope allocated.lexicalScope)
           _ roots⟩
+
+/-- Execute the common scrutinee step used by source `match` statements.
+A singleton is inferred directly; every other source list is inferred in order
+and retained through one synthetic tuple occurrence. -/
+def inferMatchScrutineesFuel
+    (fuel : Nat) (context : Frontend.SourceInference.Context)
+    (span : Syntax.SourceSpan) (sources : List Syntax.Expr)
+    (state : Frontend.SourceInference.State) :
+    Except Frontend.SourceInference.Error
+      (InferredExpression × Frontend.SourceInference.State) :=
+  match sources with
+  | [source] => Detail.inferExprFuel fuel context source none state
+  | sources => do
+      let (elements, state) ← Detail.inferExprsFuel fuel context sources state
+      let (tupleId, state) := state.allocateExpressionId
+      let type := TypeSystem.Ty.productMany (elements.map (·.type))
+      let state := state.recordNode (.expression {
+        id := tupleId
+        span
+        type
+        form := .tuple (elements.map (·.id))
+      })
+      pure ({ id := tupleId, type }, state)
+
+/-- A successful `match` without a default arm exposes the common executable
+scrutinee step, hidden-local allocation, explicit-case traversal, the passed
+exhaustiveness guard, and the exact retained statement.  The existential
+Boolean is the result of the implementation's private nominal-coverage test. -/
+theorem inferStatementFuel_success_matchWithoutDefault_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ scrutinee scrutineeState hiddenScrutinee hiddenState checked
+        nominallyExhaustive,
+      inferMatchScrutineesFuel fuel context statement.span
+        scrutinees.elements.toList allocated =
+          .ok (scrutinee, scrutineeState) ∧
+      scrutineeState.allocateHiddenLocal =
+        (hiddenScrutinee, hiddenState) ∧
+      Detail.inferMatchCasesFuel fuel context scrutinee.type expectedReturn
+        hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked ∧
+      (checked.hasWildcard || false || nominallyExhaustive) = true ∧
+      result = {
+        id
+        type := if checked.allReturn then
+          checked.state.resolve expectedReturn
+        else
+          .unit
+        hasValue := checked.allReturn
+        sawReturn := checked.allReturn
+        state := checked.state.recordNode (.statement {
+          id
+          span := statement.span
+          type := if checked.allReturn then
+            checked.state.resolve expectedReturn
+          else
+            .unit
+          form := .matchWith {
+            scrutinee := scrutinee.id
+            hiddenScrutinee
+            cases := checked.cases
+            defaultBody := none
+            requirements := checked.cases.flatMap fun arm =>
+              arm.pattern.requirements
+          }
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .matchWith {
+          scrutinee := scrutinee.id
+          hiddenScrutinee
+          cases := checked.cases
+          defaultBody := none
+          requirements := checked.cases.flatMap fun arm =>
+            arm.pattern.requirements
+        }
+      } := by
+  have finish
+      (scrutinee : InferredExpression)
+      (scrutineeState : Frontend.SourceInference.State)
+      (nominalCoverage : Detail.MatchCasesResult → Bool)
+      (residualSuccess : (do
+    let (hiddenScrutinee, state) := scrutineeState.allocateHiddenLocal
+    let outerScope := state.lexicalScope
+    let checked ← Detail.inferMatchCasesFuel fuel context scrutinee.type
+      expectedReturn outerScope arms.value.cases state
+    if checked.hasWildcard = false ∧ nominalCoverage checked = false then
+      throw (Frontend.SourceInference.Error.nonExhaustiveMatch statement.span)
+    else
+      let requirements := checked.cases.flatMap fun arm : TypedMatchCase =>
+        arm.pattern.requirements
+      let type := if checked.allReturn then
+        checked.state.resolve expectedReturn
+      else
+        .unit
+      let finalState := checked.state.recordNode (.statement {
+        id
+        span := statement.span
+        type
+        form := .matchWith {
+          scrutinee := scrutinee.id
+          hiddenScrutinee
+          cases := checked.cases
+          defaultBody := none
+          requirements
+        }
+      })
+      pure ({
+        id := id
+        type := type
+        hasValue := checked.allReturn
+        sawReturn := checked.allReturn
+        state := finalState
+      } : Detail.StatementResult)) = .ok result) :
+      ∃ hiddenScrutinee hiddenState checked,
+        scrutineeState.allocateHiddenLocal =
+          (hiddenScrutinee, hiddenState) ∧
+        Detail.inferMatchCasesFuel fuel context scrutinee.type expectedReturn
+          hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked ∧
+        (checked.hasWildcard || false || nominalCoverage checked) = true ∧
+        result = {
+          id
+          type := if checked.allReturn then
+            checked.state.resolve expectedReturn
+          else
+            .unit
+          hasValue := checked.allReturn
+          sawReturn := checked.allReturn
+          state := checked.state.recordNode (.statement {
+            id
+            span := statement.span
+            type := if checked.allReturn then
+              checked.state.resolve expectedReturn
+            else
+              .unit
+            form := .matchWith {
+              scrutinee := scrutinee.id
+              hiddenScrutinee
+              cases := checked.cases
+              defaultBody := none
+              requirements := checked.cases.flatMap fun arm =>
+                arm.pattern.requirements
+            }
+          })
+        } ∧
+        ContainsStatement (result.state.toTypedSource roots) result.id {
+          id := result.id
+          span := statement.span
+          type := result.type
+          form := .matchWith {
+            scrutinee := scrutinee.id
+            hiddenScrutinee
+            cases := checked.cases
+            defaultBody := none
+            requirements := checked.cases.flatMap fun arm =>
+              arm.pattern.requirements
+          }
+        } := by
+    rcases hiddenAllocation : scrutineeState.allocateHiddenLocal with
+      ⟨hiddenScrutinee, hiddenState⟩
+    simp only [hiddenAllocation] at residualSuccess
+    cases checkedSuccess : Detail.inferMatchCasesFuel fuel context
+        scrutinee.type expectedReturn hiddenState.lexicalScope
+        arms.value.cases hiddenState with
+    | error error =>
+        simp [checkedSuccess, bind, Except.bind] at residualSuccess
+    | ok checked =>
+        simp only [checkedSuccess, bind, Except.bind, pure, Pure.pure,
+          Except.pure]
+          at residualSuccess
+        split at residualSuccess
+        · simp_all
+        · rename_i guardPassed
+          injection residualSuccess with resultEq
+          rw [← resultEq]
+          refine ⟨hiddenScrutinee, hiddenState, checked, rfl,
+            checkedSuccess, ?_, ?_, ?_⟩
+          · cases wildcardEq : checked.hasWildcard <;> simp_all
+          · simp
+          · simpa using
+              (recordNode_containsStatement checked.state _ roots)
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases sourcesEq : scrutinees.elements.toList with
+  | nil =>
+      simp only [sourcesEq] at success
+      cases elementsSuccess : Detail.inferExprsFuel fuel context [] allocated with
+      | error error =>
+          simp [elementsSuccess] at success
+      | ok elementsPair =>
+          rcases elementsPair with ⟨elements, elementsState⟩
+          simp only [elementsSuccess, defaultEq, pure, Pure.pure, Except.pure]
+            at success
+          let scrutinee : InferredExpression := {
+            id := elementsState.allocateExpressionId.1
+            type := TypeSystem.Ty.productMany (elements.map (·.type))
+          }
+          let scrutineeState :=
+            elementsState.allocateExpressionId.2.recordNode (.expression {
+              id := elementsState.allocateExpressionId.1
+              span := statement.span
+              type := TypeSystem.Ty.productMany (elements.map (·.type))
+              form := .tuple (elements.map (·.id))
+            })
+          have scrutineeSuccess :
+              inferMatchScrutineesFuel fuel context statement.span
+                scrutinees.elements.toList allocated =
+                  .ok (scrutinee, scrutineeState) := by
+            simp only [inferMatchScrutineesFuel, sourcesEq, elementsSuccess]
+            rfl
+          rcases finish scrutinee scrutineeState _
+              (by simpa [scrutinee, scrutineeState, bind, Except.bind,
+                pure, Pure.pure, Except.pure] using success) with
+            ⟨hiddenScrutinee, hiddenState, checked, hiddenAllocation,
+              checkedSuccess, guardPassed, resultEq, contains⟩
+          exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
+            checked, _, (by simpa [sourcesEq] using scrutineeSuccess),
+            hiddenAllocation, checkedSuccess,
+            guardPassed, resultEq, contains⟩
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          simp only [sourcesEq] at success
+          cases sourceSuccess :
+              Detail.inferExprFuel fuel context first none allocated with
+          | error error =>
+              simp [sourceSuccess] at success
+          | ok scrutineePair =>
+              rcases scrutineePair with ⟨scrutinee, scrutineeState⟩
+              simp only [sourceSuccess, defaultEq, pure, Pure.pure, Except.pure]
+                at success
+              have scrutineeSuccess :
+                  inferMatchScrutineesFuel fuel context statement.span
+                    scrutinees.elements.toList allocated =
+                      .ok (scrutinee, scrutineeState) := by
+                simpa [inferMatchScrutineesFuel, sourcesEq] using sourceSuccess
+              rcases finish scrutinee scrutineeState _
+                  (by simpa [bind, Except.bind, pure, Pure.pure, Except.pure]
+                    using success) with
+                ⟨hiddenScrutinee, hiddenState, checked, hiddenAllocation,
+                  checkedSuccess, guardPassed, resultEq, contains⟩
+              exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
+                checked, _, (by simpa [sourcesEq] using scrutineeSuccess),
+                hiddenAllocation, checkedSuccess,
+                guardPassed, resultEq, contains⟩
+      | cons second tail =>
+          simp only [sourcesEq] at success
+          cases elementsSuccess : Detail.inferExprsFuel fuel context
+              (first :: second :: tail) allocated with
+          | error error =>
+              simp [elementsSuccess] at success
+          | ok elementsPair =>
+              rcases elementsPair with ⟨elements, elementsState⟩
+              simp only [elementsSuccess, defaultEq, pure, Pure.pure,
+                Except.pure] at success
+              let scrutinee : InferredExpression := {
+                id := elementsState.allocateExpressionId.1
+                type := TypeSystem.Ty.productMany (elements.map (·.type))
+              }
+              let scrutineeState :=
+                elementsState.allocateExpressionId.2.recordNode (.expression {
+                  id := elementsState.allocateExpressionId.1
+                  span := statement.span
+                  type := TypeSystem.Ty.productMany (elements.map (·.type))
+                  form := .tuple (elements.map (·.id))
+                })
+              have scrutineeSuccess :
+                  inferMatchScrutineesFuel fuel context statement.span
+                    scrutinees.elements.toList allocated =
+                      .ok (scrutinee, scrutineeState) := by
+                simp only [inferMatchScrutineesFuel, sourcesEq, elementsSuccess]
+                rfl
+              rcases finish scrutinee scrutineeState _
+                  (by simpa [scrutinee, scrutineeState, bind, Except.bind,
+                    pure, Pure.pure, Except.pure] using success) with
+                ⟨hiddenScrutinee, hiddenState, checked, hiddenAllocation,
+                  checkedSuccess, guardPassed, resultEq, contains⟩
+              exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
+                checked, _, (by simpa [sourcesEq] using scrutineeSuccess),
+                hiddenAllocation, checkedSuccess,
+                guardPassed, resultEq, contains⟩
+
+/-- A successful `match` with a default arm exposes the same common
+scrutinee and explicit-case steps, followed by default-body inference from the
+case state and restoration of the hidden-local state's lexical scope.  The
+presence of the default arm makes the executable exhaustiveness guard true. -/
+theorem inferStatementFuel_success_matchWithDefault_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = some defaultBody)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ scrutinee scrutineeState hiddenScrutinee hiddenState checked
+        defaultResult,
+      inferMatchScrutineesFuel fuel context statement.span
+        scrutinees.elements.toList allocated =
+          .ok (scrutinee, scrutineeState) ∧
+      scrutineeState.allocateHiddenLocal =
+        (hiddenScrutinee, hiddenState) ∧
+      Detail.inferMatchCasesFuel fuel context scrutinee.type expectedReturn
+        hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked ∧
+      Detail.inferStatementsFuel fuel context defaultBody.value expectedReturn
+        checked.state = .ok defaultResult ∧
+      (checked.hasWildcard || true) = true ∧
+      result = {
+        id
+        type := if checked.allReturn && defaultResult.sawReturn then
+          (defaultResult.state.restoreLexicalScope
+            hiddenState.lexicalScope).resolve expectedReturn
+        else
+          .unit
+        hasValue := checked.allReturn && defaultResult.sawReturn
+        sawReturn := checked.allReturn && defaultResult.sawReturn
+        state :=
+          (defaultResult.state.restoreLexicalScope
+            hiddenState.lexicalScope).recordNode (.statement {
+              id
+              span := statement.span
+              type := if checked.allReturn && defaultResult.sawReturn then
+                (defaultResult.state.restoreLexicalScope
+                  hiddenState.lexicalScope).resolve expectedReturn
+              else
+                .unit
+              form := .matchWith {
+                scrutinee := scrutinee.id
+                hiddenScrutinee
+                cases := checked.cases
+                defaultBody := some defaultResult.statements
+                requirements := checked.cases.flatMap fun arm =>
+                  arm.pattern.requirements
+              }
+            })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .matchWith {
+          scrutinee := scrutinee.id
+          hiddenScrutinee
+          cases := checked.cases
+          defaultBody := some defaultResult.statements
+          requirements := checked.cases.flatMap fun arm =>
+            arm.pattern.requirements
+        }
+      } := by
+  have finish
+      (scrutinee : InferredExpression)
+      (scrutineeState : Frontend.SourceInference.State)
+      (residualSuccess : (do
+    let (hiddenScrutinee, state) := scrutineeState.allocateHiddenLocal
+    let outerScope := state.lexicalScope
+    let checked ← Detail.inferMatchCasesFuel fuel context scrutinee.type
+      expectedReturn outerScope arms.value.cases state
+    let defaultResult ← Detail.inferStatementsFuel fuel context
+      defaultBody.value expectedReturn checked.state
+    let defaultState := defaultResult.state.restoreLexicalScope outerScope
+    let requirements := checked.cases.flatMap fun arm : TypedMatchCase =>
+      arm.pattern.requirements
+    let sawReturn := checked.allReturn && defaultResult.sawReturn
+    let type := if sawReturn then defaultState.resolve expectedReturn else .unit
+    let finalState := defaultState.recordNode (.statement {
+      id
+      span := statement.span
+      type
+      form := .matchWith {
+        scrutinee := scrutinee.id
+        hiddenScrutinee
+        cases := checked.cases
+        defaultBody := some defaultResult.statements
+        requirements
+      }
+    })
+    pure ({
+      id := id
+      type := type
+      hasValue := sawReturn
+      sawReturn := sawReturn
+      state := finalState
+    } : Detail.StatementResult)) = .ok result) :
+      ∃ hiddenScrutinee hiddenState checked defaultResult,
+        scrutineeState.allocateHiddenLocal =
+          (hiddenScrutinee, hiddenState) ∧
+        Detail.inferMatchCasesFuel fuel context scrutinee.type expectedReturn
+          hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked ∧
+        Detail.inferStatementsFuel fuel context defaultBody.value
+          expectedReturn checked.state = .ok defaultResult ∧
+        result = {
+          id
+          type := if checked.allReturn && defaultResult.sawReturn then
+            (defaultResult.state.restoreLexicalScope
+              hiddenState.lexicalScope).resolve expectedReturn
+          else
+            .unit
+          hasValue := checked.allReturn && defaultResult.sawReturn
+          sawReturn := checked.allReturn && defaultResult.sawReturn
+          state :=
+            (defaultResult.state.restoreLexicalScope
+              hiddenState.lexicalScope).recordNode (.statement {
+                id
+                span := statement.span
+                type := if checked.allReturn && defaultResult.sawReturn then
+                  (defaultResult.state.restoreLexicalScope
+                    hiddenState.lexicalScope).resolve expectedReturn
+                else
+                  .unit
+                form := .matchWith {
+                  scrutinee := scrutinee.id
+                  hiddenScrutinee
+                  cases := checked.cases
+                  defaultBody := some defaultResult.statements
+                  requirements := checked.cases.flatMap fun arm =>
+                    arm.pattern.requirements
+                }
+              })
+        } ∧
+        ContainsStatement (result.state.toTypedSource roots) result.id {
+          id := result.id
+          span := statement.span
+          type := result.type
+          form := .matchWith {
+            scrutinee := scrutinee.id
+            hiddenScrutinee
+            cases := checked.cases
+            defaultBody := some defaultResult.statements
+            requirements := checked.cases.flatMap fun arm =>
+              arm.pattern.requirements
+          }
+        } := by
+    rcases hiddenAllocation : scrutineeState.allocateHiddenLocal with
+      ⟨hiddenScrutinee, hiddenState⟩
+    simp only [hiddenAllocation] at residualSuccess
+    cases checkedSuccess : Detail.inferMatchCasesFuel fuel context
+        scrutinee.type expectedReturn hiddenState.lexicalScope
+        arms.value.cases hiddenState with
+    | error error =>
+        simp [checkedSuccess, bind, Except.bind] at residualSuccess
+    | ok checked =>
+        simp only [checkedSuccess, bind, Except.bind] at residualSuccess
+        cases defaultSuccess : Detail.inferStatementsFuel fuel context
+            defaultBody.value expectedReturn checked.state with
+        | error error =>
+            simp [defaultSuccess] at residualSuccess
+        | ok defaultResult =>
+            simp only [defaultSuccess, pure, Pure.pure, Except.pure]
+              at residualSuccess
+            injection residualSuccess with resultEq
+            rw [← resultEq]
+            exact ⟨hiddenScrutinee, hiddenState, checked, defaultResult, rfl,
+              checkedSuccess, defaultSuccess, rfl,
+              recordNode_containsStatement
+                (defaultResult.state.restoreLexicalScope
+                  hiddenState.lexicalScope) _ roots⟩
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases sourcesEq : scrutinees.elements.toList with
+  | nil =>
+      simp only [sourcesEq] at success
+      cases elementsSuccess : Detail.inferExprsFuel fuel context [] allocated with
+      | error error =>
+          simp [elementsSuccess] at success
+      | ok elementsPair =>
+          rcases elementsPair with ⟨elements, elementsState⟩
+          simp only [elementsSuccess, defaultEq] at success
+          let scrutinee : InferredExpression := {
+            id := elementsState.allocateExpressionId.1
+            type := TypeSystem.Ty.productMany (elements.map (·.type))
+          }
+          let scrutineeState :=
+            elementsState.allocateExpressionId.2.recordNode (.expression {
+              id := elementsState.allocateExpressionId.1
+              span := statement.span
+              type := TypeSystem.Ty.productMany (elements.map (·.type))
+              form := .tuple (elements.map (·.id))
+            })
+          have scrutineeSuccess :
+              inferMatchScrutineesFuel fuel context statement.span
+                scrutinees.elements.toList allocated =
+                  .ok (scrutinee, scrutineeState) := by
+            simp only [inferMatchScrutineesFuel, sourcesEq, elementsSuccess]
+            rfl
+          rcases finish scrutinee scrutineeState
+              (by simpa [scrutinee, scrutineeState, bind, Except.bind,
+                pure, Pure.pure, Except.pure] using success) with
+            ⟨hiddenScrutinee, hiddenState, checked, defaultResult,
+              hiddenAllocation, checkedSuccess, defaultSuccess, resultEq,
+              contains⟩
+          exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
+            checked, defaultResult,
+            (by simpa [sourcesEq] using scrutineeSuccess), hiddenAllocation,
+            checkedSuccess, defaultSuccess, (by simp), resultEq, contains⟩
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          simp only [sourcesEq] at success
+          cases sourceSuccess :
+              Detail.inferExprFuel fuel context first none allocated with
+          | error error =>
+              simp [sourceSuccess] at success
+          | ok scrutineePair =>
+              rcases scrutineePair with ⟨scrutinee, scrutineeState⟩
+              simp only [sourceSuccess, defaultEq] at success
+              have scrutineeSuccess :
+                  inferMatchScrutineesFuel fuel context statement.span
+                    scrutinees.elements.toList allocated =
+                      .ok (scrutinee, scrutineeState) := by
+                simpa [inferMatchScrutineesFuel, sourcesEq] using sourceSuccess
+              rcases finish scrutinee scrutineeState
+                  (by simpa [bind, Except.bind, pure, Pure.pure, Except.pure]
+                    using success) with
+                ⟨hiddenScrutinee, hiddenState, checked, defaultResult,
+                  hiddenAllocation, checkedSuccess, defaultSuccess, resultEq,
+                  contains⟩
+              exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
+                checked, defaultResult,
+                (by simpa [sourcesEq] using scrutineeSuccess), hiddenAllocation,
+                checkedSuccess, defaultSuccess, (by simp), resultEq, contains⟩
+      | cons second tail =>
+          simp only [sourcesEq] at success
+          cases elementsSuccess : Detail.inferExprsFuel fuel context
+              (first :: second :: tail) allocated with
+          | error error =>
+              simp [elementsSuccess] at success
+          | ok elementsPair =>
+              rcases elementsPair with ⟨elements, elementsState⟩
+              simp only [elementsSuccess, defaultEq] at success
+              let scrutinee : InferredExpression := {
+                id := elementsState.allocateExpressionId.1
+                type := TypeSystem.Ty.productMany (elements.map (·.type))
+              }
+              let scrutineeState :=
+                elementsState.allocateExpressionId.2.recordNode (.expression {
+                  id := elementsState.allocateExpressionId.1
+                  span := statement.span
+                  type := TypeSystem.Ty.productMany (elements.map (·.type))
+                  form := .tuple (elements.map (·.id))
+                })
+              have scrutineeSuccess :
+                  inferMatchScrutineesFuel fuel context statement.span
+                    scrutinees.elements.toList allocated =
+                      .ok (scrutinee, scrutineeState) := by
+                simp only [inferMatchScrutineesFuel, sourcesEq, elementsSuccess]
+                rfl
+              rcases finish scrutinee scrutineeState
+                  (by simpa [scrutinee, scrutineeState, bind, Except.bind,
+                    pure, Pure.pure, Except.pure] using success) with
+                ⟨hiddenScrutinee, hiddenState, checked, defaultResult,
+                  hiddenAllocation, checkedSuccess, defaultSuccess, resultEq,
+                  contains⟩
+              exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
+                checked, defaultResult,
+                (by simpa [sourcesEq] using scrutineeSuccess), hiddenAllocation,
+                checkedSuccess, defaultSuccess, (by simp), resultEq, contains⟩
 
 /-- A successful `for` exposes initializer items, its Boolean condition, the
 recursive loop body, restored post-item input scope, and the exact canonical
