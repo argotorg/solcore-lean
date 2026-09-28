@@ -272,6 +272,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_scopedRequirementLedgerWellFormed
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_contextSubstitutionValid
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed_bodyContext
@@ -539,6 +541,8 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.RuntimeRequirementLedge
 example := @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionValid.ofRequirementLedger
 example := @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionValid.ofRuntimeRequirementLedger
 example := @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionValid.ofScopedRequirementLedger
+example :=
+  @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionValid.ofTargetScopedRequirementLedger
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed.proves_predicate_eq
 example := @Solcore.SourceSemantics.RequirementIdsUnique.proves_predicate_eq
 example := @Solcore.SourceSemantics.RequirementIdsUnique.filter_id_eq_singleton

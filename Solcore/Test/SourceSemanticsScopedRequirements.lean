@@ -513,6 +513,24 @@ example : ScopedRequirementLedgerWellFormed
   SourceInferenceSoundness.finalize_scopedRequirementLedgerWellFormed
     templateFinalizeSuccess
 
+/-- The finalization bridge consumes structural closure separately and fills
+the implementation-evidence component from this concrete nonempty template
+fixture's finalized scoped ledger. -/
+example {sourceContext : SourceSemantics.Context}
+    {closedVariables : List TypeVarId}
+    (closes : FlexibleSubstitution.ContextCloses
+      templateFinalizedResult.substitution closedVariables sourceContext
+      (SourceInferenceSoundness.finalizedRequirementContext
+        templateInferenceContext templateFinalizedResult))
+    (schemesFresh : FlexibleSubstitution.LocalSchemesFreshFor sourceContext
+      templateFinalizedResult.substitution) :
+    FlexibleSubstitution.ContextSubstitutionValid
+      templateFinalizedResult.substitution closedVariables sourceContext
+      (SourceInferenceSoundness.finalizedRequirementContext
+        templateInferenceContext templateFinalizedResult) :=
+  SourceInferenceSoundness.finalize_contextSubstitutionValid
+    templateFinalizeSuccess closes schemesFresh
+
 /-- Finalization preserves the exact source/state template-ID alignment of a
 nonempty qualified-local fixture. -/
 example : ∀ id,

@@ -3346,6 +3346,31 @@ theorem finalize_scopedRequirementLedgerWellFormed
   simpa [finalizedRequirementContext, baseContext]
     using ledgerProof
 
+/-- Once structural closure and local-scheme freshness are available,
+successful finalization supplies the remaining evidence obligation for the
+final inference substitution from its target-side scoped requirement ledger. -/
+theorem finalize_contextSubstitutionValid
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    {sourceContext : SourceSemantics.Context}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.finalize inferenceContext type state roots = .ok result)
+    (closes : FlexibleSubstitution.ContextCloses result.substitution
+      closedVariables sourceContext
+      (finalizedRequirementContext inferenceContext result))
+    (schemesFresh : FlexibleSubstitution.LocalSchemesFreshFor sourceContext
+      result.substitution) :
+    FlexibleSubstitution.ContextSubstitutionValid result.substitution
+      closedVariables sourceContext
+      (finalizedRequirementContext inferenceContext result) := by
+  exact
+    FlexibleSubstitution.ContextSubstitutionValid.ofTargetScopedRequirementLedger
+      closes schemesFresh
+      (finalize_scopedRequirementLedgerWellFormed success)
+
 /-- Exact executable source-to-ledger validation survives final substitution
 and establishes the declarative whole-source requirement ownership judgment. -/
 theorem finalize_requirementOwnership

@@ -1021,6 +1021,47 @@ theorem ContextSubstitutionValid.ofScopedRequirementLedger
         cases impossible
 }
 
+/-- A scoped ledger already established in the target context supplies the
+implementation-evidence component of flexible context-substitution validity
+directly.  The structural closure identifies every mapped source row with a
+target ledger row; template rows cannot carry implementation evidence. -/
+theorem ContextSubstitutionValid.ofTargetScopedRequirementLedger
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {typedSource : TypedSource}
+    (closes : ContextCloses substitution closedVariables source target)
+    (schemesFresh : LocalSchemesFreshFor source substitution)
+    (ledger : SourceSemantics.ScopedRequirementLedgerWellFormed target
+      typedSource) :
+    ContextSubstitutionValid substitution closedVariables source target := {
+  closes
+  localSchemesFresh := schemesFresh
+  implementationRequirements := by
+    intro requirement evidence member implementationEq
+    have mappedMember :
+        applySolvedRequirement substitution requirement ∈
+          target.solvedRequirements := by
+      rw [← closes.target_eq]
+      exact List.mem_map.mpr ⟨requirement, member, rfl⟩
+    cases ledger.entriesValid
+        (applySolvedRequirement substitution requirement) mappedMember with
+    | ordinary _ rowValid =>
+        exact rowValid
+    | template rowScoped =>
+        rcases rowScoped.exact_owner with
+          ⟨owner, occurrence, contains, idEq, predicateEq, evidenceEq,
+            occurs, scope⟩
+        have mappedEvidence :
+            (applySolvedRequirement substitution requirement).evidence =
+              .implementation (applyEvidence substitution evidence) := by
+          simp [applySolvedRequirement, implementationEq,
+            applyPredicateEvidence]
+        have impossible :
+            PredicateEvidence.assumption owner.requirement.predicate =
+              .implementation (applyEvidence substitution evidence) :=
+          evidenceEq.symm.trans mappedEvidence
+        cases impossible
+}
+
 /-- Close every flexible variable in a well-typed body.  Exactness and range
 well-formedness establish the structural context closure; the validated
 whole-body ledger supplies the implementation evidence that remains after

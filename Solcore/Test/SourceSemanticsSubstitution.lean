@@ -61,6 +61,20 @@ example (substitution : ParameterSubstitution)
     ContextSubstitutionValid substitution context :=
   ContextSubstitutionValid.ofScopedRequirementLedger exact range ledger
 
+/-- A finalized scoped ledger is already stated in the substitution target;
+it therefore discharges the mapped implementation-row obligation directly. -/
+example (substitution : Substitution) (closedVariables : List TypeVarId)
+    (source target : SourceSemantics.Context) (typedSource : TypedSource)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      source target)
+    (schemesFresh : FlexibleSubstitution.LocalSchemesFreshFor source
+      substitution)
+    (ledger : ScopedRequirementLedgerWellFormed target typedSource) :
+    FlexibleSubstitution.ContextSubstitutionValid substitution closedVariables
+      source target :=
+  FlexibleSubstitution.ContextSubstitutionValid.ofTargetScopedRequirementLedger
+    closes schemesFresh ledger
+
 /-- Rigid declaration instantiation transports both ordinary rows and
 initializer-scoped template rows of the whole-body ledger. -/
 example (substitution : ParameterSubstitution)
