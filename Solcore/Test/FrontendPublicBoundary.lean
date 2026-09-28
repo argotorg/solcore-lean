@@ -637,6 +637,12 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.unify_integerPatternMetadata_eq
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_integerPatterns_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternsFlatFuel_integerPatterns_subset
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_integerPatterns_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_integerLiteral_metadata
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_integerLiteral_metadata

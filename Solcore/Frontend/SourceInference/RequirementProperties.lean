@@ -1799,6 +1799,163 @@ theorem unify_integerPatternMetadata_eq
   cases success
   exact ⟨rfl, rfl⟩
 
+private theorem freshTypes_integerPatterns_eq (count : Nat) (state : State) :
+    (freshTypes count state).2.integerPatterns = state.integerPatterns := by
+  induction count generalizing state with
+  | zero => rfl
+  | succ count induction =>
+      simp only [freshTypes]
+      exact (induction state.fresh.2).trans rfl
+
+private theorem freshDataConstructorInstantiation_integerPatterns_eq
+    (dataType : ProgramDataSignature)
+    (constructor : ProgramDataConstructorSignature) (state : State) :
+    (freshDataConstructorInstantiation dataType constructor
+      state).2.integerPatterns = state.integerPatterns := by
+  let step : List Ty × State → TypeParameterId → List Ty × State :=
+    fun result _ =>
+      (result.1 ++ [result.2.fresh.1], result.2.fresh.2)
+  have foldEq (parameters : List TypeParameterId)
+      (accumulator : List Ty × State) :
+      (parameters.foldl step accumulator).2.integerPatterns =
+        accumulator.2.integerPatterns := by
+    induction parameters generalizing accumulator with
+    | nil => rfl
+    | cons parameter parameters induction =>
+        simp only [List.foldl_cons]
+        exact (induction (step accumulator parameter)).trans rfl
+  unfold freshDataConstructorInstantiation
+  exact foldEq dataType.parameters ([], state)
+
+private def PreservesIntegerPatterns {alpha : Type}
+    (stateOf : alpha → State) (initial : State)
+    (computation : Except Error alpha) : Prop :=
+  ∀ result, computation = .ok result →
+    initial.integerPatterns ⊆ (stateOf result).integerPatterns
+
+private theorem unify_integerPatterns_subset
+    {before after : State} {left right : Ty}
+    (success : unify before left right = .ok after) :
+    before.integerPatterns ⊆ after.integerPatterns := by
+  rw [(unify_integerPatternMetadata_eq success).1]
+  exact fun _ member => member
+
+private theorem inferMatchPatternFlatFuel_preserves_integerPatterns
+    (fuel : Nat) (context : Context) (pattern : Syntax.Pattern)
+    (expected : Ty) (seen : List String) (state : State) :
+    PreservesIntegerPatterns InferredPattern.state state
+      (inferMatchPatternFlatFuel fuel context pattern expected seen state) := by
+  apply inferMatchPatternFlatFuel.induct context
+      (motive1 := fun fuel pattern expected seen state =>
+        PreservesIntegerPatterns InferredPattern.state state
+          (inferMatchPatternFlatFuel fuel context pattern expected seen state))
+      (motive2 := fun fuel patterns expected seen state =>
+        PreservesIntegerPatterns InferredPatterns.state state
+          (inferMatchPatternsFlatFuel fuel context patterns expected seen state))
+  all_goals
+    intros
+    unfold PreservesIntegerPatterns at *
+    intro result success
+    simp_all [inferMatchPatternFlatFuel, inferMatchPatternsFlatFuel,
+      bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try simp_all only [exceptPure_eq_ok]
+    all_goals try have unifySubset :=
+      unify_integerPatterns_subset (by assumption)
+    all_goals try specialize ih1 _ _ _ heq
+    all_goals try specialize ih1 _ _ heq
+    all_goals try specialize ih2 _ heq
+    all_goals try simp_all [State.fresh, State.addRequirementWithId,
+      State.allocateBinder]
+    all_goals intro origin member
+    all_goals try grind
+      [freshDataConstructorInstantiation_integerPatterns_eq,
+        freshTypes_integerPatterns_eq]
+
+/-- Successful flat pattern inference never removes an integer-pattern
+origin retained by its input state. -/
+theorem inferMatchPatternFlatFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {seen : List String} {state : State}
+    {result : InferredPattern}
+    (success : inferMatchPatternFlatFuel fuel context pattern expected seen state =
+      .ok result) :
+    state.integerPatterns ⊆ result.state.integerPatterns := by
+  exact inferMatchPatternFlatFuel_preserves_integerPatterns fuel context pattern
+    expected seen state result success
+
+/-- Successful source-ordered flat pattern-list inference likewise retains
+every integer-pattern origin present at entry. -/
+theorem inferMatchPatternsFlatFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {patterns : List Syntax.Pattern}
+    {expected : List Ty} {seen : List String} {state : State}
+    {result : InferredPatterns}
+    (success : inferMatchPatternsFlatFuel fuel context patterns expected seen
+      state = .ok result) :
+    state.integerPatterns ⊆ result.state.integerPatterns := by
+  induction patterns generalizing expected seen state result with
+  | nil =>
+      cases expected with
+      | nil =>
+          simp only [inferMatchPatternsFlatFuel, pure, Pure.pure, Except.pure]
+            at success
+          injection success with resultEq
+          subst result
+          exact fun _ member => member
+      | cons type types =>
+          simp [inferMatchPatternsFlatFuel] at success
+  | cons pattern patterns induction =>
+      cases expected with
+      | nil => simp [inferMatchPatternsFlatFuel] at success
+      | cons type types =>
+          simp only [inferMatchPatternsFlatFuel, bind, Except.bind] at success
+          cases headSuccess : inferMatchPatternFlatFuel fuel context pattern type
+              seen state with
+          | error error => simp [headSuccess] at success
+          | ok head =>
+              simp only [headSuccess] at success
+              cases tailSuccess : inferMatchPatternsFlatFuel fuel context patterns
+                  types head.names head.state with
+              | error error => simp [tailSuccess] at success
+              | ok tail =>
+                  simp only [tailSuccess, pure, Pure.pure, Except.pure]
+                    at success
+                  injection success with resultEq
+                  subst result
+                  have tailSubset :
+                      head.state.integerPatterns ⊆ tail.state.integerPatterns :=
+                    induction tailSuccess
+                  exact List.Subset.trans
+                    (inferMatchPatternFlatFuel_integerPatterns_subset
+                      headSuccess)
+                    tailSubset
+
+/-- The public pattern-inference wrapper retains every integer-pattern origin
+present in its input state. -/
+theorem inferMatchPatternFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {state : State} {result : TypedMatchPattern × State}
+    (success : inferMatchPatternFuel fuel context pattern expected state =
+      .ok result) :
+    state.integerPatterns ⊆ result.2.integerPatterns := by
+  unfold inferMatchPatternFuel at success
+  cases flatResult :
+      inferMatchPatternFlatFuel fuel context pattern expected [] state with
+  | error error =>
+      simp [flatResult, bind, Except.bind] at success
+  | ok inferred =>
+      simp only [flatResult, bind, Except.bind] at success
+      change Except.ok ({
+        source := inferred.source
+        type := inferred.state.resolve expected
+        resolution := inferred.resolution
+        requirements := inferred.requirements
+      }, inferred.state) = Except.ok result at success
+      injection success with resultEq
+      subst result
+      exact inferMatchPatternFlatFuel_integerPatterns_subset flatResult
+
 private def PreservesRequirements {alpha : Type} (stateOf : alpha → State)
     (initial : State) (computation : Except Error alpha) : Prop :=
   ∀ result, computation = .ok result →
