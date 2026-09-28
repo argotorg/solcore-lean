@@ -82,6 +82,10 @@ example := @Solcore.TypeSystem.Unification.unifyTypes_rangeAvoidsDomain
 example :=
   @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_next_le
 example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_domain_permutation
+example :=
+  @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_range_fresh
+example :=
   @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_substitution_range_variablesBelow
 example :=
   @Solcore.TypeSystem.Scheme.instantiateWithSubstitution_body_variablesBelow

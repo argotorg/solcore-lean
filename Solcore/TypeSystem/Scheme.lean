@@ -194,10 +194,126 @@ private theorem freshSubstitution_domain_covers
               simp only [Substitution.domain, List.map_cons, List.mem_cons]
               exact Or.inr existing)
 
+private theorem freshSubstitution_domain_eq_reverse_append
+    (variables : List TypeVarId) (next : Nat)
+    (substitution : Substitution)
+    (variablesUnique : variables.Nodup)
+    (variablesFresh : ∀ metavariable, metavariable ∈ variables →
+      metavariable ∉ substitution.domain) :
+    (freshSubstitution variables next substitution).1.domain =
+      variables.reverse ++ substitution.domain := by
+  induction variables generalizing next substitution with
+  | nil => simp [freshSubstitution]
+  | cons head variables induction =>
+      simp only [List.nodup_cons] at variablesUnique
+      have headMissing : head ∉ substitution.domain :=
+        variablesFresh head (by simp)
+      have found : substitution.lookup? head = none :=
+        (Substitution.lookup?_eq_none_iff_not_mem_domain substitution head).mpr
+          headMissing
+      simp only [freshSubstitution, found]
+      rw [induction (next + 1)
+        ((head, .variable ⟨next⟩) :: substitution)
+        variablesUnique.2]
+      · simp [Substitution.domain, List.reverse_cons, List.append_assoc]
+      · intro metavariable member
+        have different : metavariable ≠ head := by
+          intro same
+          subst metavariable
+          exact variablesUnique.1 member
+        simp only [Substitution.domain, List.map_cons, List.mem_cons, not_or]
+        exact ⟨different, variablesFresh metavariable (by simp [member])⟩
+
+private theorem freshSubstitution_range_fresh_or_mem
+    (variables : List TypeVarId) (next : Nat)
+    (substitution : Substitution) :
+    ∀ {metavariable replacement},
+      (metavariable, replacement) ∈
+          (freshSubstitution variables next substitution).1 →
+        (metavariable, replacement) ∈ substitution ∨
+          ∃ fresh,
+            replacement = .variable fresh ∧
+              next ≤ fresh.index ∧
+              fresh.index <
+                (freshSubstitution variables next substitution).2 := by
+  induction variables generalizing next substitution with
+  | nil =>
+      intro metavariable replacement member
+      exact Or.inl member
+  | cons head variables induction =>
+      intro metavariable replacement member
+      cases found : substitution.lookup? head with
+      | some existing =>
+          simp only [freshSubstitution, found] at member ⊢
+          exact induction next substitution member
+      | none =>
+          simp only [freshSubstitution, found] at member ⊢
+          rcases induction (next + 1)
+              ((head, .variable ⟨next⟩) :: substitution) member with
+            seeded | ⟨fresh, replacement_eq, lower, upper⟩
+          · rcases List.mem_cons.mp seeded with same | existing
+            · cases same
+              exact Or.inr ⟨⟨next⟩, rfl, Nat.le_refl next,
+                Nat.lt_of_lt_of_le (Nat.lt_succ_self next)
+                  (freshSubstitution_next_le variables (next + 1)
+                    ((head, .variable ⟨next⟩) :: substitution))⟩
+            · exact Or.inl existing
+          · exact Or.inr ⟨fresh, replacement_eq,
+              Nat.le_trans (Nat.le_succ next) lower, upper⟩
+
+private theorem list_perm_reverse {value : Type} (values : List value) :
+    values.Perm values.reverse := by
+  induction values with
+  | nil => exact .nil
+  | cons head tail induction =>
+      rw [List.reverse_cons]
+      exact (List.Perm.cons head induction).trans (by
+        simpa only [List.singleton_append] using
+          (List.perm_append_comm :
+            ([head] ++ tail.reverse).Perm (tail.reverse ++ [head])))
+
 /-- Instantiate every quantified variable and expose the shared substitution. -/
 def instantiateWithSubstitution (scheme : Scheme) (next : Nat) : Instantiation :=
   let (substitution, next) := freshSubstitution scheme.quantified next []
   { substitution, body := substitution.apply scheme.body, next }
+
+/-- With duplicate-free quantified binders, shared-substitution instantiation
+covers every quantified variable exactly once.  The implementation stores the
+fresh assignments in reverse allocation order, so coverage is stated up to
+permutation. -/
+theorem instantiateWithSubstitution_substitution_domain_permutation
+    (scheme : Scheme) (next : Nat)
+    (quantifiedUnique : scheme.quantified.Nodup) :
+    (scheme.instantiateWithSubstitution next).substitution.domain.Perm
+      scheme.quantified := by
+  change (freshSubstitution scheme.quantified next []).1.domain.Perm
+    scheme.quantified
+  rw [freshSubstitution_domain_eq_reverse_append scheme.quantified next []
+    quantifiedUnique (by
+      intro metavariable member
+      simp [Substitution.domain])]
+  simpa only [Substitution.domain, List.map_nil, List.append_nil] using
+    (list_perm_reverse scheme.quantified).symm
+
+/-- Every range entry produced by shared-substitution instantiation is a
+fresh flexible variable.  Its index starts at or above the input allocator and
+lies strictly below the returned allocator. -/
+theorem instantiateWithSubstitution_substitution_range_fresh
+    (scheme : Scheme) (next : Nat) :
+    ∀ {metavariable replacement},
+      (metavariable, replacement) ∈
+          (scheme.instantiateWithSubstitution next).substitution →
+        ∃ fresh,
+          replacement = .variable fresh ∧
+            next ≤ fresh.index ∧
+            fresh.index < (scheme.instantiateWithSubstitution next).next := by
+  intro metavariable replacement member
+  change (metavariable, replacement) ∈
+    (freshSubstitution scheme.quantified next []).1 at member
+  rcases freshSubstitution_range_fresh_or_mem scheme.quantified next []
+      member with existing | fresh
+  · simp at existing
+  · exact fresh
 
 /-- Scheme instantiation with its shared substitution never moves the
 fresh-variable allocator backwards. -/

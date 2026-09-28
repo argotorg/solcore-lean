@@ -175,6 +175,29 @@ theorem of_matchInstance?
     domain_permutation := by rw [domainExact]
   } rangeAdmissible applies
 
+/-- Canonical frontend instantiation is a valid semantic scheme instance in
+a body whose residual inference-variable scope remains open.  The executable
+allocator chooses fresh flexible variables; residual scope admits precisely
+those generated range entries at their retained occurrence. -/
+theorem of_instantiateWithSubstitution
+    {context : Context} {scheme : TypeSystem.Scheme}
+    (schemeWellFormed : SchemeWellFormed context scheme)
+    (residual : context.residualTypeVariables = true)
+    (next : Nat) :
+    SchemeInstantiatesAt context scheme
+      (scheme.instantiateWithSubstitution next).body := by
+  refine .intro schemeWellFormed
+    (scheme.instantiateWithSubstitution next).substitution {
+      variables_nodup := schemeWellFormed.quantified_nodup
+      domain_permutation :=
+        scheme.instantiateWithSubstitution_substitution_domain_permutation next
+          schemeWellFormed.quantified_nodup
+    } ?_ rfl
+  intro metavariable replacement member
+  obtain ⟨fresh, rfl, _, _⟩ :=
+    scheme.instantiateWithSubstitution_substitution_range_fresh next member
+  exact TypeAdmissible.variableOfResidual schemeWellFormed.binders residual fresh
+
 /-- Admissible flexible variables may occur in a monomorphic local while the
 initializer of an enclosing generalized binding is checked or while a body
 retains residual inference variables. -/

@@ -127,6 +127,39 @@ theorem residualVariableNotClosed
   intro wellFormed
   exact TypeWellFormed.variable_impossible residual wellFormed
 
+private def canonicalIdentityVariable : TypeVarId := ⟨73⟩
+
+private def canonicalIdentityScheme : Scheme := {
+  quantified := [canonicalIdentityVariable]
+  body := .function (.variable canonicalIdentityVariable)
+    (.variable canonicalIdentityVariable)
+}
+
+/-- The executable fresh instantiator for a generic identity scheme directly
+produces the declarative use-site instantiation certificate. -/
+theorem canonicalFreshIdentityInstantiation
+    (context : Solcore.SourceSemantics.Context)
+    (context_binders : TypeParameterBindersWellFormed context) :
+    SchemeInstantiatesAt context.withResidualTypeVariables
+      canonicalIdentityScheme
+      (.function (.variable ⟨10⟩) (.variable ⟨10⟩)) := by
+  have schemeWellFormed :
+      SchemeWellFormed context.withResidualTypeVariables
+        canonicalIdentityScheme := {
+    binders := context_binders.withResidualTypeVariables
+    quantified_nodup := by simp [canonicalIdentityScheme]
+    body := by
+      apply TypeWellScoped.function <;> apply TypeWellScoped.variable <;>
+        simp [canonicalIdentityScheme, canonicalIdentityVariable,
+          admissibleTypeVariables, Context.withResidualTypeVariables,
+          TypeSystem.Ty.freeVariables]
+  }
+  change SchemeInstantiatesAt context.withResidualTypeVariables
+    canonicalIdentityScheme
+      (canonicalIdentityScheme.instantiateWithSubstitution 10).body
+  exact SchemeInstantiatesAt.of_instantiateWithSubstitution schemeWellFormed
+    rfl 10
+
 /-- A residual rigid-parameter replacement is accepted by the static
 occurrence judgment but cannot cross the closed runtime-instantiation
 boundary. -/
