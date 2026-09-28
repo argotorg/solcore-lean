@@ -4787,6 +4787,3602 @@ private theorem restored_pair_result_state_header {α : Type}
     result.snd.header = initial.header :=
   pair_result_state_header (restore_state_header header) success
 
+private theorem allocateExpressionId_eq_inferenceProperties
+    {initial next : State} {id : ExpressionId}
+    (ready : initial.InferenceReady)
+    (allocation : initial.allocateExpressionId = (id, next)) :
+    initial.InferenceProgress next ∧ next.InferenceReady := by
+  have progress :=
+    State.InferenceProgress.allocateExpressionId initial ready.solved
+  have nextReady := State.InferenceReady.allocateExpressionId ready
+  rw [allocation] at progress nextReady
+  exact ⟨progress, nextReady⟩
+
+private theorem allocateStatementId_eq_inferenceProperties
+    {initial next : State} {id : StatementId}
+    (ready : initial.InferenceReady)
+    (allocation : initial.allocateStatementId = (id, next)) :
+    initial.InferenceProgress next ∧ next.InferenceReady := by
+  have progress :=
+    State.InferenceProgress.allocateStatementId initial ready.solved
+  have nextReady := State.InferenceReady.allocateStatementId ready
+  rw [allocation] at progress nextReady
+  exact ⟨progress, nextReady⟩
+
+private theorem fresh_eq_inferenceProperties
+    {initial next : State} {type : Ty}
+    (ready : initial.InferenceReady)
+    (allocation : initial.fresh = (type, next)) :
+    initial.InferenceProgress next ∧ next.InferenceReady ∧
+      type.VariablesBelow next.inference.next := by
+  have progress := State.InferenceProgress.fresh initial ready.solved
+  have nextReady := State.InferenceReady.fresh ready
+  have below : initial.fresh.1.VariablesBelow
+      initial.fresh.2.inference.next := by
+    change Ty.VariablesBelow (initial.inference.next + 1)
+      (.variable ⟨initial.inference.next⟩)
+    exact (Ty.variablesBelow_variable_iff _ _).2 (Nat.lt_succ_self _)
+  rw [allocation] at progress nextReady below
+  exact ⟨progress, nextReady, below⟩
+
+private def FunctionSchemesCanonical (context : Context) : Prop :=
+  ∀ signature ∈ context.signatures.functions,
+    signature.scheme.body = .function
+      (Ty.productMany signature.parameterTypes)
+      (Ty.productMany signature.returnTypes)
+
+private def InferExprFuelInferenceProperties
+    (fuel : Nat) (context : Context) (expression : Syntax.Expr)
+    (expected : Option Ty) (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    (∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next) →
+    ∀ result,
+      inferExprFuel fuel context expression expected state = .ok result →
+      state.InferenceProgress result.2 ∧
+        result.2.InferenceReady ∧
+        result.1.type.VariablesBelow result.2.inference.next
+
+private def InferConstructorApplicationFuelInferenceProperties
+    (fuel : Nat) (context : Context) (source : Syntax.Expr)
+    (id : ExpressionId) (instantiation : DataConstructorInstantiation)
+    (arguments : List Syntax.Expr) (expected : Option Ty)
+    (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    (∀ payload ∈ instantiation.payloadTypes,
+      payload.VariablesBelow state.inference.next) →
+    instantiation.resultType.VariablesBelow state.inference.next →
+    (∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next) →
+    ∀ result,
+      inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state = .ok result →
+      state.InferenceProgress result.2 ∧
+        result.2.InferenceReady ∧
+        result.1.type.VariablesBelow result.2.inference.next
+
+private def InferConstructorArgumentsFuelInferenceProperties
+    (fuel : Nat) (context : Context) (sources : List Syntax.Expr)
+    (expectedTypes : List Ty) (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    (∀ expectedType ∈ expectedTypes,
+      expectedType.VariablesBelow state.inference.next) →
+    ∀ result,
+      inferConstructorArgumentsFuel fuel context sources expectedTypes state =
+          .ok result →
+      state.InferenceProgress result.2 ∧
+        result.2.InferenceReady ∧
+        ∀ expression ∈ result.1,
+          expression.type.VariablesBelow result.2.inference.next
+
+private def InferStatementsFuelInferenceProperties
+    (fuel : Nat) (context : Context) (statements : List Syntax.Statement)
+    (expectedReturn : Ty) (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    expectedReturn.VariablesBelow state.inference.next →
+    ∀ result,
+      inferStatementsFuel fuel context statements expectedReturn state =
+          .ok result →
+      state.InferenceProgress result.state ∧
+        result.state.InferenceReady ∧
+        result.type.VariablesBelow result.state.inference.next
+
+private def InferStatementFuelInferenceProperties
+    (fuel : Nat) (context : Context) (statement : Syntax.Statement)
+    (expectedReturn : Ty) (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    expectedReturn.VariablesBelow state.inference.next →
+    ∀ result,
+      inferStatementFuel fuel context statement expectedReturn state =
+          .ok result →
+      state.InferenceProgress result.state ∧
+        result.state.InferenceReady ∧
+        result.type.VariablesBelow result.state.inference.next
+
+private def InferForItemsFuelInferenceProperties
+    (fuel : Nat) (context : Context) (items : List Syntax.ForItem)
+    (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    ∀ result,
+      inferForItemsFuel fuel context items state = .ok result →
+      state.InferenceProgress result.state ∧ result.state.InferenceReady
+
+private def InferForItemFuelInferenceProperties
+    (fuel : Nat) (context : Context) (item : Syntax.ForItem)
+    (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    ∀ result,
+      inferForItemFuel fuel context item state = .ok result →
+      state.InferenceProgress result.2 ∧ result.2.InferenceReady
+
+private def InferPlaceFuelInferenceProperties
+    (fuel : Nat) (context : Context) (target : Syntax.Expr)
+    (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    ∀ result,
+      inferPlaceFuel fuel context target state = .ok result →
+      state.InferenceProgress result.2 ∧
+        result.2.InferenceReady ∧
+        result.1.type.VariablesBelow result.2.inference.next
+
+private def InferAssignedValueFuelInferenceProperties
+    (fuel : Nat) (context : Context) (target : Syntax.Expr)
+    (operator : Syntax.ValueAssignOp) (value : Syntax.Expr)
+    (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    ∀ result,
+      inferAssignedValueFuel fuel context target operator value state =
+          .ok result →
+      state.InferenceProgress result.2.2 ∧
+        result.2.2.InferenceReady ∧
+        result.1.target.type.VariablesBelow result.2.2.inference.next ∧
+        result.2.1.type.VariablesBelow result.2.2.inference.next
+
+private def InferExprsFuelInferenceProperties
+    (fuel : Nat) (context : Context) (expressions : List Syntax.Expr)
+    (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    ∀ result,
+      inferExprsFuel fuel context expressions state = .ok result →
+      state.InferenceProgress result.2 ∧
+        result.2.InferenceReady ∧
+        ∀ expression ∈ result.1,
+          expression.type.VariablesBelow result.2.inference.next
+
+private def InferMatchCasesFuelInferenceProperties
+    (fuel : Nat) (context : Context) (scrutineeType expectedReturn : Ty)
+    (outerScope : LexicalScope) (cases : List Syntax.MatchCase)
+    (state : State) : Prop :=
+  state.InferenceReady →
+    ProgramSignatureFormationValidated context.signatures →
+    FunctionSchemesCanonical context →
+    scrutineeType.VariablesBelow state.inference.next →
+    expectedReturn.VariablesBelow state.inference.next →
+    state.lexicalScope = outerScope →
+    ∀ result,
+      inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state = .ok result →
+      state.InferenceProgress result.state ∧
+        result.state.InferenceReady ∧
+        result.state.lexicalScope = outerScope
+
+set_option maxHeartbeats 2000000 in
+private theorem inferFuel_inferenceProperties_internal :
+    (∀ fuel context expression expected state,
+      InferExprFuelInferenceProperties fuel context expression expected state) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      InferConstructorApplicationFuelInferenceProperties fuel context source id
+        instantiation arguments expected state) ∧
+    (∀ fuel context sources expected state,
+      InferConstructorArgumentsFuelInferenceProperties fuel context sources
+        expected state) ∧
+    (∀ fuel context statements expectedReturn state,
+      InferStatementsFuelInferenceProperties fuel context statements
+        expectedReturn state) ∧
+    (∀ fuel context statement expectedReturn state,
+      InferStatementFuelInferenceProperties fuel context statement
+        expectedReturn state) ∧
+    (∀ fuel context items state,
+      InferForItemsFuelInferenceProperties fuel context items state) ∧
+    (∀ fuel context item state,
+      InferForItemFuelInferenceProperties fuel context item state) ∧
+    (∀ fuel context target state,
+      InferPlaceFuelInferenceProperties fuel context target state) ∧
+    (∀ fuel context target operator value state,
+      InferAssignedValueFuelInferenceProperties fuel context target operator
+        value state) ∧
+    (∀ fuel context expressions state,
+      InferExprsFuelInferenceProperties fuel context expressions state) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      InferMatchCasesFuelInferenceProperties fuel context scrutineeType
+        expectedReturn outerScope cases state) := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := InferExprFuelInferenceProperties)
+    (motive2 := InferConstructorApplicationFuelInferenceProperties)
+    (motive3 := InferConstructorArgumentsFuelInferenceProperties)
+    (motive4 := InferStatementsFuelInferenceProperties)
+    (motive5 := InferStatementFuelInferenceProperties)
+    (motive6 := InferForItemsFuelInferenceProperties)
+    (motive7 := InferForItemFuelInferenceProperties)
+    (motive8 := InferPlaceFuelInferenceProperties)
+    (motive9 := InferAssignedValueFuelInferenceProperties)
+    (motive10 := InferExprsFuelInferenceProperties)
+    (motive11 := InferMatchCasesFuelInferenceProperties)
+  case case1 =>
+    simp [InferExprFuelInferenceProperties, inferExprFuel]
+  case case2 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      literal expressionEq spelling literalEq rawValue numericEq
+    unfold InferExprFuelInferenceProperties
+    intro ready _ _ expectedBelow result success
+    let type : Ty := allocated.fresh.1
+    let freshState : State := allocated.fresh.2
+    let metavariable : TypeVarId := ⟨allocated.inference.next⟩
+    let addition := freshState.addRequirementWithId
+      (ProgramSignatures.builtinIntPredicate type)
+    let literalState : State := {
+      addition.2 with integerLiterals := addition.2.integerLiterals ++ [{
+        metavariable
+        expression := id
+        requirement := addition.1
+      }]
+    }
+    have allocationProgress : initial.InferenceProgress allocated := by
+      have progress :=
+        State.InferenceProgress.allocateExpressionId initial ready.solved
+      rw [allocationEq] at progress
+      exact progress
+    have allocatedReady : allocated.InferenceReady := by
+      have nextReady := State.InferenceReady.allocateExpressionId ready
+      rw [allocationEq] at nextReady
+      exact nextReady
+    have freshProgress : allocated.InferenceProgress freshState := by
+      simpa only [freshState] using
+        State.InferenceProgress.fresh allocated allocatedReady.solved
+    have freshReady : freshState.InferenceReady := by
+      simpa only [freshState] using State.InferenceReady.fresh allocatedReady
+    have typeBelowFresh : type.VariablesBelow
+        freshState.inference.next := by
+      change Ty.VariablesBelow (allocated.inference.next + 1)
+        (.variable ⟨allocated.inference.next⟩)
+      exact (Ty.variablesBelow_variable_iff _ _).2 (Nat.lt_succ_self _)
+    have additionProgress : freshState.InferenceProgress addition.2 := by
+      simpa only [addition] using
+        State.InferenceProgress.addRequirementWithId freshState
+          (ProgramSignatures.builtinIntPredicate type) freshReady.solved
+    have additionReady : addition.2.InferenceReady := by
+      simpa only [addition] using
+        State.InferenceReady.addRequirementWithId
+          (ProgramSignatures.builtinIntPredicate type) freshReady
+    have metadataProgress : addition.2.InferenceProgress literalState := by
+      exact State.InferenceProgress.of_inference_eq additionReady.solved rfl
+    have metadataReady : literalState.InferenceReady :=
+      State.InferenceReady.of_progress_of_binderEnvironment_eq additionReady
+        metadataProgress rfl
+    have prefixProgress : initial.InferenceProgress literalState :=
+      allocationProgress.trans
+        (freshProgress.trans (additionProgress.trans metadataProgress))
+    have typeAtLiteral : type.VariablesBelow
+        literalState.inference.next :=
+      typeBelowFresh.weaken
+        (additionProgress.trans metadataProgress).next_le
+    have expectedAtLiteral : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow literalState.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken prefixProgress.next_le
+    have recordSuccess :
+        recordExpressionWithExpected context expression id type
+          (.integerLiteral (.decimal spelling) {
+            rawValue
+            targetType := type
+            requirement := addition.1
+          }) [addition.1] expected literalState = .ok result := by
+      unfold inferExprFuel at success
+      simp only [allocationEq, expressionEq, literalEq, numericEq, bind,
+        Except.bind, pure, Pure.pure, Except.pure] at success
+      simpa only [type, freshState, metavariable, addition, literalState,
+        State.fresh, TypeSystem.InferState.fresh, Prod.eta] using success
+    have recordedProperties :=
+      recordExpressionWithExpected_inferenceProperties metadataReady
+        typeAtLiteral expectedAtLiteral recordSuccess
+    exact ⟨prefixProgress.trans recordedProperties.1,
+      recordedProperties.2⟩
+  case case3 =>
+    simp_all [InferExprFuelInferenceProperties, inferExprFuel, bind,
+      Except.bind]
+  case case4 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      literal expressionEq spelling literalEq rawValue numericEq
+    unfold InferExprFuelInferenceProperties
+    intro ready _ _ expectedBelow result success
+    let type : Ty := allocated.fresh.1
+    let freshState : State := allocated.fresh.2
+    let metavariable : TypeVarId := ⟨allocated.inference.next⟩
+    let addition := freshState.addRequirementWithId
+      (ProgramSignatures.builtinIntPredicate type)
+    let literalState : State := {
+      addition.2 with integerLiterals := addition.2.integerLiterals ++ [{
+        metavariable
+        expression := id
+        requirement := addition.1
+      }]
+    }
+    have allocationProgress : initial.InferenceProgress allocated := by
+      have progress :=
+        State.InferenceProgress.allocateExpressionId initial ready.solved
+      rw [allocationEq] at progress
+      exact progress
+    have allocatedReady : allocated.InferenceReady := by
+      have nextReady := State.InferenceReady.allocateExpressionId ready
+      rw [allocationEq] at nextReady
+      exact nextReady
+    have freshProgress : allocated.InferenceProgress freshState := by
+      simpa only [freshState] using
+        State.InferenceProgress.fresh allocated allocatedReady.solved
+    have freshReady : freshState.InferenceReady := by
+      simpa only [freshState] using State.InferenceReady.fresh allocatedReady
+    have typeBelowFresh : type.VariablesBelow
+        freshState.inference.next := by
+      change Ty.VariablesBelow (allocated.inference.next + 1)
+        (.variable ⟨allocated.inference.next⟩)
+      exact (Ty.variablesBelow_variable_iff _ _).2 (Nat.lt_succ_self _)
+    have additionProgress : freshState.InferenceProgress addition.2 := by
+      simpa only [addition] using
+        State.InferenceProgress.addRequirementWithId freshState
+          (ProgramSignatures.builtinIntPredicate type) freshReady.solved
+    have additionReady : addition.2.InferenceReady := by
+      simpa only [addition] using
+        State.InferenceReady.addRequirementWithId
+          (ProgramSignatures.builtinIntPredicate type) freshReady
+    have metadataProgress : addition.2.InferenceProgress literalState := by
+      exact State.InferenceProgress.of_inference_eq additionReady.solved rfl
+    have metadataReady : literalState.InferenceReady :=
+      State.InferenceReady.of_progress_of_binderEnvironment_eq additionReady
+        metadataProgress rfl
+    have prefixProgress : initial.InferenceProgress literalState :=
+      allocationProgress.trans
+        (freshProgress.trans (additionProgress.trans metadataProgress))
+    have typeAtLiteral : type.VariablesBelow
+        literalState.inference.next :=
+      typeBelowFresh.weaken
+        (additionProgress.trans metadataProgress).next_le
+    have expectedAtLiteral : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow literalState.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken prefixProgress.next_le
+    have recordSuccess :
+        recordExpressionWithExpected context expression id type
+          (.integerLiteral (.hexadecimal spelling) {
+            rawValue
+            targetType := type
+            requirement := addition.1
+          }) [addition.1] expected literalState = .ok result := by
+      unfold inferExprFuel at success
+      simp only [allocationEq, expressionEq, literalEq, numericEq, bind,
+        Except.bind, pure, Pure.pure, Except.pure] at success
+      simpa only [type, freshState, metavariable, addition, literalState,
+        State.fresh, TypeSystem.InferState.fresh, Prod.eta] using success
+    have recordedProperties :=
+      recordExpressionWithExpected_inferenceProperties metadataReady
+        typeAtLiteral expectedAtLiteral recordSuccess
+    exact ⟨prefixProgress.trans recordedProperties.1,
+      recordedProperties.2⟩
+  case case5 =>
+    simp_all [InferExprFuelInferenceProperties, inferExprFuel, bind,
+      Except.bind]
+  case case6 =>
+    simp_all [InferExprFuelInferenceProperties, inferExprFuel]
+  case case7 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      name expressionEq binder lookupEq instantiated inference advanced
+      predicates requirements recorded requirementsEq
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProgress : initial.InferenceProgress allocated := by
+      have progress :=
+        State.InferenceProgress.allocateExpressionId initial ready.solved
+      rw [allocationEq] at progress
+      exact progress
+    have allocatedReady : allocated.InferenceReady := by
+      have nextReady := State.InferenceReady.allocateExpressionId ready
+      rw [allocationEq] at nextReady
+      exact nextReady
+    have instantiationProperties :=
+      localBinderInstantiation_inferenceProperties allocatedReady lookupEq
+    have instantiationProgress : allocated.InferenceProgress advanced := by
+      simpa only [instantiated, inference, advanced] using
+        instantiationProperties.1
+    have advancedReady : advanced.InferenceReady := by
+      simpa only [instantiated, inference, advanced] using
+        instantiationProperties.2.1
+    have bodyBelow :
+        (advanced.resolve instantiated.body).VariablesBelow
+          advanced.inference.next := by
+      simpa only [instantiated, inference, advanced] using
+        instantiationProperties.2.2
+    have requirementsProgress : advanced.InferenceProgress recorded := by
+      have progress := State.InferenceProgress.addRequirementsWithIds advanced
+        predicates advancedReady.solved
+      rw [requirementsEq] at progress
+      exact progress
+    have recordedReady : recorded.InferenceReady := by
+      have nextReady :=
+        State.InferenceReady.addRequirementsWithIds predicates advancedReady
+      rw [requirementsEq] at nextReady
+      exact nextReady
+    have expectedAtRecorded : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow recorded.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken
+        (allocationProgress.trans
+          (instantiationProgress.trans requirementsProgress)).next_le
+    have bodyAtRecorded :
+        (advanced.resolve instantiated.body).VariablesBelow
+          recorded.inference.next :=
+      bodyBelow.weaken requirementsProgress.next_le
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, lookupEq, requirementsEq, bind,
+      Except.bind] at success
+    have recordSuccess :
+        recordExpressionWithExpected context expression id
+          (advanced.resolve instantiated.body)
+          (.reference name.value (.local binder.id)) requirements expected
+          recorded = .ok result := by
+      simpa only [instantiated, inference, advanced, predicates,
+        requirementsEq] using success
+    have recordedProperties :=
+      recordExpressionWithExpected_inferenceProperties recordedReady
+        bodyAtRecorded expectedAtRecorded recordSuccess
+    exact ⟨allocationProgress.trans
+        (instantiationProgress.trans
+          (requirementsProgress.trans recordedProperties.1)),
+      recordedProperties.2⟩
+  case case8 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      name expressionEq lookupNone isBoolean
+    unfold InferExprFuelInferenceProperties
+    intro ready _ _ expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have expectedAtAllocated : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow allocated.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken
+        allocationProperties.1.next_le
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, lookupNone, isBoolean, if_true]
+      at success
+    have recordedProperties :=
+      recordExpressionWithExpected_inferenceProperties allocationProperties.2
+        (Ty.variablesBelow_constructor _ _) expectedAtAllocated success
+    exact ⟨allocationProperties.1.trans recordedProperties.1,
+      recordedProperties.2⟩
+  case case9 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      name expressionEq lookupNone notBool
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProgress : initial.InferenceProgress allocated := by
+      have progress :=
+        State.InferenceProgress.allocateExpressionId initial ready.solved
+      rw [allocationEq] at progress
+      exact progress
+    have allocatedReady : allocated.InferenceReady := by
+      have nextReady := State.InferenceReady.allocateExpressionId ready
+      rw [allocationEq] at nextReady
+      exact nextReady
+    have expectedAtAllocated : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow allocated.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken
+        allocationProgress.next_le
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, lookupNone, notBool, bind,
+      Except.bind] at success
+    cases functionsResult : functionsNamed context name.value with
+    | error error =>
+        simp [functionsResult, bind, Except.bind] at success
+    | ok candidates =>
+        simp only [functionsResult, bind, Except.bind] at success
+        cases candidates with
+        | nil =>
+            cases builtinResult : builtinFunctionNamed? name.value with
+            | none => simp [builtinResult] at success
+            | some function =>
+                simp only [builtinResult] at success
+                have recordedProperties :=
+                  recordExpressionWithExpected_inferenceProperties
+                    allocatedReady
+                    (builtinFunction_type_variablesBelow function _)
+                    expectedAtAllocated success
+                exact ⟨allocationProgress.trans recordedProperties.1,
+                  recordedProperties.2⟩
+        | cons signature rest =>
+            cases rest with
+            | nil =>
+                have catalogMember :
+                    signature ∈ context.signatures.functions :=
+                  functionsNamed_success_subset_catalog functionsResult
+                    (by simp)
+                have schemeBelow :=
+                  validated.function_scheme_body_variablesBelow catalogMember
+                    (canonical signature catalogMember)
+                    allocated.inference.next
+                have recordedProperties :=
+                  recordInstantiatedFunctionReference_inferenceProperties
+                    allocatedReady schemeBelow expectedAtAllocated success
+                exact ⟨allocationProgress.trans recordedProperties.1,
+                  recordedProperties.2⟩
+            | cons second tail => simp at success
+  case case10 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      inner expressionEq innerInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases innerResult : inferExprFuel fuel context inner expected allocated with
+    | error error =>
+        simp [innerResult, bind, Except.bind] at success
+    | ok innerPair =>
+        rcases innerPair with ⟨inferred, innerState⟩
+        simp only [innerResult, bind, Except.bind, Prod.eta] at success
+        have innerProperties := innerInduction allocationProperties.2
+          validated canonical
+          (by
+            intro expectedType member
+            exact (expectedBelow expectedType member).weaken
+              allocationProperties.1.next_le)
+          (inferred, innerState) innerResult
+        have prefixProgress := allocationProperties.1.trans innerProperties.1
+        have recordedProperties :=
+          recordExpressionWithExpected_inferenceProperties
+            innerProperties.2.1 innerProperties.2.2
+            (by
+              intro expectedType member
+              exact (expectedBelow expectedType member).weaken
+                prefixProgress.next_le)
+            success
+        exact ⟨prefixProgress.trans recordedProperties.1,
+          recordedProperties.2⟩
+  case case11 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      elements expressionEq elementsInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases elementsResult : inferExprsFuel fuel context elements.elements
+        allocated with
+    | error error =>
+        simp [elementsResult, bind, Except.bind] at success
+    | ok elementsPair =>
+        rcases elementsPair with ⟨inferredElements, elementsState⟩
+        simp only [elementsResult, bind, Except.bind, Prod.eta] at success
+        have elementsProperties := elementsInduction allocationProperties.2
+          validated canonical (inferredElements, elementsState) elementsResult
+        have tupleTypeBelow :
+            (Ty.productMany (inferredElements.map (·.type))).VariablesBelow
+              elementsState.inference.next :=
+          Ty.variablesBelow_productMany (by
+            intro type member
+            simp only [List.mem_map] at member
+            obtain ⟨element, elementMember, rfl⟩ := member
+            exact elementsProperties.2.2 element elementMember)
+        have prefixProgress :=
+          allocationProperties.1.trans elementsProperties.1
+        have recordedProperties :=
+          recordExpressionWithExpected_inferenceProperties
+            elementsProperties.2.1 tupleTypeBelow
+            (by
+              intro expectedType member
+              exact (expectedBelow expectedType member).weaken
+                prefixProgress.next_le)
+            success
+        exact ⟨prefixProgress.trans recordedProperties.1,
+          recordedProperties.2⟩
+  case case12 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      operator operand expressionEq operandInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases operandResult : inferExprFuel fuel context operand none allocated with
+    | error error =>
+        simp [operandResult, bind, Except.bind] at success
+    | ok operandPair =>
+        rcases operandPair with ⟨inferredOperand, operandState⟩
+        simp only [operandResult, bind, Except.bind, Prod.eta] at success
+        have operandProperties := operandInduction allocationProperties.2
+          validated canonical (by simp) (inferredOperand, operandState)
+          operandResult
+        have prefixProgress :=
+          allocationProperties.1.trans operandProperties.1
+        have expectedAtOperand : ∀ expectedType ∈ expected,
+            expectedType.VariablesBelow operandState.inference.next := by
+          intro expectedType member
+          exact (expectedBelow expectedType member).weaken
+            prefixProgress.next_le
+        let integerLiterals := relevantIntegerLiterals operandState
+          allocated.integerLiterals.length [inferredOperand]
+        have finishInferred (inferred : OperatorInferenceResult)
+            (inferenceSuccess : inferUnaryOperator context operator.value
+              inferredOperand.type expected integerLiterals operandState =
+                .ok inferred)
+            (recordSuccess : recordExpressionWithExpected context expression id
+              inferred.type (.unary operator.value inferredOperand.id)
+              inferred.requirements expected inferred.state = .ok result) :
+            initial.InferenceProgress result.2 ∧
+              result.2.InferenceReady ∧
+              result.1.type.VariablesBelow result.2.inference.next := by
+          have inferredProperties := inferUnaryOperator_inferenceProperties
+            operandProperties.2.1 operandProperties.2.2 expectedAtOperand
+            inferenceSuccess
+          have expectedAtInferred : ∀ expectedType ∈ expected,
+              expectedType.VariablesBelow inferred.state.inference.next := by
+            intro expectedType member
+            exact (expectedAtOperand expectedType member).weaken
+              inferredProperties.1.next_le
+          have recordedProperties :=
+            recordExpressionWithExpected_inferenceProperties
+              inferredProperties.2.1 inferredProperties.2.2
+              expectedAtInferred recordSuccess
+          exact ⟨prefixProgress.trans
+              (inferredProperties.1.trans recordedProperties.1),
+            recordedProperties.2⟩
+        cases dispatchEq : unaryOperatorDispatch operator.value with
+        | traitMethod traitName methodName =>
+            simp only [integerLiterals, dispatchEq] at success
+            cases inferredResult : inferUnaryOperator context operator.value
+                inferredOperand.type expected integerLiterals operandState with
+            | error error =>
+                simp [integerLiterals, inferredResult, bind, Except.bind]
+                  at success
+            | ok inferred =>
+                simp only [integerLiterals, inferredResult, bind,
+                  Except.bind] at success
+                exact finishInferred inferred inferredResult success
+        | function name =>
+            simp only [integerLiterals, dispatchEq] at success
+            cases functionsResult : functionsNamed context name with
+            | error error =>
+                simp [functionsResult, bind, Except.bind] at success
+            | ok candidates =>
+                simp only [functionsResult, bind, Except.bind] at success
+                cases candidates with
+                | nil =>
+                    cases inferredResult : inferUnaryOperator context
+                        operator.value inferredOperand.type expected
+                        integerLiterals operandState with
+                    | error error =>
+                        simp [integerLiterals, inferredResult, bind,
+                          Except.bind] at success
+                    | ok inferred =>
+                        simp only [integerLiterals, inferredResult, bind,
+                          Except.bind] at success
+                        exact finishInferred inferred inferredResult success
+                | cons candidate rest =>
+                    cases selectionResult : selectFunctionCandidateFrom context
+                        name (candidate :: rest) [inferredOperand]
+                        integerLiterals id expected operandState with
+                    | error error =>
+                        simp [integerLiterals, selectionResult, bind,
+                          Except.bind] at success
+                    | ok attempt =>
+                        simp only [integerLiterals, selectionResult, bind,
+                          Except.bind, pure, Pure.pure, Except.pure] at success
+                        let callee : Syntax.Expr := {
+                          span := operator.span
+                          value := .identifier {
+                            span := operator.span
+                            value := name
+                          }
+                        }
+                        change Except.ok (recordSelectedCall expression callee
+                          name [inferredOperand] attempt) = Except.ok result
+                            at success
+                        injection success with resultEq
+                        have selectedProperties :=
+                          selectFunctionCandidateFrom_inferenceProperties
+                            operandProperties.2.1
+                            (by
+                              intro argument member
+                              simp only [List.mem_singleton] at member
+                              subst argument
+                              exact operandProperties.2.2)
+                            (functionCandidates_scheme_body_variablesBelow
+                              validated canonical
+                              (functionsNamed_success_subset_catalog
+                                functionsResult) _)
+                            expectedAtOperand selectionResult
+                        have recordedProperties :=
+                          recordSelectedCall_inferenceProperties expression
+                            callee name [inferredOperand] attempt
+                            selectedProperties.2.1 selectedProperties.2.2
+                        rw [← resultEq]
+                        exact ⟨prefixProgress.trans
+                            (selectedProperties.1.trans recordedProperties.1),
+                          recordedProperties.2⟩
+  case case13 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      left operator right expressionEq leftInduction rightInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases leftResult : inferExprFuel fuel context left none allocated with
+    | error error =>
+        simp [leftResult, bind, Except.bind] at success
+    | ok leftPair =>
+        rcases leftPair with ⟨inferredLeft, leftState⟩
+        simp only [leftResult, bind, Except.bind, Prod.eta] at success
+        have leftProperties := leftInduction allocationProperties.2
+          validated canonical (by simp) (inferredLeft, leftState) leftResult
+        cases rightResult : inferExprFuel fuel context right none leftState with
+        | error error =>
+            simp [rightResult, bind, Except.bind] at success
+        | ok rightPair =>
+            rcases rightPair with ⟨inferredRight, rightState⟩
+            simp only [rightResult, bind, Except.bind, Prod.eta] at success
+            have rightProperties := rightInduction leftState
+              leftProperties.2.1 validated canonical (by simp)
+              (inferredRight, rightState) rightResult
+            have leftAtRight : inferredLeft.type.VariablesBelow
+                rightState.inference.next :=
+              leftProperties.2.2.weaken rightProperties.1.next_le
+            have argumentsBelow :
+                ∀ argument ∈ [inferredLeft, inferredRight],
+                  argument.type.VariablesBelow rightState.inference.next := by
+              intro argument member
+              simp only [List.mem_cons, List.mem_singleton] at member
+              rcases member with rfl | member
+              · exact leftAtRight
+              · rcases member with rfl | member
+                · exact rightProperties.2.2
+                · simp at member
+            have prefixProgress := allocationProperties.1.trans
+              (leftProperties.1.trans rightProperties.1)
+            have expectedAtRight : ∀ expectedType ∈ expected,
+                expectedType.VariablesBelow rightState.inference.next := by
+              intro expectedType member
+              exact (expectedBelow expectedType member).weaken
+                prefixProgress.next_le
+            let integerLiterals := relevantIntegerLiterals rightState
+              allocated.integerLiterals.length [inferredLeft, inferredRight]
+            have finishInferred (inferred : OperatorInferenceResult)
+                (inferenceSuccess : inferBinaryOperator context operator.value
+                  inferredLeft.type inferredRight.type expected integerLiterals
+                    rightState = .ok inferred)
+                (recordSuccess : recordExpressionWithExpected context
+                  expression id inferred.type
+                  (.binary inferredLeft.id operator.value inferredRight.id)
+                  inferred.requirements expected inferred.state = .ok result) :
+                initial.InferenceProgress result.2 ∧
+                  result.2.InferenceReady ∧
+                  result.1.type.VariablesBelow result.2.inference.next := by
+              have inferredProperties :=
+                inferBinaryOperator_inferenceProperties
+                  rightProperties.2.1 leftAtRight rightProperties.2.2
+                  expectedAtRight inferenceSuccess
+              have expectedAtInferred : ∀ expectedType ∈ expected,
+                  expectedType.VariablesBelow
+                    inferred.state.inference.next := by
+                intro expectedType member
+                exact (expectedAtRight expectedType member).weaken
+                  inferredProperties.1.next_le
+              have recordedProperties :=
+                recordExpressionWithExpected_inferenceProperties
+                  inferredProperties.2.1 inferredProperties.2.2
+                  expectedAtInferred recordSuccess
+              exact ⟨prefixProgress.trans
+                  (inferredProperties.1.trans recordedProperties.1),
+                recordedProperties.2⟩
+            cases dispatchEq : binaryOperatorDispatch operator.value with
+            | traitMethod traitName methodName =>
+                simp only [integerLiterals, dispatchEq] at success
+                cases inferredResult : inferBinaryOperator context
+                    operator.value inferredLeft.type inferredRight.type expected
+                    integerLiterals rightState with
+                | error error =>
+                    simp [integerLiterals, inferredResult, bind, Except.bind]
+                      at success
+                | ok inferred =>
+                    simp only [integerLiterals, inferredResult, bind,
+                      Except.bind] at success
+                    exact finishInferred inferred inferredResult success
+            | function name =>
+                simp only [integerLiterals, dispatchEq] at success
+                cases functionsResult : functionsNamed context name with
+                | error error =>
+                    simp [functionsResult, bind, Except.bind] at success
+                | ok candidates =>
+                    simp only [functionsResult, bind, Except.bind] at success
+                    cases candidates with
+                    | nil =>
+                        cases inferredResult : inferBinaryOperator context
+                            operator.value inferredLeft.type inferredRight.type
+                            expected integerLiterals rightState with
+                        | error error =>
+                            simp [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                        | ok inferred =>
+                            simp only [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                            exact finishInferred inferred inferredResult success
+                    | cons candidate rest =>
+                        cases selectionResult : selectFunctionCandidateFrom
+                            context name (candidate :: rest)
+                            [inferredLeft, inferredRight] integerLiterals id
+                            (some .bool) rightState with
+                        | error error =>
+                            simp [integerLiterals, selectionResult, bind,
+                              Except.bind] at success
+                        | ok attempt =>
+                            simp only [integerLiterals, selectionResult, bind,
+                              Except.bind] at success
+                            have selectedProperties :=
+                              selectFunctionCandidateFrom_inferenceProperties
+                                rightProperties.2.1 argumentsBelow
+                                (functionCandidates_scheme_body_variablesBelow
+                                  validated canonical
+                                  (functionsNamed_success_subset_catalog
+                                    functionsResult) _)
+                                (by
+                                  intro expectedType member
+                                  simp only [Option.mem_def] at member
+                                  injection member with typeEq
+                                  subst expectedType
+                                  exact Ty.variablesBelow_constructor _ _)
+                                selectionResult
+                            have expectedAtAttempt :
+                                ∀ expectedType ∈ expected,
+                                  expectedType.VariablesBelow
+                                    attempt.state.inference.next := by
+                              intro expectedType member
+                              exact (expectedAtRight expectedType member).weaken
+                                selectedProperties.1.next_le
+                            cases fittedResult : withExpected context
+                                attempt.state attempt.result expected with
+                            | error error =>
+                                simp [fittedResult, bind, Except.bind]
+                                  at success
+                            | ok fitted =>
+                                simp only [fittedResult, bind, Except.bind,
+                                  pure, Pure.pure, Except.pure] at success
+                                have fittedProperties :=
+                                  withExpected_inferenceProperties
+                                    selectedProperties.2.1
+                                    selectedProperties.2.2 expectedAtAttempt
+                                    fittedResult
+                                let callee : Syntax.Expr := {
+                                  span := operator.span
+                                  value := .identifier {
+                                    span := operator.span
+                                    value := name
+                                  }
+                                }
+                                change Except.ok
+                                  (recordSelectedCallResult expression callee
+                                    name [inferredLeft, inferredRight] attempt
+                                    fitted.expression fitted.coercions
+                                    fitted.state) = Except.ok result at success
+                                injection success with resultEq
+                                have recordedProperties :=
+                                  recordSelectedCallResult_inferenceProperties
+                                    expression callee name
+                                    [inferredLeft, inferredRight] attempt
+                                    fitted.expression fitted.coercions
+                                    fitted.state fittedProperties.2.1
+                                    fittedProperties.2.2
+                                rw [← resultEq]
+                                exact ⟨prefixProgress.trans
+                                    (selectedProperties.1.trans
+                                      (fittedProperties.1.trans
+                                        recordedProperties.1)),
+                                  recordedProperties.2⟩
+  case case14 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      condition question thenBranch colon elseBranch expressionEq
+      conditionInduction thenInduction elseInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases conditionResult : inferExprFuel fuel context condition
+        (some .bool) allocated with
+    | error error =>
+        simp [conditionResult, bind, Except.bind] at success
+    | ok conditionPair =>
+        rcases conditionPair with ⟨inferredCondition, conditionState⟩
+        simp only [conditionResult, bind, Except.bind, Prod.eta] at success
+        have conditionProperties := conditionInduction
+          allocationProperties.2 validated canonical
+          (by
+            intro expectedType member
+            simp only [Option.mem_def] at member
+            injection member with typeEq
+            subst expectedType
+            exact Ty.variablesBelow_constructor _ _)
+          (inferredCondition, conditionState) conditionResult
+        have throughCondition :=
+          allocationProperties.1.trans conditionProperties.1
+        have expectedAtCondition : ∀ expectedType ∈ expected,
+            expectedType.VariablesBelow conditionState.inference.next := by
+          intro expectedType member
+          exact (expectedBelow expectedType member).weaken
+            throughCondition.next_le
+        cases thenResult : inferExprFuel fuel context thenBranch expected
+            conditionState with
+        | error error =>
+            simp [thenResult, bind, Except.bind] at success
+        | ok thenPair =>
+            rcases thenPair with ⟨inferredThen, thenState⟩
+            simp only [thenResult, bind, Except.bind, Prod.eta] at success
+            have thenProperties := thenInduction conditionState
+              conditionProperties.2.1 validated canonical expectedAtCondition
+              (inferredThen, thenState) thenResult
+            have throughThen := throughCondition.trans thenProperties.1
+            have expectedAtThen : ∀ expectedType ∈ expected,
+                expectedType.VariablesBelow thenState.inference.next := by
+              intro expectedType member
+              exact (expectedBelow expectedType member).weaken
+                throughThen.next_le
+            cases elseResult : inferExprFuel fuel context elseBranch expected
+                thenState with
+            | error error =>
+                simp [elseResult, bind, Except.bind] at success
+            | ok elsePair =>
+                rcases elsePair with ⟨inferredElse, elseState⟩
+                simp only [elseResult, bind, Except.bind, Prod.eta] at success
+                have elseProperties := elseInduction thenState
+                  thenProperties.2.1 validated canonical expectedAtThen
+                  (inferredElse, elseState) elseResult
+                have thenAtElse : inferredThen.type.VariablesBelow
+                    elseState.inference.next :=
+                  thenProperties.2.2.weaken elseProperties.1.next_le
+                cases unifyResult : unify elseState inferredThen.type
+                    inferredElse.type with
+                | error error =>
+                    simp [unifyResult, bind, Except.bind] at success
+                | ok unifiedState =>
+                    simp only [unifyResult, bind, Except.bind] at success
+                    have unifyProgress := unify_inferenceProgress
+                      elseProperties.2.1.solved thenAtElse
+                      elseProperties.2.2 unifyResult
+                    have unifiedReady := unify_preserves_inferenceReady
+                      elseProperties.2.1 thenAtElse elseProperties.2.2
+                      unifyResult
+                    have throughUnify := throughThen.trans
+                      (elseProperties.1.trans unifyProgress)
+                    have resolvedThenBelow :
+                        (unifiedState.resolve inferredThen.type).VariablesBelow
+                          unifiedState.inference.next :=
+                      unifyProgress.resolve_variablesBelow thenAtElse
+                    have expectedAtUnified : ∀ expectedType ∈ expected,
+                        expectedType.VariablesBelow
+                          unifiedState.inference.next := by
+                      intro expectedType member
+                      exact (expectedBelow expectedType member).weaken
+                        throughUnify.next_le
+                    have recordedProperties :=
+                      recordExpressionWithExpected_inferenceProperties
+                        unifiedReady resolvedThenBelow expectedAtUnified success
+                    exact ⟨throughUnify.trans recordedProperties.1,
+                      recordedProperties.2⟩
+  case case19 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      base brackets index expressionEq baseInduction indexInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases baseResult : inferExprFuel fuel context base none allocated with
+    | error error =>
+        simp [baseResult, bind, Except.bind] at success
+    | ok basePair =>
+        rcases basePair with ⟨inferredBase, baseState⟩
+        simp only [baseResult, bind, Except.bind, Prod.eta] at success
+        have baseProperties := baseInduction allocationProperties.2
+          validated canonical (by simp) (inferredBase, baseState) baseResult
+        let keyAllocation := baseState.fresh
+        have keyProperties := fresh_eq_inferenceProperties
+          baseProperties.2.1 (type := keyAllocation.1)
+          (next := keyAllocation.2) rfl
+        let valueAllocation := keyAllocation.2.fresh
+        have valueProperties := fresh_eq_inferenceProperties
+          keyProperties.2.1 (type := valueAllocation.1)
+          (next := valueAllocation.2) rfl
+        have baseAtValue : inferredBase.type.VariablesBelow
+            valueAllocation.2.inference.next :=
+          baseProperties.2.2.weaken
+            (keyProperties.1.trans valueProperties.1).next_le
+        have keyAtValue : keyAllocation.1.VariablesBelow
+            valueAllocation.2.inference.next :=
+          keyProperties.2.2.weaken valueProperties.1.next_le
+        have mappingBelow :
+            (Ty.mapping keyAllocation.1 valueAllocation.1).VariablesBelow
+              valueAllocation.2.inference.next :=
+          (Ty.variablesBelow_mapping_iff _ _ _).2
+            ⟨keyAtValue, valueProperties.2.2⟩
+        cases unifyResult : unify valueAllocation.2 inferredBase.type
+            (.mapping keyAllocation.1 valueAllocation.1) with
+        | error error =>
+            simp [keyAllocation, valueAllocation, unifyResult, bind,
+              Except.bind] at success
+        | ok unifiedState =>
+            simp only [keyAllocation, valueAllocation, unifyResult, bind,
+              Except.bind] at success
+            have unifyProgress := unify_inferenceProgress
+              valueProperties.2.1.solved baseAtValue mappingBelow unifyResult
+            have unifiedReady := unify_preserves_inferenceReady
+              valueProperties.2.1 baseAtValue mappingBelow unifyResult
+            have keyAtUnified : keyAllocation.1.VariablesBelow
+                unifiedState.inference.next :=
+              keyAtValue.weaken unifyProgress.next_le
+            have resolvedKeyBelow :
+                (unifiedState.resolve keyAllocation.1).VariablesBelow
+                  unifiedState.inference.next :=
+              unifiedReady.solved.variablesBelow_apply keyAtUnified
+            cases indexResult : inferExprFuel fuel context index
+                (some (unifiedState.resolve baseState.fresh.1))
+                unifiedState with
+            | error error =>
+                simp [indexResult, bind, Except.bind] at success
+            | ok indexPair =>
+                rcases indexPair with ⟨inferredIndex, indexState⟩
+                simp only [indexResult, bind, Except.bind, Prod.eta]
+                  at success
+                have indexProperties := indexInduction baseState.fresh.1
+                  unifiedState unifiedReady validated canonical
+                  (by
+                    intro expectedType member
+                    simp only [Option.mem_def] at member
+                    injection member with typeEq
+                    subst expectedType
+                    simpa only [keyAllocation] using resolvedKeyBelow)
+                  (inferredIndex, indexState) indexResult
+                have fromValueToIndex :=
+                  unifyProgress.trans indexProperties.1
+                have resolvedValueBelow :=
+                  fromValueToIndex.resolve_variablesBelow
+                    valueProperties.2.2
+                have prefixProgress := allocationProperties.1.trans
+                  (baseProperties.1.trans
+                    (keyProperties.1.trans
+                      (valueProperties.1.trans fromValueToIndex)))
+                have expectedAtIndex : ∀ expectedType ∈ expected,
+                    expectedType.VariablesBelow indexState.inference.next := by
+                  intro expectedType member
+                  exact (expectedBelow expectedType member).weaken
+                    prefixProgress.next_le
+                have recordedProperties :=
+                  recordExpressionWithExpected_inferenceProperties
+                    indexProperties.2.1 resolvedValueBelow expectedAtIndex
+                    success
+                exact ⟨prefixProgress.trans recordedProperties.1,
+                  recordedProperties.2⟩
+  case case21 =>
+    simp_all [InferExprFuelInferenceProperties, inferExprFuel]
+  case case22 =>
+    simp_all [InferExprFuelInferenceProperties, inferExprFuel]
+  case case17 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      dot name arguments expressionEq constructorInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have expectedAtAllocated : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow allocated.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken
+        allocationProperties.1.next_le
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases candidateResult : contextualConstructorCandidate context allocated
+        expected name.value with
+    | error error =>
+        simp [candidateResult, bind, Except.bind] at success
+    | ok candidate =>
+        rcases candidate with ⟨dataType, constructor, typeArguments⟩
+        simp only [candidateResult, bind, Except.bind] at success
+        have instantiationBelow :=
+          contextualConstructorCandidate_success_instantiation_variablesBelow
+            allocationProperties.2 expectedAtAllocated validated
+            candidateResult
+        have constructorProperties := constructorInduction dataType
+          constructor typeArguments allocationProperties.2 validated canonical
+          instantiationBelow.1 instantiationBelow.2 expectedAtAllocated result
+          success
+        exact ⟨allocationProperties.1.trans constructorProperties.1,
+          constructorProperties.2⟩
+  case case18 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      marker sourceType expressionEq
+    unfold InferExprFuelInferenceProperties
+    intro ready _ _ expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have expectedAtAllocated : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow allocated.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken
+        allocationProperties.1.next_le
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases sourceTypeResult : resolveSourceType context sourceType with
+    | error error =>
+        simp [sourceTypeResult, bind, Except.bind] at success
+    | ok inner =>
+        simp only [sourceTypeResult, bind, Except.bind] at success
+        have innerBelow :=
+          resolveSourceType_success_variablesBelow sourceTypeResult
+            allocated.inference.next
+        have proxyBelow : (Ty.proxy inner).VariablesBelow
+            allocated.inference.next :=
+          (Ty.variablesBelow_proxy_iff _ _).2 innerBelow
+        have recordedProperties :=
+          recordExpressionWithExpected_inferenceProperties
+            allocationProperties.2 proxyBelow expectedAtAllocated success
+        exact ⟨allocationProperties.1.trans recordedProperties.1,
+          recordedProperties.2⟩
+  case case20 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      base dot name expressionEq constructorInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have expectedAtAllocated : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow allocated.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken
+        allocationProperties.1.next_le
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases candidatesResult :
+        constructorCalleeCandidates context allocated expression with
+    | error error =>
+        simp [candidatesResult, bind, Except.bind] at success
+    | ok candidates =>
+        simp only [candidatesResult, bind, Except.bind] at success
+        cases candidates with
+        | nil =>
+            simp_all [bind, Except.bind]
+            repeat' first | split at success
+            all_goals contradiction
+        | cons candidate rest =>
+            cases rest with
+            | cons second tail => simp at success
+            | nil =>
+                rcases candidate with ⟨dataType, constructor⟩
+                let freshResult :=
+                  freshDataConstructorInstantiation dataType constructor
+                    allocated
+                have candidateFacts :=
+                  constructorCalleeCandidates_success_members candidatesResult
+                    dataType constructor (by simp)
+                have payloadTypesBelow :=
+                  validated.data_constructor_payloadTypes_variablesBelow
+                    candidateFacts.1 candidateFacts.2
+                    allocated.inference.next
+                have freshProperties :=
+                  freshDataConstructorInstantiation_inferenceProperties
+                    dataType constructor allocated allocationProperties.2
+                    payloadTypesBelow
+                have constructorProperties := constructorInduction
+                  freshResult.1 freshResult.2 freshProperties.2.1 validated
+                  canonical freshProperties.2.2.2.1 freshProperties.2.2.2.2
+                  (by
+                    intro expectedType member
+                    exact (expectedAtAllocated expectedType member).weaken
+                      freshProperties.1.next_le)
+                  result
+                  (by simpa only [freshResult] using success)
+                exact ⟨allocationProperties.1.trans
+                    (freshProperties.1.trans constructorProperties.1),
+                  constructorProperties.2⟩
+  case case23 =>
+    intros fuel context source id instantiation arguments expected initial
+      arityEq argumentsInduction
+    unfold InferConstructorApplicationFuelInferenceProperties
+    intro ready validated canonical payloadTypesBelow resultTypeBelow
+      expectedBelow result success
+    unfold inferConstructorApplicationFuel at success
+    simp only [arityEq, if_false, bind, Except.bind] at success
+    let fittedComputation : Except Error State :=
+      match expected with
+      | none => pure initial
+      | some expectedType => unify initial instantiation.resultType expectedType
+    have fittedProperties : ∀ fittedState,
+        fittedComputation = .ok fittedState →
+        initial.InferenceProgress fittedState ∧
+          fittedState.InferenceReady := by
+      intro fittedState fittedSuccess
+      unfold fittedComputation at fittedSuccess
+      cases expected with
+      | none =>
+          simp only [pure, Pure.pure, Except.pure] at fittedSuccess
+          injection fittedSuccess with stateEq
+          subst fittedState
+          exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+      | some expectedType =>
+          exact ⟨unify_inferenceProgress ready.solved resultTypeBelow
+              (expectedBelow expectedType (by simp)) fittedSuccess,
+            unify_preserves_inferenceReady ready resultTypeBelow
+              (expectedBelow expectedType (by simp)) fittedSuccess⟩
+    cases expected with
+    | none =>
+        simp only [pure, Pure.pure, Except.pure] at success
+        cases argumentsResult : inferConstructorArgumentsFuel fuel context
+            arguments instantiation.payloadTypes initial with
+        | error error =>
+            simp [argumentsResult, bind, Except.bind] at success
+        | ok argumentsPair =>
+            rcases argumentsPair with ⟨inferredArguments, argumentsState⟩
+            simp only [argumentsResult, bind, Except.bind, Prod.eta] at success
+            have argumentsProperties := argumentsInduction initial ready
+              validated canonical payloadTypesBelow
+              (inferredArguments, argumentsState) argumentsResult
+            have resultAtArguments :=
+              argumentsProperties.1.resolve_variablesBelow resultTypeBelow
+            have recordedProperties :=
+              recordExpressionWithExpected_inferenceProperties
+                argumentsProperties.2.1 resultAtArguments (by simp) success
+            exact ⟨argumentsProperties.1.trans recordedProperties.1,
+              recordedProperties.2⟩
+    | some expectedType =>
+        cases fittedResult : unify initial instantiation.resultType
+            expectedType with
+        | error error =>
+            simp [fittedResult, bind, Except.bind] at success
+        | ok fittedState =>
+            simp only [fittedResult, bind, Except.bind] at success
+            have fitProperties := fittedProperties fittedState (by
+              simpa only [fittedComputation] using fittedResult)
+            have payloadAtFitted : ∀ payload ∈ instantiation.payloadTypes,
+                payload.VariablesBelow fittedState.inference.next := by
+              intro payload member
+              exact (payloadTypesBelow payload member).weaken
+                fitProperties.1.next_le
+            cases argumentsResult : inferConstructorArgumentsFuel fuel context
+                arguments instantiation.payloadTypes fittedState with
+            | error error =>
+                simp [argumentsResult, bind, Except.bind] at success
+            | ok argumentsPair =>
+                rcases argumentsPair with
+                  ⟨inferredArguments, argumentsState⟩
+                simp only [argumentsResult, bind, Except.bind, Prod.eta]
+                  at success
+                have argumentsProperties := argumentsInduction fittedState
+                  fitProperties.2 validated canonical payloadAtFitted
+                  (inferredArguments, argumentsState) argumentsResult
+                have throughArguments :=
+                  fitProperties.1.trans argumentsProperties.1
+                have resultAtArguments :=
+                  throughArguments.resolve_variablesBelow resultTypeBelow
+                have expectedAtArguments : ∀ candidate : Ty,
+                    candidate ∈ some expectedType →
+                    candidate.VariablesBelow
+                      argumentsState.inference.next := by
+                  intro candidate member
+                  simp only [Option.mem_def] at member
+                  injection member with typeEq
+                  subst candidate
+                  exact (expectedBelow expectedType (by simp)).weaken
+                    throughArguments.next_le
+                have recordedProperties :=
+                  recordExpressionWithExpected_inferenceProperties
+                    argumentsProperties.2.1 resultAtArguments
+                    expectedAtArguments success
+                exact ⟨throughArguments.trans recordedProperties.1,
+                  recordedProperties.2⟩
+  case case24 =>
+    simp_all [InferConstructorApplicationFuelInferenceProperties,
+      inferConstructorApplicationFuel, bind, Except.bind]
+  case case25 =>
+    intros fuel context initial
+    unfold InferConstructorArgumentsFuelInferenceProperties
+    intro ready _ _ _ result success
+    unfold inferConstructorArgumentsFuel at success
+    injection success with resultEq
+    subst result
+    exact ⟨State.InferenceProgress.refl ready.solved, ready, by simp⟩
+  case case26 =>
+    intros fuel context source sources expected expectedTypes initial
+      sourceInduction tailInduction
+    unfold InferConstructorArgumentsFuelInferenceProperties
+    intro ready validated canonical expectedTypesBelow result success
+    unfold inferConstructorArgumentsFuel at success
+    cases sourceResult : inferExprFuel fuel context source
+        (some (initial.resolve expected)) initial with
+    | error error =>
+        simp [sourceResult, bind, Except.bind] at success
+    | ok sourcePair =>
+        rcases sourcePair with ⟨inferred, sourceState⟩
+        simp only [sourceResult, bind, Except.bind] at success
+        cases tailResult : inferConstructorArgumentsFuel fuel context sources
+            expectedTypes sourceState with
+        | error error =>
+            simp [tailResult, bind, Except.bind] at success
+        | ok tailPair =>
+            rcases tailPair with ⟨tail, finalState⟩
+            simp only [tailResult, bind, Except.bind] at success
+            injection success with resultEq
+            subst result
+            have expectedBelow := expectedTypesBelow expected (by simp)
+            have sourceProperties := sourceInduction ready validated canonical
+              (by
+                intro expectedType member
+                simp at member
+                subst expectedType
+                exact ready.solved.variablesBelow_apply expectedBelow)
+              (inferred, sourceState) sourceResult
+            have tailExpectedBelow : ∀ expectedType ∈ expectedTypes,
+                expectedType.VariablesBelow sourceState.inference.next := by
+              intro expectedType member
+              exact (expectedTypesBelow expectedType (by simp [member])).weaken
+                sourceProperties.1.next_le
+            have tailProperties := tailInduction sourceState
+              sourceProperties.2.1 validated canonical tailExpectedBelow
+              (tail, finalState) tailResult
+            refine ⟨sourceProperties.1.trans tailProperties.1,
+              tailProperties.2.1, ?_⟩
+            intro expression member
+            rcases List.mem_cons.mp member with rfl | tailMember
+            · exact sourceProperties.2.2.weaken tailProperties.1.next_le
+            · exact tailProperties.2.2 expression tailMember
+  case case27 =>
+    simp_all [InferConstructorArgumentsFuelInferenceProperties,
+      inferConstructorArgumentsFuel]
+  case case28 =>
+    simp [InferStatementsFuelInferenceProperties, inferStatementsFuel]
+  case case29 =>
+    intros context expectedReturn initial fuel
+    unfold InferStatementsFuelInferenceProperties
+    intro ready _ _ _ result success
+    unfold inferStatementsFuel at success
+    injection success with resultEq
+    subst result
+    exact ⟨State.InferenceProgress.refl ready.solved, ready,
+      Ty.variablesBelow_constructor _ _⟩
+  case case30 =>
+    intros context expectedReturn initial fuel statement rest
+      statementInduction tailInduction
+    unfold InferStatementsFuelInferenceProperties
+    intro ready validated canonical returnBelow result success
+    unfold inferStatementsFuel at success
+    cases headResult : inferStatementFuel fuel context statement expectedReturn
+        initial with
+    | error error =>
+        simp [headResult, bind, Except.bind] at success
+    | ok head =>
+        simp only [headResult, bind, Except.bind] at success
+        have headProperties := statementInduction ready validated canonical
+          returnBelow head headResult
+        cases rest with
+        | nil =>
+            injection success with resultEq
+            rw [← resultEq]
+            refine ⟨headProperties.1, headProperties.2.1, ?_⟩
+            split
+            · exact headProperties.2.2
+            · exact Ty.variablesBelow_constructor _ _
+        | cons next remaining =>
+            cases tailResult : inferStatementsFuel fuel context
+                (next :: remaining) expectedReturn head.state with
+            | error error =>
+                simp [tailResult, bind, Except.bind] at success
+            | ok tail =>
+                simp only [tailResult, bind, Except.bind] at success
+                injection success with resultEq
+                rw [← resultEq]
+                have tailProperties := tailInduction head headProperties.2.1
+                  validated canonical
+                  (returnBelow.weaken headProperties.1.next_le) tail tailResult
+                refine ⟨headProperties.1.trans tailProperties.1,
+                  tailProperties.2.1, ?_⟩
+                split
+                · exact tailProperties.2.2
+                · split
+                  · exact headProperties.2.2.weaken
+                      tailProperties.1.next_le
+                  · exact tailProperties.2.2
+  case case31 =>
+    simp [InferStatementFuelInferenceProperties, inferStatementFuel]
+  case case32 =>
+    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel,
+      bind, Except.bind]
+  case case33 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq name sourceType statementEq
+    unfold InferStatementFuelInferenceProperties
+    intro ready _ _ _ result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases sourceTypeResult : resolveSourceType context sourceType with
+    | error error =>
+        simp [sourceTypeResult, bind, Except.bind] at success
+    | ok resolvedType =>
+        simp only [sourceTypeResult, bind, Except.bind, pure, Pure.pure,
+          Except.pure] at success
+        let binding :=
+          let locals := allocated.binderEnvironment.apply
+            allocated.inference.substitution
+          let valueType := allocated.resolve resolvedType
+          let generalized := generalizeValue allocated locals
+            allocated.nextRequirement valueType
+          (allocated.withLocals locals).allocateBinder name.value
+            generalized.scheme (some name.span) false generalized.requirements
+        have bindingProperties : allocated.InferenceProgress binding.2 ∧
+            binding.2.InferenceReady := by
+          simpa only [binding] using
+            generalizeValue_allocateBinder_inferenceProperties
+              (state := allocated)
+              (requirementStart := allocated.nextRequirement)
+              (valueType := resolvedType) (name := name.value)
+              (span := some name.span) allocationProperties.2
+              (resolveSourceType_success_variablesBelow sourceTypeResult _)
+        injection success with resultEq
+        rw [← resultEq]
+        refine ⟨allocationProperties.1.trans
+            (bindingProperties.1.trans
+              (State.InferenceProgress.recordNode _ _
+                bindingProperties.2.solved)),
+          State.InferenceReady.recordNode _ bindingProperties.2,
+          Ty.variablesBelow_constructor _ _⟩
+  case case34 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq name initializer statementEq initializerInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical _ result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases initializerResult : inferExprFuel fuel context initializer none
+        allocated with
+    | error error =>
+        simp [initializerResult, bind, Except.bind] at success
+    | ok initializerPair =>
+        rcases initializerPair with ⟨inferred, initializerState⟩
+        simp only [initializerResult, bind, Except.bind, Prod.eta, pure,
+          Pure.pure, Except.pure] at success
+        have initializerProperties := initializerInduction
+          allocationProperties.2 validated canonical (by simp)
+          (inferred, initializerState) initializerResult
+        let binding :=
+          let locals := initializerState.binderEnvironment.apply
+            initializerState.inference.substitution
+          let valueType := initializerState.resolve inferred.type
+          let generalized := generalizeValue initializerState locals
+            allocated.nextRequirement valueType
+          (initializerState.withLocals locals).allocateBinder name.value
+            generalized.scheme (some name.span) false generalized.requirements
+        have bindingProperties :
+            initializerState.InferenceProgress binding.2 ∧
+              binding.2.InferenceReady := by
+          simpa only [binding] using
+            generalizeValue_allocateBinder_inferenceProperties
+              (state := initializerState)
+              (requirementStart := allocated.nextRequirement)
+              (valueType := inferred.type) (name := name.value)
+              (span := some name.span) initializerProperties.2.1
+              initializerProperties.2.2
+        injection success with resultEq
+        rw [← resultEq]
+        refine ⟨allocationProperties.1.trans
+            (initializerProperties.1.trans
+              (bindingProperties.1.trans
+                (State.InferenceProgress.recordNode _ _
+                  bindingProperties.2.solved))),
+          State.InferenceReady.recordNode _ bindingProperties.2,
+          Ty.variablesBelow_constructor _ _⟩
+  case case35 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq name sourceType initializer statementEq
+      initializerInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical _ result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases sourceTypeResult : resolveSourceType context sourceType with
+    | error error =>
+        simp [sourceTypeResult, bind, Except.bind] at success
+    | ok resolvedType =>
+        simp only [sourceTypeResult, bind, Except.bind] at success
+        have resolvedTypeBelow :
+            resolvedType.VariablesBelow allocated.inference.next :=
+          resolveSourceType_success_variablesBelow sourceTypeResult _
+        cases initializerResult : inferExprFuel fuel context initializer
+            (some resolvedType) allocated with
+        | error error =>
+            simp [initializerResult, bind, Except.bind] at success
+        | ok initializerPair =>
+            rcases initializerPair with ⟨inferred, initializerState⟩
+            simp only [initializerResult, bind, Except.bind, Prod.eta, pure,
+              Pure.pure, Except.pure] at success
+            have initializerProperties := initializerInduction resolvedType
+              allocationProperties.2 validated canonical
+              (by
+                intro expectedType member
+                simp only [Option.mem_def] at member
+                injection member with typeEq
+                subst expectedType
+                exact resolvedTypeBelow)
+              (inferred, initializerState) initializerResult
+            let binding :=
+              let locals := initializerState.binderEnvironment.apply
+                initializerState.inference.substitution
+              let valueType := initializerState.resolve inferred.type
+              let generalized := generalizeValue initializerState locals
+                allocated.nextRequirement valueType
+              (initializerState.withLocals locals).allocateBinder name.value
+                generalized.scheme (some name.span) false
+                generalized.requirements
+            have bindingProperties :
+                initializerState.InferenceProgress binding.2 ∧
+                  binding.2.InferenceReady := by
+              simpa only [binding] using
+                generalizeValue_allocateBinder_inferenceProperties
+                  (state := initializerState)
+                  (requirementStart := allocated.nextRequirement)
+                  (valueType := inferred.type) (name := name.value)
+                  (span := some name.span) initializerProperties.2.1
+                  initializerProperties.2.2
+            injection success with resultEq
+            rw [← resultEq]
+            refine ⟨allocationProperties.1.trans
+                (initializerProperties.1.trans
+                  (bindingProperties.1.trans
+                    (State.InferenceProgress.recordNode _ _
+                      bindingProperties.2.solved))),
+              State.InferenceReady.recordNode _ bindingProperties.2,
+              Ty.variablesBelow_constructor _ _⟩
+  case case36 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq statementEq
+    unfold InferStatementFuelInferenceProperties
+    intro ready _ _ returnBelow result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    have returnAtAllocated :=
+      returnBelow.weaken allocationProperties.1.next_le
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases unifyResult : unify allocated .unit expectedReturn with
+    | error error =>
+        simp [unifyResult, bind, Except.bind] at success
+    | ok unifiedState =>
+        simp only [unifyResult, bind, Except.bind, pure, Pure.pure,
+          Except.pure] at success
+        have unifyProgress := unify_inferenceProgress
+          allocationProperties.2.solved (Ty.variablesBelow_constructor _ _)
+          returnAtAllocated unifyResult
+        have unifiedReady := unify_preserves_inferenceReady
+          allocationProperties.2 (Ty.variablesBelow_constructor _ _)
+          returnAtAllocated unifyResult
+        have throughUnify := allocationProperties.1.trans unifyProgress
+        have resultTypeBelow :=
+          throughUnify.resolve_variablesBelow returnBelow
+        injection success with resultEq
+        rw [← resultEq]
+        refine ⟨throughUnify.trans
+            (State.InferenceProgress.recordNode _ _ unifiedReady.solved),
+          State.InferenceReady.recordNode _ unifiedReady, resultTypeBelow⟩
+  case case37 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq value statementEq valueInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical returnBelow result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    have returnAtAllocated :=
+      returnBelow.weaken allocationProperties.1.next_le
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases valueResult : inferExprFuel fuel context value
+        (some expectedReturn) allocated with
+    | error error =>
+        simp [valueResult, bind, Except.bind] at success
+    | ok valuePair =>
+        rcases valuePair with ⟨inferred, valueState⟩
+        simp only [valueResult, bind, Except.bind, Prod.eta, pure, Pure.pure,
+          Except.pure] at success
+        have valueProperties := valueInduction allocationProperties.2
+          validated canonical
+          (by
+            intro expectedType member
+            simp only [Option.mem_def] at member
+            injection member with typeEq
+            subst expectedType
+            exact returnAtAllocated)
+          (inferred, valueState) valueResult
+        have prefixProgress :=
+          allocationProperties.1.trans valueProperties.1
+        have resultTypeBelow :=
+          prefixProgress.resolve_variablesBelow returnBelow
+        injection success with resultEq
+        rw [← resultEq]
+        refine ⟨prefixProgress.trans
+            (State.InferenceProgress.recordNode _ _
+              valueProperties.2.1.solved),
+          State.InferenceReady.recordNode _ valueProperties.2.1,
+          resultTypeBelow⟩
+  case case38 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq expression trailingSemicolon statementEq
+      expressionInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical _ result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases expressionResult : inferExprFuel fuel context expression none
+        allocated with
+    | error error =>
+        simp [expressionResult, bind, Except.bind] at success
+    | ok expressionPair =>
+        rcases expressionPair with ⟨inferred, expressionState⟩
+        simp only [expressionResult, bind, Except.bind, Prod.eta, pure,
+          Pure.pure, Except.pure] at success
+        have expressionProperties := expressionInduction
+          allocationProperties.2 validated canonical (by simp)
+          (inferred, expressionState) expressionResult
+        have prefixProgress :=
+          allocationProperties.1.trans expressionProperties.1
+        injection success with resultEq
+        rw [← resultEq]
+        refine ⟨prefixProgress.trans
+            (State.InferenceProgress.recordNode _ _
+              expressionProperties.2.1.solved),
+          State.InferenceReady.recordNode _ expressionProperties.2.1, ?_⟩
+        split
+        · exact Ty.variablesBelow_constructor _ _
+        · exact expressionProperties.2.2
+  case case39 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq condition thenBody elseBody statementEq
+      conditionInduction thenInduction elseInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical returnBelow result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases conditionResult : inferExprFuel fuel context condition (some .bool)
+        allocated with
+    | error error =>
+        simp [conditionResult, bind, Except.bind] at success
+    | ok conditionPair =>
+        rcases conditionPair with ⟨inferredCondition, conditionState⟩
+        simp only [conditionResult, bind, Except.bind, Prod.eta] at success
+        have conditionProperties := conditionInduction allocationProperties.2
+          validated canonical
+          (by
+            intro expectedType member
+            simp only [Option.mem_def] at member
+            injection member with typeEq
+            subst expectedType
+            exact Ty.variablesBelow_constructor _ _)
+          (inferredCondition, conditionState) conditionResult
+        have throughCondition :=
+          allocationProperties.1.trans conditionProperties.1
+        cases thenResultEq : inferStatementsFuel fuel context thenBody.value
+            expectedReturn conditionState with
+        | error error =>
+            simp [thenResultEq, bind, Except.bind] at success
+        | ok thenResult =>
+            simp only [thenResultEq, bind, Except.bind] at success
+            have thenProperties := thenInduction conditionState
+              conditionProperties.2.1 validated canonical
+              (returnBelow.weaken throughCondition.next_le) thenResult
+              thenResultEq
+            let afterThen := thenResult.state.restoreLexicalScope
+              conditionState.lexicalScope
+            have restoredThen :
+                conditionState.InferenceProgress afterThen ∧
+                  afterThen.InferenceReady := by
+              simpa only [afterThen] using
+                State.restoreLexicalScope_inferenceProperties
+                  conditionProperties.2.1 thenProperties.1
+            cases elseBody with
+            | none =>
+                simp only [afterThen, pure, Pure.pure, Except.pure] at success
+                injection success with resultEq
+                rw [← resultEq]
+                refine ⟨throughCondition.trans
+                    (restoredThen.1.trans
+                      (State.InferenceProgress.recordNode _ _
+                        restoredThen.2.solved)),
+                  State.InferenceReady.recordNode _ restoredThen.2,
+                  Ty.variablesBelow_constructor _ _⟩
+            | some elseBody =>
+                cases elseResultEq : inferStatementsFuel fuel context
+                    elseBody.value expectedReturn afterThen with
+                | error error =>
+                    simp [afterThen, elseResultEq, bind, Except.bind]
+                      at success
+                | ok elseResult =>
+                    simp only [afterThen, elseResultEq, bind, Except.bind,
+                      pure, Pure.pure, Except.pure] at success
+                    have elseProperties := elseInduction conditionState
+                      thenResult elseBody restoredThen.2 validated canonical
+                      (returnBelow.weaken
+                        (throughCondition.trans restoredThen.1).next_le)
+                      elseResult elseResultEq
+                    have restoredElse :=
+                      State.restoreLexicalScope_inferenceProperties
+                        conditionProperties.2.1
+                        (restoredThen.1.trans elseProperties.1)
+                    have throughElse :=
+                      throughCondition.trans restoredElse.1
+                    injection success with resultEq
+                    rw [← resultEq]
+                    refine ⟨throughElse.trans
+                        (State.InferenceProgress.recordNode _ _
+                          restoredElse.2.solved),
+                      State.InferenceReady.recordNode _ restoredElse.2, ?_⟩
+                    split
+                    · exact throughElse.resolve_variablesBelow returnBelow
+                    · exact Ty.variablesBelow_constructor _ _
+  case case40 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq body statementEq bodyInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical returnBelow result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases bodyResultEq : inferStatementsFuel fuel context body expectedReturn
+        allocated with
+    | error error =>
+        simp [bodyResultEq, bind, Except.bind] at success
+    | ok bodyResult =>
+        simp only [bodyResultEq, bind, Except.bind, pure, Pure.pure,
+          Except.pure] at success
+        have bodyProperties := bodyInduction allocationProperties.2 validated
+          canonical (returnBelow.weaken allocationProperties.1.next_le)
+          bodyResult bodyResultEq
+        have restoredBody :=
+          State.restoreLexicalScope_inferenceProperties allocationProperties.2
+            bodyProperties.1
+        injection success with resultEq
+        rw [← resultEq]
+        refine ⟨allocationProperties.1.trans
+            (restoredBody.1.trans
+              (State.InferenceProgress.recordNode _ _
+                restoredBody.2.solved)),
+          State.InferenceReady.recordNode _ restoredBody.2,
+          bodyProperties.2.2⟩
+  case case41 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq target operator value statementEq assignmentInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical _ result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases assignmentResult : inferAssignedValueFuel fuel context target
+        operator.value value allocated with
+    | error error =>
+        simp [assignmentResult, bind, Except.bind] at success
+    | ok assignmentTriple =>
+        rcases assignmentTriple with
+          ⟨assignment, inferredValue, assignmentState⟩
+        simp only [assignmentResult, bind, Except.bind, Prod.eta, pure,
+          Pure.pure, Except.pure] at success
+        have assignmentProperties := assignmentInduction
+          allocationProperties.2 validated canonical
+          (assignment, inferredValue, assignmentState) assignmentResult
+        injection success with resultEq
+        rw [← resultEq]
+        refine ⟨allocationProperties.1.trans
+            (assignmentProperties.1.trans
+              (State.InferenceProgress.recordNode _ _
+                assignmentProperties.2.1.solved)),
+          State.InferenceReady.recordNode _ assignmentProperties.2.1,
+          Ty.variablesBelow_constructor _ _⟩
+  case case42 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq target operator statementEq placeInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical _ result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases placeResult : inferPlaceFuel fuel context target allocated with
+    | error error =>
+        simp [placeResult, bind, Except.bind] at success
+    | ok placePair =>
+        rcases placePair with ⟨inferredTarget, placeState⟩
+        simp only [placeResult, bind, Except.bind, Prod.eta] at success
+        have placeProperties := placeInduction allocationProperties.2
+          validated canonical (inferredTarget, placeState) placeResult
+        cases unifyResult : unify placeState inferredTarget.type .word with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at success
+        | ok unifiedState =>
+            simp only [unifyResult, bind, Except.bind, pure, Pure.pure,
+              Except.pure] at success
+            have unifyProgress := unify_inferenceProgress
+              placeProperties.2.1.solved placeProperties.2.2
+              (Ty.variablesBelow_constructor _ _) unifyResult
+            have unifiedReady := unify_preserves_inferenceReady
+              placeProperties.2.1 placeProperties.2.2
+              (Ty.variablesBelow_constructor _ _) unifyResult
+            injection success with resultEq
+            rw [← resultEq]
+            refine ⟨allocationProperties.1.trans
+                (placeProperties.1.trans
+                  (unifyProgress.trans
+                    (State.InferenceProgress.recordNode _ _
+                      unifiedReady.solved))),
+              State.InferenceReady.recordNode _ unifiedReady,
+              Ty.variablesBelow_constructor _ _⟩
+  case case15 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      keyword sourceParameters returnAnnotation body expressionEq bodyInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProgress : initial.InferenceProgress allocated := by
+      have progress :=
+        State.InferenceProgress.allocateExpressionId initial ready.solved
+      rw [allocationEq] at progress
+      exact progress
+    have allocatedReady : allocated.InferenceReady := by
+      have nextReady := State.InferenceReady.allocateExpressionId ready
+      rw [allocationEq] at nextReady
+      exact nextReady
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases parameterResult : bindLambdaParameters context
+        sourceParameters.elements 0 [] allocated with
+    | error error =>
+        simp [parameterResult, bind, Except.bind] at success
+    | ok parameterTriple =>
+        rcases parameterTriple with
+          ⟨boundParameters, parameterTypes, parameterState⟩
+        simp only [parameterResult, bind, Except.bind] at success
+        have parameterProperties :=
+          bindLambdaParameters_inferenceProperties allocatedReady
+            parameterResult
+        have parameterProgress :
+            allocated.InferenceProgress parameterState :=
+          parameterProperties.1
+        have parameterReady : parameterState.InferenceReady :=
+          parameterProperties.2.1
+        let parameterType := Ty.productMany parameterTypes
+        have parameterTypeBelow : parameterType.VariablesBelow
+            parameterState.inference.next := by
+          exact Ty.variablesBelow_productMany parameterProperties.2.2
+        let expectedParts := expected.bind fun type =>
+          functionParts? (parameterState.resolve type)
+        have parameterTypeEq :
+            Ty.productMany parameterTypes = parameterType := rfl
+        rw [parameterTypeEq] at success
+        have expectedPartsEq :
+            (expected.bind fun type =>
+              functionParts? (parameterState.resolve type)) =
+              expectedParts := rfl
+        rw [expectedPartsEq] at success
+        have expectedPartsBelow {expectedParameter expectedResult : Ty}
+            (partsEq : expectedParts =
+              some (expectedParameter, expectedResult)) :
+            expectedParameter.VariablesBelow parameterState.inference.next ∧
+              expectedResult.VariablesBelow
+                parameterState.inference.next := by
+          unfold expectedParts at partsEq
+          simp only [Option.bind_eq_some_iff] at partsEq
+          obtain ⟨expectedType, expectedEq, typePartsEq⟩ := partsEq
+          have expectedAtParameter : expectedType.VariablesBelow
+              parameterState.inference.next :=
+            (expectedBelow expectedType (by simp [expectedEq])).weaken
+              (allocationProgress.trans parameterProgress).next_le
+          have resolvedExpectedBelow :
+              (parameterState.resolve expectedType).VariablesBelow
+                parameterState.inference.next :=
+            parameterReady.solved.variablesBelow_apply expectedAtParameter
+          exact functionParts?_success_variablesBelow resolvedExpectedBelow
+            typePartsEq
+        have finishBody (fittedState : State)
+            (fitProgress : parameterState.InferenceProgress fittedState)
+            (fittedReady : fittedState.InferenceReady)
+            (resultType : Ty) (resultState : State)
+            (resultProgress : fittedState.InferenceProgress resultState)
+            (resultReady : resultState.InferenceReady)
+            (resultTypeBelow : resultType.VariablesBelow
+              resultState.inference.next)
+            (tailSuccess :
+              (do
+                let lambdaContext := { context with loopDepth := 0 }
+                let bodyResult ← inferStatementsFuel fuel lambdaContext
+                  body.value resultType resultState
+                let next ← unify bodyResult.state bodyResult.type resultType
+                let next := next.restoreLexicalScope allocated.lexicalScope
+                recordExpressionWithExpected context expression id
+                  (.function (next.resolve parameterType)
+                    (next.resolve resultType))
+                  (.lambda boundParameters (next.resolve resultType)
+                    bodyResult.statements) [] expected next) = .ok result) :
+            initial.InferenceProgress result.2 ∧
+              result.2.InferenceReady ∧
+              result.1.type.VariablesBelow result.2.inference.next := by
+          let lambdaContext := { context with loopDepth := 0 }
+          have lambdaValidated : ProgramSignatureFormationValidated
+              lambdaContext.signatures := by
+            simpa only [lambdaContext] using validated
+          have lambdaCanonical : FunctionSchemesCanonical lambdaContext := by
+            intro signature member
+            exact canonical signature member
+          cases bodyResult : inferStatementsFuel fuel lambdaContext body.value
+              resultType resultState with
+          | error error =>
+              simp [lambdaContext, bodyResult, bind, Except.bind]
+                at tailSuccess
+          | ok inferredBody =>
+              simp only [lambdaContext, bodyResult, bind, Except.bind]
+                at tailSuccess
+              have bodyProperties := bodyInduction resultType resultState
+                resultReady lambdaValidated lambdaCanonical resultTypeBelow
+                inferredBody bodyResult
+              have resultAtBody : resultType.VariablesBelow
+                  inferredBody.state.inference.next :=
+                resultTypeBelow.weaken bodyProperties.1.next_le
+              cases unifiedResult : unify inferredBody.state
+                  inferredBody.type resultType with
+              | error error =>
+                  simp [unifiedResult, bind, Except.bind] at tailSuccess
+              | ok unifiedState =>
+                  simp only [unifiedResult, bind, Except.bind] at tailSuccess
+                  have unifiedProgress := unify_inferenceProgress
+                    bodyProperties.2.1.solved bodyProperties.2.2
+                    resultAtBody unifiedResult
+                  have unifiedReady := unify_preserves_inferenceReady
+                    bodyProperties.2.1 bodyProperties.2.2 resultAtBody
+                    unifiedResult
+                  let restoredState := unifiedState.restoreLexicalScope
+                    allocated.lexicalScope
+                  have throughUnified :
+                      allocated.InferenceProgress unifiedState :=
+                    parameterProgress.trans
+                      (fitProgress.trans
+                        (resultProgress.trans
+                          (bodyProperties.1.trans unifiedProgress)))
+                  have restoredProperties :
+                      allocated.InferenceProgress restoredState ∧
+                        restoredState.InferenceReady := by
+                    simpa only [restoredState] using
+                      State.restoreLexicalScope_inferenceProperties
+                        allocatedReady throughUnified
+                  have restoreStep :
+                      unifiedState.InferenceProgress restoredState := by
+                    simpa only [restoredState] using
+                      State.InferenceProgress.restoreLexicalScope unifiedState
+                        allocated.lexicalScope unifiedReady.solved
+                  have parameterToRestored :
+                      parameterState.InferenceProgress restoredState :=
+                    fitProgress.trans
+                      (resultProgress.trans
+                        (bodyProperties.1.trans
+                          (unifiedProgress.trans restoreStep)))
+                  have resultToRestored :
+                      resultState.InferenceProgress restoredState :=
+                    bodyProperties.1.trans
+                      (unifiedProgress.trans restoreStep)
+                  have resolvedParameterBelow :
+                      (restoredState.resolve parameterType).VariablesBelow
+                        restoredState.inference.next :=
+                    parameterToRestored.resolve_variablesBelow
+                      parameterTypeBelow
+                  have resolvedResultBelow :
+                      (restoredState.resolve resultType).VariablesBelow
+                        restoredState.inference.next :=
+                    resultToRestored.resolve_variablesBelow resultTypeBelow
+                  have functionBelow :
+                      (Ty.function (restoredState.resolve parameterType)
+                        (restoredState.resolve resultType)).VariablesBelow
+                          restoredState.inference.next :=
+                    (Ty.variablesBelow_function_iff _ _ _).2
+                      ⟨resolvedParameterBelow, resolvedResultBelow⟩
+                  have prefixProgress :
+                      initial.InferenceProgress restoredState :=
+                    allocationProgress.trans restoredProperties.1
+                  have expectedAtRestored : ∀ expectedType ∈ expected,
+                      expectedType.VariablesBelow
+                        restoredState.inference.next := by
+                    intro expectedType member
+                    exact (expectedBelow expectedType member).weaken
+                      prefixProgress.next_le
+                  have recordSuccess :
+                      recordExpressionWithExpected context expression id
+                        (.function (restoredState.resolve parameterType)
+                          (restoredState.resolve resultType))
+                        (.lambda boundParameters
+                          (restoredState.resolve resultType)
+                          inferredBody.statements)
+                        [] expected restoredState = .ok result := by
+                    simpa only [restoredState] using tailSuccess
+                  have recordedProperties :=
+                    recordExpressionWithExpected_inferenceProperties
+                      restoredProperties.2 functionBelow expectedAtRestored
+                      recordSuccess
+                  exact ⟨prefixProgress.trans recordedProperties.1,
+                    recordedProperties.2⟩
+        cases partsEq : expectedParts with
+        | none =>
+            simp only [partsEq, bind, Except.bind, pure, Pure.pure,
+              Except.pure] at success
+            cases returnAnnotation with
+            | some sourceType =>
+                cases annotationResult : resolveSourceType context sourceType with
+                | error error =>
+                    simp [annotationResult, bind, Except.bind] at success
+                | ok annotatedType =>
+                    simp only [annotationResult, bind, Except.bind, pure,
+                      Pure.pure, Except.pure, Prod.eta] at success
+                    exact finishBody parameterState
+                      (State.InferenceProgress.refl parameterReady.solved)
+                      parameterReady annotatedType parameterState
+                      (State.InferenceProgress.refl parameterReady.solved)
+                      parameterReady
+                      (resolveSourceType_success_variablesBelow
+                        annotationResult _)
+                      success
+            | none =>
+                simp only [partsEq, bind, Except.bind, pure, Pure.pure,
+                  Except.pure, Prod.eta] at success
+                have freshProgress :=
+                  State.InferenceProgress.fresh parameterState
+                    parameterReady.solved
+                have freshReady := State.InferenceReady.fresh parameterReady
+                have freshBelow :
+                    parameterState.fresh.1.VariablesBelow
+                      parameterState.fresh.2.inference.next := by
+                  change Ty.VariablesBelow (parameterState.inference.next + 1)
+                    (.variable ⟨parameterState.inference.next⟩)
+                  exact (Ty.variablesBelow_variable_iff _ _).2
+                    (Nat.lt_succ_self _)
+                exact finishBody parameterState
+                  (State.InferenceProgress.refl parameterReady.solved)
+                  parameterReady parameterState.fresh.1
+                  parameterState.fresh.2 freshProgress freshReady freshBelow
+                  success
+        | some parts =>
+            rcases parts with ⟨expectedParameter, expectedResult⟩
+            simp only [partsEq, bind, Except.bind] at success
+            cases unifiedResult : unify parameterState parameterType
+                expectedParameter with
+            | error error =>
+                simp [unifiedResult, bind, Except.bind] at success
+            | ok fittedState =>
+                simp only [unifiedResult, bind, Except.bind] at success
+                have partsBelow := expectedPartsBelow partsEq
+                have fitProgress := unify_inferenceProgress
+                  parameterReady.solved parameterTypeBelow partsBelow.1
+                  unifiedResult
+                have fittedReady := unify_preserves_inferenceReady
+                  parameterReady parameterTypeBelow partsBelow.1 unifiedResult
+                cases returnAnnotation with
+                | some sourceType =>
+                    cases annotationResult : resolveSourceType context sourceType with
+                    | error error =>
+                        simp [annotationResult, bind, Except.bind] at success
+                    | ok annotatedType =>
+                        simp only [annotationResult, bind, Except.bind, pure,
+                          Pure.pure, Except.pure, Prod.eta] at success
+                        exact finishBody fittedState fitProgress fittedReady
+                          annotatedType fittedState
+                          (State.InferenceProgress.refl fittedReady.solved)
+                          fittedReady
+                          (resolveSourceType_success_variablesBelow
+                            annotationResult _)
+                          success
+                | none =>
+                    simp only [partsEq, bind, Except.bind, pure, Pure.pure,
+                      Except.pure, Prod.eta] at success
+                    exact finishBody fittedState fitProgress fittedReady
+                      expectedResult fittedState
+                      (State.InferenceProgress.refl fittedReady.solved)
+                      fittedReady
+                      (partsBelow.2.weaken fitProgress.next_le)
+                      success
+  case case16 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      callee sourceArguments expressionEq constructorInduction
+      argumentsInduction calleeInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have expectedAtAllocated : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow allocated.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken
+        allocationProperties.1.next_le
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases candidatesResult :
+        constructorCalleeCandidates context allocated callee with
+    | error error =>
+        simp [candidatesResult, bind, Except.bind] at success
+    | ok candidates =>
+        simp only [candidatesResult, bind, Except.bind] at success
+        cases candidates with
+        | cons candidate rest =>
+            cases rest with
+            | cons second tail =>
+                simp at success
+            | nil =>
+                rcases candidate with ⟨dataType, constructor⟩
+                let freshResult :=
+                  freshDataConstructorInstantiation dataType constructor
+                    allocated
+                have candidateFacts :=
+                  constructorCalleeCandidates_success_members candidatesResult
+                    dataType constructor (by simp)
+                have payloadTypesBelow :=
+                  validated.data_constructor_payloadTypes_variablesBelow
+                    candidateFacts.1 candidateFacts.2
+                    allocated.inference.next
+                have freshProperties :=
+                  freshDataConstructorInstantiation_inferenceProperties
+                    dataType constructor allocated allocationProperties.2
+                    payloadTypesBelow
+                have constructorProperties := constructorInduction
+                  freshResult.1 freshResult.2 freshProperties.2.1 validated
+                  canonical freshProperties.2.2.2.1 freshProperties.2.2.2.2
+                  (by
+                    intro expectedType member
+                    exact (expectedAtAllocated expectedType member).weaken
+                      freshProperties.1.next_le)
+                  result
+                  (by
+                    simpa only [freshResult] using success)
+                exact ⟨allocationProperties.1.trans
+                    (freshProperties.1.trans constructorProperties.1),
+                  constructorProperties.2⟩
+        | nil =>
+            simp only [bind, Except.bind] at success
+            split at success
+            · cases success
+            · next _ missing _ =>
+              cases missing with
+              | some missing =>
+                  rcases missing with ⟨qualifiers, name⟩
+                  simp at success
+              | none =>
+                cases argumentsResult : inferExprsFuel fuel context
+                    sourceArguments.elements allocated with
+                | error error =>
+                    simp [argumentsResult, bind, Except.bind] at success
+                | ok argumentsPair =>
+                    rcases argumentsPair with ⟨arguments, argumentState⟩
+                    simp only [argumentsResult, bind, Except.bind,
+                      Prod.eta] at success
+                    have argumentsProperties := argumentsInduction
+                      allocationProperties.2 validated canonical
+                      (arguments, argumentState) argumentsResult
+                    have prefixProgress := allocationProperties.1.trans
+                      argumentsProperties.1
+                    have expectedAtArguments : ∀ expectedType ∈ expected,
+                        expectedType.VariablesBelow
+                          argumentState.inference.next := by
+                      intro expectedType member
+                      exact (expectedBelow expectedType member).weaken
+                        prefixProgress.next_le
+                    have finishSelected
+                        (name : String)
+                        (candidates : List ProgramFunctionSignature)
+                        (subset : candidates ⊆ context.signatures.functions)
+                        (attempt : CandidateAttemptResult)
+                        (selectionSuccess :
+                          selectFunctionCandidateFrom context name candidates
+                            arguments
+                            (relevantIntegerLiterals argumentState
+                              allocated.integerLiterals.length arguments)
+                            id expected argumentState = .ok attempt)
+                        (resultEq :
+                          recordSelectedCall expression callee name arguments
+                            attempt = result) :
+                        initial.InferenceProgress result.2 ∧
+                          result.2.InferenceReady ∧
+                          result.1.type.VariablesBelow
+                            result.2.inference.next := by
+                      have selectedProperties :=
+                        selectFunctionCandidateFrom_inferenceProperties
+                          argumentsProperties.2.1
+                          argumentsProperties.2.2
+                          (functionCandidates_scheme_body_variablesBelow
+                            validated canonical subset _)
+                          expectedAtArguments selectionSuccess
+                      have recordedProperties :=
+                        recordSelectedCall_inferenceProperties expression
+                          callee name arguments attempt
+                          selectedProperties.2.1 selectedProperties.2.2
+                      rw [← resultEq]
+                      exact ⟨prefixProgress.trans
+                          (selectedProperties.1.trans recordedProperties.1),
+                        recordedProperties.2⟩
+                    have finishIndirect
+                        (calleeResult : InferredExpression)
+                        (calleeState : State)
+                        (calleeSuccess :
+                          inferExprFuel fuel context callee none argumentState =
+                            .ok (calleeResult, calleeState))
+                        (application : IndirectApplicationResult)
+                        (applicationSuccess :
+                          applyFunctionType context id calleeResult.type
+                            arguments expected calleeState = .ok application)
+                        (resultEq :
+                          recordIndirectCall expression calleeResult arguments
+                            application = result) :
+                        initial.InferenceProgress result.2 ∧
+                          result.2.InferenceReady ∧
+                          result.1.type.VariablesBelow
+                            result.2.inference.next := by
+                      have calleeProperties := calleeInduction argumentState
+                        argumentsProperties.2.1 validated canonical (by simp)
+                        (calleeResult, calleeState) calleeSuccess
+                      have applicationProperties :=
+                        applyFunctionType_inferenceProperties
+                          calleeProperties.2.1 calleeProperties.2.2
+                          (by
+                            intro argument member
+                            exact (argumentsProperties.2.2 argument member).weaken
+                              calleeProperties.1.next_le)
+                          (by
+                            intro expectedType member
+                            exact (expectedAtArguments expectedType member).weaken
+                              calleeProperties.1.next_le)
+                          applicationSuccess
+                      have recordedProperties :=
+                        recordIndirectCall_inferenceProperties expression
+                          calleeResult arguments application
+                          applicationProperties.2.1 applicationProperties.2.2
+                      rw [← resultEq]
+                      exact ⟨prefixProgress.trans
+                          (calleeProperties.1.trans
+                            (applicationProperties.1.trans
+                              recordedProperties.1)),
+                        recordedProperties.2⟩
+                    cases qualifiedEq : calleeQualifiedIdentifier? callee with
+                    | some qualified =>
+                        rcases qualified with ⟨namespacePath, name⟩
+                        simp only [qualifiedEq] at success
+                        cases binderEq :
+                            argumentState.lookupBinder? namespacePath.head! with
+                        | some binder =>
+                            simp only [binderEq] at success
+                            cases calleeResult : inferExprFuel fuel context callee
+                                none argumentState with
+                            | error error =>
+                                simp [calleeResult, bind, Except.bind] at success
+                            | ok calleePair =>
+                                rcases calleePair with
+                                  ⟨inferredCallee, calleeState⟩
+                                simp only [calleeResult, bind, Except.bind,
+                                  Prod.eta] at success
+                                cases applicationResult : applyFunctionType
+                                    context id inferredCallee.type arguments
+                                    expected calleeState with
+                                | error error =>
+                                    simp [applicationResult, bind, Except.bind]
+                                      at success
+                                | ok application =>
+                                    simp only [applicationResult, bind,
+                                      Except.bind, pure, Pure.pure, Except.pure]
+                                      at success
+                                    injection success with resultEq
+                                    exact finishIndirect inferredCallee
+                                      calleeState calleeResult application
+                                      applicationResult resultEq
+                        | none =>
+                            simp only [binderEq] at success
+                            cases functionsResult : qualifiedFunctionsNamed
+                                context namespacePath name with
+                            | error error =>
+                                simp [functionsResult, bind, Except.bind]
+                                  at success
+                            | ok candidatesOption =>
+                                simp only [functionsResult, bind, Except.bind]
+                                  at success
+                                cases candidatesOption with
+                                | some candidates =>
+                                    cases selectionResult :
+                                        selectFunctionCandidateFrom context
+                                          (String.intercalate "."
+                                            (namespacePath ++ [name]))
+                                          candidates arguments
+                                          (relevantIntegerLiterals
+                                            argumentState
+                                            allocated.integerLiterals.length
+                                            arguments)
+                                          id expected argumentState with
+                                    | error error =>
+                                        simp [selectionResult, bind,
+                                          Except.bind] at success
+                                    | ok attempt =>
+                                        simp only [selectionResult, bind,
+                                          Except.bind, pure, Pure.pure,
+                                          Except.pure] at success
+                                        injection success with resultEq
+                                        exact finishSelected
+                                          (String.intercalate "."
+                                            (namespacePath ++ [name]))
+                                          candidates
+                                          (qualifiedFunctionsNamed_success_subset_catalog
+                                            functionsResult)
+                                          attempt selectionResult resultEq
+                                | none =>
+                                    cases calleeResult : inferExprFuel fuel
+                                        context callee none argumentState with
+                                    | error error =>
+                                        simp [calleeResult, bind, Except.bind]
+                                          at success
+                                    | ok calleePair =>
+                                        rcases calleePair with
+                                          ⟨inferredCallee, calleeState⟩
+                                        simp only [calleeResult, bind,
+                                          Except.bind, Prod.eta] at success
+                                        cases applicationResult :
+                                            applyFunctionType context id
+                                              inferredCallee.type arguments
+                                              expected calleeState with
+                                        | error error =>
+                                            simp [applicationResult, bind,
+                                              Except.bind] at success
+                                        | ok application =>
+                                            simp only [applicationResult, bind,
+                                              Except.bind, pure, Pure.pure,
+                                              Except.pure] at success
+                                            injection success with resultEq
+                                            exact finishIndirect inferredCallee
+                                              calleeState calleeResult
+                                              application applicationResult
+                                              resultEq
+                    | none =>
+                        simp only [qualifiedEq] at success
+                        cases identifierEq : calleeIdentifier? callee with
+                        | none =>
+                            simp only [identifierEq] at success
+                            cases calleeResult : inferExprFuel fuel context callee
+                                none argumentState with
+                            | error error =>
+                                simp [calleeResult, bind, Except.bind] at success
+                            | ok calleePair =>
+                                rcases calleePair with
+                                  ⟨inferredCallee, calleeState⟩
+                                simp only [calleeResult, bind, Except.bind,
+                                  Prod.eta] at success
+                                cases applicationResult : applyFunctionType
+                                    context id inferredCallee.type arguments
+                                    expected calleeState with
+                                | error error =>
+                                    simp [applicationResult, bind, Except.bind]
+                                      at success
+                                | ok application =>
+                                    simp only [applicationResult, bind,
+                                      Except.bind, pure, Pure.pure, Except.pure]
+                                      at success
+                                    injection success with resultEq
+                                    exact finishIndirect inferredCallee
+                                      calleeState calleeResult application
+                                      applicationResult resultEq
+                        | some name =>
+                            simp only [identifierEq] at success
+                            cases binderEq : argumentState.lookupBinder? name with
+                            | some binder =>
+                                simp only [binderEq] at success
+                                cases calleeResult : inferExprFuel fuel context
+                                    callee none argumentState with
+                                | error error =>
+                                    simp [calleeResult, bind, Except.bind]
+                                      at success
+                                | ok calleePair =>
+                                    rcases calleePair with
+                                      ⟨inferredCallee, calleeState⟩
+                                    simp only [calleeResult, bind, Except.bind,
+                                      Prod.eta] at success
+                                    cases applicationResult : applyFunctionType
+                                        context id inferredCallee.type arguments
+                                        expected calleeState with
+                                    | error error =>
+                                        simp [applicationResult, bind,
+                                          Except.bind] at success
+                                    | ok application =>
+                                        simp only [applicationResult, bind,
+                                          Except.bind, pure, Pure.pure,
+                                          Except.pure] at success
+                                        injection success with resultEq
+                                        exact finishIndirect inferredCallee
+                                          calleeState calleeResult application
+                                          applicationResult resultEq
+                            | none =>
+                                simp only [binderEq] at success
+                                cases functionsResult : functionsNamed context
+                                    name with
+                                | error error =>
+                                    simp [functionsResult, bind, Except.bind]
+                                      at success
+                                | ok candidates =>
+                                    simp only [functionsResult, bind,
+                                      Except.bind] at success
+                                    cases candidates with
+                                    | nil =>
+                                        cases builtinEq :
+                                            builtinFunctionNamed? name with
+                                        | none =>
+                                            simp [builtinEq] at success
+                                        | some function =>
+                                            simp only [builtinEq] at success
+                                            have builtinProperties :=
+                                              recordBuiltinFunctionCall_inferenceProperties
+                                                argumentsProperties.2.1
+                                                argumentsProperties.2.2
+                                                expectedAtArguments success
+                                            exact ⟨prefixProgress.trans
+                                                builtinProperties.1,
+                                              builtinProperties.2⟩
+                                    | cons candidate rest =>
+                                        cases selectionResult :
+                                            selectFunctionCandidateFrom context
+                                              name (candidate :: rest) arguments
+                                              (relevantIntegerLiterals
+                                                argumentState
+                                                allocated.integerLiterals.length
+                                                arguments)
+                                              id expected argumentState with
+                                        | error error =>
+                                            simp [selectionResult, bind,
+                                              Except.bind] at success
+                                        | ok attempt =>
+                                            simp only [selectionResult, bind,
+                                              Except.bind, pure, Pure.pure,
+                                              Except.pure] at success
+                                            injection success with resultEq
+                                            exact finishSelected name
+                                              (candidate :: rest)
+                                              (functionsNamed_success_subset_catalog
+                                                functionsResult)
+                                              attempt selectionResult resultEq
+  case case43 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq scrutinees arms statementEq sources source sourcesEq
+      casesInduction bodyInduction scrutineeInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical returnBelow result success
+    have allocationProgress : initial.InferenceProgress allocated := by
+      have progress :=
+        State.InferenceProgress.allocateStatementId initial ready.solved
+      rw [allocationEq] at progress
+      exact progress
+    have allocatedReady : allocated.InferenceReady := by
+      have nextReady := State.InferenceReady.allocateStatementId ready
+      rw [allocationEq] at nextReady
+      exact nextReady
+    unfold inferStatementFuel at success
+    have rawSourcesEq : scrutinees.elements.toList = [source] := by
+      simpa only [sources] using sourcesEq
+    simp only [allocationEq, statementEq, rawSourcesEq, bind, Except.bind]
+      at success
+    cases scrutineeResult :
+        inferExprFuel fuel context source none allocated with
+    | error error =>
+        simp [scrutineeResult, bind, Except.bind] at success
+    | ok scrutineePair =>
+        rcases scrutineePair with ⟨scrutinee, scrutineeState⟩
+        try simp only [scrutineeResult, bind, Except.bind, Prod.eta] at success
+        have scrutineeProperties := scrutineeInduction allocatedReady
+          validated canonical (by simp) (scrutinee, scrutineeState)
+          scrutineeResult
+        let hiddenState := scrutineeState.allocateHiddenLocal.2
+        have hiddenProgress :
+            scrutineeState.InferenceProgress hiddenState := by
+          simpa only [hiddenState] using
+            State.InferenceProgress.allocateHiddenLocal scrutineeState
+              scrutineeProperties.2.1.solved
+        have hiddenReady : hiddenState.InferenceReady := by
+          simpa only [hiddenState] using
+            State.InferenceReady.allocateHiddenLocal scrutineeProperties.2.1
+        have throughHidden := allocationProgress.trans
+          (scrutineeProperties.1.trans hiddenProgress)
+        cases checkedResult : inferMatchCasesFuel fuel context scrutinee.type
+            expectedReturn hiddenState.lexicalScope arms.value.cases
+            hiddenState with
+        | error error =>
+            simp [hiddenState, checkedResult, bind, Except.bind] at success
+        | ok checked =>
+            simp only [hiddenState, checkedResult, bind, Except.bind]
+              at success
+            have casesProperties := casesInduction scrutinee hiddenState
+              hiddenReady validated canonical
+              (scrutineeProperties.2.2.weaken hiddenProgress.next_le)
+              (returnBelow.weaken throughHidden.next_le) rfl checked
+              checkedResult
+            have throughChecked := throughHidden.trans casesProperties.1
+            cases defaultEq : arms.value.defaultBody with
+            | none =>
+                simp only [defaultEq, bind, Except.bind, pure, Pure.pure,
+                  Except.pure] at success
+                split at success
+                · cases success
+                · injection success with resultEq
+                  rw [← resultEq]
+                  refine ⟨throughChecked.trans
+                      (State.InferenceProgress.recordNode _ _
+                        casesProperties.2.1.solved),
+                    State.InferenceReady.recordNode _ casesProperties.2.1,
+                    ?_⟩
+                  split
+                  · exact throughChecked.resolve_variablesBelow returnBelow
+                  · exact Ty.variablesBelow_constructor _ _
+            | some body =>
+                cases bodyResult : inferStatementsFuel fuel context body.value
+                    expectedReturn checked.state with
+                | error error =>
+                    simp [defaultEq, bodyResult, bind, Except.bind] at success
+                | ok inferred =>
+                    simp only [defaultEq, bodyResult, bind, Except.bind,
+                      Prod.eta, pure, Pure.pure, Except.pure] at success
+                    have bodyProperties := bodyInduction checked body
+                      casesProperties.2.1 validated canonical
+                      (returnBelow.weaken throughChecked.next_le) inferred
+                      bodyResult
+                    have restoredProperties :=
+                      State.restoreLexicalScope_inferenceProperties
+                        casesProperties.2.1 bodyProperties.1
+                    rw [casesProperties.2.2] at restoredProperties
+                    have throughDefault :=
+                      throughChecked.trans restoredProperties.1
+                    split at success
+                    · cases success
+                    · injection success with resultEq
+                      rw [← resultEq]
+                      refine ⟨throughDefault.trans
+                          (State.InferenceProgress.recordNode _ _
+                            restoredProperties.2.solved),
+                        State.InferenceReady.recordNode _
+                          restoredProperties.2, ?_⟩
+                      split
+                      · exact throughDefault.resolve_variablesBelow returnBelow
+                      · exact Ty.variablesBelow_constructor _ _
+  case case44 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq scrutinees arms statementEq sources notSingleton
+      casesInduction bodyInduction expressionsInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical returnBelow result success
+    have allocationProgress : initial.InferenceProgress allocated := by
+      have progress :=
+        State.InferenceProgress.allocateStatementId initial ready.solved
+      rw [allocationEq] at progress
+      exact progress
+    have allocatedReady : allocated.InferenceReady := by
+      have nextReady := State.InferenceReady.allocateStatementId ready
+      rw [allocationEq] at nextReady
+      exact nextReady
+    have sourceDispatch :
+        (match sources with
+        | [source] => inferExprFuel fuel context source none allocated
+        | sources => do
+            let (elements, state) ←
+              inferExprsFuel fuel context sources allocated
+            let (tupleId, state) := state.allocateExpressionId
+            let type := Ty.productMany
+              (elements.map (fun element : InferredExpression => element.type))
+            let state := state.recordNode (.expression {
+              id := tupleId
+              span := statement.span
+              type
+              form := .tuple
+                (elements.map (fun element : InferredExpression => element.id))
+            })
+            pure ({ id := tupleId, type }, state)) =
+          (do
+            let (elements, state) ←
+              inferExprsFuel fuel context sources allocated
+            let (tupleId, state) := state.allocateExpressionId
+            let type := Ty.productMany
+              (elements.map (fun element : InferredExpression => element.type))
+            let state := state.recordNode (.expression {
+              id := tupleId
+              span := statement.span
+              type
+              form := .tuple
+                (elements.map (fun element : InferredExpression => element.id))
+            })
+            pure ({ id := tupleId, type }, state)) := by
+      cases sourcesEq : sources with
+      | nil => simp only [sourcesEq]
+      | cons first rest =>
+          cases rest with
+          | nil =>
+              exact (notSingleton first (by simpa using sourcesEq)).elim
+          | cons second tail => simp only [sourcesEq]
+    unfold inferStatementFuel at success
+    have rawSourcesEq : scrutinees.elements.toList = sources := by
+      rfl
+    simp only [allocationEq, statementEq, rawSourcesEq, sourceDispatch, bind,
+      Except.bind] at success
+    cases expressionsResult : inferExprsFuel fuel context sources allocated with
+    | error error =>
+        simp [expressionsResult, bind, Except.bind] at success
+    | ok expressionsPair =>
+        rcases expressionsPair with ⟨elements, elementState⟩
+        simp only [expressionsResult, bind, Except.bind, Prod.eta, pure,
+          Pure.pure, Except.pure] at success
+        have expressionsProperties := expressionsInduction allocatedReady
+          validated canonical (elements, elementState) expressionsResult
+        let tupleResult : InferredExpression × State := ({
+            id := elementState.allocateExpressionId.fst
+            type := Ty.productMany (elements.map (·.type))
+          }, elementState.allocateExpressionId.snd.recordNode (.expression {
+            id := elementState.allocateExpressionId.fst
+            span := statement.span
+            type := Ty.productMany (elements.map (·.type))
+            form := .tuple (elements.map (·.id))
+          }))
+        have tupleProperties := syntheticTuple_result_inferenceProperties
+          (elements := elements) (span := statement.span)
+          (state := elementState) expressionsProperties.2.1
+          expressionsProperties.2.2
+          (result := tupleResult)
+          (by simp only [tupleResult, except_pure_eq_ok])
+        let hiddenState := tupleResult.2.allocateHiddenLocal.2
+        have hiddenProgress : tupleResult.2.InferenceProgress hiddenState := by
+          simpa only [hiddenState] using
+            State.InferenceProgress.allocateHiddenLocal tupleResult.2
+              tupleProperties.2.1.solved
+        have hiddenReady : hiddenState.InferenceReady := by
+          simpa only [hiddenState] using
+            State.InferenceReady.allocateHiddenLocal tupleProperties.2.1
+        have throughHidden := allocationProgress.trans
+          (expressionsProperties.1.trans
+            (tupleProperties.1.trans hiddenProgress))
+        cases checkedResult : inferMatchCasesFuel fuel context
+            tupleResult.1.type expectedReturn hiddenState.lexicalScope
+            arms.value.cases hiddenState with
+        | error error =>
+            rw [checkedResult] at success
+            simp at success
+        | ok checked =>
+            rw [checkedResult] at success
+            simp only [bind, Except.bind] at success
+            have casesProperties := casesInduction tupleResult.1 hiddenState
+              hiddenReady validated canonical
+              (tupleProperties.2.2.weaken hiddenProgress.next_le)
+              (returnBelow.weaken throughHidden.next_le) rfl checked
+              checkedResult
+            have throughChecked := throughHidden.trans casesProperties.1
+            cases defaultEq : arms.value.defaultBody with
+            | none =>
+                simp only [defaultEq, bind, Except.bind, pure, Pure.pure,
+                  Except.pure] at success
+                split at success
+                · cases success
+                · injection success with resultEq
+                  rw [← resultEq]
+                  refine ⟨throughChecked.trans
+                      (State.InferenceProgress.recordNode _ _
+                        casesProperties.2.1.solved),
+                    State.InferenceReady.recordNode _ casesProperties.2.1,
+                    ?_⟩
+                  split
+                  · exact throughChecked.resolve_variablesBelow returnBelow
+                  · exact Ty.variablesBelow_constructor _ _
+            | some body =>
+                cases bodyResult : inferStatementsFuel fuel context body.value
+                    expectedReturn checked.state with
+                | error error =>
+                    simp [defaultEq, bodyResult, bind, Except.bind] at success
+                | ok inferred =>
+                    simp only [defaultEq, bodyResult, bind, Except.bind,
+                      Prod.eta, pure, Pure.pure, Except.pure] at success
+                    have bodyProperties := bodyInduction checked body
+                      casesProperties.2.1 validated canonical
+                      (returnBelow.weaken throughChecked.next_le) inferred
+                      bodyResult
+                    have restoredProperties :=
+                      State.restoreLexicalScope_inferenceProperties
+                        casesProperties.2.1 bodyProperties.1
+                    rw [casesProperties.2.2] at restoredProperties
+                    have throughDefault :=
+                      throughChecked.trans restoredProperties.1
+                    split at success
+                    · cases success
+                    · injection success with resultEq
+                      rw [← resultEq]
+                      refine ⟨throughDefault.trans
+                          (State.InferenceProgress.recordNode _ _
+                            restoredProperties.2.solved),
+                        State.InferenceReady.recordNode _
+                          restoredProperties.2, ?_⟩
+                      split
+                      · exact throughDefault.resolve_variablesBelow returnBelow
+                      · exact Ty.variablesBelow_constructor _ _
+  case case45 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq headerSpan initializer condition post body statementEq
+      initializerInduction conditionInduction bodyInduction postInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical returnBelow result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    let loopContext := { context with loopDepth := context.loopDepth + 1 }
+    have loopValidated :
+        ProgramSignatureFormationValidated loopContext.signatures := by
+      simpa only [loopContext] using validated
+    have loopCanonical : FunctionSchemesCanonical loopContext := by
+      intro signature member
+      exact canonical signature member
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases initializerResult : inferForItemsFuel fuel context initializer allocated with
+    | error error =>
+        simp [initializerResult, bind, Except.bind] at success
+    | ok initialized =>
+      simp only [initializerResult, bind, Except.bind] at success
+      have initializerProperties := initializerInduction allocationProperties.2
+        validated canonical initialized initializerResult
+      cases conditionResult : inferExprFuel fuel context condition (some .bool)
+          initialized.state with
+      | error error =>
+          simp [conditionResult, bind, Except.bind] at success
+      | ok conditionPair =>
+        rcases conditionPair with ⟨inferredCondition, conditionState⟩
+        simp only [conditionResult, bind, Except.bind, Prod.eta] at success
+        have conditionProperties := conditionInduction initialized
+          initializerProperties.2 validated canonical
+          (by
+            intro expectedType member
+            simp at member
+            subst expectedType
+            exact Ty.variablesBelow_constructor _ _)
+          (inferredCondition, conditionState) conditionResult
+        have throughCondition := allocationProperties.1.trans
+          (initializerProperties.1.trans conditionProperties.1)
+        cases bodyResult : inferStatementsFuel fuel loopContext body.value
+            expectedReturn conditionState with
+        | error error =>
+            simp [loopContext, bodyResult, bind, Except.bind] at success
+        | ok inferredBody =>
+          simp only [loopContext, bodyResult, bind, Except.bind] at success
+          have bodyProperties := bodyInduction conditionState
+            conditionProperties.2.1 loopValidated loopCanonical
+            (returnBelow.weaken throughCondition.next_le) inferredBody bodyResult
+          let afterBody := inferredBody.state.restoreLexicalScope
+            initialized.state.lexicalScope
+          have restoredBody : initialized.state.InferenceProgress afterBody ∧
+              afterBody.InferenceReady := by
+            simpa only [afterBody] using
+              State.restoreLexicalScope_inferenceProperties
+                initializerProperties.2
+                (conditionProperties.1.trans bodyProperties.1)
+          cases postResult : inferForItemsFuel fuel loopContext post afterBody with
+          | error error =>
+              simp [loopContext, afterBody, postResult, bind, Except.bind]
+                at success
+          | ok inferredPost =>
+            simp only [loopContext, afterBody, postResult, bind, Except.bind]
+              at success
+            have postProperties := postInduction initialized inferredBody
+              restoredBody.2 loopValidated loopCanonical inferredPost postResult
+            have throughPost : allocated.InferenceProgress inferredPost.state :=
+              initializerProperties.1.trans
+                (restoredBody.1.trans postProperties.1)
+            let preRecordState := inferredPost.state.restoreLexicalScope
+              allocated.lexicalScope
+            have restoredOuter : allocated.InferenceProgress preRecordState ∧
+                preRecordState.InferenceReady := by
+              simpa only [preRecordState] using
+                State.restoreLexicalScope_inferenceProperties
+                  allocationProperties.2 throughPost
+            injection success with resultEq
+            rw [← resultEq]
+            refine ⟨allocationProperties.1.trans
+                (restoredOuter.1.trans
+                  (State.InferenceProgress.recordNode _ _
+                    restoredOuter.2.solved)),
+              State.InferenceReady.recordNode _ restoredOuter.2,
+              Ty.variablesBelow_constructor _ _⟩
+  case case46 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq condition body statementEq conditionInduction bodyInduction
+    unfold InferStatementFuelInferenceProperties
+    intro ready validated canonical returnBelow result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    let loopContext := { context with loopDepth := context.loopDepth + 1 }
+    have loopValidated :
+        ProgramSignatureFormationValidated loopContext.signatures := by
+      simpa only [loopContext] using validated
+    have loopCanonical : FunctionSchemesCanonical loopContext := by
+      intro signature member
+      exact canonical signature member
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, bind, Except.bind] at success
+    cases conditionResult : inferExprFuel fuel context condition (some .bool)
+        allocated with
+    | error error =>
+        simp [conditionResult, bind, Except.bind] at success
+    | ok conditionPair =>
+      rcases conditionPair with ⟨inferredCondition, conditionState⟩
+      simp only [conditionResult, bind, Except.bind, Prod.eta] at success
+      have conditionProperties := conditionInduction allocationProperties.2
+        validated canonical
+        (by
+          intro expectedType member
+          simp at member
+          subst expectedType
+          exact Ty.variablesBelow_constructor _ _)
+        (inferredCondition, conditionState) conditionResult
+      have throughCondition :=
+        allocationProperties.1.trans conditionProperties.1
+      cases bodyResult : inferStatementsFuel fuel loopContext body.value
+          expectedReturn conditionState with
+      | error error =>
+          simp [loopContext, bodyResult, bind, Except.bind] at success
+      | ok inferredBody =>
+        simp only [loopContext, bodyResult, bind, Except.bind] at success
+        have bodyProperties := bodyInduction conditionState
+          conditionProperties.2.1 loopValidated loopCanonical
+          (returnBelow.weaken throughCondition.next_le) inferredBody bodyResult
+        let preRecordState := inferredBody.state.restoreLexicalScope
+          conditionState.lexicalScope
+        have restoredBody : conditionState.InferenceProgress preRecordState ∧
+            preRecordState.InferenceReady := by
+          simpa only [preRecordState] using
+            State.restoreLexicalScope_inferenceProperties
+              conditionProperties.2.1 bodyProperties.1
+        injection success with resultEq
+        rw [← resultEq]
+        refine ⟨throughCondition.trans
+            (restoredBody.1.trans
+              (State.InferenceProgress.recordNode _ _
+                restoredBody.2.solved)),
+          State.InferenceReady.recordNode _ restoredBody.2,
+          Ty.variablesBelow_constructor _ _⟩
+  case case47 =>
+    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel]
+  case case48 =>
+    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel,
+      bind, Except.bind]
+  case case49 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq statementEq loopNonzero
+    unfold InferStatementFuelInferenceProperties
+    intro ready _ _ _ result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    let finalState := allocated.recordNode (.statement {
+      id
+      span := statement.span
+      type := .unit
+      form := .breakStmt
+    })
+    have recordProgress : allocated.InferenceProgress finalState := by
+      simpa only [finalState] using State.InferenceProgress.recordNode
+        allocated (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .breakStmt
+        }) allocationProperties.2.solved
+    have finalReady : finalState.InferenceReady := by
+      simpa only [finalState] using State.InferenceReady.recordNode
+        (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .breakStmt
+        }) allocationProperties.2
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, loopNonzero, Bool.false_eq_true,
+      if_false, finalState] at success
+    injection success with resultEq
+    subst result
+    exact ⟨allocationProperties.1.trans recordProgress, finalReady,
+      Ty.variablesBelow_constructor _ _⟩
+  case case50 =>
+    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel,
+      bind, Except.bind]
+  case case51 =>
+    intros context statement expectedReturn initial fuel id allocated
+      allocationEq statementEq loopNonzero
+    unfold InferStatementFuelInferenceProperties
+    intro ready _ _ _ result success
+    have allocationProperties :=
+      allocateStatementId_eq_inferenceProperties ready allocationEq
+    let finalState := allocated.recordNode (.statement {
+      id
+      span := statement.span
+      type := .unit
+      form := .continueStmt
+    })
+    have recordProgress : allocated.InferenceProgress finalState := by
+      simpa only [finalState] using State.InferenceProgress.recordNode
+        allocated (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .continueStmt
+        }) allocationProperties.2.solved
+    have finalReady : finalState.InferenceReady := by
+      simpa only [finalState] using State.InferenceReady.recordNode
+        (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .continueStmt
+        }) allocationProperties.2
+    unfold inferStatementFuel at success
+    simp only [allocationEq, statementEq, loopNonzero, Bool.false_eq_true,
+      if_false, finalState] at success
+    injection success with resultEq
+    subst result
+    exact ⟨allocationProperties.1.trans recordProgress, finalReady,
+      Ty.variablesBelow_constructor _ _⟩
+  case case52 =>
+    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel]
+  case case53 =>
+    intros fuel context initial
+    unfold InferForItemsFuelInferenceProperties
+    intro ready _ _ result success
+    unfold inferForItemsFuel at success
+    injection success with resultEq
+    subst result
+    exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+  case case54 =>
+    intros fuel context item items initial itemInduction tailInduction
+    unfold InferForItemsFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferForItemsFuel at success
+    cases itemResult : inferForItemFuel fuel context item initial with
+    | error error =>
+        simp [itemResult, bind, Except.bind] at success
+    | ok itemPair =>
+        rcases itemPair with ⟨inferredItem, itemState⟩
+        simp only [itemResult, bind, Except.bind] at success
+        cases tailResult : inferForItemsFuel fuel context items itemState with
+        | error error =>
+            simp [tailResult, bind, Except.bind] at success
+        | ok tail =>
+            simp only [tailResult, bind, Except.bind] at success
+            injection success with resultEq
+            subst result
+            have itemProperties := itemInduction ready validated canonical
+              (inferredItem, itemState) itemResult
+            have tailProperties := tailInduction itemState
+              itemProperties.2 validated canonical tail tailResult
+            exact ⟨itemProperties.1.trans tailProperties.1,
+              tailProperties.2⟩
+  case case55 =>
+    simp [InferForItemFuelInferenceProperties, inferForItemFuel]
+  case case56 =>
+    simp_all [InferForItemFuelInferenceProperties, inferForItemFuel, bind,
+      Except.bind]
+  case case57 =>
+    intros context item initial fuel name sourceType itemEq
+    unfold InferForItemFuelInferenceProperties
+    intro ready _ _ result success
+    unfold inferForItemFuel at success
+    simp only [itemEq, bind, Except.bind] at success
+    cases sourceTypeResult : resolveSourceType context sourceType with
+    | error error =>
+        simp [sourceTypeResult, bind, Except.bind] at success
+    | ok resolvedType =>
+        simp only [sourceTypeResult, bind, Except.bind, pure, Pure.pure,
+          Except.pure] at success
+        let binding :=
+          let locals := initial.binderEnvironment.apply
+            initial.inference.substitution
+          let valueType := initial.resolve resolvedType
+          let generalized := generalizeValue initial locals
+            initial.nextRequirement valueType
+          (initial.withLocals locals).allocateBinder name.value
+            generalized.scheme (some name.span) false generalized.requirements
+        have bindingProperties : initial.InferenceProgress binding.2 ∧
+            binding.2.InferenceReady := by
+          simpa only [binding] using
+            generalizeValue_allocateBinder_inferenceProperties
+              (state := initial) (requirementStart := initial.nextRequirement)
+              (valueType := resolvedType) (name := name.value)
+              (span := some name.span) ready
+              (resolveSourceType_success_variablesBelow sourceTypeResult _)
+        injection success with resultEq
+        rw [← resultEq]
+        exact bindingProperties
+  case case58 =>
+    intros context item initial fuel name initializer itemEq
+      initializerInduction
+    unfold InferForItemFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferForItemFuel at success
+    simp only [itemEq, bind, Except.bind] at success
+    cases initializerResult : inferExprFuel fuel context initializer none
+        initial with
+    | error error =>
+        simp [initializerResult, bind, Except.bind] at success
+    | ok initializerPair =>
+        rcases initializerPair with ⟨inferred, initializerState⟩
+        simp only [initializerResult, bind, Except.bind, Prod.eta, pure,
+          Pure.pure, Except.pure] at success
+        have initializerProperties := initializerInduction ready validated
+          canonical (by simp) (inferred, initializerState) initializerResult
+        let binding :=
+          let locals := initializerState.binderEnvironment.apply
+            initializerState.inference.substitution
+          let valueType := initializerState.resolve inferred.type
+          let generalized := generalizeValue initializerState locals
+            initial.nextRequirement valueType
+          (initializerState.withLocals locals).allocateBinder name.value
+            generalized.scheme (some name.span) false generalized.requirements
+        have bindingProperties :
+            initializerState.InferenceProgress binding.2 ∧
+              binding.2.InferenceReady := by
+          simpa only [binding] using
+            generalizeValue_allocateBinder_inferenceProperties
+              (state := initializerState)
+              (requirementStart := initial.nextRequirement)
+              (valueType := inferred.type) (name := name.value)
+              (span := some name.span) initializerProperties.2.1
+              initializerProperties.2.2
+        injection success with resultEq
+        rw [← resultEq]
+        exact ⟨initializerProperties.1.trans bindingProperties.1,
+          bindingProperties.2⟩
+  case case59 =>
+    intros context item initial fuel name sourceType initializer itemEq
+      initializerInduction
+    unfold InferForItemFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferForItemFuel at success
+    simp only [itemEq, bind, Except.bind] at success
+    cases sourceTypeResult : resolveSourceType context sourceType with
+    | error error =>
+        simp [sourceTypeResult, bind, Except.bind] at success
+    | ok resolvedType =>
+        simp only [sourceTypeResult, bind, Except.bind] at success
+        have resolvedTypeBelow :
+            resolvedType.VariablesBelow initial.inference.next :=
+          resolveSourceType_success_variablesBelow sourceTypeResult _
+        cases initializerResult : inferExprFuel fuel context initializer
+            (some resolvedType) initial with
+        | error error =>
+            simp [initializerResult, bind, Except.bind] at success
+        | ok initializerPair =>
+            rcases initializerPair with ⟨inferred, initializerState⟩
+            simp only [initializerResult, bind, Except.bind, Prod.eta, pure,
+              Pure.pure, Except.pure] at success
+            have initializerProperties := initializerInduction resolvedType
+              ready validated canonical
+              (by
+                intro expectedType member
+                simp only [Option.mem_def] at member
+                injection member with typeEq
+                subst expectedType
+                exact resolvedTypeBelow)
+              (inferred, initializerState) initializerResult
+            let binding :=
+              let locals := initializerState.binderEnvironment.apply
+                initializerState.inference.substitution
+              let valueType := initializerState.resolve inferred.type
+              let generalized := generalizeValue initializerState locals
+                initial.nextRequirement valueType
+              (initializerState.withLocals locals).allocateBinder name.value
+                generalized.scheme (some name.span) false
+                generalized.requirements
+            have bindingProperties :
+                initializerState.InferenceProgress binding.2 ∧
+                  binding.2.InferenceReady := by
+              simpa only [binding] using
+                generalizeValue_allocateBinder_inferenceProperties
+                  (state := initializerState)
+                  (requirementStart := initial.nextRequirement)
+                  (valueType := inferred.type) (name := name.value)
+                  (span := some name.span) initializerProperties.2.1
+                  initializerProperties.2.2
+            injection success with resultEq
+            rw [← resultEq]
+            exact ⟨initializerProperties.1.trans bindingProperties.1,
+              bindingProperties.2⟩
+  case case60 =>
+    intros context item initial fuel expression itemEq expressionInduction
+    unfold InferForItemFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferForItemFuel at success
+    simp only [itemEq, bind, Except.bind] at success
+    cases expressionResult : inferExprFuel fuel context expression none initial with
+    | error error =>
+        simp [expressionResult, bind, Except.bind] at success
+    | ok expressionPair =>
+        rcases expressionPair with ⟨inferred, expressionState⟩
+        simp only [expressionResult, bind, Except.bind, Prod.eta, pure,
+          Pure.pure, Except.pure] at success
+        injection success with resultEq
+        rw [← resultEq]
+        have expressionProperties := expressionInduction ready validated
+          canonical (by simp) (inferred, expressionState) expressionResult
+        exact ⟨expressionProperties.1, expressionProperties.2.1⟩
+  case case61 =>
+    intros context item initial fuel target operator value itemEq
+      assignmentInduction
+    unfold InferForItemFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferForItemFuel at success
+    simp only [itemEq, bind, Except.bind] at success
+    cases assignmentResult : inferAssignedValueFuel fuel context target
+        operator.value value initial with
+    | error error =>
+        simp [assignmentResult, bind, Except.bind] at success
+    | ok assignmentTriple =>
+        rcases assignmentTriple with
+          ⟨assignment, inferredValue, assignmentState⟩
+        simp only [assignmentResult, bind, Except.bind, Prod.eta, pure,
+          Pure.pure, Except.pure] at success
+        injection success with resultEq
+        rw [← resultEq]
+        have assignmentProperties := assignmentInduction ready validated
+          canonical (assignment, inferredValue, assignmentState)
+          assignmentResult
+        exact ⟨assignmentProperties.1, assignmentProperties.2.1⟩
+  case case62 =>
+    intros context item initial fuel target operator itemEq placeInduction
+    unfold InferForItemFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferForItemFuel at success
+    simp only [itemEq, bind, Except.bind] at success
+    cases placeResult : inferPlaceFuel fuel context target initial with
+    | error error =>
+        simp [placeResult, bind, Except.bind] at success
+    | ok placePair =>
+        rcases placePair with ⟨place, placeState⟩
+        simp only [placeResult, bind, Except.bind, Prod.eta] at success
+        have placeProperties := placeInduction ready validated canonical
+          (place, placeState) placeResult
+        cases unifyResult : unify placeState place.type .word with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at success
+        | ok unifiedState =>
+            simp only [unifyResult, bind, Except.bind, pure, Pure.pure,
+              Except.pure] at success
+            injection success with resultEq
+            rw [← resultEq]
+            have unifyProgress := unify_inferenceProgress
+              placeProperties.2.1.solved placeProperties.2.2
+              (Ty.variablesBelow_constructor _ _) unifyResult
+            have unifiedReady := unify_preserves_inferenceReady
+              placeProperties.2.1 placeProperties.2.2
+              (Ty.variablesBelow_constructor _ _) unifyResult
+            exact ⟨placeProperties.1.trans unifyProgress, unifiedReady⟩
+  case case63 =>
+    simp [InferPlaceFuelInferenceProperties, inferPlaceFuel]
+  case case64 =>
+    intros context target initial fuel name targetEq binder lookupEq
+      monomorphic
+    unfold InferPlaceFuelInferenceProperties
+    intro ready _ _ result success
+    unfold inferPlaceFuel at success
+    simp only [targetEq, lookupEq, monomorphic, if_true] at success
+    injection success with resultEq
+    subst result
+    have bodyBelow :=
+      State.InferenceReady.lookupBinder?_body_variablesBelow ready lookupEq
+    exact ⟨State.InferenceProgress.refl ready.solved, ready,
+      ready.solved.variablesBelow_apply bodyBelow⟩
+  case case65 =>
+    simp_all [InferPlaceFuelInferenceProperties, inferPlaceFuel, bind,
+      Except.bind]
+  case case66 =>
+    simp_all [InferPlaceFuelInferenceProperties, inferPlaceFuel, bind,
+      Except.bind]
+  case case67 =>
+    intros fuel context target initial inner targetEq induction
+    unfold InferPlaceFuelInferenceProperties at *
+    intro ready validated canonical result success
+    apply induction ready validated canonical result
+    simpa only [inferPlaceFuel, targetEq] using success
+  case case68 =>
+    intros context target initial fuel base brackets key targetEq
+      baseInduction keyInduction
+    unfold InferPlaceFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferPlaceFuel at success
+    simp only [targetEq, bind, Except.bind] at success
+    cases baseResult : inferPlaceFuel fuel context base initial with
+    | error error =>
+        simp [baseResult, bind, Except.bind] at success
+    | ok basePair =>
+        rcases basePair with ⟨basePlace, baseState⟩
+        simp only [baseResult, bind, Except.bind, Prod.eta] at success
+        have baseProperties := baseInduction ready validated canonical
+          (basePlace, baseState) baseResult
+        let keyAllocation := baseState.fresh
+        have keyProperties := fresh_eq_inferenceProperties
+          baseProperties.2.1 (type := keyAllocation.1)
+          (next := keyAllocation.2) rfl
+        let valueAllocation := keyAllocation.2.fresh
+        have valueProperties := fresh_eq_inferenceProperties
+          keyProperties.2.1 (type := valueAllocation.1)
+          (next := valueAllocation.2) rfl
+        have baseAtValue : basePlace.type.VariablesBelow
+            valueAllocation.2.inference.next :=
+          baseProperties.2.2.weaken
+            (keyProperties.1.trans valueProperties.1).next_le
+        have keyAtValue : keyAllocation.1.VariablesBelow
+            valueAllocation.2.inference.next :=
+          keyProperties.2.2.weaken valueProperties.1.next_le
+        have mappingBelow :
+            (Ty.mapping keyAllocation.1 valueAllocation.1).VariablesBelow
+              valueAllocation.2.inference.next :=
+          (Ty.variablesBelow_mapping_iff _ _ _).2
+            ⟨keyAtValue, valueProperties.2.2⟩
+        cases unifyResult : unify valueAllocation.2 basePlace.type
+            (.mapping keyAllocation.1 valueAllocation.1) with
+        | error error =>
+            simp [keyAllocation, valueAllocation, unifyResult, bind,
+              Except.bind] at success
+        | ok unifiedState =>
+            simp only [keyAllocation, valueAllocation, unifyResult, bind,
+              Except.bind] at success
+            have unifyProgress := unify_inferenceProgress
+              valueProperties.2.1.solved baseAtValue mappingBelow unifyResult
+            have unifiedReady := unify_preserves_inferenceReady
+              valueProperties.2.1 baseAtValue mappingBelow unifyResult
+            have keyAtUnified : keyAllocation.1.VariablesBelow
+                unifiedState.inference.next :=
+              keyAtValue.weaken unifyProgress.next_le
+            have resolvedKeyBelow :
+                (unifiedState.resolve keyAllocation.1).VariablesBelow
+                  unifiedState.inference.next :=
+              unifiedReady.solved.variablesBelow_apply keyAtUnified
+            cases keyResult : inferExprFuel fuel context key
+                (some (unifiedState.resolve baseState.fresh.1)) unifiedState with
+            | error error =>
+                simp [keyResult, bind, Except.bind] at success
+            | ok keyPair =>
+                rcases keyPair with ⟨inferredKey, keyState⟩
+                simp only [keyResult, bind, Except.bind, Prod.eta, pure,
+                  Pure.pure, Except.pure] at success
+                injection success with resultEq
+                rw [← resultEq]
+                have keyExpressionProperties := keyInduction baseState.fresh.1
+                  unifiedState unifiedReady validated canonical
+                  (by
+                    intro expectedType member
+                    simp only [Option.mem_def] at member
+                    injection member with typeEq
+                    subst expectedType
+                    simpa only [keyAllocation] using resolvedKeyBelow)
+                  (inferredKey, keyState) keyResult
+                have fromValueToKey :=
+                  unifyProgress.trans keyExpressionProperties.1
+                have resolvedValueBelow :=
+                  fromValueToKey.resolve_variablesBelow
+                    valueProperties.2.2
+                exact ⟨baseProperties.1.trans
+                    (keyProperties.1.trans
+                      (valueProperties.1.trans fromValueToKey)),
+                  keyExpressionProperties.2.1, resolvedValueBelow⟩
+  case case69 =>
+    simp_all [InferPlaceFuelInferenceProperties, inferPlaceFuel, bind,
+      Except.bind]
+  case case70 =>
+    intros fuel context target operator value initial placeInduction
+      valueInduction
+    unfold InferAssignedValueFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferAssignedValueFuel at success
+    cases placeResult : inferPlaceFuel fuel context target initial with
+    | error error =>
+        simp [placeResult, bind, Except.bind] at success
+    | ok placePair =>
+      rcases placePair with ⟨place, placeState⟩
+      simp only [placeResult, bind, Except.bind, Prod.eta] at success
+      have placeProperties := placeInduction ready validated canonical
+        (place, placeState) placeResult
+      have finishValue (fittedState : State)
+          (fitProgress : placeState.InferenceProgress fittedState)
+          (fittedReady : fittedState.InferenceReady) (expected : Ty)
+          (expectedBelow : expected.VariablesBelow fittedState.inference.next)
+          (valueProperties : InferExprFuelInferenceProperties fuel context
+            value (some expected) fittedState)
+          (tailSuccess :
+            (do
+              let (inferredValue, finalState) ← inferExprFuel fuel context
+                value (some expected) fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue,
+                finalState)) = .ok result) :
+          initial.InferenceProgress result.2.2 ∧
+            result.2.2.InferenceReady ∧
+            result.1.target.type.VariablesBelow
+              result.2.2.inference.next ∧
+            result.2.1.type.VariablesBelow
+              result.2.2.inference.next := by
+        cases valueResult : inferExprFuel fuel context value (some expected)
+            fittedState with
+        | error error =>
+            simp [valueResult, bind, Except.bind] at tailSuccess
+        | ok valuePair =>
+          rcases valuePair with ⟨inferredValue, finalState⟩
+          simp only [valueResult, bind, Except.bind, Prod.eta, pure,
+            Pure.pure, Except.pure] at tailSuccess
+          injection tailSuccess with resultEq
+          rw [← resultEq]
+          have inferredProperties := valueProperties fittedReady validated
+            canonical
+            (by
+              intro candidate member
+              simp only [Option.mem_def] at member
+              injection member with typeEq
+              subst candidate
+              exact expectedBelow)
+            (inferredValue, finalState) valueResult
+          have throughValue := fitProgress.trans inferredProperties.1
+          have targetBelow :=
+            throughValue.resolve_variablesBelow placeProperties.2.2
+          exact ⟨placeProperties.1.trans throughValue,
+            inferredProperties.2.1, targetBelow, inferredProperties.2.2⟩
+      have finishNonEqual
+          (valueProperties : ∀ fittedState : State,
+            InferExprFuelInferenceProperties fuel context value
+              (some .word) fittedState)
+          (tailSuccess :
+            (do
+              let fittedState ← unify placeState place.type .word
+              let (inferredValue, finalState) ← inferExprFuel fuel context
+                value (some .word) fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue,
+                finalState)) = .ok result) :
+          initial.InferenceProgress result.2.2 ∧
+            result.2.2.InferenceReady ∧
+            result.1.target.type.VariablesBelow
+              result.2.2.inference.next ∧
+            result.2.1.type.VariablesBelow
+              result.2.2.inference.next := by
+        cases unifyResult : unify placeState place.type .word with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+          simp only [unifyResult, bind, Except.bind] at tailSuccess
+          have fitProgress := unify_inferenceProgress
+            placeProperties.2.1.solved placeProperties.2.2
+            (Ty.variablesBelow_constructor _ _) unifyResult
+          have fittedReady := unify_preserves_inferenceReady
+            placeProperties.2.1 placeProperties.2.2
+            (Ty.variablesBelow_constructor _ _) unifyResult
+          exact finishValue fittedState fitProgress fittedReady .word
+            (Ty.variablesBelow_constructor _ _)
+            (valueProperties fittedState) tailSuccess
+      cases operator with
+      | equal =>
+          simp only [pure, Pure.pure, Except.pure] at success
+          exact finishValue placeState
+            (State.InferenceProgress.refl placeProperties.2.1.solved)
+            placeProperties.2.1 (placeState.resolve place.type)
+            (placeProperties.2.1.solved.variablesBelow_apply
+              placeProperties.2.2)
+            (valueInduction place placeState) success
+      | add => exact finishNonEqual (valueInduction place) success
+      | subtract => exact finishNonEqual (valueInduction place) success
+      | multiply => exact finishNonEqual (valueInduction place) success
+      | divide => exact finishNonEqual (valueInduction place) success
+      | modulo => exact finishNonEqual (valueInduction place) success
+      | bitAnd => exact finishNonEqual (valueInduction place) success
+      | bitXor => exact finishNonEqual (valueInduction place) success
+      | bitOr => exact finishNonEqual (valueInduction place) success
+  case case71 =>
+    simp [InferExprsFuelInferenceProperties, inferExprsFuel]
+  case case72 =>
+    intros context initial fuel
+    unfold InferExprsFuelInferenceProperties
+    intro ready _ _ result success
+    unfold inferExprsFuel at success
+    injection success with resultEq
+    subst result
+    exact ⟨State.InferenceProgress.refl ready.solved, ready, by simp⟩
+  case case73 =>
+    intros context initial fuel expression rest expressionInduction
+      tailInduction
+    unfold InferExprsFuelInferenceProperties
+    intro ready validated canonical result success
+    unfold inferExprsFuel at success
+    cases expressionResult : inferExprFuel fuel context expression none
+        initial with
+    | error error =>
+        simp [expressionResult, bind, Except.bind] at success
+    | ok expressionPair =>
+        rcases expressionPair with ⟨inferred, expressionState⟩
+        simp only [expressionResult, bind, Except.bind] at success
+        cases tailResult : inferExprsFuel fuel context rest expressionState with
+        | error error =>
+            simp [tailResult, bind, Except.bind] at success
+        | ok tailPair =>
+            rcases tailPair with ⟨tail, finalState⟩
+            simp only [tailResult, bind, Except.bind] at success
+            injection success with resultEq
+            subst result
+            have expressionProperties := expressionInduction ready validated
+              canonical (by simp) (inferred, expressionState)
+              expressionResult
+            have tailProperties := tailInduction expressionState
+              expressionProperties.2.1 validated canonical
+              (tail, finalState) tailResult
+            refine ⟨expressionProperties.1.trans tailProperties.1,
+              tailProperties.2.1, ?_⟩
+            intro element member
+            rcases List.mem_cons.mp member with rfl | tailMember
+            · exact expressionProperties.2.2.weaken
+                tailProperties.1.next_le
+            · exact tailProperties.2.2 element tailMember
+  case case74 =>
+    simp [InferMatchCasesFuelInferenceProperties, inferMatchCasesFuel]
+  case case76 =>
+    intros context scrutineeType expectedReturn outerScope initial fuel arm rest
+      bodyInduction tailInduction
+    unfold InferMatchCasesFuelInferenceProperties
+    intro ready validated canonical scrutineeBelow returnBelow scopeEq result
+      success
+    subst outerScope
+    unfold inferMatchCasesFuel at success
+    simp only [bind, Except.bind] at success
+    cases patternResult : inferMatchPatternFuel fuel context arm.value.pattern
+        scrutineeType initial with
+    | error error =>
+        simp [patternResult, bind, Except.bind] at success
+    | ok patternPair =>
+        rcases patternPair with ⟨pattern, patternState⟩
+        simp only [patternResult, bind, Except.bind] at success
+        cases bodyResult : inferStatementsFuel fuel context
+            arm.value.body.value expectedReturn patternState with
+        | error error =>
+            simp [bodyResult, bind, Except.bind] at success
+        | ok body =>
+            simp only [bodyResult, bind, Except.bind] at success
+            cases tailResult : inferMatchCasesFuel fuel context scrutineeType
+                expectedReturn initial.lexicalScope rest
+                (body.state.restoreLexicalScope initial.lexicalScope) with
+            | error error =>
+                simp [tailResult, bind, Except.bind] at success
+            | ok tail =>
+                simp only [tailResult, bind, Except.bind] at success
+                injection success with resultEq
+                subst result
+                have patternProperties :=
+                  inferMatchPatternFuel_inferenceProperties ready
+                    scrutineeBelow validated patternResult
+                have returnAtPattern :=
+                  returnBelow.weaken patternProperties.1.next_le
+                have bodyProperties := bodyInduction patternState
+                  patternProperties.2.1 validated canonical returnAtPattern
+                  body bodyResult
+                have throughBody :=
+                  patternProperties.1.trans bodyProperties.1
+                have restoredProperties :=
+                  State.restoreLexicalScope_inferenceProperties ready
+                    throughBody
+                have tailProperties := tailInduction body
+                  restoredProperties.2 validated canonical
+                  (scrutineeBelow.weaken restoredProperties.1.next_le)
+                  (returnBelow.weaken restoredProperties.1.next_le)
+                  (by simp) tail tailResult
+                exact ⟨restoredProperties.1.trans tailProperties.1,
+                  tailProperties.2⟩
+  case case75 =>
+    intros context scrutineeType expectedReturn outerScope initial fuel
+    unfold InferMatchCasesFuelInferenceProperties
+    intro ready _ _ _ _ scopeEq result success
+    unfold inferMatchCasesFuel at success
+    injection success with resultEq
+    subst result
+    exact ⟨State.InferenceProgress.refl ready.solved, ready, scopeEq⟩
+
+private theorem inferExprFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (expression : Syntax.Expr)
+    (expected : Option Ty) (state : State) :
+    InferExprFuelInferenceProperties fuel context expression expected state :=
+  inferFuel_inferenceProperties_internal.1 fuel context expression expected state
+
+private theorem inferStatementsFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (statements : List Syntax.Statement)
+    (expectedReturn : Ty) (state : State) :
+    InferStatementsFuelInferenceProperties fuel context statements
+      expectedReturn state :=
+  inferFuel_inferenceProperties_internal.2.2.2.1 fuel context statements
+    expectedReturn state
+
+/-- Successful expression inference makes monotone inference progress, leaves
+the resulting state ready for further inference, and returns a type whose
+variables are allocated by that state. -/
+theorem inferExprFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  exact inferExprFuel_inferenceProperties_internal fuel context expression
+    expected state ready validated canonical expectedBelow result success
+
+/-- Successful statement-list inference makes monotone inference progress,
+leaves the resulting state ready for further inference, and returns a block
+type whose variables are allocated by that state. -/
+theorem inferStatementsFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {statements : List Syntax.Statement}
+    {expectedReturn : Ty} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (returnBelow : expectedReturn.VariablesBelow state.inference.next)
+    {result : BlockResult}
+    (success : inferStatementsFuel fuel context statements expectedReturn
+      state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  exact inferStatementsFuel_inferenceProperties_internal fuel context
+    statements expectedReturn state ready validated canonical returnBelow
+    result success
+
 set_option maxHeartbeats 500000 in
 private theorem inferStatementsFuel_preserves_header_internal
     (fuel : Nat) (context : Context) (statements : List Syntax.Statement)
