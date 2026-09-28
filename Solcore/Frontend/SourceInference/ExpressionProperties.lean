@@ -12266,6 +12266,16 @@ theorem inferStatementsFuel_nextLocal_le
   inferFuel_advances_nextLocal_internal.2.2.2.1
     fuel context statements expectedReturn state result success
 
+/-- Successful source-ordered expression-list inference monotonically
+advances the shared declaration-local identity cutoff. -/
+theorem inferExprsFuel_nextLocal_le
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    state.nextLocal ≤ result.2.nextLocal :=
+  inferFuel_advances_nextLocal_internal.2.2.2.2.2.2.2.2.2.1
+    fuel context expressions state result success
+
 /-- Expression inference preserves the stable-binder allocation bound: it
 restores the caller's visible binders and never moves the shared cutoff
 backwards. -/
@@ -12282,6 +12292,20 @@ theorem inferExprFuel_preserves_localBindersBelowNextLocal
       (inferExprFuel_nextLocal_le success) below
   exact congrArg LexicalScope.binders
     (inferExprFuel_success_lexicalScope_eq success)
+
+/-- Expression-list inference restores the caller's visible binders while
+monotonically advancing the shared local allocator. -/
+theorem inferExprsFuel_preserves_localBindersBelowNextLocal
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    result.2.LocalBindersBelowNextLocal := by
+  apply State.LocalBindersBelowNextLocal.transport
+      (before := state) (after := result.2) ?_
+      (inferExprsFuel_nextLocal_le success) below
+  exact congrArg LexicalScope.binders
+    (inferExprsFuel_success_lexicalScope_eq success)
 
 /-- Successful inference of a source-ordered `for`-item sequence never moves
 the declaration-local identity cutoff backwards. -/
