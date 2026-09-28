@@ -3158,6 +3158,401 @@ theorem freshDataConstructorInstantiation_inferenceProperties
     (freshDataConstructorInstantiation_preserves_header dataType constructor
       state)
 
+private def MatchPatternFlatInferenceProperties (context : Context)
+    (_pattern : Syntax.Pattern) (expected : Ty) (_seen : List String)
+    (state : State) (computation : Except Error InferredPattern) : Prop :=
+  ∀ result,
+    state.InferenceReady →
+    expected.VariablesBelow state.inference.next →
+    ProgramSignatureFormationValidated context.signatures →
+    computation = .ok result →
+    state.InferenceProgress result.state ∧ result.state.InferenceReady
+
+private def MatchPatternsFlatInferenceProperties (context : Context)
+    (_patterns : List Syntax.Pattern) (expectedTypes : List Ty)
+    (_seen : List String) (state : State)
+    (computation : Except Error InferredPatterns) : Prop :=
+  ∀ result,
+    state.InferenceReady →
+    (∀ expected ∈ expectedTypes,
+      expected.VariablesBelow state.inference.next) →
+    ProgramSignatureFormationValidated context.signatures →
+    computation = .ok result →
+    state.InferenceProgress result.state ∧ result.state.InferenceReady
+
+private theorem contextualConstructorPrefix_inferenceProperties
+    {context : Context} {state next : State} {expected : Ty} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (selected : contextualConstructorCandidate context state (some expected)
+      name = .ok (dataType, constructor, arguments))
+    (unified : unify state
+      (instantiateDataConstructor dataType constructor arguments).resultType
+      expected = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady ∧
+      ∀ payload ∈
+        (instantiateDataConstructor dataType constructor arguments).payloadTypes,
+        payload.VariablesBelow next.inference.next := by
+  have bounded :=
+    contextualConstructorCandidate_success_instantiation_variablesBelow
+      ready (by
+        intro retained member
+        simp only [Option.mem_def] at member
+        cases Option.some.inj member
+        exact expectedBelow) validated selected
+  have progress := unify_inferenceProgress ready.solved bounded.2
+    expectedBelow unified
+  have nextReady := unify_preserves_inferenceReady ready bounded.2
+    expectedBelow unified
+  exact ⟨progress, nextReady, fun payload member =>
+    (bounded.1 payload member).weaken progress.next_le⟩
+
+private theorem explicitConstructorPrefix_inferenceProperties
+    {context : Context} {state allocated next : State} {expected : Ty}
+    {qualifiers : List String} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    {instantiation : DataConstructorInstantiation}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (selected : explicitConstructorCandidate context qualifiers name =
+      .ok (dataType, constructor))
+    (freshEq : freshDataConstructorInstantiation dataType constructor state =
+      (instantiation, allocated))
+    (unified : unify allocated instantiation.resultType expected = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady ∧
+      ∀ payload ∈ instantiation.payloadTypes,
+        payload.VariablesBelow next.inference.next := by
+  rcases explicitConstructorCandidate_success_members selected with
+    ⟨dataMember, constructorMember⟩
+  have rawBelow :=
+    validated.data_constructor_payloadTypes_variablesBelow dataMember
+      constructorMember state.inference.next
+  have allocatedProperties :=
+    freshDataConstructorInstantiation_inferenceProperties dataType constructor
+      state ready rawBelow
+  simp only [freshEq] at allocatedProperties
+  have expectedBelowAllocated :=
+    expectedBelow.weaken allocatedProperties.1.next_le
+  have progress := unify_inferenceProgress allocatedProperties.2.1.solved
+    allocatedProperties.2.2.2.2 expectedBelowAllocated unified
+  have nextReady := unify_preserves_inferenceReady allocatedProperties.2.1
+    allocatedProperties.2.2.2.2 expectedBelowAllocated unified
+  exact ⟨allocatedProperties.1.trans progress, nextReady,
+    fun payload member =>
+      (allocatedProperties.2.2.2.1 payload member).weaken progress.next_le⟩
+
+private theorem tuplePatternPrefix_inferenceProperties
+    {state allocated next : State} {expected : Ty} {count : Nat}
+    {elementTypes : List Ty}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next)
+    (freshEq : freshTypes count state = (elementTypes, allocated))
+    (unified : unify allocated expected (Ty.productMany elementTypes) =
+      .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady ∧
+      ∀ element ∈ elementTypes,
+        element.VariablesBelow next.inference.next := by
+  have allocatedProperties := freshTypes_inferenceProperties count state ready
+  simp only [freshEq] at allocatedProperties
+  have expectedBelowAllocated :=
+    expectedBelow.weaken allocatedProperties.1.next_le
+  have productBelow :=
+    Ty.variablesBelow_productMany allocatedProperties.2.2
+  have progress := unify_inferenceProgress allocatedProperties.2.1.solved
+    expectedBelowAllocated productBelow unified
+  have nextReady := unify_preserves_inferenceReady allocatedProperties.2.1
+    expectedBelowAllocated productBelow unified
+  exact ⟨allocatedProperties.1.trans progress, nextReady,
+    fun element member =>
+      (allocatedProperties.2.2 element member).weaken progress.next_le⟩
+
+private theorem integerPatternPrefix_inferenceProperties
+    {state recorded next : State} {expected : Ty}
+    {metavariable : TypeVarId} {normalized : Ty}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next)
+    (freshTypeEq : state.fresh.1 = .variable metavariable)
+    (unified : unify recorded (.variable metavariable) normalized = .ok next)
+    (normalizedEq : recorded.resolve expected = normalized)
+    (recordedInferenceEq : recorded.inference =
+      (state.fresh.2.addRequirementWithId
+        (ProgramSignatures.builtinIntPredicate
+          (.variable metavariable))).2.inference)
+    (recordedBinderEnvironmentEq : recorded.binderEnvironment =
+      (state.fresh.2.addRequirementWithId
+        (ProgramSignatures.builtinIntPredicate
+          (.variable metavariable))).2.binderEnvironment) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  let required := state.fresh.2.addRequirementWithId
+    (ProgramSignatures.builtinIntPredicate (.variable metavariable))
+  have freshProgress := State.InferenceProgress.fresh state ready.solved
+  have freshReady := State.InferenceReady.fresh ready
+  have requirementProgress :
+      state.fresh.2.InferenceProgress required.2 := by
+    simpa only [required] using State.InferenceProgress.addRequirementWithId
+      state.fresh.2
+      (ProgramSignatures.builtinIntPredicate (.variable metavariable))
+      freshReady.solved
+  have requirementReady : required.2.InferenceReady := by
+    simpa only [required] using State.InferenceReady.addRequirementWithId
+      (ProgramSignatures.builtinIntPredicate (.variable metavariable))
+      freshReady
+  have recordProgress : required.2.InferenceProgress recorded := by
+    apply State.InferenceProgress.of_inference_eq requirementReady.solved
+    simpa only [required] using recordedInferenceEq
+  have recordReady : recorded.InferenceReady := by
+    apply State.InferenceReady.of_progress_of_binderEnvironment_eq
+      requirementReady recordProgress
+    simpa only [required] using recordedBinderEnvironmentEq
+  have prefixProgress :=
+    freshProgress.trans (requirementProgress.trans recordProgress)
+  have freshTargetBelow :
+      state.fresh.1.VariablesBelow state.fresh.2.inference.next := by
+    change Ty.VariablesBelow (state.inference.next + 1)
+      (.variable ⟨state.inference.next⟩)
+    exact (Ty.variablesBelow_variable_iff _ _).2 (Nat.lt_succ_self _)
+  have targetBelow :
+      (Ty.variable metavariable).VariablesBelow recorded.inference.next := by
+    rw [← freshTypeEq]
+    exact freshTargetBelow.weaken
+      (Nat.le_trans requirementProgress.next_le recordProgress.next_le)
+  have expectedResolvedBelow :
+      normalized.VariablesBelow recorded.inference.next := by
+    rw [← normalizedEq]
+    exact prefixProgress.resolve_variablesBelow expectedBelow
+  have unifiedProgress := unify_inferenceProgress recordReady.solved
+    targetBelow expectedResolvedBelow unified
+  have unifiedReady := unify_preserves_inferenceReady recordReady targetBelow
+    expectedResolvedBelow unified
+  exact ⟨prefixProgress.trans unifiedProgress, unifiedReady⟩
+
+private theorem binderPattern_inferenceProperties
+    {state : State} {expected : Ty} {name : String}
+    {span : Syntax.SourceSpan}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next) :
+    state.InferenceProgress
+        (state.allocateBinder name (.mono (state.resolve expected))
+          (some span)).2 ∧
+      (state.allocateBinder name (.mono (state.resolve expected))
+        (some span)).2.InferenceReady := by
+  have resolvedExpectedBelow :
+      (state.resolve expected).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply expectedBelow
+  exact ⟨State.InferenceProgress.allocateBinder state name
+      (.mono (state.resolve expected)) (some span) false [] ready.solved,
+    State.InferenceReady.allocateBinder name (.mono (state.resolve expected))
+      (some span) false [] ready resolvedExpectedBelow⟩
+
+set_option maxHeartbeats 500000 in
+private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (pattern : Syntax.Pattern)
+    (expected : Ty) (seen : List String) (state : State) :
+    MatchPatternFlatInferenceProperties context pattern expected seen state
+      (inferMatchPatternFlatFuel fuel context pattern expected seen state) := by
+  apply inferMatchPatternFlatFuel.induct context
+      (motive1 := fun fuel pattern expected seen state =>
+        MatchPatternFlatInferenceProperties context pattern expected seen state
+          (inferMatchPatternFlatFuel fuel context pattern expected seen state))
+      (motive2 := fun fuel patterns expectedTypes seen state =>
+        MatchPatternsFlatInferenceProperties context patterns expectedTypes seen
+          state (inferMatchPatternsFlatFuel fuel context patterns expectedTypes
+            seen state))
+  case case3 =>
+    intros
+    unfold MatchPatternFlatInferenceProperties at *
+    intro result ready expectedBelow validated success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals
+      exact integerPatternPrefix_inferenceProperties ready expectedBelow
+        (by assumption)
+        (by assumption) (by assumption) (by rfl) (by rfl)
+  case case5 =>
+    intros
+    unfold MatchPatternFlatInferenceProperties at *
+    intro result ready expectedBelow validated success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals
+      exact integerPatternPrefix_inferenceProperties ready expectedBelow
+        (by assumption)
+        (by assumption) (by assumption) (by rfl) (by rfl)
+  case case10 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
+      flatArguments contextualBranch childrenIH
+    unfold MatchPatternFlatInferenceProperties at *
+    intro result ready expectedBelow validated success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | have constructorPrefix :=
+          contextualConstructorPrefix_inferenceProperties ready expectedBelow
+            validated (by assumption) (by assumption)
+        have children := childrenIH _ _ _ constructorPrefix.2.1
+          constructorPrefix.2.2 validated (by assumption)
+        exact ⟨constructorPrefix.1.trans children.1, children.2⟩
+      | have constructorPrefix :=
+          explicitConstructorPrefix_inferenceProperties ready expectedBelow
+            validated (by assumption) (by rfl) (by assumption)
+        have children := childrenIH _ _ _ constructorPrefix.2.1
+          constructorPrefix.2.2 validated (by assumption)
+        exact ⟨constructorPrefix.1.trans children.1, children.2⟩
+  case case11 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
+      flatArguments explicitBranch childrenIH
+    unfold MatchPatternFlatInferenceProperties at *
+    intro result ready expectedBelow validated success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | have constructorPrefix :=
+          contextualConstructorPrefix_inferenceProperties ready expectedBelow
+            validated (by assumption) (by assumption)
+        have children := childrenIH _ _ _ constructorPrefix.2.1
+          constructorPrefix.2.2 validated (by assumption)
+        exact ⟨constructorPrefix.1.trans children.1, children.2⟩
+      | have constructorPrefix :=
+          explicitConstructorPrefix_inferenceProperties ready expectedBelow
+            validated (by assumption) (by rfl) (by assumption)
+        have children := childrenIH _ _ _ constructorPrefix.2.1
+          constructorPrefix.2.2 validated (by assumption)
+        exact ⟨constructorPrefix.1.trans children.1, children.2⟩
+  case case13 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      elements patternEq sources argumentTypes allocatedState freshEq childrenIH
+    unfold MatchPatternFlatInferenceProperties at *
+    intro result ready expectedBelow validated success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    have argumentTypesEq :
+        (freshTypes sources.length inputState).1 = argumentTypes := by
+      simpa only using congrArg Prod.fst freshEq
+    have allocatedStateEq :
+        (freshTypes sources.length inputState).2 = allocatedState := by
+      simpa only using congrArg Prod.snd freshEq
+    have tuplePrefix := tuplePatternPrefix_inferenceProperties
+      (count := sources.length) (elementTypes := argumentTypes)
+      (allocated := allocatedState) ready expectedBelow freshEq (by
+        rw [← allocatedStateEq, ← argumentTypesEq]
+        simpa only [sources] using (by assumption))
+    have children := childrenIH _ _ tuplePrefix.2.1 tuplePrefix.2.2 validated
+      (by
+        rw [← argumentTypesEq]
+        simpa only [sources] using (by assumption))
+    exact ⟨tuplePrefix.1.trans children.1, children.2⟩
+  case case17 =>
+    intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
+    unfold MatchPatternsFlatInferenceProperties
+    unfold MatchPatternFlatInferenceProperties at ihHead
+    unfold MatchPatternsFlatInferenceProperties at ihTail
+    intro result ready expectedBelow validated success
+    simp only [inferMatchPatternsFlatFuel] at success
+    cases headResult : inferMatchPatternFlatFuel fuel context head expectedHead
+        seen state with
+    | error error =>
+        simp [headResult, bind, Except.bind] at success
+    | ok inferredHead =>
+        simp only [headResult, bind, Except.bind] at success
+        cases tailResult : inferMatchPatternsFlatFuel fuel context rest
+            expectedTail inferredHead.names inferredHead.state with
+        | error error =>
+            simp [tailResult, bind, Except.bind] at success
+        | ok inferredTail =>
+            simp only [tailResult, bind, Except.bind] at success
+            injection success with resultEq
+            subst result
+            have headProperties := ihHead inferredHead ready
+              (expectedBelow expectedHead (by simp)) validated headResult
+            have tailProperties := ihTail inferredHead inferredTail
+              headProperties.2 (by
+                intro expected member
+                exact (expectedBelow expected (by simp [member])).weaken
+                  headProperties.1.next_le) validated tailResult
+            exact ⟨headProperties.1.trans tailProperties.1,
+              tailProperties.2⟩
+  all_goals
+    intros
+    first
+      | unfold MatchPatternFlatInferenceProperties at *
+      | unfold MatchPatternsFlatInferenceProperties at *
+    intro result ready expectedBelow validated success
+    first
+      | unfold inferMatchPatternFlatFuel at success
+      | unfold inferMatchPatternsFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try simp_all
+    all_goals try exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+    all_goals try simpa using ih1 _ (by assumption)
+    all_goals try
+      constructor
+      · simpa only using State.InferenceProgress.refl ready.solved
+      · simpa only using ready
+    all_goals try exact (by simpa only using ih1 _ (by assumption))
+    all_goals try exact State.InferenceProgress.refl ready.solved
+    all_goals try
+      exact binderPattern_inferenceProperties ready expectedBelow
+
+/-- Successful source-pattern inference makes semantic inference progress,
+preserves readiness, and returns a pattern type below the final allocator. -/
+theorem inferMatchPatternFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {state : State} {result : TypedMatchPattern × State}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (success : inferMatchPatternFuel fuel context pattern expected state =
+      .ok result) :
+    state.InferenceProgress result.2 ∧ result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  unfold inferMatchPatternFuel at success
+  cases flatResult :
+      inferMatchPatternFlatFuel fuel context pattern expected [] state with
+  | error error =>
+      simp [flatResult, bind, Except.bind] at success
+  | ok inferred =>
+      simp only [flatResult, bind, Except.bind] at success
+      change Except.ok ({
+        source := inferred.source
+        type := inferred.state.resolve expected
+        resolution := inferred.resolution
+        requirements := inferred.requirements
+      }, inferred.state) = Except.ok result at success
+      injection success with resultEq
+      subst result
+      have properties :=
+        inferMatchPatternFlatFuel_inferenceProperties_internal fuel context
+          pattern expected [] state inferred ready expectedBelow validated
+          flatResult
+      exact ⟨properties.1, properties.2,
+        properties.1.resolve_variablesBelow expectedBelow⟩
+
 private theorem inferMatchPatternFlatFuel_preserves_header
     (fuel : Nat) (context : Context) (pattern : Syntax.Pattern)
     (expected : Ty) (seen : List String) (state : State) :

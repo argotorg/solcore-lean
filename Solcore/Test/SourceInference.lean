@@ -158,6 +158,22 @@ example {context : SourceInference.Context}
   exact SourceInference.Detail.bindLambdaParameters_inferenceProperties
     ready success
 
+/-- Successful recursive source-pattern inference advances inference safely
+and returns a pattern type bounded by the final allocator. -/
+example {fuel : Nat} {context : SourceInference.Context}
+    {pattern : Syntax.Pattern} {expected : TypeSystem.Ty}
+    {state : SourceInference.State}
+    {result : SourceInference.TypedMatchPattern × SourceInference.State}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (success : SourceInference.Detail.inferMatchPatternFuel fuel context
+      pattern expected state = .ok result) :
+    state.InferenceProgress result.2 ∧ result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  exact SourceInference.Detail.inferMatchPatternFuel_inferenceProperties
+    ready expectedBelow validated success
+
 private def shadowingBinderEnvironment : TypeSystem.Environment :=
   [("shadowed", TypeSystem.Scheme.mono .bool),
     ("shadowed", TypeSystem.Scheme.mono .word)]
