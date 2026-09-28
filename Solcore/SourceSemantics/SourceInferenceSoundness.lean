@@ -1365,6 +1365,280 @@ theorem expressionStatementValueHasType_afterSubstitution
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl expressionType (by simp [StatementNode.applySubstitution])
 
+/-- The proof-facing facts of one finalized statement agree with the three
+fields retained by executable statement inference.  Control is deliberately
+absent: it is determined by `StatementHasType`, whereas `StatementResult`
+stores only the observable type/value/return projections. -/
+structure StatementResultMatchesFactsAfterSubstitution
+    (substitution : TypeSystem.Substitution)
+    (result : Detail.StatementResult) (facts : StatementFacts) : Prop where
+  type_eq : facts.type = substitution.apply result.type
+  hasValue_eq : facts.hasValue = result.hasValue
+  sawReturn_eq : facts.sawReturn = result.sawReturn
+
+/-- The proof-facing facts of a finalized statement sequence agree with the
+type and return summary retained by executable block inference. -/
+structure BlockResultMatchesFactsAfterSubstitution
+    (substitution : TypeSystem.Substitution)
+    (result : Detail.BlockResult) (facts : BodyFacts) : Prop where
+  type_eq : facts.type = substitution.apply result.type
+  sawReturn_eq : facts.sawReturn = result.sawReturn
+
+/-- Empty executable block inference returns the canonical empty block
+without changing its input state. -/
+theorem inferStatementsFuel_success_nil_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    (success : Detail.inferStatementsFuel (fuel + 1) context [] expectedReturn
+      state = .ok result) :
+    result = {
+      statements := []
+      type := .unit
+      sawReturn := false
+      state
+    } := by
+  unfold Detail.inferStatementsFuel at success
+  injection success with resultEq
+  subst result
+  rfl
+
+/-- Singleton executable block inference exposes its exact statement result
+and the canonical projection from that result into `BlockResult`. -/
+theorem inferStatementsFuel_success_singleton_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    (success : Detail.inferStatementsFuel (fuel + 1) context [statement]
+      expectedReturn state = .ok result) :
+    ∃ head,
+      Detail.inferStatementFuel fuel context statement expectedReturn state =
+        .ok head ∧
+      result = {
+        statements := [head.id]
+        type := if head.sawReturn || head.hasValue then head.type else .unit
+        sawReturn := head.sawReturn
+        state := head.state
+      } := by
+  unfold Detail.inferStatementsFuel at success
+  cases headSuccess :
+      Detail.inferStatementFuel fuel context statement expectedReturn state with
+  | error error =>
+      simp [headSuccess, bind, Except.bind] at success
+  | ok head =>
+      simp only [headSuccess, bind, Except.bind] at success
+      injection success with resultEq
+      subst result
+      exact ⟨head, rfl, rfl⟩
+
+/-- Non-singleton executable block inference exposes the exact head and tail
+computations and the canonical sequential `BlockResult` assembled from them. -/
+theorem inferStatementsFuel_success_cons_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement next : Syntax.Statement} {rest : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    (success : Detail.inferStatementsFuel (fuel + 1) context
+      (statement :: next :: rest) expectedReturn state = .ok result) :
+    ∃ head tail,
+      Detail.inferStatementFuel fuel context statement expectedReturn state =
+        .ok head ∧
+      Detail.inferStatementsFuel fuel context (next :: rest) expectedReturn
+        head.state = .ok tail ∧
+      result = {
+        statements := head.id :: tail.statements
+        type := if tail.sawReturn then tail.type
+          else if head.sawReturn then head.type else tail.type
+        sawReturn := head.sawReturn || tail.sawReturn
+        state := tail.state
+      } := by
+  unfold Detail.inferStatementsFuel at success
+  cases headSuccess :
+      Detail.inferStatementFuel fuel context statement expectedReturn state with
+  | error error =>
+      simp [headSuccess, bind, Except.bind] at success
+  | ok head =>
+      simp only [headSuccess, bind, Except.bind] at success
+      cases tailSuccess : Detail.inferStatementsFuel fuel context
+          (next :: rest) expectedReturn head.state with
+      | error error =>
+          simp [tailSuccess] at success
+      | ok tail =>
+          simp only [tailSuccess] at success
+          injection success with resultEq
+          subst result
+          exact ⟨head, tail, rfl, tailSuccess, rfl⟩
+
+/-- Successful inference of a nonempty source statement list returns a
+nonempty list of retained statement occurrences. -/
+theorem inferStatementsFuel_success_statements_eq_cons
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {rest : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    (success : Detail.inferStatementsFuel fuel context (statement :: rest)
+      expectedReturn state = .ok result) :
+    ∃ id ids, result.statements = id :: ids := by
+  cases fuel with
+  | zero =>
+      simp [Detail.inferStatementsFuel] at success
+  | succ fuel =>
+      cases rest with
+      | nil =>
+          obtain ⟨head, _, resultEq⟩ :=
+            inferStatementsFuel_success_singleton_facts success
+          rw [resultEq]
+          exact ⟨head.id, [], rfl⟩
+      | cons next rest =>
+          obtain ⟨head, tail, _, _, resultEq⟩ :=
+            inferStatementsFuel_success_cons_facts success
+          rw [resultEq]
+          exact ⟨head.id, tail.statements, rfl⟩
+
+namespace BlockResultMatchesFactsAfterSubstitution
+
+/-- The canonical empty executable block matches `BodyFacts.empty` under any
+final substitution. -/
+theorem empty (substitution : TypeSystem.Substitution)
+    (state : Frontend.SourceInference.State) :
+    BlockResultMatchesFactsAfterSubstitution substitution {
+      statements := []
+      type := .unit
+      sawReturn := false
+      state
+    } .empty := by
+  constructor <;> rfl
+
+/-- Matching one executable statement is exactly enough to match the
+singleton block assembled from it. -/
+theorem singleton
+    {substitution : TypeSystem.Substitution}
+    {result : Detail.StatementResult} {facts : StatementFacts}
+    (agreement : StatementResultMatchesFactsAfterSubstitution substitution
+      result facts) :
+    BlockResultMatchesFactsAfterSubstitution substitution {
+      statements := [result.id]
+      type := if result.sawReturn || result.hasValue then result.type else .unit
+      sawReturn := result.sawReturn
+      state := result.state
+    } (.singleton facts) := by
+  rcases agreement with ⟨typeEq, hasValueEq, sawReturnEq⟩
+  constructor
+  · simp only [BodyFacts.singleton]
+    rw [typeEq, hasValueEq, sawReturnEq]
+    cases result.sawReturn <;> cases result.hasValue <;> rfl
+  · exact sawReturnEq
+
+/-- Head and tail matches compose according to the executable and declarative
+sequence folds. -/
+theorem cons
+    {substitution : TypeSystem.Substitution}
+    {head : Detail.StatementResult} {headFacts : StatementFacts}
+    {tail : Detail.BlockResult} {tailFacts : BodyFacts}
+    (headMatches : StatementResultMatchesFactsAfterSubstitution substitution
+      head headFacts)
+    (tailMatches : BlockResultMatchesFactsAfterSubstitution substitution
+      tail tailFacts) :
+    BlockResultMatchesFactsAfterSubstitution substitution {
+      statements := head.id :: tail.statements
+      type := if tail.sawReturn then tail.type
+        else if head.sawReturn then head.type else tail.type
+      sawReturn := head.sawReturn || tail.sawReturn
+      state := tail.state
+    } (.cons headFacts tailFacts) := by
+  rcases headMatches with ⟨headTypeEq, headHasValueEq, headSawReturnEq⟩
+  rcases tailMatches with ⟨tailTypeEq, tailSawReturnEq⟩
+  constructor
+  · simp only [BodyFacts.cons]
+    rw [tailTypeEq, headTypeEq, tailSawReturnEq, headSawReturnEq]
+    cases tail.sawReturn <;> cases head.sawReturn <;> rfl
+  · simp only [BodyFacts.cons]
+    rw [headSawReturnEq, tailSawReturnEq]
+
+end BlockResultMatchesFactsAfterSubstitution
+
+/-- Statement-list inference is a generic sequencing layer over soundness for
+one statement.  The caller chooses the relation connecting executable states
+to lexical semantic contexts and supplies one-statement soundness in the final
+common typed source; this theorem threads that relation, builds
+`StatementsHaveType`, and proves exact agreement with the executable block
+summary. -/
+theorem inferStatementsFuel_success_statementsHaveType
+    (invariant : Frontend.SourceInference.State →
+      SourceSemantics.Context → Prop)
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    {source : TypedSource} {control : ControlContext}
+    {substitution : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (initialInvariant : invariant state semanticContext)
+    (statementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {statement : Syntax.Statement} {head : Detail.StatementResult},
+        invariant input inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext statement
+          expectedReturn input = .ok head →
+        ∃ outputContext facts,
+          invariant head.state outputContext ∧
+          StatementHasType source control inputContext head.id outputContext
+            facts ∧
+          StatementResultMatchesFactsAfterSubstitution substitution head facts)
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn state = .ok result) :
+    ∃ finalContext facts,
+      invariant result.state finalContext ∧
+      StatementsHaveType source control semanticContext result.statements
+        finalContext facts ∧
+      BlockResultMatchesFactsAfterSubstitution substitution result facts := by
+  induction fuel generalizing statements state semanticContext result with
+  | zero =>
+      simp [Detail.inferStatementsFuel] at success
+  | succ fuel induction =>
+      cases statements with
+      | nil =>
+          have resultEq := inferStatementsFuel_success_nil_facts success
+          subst result
+          exact ⟨semanticContext, .empty, initialInvariant,
+            .nil control semanticContext,
+            BlockResultMatchesFactsAfterSubstitution.empty substitution state⟩
+      | cons statement rest =>
+          cases rest with
+          | nil =>
+              obtain ⟨head, headSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_singleton_facts success
+              obtain ⟨finalContext, headFacts, finalInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound initialInvariant headSuccess
+              subst result
+              exact ⟨finalContext, .singleton headFacts, finalInvariant,
+                .singleton headTyping,
+                BlockResultMatchesFactsAfterSubstitution.singleton headMatches⟩
+          | cons next rest =>
+              obtain ⟨head, tail, headSuccess, tailSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_cons_facts success
+              obtain ⟨middleContext, headFacts, middleInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound initialInvariant headSuccess
+              obtain ⟨finalContext, tailFacts, finalInvariant, tailTyping,
+                  tailMatches⟩ :=
+                induction middleInvariant tailSuccess
+              obtain ⟨tailHead, tailRest, tailStatementsEq⟩ :=
+                inferStatementsFuel_success_statements_eq_cons tailSuccess
+              have sequenceTyping : StatementsHaveType source control
+                  semanticContext (head.id :: tail.statements) finalContext
+                  (.cons headFacts tailFacts) := by
+                rw [tailStatementsEq]
+                exact .cons headTyping
+                  (by simpa [tailStatementsEq] using tailTyping)
+              subst result
+              exact ⟨finalContext, .cons headFacts tailFacts, finalInvariant,
+                sequenceTyping,
+                BlockResultMatchesFactsAfterSubstitution.cons headMatches
+                  tailMatches⟩
+
 /-- A successful local-identifier branch materializes the exact local
 reference node used by source semantics.  In particular, the node retains the
 canonical allocator position from immediately before scheme instantiation and

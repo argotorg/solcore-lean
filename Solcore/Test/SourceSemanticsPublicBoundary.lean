@@ -175,6 +175,26 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.expressionStatementValueHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_nil_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_singleton_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_cons_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_statements_eq_cons
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.empty
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.singleton
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.cons
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_statementsHaveType
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_containsExpression
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_facts
