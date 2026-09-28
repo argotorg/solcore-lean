@@ -180,6 +180,26 @@ example :=
   @Solcore.Frontend.SourceInference.State.LocalBindersBelowNextLocal
 example :=
   @Solcore.Frontend.SourceInference.State.LocalBindersBelowNextLocal.transport
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplatesTracked
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplatesTracked.transport
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplatesTracked.of_lookupBinder?
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.refl
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.trans
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.of_fields_eq
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.withLocals
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.allocateBinder
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.restoreLexicalScope
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.refl
 example :=
@@ -266,6 +286,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.initial_localBindersBelowNextLocal
 example :=
+  @Solcore.Frontend.SourceInference.State.initial_localBinderTemplatesTracked
+example :=
   @Solcore.Frontend.SourceInference.State.fresh_preserves_nodesBelowNextOccurrence
 example :=
   @Solcore.Frontend.SourceInference.State.withLocals_preserves_nodesBelowNextOccurrence
@@ -308,6 +330,12 @@ example :=
   @Solcore.Frontend.SourceInference.State.restoreLexicalScope_preserves_localBindersBelowNextLocal
 example :=
   @Solcore.Frontend.SourceInference.State.allocateBinder_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.withLocals_preserves_localBinderTemplatesTracked
+example :=
+  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_preserves_localBinderTemplatesTracked
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateBinder_preserves_localBinderTemplatesTracked
 example :=
   @Solcore.Frontend.SourceInference.State.allocateBinder_id_fresh
 example :=

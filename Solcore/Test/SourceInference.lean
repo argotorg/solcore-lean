@@ -1040,6 +1040,50 @@ private theorem generalizationSideConditionState_requirementsWellFormed :
     generalizationSideConditionState.RequirementsWellFormed := by
   rfl
 
+private def forgedLocalSchemeRequirement :
+    SourceInference.LocalSchemeRequirement := {
+  templateRequirement := solverRegressionRequirement.id
+  predicate := solverRegressionNormalized
+}
+
+private def forgedQualifiedBinder : SourceInference.TypedBinder := {
+  id := { owner := solverRegressionOwner, binderIndex := 0 }
+  name := "forged"
+  scheme := .mono .word
+  schemeRequirements := [forgedLocalSchemeRequirement]
+}
+
+/-- A state assembled outside the canonical allocation API can satisfy both
+the requirement-ledger and local-identity bounds while omitting a visible
+binder's template from the local-scheme assumption classification.  The new
+tracking invariant excludes exactly this forgeable state. -/
+private def forgedUntrackedBinderState : SourceInference.State := {
+  SourceInference.State.initial solverRegressionOwner with
+  localBinders := [forgedQualifiedBinder]
+  nextLocal := 1
+}
+
+example :
+    forgedUntrackedBinderState.RequirementsWellFormed ∧
+      forgedUntrackedBinderState.LocalBindersBelowNextLocal ∧
+      ¬ forgedUntrackedBinderState.LocalBinderTemplatesTracked := by
+  refine ⟨rfl, ?_, ?_⟩
+  · intro binder member
+    have binderEq : binder = forgedQualifiedBinder := by
+      simpa [forgedUntrackedBinderState] using member
+    subst binder
+    simp [forgedQualifiedBinder, forgedUntrackedBinderState]
+  · intro tracked
+    have templateMember : solverRegressionRequirement.id ∈
+        forgedQualifiedBinder.schemeRequirements.map
+          (fun requirement => requirement.templateRequirement) := by
+      simp [forgedQualifiedBinder, forgedLocalSchemeRequirement]
+    have classified := tracked forgedQualifiedBinder
+      (by simp [forgedUntrackedBinderState])
+      templateMember
+    change solverRegressionRequirement.id ∈ [] at classified
+    simp at classified
+
 /-- Batch allocation produces consecutive, distinct identities which remain
 fresh for the complete input ledger even when predicate payloads repeat. -/
 example :
