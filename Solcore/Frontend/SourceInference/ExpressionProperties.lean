@@ -3761,7 +3761,7 @@ theorem freshTypes_preserves_localBindersBelowNextLocal
   unfold freshDataConstructorInstantiation
   exact foldHeader dataType.parameters ([], state)
 
-@[simp] private theorem freshDataConstructorInstantiation_preserves_lexicalScope
+@[simp] theorem freshDataConstructorInstantiation_preserves_lexicalScope
     (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature) (state : State) :
     (freshDataConstructorInstantiation dataType constructor state).2.lexicalScope =

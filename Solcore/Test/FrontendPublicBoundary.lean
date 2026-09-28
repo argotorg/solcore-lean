@@ -500,6 +500,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_success_shape
 example :=
+  @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_preserves_lexicalScope
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_localBindersBelowNextLocal

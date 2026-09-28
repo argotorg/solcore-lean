@@ -1051,6 +1051,7 @@ example := @Solcore.SourceSemantics.ExpressionsHaveTypes.product_type_admissible
 example := @Solcore.SourceSemantics.StatementHasType
 example := @Solcore.SourceSemantics.StatementHasType.letInitializedGeneralized
 example := @Solcore.SourceSemantics.StatementsHaveType
+example := @Solcore.SourceSemantics.BindersExtend.signatures_eq
 example := @Solcore.SourceSemantics.BindersExtend.locals_eq
 example := @Solcore.SourceSemantics.BindersExtend.localSchemeRequirements_eq
 example := @Solcore.SourceSemantics.MonoBindersExtend.locals_eq

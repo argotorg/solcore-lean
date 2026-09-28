@@ -243,6 +243,18 @@ end BinderExtends
 
 namespace BindersExtend
 
+/-- Installing a source-ordered binder row changes only lexical tables and
+therefore preserves the whole-program signature catalog. -/
+theorem signatures_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder}
+    (extension : BindersExtend owner context binders final) :
+    final.signatures = context.signatures := by
+  induction extension with
+  | nil => rfl
+  | cons head _ induction =>
+      exact induction.trans head.context_fields.1
+
 /-- Every binder installed by an extension is fresh for the lexical scope at
 the start of that extension. -/
 theorem ids_fresh_for_source
