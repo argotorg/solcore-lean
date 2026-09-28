@@ -9004,10 +9004,10 @@ structure MatchPatternRecursiveSoundnessCallbacks
       Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
         activeContext outer expected seen initial result)
 
-/-- Exact semantic frontiers for literal and constructor patterns.  The
-certificate-producing callbacks are tied to one concrete syntax
-constructor, its successful executable call, and the complete premises used
-by that call; in particular this is not a catch-all certificate oracle.
+/-- Exact semantic frontiers for literal and constructor patterns.  Integer
+literals expose only their irreducible solved-evidence obligation; their
+source correspondence, instruction typing, and state facts are proved by the
+dispatcher.  Constructor soundness remains a temporary certificate boundary.
 Wildcards, binders, groups, and tuple assembly are proved by the dispatcher. -/
 structure MatchPatternBranchSoundnessCallbacks
     (source : TypedSource)
@@ -9016,26 +9016,16 @@ structure MatchPatternBranchSoundnessCallbacks
     (outer : TypeSystem.Substitution) where
   literal :
     ∀ {fuel : Nat} {pattern : Syntax.Pattern}
-      {literal : Syntax.CoreLiteral} {expected : TypeSystem.Ty}
+      {literal : Syntax.CoreLiteral} {literalSource : Syntax.CoreLiteralValue}
+      {resolution : IntegerLiteralResolution} {expected : TypeSystem.Ty}
       {seen : List String} {initial : Frontend.SourceInference.State}
-      {result : Detail.InferredPattern}
-      {activeContext : SourceSemantics.Context},
+      {result : Detail.InferredPattern},
       pattern.value = .literal literal →
-      initial.InferenceReady →
-      expected.VariablesBelow initial.inference.next →
-      ProgramSignatureFormationValidated inferenceContext.signatures →
-      initial.LocalBindersBelowNextLocal →
-      source.owner = initial.owner →
-      semanticContext.currentDeclaration = some source.owner →
-      seen.Nodup →
-      TypeAdmissible semanticContext (outer.apply expected) →
-      TypeAdmissible activeContext (outer.apply expected) →
-      ActiveLocalContextInvariant initial outer activeContext →
-      outer.SemanticallyExtends result.state.inference.substitution →
       Detail.inferMatchPatternFlatFuel fuel inferenceContext pattern expected
           seen initial = .ok result →
-      Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
-        activeContext outer expected seen initial result)
+      result.resolution = .integerLiteral literalSource resolution →
+      IntegerLiteralValid semanticContext literalSource
+        (resolution.applySubstitution outer)
   constructor :
     ∀ {fuel : Nat} {pattern : Syntax.Pattern}
       {leadingDot : Option Syntax.SourceSpan}
@@ -9313,6 +9303,87 @@ private theorem inferMatchPatternFlatFuel_success_wildcard_sound
     owner_eq := properties.2.2.2
     names_eq := by simp
     names_nodup := seen_nodup
+  }⟩
+
+/-- Integer-literal leaves retain no binders and expose a single instruction.
+Only the solved `IntegerLiteralValid` evidence crosses the semantic callback
+boundary; every structural and state field follows from frontend inversion. -/
+private theorem inferMatchPatternFlatFuel_success_literal_sound
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {fuel : Nat}
+    {pattern : Syntax.Pattern} {literal : Syntax.CoreLiteral}
+    {expected : TypeSystem.Ty} {seen : List String}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (pattern_eq : pattern.value = .literal literal)
+    (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (below : initial.LocalBindersBelowNextLocal)
+    (seen_nodup : seen.Nodup)
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (literalEvidence : ∀ {literalSource resolution},
+      result.resolution = .integerLiteral literalSource resolution →
+        IntegerLiteralValid semanticContext literalSource
+          (resolution.applySubstitution outer))
+    (success : Detail.inferMatchPatternFlatFuel (fuel + 1) inferenceContext
+      pattern expected seen initial = .ok result) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  have properties := stateCallbacks.pattern ready expectedBelow validated below
+    success
+  obtain ⟨literalSource, resolution, literalValue, sourceEq, resolutionEq,
+      instructionsEq, requirementsEq, namesEq, localBindersEq, resolvedEq⟩ :=
+    Detail.inferMatchPatternFlatFuel_literal_facts pattern_eq properties.1
+      success
+  have valid : IntegerLiteralValid semanticContext literalSource
+      (resolution.applySubstitution outer) :=
+    literalEvidence resolutionEq
+  have closedTargetEq :
+      (resolution.applySubstitution outer).targetType = outer.apply expected := by
+    change outer.apply resolution.targetType = outer.apply expected
+    calc
+      outer.apply resolution.targetType =
+          outer.apply (result.state.resolve resolution.targetType) := by
+        simpa [Frontend.SourceInference.State.resolve,
+          TypeSystem.InferState.resolve] using
+            (outerExtension resolution.targetType).symm
+      _ = outer.apply (result.state.resolve expected) :=
+        congrArg outer.apply resolvedEq
+      _ = outer.apply expected := by
+        simpa [Frontend.SourceInference.State.resolve,
+          TypeSystem.InferState.resolve] using outerExtension expected
+  exact ⟨{
+    binders := []
+    rootArity := 0
+    finalContext := activeContext
+    source_represents := by
+      rw [sourceEq, resolutionEq]
+      exact .integerLiteral literalValue
+    instructions_eq := by
+      rw [instructionsEq, resolutionEq]
+      rfl
+    instruction_type := fun suffix => by
+      rw [instructionsEq, requirementsEq, ← closedTargetEq]
+      simpa [MatchPatternInstruction.applySubstitution] using
+        (PatternInstructionHasType.integerLiteral
+          (rest := suffix) valid)
+    binders_extend := .nil activeContext
+    invariant := invariant.congr_localBinders localBindersEq
+    progress := properties.1
+    ready := properties.2.1
+    below := properties.2.2.1
+    owner_eq := properties.2.2.2
+    names_eq := by simpa using namesEq
+    names_nodup := by
+      rw [namesEq]
+      exact seen_nodup
   }⟩
 
 /-- A successful binder pattern installs exactly one closed monomorphic
@@ -9709,9 +9780,10 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
 
 The dispatcher rules out the two executable error-only forms, proves
 wildcards directly, and transports every field of a strict recursive
-certificate through grouping.  Literal and constructor forms cross the
-  explicit branch-specific certificate boundary above.  Tuple assembly and
-admissibility projection are proved directly. -/
+certificate through grouping.  Literal forms cross only the exact
+integer-evidence boundary above, while constructors still cross the temporary
+certificate boundary.  Tuple assembly and admissibility projection are proved
+directly. -/
 theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
     {source : TypedSource}
     {inferenceContext : Frontend.SourceInference.Context}
@@ -9755,9 +9827,11 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
             seen_nodup invariant (by
               simpa only [Nat.succ_eq_add_one] using success)
       | literal literal =>
-          exact branches.literal valueEq ready expectedBelow validated below
-            owner_eq semanticOwner seen_nodup semanticAdmissible
-            activeAdmissible invariant outerExtension success
+          exact inferMatchPatternFlatFuel_success_literal_sound valueEq
+            stateCallbacks ready expectedBelow validated below seen_nodup
+            invariant outerExtension
+            (fun resolutionEq => branches.literal valueEq success resolutionEq)
+            (by simpa only [Nat.succ_eq_add_one] using success)
       | binder name =>
           exact inferMatchPatternFlatFuel_success_binder_sound valueEq
             stateCallbacks ready expectedBelow validated below owner_eq

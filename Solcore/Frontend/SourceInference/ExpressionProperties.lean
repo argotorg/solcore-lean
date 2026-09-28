@@ -4806,6 +4806,62 @@ theorem inferMatchPatternsFlatFuel_stateProperties
                     tailProperties.2.1, tailProperties.2.2.1,
                     tailProperties.2.2.2.trans headProperties.2.2.2⟩
 
+/-- A successful direct literal-pattern branch exposes its exact retained
+source, resolution, instruction, requirement, and unchanged binder scope.
+The resolved target equality is the only type-inference fact needed by the
+declarative integer-pattern bridge. -/
+theorem inferMatchPatternFlatFuel_literal_facts
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {literal : Syntax.CoreLiteral} {expected : Ty} {seen : List String}
+    {state : State} {result : InferredPattern}
+    (patternValue : pattern.value = .literal literal)
+    (progress : state.InferenceProgress result.state)
+    (success : inferMatchPatternFlatFuel fuel context pattern expected seen
+      state = .ok result) :
+    ∃ source resolution,
+      literal.value = source ∧
+      result.source = .integerLiteral pattern.span literal ∧
+      result.resolution = .integerLiteral source resolution ∧
+      result.instructions = [.integerLiteral source resolution] ∧
+      result.requirements = [resolution.requirement] ∧
+      result.names = seen ∧
+      result.state.localBinders = state.localBinders ∧
+      result.state.resolve resolution.targetType =
+        result.state.resolve expected := by
+  cases fuel with
+  | zero => simp [inferMatchPatternFlatFuel] at success
+  | succ fuel =>
+      unfold inferMatchPatternFlatFuel at success
+      simp only [patternValue] at success
+      cases literalValue : literal.value with
+      | string spelling => simp [literalValue] at success
+      | decimal spelling | hexadecimal spelling =>
+          simp only [literalValue, bind, Except.bind] at success
+          cases decoded : Frontend.numericLiteralValue? literal.value with
+          | none =>
+              rw [literalValue] at decoded
+              simp [decoded] at success
+          | some rawValue =>
+              rw [literalValue] at decoded
+              simp only [decoded] at success
+              simp [State.fresh, TypeSystem.InferState.fresh,
+                State.addRequirementWithId] at success
+              repeat' first | split at success
+              all_goals try simp_all only [exceptPure_eq_ok]
+              all_goals try simp_all
+              all_goals try cases success
+              all_goals try subst result
+              all_goals
+                have unified := unify_resolve_eq (by assumption)
+                have bindersPreserved :=
+                  unify_preserves_localBinders (by assumption)
+                simp_all [State.resolve, TypeSystem.InferState.resolve,
+                  State.fresh, TypeSystem.InferState.fresh,
+                  State.addRequirementWithId]
+                have extension := progress.substitution_extends expected
+                simp_all only [State.resolve,
+                  TypeSystem.InferState.resolve]
+
 /-- Successful pattern inference preserves the declaration-scoped state
 header. -/
 theorem inferMatchPatternFuel_state_header

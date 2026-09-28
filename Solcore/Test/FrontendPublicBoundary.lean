@@ -520,6 +520,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_stateProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_literal_facts
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternsFlatFuel_stateProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.explicitConstructorCandidate_success_members
