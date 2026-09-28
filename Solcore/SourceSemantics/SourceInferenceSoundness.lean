@@ -2970,6 +2970,70 @@ theorem inferStatementFuel_success_block_facts
           (bodyResult.state.restoreLexicalScope allocated.lexicalScope)
           _ roots⟩
 
+/-- A successful `while` branch exposes the expected-`Bool` condition, the
+body checked at one greater loop depth, lexical-scope restoration, and the
+canonical unit statement recorded afterwards. -/
+theorem inferStatementFuel_success_whileLoop_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .whileLoop condition body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ inferredCondition conditionState bodyResult,
+      Detail.inferExprFuel fuel context condition (some .bool) allocated =
+        .ok (inferredCondition, conditionState) ∧
+      Detail.inferStatementsFuel fuel
+        { context with loopDepth := context.loopDepth + 1 }
+        body.value expectedReturn conditionState = .ok bodyResult ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state :=
+          (bodyResult.state.restoreLexicalScope
+            conditionState.lexicalScope).recordNode (.statement {
+              id
+              span := statement.span
+              type := .unit
+              form := .whileLoop inferredCondition.id bodyResult.statements
+            })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .whileLoop inferredCondition.id bodyResult.statements
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases conditionSuccess : Detail.inferExprFuel fuel context condition
+      (some .bool) allocated with
+  | error error =>
+      simp [conditionSuccess] at success
+  | ok conditionPair =>
+      rcases conditionPair with ⟨inferredCondition, conditionState⟩
+      simp only [conditionSuccess] at success
+      cases bodySuccess : Detail.inferStatementsFuel fuel
+          { context with loopDepth := context.loopDepth + 1 }
+          body.value expectedReturn conditionState with
+      | error error =>
+          simp [bodySuccess] at success
+      | ok bodyResult =>
+          simp only [bodySuccess, pure, Pure.pure, Except.pure] at success
+          injection success with resultEq
+          rw [← resultEq]
+          exact ⟨inferredCondition, conditionState, bodyResult,
+            rfl, bodySuccess, rfl,
+            recordNode_containsStatement
+              (bodyResult.state.restoreLexicalScope
+                conditionState.lexicalScope) _ roots⟩
+
 /-- A retained semicolon-terminated expression statement discards its child's
 value.  Final substitution changes the child proof but leaves the statement's
 unit result and ordinary control summary unchanged. -/
@@ -3377,6 +3441,40 @@ theorem blockStatementHasType_afterSubstitution
     rfl bodyType (by
       simpa [StatementNode.applySubstitution] using agreement.type_eq.symm)
 
+/-- A retained `while` statement is typed from its finalized Boolean
+condition and recursively reconstructed body at one greater loop depth.
+Lexical effects of the body remain scoped to the loop. -/
+theorem whileLoopStatementHasType_afterSubstitution
+    {source : TypedSource} {target bodyFinal : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {inferredCondition : InferredExpression}
+    {bodyResult : Detail.BlockResult} {bodyFacts : BodyFacts}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .whileLoop inferredCondition.id bodyResult.statements
+    })
+    (conditionType : ExpressionHasType (source.applySubstitution outer) target
+      inferredCondition.id (outer.apply inferredCondition.type))
+    (conditionEq : outer.apply inferredCondition.type = .bool)
+    (bodyType : StatementsHaveType (source.applySubstitution outer)
+      control.enterLoop target bodyResult.statements bodyFinal bodyFacts) :
+    StatementHasType (source.applySubstitution outer) control target id target {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .loop bodyFacts.control
+    } := by
+  have conditionBool : ExpressionHasType (source.applySubstitution outer)
+      target inferredCondition.id .bool := by
+    rw [← conditionEq]
+    exact conditionType
+  exact .whileLoop
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl conditionBool bodyType (by simp [StatementNode.applySubstitution])
+
 namespace StatementResultMatchesFactsAfterSubstitution
 
 /-- Every executable local declaration returns the canonical ordinary-unit
@@ -3550,6 +3648,25 @@ theorem block
     } := by
   exact ⟨agreement.type_eq, agreement.sawReturn_eq,
     agreement.sawReturn_eq⟩
+
+/-- A loop statement always has the executable unit/non-returning summary;
+the declarative body control is retained only inside the loop summary. -/
+theorem whileLoop
+    (substitution : TypeSystem.Substitution) (bodyFacts : BodyFacts)
+    (id : StatementId) (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      state
+    } {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .loop bodyFacts.control
+    } := by
+  constructor <;> rfl
 
 end StatementResultMatchesFactsAfterSubstitution
 
@@ -4098,6 +4215,138 @@ theorem inferStatementFuel_success_ifWithElse_sound
       elseAgreement elseExtension
   · exact StatementResultMatchesFactsAfterSubstitution.ifWithElse
       thenAgreement elseAgreement elseExtension id _
+
+/-- A successful `while` statement is compositional modulo condition and body
+soundness in the common final typed source.  Executable and declarative loop
+depths advance together for the body, and lexical restoration returns the
+enclosing statement to its input semantic context. -/
+theorem inferStatementFuel_success_whileLoop_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .whileLoop condition body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (conditionSound :
+      ∀ {inferredCondition : InferredExpression}
+        {conditionState : Frontend.SourceInference.State},
+        Detail.inferExprFuel fuel inferenceContext condition (some .bool)
+            allocated = .ok (inferredCondition, conditionState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target inferredCondition.id
+            (outer.apply inferredCondition.type))
+    (bodySound :
+      ∀ {conditionState : Frontend.SourceInference.State}
+        {bodyResult : Detail.BlockResult},
+        ActiveLocalContextInvariant conditionState outer target →
+          Detail.inferStatementsFuel fuel {
+              inferenceContext with
+              loopDepth := inferenceContext.loopDepth + 1
+            } body.value expectedReturn conditionState = .ok bodyResult →
+            ∃ bodyFinal bodyFacts,
+              ActiveLocalContextInvariant bodyResult.state outer bodyFinal ∧
+              StatementsHaveType
+                ((result.state.toTypedSource roots).applySubstitution outer)
+                ({
+                  returnType := outer.apply expectedReturn
+                  loopDepth := inferenceContext.loopDepth
+                } : ControlContext).enterLoop target bodyResult.statements
+                bodyFinal bodyFacts ∧
+              BlockResultMatchesFactsAfterSubstitution outer bodyResult
+                bodyFacts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [finalEq] at preserved
+    exact preserved
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← finalEq]
+    exact returnBelow
+  obtain ⟨inferredCondition, conditionState, bodyResult, conditionSuccess,
+      bodySuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_whileLoop_facts statementEq allocationEq
+      success roots
+  have conditionProperties :=
+    Detail.inferExprFuel_inferenceProperties allocatedReady signatureFormation
+      functionsCanonical (by
+        intro expected member
+        simp only [Option.mem_def] at member
+        injection member with expectedEq
+        subst expected
+        simp [TypeSystem.Ty.bool]) conditionSuccess
+  have conditionInvariant :
+      ActiveLocalContextInvariant conditionState outer target :=
+    allocatedInvariant.inferExprFuel conditionSuccess
+  have conditionTyping := conditionSound conditionSuccess
+  have conditionReturnBelow :
+      expectedReturn.VariablesBelow conditionState.inference.next :=
+    allocatedReturnBelow.weaken conditionProperties.1.next_le
+  have bodyProperties :=
+    Detail.inferStatementsFuel_inferenceProperties
+      (context := {
+        inferenceContext with
+        loopDepth := inferenceContext.loopDepth + 1
+      }) conditionProperties.2.1 signatureFormation functionsCanonical
+      conditionReturnBelow bodySuccess
+  obtain ⟨bodyFinal, bodyFacts, _bodyInvariant, bodyTyping,
+      bodyAgreement⟩ := bodySound conditionInvariant bodySuccess
+  subst result
+  have bodyExtension : outer.SemanticallyExtends
+      bodyResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      bodyResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  have conditionExtension : outer.SemanticallyExtends
+      conditionState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans bodyExtension
+      bodyProperties.1.substitution_extends
+  have conditionEq : outer.apply inferredCondition.type = .bool := by
+    simpa using Detail.inferExprFuel_expected_type_apply_eq conditionSuccess
+      conditionExtension
+  refine ⟨{
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .loop bodyFacts.control
+    }, conditionInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact whileLoopStatementHasType_afterSubstitution contains conditionTyping
+      conditionEq bodyTyping
+  · exact StatementResultMatchesFactsAfterSubstitution.whileLoop outer
+      bodyFacts id _
 
 /-- Empty executable block inference returns the canonical empty block
 without changing its input state. -/
