@@ -450,6 +450,16 @@ private theorem nominal_ne_function
   rw [applicationHead_nominal] at heads
   cases heads
 
+private theorem nominal_ne_product
+    (declaration : Resolved.DeclarationId)
+    (arguments : List TypeSystem.Ty)
+    (left right : TypeSystem.Ty) :
+    TypeSystem.Ty.nominal declaration arguments ≠ .product left right := by
+  intro equal
+  have heads := congrArg applicationHead equal
+  rw [applicationHead_nominal] at heads
+  cases heads
+
 private theorem nominal_ne_mapping
     (declaration : Resolved.DeclarationId)
     (arguments : List TypeSystem.Ty)
@@ -563,6 +573,36 @@ theorem function_components
       cases equal
       exact ⟨parameterScoped, resultScoped⟩
   | .product _ _ => by intro _ _ equal; cases equal
+  | .mapping _ _ => by intro _ _ equal; cases equal
+  | .proxy _ => by intro _ _ equal; cases equal
+  | .comptime _ => by intro _ _ equal; cases equal
+
+/-- Inversion for product types exposes both structurally scoped
+components. -/
+theorem product_components
+    {context : Context} {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    ∀ left right, type = .product left right →
+      TypeWellScoped context flexibleVariables left ∧
+        TypeWellScoped context flexibleVariables right :=
+  match wellScoped with
+  | .variable _ => by intro _ _ equal; cases equal
+  | .parameter _ _ => by intro _ _ equal; cases equal
+  | .builtin _ => by intro _ _ equal; cases equal
+  | .nominal dataType arguments _ _ _ => by
+      intro left right equal
+      exact False.elim
+        (nominal_ne_product dataType.id arguments left right equal)
+  | .contractNominal contract arguments _ _ _ => by
+      intro left right equal
+      exact False.elim
+        (nominal_ne_product contract.id arguments left right equal)
+  | .function _ _ => by intro _ _ equal; cases equal
+  | .product leftScoped rightScoped => by
+      intro _ _ equal
+      cases equal
+      exact ⟨leftScoped, rightScoped⟩
   | .mapping _ _ => by intro _ _ equal; cases equal
   | .proxy _ => by intro _ _ equal; cases equal
   | .comptime _ => by intro _ _ equal; cases equal

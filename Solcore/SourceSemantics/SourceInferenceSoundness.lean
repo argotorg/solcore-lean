@@ -9004,9 +9004,8 @@ structure MatchPatternRecursiveSoundnessCallbacks
       Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
         activeContext outer expected seen initial result)
 
-/-- Exact semantic frontiers for literal and constructor patterns, plus the
-narrow structural admissibility projection used by the direct tuple proof.
-The certificate-producing callbacks are tied to one concrete syntax
+/-- Exact semantic frontiers for literal and constructor patterns.  The
+certificate-producing callbacks are tied to one concrete syntax
 constructor, its successful executable call, and the complete premises used
 by that call; in particular this is not a catch-all certificate oracle.
 Wildcards, binders, groups, and tuple assembly are proved by the dispatcher. -/
@@ -9063,16 +9062,6 @@ structure MatchPatternBranchSoundnessCallbacks
           seen initial = .ok result →
       Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
         activeContext outer expected seen initial result)
-  tuple_elements_admissible :
-    ∀ {activeContext : SourceSemantics.Context}
-      {expected : TypeSystem.Ty} {elementTypes : List TypeSystem.Ty},
-      TypeAdmissible semanticContext (outer.apply expected) →
-      TypeAdmissible activeContext (outer.apply expected) →
-      outer.apply expected =
-        TypeSystem.Ty.productMany (elementTypes.map outer.apply) →
-      ∀ element, element ∈ elementTypes →
-        TypeAdmissible semanticContext (outer.apply element) ∧
-          TypeAdmissible activeContext (outer.apply element)
 
 private theorem bindersExtend_append
     {owner : Resolved.DeclarationId}
@@ -9532,9 +9521,8 @@ private theorem freshTypes_preserves_owner
 
 /-- Tuple-pattern inference allocates one fresh expected type per source
 element, unifies their product with the caller's expected type, and delegates
-the source-ordered children to the recursive list theorem.  The only semantic
-boundary retained in `MatchPatternBranchSoundnessCallbacks` is the structural
-projection of admissibility from that unified product to its elements. -/
+the source-ordered children to the recursive list theorem.  Admissibility of
+each child follows structurally from the unified product type. -/
 private theorem inferMatchPatternFlatFuel_success_tuple_sound
     {source : TypedSource}
     {inferenceContext : Frontend.SourceInference.Context}
@@ -9550,8 +9538,6 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
       inferenceContext.signatures)
     (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
     (recursive : MatchPatternRecursiveSoundnessCallbacks source
-      inferenceContext semanticContext outer)
-    (branches : MatchPatternBranchSoundnessCallbacks source
       inferenceContext semanticContext outer)
     (ready : initial.InferenceReady)
     (expectedBelow : expected.VariablesBelow initial.inference.next)
@@ -9643,8 +9629,24 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
               _ = TypeSystem.Ty.productMany
                   (elementTypes.map outer.apply) :=
                 FlexibleSubstitution.apply_productMany outer elementTypes
-          have eachAdmissible := branches.tuple_elements_admissible
-            semanticAdmissible activeAdmissible productEq
+          have semanticProduct : TypeAdmissible semanticContext
+              (TypeSystem.Ty.productMany (elementTypes.map outer.apply)) := by
+            rw [← productEq]
+            exact semanticAdmissible
+          have activeProduct : TypeAdmissible activeContext
+              (TypeSystem.Ty.productMany (elementTypes.map outer.apply)) := by
+            rw [← productEq]
+            exact activeAdmissible
+          have eachSemantic : ∀ type ∈ elementTypes,
+              TypeAdmissible semanticContext (outer.apply type) := by
+            intro type member
+            apply TypeAdmissible.productMany_member semanticProduct
+            exact List.mem_map.mpr ⟨type, member, rfl⟩
+          have eachActive : ∀ type ∈ elementTypes,
+              TypeAdmissible activeContext (outer.apply type) := by
+            intro type member
+            apply TypeAdmissible.productMany_member activeProduct
+            exact List.mem_map.mpr ⟨type, member, rfl⟩
           have allocatedInvariant : ActiveLocalContextInvariant allocated outer
               activeContext := by
             apply invariant.congr_localBinders
@@ -9667,8 +9669,7 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
           obtain ⟨childrenCertificate⟩ := recursive.patterns
             unifiedReady elementTypesBelow unifiedBelow recursiveOwner
             seen_nodup
-            (fun type member => (eachAdmissible type member).1)
-            (fun type member => (eachAdmissible type member).2)
+            eachSemantic eachActive
             unifiedInvariant outerExtension childrenResult
           have arity : elements.elements.length =
               (elementTypes.map outer.apply).length := by
@@ -9709,9 +9710,8 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
 The dispatcher rules out the two executable error-only forms, proves
 wildcards directly, and transports every field of a strict recursive
 certificate through grouping.  Literal and constructor forms cross the
-explicit branch-specific certificate boundary above.  Tuple assembly is
-proved directly and retains only the narrow structural fact that admissibility
-of a product projects to each element. -/
+  explicit branch-specific certificate boundary above.  Tuple assembly and
+admissibility projection are proved directly. -/
 theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
     {source : TypedSource}
     {inferenceContext : Frontend.SourceInference.Context}
@@ -9806,7 +9806,7 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
               }⟩
       | tuple elements =>
           exact inferMatchPatternFlatFuel_success_tuple_sound valueEq validated
-            stateCallbacks recursive branches ready expectedBelow below owner_eq
+            stateCallbacks recursive ready expectedBelow below owner_eq
             seen_nodup semanticAdmissible activeAdmissible invariant
             outerExtension (by
               simpa only [Nat.succ_eq_add_one] using success)

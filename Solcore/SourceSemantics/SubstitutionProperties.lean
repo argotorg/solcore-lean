@@ -5848,6 +5848,49 @@ theorem function_result
     exact (admissible.typeWellScoped.function_components parameter result rfl).2
   exact component admissible componentScoped
 
+/-- The left component of an admissible product type is admissible. -/
+theorem product_left
+    {context : Context} {left right : Ty}
+    (admissible : TypeAdmissible context (.product left right)) :
+    TypeAdmissible context left := by
+  have componentScoped : TypeWellScoped context
+      (admissibleTypeVariables context (.product left right)) left := by
+    exact (admissible.typeWellScoped.product_components left right rfl).1
+  exact component admissible componentScoped
+
+/-- The right component of an admissible product type is admissible. -/
+theorem product_right
+    {context : Context} {left right : Ty}
+    (admissible : TypeAdmissible context (.product left right)) :
+    TypeAdmissible context right := by
+  have componentScoped : TypeWellScoped context
+      (admissibleTypeVariables context (.product left right)) right := by
+    exact (admissible.typeWellScoped.product_components left right rfl).2
+  exact component admissible componentScoped
+
+/-- Every source element of an admissible right-associated product is
+admissible in the same context. -/
+theorem productMany_member
+    {context : Context} {types : List Ty}
+    (admissible : TypeAdmissible context (Ty.productMany types)) :
+    ∀ type, type ∈ types → TypeAdmissible context type := by
+  induction types with
+  | nil =>
+      intro type member
+      simp at member
+  | cons head tail induction =>
+      cases tail with
+      | nil =>
+          intro type member
+          simp only [List.mem_singleton] at member
+          subst type
+          simpa [Ty.productMany] using admissible
+      | cons next rest =>
+          intro type member
+          rcases List.mem_cons.mp member with rfl | member
+          · exact product_left admissible
+          · exact induction (product_right admissible) type member
+
 /-- The key component of an admissible mapping type is admissible. -/
 theorem mapping_key
     {context : Context} {key value : Ty}
