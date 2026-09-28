@@ -892,4 +892,78 @@ theorem ordinaryDeclarationAssumptionAccepted :
   · simp [sourceLocalSchemeTemplateIds, localSchemeTemplateOwners,
       initializedLetBindings, ordinarySource]
 
+private theorem ordinaryRequirementOwnership :
+    RequirementOwnership ordinaryContextWithAssumption ordinarySource := by
+  constructor <;>
+    simp [primaryRequirementIds, statementPrimaryRequirementIds,
+      ordinaryContextWithAssumption, Context.withSolvedRequirements,
+      Context.withAssumptions, Context.ofSignatures, ordinarySource,
+      expressionNode, ordinaryRow]
+
+private theorem ordinaryExpressionContained :
+    ContainsExpression ordinarySource (expressionId 0)
+      (expressionNode 0 [ordinaryId]) := by
+  simp [ContainsExpression, ordinarySource, expressionNode]
+
+private theorem ordinaryRootScopeCovered :
+    TemplateScopeCovered ordinarySource ordinaryContextWithAssumption
+      (.expression (expressionId 0)) := by
+  intro owner scope
+  have impossible : False := by
+    simpa [ContainsLocalSchemeTemplate, localSchemeTemplateOwners,
+      initializedLetBindings, ordinarySource] using scope.1
+  exact impossible.elim
+
+/-- The occurrence-sensitive bridge retains the ordinary ledger branch when
+the active context is the declaration context itself. -/
+example : RequirementValid ordinaryContextWithAssumption ordinaryId := by
+  apply ordinaryDeclarationAssumptionAccepted.requirementValidAt
+    ordinaryRequirementOwnership rfl rfl (fun _ member => member)
+    ordinaryRootScopeCovered
+  exact ordinaryExpressionContained.primaryRequirementOccursAt
+    (by simp [expressionNode])
+
+private theorem scopedTemplateRequirementOwnership :
+    RequirementOwnership templateContext scopedTemplateSource := by
+  constructor <;>
+    simp [primaryRequirementIds, statementPrimaryRequirementIds,
+      templateContext, Context.withSolvedRequirements, Context.ofSignatures,
+      scopedTemplateSource, expressionNode, letNode, templateRow]
+
+private theorem templateInitializerScopeCovered :
+    TemplateScopeCovered scopedTemplateSource
+      (localSchemeInitializerContext templateContext (templateBinder 0))
+      (.expression (expressionId 0)) := by
+  intro owner scope
+  have ownerEq : owner = scopedTemplateOwner := by
+    simpa [ContainsLocalSchemeTemplate, localSchemeTemplateOwners,
+      initializedLetBindings, statementInitializedLetBindings,
+      InitializedLetBinding.templateOwners, scopedTemplateSource,
+      scopedTemplateOwner, letNode, templateBinder, templateRequirement] using
+      scope.1
+  subst owner
+  simp [localSchemeInitializerContext, Context.withTypeVariables,
+    Context.withAssumptions, templateContext, Context.withSolvedRequirements,
+    Context.ofSignatures, scopedTemplateOwner, templateBinder,
+    templateRequirement]
+
+/-- The same bridge accepts a template row only inside its covered
+initializer context, where the retained assumption evidence is active. -/
+example : RequirementIdsValid
+    (localSchemeInitializerContext templateContext (templateBinder 0))
+    [templateId] := by
+  apply initializerRootTemplateAccepted.requirementIdsValidAt
+    (active := localSchemeInitializerContext templateContext (templateBinder 0))
+    (occurrence := .expression (expressionId 0))
+    (ids := [templateId])
+    scopedTemplateRequirementOwnership rfl rfl
+  · intro predicate member
+    simp [templateContext, Context.withSolvedRequirements,
+      Context.ofSignatures] at member
+  · exact templateInitializerScopeCovered
+  · intro id member
+    have idEq : id = templateId := by simpa using member
+    subst id
+    exact templateOccursAtInitializer
+
 end Solcore.Test.SourceSemanticsScopedRequirements

@@ -78,6 +78,13 @@ def LocalSchemeTemplateOwner.Scopes (source : TypedSource)
   ContainsLocalSchemeTemplate source owner ∧
     InReflexiveSubtree source owner.initializer occurrence
 
+/-- Every qualified local-scheme template whose initializer scope contains an
+occurrence is available as an assumption in the occurrence's static context. -/
+def TemplateScopeCovered (source : TypedSource) (context : Context)
+    (occurrence : NodeId) : Prop :=
+  ∀ owner : LocalSchemeTemplateOwner, owner.Scopes source occurrence →
+    owner.requirement.predicate ∈ context.assumptions
+
 namespace LocalSchemeTemplateOwner
 
 theorem scopes_initializer

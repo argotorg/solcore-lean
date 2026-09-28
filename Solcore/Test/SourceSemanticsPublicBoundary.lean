@@ -21,6 +21,8 @@ example := @Solcore.SourceSemantics.Context.HasAssumption
 example := @Solcore.SourceSemantics.ContainsNode
 example := @Solcore.SourceSemantics.ContainsExpression
 example := @Solcore.SourceSemantics.ContainsStatement
+example := @Solcore.SourceSemantics.ContainsExpression.primaryRequirementOccursAt
+example := @Solcore.SourceSemantics.ContainsStatement.primaryRequirementOccursAt
 example := @Solcore.SourceSemantics.ContainsNode.of_nodes_prefix
 example := @Solcore.SourceSemantics.ContainsExpression.of_nodes_prefix
 example := @Solcore.SourceSemantics.ContainsStatement.of_nodes_prefix
@@ -540,6 +542,10 @@ example := @Solcore.SourceSemantics.ScopedRequirementEntryValid
 example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed
 example :=
   @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.transportContext
+example :=
+  @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.requirementValidAt
+example :=
+  @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.requirementIdsValidAt
 example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.template_exact
 example :=
   @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.localSchemeRequirementWellFormed
@@ -549,6 +555,8 @@ example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.toRuntime
 example := @Solcore.SourceSemantics.RuntimeRequirementLedgerValid
 example := @Solcore.SourceSemantics.LocalIdentityOwnership
 example := @Solcore.SourceSemantics.RequirementOwnership
+example := @Solcore.SourceSemantics.RequirementOwnership.primaryOccurrence_unique
+example := @Solcore.SourceSemantics.TemplateScopeCovered
 example := @Solcore.SourceSemantics.LocalSchemeTemplateOwnership.owner_unique
 example := @Solcore.SourceSemantics.patternInstructionBinderIds_eq_carrier
 example := @Solcore.SourceSemantics.patternBinderIds_eq_carrier

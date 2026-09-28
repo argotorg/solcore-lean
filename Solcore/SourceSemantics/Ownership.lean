@@ -546,6 +546,36 @@ def PrimaryRequirementOccursAt (source : TypedSource) (occurrence : NodeId)
     (requirement : RequirementId) : Prop :=
   { occurrence, requirement } ∈ primaryRequirementOccurrences source
 
+/-- An expression-owned requirement is attached at that exact expression
+occurrence in the whole-source primary-requirement inventory. -/
+theorem ContainsExpression.primaryRequirementOccursAt
+    {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
+    {requirement : RequirementId}
+    (contains : ContainsExpression source id node)
+    (member : requirement ∈ node.requirements) :
+    PrimaryRequirementOccursAt source (.expression id) requirement := by
+  unfold PrimaryRequirementOccursAt primaryRequirementOccurrences
+  apply List.mem_flatMap.mpr
+  refine ⟨.expression node, contains.1, ?_⟩
+  simp only [nodePrimaryRequirementOccurrences,
+    expressionPrimaryRequirementOccurrences, List.mem_map]
+  exact ⟨requirement, member, by simp [contains.2]⟩
+
+/-- A statement-owned requirement is attached at that exact statement
+occurrence in the whole-source primary-requirement inventory. -/
+theorem ContainsStatement.primaryRequirementOccursAt
+    {source : TypedSource} {id : StatementId} {node : StatementNode}
+    {requirement : RequirementId}
+    (contains : ContainsStatement source id node)
+    (member : requirement ∈ statementPrimaryRequirementIds node.form) :
+    PrimaryRequirementOccursAt source (.statement id) requirement := by
+  unfold PrimaryRequirementOccursAt primaryRequirementOccurrences
+  apply List.mem_flatMap.mpr
+  refine ⟨.statement node, contains.1, ?_⟩
+  simp only [nodePrimaryRequirementOccurrences,
+    statementPrimaryRequirementOccurrences, List.mem_map]
+  exact ⟨requirement, member, by simp [contains.2]⟩
+
 /-- Every primary evidence owner in node-table order. -/
 def primaryRequirementIds (source : TypedSource) : List RequirementId :=
   source.nodes.flatMap fun node =>
@@ -673,6 +703,55 @@ structure RequirementOwnership (context : Context) (source : TypedSource) : Prop
     (context.solvedRequirements.map fun requirement => requirement.id)
 
 namespace RequirementOwnership
+
+private theorem eq_of_mem_of_mapped_nodup
+    {alpha beta : Type} {values : List alpha} {key : alpha → beta}
+    {left right : alpha}
+    (keysNodup : (values.map key).Nodup)
+    (leftMem : left ∈ values) (rightMem : right ∈ values)
+    (keysEq : key left = key right) :
+    left = right := by
+  induction values with
+  | nil => simp at leftMem
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at keysNodup
+      rcases keysNodup with ⟨headFresh, tailNodup⟩
+      simp only [List.mem_cons] at leftMem rightMem
+      rcases leftMem with rfl | leftTail
+      · rcases rightMem with rfl | rightTail
+        · rfl
+        · exfalso
+          apply headFresh
+          rw [keysEq]
+          exact List.mem_map.mpr ⟨right, rightTail, rfl⟩
+      · rcases rightMem with rfl | rightTail
+        · exfalso
+          apply headFresh
+          rw [← keysEq]
+          exact List.mem_map.mpr ⟨left, leftTail, rfl⟩
+        · exact induction tailNodup leftTail rightTail
+
+/-- Whole-source primary identity uniqueness pins one requirement identity to
+one exact source occurrence. -/
+theorem primaryOccurrence_unique
+    {context : Context} {source : TypedSource}
+    (ownership : RequirementOwnership context source)
+    {left right : NodeId} {id : RequirementId}
+    (leftOccurs : PrimaryRequirementOccursAt source left id)
+    (rightOccurs : PrimaryRequirementOccursAt source right id) :
+    left = right := by
+  have occurrenceIdsUnique :
+      ((primaryRequirementOccurrences source).map
+        (fun occurrence => occurrence.requirement)).Nodup := by
+    rw [primaryRequirementOccurrenceIds_eq]
+    exact ownership.primary_unique
+  have occurrencesEq :
+      ({ occurrence := left, requirement := id } :
+          PrimaryRequirementOccurrence) =
+        { occurrence := right, requirement := id } :=
+    eq_of_mem_of_mapped_nodup occurrenceIdsUnique leftOccurs rightOccurs rfl
+  exact congrArg (fun occurrence : PrimaryRequirementOccurrence =>
+    occurrence.occurrence) occurrencesEq
 
 theorem ledger_ids_unique
     {context : Context} {source : TypedSource}

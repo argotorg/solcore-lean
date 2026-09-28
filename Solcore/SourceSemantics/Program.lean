@@ -179,6 +179,76 @@ theorem template_scoped
   | ordinary notTemplate _ => exact False.elim (notTemplate templateId)
   | template scopeProof => exact scopeProof
 
+/-- A primary requirement is valid at its exact source occurrence when every
+qualified template whose initializer scope contains that occurrence is active
+in the local assumption context.  Ordinary ledger evidence is transported by
+assumption weakening; template evidence is justified by scope coverage. -/
+theorem requirementValidAt
+    {base active : Context} {source : TypedSource}
+    {occurrence : NodeId} {id : RequirementId}
+    (wellFormed : ScopedRequirementLedgerWellFormed base source)
+    (ownership : RequirementOwnership base source)
+    (signatures_eq : active.signatures = base.signatures)
+    (requirements_eq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptions_mono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered source active occurrence)
+    (occurs : PrimaryRequirementOccursAt source occurrence id) :
+    RequirementValid active id := by
+  have primaryMember : id ∈ primaryRequirementIds source :=
+    primaryRequirementIds_mem_iff_occursAt.mpr ⟨occurrence, occurs⟩
+  have ledgerMember : id ∈
+      base.solvedRequirements.map (fun requirement => requirement.id) :=
+    (ownership.primary_mem_iff_ledger id).mp primaryMember
+  rcases List.mem_map.mp ledgerMember with
+    ⟨row, rowMember, rowIdEq⟩
+  have activeMember : row ∈ active.solvedRequirements := by
+    rw [requirements_eq]
+    exact rowMember
+  refine ⟨row.predicate, row, ⟨activeMember, rowIdEq⟩, rfl, ?_⟩
+  cases wellFormed.entriesValid row rowMember with
+  | ordinary _ valid =>
+      cases valid with
+      | intro evidenceValid =>
+          apply SolvedRequirementValid.intro
+          simpa [signatures_eq] using
+            evidenceValid.weakenAssumptions assumptions_mono
+  | template rowScoped =>
+      rcases rowScoped.exact_owner with
+        ⟨owner, scopedOccurrence, _, _, predicateEq, evidenceEq,
+          scopedOccurs, inScope⟩
+      have currentOccurs :
+          PrimaryRequirementOccursAt source occurrence row.id := by
+        simpa [rowIdEq] using occurs
+      have occurrenceEq : scopedOccurrence = occurrence :=
+        ownership.primaryOccurrence_unique scopedOccurs currentOccurs
+      subst scopedOccurrence
+      have assumptionMember :
+          owner.requirement.predicate ∈ active.assumptions :=
+        covered owner inScope
+      apply SolvedRequirementValid.intro
+      rw [predicateEq, evidenceEq]
+      exact .intro (.assumption _) (.assumption assumptionMember)
+
+/-- Pointwise source ownership lifts `requirementValidAt` to every stable
+requirement identity attached at one occurrence. -/
+theorem requirementIdsValidAt
+    {base active : Context} {source : TypedSource}
+    {occurrence : NodeId} {ids : List RequirementId}
+    (wellFormed : ScopedRequirementLedgerWellFormed base source)
+    (ownership : RequirementOwnership base source)
+    (signatures_eq : active.signatures = base.signatures)
+    (requirements_eq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptions_mono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered source active occurrence)
+    (occurs : ∀ id, id ∈ ids →
+      PrimaryRequirementOccursAt source occurrence id) :
+    RequirementIdsValid active ids := by
+  intro id member
+  exact wellFormed.requirementValidAt ownership signatures_eq requirements_eq
+    assumptions_mono covered (occurs id member)
+
 /-- Recover the exact scoped ledger row promised for one source template
 owner. -/
 theorem template_row
