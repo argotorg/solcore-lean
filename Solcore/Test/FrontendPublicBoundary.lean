@@ -649,6 +649,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_lexicalScope_eq
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_nextLocal_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_localBindersBelowNextLocal
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_localIdentifier_record
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_inferenceProperties

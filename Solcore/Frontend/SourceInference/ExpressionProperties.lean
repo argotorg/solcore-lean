@@ -1527,6 +1527,13 @@ private def PreservesStateHeader {α : Type} (stateOf : α → State)
   ∀ result, computation = .ok result →
     (stateOf result).header = initial.header
 
+/-- Recursive inference may allocate declaration-local identities, but never
+moves the shared allocator cutoff backwards. -/
+private def AdvancesNextLocal {α : Type} (stateOf : α → State)
+    (initial : State) (computation : Except Error α) : Prop :=
+  ∀ result, computation = .ok result →
+    initial.nextLocal ≤ (stateOf result).nextLocal
+
 private def PreservesLexicalScope {α : Type} (stateOf : α → State)
     (initial : State) (computation : Except Error α) : Prop :=
   ∀ result, computation = .ok result →
@@ -1559,6 +1566,16 @@ private theorem pair_success_lexicalScope {α : Type}
       exact (congrArg (fun result => result.2.lexicalScope) success).symm
     _ = initial.lexicalScope := operationScope
 
+private theorem pair_success_nextLocal {α : Type}
+    {operation : α × State} {value : α} {next initial : State}
+    (operationNext : operation.2.nextLocal = initial.nextLocal)
+    (success : operation = (value, next)) :
+    next.nextLocal = initial.nextLocal := by
+  calc
+    next.nextLocal = operation.2.nextLocal := by
+      exact (congrArg (fun result => result.2.nextLocal) success).symm
+    _ = initial.nextLocal := operationNext
+
 private theorem pair_eq_property {α β : Type} {result : α × β}
     {property : β → Prop}
     (invariant : ∀ value state, result = (value, state) → property state) :
@@ -1588,6 +1605,12 @@ private theorem allocateExpressionId_success_lexicalScope
     next.lexicalScope = state.lexicalScope :=
   pair_success_lexicalScope rfl success
 
+private theorem allocateExpressionId_success_nextLocal
+    {state next : State} {id : ExpressionId}
+    (success : state.allocateExpressionId = (id, next)) :
+    next.nextLocal = state.nextLocal :=
+  pair_success_nextLocal rfl success
+
 private theorem allocateStatementId_success_header
     {state next : State} {id : StatementId}
     (success : state.allocateStatementId = (id, next)) :
@@ -1600,6 +1623,12 @@ private theorem allocateStatementId_success_lexicalScope
     next.lexicalScope = state.lexicalScope :=
   pair_success_lexicalScope rfl success
 
+private theorem allocateStatementId_success_nextLocal
+    {state next : State} {id : StatementId}
+    (success : state.allocateStatementId = (id, next)) :
+    next.nextLocal = state.nextLocal :=
+  pair_success_nextLocal rfl success
+
 private theorem state_fresh_success_header
     {state next : State} {type : Ty}
     (success : state.fresh = (type, next)) :
@@ -1611,6 +1640,12 @@ private theorem state_fresh_success_lexicalScope
     (success : state.fresh = (type, next)) :
     next.lexicalScope = state.lexicalScope :=
   pair_success_lexicalScope rfl success
+
+private theorem state_fresh_success_nextLocal
+    {state next : State} {type : Ty}
+    (success : state.fresh = (type, next)) :
+    next.nextLocal = state.nextLocal :=
+  pair_success_nextLocal rfl success
 
 private theorem allocateHiddenLocal_success_header
     {state next : State} {id : Resolved.LocalId}
@@ -1638,6 +1673,17 @@ private theorem addRequirementsWithIds_success_header
     (state : State) (predicates : List ProgramPredicate) :
     (state.addRequirementsWithIds predicates).2.lexicalScope =
       state.lexicalScope := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate rest induction =>
+      simp only [State.addRequirementsWithIds]
+      rw [induction]
+      rfl
+
+@[simp] private theorem addRequirementsWithIds_nextLocal
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.nextLocal =
+      state.nextLocal := by
   induction predicates generalizing state with
   | nil => rfl
   | cons predicate rest induction =>
@@ -1700,6 +1746,17 @@ private theorem allocateBinder_success_header
       simp only [commitCoercionPlan]
       rw [induction]
       rw [addRequirementsWithIds_lexicalScope]
+      rfl
+
+@[simp] private theorem commitCoercionPlan_nextLocal
+    (state : State) (plan : List PlannedCoercionStep) :
+    (commitCoercionPlan state plan).2.nextLocal = state.nextLocal := by
+  induction plan generalizing state with
+  | nil => rfl
+  | cons step rest induction =>
+      simp only [commitCoercionPlan]
+      rw [induction]
+      rw [addRequirementsWithIds_nextLocal]
       rfl
 
 private theorem withExpected_state_header
@@ -1778,6 +1835,44 @@ private theorem withExpected_lexicalScope
                       subst result
                       exact commitCoercionPlan_lexicalScope state plan
 
+private theorem withExpected_nextLocal
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    result.state.nextLocal = state.nextLocal := by
+  cases expected with
+  | none =>
+      simp only [withExpected] at success
+      injection success with resultEq
+      subst result
+      rfl
+  | some expected =>
+      cases unification : state.inference.unify actual.type expected with
+      | ok inference =>
+          simp only [withExpected, unification] at success
+          injection success with resultEq
+          subst result
+          rfl
+      | error error =>
+          cases error with
+          | occursCheck metavariable type =>
+              simp [withExpected, unification] at success
+          | exhausted => simp [withExpected, unification] at success
+          | mismatch left right =>
+              simp only [withExpected, unification] at success
+              cases planResult : coercionPlan? context state
+                  (state.resolve actual.type) (state.resolve expected) with
+              | error error => simp [planResult, bind, Except.bind] at success
+              | ok plan? =>
+                  cases plan? with
+                  | none => simp [planResult, bind, Except.bind] at success
+                  | some plan =>
+                      simp only [planResult, bind, Except.bind] at success
+                      change Except.ok _ = Except.ok result at success
+                      injection success with resultEq
+                      subst result
+                      exact commitCoercionPlan_nextLocal state plan
+
 @[simp] private theorem withExpected_preserves_owner
     {context : Context} {state : State} {actual : InferredExpression}
     {expected : Option Ty} {result : ExpectationResult}
@@ -1809,6 +1904,10 @@ private theorem withExpected_lexicalScope
     (state.recordNode node).lexicalScope = state.lexicalScope := by
   rfl
 
+@[simp] private theorem recordNode_nextLocal (state : State) (node : Node) :
+    (state.recordNode node).nextLocal = state.nextLocal := by
+  rfl
+
 @[simp] private theorem recordNode_locals (state : State) (node : Node) :
     (state.recordNode node).locals = state.locals := by
   rfl
@@ -1825,6 +1924,15 @@ private theorem withExpected_lexicalScope
     (recordExpression source expression form requirements coercions state
       localSchemeInstantiationStart).2.lexicalScope =
       state.lexicalScope := by
+  rfl
+
+@[simp] private theorem recordExpression_nextLocal
+    (source : Syntax.Expr) (expression : InferredExpression)
+    (form : ExpressionForm) (requirements : List RequirementId)
+    (coercions : List CoercionStep) (state : State)
+    {localSchemeInstantiationStart : Option Nat} :
+    (recordExpression source expression form requirements coercions state
+      localSchemeInstantiationStart).2.nextLocal = state.nextLocal := by
   rfl
 
 private theorem recordExpressionWithExpected_state_header
@@ -1864,6 +1972,23 @@ private theorem recordExpressionWithExpected_lexicalScope
       simp only [fittedResult, bind, Except.bind, except_pure_eq_ok] at success
       subst result
       exact withExpected_lexicalScope fittedResult
+
+private theorem recordExpressionWithExpected_nextLocal
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result) :
+    result.2.nextLocal = state.nextLocal := by
+  unfold recordExpressionWithExpected at success
+  cases fittedResult : withExpected context state { id, type } expected with
+  | error error => simp [fittedResult, bind, Except.bind] at success
+  | ok fitted =>
+      simp only [fittedResult, bind, Except.bind, except_pure_eq_ok] at success
+      subst result
+      exact withExpected_nextLocal fittedResult
 
 private theorem bindLambdaParameters_state_header
     {context : Context} {parameters : List Syntax.LambdaParameter}
@@ -1909,6 +2034,52 @@ private theorem bindLambdaParameters_state_header
                 exact tailHeader.trans (by
                   simp_all [State.header, State.allocateBinder])
 
+/-- Parameter binding extends a transient lambda scope without moving the
+shared declaration-local allocator backwards. -/
+private theorem bindLambdaParameters_nextLocal_le
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {state : State}
+    {result : List TypedBinder × List Ty × State}
+    (success : bindLambdaParameters context parameters index seen state =
+      .ok result) :
+    state.nextLocal ≤ result.2.2.nextLocal := by
+  induction parameters generalizing index seen state result with
+  | nil =>
+      simp only [bindLambdaParameters] at success
+      injection success with resultEq
+      subst result
+      exact Nat.le_refl _
+  | cons parameter rest induction =>
+      cases parameterValue : parameter.value with
+      | error =>
+          simp [bindLambdaParameters, parameterValue, bind, Except.bind,
+            Except.pure] at success
+      | inferred name =>
+          simp only [bindLambdaParameters, parameterValue] at success
+          simp only [bind, Except.bind] at success
+          repeat' first | split at success
+          all_goals try simp_all [Except.pure]
+          all_goals
+            subst result
+            subst_vars
+            have tailNext := induction _ _ _ (by assumption)
+            simp_all [State.fresh, State.allocateBinder]
+            omega
+      | typed marker name sourceType =>
+          simp only [bindLambdaParameters, parameterValue] at success
+          cases typeResult : resolveSourceType context sourceType with
+          | error error => simp [typeResult, bind, Except.bind] at success
+          | ok type =>
+              simp only [typeResult, bind, Except.bind] at success
+              repeat' first | split at success
+              all_goals try simp_all [Except.pure]
+              all_goals
+                subst result
+                subst_vars
+                have tailNext := induction _ _ _ (by assumption)
+                simp_all [State.allocateBinder]
+                omega
+
 /-- Successful unification changes only the inference substitution, preserving
 the declaration owner and original input binders. -/
 @[simp] theorem unify_state_header
@@ -1929,6 +2100,20 @@ the declaration owner and original input binders. -/
     {state next : State} {left right : Ty}
     (success : unify state left right = .ok next) :
     next.lexicalScope = state.lexicalScope := by
+  unfold unify at success
+  cases inferenceResult : liftUnification (state.inference.unify left right) with
+  | error error => simp [inferenceResult, bind, Except.bind] at success
+  | ok inference =>
+      simp only [inferenceResult, bind, Except.bind] at success
+      change Except.ok { state with inference } = Except.ok next at success
+      injection success with nextEq
+      subst next
+      rfl
+
+@[simp] private theorem unify_preserves_nextLocal
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    next.nextLocal = state.nextLocal := by
   unfold unify at success
   cases inferenceResult : liftUnification (state.inference.unify left right) with
   | error error => simp [inferenceResult, bind, Except.bind] at success
@@ -3524,6 +3709,16 @@ theorem freshDataConstructorInstantiation_inferenceProperties
   exact congrArg (fun header : State.Header => header.inputs)
     (freshTypes_preserves_header count state)
 
+@[simp] private theorem freshTypes_preserves_nextLocal
+    (count : Nat) (state : State) :
+    (freshTypes count state).2.nextLocal = state.nextLocal := by
+  induction count generalizing state with
+  | zero => rfl
+  | succ count induction =>
+      simp only [freshTypes]
+      rw [induction]
+      rfl
+
 @[simp] private theorem freshDataConstructorInstantiation_preserves_header
     (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature) (state : State) :
@@ -3565,6 +3760,27 @@ theorem freshDataConstructorInstantiation_inferenceProperties
         rfl
   unfold freshDataConstructorInstantiation
   exact foldScope dataType.parameters ([], state)
+
+@[simp] private theorem freshDataConstructorInstantiation_preserves_nextLocal
+    (dataType : ProgramDataSignature)
+    (constructor : ProgramDataConstructorSignature) (state : State) :
+    (freshDataConstructorInstantiation dataType constructor state).2.nextLocal =
+      state.nextLocal := by
+  let step : List Ty × State → TypeParameterId → List Ty × State :=
+    fun result _ =>
+      (result.1 ++ [result.2.fresh.1], result.2.fresh.2)
+  have foldNextLocal (parameters : List TypeParameterId)
+      (accumulator : List Ty × State) :
+      (parameters.foldl step accumulator).2.nextLocal =
+        accumulator.2.nextLocal := by
+    induction parameters generalizing accumulator with
+    | nil => rfl
+    | cons parameter parameters induction =>
+        simp only [List.foldl_cons]
+        rw [induction]
+        rfl
+  unfold freshDataConstructorInstantiation
+  exact foldNextLocal dataType.parameters ([], state)
 
 @[simp] private theorem freshDataConstructorInstantiation_preserves_owner
     (dataType : ProgramDataSignature)
@@ -4013,6 +4229,125 @@ private theorem inferMatchPatternFlatFuel_preserves_header
       freshDataConstructorInstantiation_preserves_inputs,
       freshTypes_preserves_owner, freshTypes_preserves_inputs]
 
+/-- Pattern traversal may enter binders in the current arm scope, but every
+such allocation advances the declaration-local cutoff. -/
+private theorem inferMatchPatternFlatFuel_advances_nextLocal
+    (fuel : Nat) (context : Context) (pattern : Syntax.Pattern)
+    (expected : Ty) (seen : List String) (state : State) :
+    AdvancesNextLocal InferredPattern.state state
+      (inferMatchPatternFlatFuel fuel context pattern expected seen state) := by
+  apply inferMatchPatternFlatFuel.induct context
+      (motive1 := fun fuel pattern expected seen state =>
+        AdvancesNextLocal InferredPattern.state state
+          (inferMatchPatternFlatFuel fuel context pattern expected seen state))
+      (motive2 := fun fuel patterns expected seen state =>
+        AdvancesNextLocal InferredPatterns.state state
+          (inferMatchPatternsFlatFuel fuel context patterns expected seen state))
+  case case10 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
+      flatArguments contextualBranch childrenIH
+    unfold AdvancesNextLocal at *
+    intro result success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | have childrenNext := childrenIH _ _ _ (by assumption)
+        have unifiedNext := unify_preserves_nextLocal (by assumption)
+        omega
+      | have childrenNext := childrenIH _ _ _ (by assumption)
+        have unifiedNext := unify_preserves_nextLocal (by assumption)
+        simp_all <;> omega
+  case case11 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
+      flatArguments explicitBranch childrenIH
+    unfold AdvancesNextLocal at *
+    intro result success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | have childrenNext := childrenIH _ _ _ (by assumption)
+        have unifiedNext := unify_preserves_nextLocal (by assumption)
+        omega
+      | have childrenNext := childrenIH _ _ _ (by assumption)
+        have unifiedNext := unify_preserves_nextLocal (by assumption)
+        simp_all <;> omega
+  case case13 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      elements patternEq sources argumentTypes allocatedState freshEq childrenIH
+    unfold AdvancesNextLocal at *
+    intro result success
+    unfold inferMatchPatternFlatFuel at success
+    simp only [patternEq, sources, freshEq, bind, Except.bind] at success
+    cases unifiedResult :
+        unify allocatedState sourceExpected (Ty.productMany argumentTypes) with
+    | error error =>
+        simp [unifiedResult, bind, Except.bind] at success
+    | ok unifiedState =>
+        simp only [unifiedResult, bind, Except.bind] at success
+        cases childrenResult : inferMatchPatternsFlatFuel sourceFuel context
+            elements.elements argumentTypes sourceSeen unifiedState with
+        | error error =>
+            simp [childrenResult, bind, Except.bind] at success
+        | ok children =>
+            simp only [childrenResult, pure, Pure.pure, Except.pure] at success
+            injection success with resultEq
+            subst result
+            have allocatedNext :=
+              congrArg (fun pair => pair.2.nextLocal) freshEq
+            have unifiedNext := unify_preserves_nextLocal unifiedResult
+            have childrenNext := childrenIH unifiedState children (by
+              simpa only [sources] using childrenResult)
+            simp only [freshTypes_preserves_nextLocal] at allocatedNext
+            exact calc
+              inputState.nextLocal = allocatedState.nextLocal := allocatedNext
+              _ = unifiedState.nextLocal := unifiedNext.symm
+              _ ≤ children.state.nextLocal := childrenNext
+  case case17 =>
+    intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
+    unfold AdvancesNextLocal at *
+    intro result success
+    simp only [inferMatchPatternsFlatFuel] at success
+    cases headResult : inferMatchPatternFlatFuel fuel context head expectedHead
+        seen state with
+    | error error =>
+        simp [headResult, bind, Except.bind] at success
+    | ok inferredHead =>
+        simp only [headResult, bind, Except.bind] at success
+        cases tailResult : inferMatchPatternsFlatFuel fuel context rest
+            expectedTail inferredHead.names inferredHead.state with
+        | error error =>
+            simp [tailResult, bind, Except.bind] at success
+        | ok inferredTail =>
+            simp only [tailResult, bind, Except.bind] at success
+            injection success with resultEq
+            subst result
+            exact Nat.le_trans (ihHead inferredHead headResult)
+              (ihTail inferredHead inferredTail tailResult)
+  all_goals
+    intros
+    unfold AdvancesNextLocal at *
+    intro result success
+    simp_all [inferMatchPatternFlatFuel, inferMatchPatternsFlatFuel,
+      bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try specialize ih1 _ _ _ heq
+    all_goals try specialize ih1 _ _ heq
+    all_goals try have unifiedNext := unify_preserves_nextLocal (by assumption)
+    all_goals try simp_all [State.fresh, State.addRequirementWithId,
+      State.allocateBinder, bind, Except.bind]
+    all_goals omega
+
 /-- Successful pattern inference preserves the declaration-scoped state
 header. -/
 theorem inferMatchPatternFuel_state_header
@@ -4036,6 +4371,31 @@ theorem inferMatchPatternFuel_state_header
       injection success with resultEq
       subst result
       exact inferMatchPatternFlatFuel_preserves_header fuel context pattern
+        expected [] state inferred flatResult
+
+/-- Successful nested-pattern inference preserves or advances the shared
+declaration-local cutoff. -/
+private theorem inferMatchPatternFuel_nextLocal_le
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {state : State} {result : TypedMatchPattern × State}
+    (success : inferMatchPatternFuel fuel context pattern expected state =
+      .ok result) :
+    state.nextLocal ≤ result.2.nextLocal := by
+  unfold inferMatchPatternFuel at success
+  cases flatResult :
+      inferMatchPatternFlatFuel fuel context pattern expected [] state with
+  | error error => simp [flatResult, bind, Except.bind] at success
+  | ok inferred =>
+      simp only [flatResult, bind, Except.bind] at success
+      change Except.ok ({
+        source := inferred.source
+        type := inferred.state.resolve expected
+        resolution := inferred.resolution
+        requirements := inferred.requirements
+      }, inferred.state) = Except.ok result at success
+      injection success with resultEq
+      subst result
+      exact inferMatchPatternFlatFuel_advances_nextLocal fuel context pattern
         expected [] state inferred flatResult
 
 private theorem inferUnaryOperator_state_header
@@ -4076,6 +4436,28 @@ private theorem inferUnaryOperator_lexicalScope
   all_goals simp_all [pure, Pure.pure, Except.pure, State.lexicalScope,
     State.addRequirementsWithIds, State.addRequirementWithId]
   all_goals grind [unify_preserves_lexicalScope]
+
+private theorem inferUnaryOperator_nextLocal
+    {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferUnaryOperator context operator operandType expected
+      integerLiterals state = .ok result) :
+    result.state.nextLocal = state.nextLocal := by
+  unfold inferUnaryOperator at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have firstUnifiedNext : v.nextLocal = state.nextLocal :=
+    unify_preserves_nextLocal heq
+  all_goals try have secondUnifiedNext :
+      v_1.nextLocal = v.nextLocal :=
+    unify_preserves_nextLocal heq_1
+  all_goals try have unifiedNext :=
+    unify_preserves_nextLocal (by assumption)
+  all_goals simp_all [pure, Pure.pure, Except.pure,
+    State.addRequirementsWithIds, State.addRequirementWithId]
+  all_goals grind [unify_preserves_nextLocal]
 
 private theorem inferBinaryOperator_state_header
     {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
@@ -4118,6 +4500,29 @@ private theorem inferBinaryOperator_lexicalScope
         State.addRequirementWithId]
       all_goals grind [unify_preserves_lexicalScope]
 
+private theorem inferBinaryOperator_nextLocal
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    result.state.nextLocal = state.nextLocal := by
+  unfold inferBinaryOperator at success
+  simp only [bind, Except.bind] at success
+  cases firstResult : unify state left right with
+  | error error =>
+      simp [firstResult, bind, Except.bind] at success
+  | ok firstState =>
+      simp only [firstResult, bind, Except.bind] at success
+      have firstNext := unify_preserves_nextLocal firstResult
+      repeat' first | split at success
+      all_goals try cases success
+      all_goals try have secondNext :=
+        unify_preserves_nextLocal (by assumption)
+      all_goals simp_all [pure, Pure.pure, Except.pure,
+        State.addRequirementsWithIds, State.addRequirementWithId]
+      all_goals grind [unify_preserves_nextLocal]
+
 private theorem candidateWithExpected_some_state_header
     {context : Context} {state : State} {actual : InferredExpression}
     {expected : Option Ty} {result : ExpectationResult}
@@ -4153,6 +4558,24 @@ private theorem candidateWithExpected_some_lexicalScope
       have fittedEq : fitted = result := Option.some.inj resultEq
       subst result
       exact withExpected_lexicalScope fittedResult
+
+private theorem candidateWithExpected_some_nextLocal
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : candidateWithExpected context state actual expected =
+      .ok (some result)) :
+    result.state.nextLocal = state.nextLocal := by
+  unfold candidateWithExpected at success
+  cases fittedResult : withExpected context state actual expected with
+  | error error =>
+      cases error <;> simp [fittedResult] at success
+      all_goals cases ‹Unification.Error› <;> simp_all [fittedResult]
+  | ok fitted =>
+      simp only [fittedResult] at success
+      injection success with resultEq
+      have fittedEq : fitted = result := Option.some.inj resultEq
+      subst result
+      exact withExpected_nextLocal fittedResult
 
 private theorem fitArguments_some_state_header
     {context : Context} {state : State}
@@ -4238,6 +4661,48 @@ private theorem fitArguments_some_lexicalScope
                           exact (induction tailResult).trans
                             (candidateWithExpected_some_lexicalScope fittedResult)
 
+private theorem fitArguments_some_nextLocal
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    result.state.nextLocal = state.nextLocal := by
+  induction arguments generalizing parameters state result with
+  | nil =>
+      cases parameters <;> simp [fitArguments] at success
+      subst result
+      rfl
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil => simp [fitArguments] at success
+      | cons parameter parameters =>
+          simp only [fitArguments] at success
+          cases fittedResult :
+              candidateWithExpected context state argument (some parameter) with
+          | error error =>
+              simp [fittedResult, bind, Except.bind] at success
+          | ok fitted? =>
+              cases fitted? with
+              | none => simp [fittedResult, bind, Except.bind] at success
+              | some fitted =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  cases tailResult : fitArguments context fitted.state arguments
+                      parameters with
+                  | error error =>
+                      simp [tailResult, bind, Except.bind] at success
+                  | ok tail? =>
+                      cases tail? with
+                      | none => simp [tailResult, bind, Except.bind] at success
+                      | some tail =>
+                          simp only [tailResult, bind, Except.bind,
+                            except_pure_eq_ok] at success
+                          have resultEq : _ = result := Option.some.inj success
+                          clear success
+                          subst result
+                          exact (induction tailResult).trans
+                            (candidateWithExpected_some_nextLocal fittedResult)
+
 /-- A successful function-candidate attempt retains exactly the generic
 instantiation allocated before argument fitting, expected-type fitting, and
 predicate validation.  None of those later checks may replace the selected
@@ -4296,6 +4761,26 @@ private theorem tryFunctionCandidate_some_lexicalScope
     candidateWithExpected_some_lexicalScope (by assumption)
   all_goals try simp_all
   all_goals simp_all [State.lexicalScope, State.addRequirementsWithIds,
+    State.addRequirementWithId, State.markDirectCallRequirements]
+
+private theorem tryFunctionCandidate_some_nextLocal
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    result.state.nextLocal = state.nextLocal := by
+  unfold tryFunctionCandidate at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have fitNext :=
+    fitArguments_some_nextLocal (by assumption)
+  all_goals try have expectedNext :=
+    candidateWithExpected_some_nextLocal (by assumption)
+  all_goals try simp_all
+  all_goals simp_all [State.addRequirementsWithIds,
     State.addRequirementWithId, State.markDirectCallRequirements]
 
 private theorem collectCandidateAttempts_success_header
@@ -4745,6 +5230,20 @@ private theorem selectFunctionCandidateFrom_lexicalScope
     selectFunctionCandidateFrom_success_candidate success
   exact tryFunctionCandidate_some_lexicalScope candidateSuccess
 
+private theorem selectFunctionCandidateFrom_nextLocal
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    result.state.nextLocal = state.nextLocal := by
+  obtain ⟨signature, _, candidateSuccess⟩ :=
+    selectFunctionCandidateFrom_success_candidate success
+  exact tryFunctionCandidate_some_nextLocal candidateSuccess
+
 @[simp] private theorem attachExpressionCoercions_state_header
     (state : State) (entries : List ExpressionCoercions) :
     (attachExpressionCoercions state entries).header = state.header := by
@@ -4767,6 +5266,17 @@ private theorem selectFunctionCandidateFrom_lexicalScope
       simp only [List.foldl_cons]
       exact (induction _).trans (by rfl)
 
+@[simp] private theorem attachExpressionCoercions_nextLocal
+    (state : State) (entries : List ExpressionCoercions) :
+    (attachExpressionCoercions state entries).nextLocal =
+      state.nextLocal := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil => rfl
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      exact (induction _).trans (by rfl)
+
 @[simp] private theorem allocateExpressionId_inference
     (state : State) :
     state.allocateExpressionId.2.inference = state.inference := by
@@ -4775,6 +5285,11 @@ private theorem selectFunctionCandidateFrom_lexicalScope
 @[simp] private theorem allocateExpressionId_lexicalScope
     (state : State) :
     state.allocateExpressionId.2.lexicalScope = state.lexicalScope := by
+  rfl
+
+@[simp] private theorem allocateExpressionId_nextLocal
+    (state : State) :
+    state.allocateExpressionId.2.nextLocal = state.nextLocal := by
   rfl
 
 @[simp] private theorem attachExpressionCoercions_resolve
@@ -4814,6 +5329,13 @@ private theorem selectFunctionCandidateFrom_lexicalScope
       attempt.state.lexicalScope := by
   simp [recordSelectedCall, recordSelectedCallResult]
 
+@[simp] private theorem recordSelectedCall_nextLocal
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+    (recordSelectedCall source callee name arguments attempt).2.nextLocal =
+      attempt.state.nextLocal := by
+  simp [recordSelectedCall, recordSelectedCallResult]
+
 @[simp] private theorem recordSelectedCallResult_state_header
     (source callee : Syntax.Expr) (name : String)
     (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
@@ -4830,6 +5352,15 @@ private theorem selectFunctionCandidateFrom_lexicalScope
     (state : State) :
     (recordSelectedCallResult source callee name arguments attempt result
       trailingCoercions state).2.lexicalScope = state.lexicalScope := by
+  simp [recordSelectedCallResult]
+
+@[simp] private theorem recordSelectedCallResult_nextLocal
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) :
+    (recordSelectedCallResult source callee name arguments attempt result
+      trailingCoercions state).2.nextLocal = state.nextLocal := by
   simp [recordSelectedCallResult]
 
 @[simp] private theorem recordSelectedCallResult_resolve
@@ -5658,6 +6189,70 @@ private theorem applyFunctionType_lexicalScope
                 ((unify_preserves_lexicalScope unifyResult).trans
                   (state_fresh_success_lexicalScope freshResultEq))
 
+private theorem applyFunctionType_nextLocal
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Option Ty}
+    {state : State} {result : IndirectApplicationResult}
+    (success : applyFunctionType context call calleeType arguments expected
+      state = .ok result) :
+    result.state.nextLocal = state.nextLocal := by
+  unfold applyFunctionType at success
+  cases partsResult : functionParts? (state.resolve calleeType) with
+  | some parts =>
+      rcases parts with ⟨parameter, returnType⟩
+      simp only [partsResult] at success
+      cases argumentResult : withExpected context state
+          { id := call, type := Ty.productMany (arguments.map (fun x => x.type)) }
+          (some parameter) with
+      | error error =>
+          simp [argumentResult, bind, Except.bind] at success
+      | ok fittedArgument =>
+          simp only [argumentResult, bind, Except.bind] at success
+          cases resultResult : withExpected context fittedArgument.state
+              { id := call, type := returnType } expected with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := fittedArgument.coercions
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              exact (withExpected_nextLocal resultResult).trans
+                (withExpected_nextLocal argumentResult)
+  | none =>
+      simp only [partsResult] at success
+      generalize freshResultEq : state.fresh = freshResult at success
+      rcases freshResult with ⟨resultType, freshState⟩
+      cases unifyResult : unify freshState calleeType
+          (.function (Ty.productMany (arguments.map fun x => x.type))
+            resultType) with
+      | error error =>
+          simp [unifyResult, bind, Except.bind] at success
+      | ok unifiedState =>
+          simp only [unifyResult, bind, Except.bind] at success
+          cases resultResult : withExpected context unifiedState
+              { id := call, type := resultType } expected with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := []
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              exact (withExpected_nextLocal resultResult).trans
+                ((unify_preserves_nextLocal unifyResult).trans
+                  (state_fresh_success_nextLocal freshResultEq))
+
 @[simp] private theorem recordIndirectCall_state_header
     (source : Syntax.Expr) (callee : InferredExpression)
     (arguments : List InferredExpression) (result : IndirectApplicationResult) :
@@ -5670,6 +6265,13 @@ private theorem applyFunctionType_lexicalScope
     (arguments : List InferredExpression) (result : IndirectApplicationResult) :
     (recordIndirectCall source callee arguments result).2.lexicalScope =
       result.state.lexicalScope := by
+  simp [recordIndirectCall]
+
+@[simp] private theorem recordIndirectCall_nextLocal
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult) :
+    (recordIndirectCall source callee arguments result).2.nextLocal =
+      result.state.nextLocal := by
   simp [recordIndirectCall]
 
 @[simp] private theorem recordIndirectCall_resolve
@@ -5798,6 +6400,35 @@ private theorem unifyBuiltinFunctionArgumentsEqual_lexicalScope
               exact (induction success).trans
                 (unify_preserves_lexicalScope unifyResult)
 
+private theorem unifyBuiltinFunctionArgumentsEqual_nextLocal
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {state next : State}
+    (success : unifyBuiltinFunctionArgumentsEqual arguments parameters state =
+      .ok next) :
+    next.nextLocal = state.nextLocal := by
+  induction arguments generalizing parameters state next with
+  | nil =>
+      simp only [unifyBuiltinFunctionArgumentsEqual] at success
+      injection success with nextEq
+      subst next
+      rfl
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          injection success with nextEq
+          subst next
+          rfl
+      | cons parameter parameters =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          cases unifyResult : unify state argument.type parameter with
+          | error error =>
+              simp [unifyResult, bind, Except.bind] at success
+          | ok unifiedState =>
+              simp only [unifyResult, bind, Except.bind] at success
+              exact (induction success).trans
+                (unify_preserves_nextLocal unifyResult)
+
 private theorem functionCandidates_scheme_body_variablesBelow
     {context : Context} {candidates : List ProgramFunctionSignature}
     (validated : ProgramSignatureFormationValidated context.signatures)
@@ -5903,6 +6534,26 @@ private theorem recordBuiltinFunctionCall_lexicalScope
     unify_preserves_lexicalScope (by assumption)
   all_goals try simp_all
   all_goals try simp_all [State.lexicalScope, State.allocateExpressionId,
+    State.recordNode, recordExpression, bind, Except.bind]
+
+private theorem recordBuiltinFunctionCall_nextLocal
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    result.2.nextLocal = state.nextLocal := by
+  unfold recordBuiltinFunctionCall at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have argumentsNext :=
+    unifyBuiltinFunctionArgumentsEqual_nextLocal (by assumption)
+  all_goals try have unifiedNext :=
+    unify_preserves_nextLocal (by assumption)
+  all_goals try simp_all
+  all_goals try simp_all [State.allocateExpressionId,
     State.recordNode, recordExpression, bind, Except.bind]
 
 private theorem syntheticTuple_result_inferenceProperties
@@ -10565,6 +11216,279 @@ theorem inferExprFuel_success_lexicalScope_eq
     result.2.lexicalScope = state.lexicalScope :=
   inferExprFuel_preserves_lexicalScope fuel context expression expected state
     result success
+
+private theorem pair_except_nextLocal {ε α β : Type}
+    {computation : Except ε (α × β)} {result : α × β}
+    {initial : State} {nextLocal : β → Nat}
+    (invariant : ∀ value state,
+      computation = .ok (value, state) →
+        initial.nextLocal ≤ nextLocal state)
+    (success : computation = .ok result) :
+    initial.nextLocal ≤ nextLocal result.2 := by
+  rcases result with ⟨value, state⟩
+  exact invariant value state success
+
+private theorem pair_eq_nextLocal {α : Type}
+    {result : α × State} {initial : State}
+    (invariant : ∀ value state, result = (value, state) →
+      initial.nextLocal ≤ state.nextLocal) :
+    initial.nextLocal ≤ result.2.nextLocal := by
+  exact invariant result.1 result.2 (Prod.eta result)
+
+private theorem triple_eq_nextLocal {α β : Type}
+    {result : α × β × State} {initial : State}
+    (invariant : ∀ first second state,
+      result = (first, second, state) →
+        initial.nextLocal ≤ state.nextLocal) :
+    initial.nextLocal ≤ result.2.2.nextLocal := by
+  rcases result with ⟨first, second, state⟩
+  exact invariant first second state rfl
+
+set_option maxHeartbeats 1000000 in
+private theorem inferFuel_advances_nextLocal_internal :
+    (∀ fuel context expression expected state,
+      AdvancesNextLocal Prod.snd state
+        (inferExprFuel fuel context expression expected state)) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      AdvancesNextLocal Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state)) ∧
+    (∀ fuel context sources expected state,
+      AdvancesNextLocal Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state)) ∧
+    (∀ fuel context statements expectedReturn state,
+      AdvancesNextLocal BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state)) ∧
+    (∀ fuel context statement expectedReturn state,
+      AdvancesNextLocal StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state)) ∧
+    (∀ fuel context items state,
+      AdvancesNextLocal InferredForItems.state state
+        (inferForItemsFuel fuel context items state)) ∧
+    (∀ fuel context item state,
+      AdvancesNextLocal Prod.snd state
+        (inferForItemFuel fuel context item state)) ∧
+    (∀ fuel context target state,
+      AdvancesNextLocal Prod.snd state
+        (inferPlaceFuel fuel context target state)) ∧
+    (∀ fuel context target operator value state,
+      AdvancesNextLocal (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state)) ∧
+    (∀ fuel context expressions state,
+      AdvancesNextLocal Prod.snd state
+        (inferExprsFuel fuel context expressions state)) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      AdvancesNextLocal MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn
+          outerScope cases state)) := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := fun fuel context expression expected state =>
+      AdvancesNextLocal Prod.snd state
+        (inferExprFuel fuel context expression expected state))
+    (motive2 := fun fuel context source id instantiation arguments expected
+        state =>
+      AdvancesNextLocal Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state))
+    (motive3 := fun fuel context sources expected state =>
+      AdvancesNextLocal Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state))
+    (motive4 := fun fuel context statements expectedReturn state =>
+      AdvancesNextLocal BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state))
+    (motive5 := fun fuel context statement expectedReturn state =>
+      AdvancesNextLocal StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state))
+    (motive6 := fun fuel context items state =>
+      AdvancesNextLocal InferredForItems.state state
+        (inferForItemsFuel fuel context items state))
+    (motive7 := fun fuel context item state =>
+      AdvancesNextLocal Prod.snd state
+        (inferForItemFuel fuel context item state))
+    (motive8 := fun fuel context target state =>
+      AdvancesNextLocal Prod.snd state
+        (inferPlaceFuel fuel context target state))
+    (motive9 := fun fuel context target operator value state =>
+      AdvancesNextLocal (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state))
+    (motive10 := fun fuel context expressions state =>
+      AdvancesNextLocal Prod.snd state
+        (inferExprsFuel fuel context expressions state))
+    (motive11 := fun fuel context scrutineeType expectedReturn outerScope
+        cases state =>
+      AdvancesNextLocal MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn
+          outerScope cases state))
+  -- Generated case 15 is lambda inference.  Parameter binding and body
+  -- inference are the only steps which may advance the local allocator.
+  case case15 =>
+    intros context expression expected state fuel calleeId stateAfterId
+      allocationEq keyword parameters returnType body expressionEq bodyInduction
+    unfold AdvancesNextLocal at *
+    intro result success
+    unfold inferExprFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals try have bodyNext := bodyInduction _ _ _ (by assumption)
+    all_goals try have allocationNext :=
+      allocateExpressionId_success_nextLocal (by assumption)
+    all_goals try have lambdaNext :=
+      bindLambdaParameters_nextLocal_le (by assumption)
+    all_goals try have unifiedNext :=
+      unify_preserves_nextLocal (by assumption)
+    all_goals try have recordNext :=
+      recordExpressionWithExpected_nextLocal (by assumption)
+    all_goals simp_all only [except_pure_eq_ok]
+    all_goals simp only [State.restoreLexicalScope_nextLocal] at *
+    all_goals try omega
+    all_goals grind [State.fresh, unify_preserves_nextLocal]
+  -- Generated case 67 is a grouped place and delegates directly.
+  case case67 =>
+    unfold AdvancesNextLocal at *
+    intros
+    simp_all only [inferPlaceFuel]
+  -- Generated case 70 threads a place through optional operator unification
+  -- and then through value inference.
+  case case70 =>
+    intros fuel context target operator value state placeInduction
+      valueInduction
+    unfold AdvancesNextLocal at *
+    intro result success
+    unfold inferAssignedValueFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try have placeNext :=
+      pair_except_nextLocal placeInduction (by assumption)
+    all_goals try have valueNext :=
+      pair_except_nextLocal (valueInduction _ _) (by assumption)
+    all_goals try have unifiedNext :=
+      unify_preserves_nextLocal (by assumption)
+    all_goals simp_all [Prod.eta]
+    all_goals omega
+  -- All remaining generated cases have the same shape: expose successful
+  -- recursive calls, apply their monotonicity hypotheses, then discharge
+  -- state-only operations with exact nextLocal preservation lemmas.
+  all_goals
+    intros
+    unfold AdvancesNextLocal at *
+    intro result success
+    first
+      | unfold inferExprFuel at success
+      | unfold inferConstructorApplicationFuel at success
+      | unfold inferConstructorArgumentsFuel at success
+      | unfold inferStatementsFuel at success
+      | unfold inferStatementFuel at success
+      | unfold inferForItemsFuel at success
+      | unfold inferForItemFuel at success
+      | unfold inferPlaceFuel at success
+      | unfold inferAssignedValueFuel at success
+      | unfold inferExprsFuel at success
+      | unfold inferMatchCasesFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals first
+      | specialize ih1 _ _ _ _ (by assumption)
+      | specialize ih1 _ _ _ (by assumption)
+      | specialize ih1 _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih2 _ _ _ _ (by assumption)
+      | specialize ih2 _ _ _ (by assumption)
+      | specialize ih2 _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih3 _ _ _ _ (by assumption)
+      | specialize ih3 _ _ _ (by assumption)
+      | specialize ih3 _ _ (by assumption)
+      | skip
+    all_goals try have unifiedNext :=
+      unify_preserves_nextLocal (by assumption)
+    all_goals try have recordNext :=
+      recordExpressionWithExpected_nextLocal (by assumption)
+    all_goals try have lambdaNext :=
+      bindLambdaParameters_nextLocal_le (by assumption)
+    all_goals try have patternNext :=
+      inferMatchPatternFuel_nextLocal_le (by assumption)
+    all_goals try have unaryNext :=
+      inferUnaryOperator_nextLocal (by assumption)
+    all_goals try have binaryNext :=
+      inferBinaryOperator_nextLocal (by assumption)
+    all_goals try have selectionNext :=
+      selectFunctionCandidateFrom_nextLocal (by assumption)
+    all_goals try have expectedNext :=
+      withExpected_nextLocal (by assumption)
+    all_goals try have applicationNext :=
+      applyFunctionType_nextLocal (by assumption)
+    all_goals try have builtinNext :=
+      recordBuiltinFunctionCall_nextLocal (by assumption)
+    all_goals first
+      | have ih1Next := pair_eq_nextLocal ih1
+      | have ih1Next := triple_eq_nextLocal ih1
+      | skip
+    all_goals first
+      | have ih2Next := pair_eq_nextLocal ih2
+      | have ih2Next := triple_eq_nextLocal ih2
+      | skip
+    all_goals first
+      | have ih3Next := pair_eq_nextLocal ih3
+      | have ih3Next := triple_eq_nextLocal ih3
+      | skip
+    all_goals try simp_all
+    all_goals try simp_all [State.fresh, State.addRequirementWithId,
+      State.addRequirementsWithIds, State.allocateBinder,
+      State.allocateHiddenLocal, State.restoreLexicalScope, State.recordNode,
+      bind, Except.bind]
+    all_goals try simp_all only [State.allocateExpressionId_nextLocal,
+      State.allocateStatementId_nextLocal]
+    all_goals try simp_all [recordExpression]
+    all_goals try grind [allocateExpressionId_success_nextLocal,
+      allocateStatementId_success_nextLocal, unify_preserves_nextLocal,
+      freshDataConstructorInstantiation_preserves_nextLocal,
+      freshTypes_preserves_nextLocal]
+
+/-- Successful expression inference monotonically advances the shared
+declaration-local identity cutoff. -/
+theorem inferExprFuel_nextLocal_le
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    state.nextLocal ≤ result.2.nextLocal :=
+  inferFuel_advances_nextLocal_internal.1 fuel context expression expected
+    state result success
+
+/-- Expression inference preserves the stable-binder allocation bound: it
+restores the caller's visible binders and never moves the shared cutoff
+backwards. -/
+theorem inferExprFuel_preserves_localBindersBelowNextLocal
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    result.2.LocalBindersBelowNextLocal := by
+  apply State.LocalBindersBelowNextLocal.transport
+      (before := state) (after := result.2) ?_
+      (inferExprFuel_nextLocal_le success) below
+  exact congrArg LexicalScope.binders
+    (inferExprFuel_success_lexicalScope_eq success)
 
 set_option maxHeartbeats 500000 in
 private theorem inferStatementsFuel_preserves_header_internal
