@@ -5552,6 +5552,118 @@ private theorem fresh_eq_inferenceProperties
   rw [allocation] at progress nextReady below
   exact ⟨progress, nextReady, below⟩
 
+private def InferExprFuelExpectedTypeCoherent
+    (fuel : Nat) (context : Context) (expression : Syntax.Expr)
+    (expected : Option Ty) (state : State) : Prop :=
+  ∀ expectedType, expected = some expectedType →
+    ∀ result (outer : Substitution),
+      inferExprFuel fuel context expression expected state = .ok result →
+      outer.SemanticallyExtends result.2.inference.substitution →
+      outer.apply result.1.type = outer.apply expectedType
+
+private def InferConstructorApplicationFuelExpectedTypeCoherent
+    (fuel : Nat) (context : Context) (source : Syntax.Expr)
+    (id : ExpressionId) (instantiation : DataConstructorInstantiation)
+    (arguments : List Syntax.Expr) (expected : Option Ty)
+    (state : State) : Prop :=
+  ∀ expectedType, expected = some expectedType →
+    ∀ result (outer : Substitution),
+      inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state = .ok result →
+      outer.SemanticallyExtends result.2.inference.substitution →
+      outer.apply result.1.type = outer.apply expectedType
+
+set_option maxHeartbeats 1000000 in
+private theorem inferFuel_expectedTypeCoherent_internal :
+    (∀ fuel context expression expected state,
+      InferExprFuelExpectedTypeCoherent fuel context expression expected state) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      InferConstructorApplicationFuelExpectedTypeCoherent fuel context source id
+        instantiation arguments expected state) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_sources : List Syntax.Expr)
+      (_expected : List Ty) (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context)
+      (_statements : List Syntax.Statement) (_expectedReturn : Ty)
+      (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_statement : Syntax.Statement)
+      (_expectedReturn : Ty) (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_items : List Syntax.ForItem)
+      (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_item : Syntax.ForItem)
+      (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_target : Syntax.Expr)
+      (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_target : Syntax.Expr)
+      (_operator : Syntax.ValueAssignOp) (_value : Syntax.Expr)
+      (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_expressions : List Syntax.Expr)
+      (_state : State), True) ∧
+    ∀ (_fuel : Nat) (_context : Context) (_scrutineeType : Ty)
+      (_expectedReturn : Ty) (_outerScope : LexicalScope)
+      (_cases : List Syntax.MatchCase) (_state : State), True := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := InferExprFuelExpectedTypeCoherent)
+    (motive2 := InferConstructorApplicationFuelExpectedTypeCoherent)
+    (motive3 := fun _ _ _ _ _ => True)
+    (motive4 := fun _ _ _ _ _ => True)
+    (motive5 := fun _ _ _ _ _ => True)
+    (motive6 := fun _ _ _ _ => True)
+    (motive7 := fun _ _ _ _ => True)
+    (motive8 := fun _ _ _ _ => True)
+    (motive9 := fun _ _ _ _ _ _ => True)
+    (motive10 := fun _ _ _ _ => True)
+    (motive11 := fun _ _ _ _ _ _ _ => True)
+  all_goals
+    intros
+    try trivial
+  all_goals first
+    | unfold InferConstructorApplicationFuelExpectedTypeCoherent
+      intro expectedType expectedEq result outer success extension
+      subst_vars
+      exact inferConstructorApplicationFuel_some_apply_eq success extension
+    | unfold InferExprFuelExpectedTypeCoherent at *
+      intro expectedType expectedEq result outer success extension
+      subst_vars
+      unfold inferExprFuel at success
+      simp_all [bind, Except.bind]
+      repeat' first | split at success
+      all_goals try cases success
+      all_goals try rcases v with ⟨v0a, v0b⟩
+      all_goals try rcases v_1 with ⟨v1a, v1b⟩
+      all_goals try rcases v_2 with ⟨v2a, v2b⟩
+      all_goals try rcases v_3 with ⟨v3a, v3b⟩
+      all_goals try rcases v_4 with ⟨v4a, v4b⟩
+      all_goals try subst_vars
+      all_goals first
+        | exact recordExpressionWithExpected_some_apply_eq
+            (by assumption) extension
+        | exact inferConstructorApplicationFuel_some_apply_eq
+            (by assumption) extension
+        | exact recordSelectedCall_selected_apply_eq (by assumption) extension
+        | exact recordSelectedCallResult_withExpected_apply_eq
+            (by assumption) extension
+        | exact recordBuiltinFunctionCall_some_apply_eq
+            (by assumption) extension
+        | exact recordIndirectCall_application_apply_eq
+            (by assumption) extension
+        | simp_all [recordSelectedCall, recordSelectedCallResult,
+            recordIndirectCall, recordExpression]
+
+/-- Successful expression inference against a concrete expectation returns a
+type equal to that expectation under every semantic extension of the final
+inference substitution. -/
+theorem inferExprFuel_expected_type_apply_eq
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Ty} {state : State} {result : InferredExpression × State}
+    {outer : Substitution}
+    (success : inferExprFuel fuel context expression (some expected) state =
+      .ok result)
+    (extension : outer.SemanticallyExtends
+      result.2.inference.substitution) :
+    outer.apply result.1.type = outer.apply expected := by
+  exact inferFuel_expectedTypeCoherent_internal.1 fuel context expression
+    (some expected) state expected rfl result outer success extension
+
 private def FunctionSchemesCanonical (context : Context) : Prop :=
   ∀ signature ∈ context.signatures.functions,
     signature.scheme.body = .function
