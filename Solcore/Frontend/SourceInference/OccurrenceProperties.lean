@@ -2647,5 +2647,67 @@ theorem inferMatchCasesFuel_nextOccurrence_le
   inference_preserves_nextOccurrence.2.2.2.2.2.2.2.2.2.2 fuel context
     scrutineeType expectedReturn outerScope cases state result success
 
+/-! ## Anchored node-prefix preservation
+
+Selected-call fitting is the only traversal step that may rewrite already
+recorded expression payloads.  The following adapters package the freshness
+side condition which protects an older node prefix in the form needed by the
+eventual mutual traversal proof. -/
+
+/-- Explicit overload selection followed by selected-call recording retains
+an older anchored prefix when all caller arguments are fresh at its cutoff. -/
+theorem selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix_of_fresh
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {attempt : CandidateAttemptResult} {source callee : Syntax.Expr}
+    {baseNodes : List Node} {cutoff : Nat}
+    (selection : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok attempt)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow :
+      ∀ node ∈ baseNodes, node.occurrenceId.index < cutoff)
+    (argumentsFresh : ∀ argument ∈ arguments,
+      cutoff ≤ argument.id.occurrence.index) :
+    baseNodes <+:
+      (recordSelectedCall source callee name arguments attempt).2.nodes := by
+  have attemptPrefix : baseNodes <+: attempt.state.nodes := by
+    rw [(selectFunctionCandidateFrom_occurrenceState_eq selection).1]
+    exact nodesPrefix
+  exact recordSelectedCall_preserves_nodesPrefix_of_fresh source callee name
+    arguments attempt baseNodes cutoff attemptPrefix baseBelow
+    (selectFunctionCandidateFrom_argumentCoercions_fresh selection
+      argumentsFresh)
+
+/-- Expression-list inference supplies exactly the root freshness needed by
+the selected-call prefix adapter.  The caller only has to thread the prefix
+through the argument traversal itself. -/
+theorem inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {initial argumentState : State} {arguments : List InferredExpression}
+    {name : String} {candidates : List ProgramFunctionSignature}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty}
+    {attempt : CandidateAttemptResult} {source callee : Syntax.Expr}
+    {baseNodes : List Node} {cutoff : Nat}
+    (argumentsSuccess : inferExprsFuel fuel context sources initial =
+      .ok (arguments, argumentState))
+    (selection : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected argumentState = .ok attempt)
+    (argumentPrefix : baseNodes <+: argumentState.nodes)
+    (baseBelow :
+      ∀ node ∈ baseNodes, node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ initial.nextOccurrence) :
+    baseNodes <+:
+      (recordSelectedCall source callee name arguments attempt).2.nodes := by
+  apply
+    selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix_of_fresh
+      selection argumentPrefix baseBelow
+  intro argument member
+  exact Nat.le_trans cutoffLe
+    (inferExprsFuel_success_ids_fresh argumentsSuccess argument member)
+
 
 end Solcore.Frontend.SourceInference.Detail

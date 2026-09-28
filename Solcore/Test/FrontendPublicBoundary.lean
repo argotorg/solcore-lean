@@ -375,6 +375,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_success_ids_fresh
 example :=
+  @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix_of_fresh
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_nextOccurrence_le
 example :=
   @Solcore.Frontend.SourceInference.State.initial_requirementsWellFormed
