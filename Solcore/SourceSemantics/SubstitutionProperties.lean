@@ -7349,6 +7349,163 @@ theorem ParameterSubstitution.orderedArguments_mapRange
       mappedMember
   simp [innerLookup, mappedLookup]
 
+/-- Applying an outer flexible substitution after an exact inner one commutes
+with mapping the outer action over the inner range when only the outer ranges
+that are relevant to `type` avoid the inner domain. -/
+theorem Ty.applyFlexible_compose_of_rangeAvoidsVariablesOn
+    {substitutedVariables : List TypeVarId} {type : Ty}
+    (outer inner : Substitution)
+    (innerExact : ExactSubstitution inner substitutedVariables)
+    (outerFresh : ∀ metavariable,
+      metavariable ∈ substitutedVariables →
+        metavariable ∉ outer.domain)
+    (rangeAvoids : outer.RangeAvoidsVariablesOn substitutedVariables type) :
+    outer.apply (inner.apply type) =
+      (Substitution.mapRange outer inner).apply (outer.apply type) := by
+  induction type with
+  | «variable» metavariable =>
+      by_cases substituted : metavariable ∈ substitutedVariables
+      · obtain ⟨replacement, member, innerLookup⟩ :=
+          StructuralSubstitution.Substitution.exists_lookup?_eq_some innerExact
+            substituted
+        have mappedMember :
+            (metavariable, outer.apply replacement) ∈
+              Substitution.mapRange outer inner :=
+          List.mem_map.mpr ⟨(metavariable, replacement), member, rfl⟩
+        have mappedLookup :=
+          StructuralSubstitution.Substitution.lookup?_eq_some_of_mem_of_domain_nodup
+            (Substitution.ExactSubstitution.mapRange outer innerExact).domain_nodup
+            mappedMember
+        have outerLookup :=
+          StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+            (outerFresh metavariable substituted)
+        simp [TypeSystem.Substitution.apply, innerLookup, mappedLookup,
+          outerLookup]
+      · have innerAbsent : metavariable ∉ inner.domain := by
+          intro member
+          exact substituted ((innerExact.mem_domain_iff metavariable).mp member)
+        have mappedExact :=
+          Substitution.ExactSubstitution.mapRange outer innerExact
+        have mappedAbsent :
+            metavariable ∉ (Substitution.mapRange outer inner).domain := by
+          intro member
+          exact substituted ((mappedExact.mem_domain_iff metavariable).mp member)
+        have innerLookup :=
+          StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+            innerAbsent
+        have mappedLookup :=
+          StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
+            mappedAbsent
+        cases outerLookup : outer.lookup? metavariable with
+        | none =>
+            simp [TypeSystem.Substitution.apply, innerLookup, mappedLookup,
+              outerLookup]
+        | some replacement =>
+            have replacementFixed :
+                (Substitution.mapRange outer inner).apply replacement =
+                  replacement := by
+              apply TypeSystem.Ty.apply_eq_self_of_domain_disjoint_freeVariables
+              intro protectedVariable domainMember captured
+              have protectedMember :=
+                (mappedExact.mem_domain_iff protectedVariable).mp domainMember
+              exact (rangeAvoids metavariable (by simp [Ty.freeVariables])
+                replacement outerLookup protectedVariable captured)
+                  protectedMember
+            simp [TypeSystem.Substitution.apply, innerLookup,
+              outerLookup, replacementFixed]
+  | parameter parameter => rfl
+  | constructor constructor => rfl
+  | application left right leftInduction rightInduction =>
+      have leftAvoids := rangeAvoids.mono (by
+        intro metavariable occurs
+        exact (Ty.mem_freeVariables_application_iff
+          metavariable left right).mpr (.inl occurs))
+      have rightAvoids := rangeAvoids.mono (by
+        intro metavariable occurs
+        exact (Ty.mem_freeVariables_application_iff
+          metavariable left right).mpr (.inr occurs))
+      simp only [TypeSystem.Substitution.apply]
+      rw [leftInduction leftAvoids, rightInduction rightAvoids]
+  | function parameter result parameterInduction resultInduction =>
+      have parameterAvoids := rangeAvoids.mono (by
+        intro metavariable occurs
+        exact (Ty.mem_freeVariables_function_iff
+          metavariable parameter result).mpr (.inl occurs))
+      have resultAvoids := rangeAvoids.mono (by
+        intro metavariable occurs
+        exact (Ty.mem_freeVariables_function_iff
+          metavariable parameter result).mpr (.inr occurs))
+      simp only [TypeSystem.Substitution.apply]
+      rw [parameterInduction parameterAvoids, resultInduction resultAvoids]
+  | product left right leftInduction rightInduction =>
+      have leftAvoids := rangeAvoids.mono (by
+        intro metavariable occurs
+        exact (Ty.mem_freeVariables_product_iff
+          metavariable left right).mpr (.inl occurs))
+      have rightAvoids := rangeAvoids.mono (by
+        intro metavariable occurs
+        exact (Ty.mem_freeVariables_product_iff
+          metavariable left right).mpr (.inr occurs))
+      simp only [TypeSystem.Substitution.apply]
+      rw [leftInduction leftAvoids, rightInduction rightAvoids]
+  | mapping key value keyInduction valueInduction =>
+      have keyAvoids := rangeAvoids.mono (by
+        intro metavariable occurs
+        exact (Ty.mem_freeVariables_mapping_iff
+          metavariable key value).mpr (.inl occurs))
+      have valueAvoids := rangeAvoids.mono (by
+        intro metavariable occurs
+        exact (Ty.mem_freeVariables_mapping_iff
+          metavariable key value).mpr (.inr occurs))
+      simp only [TypeSystem.Substitution.apply]
+      rw [keyInduction keyAvoids, valueInduction valueAvoids]
+  | proxy innerType innerInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [innerInduction rangeAvoids]
+  | comptime innerType innerInduction =>
+      simp only [TypeSystem.Substitution.apply]
+      rw [innerInduction rangeAvoids]
+  | error => rfl
+
+/-- The selected outer ranges relevant to every type carried by a predicate
+avoid a protected set of flexible variables. -/
+def PredicateRangeAvoidsVariablesOn (outer : Substitution)
+    (protectedVariables : List TypeVarId)
+    (predicate : ProgramPredicate) : Prop :=
+  outer.RangeAvoidsVariablesOn protectedVariables predicate.subject ∧
+    ∀ argument, argument ∈ predicate.arguments →
+      outer.RangeAvoidsVariablesOn protectedVariables argument
+
+/-- Relevance-restricted no-capture is sufficient to commute flexible
+substitution over every type position in a trait predicate. -/
+theorem TypedTraitResolution.applySubstitution_compose_of_rangeAvoidsVariablesOn
+    {predicate : ProgramPredicate}
+    {substitutedVariables : List TypeVarId}
+    (outer inner : Substitution)
+    (innerExact : ExactSubstitution inner substitutedVariables)
+    (outerFresh : ∀ metavariable,
+      metavariable ∈ substitutedVariables →
+        metavariable ∉ outer.domain)
+    (rangeAvoids : PredicateRangeAvoidsVariablesOn outer
+      substitutedVariables predicate) :
+    TypedTraitResolution.applySubstitution outer
+        (TypedTraitResolution.applySubstitution inner predicate) =
+      TypedTraitResolution.applySubstitution
+        (Substitution.mapRange outer inner)
+        (TypedTraitResolution.applySubstitution outer predicate) := by
+  cases predicate with
+  | mk trait subject arguments =>
+      rcases rangeAvoids with ⟨subjectAvoids, argumentsAvoid⟩
+      simp only [TypedTraitResolution.applySubstitution]
+      congr 1
+      · exact Ty.applyFlexible_compose_of_rangeAvoidsVariablesOn outer inner
+          innerExact outerFresh subjectAvoids
+      · simp only [List.map_map]
+        apply List.map_congr_left
+        intro argument member
+        exact Ty.applyFlexible_compose_of_rangeAvoidsVariablesOn outer inner
+          innerExact outerFresh (argumentsAvoid argument member)
+
 /-- Applying an outer flexible substitution after an exact inner one is
 equivalent to mapping the outer action over the inner range and then applying
 that mapped substitution to the outer image.  Freshness prevents the outer
@@ -7365,94 +7522,19 @@ theorem TypeWellScoped.applyFlexible_compose
     (outerFresh : ∀ metavariable,
       metavariable ∈ substitutedVariables →
         metavariable ∉ outer.domain)
-    (wellScoped : TypeWellScoped source flexibleVariables type) :
+    (_wellScoped : TypeWellScoped source flexibleVariables type) :
     outer.apply (inner.apply type) =
       (Substitution.mapRange outer inner).apply (outer.apply type) := by
-  refine TypeWellScoped.rec
-    (motive_1 := fun type _ =>
-      outer.apply (inner.apply type) =
-        (Substitution.mapRange outer inner).apply (outer.apply type))
-    (motive_2 := fun types _ =>
-      (types.map inner.apply).map outer.apply =
-        (types.map outer.apply).map
-          (Substitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
-  · intro metavariable _
-    by_cases substituted : metavariable ∈ substitutedVariables
-    · obtain ⟨replacement, member, innerLookup⟩ :=
-        StructuralSubstitution.Substitution.exists_lookup?_eq_some innerExact
-          substituted
-      have mappedMember :
-          (metavariable, outer.apply replacement) ∈
-            Substitution.mapRange outer inner :=
-        List.mem_map.mpr ⟨(metavariable, replacement), member, rfl⟩
-      have mappedLookup :=
-        StructuralSubstitution.Substitution.lookup?_eq_some_of_mem_of_domain_nodup
-          (Substitution.ExactSubstitution.mapRange outer innerExact).domain_nodup
-          mappedMember
-      have outerLookup :=
-        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
-          (outerFresh metavariable substituted)
-      simp [TypeSystem.Substitution.apply, innerLookup, mappedLookup,
-        outerLookup]
-    · have innerAbsent : metavariable ∉ inner.domain := by
-        intro member
-        exact substituted ((innerExact.mem_domain_iff metavariable).mp member)
-      have mappedExact :=
-        Substitution.ExactSubstitution.mapRange outer innerExact
-      have mappedAbsent :
-          metavariable ∉ (Substitution.mapRange outer inner).domain := by
-        intro member
-        exact substituted ((mappedExact.mem_domain_iff metavariable).mp member)
-      have innerLookup :=
-        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
-          innerAbsent
-      have mappedLookup :=
-        StructuralSubstitution.Substitution.lookup?_eq_none_of_not_mem_domain
-          mappedAbsent
-      cases outerLookup : outer.lookup? metavariable with
-      | none =>
-          simp [TypeSystem.Substitution.apply, innerLookup, mappedLookup,
-            outerLookup]
-      | some replacement =>
-          have outerMember := Substitution.mem_of_lookup?_eq_some outerLookup
-          have replacementFixed :=
-            StructuralSubstitution.TypeWellScoped.applySubstitution_eq_self
-              (Substitution.mapRange outer inner)
-              (outerRange metavariable replacement outerMember).typeWellScoped
-          simp [TypeSystem.Substitution.apply, innerLookup, outerLookup,
-            replacementFixed]
-  · intro parameter _ _
-    rfl
-  · intro builtin
-    rfl
-  · intro dataType arguments _ _ _ argumentsInduction
-    simp only [StructuralSubstitution.applyFlexible_nominal]
-    exact congrArg (fun mapped => Ty.nominal dataType.id mapped)
-      argumentsInduction
-  · intro contract arguments _ _ _ argumentsInduction
-    simp only [StructuralSubstitution.applyFlexible_nominal]
-    exact congrArg (fun mapped => Ty.nominal contract.id mapped)
-      argumentsInduction
-  · intro parameter result _ _ parameterInduction resultInduction
-    simp only [TypeSystem.Substitution.apply]
-    rw [parameterInduction, resultInduction]
-  · intro left right _ _ leftInduction rightInduction
-    simp only [TypeSystem.Substitution.apply]
-    rw [leftInduction, rightInduction]
-  · intro key value _ _ keyInduction valueInduction
-    simp only [TypeSystem.Substitution.apply]
-    rw [keyInduction, valueInduction]
-  · intro innerType _ innerInduction
-    simp only [TypeSystem.Substitution.apply]
-    rw [innerInduction]
-  · intro innerType _ innerInduction
-    simp only [TypeSystem.Substitution.apply]
-    rw [innerInduction]
-  · rfl
-  · intro head tail _ _ headInduction tailInduction
-    simp only [List.map_cons]
-    rw [headInduction, tailInduction]
+  have rangeAvoids :
+      outer.RangeAvoidsVariablesOn substitutedVariables type := by
+    intro sourceVariable _ replacement found protectedVariable captured
+    have member := TypeSystem.Substitution.lookup?_eq_some_mem found
+    have closed := StructuralSubstitution.TypeWellFormed.freeVariables_eq_nil
+      (outerRange sourceVariable replacement member)
+    rw [closed] at captured
+    simp at captured
+  exact Ty.applyFlexible_compose_of_rangeAvoidsVariablesOn outer inner
+    innerExact outerFresh rangeAvoids
 
 /-- Flexible range mapping commutes with substitution of every type carried by
 an admissible trait predicate. -/

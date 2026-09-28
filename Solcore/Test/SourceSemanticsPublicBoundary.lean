@@ -411,6 +411,12 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.TypeWellScoped.applySub
 example :=
   @Solcore.SourceSemantics.FlexibleSubstitution.TypeWellScoped.applyExactAdmissible
 example := @Solcore.SourceSemantics.FlexibleSubstitution.TypeWellScoped.applyFlexible_compose
+example :=
+  @Solcore.SourceSemantics.FlexibleSubstitution.Ty.applyFlexible_compose_of_rangeAvoidsVariablesOn
+example :=
+  @Solcore.SourceSemantics.FlexibleSubstitution.PredicateRangeAvoidsVariablesOn
+example :=
+  @Solcore.SourceSemantics.FlexibleSubstitution.TypedTraitResolution.applySubstitution_compose_of_rangeAvoidsVariablesOn
 example := @Solcore.SourceSemantics.FlexibleSubstitution.TypeWellScoped.applyFlexible_composeParameters
 example := @Solcore.SourceSemantics.FlexibleSubstitution.TypesWellScoped.applyFlexible_composeParameters
 example := @Solcore.SourceSemantics.FlexibleSubstitution.TypesWellScoped.applySubstitution

@@ -16,6 +16,104 @@ open TypeSystem
 open SourceSemantics
 open SourceSemantics.StructuralSubstitution
 
+private def captureSource : TypeVarId := ⟨0⟩
+
+private def captureProtected : TypeVarId := ⟨1⟩
+
+private def captureSafeRange : TypeVarId := ⟨2⟩
+
+private def captureInner : Substitution :=
+  [(captureProtected, .word)]
+
+private def capturingOuter : Substitution :=
+  [(captureSource, .variable captureProtected)]
+
+private def captureSafeOuter : Substitution :=
+  [(captureSource, .variable captureSafeRange)]
+
+private def captureType : Ty := .variable captureSource
+
+private theorem captureInnerExact :
+    ExactSubstitution captureInner [captureProtected] := by
+  exact ExactSubstitution.singleton captureProtected .word
+
+private theorem captureSafeOuterFresh :
+    ∀ metavariable, metavariable ∈ [captureProtected] →
+      metavariable ∉ captureSafeOuter.domain := by
+  intro metavariable protectedMember
+  simp only [List.mem_singleton] at protectedMember
+  subst metavariable
+  simp [captureSafeOuter, captureProtected, captureSource,
+    TypeSystem.Substitution.domain]
+
+private theorem captureSafeRangeAvoids :
+    captureSafeOuter.RangeAvoidsVariablesOn [captureProtected]
+      captureType := by
+  intro sourceVariable occurs replacement found protectedVariable captured
+  simp only [captureType, Ty.freeVariables, List.mem_singleton] at occurs
+  subst sourceVariable
+  simp [captureSafeOuter] at found
+  subst replacement
+  simp only [Ty.freeVariables, List.mem_singleton] at captured
+  subst protectedVariable
+  simp [captureSafeRange, captureProtected]
+
+/-- The tempting weaker premise `protected ∉ outer.domain` is insufficient:
+an outer replacement can introduce the inner variable and be captured by the
+mapped inner substitution. -/
+example :
+    capturingOuter.apply (captureInner.apply captureType) ≠
+      (FlexibleSubstitution.Substitution.mapRange
+        capturingOuter captureInner).apply (capturingOuter.apply captureType) := by
+  simp [capturingOuter, captureInner, captureType, captureSource,
+    captureProtected, FlexibleSubstitution.Substitution.mapRange,
+    TypeSystem.Substitution.apply, TypeSystem.Substitution.lookup?]
+  intro impossible
+  cases impossible
+
+/-- The counterexample is rejected exactly by the relevance-restricted
+no-capture premise. -/
+example : ¬ capturingOuter.RangeAvoidsVariablesOn [captureProtected]
+    captureType := by
+  intro avoids
+  have outside := avoids captureSource
+    (by simp [captureType, captureSource, Ty.freeVariables])
+    (.variable captureProtected)
+    (by simp [capturingOuter, captureSource])
+    captureProtected
+    (by simp [Ty.freeVariables])
+  exact outside (by simp)
+
+/-- When the only relevant outer range avoids the protected inner variable,
+the flexible composition theorem applies without requiring a ground range. -/
+example :
+    captureSafeOuter.apply (captureInner.apply captureType) =
+      (FlexibleSubstitution.Substitution.mapRange
+        captureSafeOuter captureInner).apply
+          (captureSafeOuter.apply captureType) :=
+  FlexibleSubstitution.Ty.applyFlexible_compose_of_rangeAvoidsVariablesOn
+    captureSafeOuter captureInner captureInnerExact captureSafeOuterFresh
+    captureSafeRangeAvoids
+
+/-- The same local algebraic boundary covers the subject and arguments of a
+trait predicate. -/
+example :
+    let predicate := ProgramSignatures.builtinIntPredicate captureType
+    TypedTraitResolution.applySubstitution captureSafeOuter
+        (TypedTraitResolution.applySubstitution captureInner predicate) =
+      TypedTraitResolution.applySubstitution
+        (FlexibleSubstitution.Substitution.mapRange
+          captureSafeOuter captureInner)
+        (TypedTraitResolution.applySubstitution captureSafeOuter predicate) := by
+  dsimp only
+  apply
+    FlexibleSubstitution.TypedTraitResolution.applySubstitution_compose_of_rangeAvoidsVariablesOn
+    captureSafeOuter captureInner captureInnerExact captureSafeOuterFresh
+  constructor
+  · exact captureSafeRangeAvoids
+  · intro argument member
+    simp [ProgramSignatures.builtinIntPredicate] at member
+
 /-- An already matched implementation head remains matched after applying an
 outer declaration-parameter substitution to its goal and premises. -/
 example (outer : ParameterSubstitution) (rule : ProgramImplRule)

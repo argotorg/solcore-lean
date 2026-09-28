@@ -360,6 +360,18 @@ def RangeAvoidsDomain (newer older : Substitution) : Prop :=
       ∀ rangeVariable, rangeVariable ∈ replacement.freeVariables →
         rangeVariable ∉ older.domain
 
+/-- The ranges selected by `outer` at variables that actually occur in
+`type` avoid a protected set of variables.  Using first-match lookup here is
+intentional: shadowed substitution entries and entries irrelevant to `type`
+cannot participate in capture. -/
+def RangeAvoidsVariablesOn (outer : Substitution)
+    (protectedVariables : List TypeVarId) (type : Ty) : Prop :=
+  ∀ sourceVariable, sourceVariable ∈ type.freeVariables →
+    ∀ replacement, outer.lookup? sourceVariable = some replacement →
+      ∀ protectedVariable,
+        protectedVariable ∈ replacement.freeVariables →
+          protectedVariable ∉ protectedVariables
+
 /-- `result` semantically extends `previous` when reapplying the previous
 substitution before the result cannot change any type. -/
 def SemanticallyExtends (result previous : Substitution) : Prop :=
@@ -586,6 +598,23 @@ theorem apply_variables_outside_domain
   | error => simp [Substitution.apply, Ty.freeVariables]
 
 end SolvedBelow
+
+namespace RangeAvoidsVariablesOn
+
+/-- A relevance-restricted no-capture fact can be narrowed to a type whose
+free variables are included in those of the original type. -/
+theorem mono
+    {outer : Substitution} {protectedVariables : List TypeVarId}
+    {source target : Ty}
+    (avoids : RangeAvoidsVariablesOn outer protectedVariables target)
+    (included : ∀ metavariable, metavariable ∈ source.freeVariables →
+      metavariable ∈ target.freeVariables) :
+    RangeAvoidsVariablesOn outer protectedVariables source := by
+  intro sourceVariable occurs replacement found protectedVariable captured
+  exact avoids sourceVariable (included sourceVariable occurs) replacement
+    found protectedVariable captured
+
+end RangeAvoidsVariablesOn
 
 namespace RangeAvoidsDomain
 
