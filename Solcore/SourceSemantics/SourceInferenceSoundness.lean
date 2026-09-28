@@ -4955,6 +4955,118 @@ theorem finalize_requirementOwnership
   · rw [solved_eq]
     simpa [idsEq] using validated.2.2
 
+/-- The reusable whole-body resources exposed by one successful finalization.
+
+The hidden post-defaulting state is retained so recursive inference proofs can
+target the exact state consumed by requirement solving.  Source containment,
+on the other hand, remains stated against the public input and output sources:
+the final source is precisely the input source under the returned
+substitution. -/
+structure FinalInferenceResources
+    (inferenceContext : Frontend.SourceInference.Context)
+    (type : TypeSystem.Ty)
+    (state : Frontend.SourceInference.State)
+    (roots : List NodeId)
+    (result : Frontend.SourceInference.Result) where
+  finalState : Frontend.SourceInference.State
+  progress_of_ready :
+    state.InferenceReady → state.InferenceProgress finalState
+  requirements_eq : finalState.requirements = state.requirements
+  substitution_eq :
+    result.substitution = finalState.inference.substitution
+  solve_success :
+    Detail.solveRequirements inferenceContext finalState
+      finalState.requirements = .ok result.solvedRequirements
+  type_eq : result.type = result.substitution.apply type
+  source_eq : result.typedSource =
+    (state.toTypedSource roots).applySubstitution result.substitution
+  solved_context_eq :
+    (finalizedRequirementContext inferenceContext result).solvedRequirements =
+      result.solvedRequirements
+  range_formation :
+    Frontend.InferenceSubstitutionRangeFormationValidated
+      inferenceContext.signatures inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters result.substitution
+  graph_closed : OccurrenceGraphClosed result.typedSource
+  local_identity_ownership : LocalIdentityOwnership result.typedSource
+  ledger : ScopedRequirementLedgerWellFormed
+    (finalizedRequirementContext inferenceContext result) result.typedSource
+  ownership : RequirementOwnership
+    (finalizedRequirementContext inferenceContext result) result.typedSource
+  local_no_capture : ∀ binder,
+    binder ∈ (state.toTypedSource roots).initializedLetBinders →
+      Detail.LocalBinderInstantiationNoCapture result.substitution binder
+
+namespace FinalInferenceResources
+
+/-- Package all finalization-wide resources around the exact hidden solver
+state.  The progress projection remains conditional on inference readiness,
+which is the invariant threaded by recursive source inference. -/
+def ofFinalize
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    FinalInferenceResources inferenceContext type state roots result := by
+  let witness := Detail.finalize_success_witness success
+  have requirementsEq :
+      witness.finalState.requirements = state.requirements := by
+    rw [Detail.defaultIntegerLiteralTargets_requirements
+      witness.literalDefault,
+      Detail.defaultIntegerPatternTargets_requirements
+        witness.patternDefault]
+  have substitutionEq :
+      result.substitution = witness.finalState.inference.substitution :=
+    congrArg Frontend.SourceInference.Result.substitution witness.result_eq
+  have solvedEq :
+      result.solvedRequirements = witness.solvedRequirements :=
+    congrArg Frontend.SourceInference.Result.solvedRequirements
+      witness.result_eq
+  refine {
+    finalState := witness.finalState
+    progress_of_ready := ?_
+    requirements_eq := requirementsEq
+    substitution_eq := substitutionEq
+    solve_success := ?_
+    type_eq := Detail.finalize_type success
+    source_eq := Detail.finalize_typedSource success
+    solved_context_eq := rfl
+    range_formation :=
+      Detail.finalize_substitutionRangeFormationValidated success
+    graph_closed := finalize_occurrenceGraphClosed success
+    local_identity_ownership := finalize_localIdentityOwnership success
+    ledger := finalize_scopedRequirementLedgerWellFormed success
+    ownership := finalize_requirementOwnership rfl success
+    local_no_capture :=
+      Detail.finalize_localBinderInstantiationNoCapture success
+  }
+  · intro ready
+    have originsBelow := Detail.finalize_numericOriginsBelowNext success
+    have patternProperties :=
+      Detail.defaultIntegerPatternTargets_inferenceProperties ready
+        originsBelow.1 witness.patternDefault
+    have patternLiteralOrigins :=
+      Detail.defaultIntegerPatternTargets_integerLiterals
+        witness.patternDefault
+    have literalOriginsBelow : ∀ origin ∈ witness.patternState.integerLiterals,
+        origin.metavariable.index < witness.patternState.inference.next := by
+      intro origin member
+      have inputMember : origin ∈ state.integerLiterals := by
+        rw [patternLiteralOrigins] at member
+        exact member
+      exact Nat.lt_of_lt_of_le (originsBelow.2 origin inputMember)
+        patternProperties.1.next_le
+    have literalProperties :=
+      Detail.defaultIntegerLiteralTargets_inferenceProperties
+        patternProperties.2 literalOriginsBelow witness.literalDefault
+    exact patternProperties.1.trans literalProperties.1
+  · rw [solvedEq]
+    exact witness.requirementsSolved
+
+end FinalInferenceResources
+
 /-- Every successfully checked function body owns each solved requirement at
 exactly one primary source occurrence, independently of ledger order. -/
 theorem checkFunctionBody_success_requirementOwnership

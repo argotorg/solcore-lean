@@ -344,6 +344,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_contextSubstitutionValid
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.ofFinalize
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed_bodyContext
