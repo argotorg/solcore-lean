@@ -673,16 +673,18 @@ private theorem constructorsInDataTypes_member_origin
       constructorsInDataTypes dataTypes name) :
     ∃ accessible ∈ dataTypes,
       dataType = accessible.signature ∧
-        constructor ∈ accessible.signature.constructors := by
+        constructor ∈ accessible.signature.constructors ∧
+        constructor.name = name := by
   unfold constructorsInDataTypes at member
   rcases List.mem_flatMap.mp member with
     ⟨accessible, accessibleMember, constructorMember⟩
   simp only [List.mem_filterMap] at constructorMember
   obtain ⟨candidate, candidateMember, produced⟩ := constructorMember
-  split at produced
+  split at produced <;> rename_i accepted
   · simp only [Option.some.injEq, Prod.mk.injEq] at produced
     rcases produced with ⟨dataTypeEq, rfl⟩
-    exact ⟨accessible, accessibleMember, dataTypeEq.symm, candidateMember⟩
+    exact ⟨accessible, accessibleMember, dataTypeEq.symm, candidateMember,
+      beq_iff_eq.mp (Bool.and_eq_true_iff.mp accepted).1⟩
   · contradiction
 
 private theorem constructorsInDataTypes_member_facts
@@ -696,8 +698,19 @@ private theorem constructorsInDataTypes_member_facts
     dataType ∈ context.signatures.dataTypes ∧
       constructor ∈ dataType.constructors := by
   rcases constructorsInDataTypes_member_origin member with
-    ⟨accessible, accessibleMember, rfl, constructorMember⟩
+    ⟨accessible, accessibleMember, rfl, constructorMember, _⟩
   exact ⟨cataloged accessible accessibleMember, constructorMember⟩
+
+private theorem constructorsInDataTypes_member_name
+    {dataTypes : List AccessibleDataType} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    (member : (dataType, constructor) ∈
+      constructorsInDataTypes dataTypes name) :
+    constructor.name = name := by
+  rcases constructorsInDataTypes_member_origin member with
+    ⟨_, _, _, _, nameEqual⟩
+  exact nameEqual
 
 private def exactConstructorCandidate (qualifiers : List String) (name : String) :
     List (ProgramDataSignature × ProgramDataConstructorSignature) →
@@ -756,6 +769,39 @@ theorem explicitConstructorCandidate_success_members
       exact constructorsInDataTypes_member_facts
         (qualifiedDataTypesNamed_success_members found) selected
 
+/-- An explicitly selected constructor has the name requested by the source
+path. -/
+theorem explicitConstructorCandidate_success_name
+    {context : Context} {qualifiers : List String} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    (success : explicitConstructorCandidate context qualifiers name =
+      .ok (dataType, constructor)) :
+    constructor.name = name := by
+  cases found : qualifiedDataTypesNamed context qualifiers with
+  | error errors =>
+      simp [explicitConstructorCandidate, found, bind, Except.bind] at success
+  | ok dataTypes =>
+      apply constructorsInDataTypes_member_name
+      apply exactConstructorCandidate_success_member
+      simpa [explicitConstructorCandidate, found, bind, Except.bind, pure,
+        Pure.pure, Except.pure] using success
+
+/-- The complete stable provenance boundary for explicit constructor
+selection. -/
+theorem explicitConstructorCandidate_success_facts
+    {context : Context} {qualifiers : List String} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    (success : explicitConstructorCandidate context qualifiers name =
+      .ok (dataType, constructor)) :
+    dataType ∈ context.signatures.dataTypes ∧
+      constructor ∈ dataType.constructors ∧
+      constructor.name = name := by
+  exact ⟨(explicitConstructorCandidate_success_members success).1,
+    (explicitConstructorCandidate_success_members success).2,
+    explicitConstructorCandidate_success_name success⟩
+
 def contextualConstructorCandidate (context : Context) (state : State)
     (expected : Option Ty) (name : String) :
     Except Error (ProgramDataSignature × ProgramDataConstructorSignature × List Ty) := do
@@ -784,9 +830,10 @@ def contextualConstructorCandidate (context : Context) (state : State)
     }] name)
   pure (constructor.1, constructor.2, arguments)
 
-/-- Contextual constructor selection preserves both catalog provenance and
-the nominal expected type that supplied its type arguments. -/
-theorem contextualConstructorCandidate_success_facts
+/-- Contextual constructor selection preserves catalog provenance, the
+queried constructor name, and the nominal expected type that supplied its
+type arguments. -/
+theorem contextualConstructorCandidate_success_facts_with_name
     {context : Context} {state : State} {expected : Option Ty} {name : String}
     {dataType : ProgramDataSignature}
     {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
@@ -794,9 +841,10 @@ theorem contextualConstructorCandidate_success_facts
       .ok (dataType, constructor, arguments)) :
     dataType ∈ context.signatures.dataTypes ∧
       constructor ∈ dataType.constructors ∧
+      constructor.name = name ∧
       ∃ expectedType,
-        expected = some expectedType ∧
-          state.resolve expectedType = Ty.nominal dataType.id arguments := by
+          expected = some expectedType ∧
+            state.resolve expectedType = Ty.nominal dataType.id arguments := by
   cases expected with
   | none =>
       simp [contextualConstructorCandidate, bind, Except.bind, pure,
@@ -830,16 +878,18 @@ theorem contextualConstructorCandidate_success_facts
                     }] name) = .ok (selectedDataType, selectedConstructor) →
                   selectedDataType = sourceDataType ∧
                     selectedDataType ∈ context.signatures.dataTypes ∧
-                    selectedConstructor ∈ selectedDataType.constructors := by
+                    selectedConstructor ∈ selectedDataType.constructors ∧
+                    selectedConstructor.name = name := by
                 intro visibility selectedDataType selectedConstructor selected
                 rcases constructorsInDataTypes_member_origin
                     (exactConstructorCandidate_success_member selected) with
                   ⟨accessible, accessibleMember, selectedOwner,
-                    constructorMember⟩
+                    constructorMember, constructorName⟩
                 simp only [List.mem_singleton] at accessibleMember
                 subst accessible
                 subst selectedDataType
-                exact ⟨rfl, sourceDataTypeMember, constructorMember⟩
+                exact ⟨rfl, sourceDataTypeMember, constructorMember,
+                  constructorName⟩
               cases isLocal : decide
                   (sourceDataType.id.moduleId = context.scope.currentModule) with
               | true =>
@@ -867,8 +917,8 @@ theorem contextualConstructorCandidate_success_facts
                           Ty.nominal selectedDataType.id sourceArguments := by
                         rw [provenance.1]
                         exact nominalSource
-                      exact ⟨provenance.2.1, provenance.2.2, expectedType,
-                        rfl, nominalSelected⟩
+                      exact ⟨provenance.2.1, provenance.2.2.1,
+                        provenance.2.2.2, expectedType, rfl, nominalSelected⟩
               | false =>
                   cases imported : buildProgramImports context.environment
                       context.scope.currentModule with
@@ -905,8 +955,37 @@ theorem contextualConstructorCandidate_success_facts
                               Ty.nominal selectedDataType.id sourceArguments := by
                             rw [provenance.1]
                             exact nominalSource
-                          exact ⟨provenance.2.1, provenance.2.2, expectedType,
-                            rfl, nominalSelected⟩
+                          exact ⟨provenance.2.1, provenance.2.2.1,
+                            provenance.2.2.2, expectedType, rfl,
+                            nominalSelected⟩
+
+/-- Contextual constructor selection preserves both catalog provenance and
+the nominal expected type that supplied its type arguments. -/
+theorem contextualConstructorCandidate_success_facts
+    {context : Context} {state : State} {expected : Option Ty} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
+    (success : contextualConstructorCandidate context state expected name =
+      .ok (dataType, constructor, arguments)) :
+    dataType ∈ context.signatures.dataTypes ∧
+      constructor ∈ dataType.constructors ∧
+      ∃ expectedType,
+        expected = some expectedType ∧
+          state.resolve expectedType = Ty.nominal dataType.id arguments := by
+  rcases contextualConstructorCandidate_success_facts_with_name success with
+    ⟨dataTypeMember, constructorMember, _, expectedFacts⟩
+  exact ⟨dataTypeMember, constructorMember, expectedFacts⟩
+
+/-- A contextually selected constructor has the name requested by the source
+pattern. -/
+theorem contextualConstructorCandidate_success_name
+    {context : Context} {state : State} {expected : Option Ty} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
+    (success : contextualConstructorCandidate context state expected name =
+      .ok (dataType, constructor, arguments)) :
+    constructor.name = name :=
+  (contextualConstructorCandidate_success_facts_with_name success).2.2.1
 
 def instantiateDataConstructor
     (dataType : ProgramDataSignature)

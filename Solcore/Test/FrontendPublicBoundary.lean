@@ -504,7 +504,15 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.explicitConstructorCandidate_success_members
 example :=
+  @Solcore.Frontend.SourceInference.Detail.explicitConstructorCandidate_success_name
+example :=
+  @Solcore.Frontend.SourceInference.Detail.explicitConstructorCandidate_success_facts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.contextualConstructorCandidate_success_facts_with_name
+example :=
   @Solcore.Frontend.SourceInference.Detail.contextualConstructorCandidate_success_facts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.contextualConstructorCandidate_success_name
 example :=
   @Solcore.Frontend.SourceInference.Detail.contextualConstructorCandidate_success_instantiation_variablesBelow
 example :=
