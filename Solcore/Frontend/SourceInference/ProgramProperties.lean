@@ -1309,6 +1309,118 @@ theorem defaultIntegerLiteralTargets_requirements
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_requirements headResult)
 
+/-- Defaulting one unresolved integer-pattern target is ordinary inference
+progress and preserves readiness when the recorded metavariable lies below
+the input allocator.  A target already fixed to a non-variable type leaves
+the state unchanged. -/
+theorem defaultIntegerPatternTarget_inferenceProperties
+    {state next : State} {origin : IntegerPatternOrigin}
+    (ready : state.InferenceReady)
+    (originBelow : origin.metavariable.index < state.inference.next)
+    (success : defaultIntegerPatternTarget state origin = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerPatternTarget, resolved] at success
+  · have targetBelow : (Ty.variable origin.metavariable).VariablesBelow
+        state.inference.next :=
+      (Ty.variablesBelow_variable_iff _ _).2 originBelow
+    have wordBelow : Ty.word.VariablesBelow state.inference.next :=
+      Ty.variablesBelow_constructor _ _
+    exact ⟨unify_inferenceProgress ready.solved targetBelow wordBelow success,
+      unify_preserves_inferenceReady ready targetBelow wordBelow success⟩
+  all_goals cases success
+  all_goals exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+
+/-- Defaulting a source-ordered list of integer-pattern targets composes the
+single-origin inference certificates. -/
+theorem defaultIntegerPatternTargets_inferenceProperties
+    {origins : List IntegerPatternOrigin} {state next : State}
+    (ready : state.InferenceReady)
+    (originsBelow : ∀ origin ∈ origins,
+      origin.metavariable.index < state.inference.next)
+    (success : defaultIntegerPatternTargets origins state = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerPatternTargets] at success
+      cases success
+      exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerPatternTarget state origin with
+      | error error =>
+          simp [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+            at success
+      | ok middle =>
+          have tailResult :
+              defaultIntegerPatternTargets rest middle = .ok next := by
+            simpa [defaultIntegerPatternTargets, headResult, bind, Except.bind]
+              using success
+          have headProperties := defaultIntegerPatternTarget_inferenceProperties
+            ready (originsBelow origin (by simp)) headResult
+          have restBelow : ∀ candidate ∈ rest,
+              candidate.metavariable.index < middle.inference.next := by
+            intro candidate member
+            exact Nat.lt_of_lt_of_le
+              (originsBelow candidate (by simp [member]))
+              headProperties.1.next_le
+          have tailProperties := induction headProperties.2 restBelow tailResult
+          exact ⟨headProperties.1.trans tailProperties.1, tailProperties.2⟩
+
+/-- Integer-literal defaulting has the same inference behavior as pattern
+defaulting. -/
+theorem defaultIntegerLiteralTarget_inferenceProperties
+    {state next : State} {origin : IntegerLiteralOrigin}
+    (ready : state.InferenceReady)
+    (originBelow : origin.metavariable.index < state.inference.next)
+    (success : defaultIntegerLiteralTarget state origin = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  cases resolved : state.resolve (.variable origin.metavariable) <;>
+    simp [defaultIntegerLiteralTarget, resolved] at success
+  · have targetBelow : (Ty.variable origin.metavariable).VariablesBelow
+        state.inference.next :=
+      (Ty.variablesBelow_variable_iff _ _).2 originBelow
+    have wordBelow : Ty.word.VariablesBelow state.inference.next :=
+      Ty.variablesBelow_constructor _ _
+    exact ⟨unify_inferenceProgress ready.solved targetBelow wordBelow success,
+      unify_preserves_inferenceReady ready targetBelow wordBelow success⟩
+  all_goals cases success
+  all_goals exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+
+/-- Defaulting a source-ordered list of integer-literal targets composes the
+single-origin inference certificates. -/
+theorem defaultIntegerLiteralTargets_inferenceProperties
+    {origins : List IntegerLiteralOrigin} {state next : State}
+    (ready : state.InferenceReady)
+    (originsBelow : ∀ origin ∈ origins,
+      origin.metavariable.index < state.inference.next)
+    (success : defaultIntegerLiteralTargets origins state = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  induction origins generalizing state with
+  | nil =>
+      simp [defaultIntegerLiteralTargets] at success
+      cases success
+      exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+  | cons origin rest induction =>
+      cases headResult : defaultIntegerLiteralTarget state origin with
+      | error error =>
+          simp [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+            at success
+      | ok middle =>
+          have tailResult :
+              defaultIntegerLiteralTargets rest middle = .ok next := by
+            simpa [defaultIntegerLiteralTargets, headResult, bind, Except.bind]
+              using success
+          have headProperties := defaultIntegerLiteralTarget_inferenceProperties
+            ready (originsBelow origin (by simp)) headResult
+          have restBelow : ∀ candidate ∈ rest,
+              candidate.metavariable.index < middle.inference.next := by
+            intro candidate member
+            exact Nat.lt_of_lt_of_le
+              (originsBelow candidate (by simp [member]))
+              headProperties.1.next_le
+          have tailProperties := induction headProperties.2 restBelow tailResult
+          exact ⟨headProperties.1.trans tailProperties.1, tailProperties.2⟩
+
 /-- Defaulting one numeric pattern target preserves every type equality
 already visible through the input inference state. -/
 theorem defaultIntegerPatternTarget_preserves_resolve_eq
@@ -1658,6 +1770,58 @@ def finalize_success_witness
                                     requirementsSolved := requirementsResult
                                     result_eq := rfl
                                   }
+
+/-- Numeric-origin allocator safety lets finalization compose both defaulting
+passes as ordinary semantic inference progress.  The existential final state
+is the internal state whose substitution is exposed by the public result. -/
+theorem finalize_inferenceProperties
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (ready : state.InferenceReady)
+    (originsBelow : state.NumericOriginsBelowNext)
+    (success : finalize context type state roots = .ok result) :
+    ∃ finalState,
+      state.InferenceProgress finalState ∧
+        finalState.InferenceReady ∧
+        result.substitution = finalState.inference.substitution := by
+  obtain ⟨patternState, finalState, _, _, _, _, _, patternDefault,
+      literalDefault, _, _, _, _, _, resultEq⟩ :=
+    finalize_success_witness success
+  subst result
+  have patternProperties :=
+    defaultIntegerPatternTargets_inferenceProperties ready originsBelow.1
+      patternDefault
+  have patternLiteralOrigins :=
+    defaultIntegerPatternTargets_integerLiterals patternDefault
+  have literalOriginsBelow : ∀ origin ∈ patternState.integerLiterals,
+      origin.metavariable.index < patternState.inference.next := by
+    intro origin member
+    have inputMember : origin ∈ state.integerLiterals := by
+      rw [patternLiteralOrigins] at member
+      exact member
+    exact Nat.lt_of_lt_of_le (originsBelow.2 origin inputMember)
+      patternProperties.1.next_le
+  have literalProperties :=
+    defaultIntegerLiteralTargets_inferenceProperties patternProperties.2
+      literalOriginsBelow literalDefault
+  exact ⟨finalState, patternProperties.1.trans literalProperties.1,
+    literalProperties.2, rfl⟩
+
+/-- Under the same allocator-safety premise, the substitution returned by
+finalization is solved below the allocator of its hidden final state.  This is
+the public certificate needed by later final-result soundness proofs. -/
+theorem finalize_substitution_solvedBelow
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (ready : state.InferenceReady)
+    (originsBelow : state.NumericOriginsBelowNext)
+    (success : finalize context type state roots = .ok result) :
+    ∃ next, result.substitution.SolvedBelow next := by
+  obtain ⟨finalState, _, finalReady, substitutionEq⟩ :=
+    finalize_inferenceProperties ready originsBelow success
+  refine ⟨finalState.inference.next, ?_⟩
+  rw [substitutionEq]
+  exact finalReady.solved
 
 /-- Successful finalization includes successful structural validation of its
 input typed-source graph. -/

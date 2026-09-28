@@ -23,24 +23,15 @@ def LocalBindersBelowNextLocal (state : State) : Prop :=
   ∀ binder ∈ state.localBinders,
     binder.id.binderIndex < state.nextLocal
 
-/-- Every requirement template retained by a visible local scheme is
-classified as a local-scheme assumption.  This connects lexical lookup to
-the declaration-wide requirement classification used when instantiating a
-generalized local. -/
-def LocalBinderTemplatesTracked (state : State) : Prop :=
-  ∀ binder ∈ state.localBinders,
-    binder.schemeRequirements.map
-      (fun requirement => requirement.templateRequirement) ⊆
-      state.localSchemeAssumptions
-
-/-- The part of source-state evolution needed to preserve the classification
-of requirement templates owned by visible local schemes. -/
-structure LocalBinderTemplateProgress (before after : State) : Prop where
-  assumptions_subset :
-    before.localSchemeAssumptions ⊆ after.localSchemeAssumptions
-  preserves :
-    before.LocalBinderTemplatesTracked →
-      after.LocalBinderTemplatesTracked
+/-- Every numeric-defaulting origin names a metavariable already allocated by
+the inference state.  Finalization needs this allocator bound to invoke the
+ordinary unification preservation theorem while closing unresolved numeric
+targets. -/
+def NumericOriginsBelowNext (state : State) : Prop :=
+  (∀ origin ∈ state.integerPatterns,
+      origin.metavariable.index < state.inference.next) ∧
+    ∀ origin ∈ state.integerLiterals,
+      origin.metavariable.index < state.inference.next
 
 /-- The part of source-inference state evolution needed to preserve occurrence
 allocation safety.  This deliberately says nothing about exact node payloads:
@@ -115,60 +106,6 @@ theorem transport {before after : State}
   exact Nat.lt_of_lt_of_le (below binder member) nextLocalLe
 
 end LocalBindersBelowNextLocal
-
-namespace LocalBinderTemplatesTracked
-
-/-- Dropping visible binders while retaining all classified template
-identities preserves local-binder template tracking. -/
-theorem transport {before after : State}
-    (bindersSubset : after.localBinders ⊆ before.localBinders)
-    (assumptionsSubset :
-      before.localSchemeAssumptions ⊆ after.localSchemeAssumptions)
-    (tracked : before.LocalBinderTemplatesTracked) :
-    after.LocalBinderTemplatesTracked := by
-  intro binder member id idMember
-  exact assumptionsSubset (tracked binder (bindersSubset member) idMember)
-
-end LocalBinderTemplatesTracked
-
-namespace LocalBinderTemplateProgress
-
-/-- Every state makes reflexive local-template tracking progress. -/
-theorem refl (state : State) : state.LocalBinderTemplateProgress state :=
-  ⟨fun _ member => member, fun tracked => tracked⟩
-
-/-- Local-template tracking progress composes across sequential state
-updates. -/
-theorem trans {first second third : State}
-    (firstSecond : first.LocalBinderTemplateProgress second)
-    (secondThird : second.LocalBinderTemplateProgress third) :
-    first.LocalBinderTemplateProgress third :=
-  ⟨fun _ member =>
-      secondThird.assumptions_subset
-        (firstSecond.assumptions_subset member),
-    fun tracked => secondThird.preserves (firstSecond.preserves tracked)⟩
-
-/-- Equality of the visible-binder and assumption projections is sufficient
-for local-template tracking progress, even when unrelated fields change. -/
-theorem of_fields_eq {before after : State}
-    (bindersEq : after.localBinders = before.localBinders)
-    (assumptionsEq :
-      after.localSchemeAssumptions = before.localSchemeAssumptions) :
-    before.LocalBinderTemplateProgress after := by
-  constructor
-  · intro id member
-    simpa only [assumptionsEq] using member
-  · intro tracked
-    exact LocalBinderTemplatesTracked.transport
-      (by
-        rw [bindersEq]
-        exact fun _ member => member)
-      (by
-        intro id member
-        simpa only [assumptionsEq] using member)
-      tracked
-
-end LocalBinderTemplateProgress
 
 namespace InferenceProgress
 
@@ -256,6 +193,14 @@ private theorem map_mapIdx {α β γ : Type} (items : List α)
       (initial owner locals inputComptime).localBinders := by
   rfl
 
+/-- Initial source inference has no numeric origins, so its origin allocator
+bound holds independently of the input environment. -/
+theorem initial_numericOriginsBelowNext
+    (owner : Resolved.DeclarationId) (locals : TypeSystem.Environment)
+    (inputComptime : List Bool) :
+    (initial owner locals inputComptime).NumericOriginsBelowNext := by
+  constructor <;> simp [initial]
+
 /-- Stable input binders reconstruct the complete initial inference
 environment, including schemes and source order. -/
 @[simp] theorem initial_binderEnvironment
@@ -269,30 +214,58 @@ environment, including schemes and source order. -/
   | cons entry rest induction =>
       simp [List.mapIdx_cons, induction]
 
+private theorem lookupBinder?_eq_some_raw_and_templates
+    {state : State} {name : String} {binder : TypedBinder}
+    (found : state.lookupBinder? name = some binder) :
+    state.localBinders.find? (fun candidate => candidate.name == name) =
+        some binder ∧
+      binder.schemeRequirements.map
+          (fun requirement => requirement.templateRequirement) ⊆
+        state.localSchemeAssumptions := by
+  unfold lookupBinder? at found
+  cases rawFound : state.localBinders.find?
+      (fun candidate => candidate.name == name) with
+  | none => simp [rawFound] at found
+  | some candidate =>
+      simp only [rawFound] at found
+      split at found
+      next guarded =>
+        injection found with candidateEq
+        subst candidate
+        exact ⟨rfl, guarded⟩
+      next => contradiction
+
+/-- Guarded lookup retains the ordinary first-match result selected before the
+template-classification check. -/
+theorem lookupBinder?_eq_some_raw
+    {state : State} {name : String} {binder : TypedBinder}
+    (found : state.lookupBinder? name = some binder) :
+    state.localBinders.find? (fun candidate => candidate.name == name) =
+      some binder :=
+  (lookupBinder?_eq_some_raw_and_templates found).1
+
 /-- Successful lexical lookup returns a retained stable binder whose source
 name is exactly the queried name. -/
 theorem lookupBinder?_eq_some_facts
     {state : State} {name : String} {binder : TypedBinder}
     (found : state.lookupBinder? name = some binder) :
     binder ∈ state.localBinders ∧ binder.name = name := by
-  have rawFound : state.localBinders.find?
-      (fun candidate => candidate.name == name) = some binder := by
-    simpa only [lookupBinder?] using found
+  have rawFound := lookupBinder?_eq_some_raw found
   have accepted : (binder.name == name) = true :=
     List.find?_some
       (p := fun candidate : TypedBinder => candidate.name == name) rawFound
   exact ⟨List.mem_of_find?_eq_some rawFound, by simpa using accepted⟩
 
 /-- A successfully looked-up binder exposes only requirement templates already
-classified as local-scheme assumptions by a tracked state. -/
-theorem LocalBinderTemplatesTracked.of_lookupBinder?
+classified as local-scheme assumptions.  This is guaranteed at the lookup
+boundary even for an otherwise malformed inference state. -/
+theorem lookupBinder?_eq_some_templates_subset
     {state : State} {name : String} {binder : TypedBinder}
-    (tracked : state.LocalBinderTemplatesTracked)
     (found : state.lookupBinder? name = some binder) :
     binder.schemeRequirements.map
         (fun requirement => requirement.templateRequirement) ⊆
       state.localSchemeAssumptions :=
-  tracked binder (lookupBinder?_eq_some_facts found).1
+  (lookupBinder?_eq_some_raw_and_templates found).2
 
 /-- Successful lexical lookup exposes the selected scheme under the queried
 name in the canonical binder environment. -/
@@ -375,19 +348,6 @@ theorem initial_localBindersBelowNextLocal
   subst binder
   exact indexLt
 
-/-- Initial parameter binders carry no qualified-local requirements, so every
-initial state tracks all of its binder templates vacuously. -/
-theorem initial_localBinderTemplatesTracked
-    (owner : Resolved.DeclarationId) (locals : TypeSystem.Environment)
-    (inputComptime : List Bool) :
-    (initial owner locals inputComptime).LocalBinderTemplatesTracked := by
-  intro binder member id idMember
-  rw [← initial_inputs_eq_localBinders] at member
-  rw [initial_inputs_definition] at member
-  obtain ⟨index, indexLt, binderEq⟩ := List.exists_of_mem_mapIdx member
-  subst binder
-  simp at idMember
-
 @[simp] theorem fresh_header (state : State) :
     state.fresh.2.header = state.header := by
   rfl
@@ -420,15 +380,6 @@ theorem withLocals_preserves_nodesBelowNextOccurrence
   change state.NodesBelowNextOccurrence
   exact below
 
-/-- Replacing the compatibility-only local environment leaves stable binders
-and their classified requirement templates unchanged. -/
-theorem withLocals_preserves_localBinderTemplatesTracked
-    (state : State) (locals : TypeSystem.Environment)
-    (tracked : state.LocalBinderTemplatesTracked) :
-    (state.withLocals locals).LocalBinderTemplatesTracked := by
-  change state.LocalBinderTemplatesTracked
-  exact tracked
-
 @[simp] theorem restoreLexicalScope_header (state : State)
     (scope : LexicalScope) :
     (state.restoreLexicalScope scope).header = state.header := by
@@ -456,24 +407,6 @@ theorem restoreLexicalScope_preserves_nodesBelowNextOccurrence
     (state.restoreLexicalScope scope).NodesBelowNextOccurrence := by
   change state.NodesBelowNextOccurrence
   exact below
-
-/-- Restoring an outer lexical scope preserves template tracking when the
-inner traversal retained every assumption classified by the outer scope. -/
-theorem restoreLexicalScope_preserves_localBinderTemplatesTracked
-    {outer inner : State}
-    (tracked : outer.LocalBinderTemplatesTracked)
-    (assumptionsSubset :
-      outer.localSchemeAssumptions ⊆ inner.localSchemeAssumptions) :
-    (inner.restoreLexicalScope outer.lexicalScope)
-      |>.LocalBinderTemplatesTracked := by
-  exact LocalBinderTemplatesTracked.transport
-    (before := outer)
-    (after := inner.restoreLexicalScope outer.lexicalScope)
-    (by
-      intro binder member
-      exact member)
-    assumptionsSubset
-    tracked
 
 @[simp] theorem allocateBinder_header (state : State) (name : String)
     (scheme : TypeSystem.Scheme) (span : Option Syntax.SourceSpan)
@@ -503,56 +436,6 @@ theorem allocateBinder_preserves_nodesBelowNextOccurrence
       |>.NodesBelowNextOccurrence := by
   change state.NodesBelowNextOccurrence
   exact below
-
-/-- Visible binder allocation tracks the newly introduced binder templates by
-appending their identities to the local-scheme assumption classification. -/
-theorem allocateBinder_preserves_localBinderTemplatesTracked
-    (state : State) (name : String) (scheme : TypeSystem.Scheme)
-    (span : Option Syntax.SourceSpan) (comptime : Bool)
-    (schemeRequirements : List LocalSchemeRequirement)
-    (tracked : state.LocalBinderTemplatesTracked) :
-    (state.allocateBinder name scheme span comptime schemeRequirements).2
-      |>.LocalBinderTemplatesTracked := by
-  intro binder member id idMember
-  simp only [allocateBinder, List.mem_cons] at member
-  rcases member with rfl | member
-  · exact List.mem_append_right _ idMember
-  · exact List.mem_append_left _ (tracked binder member idMember)
-
-namespace LocalBinderTemplateProgress
-
-/-- Compatibility-local replacement makes reflexive local-template tracking
-progress. -/
-theorem withLocals (state : State) (locals : TypeSystem.Environment) :
-    state.LocalBinderTemplateProgress (state.withLocals locals) :=
-  of_fields_eq rfl rfl
-
-/-- Visible binder allocation monotonically extends the assumption
-classification and preserves tracking for both old and new binders. -/
-theorem allocateBinder (state : State) (name : String)
-    (scheme : TypeSystem.Scheme) (span : Option Syntax.SourceSpan)
-    (comptime : Bool) (schemeRequirements : List LocalSchemeRequirement) :
-    state.LocalBinderTemplateProgress
-      (state.allocateBinder name scheme span comptime schemeRequirements).2 := by
-  constructor
-  · intro id member
-    exact List.mem_append_left _ member
-  · exact allocateBinder_preserves_localBinderTemplatesTracked
-      state name scheme span comptime schemeRequirements
-
-/-- Restoring the outer binder stack after inner progress retains every outer
-template classification accumulated by that progress. -/
-theorem restoreLexicalScope {outer inner : State}
-    (progress : outer.LocalBinderTemplateProgress inner) :
-    outer.LocalBinderTemplateProgress
-      (inner.restoreLexicalScope outer.lexicalScope) := by
-  constructor
-  · exact progress.assumptions_subset
-  · intro tracked
-    exact restoreLexicalScope_preserves_localBinderTemplatesTracked
-      tracked progress.assumptions_subset
-
-end LocalBinderTemplateProgress
 
 @[simp] theorem allocateHiddenLocal_header (state : State) :
     state.allocateHiddenLocal.2.header = state.header := by

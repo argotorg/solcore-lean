@@ -174,6 +174,10 @@ example := @Solcore.Frontend.SourceInference.State.binderEnvironment
 example :=
   @Solcore.Frontend.SourceInference.State.lookupBinder?_eq_some_facts
 example :=
+  @Solcore.Frontend.SourceInference.State.lookupBinder?_eq_some_raw
+example :=
+  @Solcore.Frontend.SourceInference.State.lookupBinder?_eq_some_templates_subset
+example :=
   @Solcore.Frontend.SourceInference.State.lookupBinder?_eq_some_mem_binderEnvironment
 example := @Solcore.Frontend.SourceInference.State.NodesBelowNextOccurrence
 example :=
@@ -181,25 +185,9 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.LocalBindersBelowNextLocal.transport
 example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplatesTracked
+  @Solcore.Frontend.SourceInference.State.NumericOriginsBelowNext
 example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplatesTracked.transport
-example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplatesTracked.of_lookupBinder?
-example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress
-example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.refl
-example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.trans
-example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.of_fields_eq
-example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.withLocals
-example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.allocateBinder
-example :=
-  @Solcore.Frontend.SourceInference.State.LocalBinderTemplateProgress.restoreLexicalScope
+  @Solcore.Frontend.SourceInference.State.initial_numericOriginsBelowNext
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.refl
 example :=
@@ -286,8 +274,6 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.initial_localBindersBelowNextLocal
 example :=
-  @Solcore.Frontend.SourceInference.State.initial_localBinderTemplatesTracked
-example :=
   @Solcore.Frontend.SourceInference.State.fresh_preserves_nodesBelowNextOccurrence
 example :=
   @Solcore.Frontend.SourceInference.State.withLocals_preserves_nodesBelowNextOccurrence
@@ -330,12 +316,6 @@ example :=
   @Solcore.Frontend.SourceInference.State.restoreLexicalScope_preserves_localBindersBelowNextLocal
 example :=
   @Solcore.Frontend.SourceInference.State.allocateBinder_preserves_localBindersBelowNextLocal
-example :=
-  @Solcore.Frontend.SourceInference.State.withLocals_preserves_localBinderTemplatesTracked
-example :=
-  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_preserves_localBinderTemplatesTracked
-example :=
-  @Solcore.Frontend.SourceInference.State.allocateBinder_preserves_localBinderTemplatesTracked
 example :=
   @Solcore.Frontend.SourceInference.State.allocateBinder_id_fresh
 example :=
@@ -932,9 +912,21 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.defaultIntegerLiteralTargets_requirements
 example :=
+  @Solcore.Frontend.SourceInference.Detail.defaultIntegerPatternTarget_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.defaultIntegerPatternTargets_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.defaultIntegerLiteralTarget_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.defaultIntegerLiteralTargets_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.FinalizeSuccessWitness
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_success_witness
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_substitution_solvedBelow
 example := @Solcore.Frontend.SourceInference.Detail.finalize_type
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceGraph

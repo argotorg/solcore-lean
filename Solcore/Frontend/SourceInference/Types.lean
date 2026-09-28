@@ -352,9 +352,20 @@ type environment; typed traversal should use `lexicalScope` and
 def withLocals (state : State) (locals : TypeSystem.Environment) : State :=
   { state with locals }
 
-/-- Resolve the innermost stable binder carrying a source name. -/
+/-- Resolve the innermost stable binder carrying a source name, provided every
+requirement template owned by its scheme is classified as a local assumption.
+The guard is applied after first-match selection, so a malformed inner binder
+is rejected instead of exposing or skipping to an outer binder. -/
 def lookupBinder? (state : State) (name : String) : Option TypedBinder :=
-  state.localBinders.find? fun binder => binder.name == name
+  match state.localBinders.find? fun binder => binder.name == name with
+  | none => none
+  | some binder =>
+      if binder.schemeRequirements.map
+          (fun requirement => requirement.templateRequirement) ⊆
+          state.localSchemeAssumptions then
+        some binder
+      else
+        none
 
 /-- Capture only the name/type and stable-binder portion of the current lexical
 scope. -/

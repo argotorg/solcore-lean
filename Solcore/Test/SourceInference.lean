@@ -321,6 +321,52 @@ private def solverRegressionContext : SourceInference.Context := {
 private def solverRegressionSpan : Syntax.SourceSpan :=
   ⟨⟨.main, "source_inference_solver.sol"⟩, 0, 0⟩
 
+private def numericPatternOrigin : SourceInference.IntegerPatternOrigin := {
+  metavariable := ⟨0⟩
+  span := solverRegressionSpan
+  requirement := ⟨0⟩
+}
+
+private def numericPatternState : SourceInference.State := {
+  unificationProgressInput with integerPatterns := [numericPatternOrigin]
+}
+
+private def numericPatternResult : SourceInference.State := {
+  numericPatternState with inference := unificationProgressResult.inference
+}
+
+private theorem numericPatternState_ready :
+    numericPatternState.InferenceReady := by
+  have ready := SourceInference.State.InferenceReady.fresh
+    (SourceInference.State.InferenceReady.initial solverRegressionOwner [] [])
+  constructor
+  · simpa [numericPatternState, unificationProgressInput] using ready.solved
+  · simpa [numericPatternState, unificationProgressInput,
+      SourceInference.State.binderEnvironment] using ready.bindersBelow
+
+private theorem numericPatternState_originsBelow :
+    numericPatternState.NumericOriginsBelowNext := by
+  simp [SourceInference.State.NumericOriginsBelowNext, numericPatternState,
+    numericPatternOrigin, unificationProgressInput,
+    SourceInference.State.initial, SourceInference.State.fresh,
+    TypeSystem.InferState.fresh]
+
+private theorem numericPatternDefault_success :
+    SourceInference.Detail.defaultIntegerPatternTarget numericPatternState
+      numericPatternOrigin = .ok numericPatternResult := by
+  rfl
+
+/-- A concrete unresolved numeric origin is allocator-bounded and defaulting
+it to `Word` preserves both solved inference progress and readiness. -/
+example :
+    numericPatternState.InferenceProgress numericPatternResult ∧
+      numericPatternResult.InferenceReady := by
+  exact SourceInference.Detail.defaultIntegerPatternTarget_inferenceProperties
+    numericPatternState_ready
+    (numericPatternState_originsBelow.1 numericPatternOrigin (by simp
+      [numericPatternState]))
+    numericPatternDefault_success
+
 private def solverRegressionRecoveryType : Syntax.TypeExpr := {
   span := solverRegressionSpan
   value := .error
@@ -1053,36 +1099,37 @@ private def forgedQualifiedBinder : SourceInference.TypedBinder := {
   schemeRequirements := [forgedLocalSchemeRequirement]
 }
 
-/-- A state assembled outside the canonical allocation API can satisfy both
-the requirement-ledger and local-identity bounds while omitting a visible
-binder's template from the local-scheme assumption classification.  The new
-tracking invariant excludes exactly this forgeable state. -/
-private def forgedUntrackedBinderState : SourceInference.State := {
-  SourceInference.State.initial solverRegressionOwner with
-  localBinders := [forgedQualifiedBinder]
-  nextLocal := 1
+private def forgedOuterBinder : SourceInference.TypedBinder := {
+  id := { owner := solverRegressionOwner, binderIndex := 1 }
+  name := "forged"
+  scheme := .mono .bool
 }
 
+/-- A state assembled outside the canonical allocation API may omit the
+selected inner binder's template classification even when an outer binder with
+the same name is otherwise valid. -/
+private def forgedUntrackedBinderState : SourceInference.State := {
+  SourceInference.State.initial solverRegressionOwner with
+  localBinders := [forgedQualifiedBinder, forgedOuterBinder]
+  nextLocal := 2
+}
+
+/-- Guarded lookup rejects the malformed first match instead of exposing it or
+silently skipping to the valid outer binder. -/
 example :
-    forgedUntrackedBinderState.RequirementsWellFormed ∧
-      forgedUntrackedBinderState.LocalBindersBelowNextLocal ∧
-      ¬ forgedUntrackedBinderState.LocalBinderTemplatesTracked := by
-  refine ⟨rfl, ?_, ?_⟩
-  · intro binder member
-    have binderEq : binder = forgedQualifiedBinder := by
-      simpa [forgedUntrackedBinderState] using member
-    subst binder
-    simp [forgedQualifiedBinder, forgedUntrackedBinderState]
-  · intro tracked
-    have templateMember : solverRegressionRequirement.id ∈
-        forgedQualifiedBinder.schemeRequirements.map
-          (fun requirement => requirement.templateRequirement) := by
-      simp [forgedQualifiedBinder, forgedLocalSchemeRequirement]
-    have classified := tracked forgedQualifiedBinder
-      (by simp [forgedUntrackedBinderState])
-      templateMember
-    change solverRegressionRequirement.id ∈ [] at classified
-    simp at classified
+    forgedUntrackedBinderState.lookupBinder? "forged" = none := by
+  rfl
+
+private def guardedBinderAllocation :=
+  (SourceInference.State.initial solverRegressionOwner).allocateBinder
+    "guarded" (.mono .word) none false [forgedLocalSchemeRequirement]
+
+/-- Canonical binder allocation classifies its templates, so the lookup guard
+is observationally transparent for well-formed states. -/
+example :
+    guardedBinderAllocation.2.lookupBinder? "guarded" =
+      some guardedBinderAllocation.1 := by
+  rfl
 
 /-- Batch allocation produces consecutive, distinct identities which remain
 fresh for the complete input ledger even when predicate payloads repeat. -/

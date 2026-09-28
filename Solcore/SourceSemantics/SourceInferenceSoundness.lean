@@ -251,7 +251,7 @@ theorem lookup_of_lookupBinder?
         (binder.applySubstitution substitution).schemeRequirements := by
   have rawFound : state.localBinders.find?
       (fun candidate => candidate.name == name) = some binder := by
-    simpa [Frontend.SourceInference.State.lookupBinder?] using found
+    exact Frontend.SourceInference.State.lookupBinder?_eq_some_raw found
   have binderMember : binder ∈ state.localBinders :=
     List.mem_of_find?_eq_some rawFound
   have localMember :
