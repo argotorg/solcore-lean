@@ -291,6 +291,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_block_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithoutElse_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithElse_sound
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_nil_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_singleton_facts

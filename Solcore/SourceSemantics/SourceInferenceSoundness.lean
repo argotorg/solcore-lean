@@ -3809,6 +3809,296 @@ theorem inferStatementFuel_success_block_sound
   · exact StatementResultMatchesFactsAfterSubstitution.block bodyAgreement
       id _
 
+/-- A successful conditional without an `else` is compositional modulo
+typing its condition and then-body in the common final typed source.  The
+inference-progress witness for the body transports the condition's expected
+`Bool` type through the final substitution. -/
+theorem inferStatementFuel_success_ifWithoutElse_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {thenBody : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .ifThen condition thenBody none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (conditionSound :
+      ∀ {inferredCondition : InferredExpression}
+        {conditionState : Frontend.SourceInference.State},
+        Detail.inferExprFuel fuel inferenceContext condition (some .bool)
+            allocated = .ok (inferredCondition, conditionState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target inferredCondition.id
+            (outer.apply inferredCondition.type))
+    (thenSound :
+      ∀ {conditionState : Frontend.SourceInference.State}
+        {thenResult : Detail.BlockResult},
+        ActiveLocalContextInvariant conditionState outer target →
+          Detail.inferStatementsFuel fuel inferenceContext thenBody.value
+            expectedReturn conditionState = .ok thenResult →
+          ∃ thenFinal thenFacts,
+            ActiveLocalContextInvariant thenResult.state outer thenFinal ∧
+            StatementsHaveType
+              ((result.state.toTypedSource roots).applySubstitution outer) {
+                returnType := outer.apply expectedReturn
+                loopDepth := inferenceContext.loopDepth
+              } target thenResult.statements thenFinal thenFacts ∧
+            BlockResultMatchesFactsAfterSubstitution outer thenResult
+              thenFacts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [finalEq] at preserved
+    exact preserved
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← finalEq]
+    exact returnBelow
+  obtain ⟨inferredCondition, conditionState, thenResult, conditionSuccess,
+      thenSuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_ifWithoutElse_facts statementEq allocationEq
+      success roots
+  have conditionProperties :=
+    Detail.inferExprFuel_inferenceProperties allocatedReady signatureFormation
+      functionsCanonical (by
+        intro expected member
+        simp only [Option.mem_def] at member
+        injection member with expectedEq
+        subst expected
+        simp [TypeSystem.Ty.bool]) conditionSuccess
+  have conditionInvariant :
+      ActiveLocalContextInvariant conditionState outer target :=
+    allocatedInvariant.inferExprFuel conditionSuccess
+  have conditionTyping := conditionSound conditionSuccess
+  have conditionReturnBelow :
+      expectedReturn.VariablesBelow conditionState.inference.next :=
+    allocatedReturnBelow.weaken conditionProperties.1.next_le
+  have thenProperties :=
+    Detail.inferStatementsFuel_inferenceProperties conditionProperties.2.1
+      signatureFormation functionsCanonical conditionReturnBelow thenSuccess
+  obtain ⟨thenFinal, thenFacts, _thenInvariant, thenTyping,
+      thenAgreement⟩ := thenSound conditionInvariant thenSuccess
+  subst result
+  have thenExtension : outer.SemanticallyExtends
+      thenResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      thenResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  have conditionExtension : outer.SemanticallyExtends
+      conditionState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans thenExtension
+      thenProperties.1.substitution_extends
+  have conditionEq : outer.apply inferredCondition.type = .bool := by
+    simpa using Detail.inferExprFuel_expected_type_apply_eq conditionSuccess
+      conditionExtension
+  refine ⟨{
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := thenFacts.control.branches (.ordinary .unit)
+    }, conditionInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact ifWithoutElseStatementHasType_afterSubstitution contains
+      conditionTyping conditionEq thenTyping
+  · exact
+      StatementResultMatchesFactsAfterSubstitution.ifWithoutElse outer
+        thenFacts id _
+
+/-- A successful two-branch conditional is compositional modulo condition and
+branch soundness in the common final typed source.  Both branch scopes start
+from the condition context; executable restoration prevents declarations in
+the then-branch from leaking into the else-branch or the enclosing context. -/
+theorem inferStatementFuel_success_ifWithElse_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {thenBody elseBody : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .ifThen condition thenBody (some elseBody))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (conditionSound :
+      ∀ {inferredCondition : InferredExpression}
+        {conditionState : Frontend.SourceInference.State},
+        Detail.inferExprFuel fuel inferenceContext condition (some .bool)
+            allocated = .ok (inferredCondition, conditionState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target inferredCondition.id
+            (outer.apply inferredCondition.type))
+    (thenSound :
+      ∀ {conditionState : Frontend.SourceInference.State}
+        {thenResult : Detail.BlockResult},
+        ActiveLocalContextInvariant conditionState outer target →
+          Detail.inferStatementsFuel fuel inferenceContext thenBody.value
+              expectedReturn conditionState = .ok thenResult →
+            ∃ thenFinal thenFacts,
+              ActiveLocalContextInvariant thenResult.state outer thenFinal ∧
+              StatementsHaveType
+                ((result.state.toTypedSource roots).applySubstitution outer) {
+                  returnType := outer.apply expectedReturn
+                  loopDepth := inferenceContext.loopDepth
+                } target thenResult.statements thenFinal thenFacts ∧
+              BlockResultMatchesFactsAfterSubstitution outer thenResult
+                thenFacts)
+    (elseSound :
+      ∀ {elseInput : Frontend.SourceInference.State}
+        {elseResult : Detail.BlockResult},
+        ActiveLocalContextInvariant elseInput outer target →
+          Detail.inferStatementsFuel fuel inferenceContext elseBody.value
+              expectedReturn elseInput = .ok elseResult →
+            ∃ elseFinal elseFacts,
+              ActiveLocalContextInvariant elseResult.state outer elseFinal ∧
+              StatementsHaveType
+                ((result.state.toTypedSource roots).applySubstitution outer) {
+                  returnType := outer.apply expectedReturn
+                  loopDepth := inferenceContext.loopDepth
+                } target elseResult.statements elseFinal elseFacts ∧
+              BlockResultMatchesFactsAfterSubstitution outer elseResult
+                elseFacts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [finalEq] at preserved
+    exact preserved
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← finalEq]
+    exact returnBelow
+  obtain ⟨inferredCondition, conditionState, thenResult, elseResult,
+      conditionSuccess, thenSuccess, elseSuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_ifWithElse_facts statementEq allocationEq
+      success roots
+  have conditionProperties :=
+    Detail.inferExprFuel_inferenceProperties allocatedReady signatureFormation
+      functionsCanonical (by
+        intro expected member
+        simp only [Option.mem_def] at member
+        injection member with expectedEq
+        subst expected
+        simp [TypeSystem.Ty.bool]) conditionSuccess
+  have conditionInvariant :
+      ActiveLocalContextInvariant conditionState outer target :=
+    allocatedInvariant.inferExprFuel conditionSuccess
+  have conditionTyping := conditionSound conditionSuccess
+  have conditionReturnBelow :
+      expectedReturn.VariablesBelow conditionState.inference.next :=
+    allocatedReturnBelow.weaken conditionProperties.1.next_le
+  have thenProperties :=
+    Detail.inferStatementsFuel_inferenceProperties conditionProperties.2.1
+      signatureFormation functionsCanonical conditionReturnBelow thenSuccess
+  obtain ⟨thenFinal, thenFacts, _thenInvariant, thenTyping,
+      thenAgreement⟩ := thenSound conditionInvariant thenSuccess
+  have restoredProperties :=
+    Frontend.SourceInference.State.restoreLexicalScope_inferenceProperties
+      conditionProperties.2.1 thenProperties.1
+  have elseInputInvariant : ActiveLocalContextInvariant
+      (thenResult.state.restoreLexicalScope conditionState.lexicalScope) outer
+      target :=
+    conditionInvariant.restoreLexicalScope
+  have elseReturnBelow : expectedReturn.VariablesBelow
+      (thenResult.state.restoreLexicalScope
+        conditionState.lexicalScope).inference.next :=
+    conditionReturnBelow.weaken restoredProperties.1.next_le
+  have elseProperties :=
+    Detail.inferStatementsFuel_inferenceProperties restoredProperties.2
+      signatureFormation functionsCanonical elseReturnBelow elseSuccess
+  obtain ⟨elseFinal, elseFacts, _elseInvariant, elseTyping,
+      elseAgreement⟩ := elseSound elseInputInvariant elseSuccess
+  subst result
+  have elseExtension : outer.SemanticallyExtends
+      elseResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      elseResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  have restoredExtension : outer.SemanticallyExtends
+      (thenResult.state.restoreLexicalScope
+        conditionState.lexicalScope).inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans elseExtension
+      elseProperties.1.substitution_extends
+  have conditionExtension : outer.SemanticallyExtends
+      conditionState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans restoredExtension
+      restoredProperties.1.substitution_extends
+  have conditionEq : outer.apply inferredCondition.type = .bool := by
+    simpa using Detail.inferExprFuel_expected_type_apply_eq conditionSuccess
+      conditionExtension
+  refine ⟨{
+      type := if thenFacts.sawReturn && elseFacts.sawReturn then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := thenFacts.sawReturn && elseFacts.sawReturn
+      sawReturn := thenFacts.sawReturn && elseFacts.sawReturn
+      control := thenFacts.control.branches elseFacts.control
+    }, conditionInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact ifWithElseStatementHasType_afterSubstitution contains
+      conditionTyping conditionEq thenTyping elseTyping thenAgreement
+      elseAgreement elseExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.ifWithElse
+      thenAgreement elseAgreement elseExtension id _
+
 /-- Empty executable block inference returns the canonical empty block
 without changing its input state. -/
 theorem inferStatementsFuel_success_nil_facts
