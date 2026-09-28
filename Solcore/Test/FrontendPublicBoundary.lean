@@ -86,6 +86,9 @@ example := @Solcore.Frontend.ImplementationSignatureMethodCatalogValidated
 example := @Solcore.Frontend.ProgramSignatureFormationError
 example := @Solcore.Frontend.SignatureTypeFormationValidated
 example := @Solcore.Frontend.SignatureTypesFormationValidated
+example := @Solcore.Frontend.InferenceTypeFormationValidated
+example := @Solcore.Frontend.InferenceTypesFormationValidated
+example := @Solcore.Frontend.InferenceSubstitutionRangeFormationValidated
 example := @Solcore.Frontend.SignaturePredicateFormationValidated
 example := @Solcore.Frontend.SignaturePredicatesFormationValidated
 example := @Solcore.Frontend.ProgramSignatureFormationValidated
@@ -93,6 +96,11 @@ example := @Solcore.Frontend.validateProgramSignatureFormation
 example := @Solcore.Frontend.validateProgramSignatureFormation_success
 example := @Solcore.Frontend.validateResolvedTypeFormation
 example := @Solcore.Frontend.validateResolvedTypeFormation_success
+example := @Solcore.Frontend.validateInferenceTypeFormation
+example := @Solcore.Frontend.validateInferenceTypeFormation_success
+example := @Solcore.Frontend.validateInferenceSubstitutionRangeFormation
+example :=
+  @Solcore.Frontend.validateInferenceSubstitutionRangeFormation_success
 example := @Solcore.Frontend.SignatureTypeFormationValidated.variablesBelow
 example := @Solcore.Frontend.SignatureTypesFormationValidated.variablesBelow
 example :=
@@ -563,6 +571,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_requirements_subset
 example :=
+  @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_success_localSchemeInstantiationStart
+example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordInstantiatedFunctionReference_inferenceProperties
@@ -965,9 +975,15 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceTemplateTracking
 example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateFinalSubstitutionRangeFormation
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_substitutionRangeFormationValidated
+example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceLocalSchemeNoCapture
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_localBinderInstantiationNoCapture
+example :=
+  @Solcore.Frontend.SourceInference.Detail.checkFunctionBody_success_substitutionRangeFormationValidated
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceRequirementOwnership
 example :=
@@ -991,6 +1007,11 @@ example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputNa
 example := @Solcore.Frontend.SourceInference.Detail.finalize_typedSource_inputComptime
 example := @Solcore.Frontend.SourceInference.TypedBinder.applySubstitution_name
 example := @Solcore.Frontend.SourceInference.TypedBinder.applySubstitution_comptime
+example (substitution : Solcore.TypeSystem.Substitution)
+    (node : Solcore.Frontend.SourceInference.ExpressionNode) :
+    (node.applySubstitution substitution).localSchemeInstantiationStart =
+      node.localSchemeInstantiationStart := by
+  rfl
 example := @Solcore.Frontend.SourceInference.PlaceResolution.references
 example := @Solcore.Frontend.SourceInference.AssignmentResolution.references
 example := @Solcore.Frontend.SourceInference.ForItemForm.references

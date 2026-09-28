@@ -1081,7 +1081,8 @@ def attachExpressionCoercions (state : State)
 
 def recordExpression (source : Syntax.Expr) (expression : InferredExpression)
     (form : ExpressionForm) (requirements : List RequirementId)
-    (coercions : List CoercionStep) (state : State) :
+    (coercions : List CoercionStep) (state : State)
+    (localSchemeInstantiationStart : Option Nat := none) :
     InferredExpression × State :=
   let node : ExpressionNode := {
     id := expression.id
@@ -1090,17 +1091,19 @@ def recordExpression (source : Syntax.Expr) (expression : InferredExpression)
     form
     requirements
     coercions
+    localSchemeInstantiationStart
   }
   (expression, state.recordNode (.expression node))
 
 def recordExpressionWithExpected (context : Context) (source : Syntax.Expr)
     (id : ExpressionId) (type : Ty) (form : ExpressionForm)
-    (requirements : List RequirementId) (expected : Option Ty) (state : State) :
+    (requirements : List RequirementId) (expected : Option Ty) (state : State)
+    (localSchemeInstantiationStart : Option Nat := none) :
     Except Error (InferredExpression × State) := do
   let fitted ← withExpected context state { id, type } expected
   pure <| recordExpression source fitted.expression form
     (requirements ++ coercionRequirements fitted.coercions)
-    fitted.coercions fitted.state
+    fitted.coercions fitted.state localSchemeInstantiationStart
 
 def recordSelectedCallResult (source callee : Syntax.Expr) (name : String)
     (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
@@ -1501,8 +1504,10 @@ mutual
       | .identifier name =>
           match state.lookupBinder? name.value with
           | some binder =>
+              let localSchemeInstantiationStart := state.inference.next
               let instantiated :=
-                binder.scheme.instantiateWithSubstitution state.inference.next
+                binder.scheme.instantiateWithSubstitution
+                  localSchemeInstantiationStart
               let inference := {
                 state.inference with next := instantiated.next
               }
@@ -1516,7 +1521,8 @@ mutual
                 state.addRequirementsWithIds predicates
               recordExpressionWithExpected context expression id type
                 (.reference name.value (.local binder.id)) requirements expected
-                state
+                state (localSchemeInstantiationStart :=
+                  some localSchemeInstantiationStart)
           | none =>
               if name.value == "true" || name.value == "false" then
                 recordExpressionWithExpected context expression id .bool

@@ -445,6 +445,8 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.instantiateLocalSchemeP
 example :=
   @Solcore.SourceSemantics.FlexibleSubstitution.instantiateLocalSchemePredicates_applySubstitution_of_rangeAvoidsVariablesOn
 example :=
+  @Solcore.SourceSemantics.FlexibleSubstitution.SubstitutionRangeAdmissible.mapRange_instantiateWithSubstitution
+example :=
   @Solcore.SourceSemantics.FlexibleSubstitution.LocalSchemeInstantiationValid.of_instantiateWithSubstitution_afterSubstitution_atTarget
 example :=
   @Solcore.SourceSemantics.FlexibleSubstitution.LocalSchemeInstantiationValid.of_instantiateWithSubstitution_afterSubstitution
@@ -761,6 +763,12 @@ example := @Solcore.SourceSemantics.signatureDeclarationIds_nodup_ofCheckProgram
 example :=
   @Solcore.SourceSemantics.SignatureTypeFormationValidated.typeWellScoped
 example :=
+  @Solcore.SourceSemantics.InferenceTypeFormationValidated.typeWellScoped
+example :=
+  @Solcore.SourceSemantics.InferenceTypeFormationValidated.typeAdmissible
+example :=
+  @Solcore.SourceSemantics.InferenceSubstitutionRangeFormationValidated.rangeAdmissible
+example :=
   @Solcore.SourceSemantics.SignatureTypesFormationValidated.typesWellScoped
 example :=
   @Solcore.SourceSemantics.SignatureTypeFormationValidated.typeWellFormed
@@ -792,6 +800,8 @@ example :=
   @Solcore.SourceSemantics.SignaturePredicatesFormationValidated.predicatesWellFormed
 example := @Solcore.SourceSemantics.checkFunctionBody_success_result_type_eq
 example := @Solcore.SourceSemantics.checkFunctionBody_success_inputs_extend
+example :=
+  @Solcore.SourceSemantics.checkFunctionBody_success_substitutionRangeAdmissible
 example :=
   @Solcore.SourceSemantics.checkedFunctionHeaderWellFormed_ofCheckLoadedProgram
 example :=

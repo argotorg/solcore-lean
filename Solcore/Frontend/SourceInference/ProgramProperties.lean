@@ -1918,9 +1918,8 @@ def finalize_success_witness
                             ownershipResult, bind, Except.bind] at success
                       | ok ownershipValidation =>
                           cases ownershipValidation
-                          cases captureResult :
-                              validateSourceLocalSchemeNoCapture
-                                (finalState.toTypedSource roots)
+                          cases rangeResult :
+                              validateFinalSubstitutionRangeFormation context
                                 finalState.inference.substitution with
                           | error error =>
                               simp [graphValidation, localIdentityValidation,
@@ -1928,16 +1927,14 @@ def finalize_success_witness
                                 patternResult, literalResult,
                                 patternValidationResult,
                                 literalValidationResult, ownershipResult,
-                                captureResult, bind, Except.bind]
+                                rangeResult, bind, Except.bind]
                                 at success
-                          | ok captureValidation =>
-                              cases captureValidation
-                              cases templateScopeResult :
-                                  validateSourceTemplateScopes
-                                    ((finalState.toTypedSource roots
-                                      ).applySubstitution
-                                        finalState.inference.substitution)
-                                    finalState with
+                          | ok rangeValidation =>
+                              cases rangeValidation
+                              cases captureResult :
+                                  validateSourceLocalSchemeNoCapture
+                                    (finalState.toTypedSource roots)
+                                    finalState.inference.substitution with
                               | error error =>
                                   simp [graphValidation,
                                     localIdentityValidation,
@@ -1945,13 +1942,17 @@ def finalize_success_witness
                                     patternResult, literalResult,
                                     patternValidationResult,
                                     literalValidationResult, ownershipResult,
-                                    captureResult, templateScopeResult, bind,
-                                    Except.bind] at success
-                              | ok templateScopeValidation =>
-                                  cases templateScopeValidation
-                                  cases requirementsResult :
-                                      solveRequirements context finalState
-                                        finalState.requirements with
+                                    rangeResult, captureResult, bind,
+                                    Except.bind]
+                                    at success
+                              | ok captureValidation =>
+                                  cases captureValidation
+                                  cases templateScopeResult :
+                                      validateSourceTemplateScopes
+                                        ((finalState.toTypedSource roots
+                                          ).applySubstitution
+                                            finalState.inference.substitution)
+                                        finalState with
                                   | error error =>
                                       simp [graphValidation,
                                         localIdentityValidation,
@@ -1959,43 +1960,64 @@ def finalize_success_witness
                                         ledgerResult, patternResult,
                                         literalResult, patternValidationResult,
                                         literalValidationResult,
-                                        ownershipResult, captureResult,
-                                        templateScopeResult,
-                                        requirementsResult, bind, Except.bind]
+                                        ownershipResult, rangeResult,
+                                        captureResult, templateScopeResult,
+                                        bind, Except.bind]
                                         at success
-                                  | ok requirements =>
-                                      simp [graphValidation,
-                                        localIdentityValidation,
-                                        templateTrackingValidation,
-                                        ledgerResult, patternResult,
-                                        literalResult, patternValidationResult,
-                                        literalValidationResult,
-                                        ownershipResult, captureResult,
-                                        templateScopeResult,
-                                        requirementsResult, bind, Except.bind]
-                                        at success
-                                      cases success
-                                      exact {
-                                        patternState
-                                        finalState
-                                        solvedRequirements := requirements
-                                        graphValidation
-                                        localIdentityValidation
-                                        templateTrackingValidation
-                                        ledgerValidation := ledgerResult
-                                        patternDefault := patternResult
-                                        literalDefault := literalResult
-                                        patternValidation :=
-                                          patternValidationResult
-                                        literalValidation :=
-                                          literalValidationResult
-                                        requirementOwnershipValidation :=
-                                          ownershipResult
-                                        templateScopeValidation :=
-                                          templateScopeResult
-                                        requirementsSolved := requirementsResult
-                                        result_eq := rfl
-                                      }
+                                  | ok templateScopeValidation =>
+                                      cases templateScopeValidation
+                                      cases requirementsResult :
+                                          solveRequirements context finalState
+                                            finalState.requirements with
+                                      | error error =>
+                                          simp [graphValidation,
+                                            localIdentityValidation,
+                                            templateTrackingValidation,
+                                            ledgerResult, patternResult,
+                                            literalResult,
+                                            patternValidationResult,
+                                            literalValidationResult,
+                                            ownershipResult, rangeResult,
+                                            captureResult, templateScopeResult,
+                                            requirementsResult, bind,
+                                            Except.bind]
+                                            at success
+                                      | ok requirements =>
+                                          simp [graphValidation,
+                                            localIdentityValidation,
+                                            templateTrackingValidation,
+                                            ledgerResult, patternResult,
+                                            literalResult,
+                                            patternValidationResult,
+                                            literalValidationResult,
+                                            ownershipResult, rangeResult,
+                                            captureResult, templateScopeResult,
+                                            requirementsResult, bind,
+                                            Except.bind]
+                                            at success
+                                          cases success
+                                          exact {
+                                            patternState
+                                            finalState
+                                            solvedRequirements := requirements
+                                            graphValidation
+                                            localIdentityValidation
+                                            templateTrackingValidation
+                                            ledgerValidation := ledgerResult
+                                            patternDefault := patternResult
+                                            literalDefault := literalResult
+                                            patternValidation :=
+                                              patternValidationResult
+                                            literalValidation :=
+                                              literalValidationResult
+                                            requirementOwnershipValidation :=
+                                              ownershipResult
+                                            templateScopeValidation :=
+                                              templateScopeResult
+                                            requirementsSolved :=
+                                              requirementsResult
+                                            result_eq := rfl
+                                          }
 
 /-- Finalization validates numeric-origin allocator safety before composing
 both defaulting passes as ordinary semantic inference progress.  The
@@ -2077,6 +2099,91 @@ theorem finalize_validateSourceTemplateTracking
       .ok () := by
   exact (finalize_success_witness success).templateTrackingValidation
 
+private theorem finalize_success_witness_rangeFormationValidation
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    validateFinalSubstitutionRangeFormation context
+      (finalize_success_witness success).finalState.inference.substitution =
+        .ok () := by
+  let witness := finalize_success_witness success
+  have pipeline := success
+  have numericValidation := finalize_validateNumericOriginsBelowNext success
+  unfold finalize at pipeline
+  simp only [numericValidation, bind, Except.bind] at pipeline
+  simp only [witness.graphValidation] at pipeline
+  simp only [witness.localIdentityValidation] at pipeline
+  simp only [witness.templateTrackingValidation] at pipeline
+  simp only [witness.ledgerValidation] at pipeline
+  simp only [witness.patternDefault] at pipeline
+  simp only [witness.literalDefault] at pipeline
+  simp only [witness.patternValidation] at pipeline
+  simp only [witness.literalValidation] at pipeline
+  simp only [witness.requirementOwnershipValidation] at pipeline
+  cases validation : validateFinalSubstitutionRangeFormation context
+      witness.finalState.inference.substitution with
+  | error error =>
+      simp only [validation, reduceCtorEq] at pipeline
+  | ok validated =>
+      cases validated
+      rfl
+
+/-- Successful finalization exposes the hidden post-defaulting state at which
+the complete inference-substitution range passed structural formation
+validation. -/
+theorem finalize_validateFinalSubstitutionRangeFormation
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    ∃ finalState : State,
+      result.substitution = finalState.inference.substitution ∧
+        validateFinalSubstitutionRangeFormation context
+          finalState.inference.substitution = .ok () := by
+  let witness := finalize_success_witness success
+  exact ⟨witness.finalState,
+    congrArg Result.substitution witness.result_eq,
+    finalize_success_witness_rangeFormationValidation success⟩
+
+/-- Finalization success is a reusable frontend certificate that every actual
+entry of the returned inference substitution is structurally formed in the
+declaration's open type scope. -/
+theorem finalize_substitutionRangeFormationValidated
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    InferenceSubstitutionRangeFormationValidated context.signatures
+      context.scope.genericOwner context.typeParameters result.substitution := by
+  obtain ⟨finalState, substitutionEq, validation⟩ :=
+    finalize_validateFinalSubstitutionRangeFormation success
+  rw [substitutionEq]
+  unfold validateFinalSubstitutionRangeFormation at validation
+  cases rangeResult : validateInferenceSubstitutionRangeFormation
+      context.signatures context.scope.genericOwner context.typeParameters
+      finalState.inference.substitution with
+  | error error => simp [rangeResult] at validation
+  | ok validated =>
+      cases validated
+      exact validateInferenceSubstitutionRangeFormation_success rangeResult
+
+/-- A successful function-body check exposes the open range-formation
+certificate for the exact substitution retained by the checked function. -/
+theorem checkFunctionBody_success_substitutionRangeFormationValidated
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat} {checked : CheckedFunction}
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    InferenceSubstitutionRangeFormationValidated signatures signature.id
+      signature.scheme.parameters checked.substitution := by
+  obtain ⟨declaration, body, finalState, result, declarationEq, _, _,
+      finalizeEq, checkedEq⟩ := checkFunctionBody_success_witness success
+  have declarationId : declaration.id = signature.id :=
+    (ProgramEnvironment.declaration?_sound declarationEq).2
+  have validated := finalize_substitutionRangeFormationValidated finalizeEq
+  rw [checkedEq]
+  simpa [ProgramTypeScope.ofDeclaration, declarationId] using validated
+
 /-- Successful finalization exposes the hidden post-defaulting state at which
 local-scheme capture was checked.  The source carrier is unchanged by both
 defaulting passes and the state's substitution is exactly the public result
@@ -2116,6 +2223,11 @@ theorem finalize_validateSourceLocalSchemeNoCapture
     simp only [witness.patternValidation] at pipeline
     simp only [witness.literalValidation] at pipeline
     simp only [witness.requirementOwnershipValidation] at pipeline
+    have rangeValidation :
+        validateFinalSubstitutionRangeFormation context
+            witness.finalState.inference.substitution = .ok () :=
+      finalize_success_witness_rangeFormationValidation success
+    simp only [rangeValidation] at pipeline
     cases validation : validateSourceLocalSchemeNoCapture
         (witness.finalState.toTypedSource roots)
         witness.finalState.inference.substitution with

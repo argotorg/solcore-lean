@@ -597,6 +597,30 @@ private def canonicalGenericLocalFinalTarget
     (signatures : ProgramSignatures) : SourceSemantics.Context :=
   SourceSemantics.Context.ofSignatures signatures
 
+/-- Canonical fresh instantiation ranges remain admissible when the final
+substitution leaves an occurrence variable unresolved in a residually open
+checked-body context. -/
+theorem canonicalGenericLocalMappedRangeAdmissible
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId) :
+    SubstitutionRangeAdmissible (canonicalGenericLocalTarget signatures)
+      (FlexibleSubstitution.Substitution.mapRange
+        canonicalLocalOuterSubstitution
+        ((canonicalGenericLocalBinder owner).scheme
+          |>.instantiateWithSubstitution 10).substitution) := by
+  have binders : TypeParameterBindersWellFormed
+      (canonicalGenericLocalTarget signatures) :=
+    (TypeParameterBindersWellFormed.ofSignatures signatures)
+      |>.withResidualTypeVariables
+  have outerRange : SubstitutionRangeAdmissible
+      (canonicalGenericLocalTarget signatures)
+      canonicalLocalOuterSubstitution := by
+    intro metavariable replacement member
+    simp only [canonicalLocalOuterSubstitution, List.mem_singleton] at member
+    cases member
+    exact TypeAdmissible.builtin binders .word
+  exact FlexibleSubstitution.SubstitutionRangeAdmissible.mapRange_instantiateWithSubstitution
+    (canonicalGenericLocalBinder owner).scheme 10 binders rfl outerRange
+
 /-- Canonical instantiation of a concrete generic local composes with a later
 outer closure: the outer metavariable closes to `word`, while the generic
 identity's freshly allocated occurrence variable remains shared by its

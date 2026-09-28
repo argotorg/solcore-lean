@@ -8,6 +8,48 @@ namespace Tests.ProgramSignatureFormation
 
 open Solcore Solcore.Frontend Solcore.TypeSystem
 
+private def emptySignatures : ProgramSignatures := {
+  functions := []
+  implRules := []
+  traits := []
+  implementations := []
+}
+
+private def rangeDomain : TypeVarId := ⟨0⟩
+
+private def rangeResidual : TypeVarId := ⟨1⟩
+
+private def openRange : Substitution :=
+  [(rangeDomain, .function (.variable rangeResidual) .word)]
+
+/-- Final inference ranges may retain flexible variables when each replacement
+is checked in its own complete free-variable scope. -/
+example (owner : Resolved.DeclarationId) :
+    validateInferenceSubstitutionRangeFormation emptySignatures owner []
+      openRange = .ok () := by
+  rfl
+
+/-- Recovery types are rejected even in an otherwise open inference range. -/
+example (owner : Resolved.DeclarationId) :
+    validateInferenceSubstitutionRangeFormation emptySignatures owner []
+        [(rangeDomain, .error)] =
+      .error (.recoveryType owner) := by
+  rfl
+
+/-- An uncataloged nominal cannot enter a finalized substitution range. -/
+example (owner nominal : Resolved.DeclarationId) :
+    validateInferenceSubstitutionRangeFormation emptySignatures owner []
+        [(rangeDomain, Ty.nominal nominal [])] =
+      .error (.unknownNominal owner nominal) := by
+  rfl
+
+/-- Successful executable range validation exposes the pointwise open
+formation witness used by source-semantics soundness. -/
+example (owner : Resolved.DeclarationId) :
+    InferenceSubstitutionRangeFormationValidated emptySignatures owner []
+      openRange := by
+  exact validateInferenceSubstitutionRangeFormation_success (by rfl)
+
 example {signatures : ProgramSignatures}
     {owner : Resolved.DeclarationId}
     {parameters : List TypeParameterId}

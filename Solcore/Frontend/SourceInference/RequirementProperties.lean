@@ -1386,19 +1386,22 @@ theorem recordExpression_preserves_requirementsWellFormed
     (source : Syntax.Expr) (expression : InferredExpression)
     (form : ExpressionForm) (requirements : List RequirementId)
     (coercions : List CoercionStep) (state : State)
+    {localSchemeInstantiationStart : Option Nat}
     (wellFormed : state.RequirementsWellFormed) :
     State.RequirementsWellFormed
-      (recordExpression source expression form requirements coercions state).2 := by
+      (recordExpression source expression form requirements coercions state
+        localSchemeInstantiationStart).2 := by
   exact State.recordNode_preserves_requirementsWellFormed state _ wellFormed
 
 /-- Recording one expression node does not remove requirement ledger rows. -/
 theorem recordExpression_requirements_subset
     (source : Syntax.Expr) (expression : InferredExpression)
     (form : ExpressionForm) (requirements : List RequirementId)
-    (coercions : List CoercionStep) (state : State) :
+    (coercions : List CoercionStep) (state : State)
+    {localSchemeInstantiationStart : Option Nat} :
     state.requirements ⊆
       (recordExpression source expression form requirements coercions
-        state).2.requirements := by
+        state localSchemeInstantiationStart).2.requirements := by
   exact fun _ member => member
 
 /-- Expected-type fitting may allocate coercion requirements; recording the
@@ -1407,9 +1410,10 @@ theorem recordExpressionWithExpected_preserves_requirementsWellFormed
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result)
+      requirements expected state localSchemeInstantiationStart = .ok result)
     (wellFormed : state.RequirementsWellFormed) :
     result.2.RequirementsWellFormed := by
   unfold recordExpressionWithExpected at success
@@ -1420,13 +1424,15 @@ theorem recordExpressionWithExpected_preserves_requirementsWellFormed
       simp only [fittedResult, bind, Except.bind] at success
       change Except.ok (recordExpression source fitted.expression form
         (requirements ++ coercionRequirements fitted.coercions)
-        fitted.coercions fitted.state) = Except.ok result at success
+        fitted.coercions fitted.state localSchemeInstantiationStart) =
+          Except.ok result at success
       injection success with resultEq
       subst result
       exact recordExpression_preserves_requirementsWellFormed
         source fitted.expression form
         (requirements ++ coercionRequirements fitted.coercions)
         fitted.coercions fitted.state
+        (localSchemeInstantiationStart := localSchemeInstantiationStart)
         (withExpected_preserves_requirementsWellFormed fittedResult wellFormed)
 
 /-- Expected-type fitting may append coercion obligations; recording the
@@ -1435,9 +1441,10 @@ theorem recordExpressionWithExpected_requirements_subset
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result) :
+      requirements expected state localSchemeInstantiationStart = .ok result) :
     state.requirements ⊆ result.2.requirements := by
   unfold recordExpressionWithExpected at success
   cases fittedResult : withExpected context state { id, type } expected with
@@ -1447,13 +1454,15 @@ theorem recordExpressionWithExpected_requirements_subset
       simp only [fittedResult, bind, Except.bind] at success
       change Except.ok (recordExpression source fitted.expression form
         (requirements ++ coercionRequirements fitted.coercions)
-        fitted.coercions fitted.state) = Except.ok result at success
+        fitted.coercions fitted.state localSchemeInstantiationStart) =
+          Except.ok result at success
       injection success with resultEq
       subst result
       exact List.Subset.trans (withExpected_requirements_subset fittedResult)
         (recordExpression_requirements_subset source fitted.expression form
           (requirements ++ coercionRequirements fitted.coercions)
-          fitted.coercions fitted.state)
+          fitted.coercions fitted.state
+          (localSchemeInstantiationStart := localSchemeInstantiationStart))
 
 /-- Recording the callee and call nodes for a selected declaration preserves
 the explicitly supplied state ledger. -/

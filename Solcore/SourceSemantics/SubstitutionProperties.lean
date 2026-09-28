@@ -7106,6 +7106,34 @@ theorem domain_without_nodup (substitution : TypeSystem.Substitution)
 
 end Substitution
 
+/-- Mapping a residually admissible outer substitution over the canonical
+fresh-variable range of scheme instantiation preserves range admissibility.
+An outer lookup contributes its validated replacement; a missing lookup
+leaves the generated variable admissible through the residual body scope. -/
+theorem SubstitutionRangeAdmissible.mapRange_instantiateWithSubstitution
+    {target : Context} {outer : TypeSystem.Substitution}
+    (scheme : Scheme) (next : Nat)
+    (binders : TypeParameterBindersWellFormed target)
+    (residual : target.residualTypeVariables = true)
+    (outerRange : SourceSemantics.SubstitutionRangeAdmissible target outer) :
+    SourceSemantics.SubstitutionRangeAdmissible target
+      (Substitution.mapRange outer
+        (scheme.instantiateWithSubstitution next).substitution) := by
+  intro metavariable replacement member
+  rcases List.mem_map.mp member with
+    ⟨⟨innerVariable, innerReplacement⟩, innerMember, entryEq⟩
+  cases entryEq
+  obtain ⟨fresh, rfl, _, _⟩ :=
+    scheme.instantiateWithSubstitution_substitution_range_fresh next innerMember
+  cases found : outer.lookup? fresh with
+  | none =>
+      simp only [TypeSystem.Substitution.apply, found, Option.getD_none]
+      exact TypeAdmissible.variableOfResidual binders residual fresh
+  | some outerReplacement =>
+      simp only [TypeSystem.Substitution.apply, found, Option.getD_some]
+      exact outerRange fresh outerReplacement
+        (TypeSystem.Substitution.lookup?_eq_some_mem found)
+
 /-- Capture-avoiding substitution fixes a scheme when its unbound flexible
 variables are disjoint from the substitution domain.  Quantified variables
 need no separate premise because `Scheme.apply` removes them from the

@@ -321,6 +321,66 @@ private def solverRegressionContext : SourceInference.Context := {
 private def solverRegressionSpan : Syntax.SourceSpan :=
   ⟨⟨.main, "source_inference_solver.sol"⟩, 0, 0⟩
 
+private def residualRangeSubstitution : TypeSystem.Substitution :=
+  [(⟨0⟩, .variable ⟨1⟩)]
+
+private def residualRangeState : SourceInference.State := {
+  SourceInference.State.initial solverRegressionOwner with
+  inference := { next := 2, substitution := residualRangeSubstitution }
+}
+
+private def residualRangeResult : SourceInference.Result := {
+  type := .unit
+  substitution := residualRangeSubstitution
+  solvedRequirements := []
+  typedSource := residualRangeState.toTypedSource []
+}
+
+/-- Finalization accepts a structurally formed substitution range which
+retains a residual flexible variable. -/
+example :
+    SourceInference.Detail.finalize solverRegressionContext .unit
+        residualRangeState [] = .ok residualRangeResult := by
+  rfl
+
+private def recoveryRangeState : SourceInference.State := {
+  SourceInference.State.initial solverRegressionOwner with
+  inference := { next := 1, substitution := [(⟨0⟩, .error)] }
+}
+
+/-- Finalization rejects a recovery type stored in the final substitution
+before exposing the substituted source. -/
+example :
+    SourceInference.Detail.finalize solverRegressionContext .unit
+        recoveryRangeState [] =
+      .error (.typeFormation (.recoveryType solverRegressionOwner)) := by
+  rfl
+
+private def instantiationStartScheme : TypeSystem.Scheme := {
+  quantified := [⟨0⟩]
+  body := .variable ⟨0⟩
+}
+
+private def instantiationStartState : SourceInference.State :=
+  SourceInference.State.initial solverRegressionOwner
+    [("genericStart", instantiationStartScheme)]
+
+private def instantiationStartSource : Syntax.Expr :=
+  ⟨solverRegressionSpan,
+    .identifier ⟨solverRegressionSpan, "genericStart"⟩⟩
+
+/-- A local generic reference retains the exact allocator position from
+immediately before its canonical scheme instantiation. -/
+example :
+    (match SourceInference.Detail.inferExprFuel 1 solverRegressionContext
+        instantiationStartSource none instantiationStartState with
+      | .error _ => []
+      | .ok (_, state) => state.nodes.filterMap fun
+          | .expression node => some node.localSchemeInstantiationStart
+          | .statement _ => none) =
+      [some instantiationStartState.inference.next] := by
+  native_decide
+
 private def noCaptureQuantified : TypeSystem.TypeVarId := ⟨10⟩
 private def noCaptureSourceVariable : TypeSystem.TypeVarId := ⟨11⟩
 

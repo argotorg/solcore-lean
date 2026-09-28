@@ -339,6 +339,10 @@ structure ExpressionNode where
   form : ExpressionForm
   requirements : List RequirementId := []
   coercions : List CoercionStep := []
+  /-- Fresh-variable allocator position immediately before canonical
+  instantiation of a referenced local scheme.  Non-local expressions carry
+  no start certificate. -/
+  localSchemeInstantiationStart : Option Nat := none
   deriving Repr, BEq, DecidableEq
 
 /-- Typed statement shape for every statement form accepted by the current

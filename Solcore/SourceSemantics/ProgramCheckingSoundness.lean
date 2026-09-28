@@ -146,6 +146,108 @@ theorem SignatureTypeFormationValidated.typeWellScoped
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
 
+/-- Frontend formation of an open inference type embeds into the semantic
+declaration scope with the same explicit flexible-variable row. -/
+theorem InferenceTypeFormationValidated.typeWellScoped
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (validated : Frontend.InferenceTypeFormationValidated signatures owner
+      parameters flexibleVariables type)
+    (assumptions : List ProgramPredicate) :
+    TypeWellScoped
+      (signatureContext signatures owner parameters assumptions)
+      flexibleVariables type := by
+  refine Frontend.InferenceTypeFormationValidated.rec
+    (motive_1 := fun type _ => TypeWellScoped
+      (signatureContext signatures owner parameters assumptions)
+      flexibleVariables type)
+    (motive_2 := fun types _ => TypesWellScoped
+      (signatureContext signatures owner parameters assumptions)
+      flexibleVariables types)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
+  · intro metavariable bound
+    exact .variable bound
+  · intro parameter bound owned
+    exact .parameter
+      (by simpa [signatureContext, Context.withAssumptions,
+        Context.forDeclaration] using bound)
+      (by simp [signatureContext, Context.withAssumptions,
+        Context.forDeclaration, owned])
+  · intro builtin
+    exact .builtin builtin
+  · intro dataType arguments cataloged arity _ argumentsInduction
+    exact .nominal dataType arguments cataloged arity argumentsInduction
+  · intro contract arguments cataloged arity _ argumentsInduction
+    exact .contractNominal contract arguments cataloged arity argumentsInduction
+  · intro parameter result _ _ parameterInduction resultInduction
+    exact .function parameterInduction resultInduction
+  · intro left right _ _ leftInduction rightInduction
+    exact .product leftInduction rightInduction
+  · intro key value _ _ keyInduction valueInduction
+    exact .mapping keyInduction valueInduction
+  · intro inner _ innerInduction
+    exact .proxy innerInduction
+  · intro inner _ innerInduction
+    exact .comptime innerInduction
+  · exact .nil
+  · intro head tail _ _ headInduction tailInduction
+    exact .cons headInduction tailInduction
+
+/-- In a residually open semantic body, a frontend-formed inference type is
+admissible after transporting its rigid declaration scope to the target
+context. -/
+theorem InferenceTypeFormationValidated.typeAdmissible
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty} {target : Context}
+    (validated : Frontend.InferenceTypeFormationValidated signatures owner
+      parameters flexibleVariables type)
+    (binders : TypeParameterBindersWellFormed target)
+    (signatures_eq : target.signatures = signatures)
+    (parameters_eq : target.typeParameters = parameters)
+    (owner_eq : target.currentDeclaration = some owner)
+    (residual : target.residualTypeVariables = true) :
+    TypeAdmissible target type := by
+  have wellScoped := InferenceTypeFormationValidated.typeWellScoped validated []
+  have targetScoped : TypeWellScoped target flexibleVariables type :=
+    StructuralSubstitution.TypeWellScoped.transportContext
+      (source := signatureContext signatures owner parameters [])
+      (target := target)
+      (by simpa [signatureContext, Context.withAssumptions,
+        Context.forDeclaration, Context.ofSignatures] using signatures_eq)
+      (by simpa [signatureContext, Context.withAssumptions,
+        Context.forDeclaration, Context.ofSignatures] using parameters_eq)
+      (by simpa [signatureContext, Context.withAssumptions,
+        Context.forDeclaration, Context.ofSignatures] using owner_eq)
+      wellScoped
+  exact StructuralSubstitution.TypeWellScoped.toAdmissibleOfResidual binders
+    residual targetScoped
+
+/-- Pointwise open formation of a frontend inference substitution becomes the
+semantic admissible-range judgment in any matching residually open context. -/
+theorem InferenceSubstitutionRangeFormationValidated.rangeAdmissible
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {substitution : TypeSystem.Substitution} {target : Context}
+    (validated : Frontend.InferenceSubstitutionRangeFormationValidated
+      signatures owner parameters substitution)
+    (binders : TypeParameterBindersWellFormed target)
+    (signatures_eq : target.signatures = signatures)
+    (parameters_eq : target.typeParameters = parameters)
+    (owner_eq : target.currentDeclaration = some owner)
+    (residual : target.residualTypeVariables = true) :
+    SubstitutionRangeAdmissible target substitution := by
+  intro metavariable replacement member
+  exact InferenceTypeFormationValidated.typeAdmissible
+    (validated metavariable replacement member) binders signatures_eq
+    parameters_eq owner_eq residual
+
 /-- Source-order type-row formation embeds into the corresponding semantic
 scope using the type conversion above. -/
 theorem SignatureTypesFormationValidated.typesWellScoped
@@ -532,6 +634,24 @@ theorem checkFunctionBody_success_inputs_extend
       locals_empty local_requirements_empty parameterTypes
   rw [inputsEq]
   exact ⟨lexicalContext, extension⟩
+
+/-- The final inference substitution retained by a checked body has an
+admissible range in that body's residually open semantic context. -/
+theorem checkFunctionBody_success_substitutionRangeAdmissible
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat} {checked : CheckedFunction}
+    (header : CheckedBodyHeaderWellFormed signatures signature checked)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    SubstitutionRangeAdmissible
+      (checkedBodyContext signatures signature checked)
+      checked.substitution := by
+  exact InferenceSubstitutionRangeFormationValidated.rangeAdmissible
+    (Frontend.SourceInference.Detail.checkFunctionBody_success_substitutionRangeFormationValidated
+      success)
+    header.parameter_binders rfl rfl rfl rfl
 
 namespace CheckedBodyHeaderWellFormed
 

@@ -1320,9 +1320,11 @@ theorem recordExpression_occurrenceBoundExtends
     (source : Syntax.Expr) (expression : InferredExpression)
     (form : ExpressionForm) (requirements : List RequirementId)
     (coercions : List CoercionStep) (state : State)
+    {localSchemeInstantiationStart : Option Nat}
     (idBelow : expression.id.occurrence.index < state.nextOccurrence) :
     state.OccurrenceBoundExtends
-      (recordExpression source expression form requirements coercions state).2 := by
+      (recordExpression source expression form requirements coercions state
+        localSchemeInstantiationStart).2 := by
   unfold recordExpression
   exact State.OccurrenceBoundExtends.recordNode state _ idBelow
 
@@ -1332,9 +1334,10 @@ theorem recordExpressionWithExpected_occurrenceBoundExtends
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result)
+      requirements expected state localSchemeInstantiationStart = .ok result)
     (idBelow : id.occurrence.index < state.nextOccurrence) :
     state.OccurrenceBoundExtends result.2 := by
   unfold recordExpressionWithExpected at success
@@ -1356,7 +1359,8 @@ theorem recordExpressionWithExpected_occurrenceBoundExtends
       exact fittedExtends.trans
         (recordExpression_occurrenceBoundExtends source fitted.expression form
           (requirements ++ coercionRequirements fitted.coercions)
-          fitted.coercions fitted.state fittedBelow)
+          fitted.coercions fitted.state fittedBelow
+          (localSchemeInstantiationStart := localSchemeInstantiationStart))
 
 /-- Invert successful expected-type recording into the exact fit result and
 the exact expression node appended to that fit state's node table. -/
@@ -1364,9 +1368,10 @@ theorem recordExpressionWithExpected_success_record
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result) :
+      requirements expected state localSchemeInstantiationStart = .ok result) :
     ∃ fitted,
       withExpected context state { id, type } expected = .ok fitted ∧
       result.1 = fitted.expression ∧
@@ -1378,6 +1383,7 @@ theorem recordExpressionWithExpected_success_record
         requirements := requirements ++
           coercionRequirements fitted.coercions
         coercions := fitted.coercions
+        localSchemeInstantiationStart
       }) := by
   unfold recordExpressionWithExpected at success
   cases fittedResult : withExpected context state { id, type } expected with
@@ -1395,9 +1401,10 @@ theorem recordExpressionWithExpected_success_nodes
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result) :
+      requirements expected state localSchemeInstantiationStart = .ok result) :
     ∃ fitted,
       withExpected context state { id, type } expected = .ok fitted ∧
       result.1 = fitted.expression ∧
@@ -1409,6 +1416,7 @@ theorem recordExpressionWithExpected_success_nodes
         requirements := requirements ++
           coercionRequirements fitted.coercions
         coercions := fitted.coercions
+        localSchemeInstantiationStart
       }] := by
   obtain ⟨fitted, fittedSuccess, resultExpression, resultState⟩ :=
     recordExpressionWithExpected_success_record success
@@ -1416,15 +1424,47 @@ theorem recordExpressionWithExpected_success_nodes
   rw [resultState]
   exact State.recordNode_nodes _ _
 
+/-- Successful recording retains the caller-supplied local-instantiation
+allocator start on the exact expression node returned to the traversal. -/
+theorem recordExpressionWithExpected_success_localSchemeInstantiationStart
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result) :
+    ∃ node,
+      .expression node ∈ result.2.nodes ∧
+      node.id = result.1.id ∧
+      node.localSchemeInstantiationStart = localSchemeInstantiationStart := by
+  obtain ⟨fitted, _, resultExpression, resultNodes⟩ :=
+    recordExpressionWithExpected_success_nodes success
+  let node : ExpressionNode := {
+    id := fitted.expression.id
+    span := source.span
+    type := fitted.expression.type
+    form
+    requirements := requirements ++
+      coercionRequirements fitted.coercions
+    coercions := fitted.coercions
+    localSchemeInstantiationStart
+  }
+  refine ⟨node, ?_, ?_, rfl⟩
+  · rw [resultNodes]
+    simp [node]
+  · rw [resultExpression]
+
 /-- Expected-type recording returns the occurrence identity supplied by its
 caller, regardless of whether fitting chose unification or coercion. -/
 theorem recordExpressionWithExpected_success_id
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result) :
+      requirements expected state localSchemeInstantiationStart = .ok result) :
     result.1.id = id := by
   obtain ⟨fitted, fittedSuccess, resultExpression, _⟩ :=
     recordExpressionWithExpected_success_record success
@@ -1437,9 +1477,10 @@ theorem recordExpressionWithExpected_success_nextOccurrence
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result) :
+      requirements expected state localSchemeInstantiationStart = .ok result) :
     result.2.nextOccurrence = state.nextOccurrence := by
   obtain ⟨fitted, fittedSuccess, _, resultState⟩ :=
     recordExpressionWithExpected_success_record success

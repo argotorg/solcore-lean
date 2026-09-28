@@ -131,6 +131,132 @@ mutual
 
 end
 
+mutual
+
+  /-- A structurally formed inference type may retain exactly the flexible
+  variables supplied by its caller.  This is the open counterpart of
+  `SignatureTypeFormationValidated`: rigid parameters and nominal heads are
+  checked in the same declaration scope, while recovery types and arbitrary
+  type applications remain invalid. -/
+  inductive InferenceTypeFormationValidated
+      (signatures : ProgramSignatures)
+      (owner : Resolved.DeclarationId)
+      (parameters : List TypeSystem.TypeParameterId)
+      (flexibleVariables : List TypeSystem.TypeVarId) :
+      TypeSystem.Ty → Prop where
+    | variable
+        {metavariable : TypeSystem.TypeVarId}
+        (bound : metavariable ∈ flexibleVariables) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (.variable metavariable)
+    | parameter
+        {parameter : TypeSystem.TypeParameterId}
+        (bound : parameter ∈ parameters)
+        (owned : parameter.owner = owner) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (.parameter parameter)
+    | builtin (builtin : TypeSystem.BuiltinType) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (.constructor (.builtin builtin))
+    | dataNominal
+        (dataType : ProgramDataSignature) (arguments : List TypeSystem.Ty)
+        (cataloged : dataType ∈ signatures.dataTypes)
+        (arity : arguments.length = dataType.parameters.length)
+        (argumentsValidated :
+          InferenceTypesFormationValidated signatures owner parameters
+            flexibleVariables arguments) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (TypeSystem.Ty.nominal dataType.id arguments)
+    | contractNominal
+        (contract : ProgramContractSignature) (arguments : List TypeSystem.Ty)
+        (cataloged : contract ∈ signatures.contracts)
+        (arity : arguments.length = contract.parameters.length)
+        (argumentsValidated :
+          InferenceTypesFormationValidated signatures owner parameters
+            flexibleVariables arguments) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (TypeSystem.Ty.nominal contract.id arguments)
+    | function
+        {parameter result : TypeSystem.Ty}
+        (parameterValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables parameter)
+        (resultValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables result) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (.function parameter result)
+    | product
+        {left right : TypeSystem.Ty}
+        (leftValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables left)
+        (rightValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables right) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (.product left right)
+    | mapping
+        {key value : TypeSystem.Ty}
+        (keyValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables key)
+        (valueValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables value) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (.mapping key value)
+    | proxy
+        {inner : TypeSystem.Ty}
+        (innerValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables inner) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (.proxy inner)
+    | comptime
+        {inner : TypeSystem.Ty}
+        (innerValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables inner) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (.comptime inner)
+
+  /-- Source-order companion for a row of open inference types. -/
+  inductive InferenceTypesFormationValidated
+      (signatures : ProgramSignatures)
+      (owner : Resolved.DeclarationId)
+      (parameters : List TypeSystem.TypeParameterId)
+      (flexibleVariables : List TypeSystem.TypeVarId) :
+      List TypeSystem.Ty → Prop where
+    | nil : InferenceTypesFormationValidated signatures owner parameters
+        flexibleVariables []
+    | cons
+        {head : TypeSystem.Ty} {tail : List TypeSystem.Ty}
+        (headValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables head)
+        (tailValidated :
+          InferenceTypesFormationValidated signatures owner parameters
+            flexibleVariables tail) :
+        InferenceTypesFormationValidated signatures owner parameters
+          flexibleVariables (head :: tail)
+
+end
+
+/-- Every stored replacement in an inference substitution is structurally
+formed in the declaration scope.  Each replacement supplies its own complete
+flexible-variable scope because final source bodies retain residual inference
+variables. -/
+def InferenceSubstitutionRangeFormationValidated
+    (signatures : ProgramSignatures)
+    (owner : Resolved.DeclarationId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (substitution : TypeSystem.Substitution) : Prop :=
+  ∀ metavariable replacement,
+    (metavariable, replacement) ∈ substitution →
+      InferenceTypeFormationValidated signatures owner parameters
+        replacement.freeVariables replacement
+
 /-- A resolved predicate has closed component types and names a trait at its
 exact total arity, including the distinguished subject position. -/
 structure SignaturePredicateFormationValidated
@@ -300,6 +426,67 @@ private def validateSignatureTypeFuel
           validateSignatureTypeFuel signatures owner parameters fuel inner
       | .error => .error (.recoveryType owner)
 
+private def validateInferenceTypeFuel
+    (signatures : ProgramSignatures)
+    (owner : Resolved.DeclarationId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (flexibleVariables : List TypeSystem.TypeVarId) :
+    Nat → TypeSystem.Ty → Except ProgramSignatureFormationError Unit
+  | 0, type => .error (.nestingLimit owner type)
+  | fuel + 1, type =>
+      match type with
+      | .variable metavariable =>
+          if metavariable ∈ flexibleVariables then .ok ()
+          else .error (.flexibleVariable owner metavariable)
+      | .parameter parameter =>
+          if parameter ∈ parameters then
+            if parameter.owner = owner then .ok ()
+            else .error (.rigidParameterOwnerMismatch owner parameter)
+          else
+            .error (.rigidParameterOutOfScope owner parameter)
+      | .constructor (.builtin _) => .ok ()
+      | .constructor (.declaration nominal) =>
+          validateSignatureNominalWith
+            (validateInferenceTypeFuel signatures owner parameters
+              flexibleVariables fuel)
+            signatures owner nominal []
+      | .application _ _ =>
+          match signatureTypeApplicationSpine type with
+          | (.constructor (.declaration nominal), arguments) =>
+              validateSignatureNominalWith
+                (validateInferenceTypeFuel signatures owner parameters
+                  flexibleVariables fuel)
+                signatures owner nominal arguments
+          | _ => .error (.invalidApplication owner type)
+      | .function parameter result =>
+          match validateInferenceTypeFuel signatures owner parameters
+              flexibleVariables fuel parameter with
+          | .error error => .error error
+          | .ok () =>
+              validateInferenceTypeFuel signatures owner parameters
+                flexibleVariables fuel result
+      | .product left right =>
+          match validateInferenceTypeFuel signatures owner parameters
+              flexibleVariables fuel left with
+          | .error error => .error error
+          | .ok () =>
+              validateInferenceTypeFuel signatures owner parameters
+                flexibleVariables fuel right
+      | .mapping key value =>
+          match validateInferenceTypeFuel signatures owner parameters
+              flexibleVariables fuel key with
+          | .error error => .error error
+          | .ok () =>
+              validateInferenceTypeFuel signatures owner parameters
+                flexibleVariables fuel value
+      | .proxy inner =>
+          validateInferenceTypeFuel signatures owner parameters
+            flexibleVariables fuel inner
+      | .comptime inner =>
+          validateInferenceTypeFuel signatures owner parameters
+            flexibleVariables fuel inner
+      | .error => .error (.recoveryType owner)
+
 private def validateSignatureType
     (signatures : ProgramSignatures)
     (owner : Resolved.DeclarationId)
@@ -317,6 +504,30 @@ def validateResolvedTypeFormation
     (parameters : List TypeSystem.TypeParameterId)
     (type : TypeSystem.Ty) : Except ProgramSignatureFormationError Unit :=
   validateSignatureType signatures owner parameters type
+
+/-- Validate one inference type against a completed signature catalog, an
+explicit rigid-parameter scope, and an explicit flexible-variable scope. -/
+def validateInferenceTypeFormation
+    (signatures : ProgramSignatures)
+    (owner : Resolved.DeclarationId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (flexibleVariables : List TypeSystem.TypeVarId)
+    (type : TypeSystem.Ty) : Except ProgramSignatureFormationError Unit :=
+  validateInferenceTypeFuel signatures owner parameters flexibleVariables
+    (signatureTypeFuel type + 1) type
+
+/-- Validate every actual entry in an inference substitution.  A replacement
+is open over exactly its own free variables, matching the residual-variable
+scope retained by finalized source bodies. -/
+def validateInferenceSubstitutionRangeFormation
+    (signatures : ProgramSignatures)
+    (owner : Resolved.DeclarationId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (substitution : TypeSystem.Substitution) :
+    Except ProgramSignatureFormationError Unit :=
+  validateAll (fun entry =>
+    validateInferenceTypeFormation signatures owner parameters
+      entry.2.freeVariables entry.2) substitution
 
 private def validateSignatureTypes
     (signatures : ProgramSignatures)
@@ -765,6 +976,254 @@ theorem validateResolvedTypeFormation_success
       .ok ()) :
     SignatureTypeFormationValidated signatures owner parameters type :=
   validateSignatureType_success success
+
+private theorem inferenceTypesFormationValidated_of_forall
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {flexibleVariables : List TypeSystem.TypeVarId}
+    {types : List TypeSystem.Ty}
+    (validated : ∀ type, type ∈ types →
+      InferenceTypeFormationValidated signatures owner parameters
+        flexibleVariables type) :
+    InferenceTypesFormationValidated signatures owner parameters
+      flexibleVariables types := by
+  induction types with
+  | nil => exact .nil
+  | cons head tail induction =>
+      exact .cons
+        (validated head (by simp))
+        (induction fun type member => validated type (by simp [member]))
+
+private def InferenceNominalFormationValidated
+    (signatures : ProgramSignatures)
+    (owner : Resolved.DeclarationId)
+    (parameters : List TypeSystem.TypeParameterId)
+    (flexibleVariables : List TypeSystem.TypeVarId)
+    (nominal : Resolved.DeclarationId)
+    (arguments : List TypeSystem.Ty) : Prop :=
+  (∃ dataType ∈ signatures.dataTypes,
+      dataType.id = nominal ∧
+      arguments.length = dataType.parameters.length ∧
+      InferenceTypesFormationValidated signatures owner parameters
+        flexibleVariables arguments) ∨
+    (∃ contract ∈ signatures.contracts,
+      contract.id = nominal ∧
+      arguments.length = contract.parameters.length ∧
+      InferenceTypesFormationValidated signatures owner parameters
+        flexibleVariables arguments)
+
+private theorem validateInferenceNominalWith_success
+    {signatures : ProgramSignatures}
+    {owner nominal : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {flexibleVariables : List TypeSystem.TypeVarId}
+    {arguments : List TypeSystem.Ty}
+    {validate : TypeSystem.Ty →
+      Except ProgramSignatureFormationError Unit}
+    (success : validateSignatureNominalWith validate signatures owner nominal
+      arguments = .ok ())
+    (sound : ∀ type, validate type = .ok () →
+      InferenceTypeFormationValidated signatures owner parameters
+        flexibleVariables type) :
+    InferenceNominalFormationValidated signatures owner parameters
+      flexibleVariables nominal arguments := by
+  cases dataFound : signatures.dataType? nominal with
+  | some dataType =>
+      rcases dataType?_eq_some_facts dataFound with ⟨cataloged, id_eq⟩
+      by_cases arity : arguments.length = dataType.parameters.length
+      · have argumentsSuccess : validateAll validate arguments = .ok () := by
+          simpa [validateSignatureNominalWith, dataFound, arity] using success
+        exact Or.inl ⟨dataType, cataloged, id_eq, arity,
+          inferenceTypesFormationValidated_of_forall
+            (validateAll_success argumentsSuccess sound)⟩
+      · simp [validateSignatureNominalWith, dataFound, arity] at success
+  | none =>
+      cases contractFound : signatures.contract? nominal with
+      | some contract =>
+          rcases contract?_eq_some_facts contractFound with ⟨cataloged, id_eq⟩
+          by_cases arity : arguments.length = contract.parameters.length
+          · have argumentsSuccess : validateAll validate arguments = .ok () := by
+              simpa [validateSignatureNominalWith, dataFound, contractFound,
+                arity] using success
+            exact Or.inr ⟨contract, cataloged, id_eq, arity,
+              inferenceTypesFormationValidated_of_forall
+                (validateAll_success argumentsSuccess sound)⟩
+          · simp [validateSignatureNominalWith, dataFound, contractFound,
+              arity] at success
+      | none =>
+          simp [validateSignatureNominalWith, dataFound, contractFound] at success
+
+private theorem validateInferenceTypeFuel_success
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {flexibleVariables : List TypeSystem.TypeVarId}
+    {fuel : Nat} {type : TypeSystem.Ty}
+    (success : validateInferenceTypeFuel signatures owner parameters
+      flexibleVariables fuel type = .ok ()) :
+    InferenceTypeFormationValidated signatures owner parameters
+      flexibleVariables type := by
+  induction fuel generalizing type with
+  | zero => simp [validateInferenceTypeFuel] at success
+  | succ fuel induction =>
+      cases type with
+      | «variable» metavariable =>
+          by_cases bound : metavariable ∈ flexibleVariables
+          · exact .variable bound
+          · simp [validateInferenceTypeFuel, bound] at success
+      | parameter parameter =>
+          by_cases bound : parameter ∈ parameters
+          · by_cases owned : parameter.owner = owner
+            · exact .parameter bound owned
+            · simp [validateInferenceTypeFuel, bound, owned] at success
+          · simp [validateInferenceTypeFuel, bound] at success
+      | constructor constructor =>
+          cases constructor with
+          | builtin builtin => exact .builtin builtin
+          | declaration nominal =>
+              have nominalValidated := validateInferenceNominalWith_success
+                (parameters := parameters)
+                (flexibleVariables := flexibleVariables) success
+                (fun type typeSuccess => induction typeSuccess)
+              rcases nominalValidated with
+                ⟨dataType, cataloged, id_eq, arity, argumentsValidated⟩ |
+                ⟨contract, cataloged, id_eq, arity, argumentsValidated⟩
+              · subst nominal
+                simpa [TypeSystem.Ty.nominal, TypeSystem.Ty.applyMany] using
+                  InferenceTypeFormationValidated.dataNominal dataType []
+                    cataloged arity argumentsValidated
+              · subst nominal
+                simpa [TypeSystem.Ty.nominal, TypeSystem.Ty.applyMany] using
+                  InferenceTypeFormationValidated.contractNominal contract []
+                    cataloged arity argumentsValidated
+      | application function argument =>
+          cases spine : signatureTypeApplicationSpine
+              (.application function argument) with
+          | mk head arguments =>
+              cases head with
+              | constructor constructor =>
+                  cases constructor with
+                  | declaration nominal =>
+                      have nominalSuccess :
+                          validateSignatureNominalWith
+                              (validateInferenceTypeFuel signatures owner
+                                parameters flexibleVariables fuel)
+                              signatures owner nominal arguments = .ok () := by
+                        simpa [validateInferenceTypeFuel, spine] using success
+                      have nominalValidated :=
+                        validateInferenceNominalWith_success
+                          (parameters := parameters)
+                          (flexibleVariables := flexibleVariables)
+                          nominalSuccess
+                          (fun type typeSuccess => induction typeSuccess)
+                      have reconstructed :=
+                        signatureTypeApplicationSpine_reconstruct spine
+                      rcases nominalValidated with
+                        ⟨dataType, cataloged, id_eq, arity,
+                          argumentsValidated⟩ |
+                        ⟨contract, cataloged, id_eq, arity,
+                          argumentsValidated⟩
+                      · subst nominal
+                        rw [← reconstructed]
+                        exact .dataNominal dataType arguments cataloged arity
+                          argumentsValidated
+                      · subst nominal
+                        rw [← reconstructed]
+                        exact .contractNominal contract arguments cataloged arity
+                          argumentsValidated
+                  | builtin builtin =>
+                      simp [validateInferenceTypeFuel, spine] at success
+              | «variable» metavariable =>
+                  simp [validateInferenceTypeFuel, spine] at success
+              | parameter parameter =>
+                  simp [validateInferenceTypeFuel, spine] at success
+              | application left right =>
+                  simp [validateInferenceTypeFuel, spine] at success
+              | function parameter result =>
+                  simp [validateInferenceTypeFuel, spine] at success
+              | product left right =>
+                  simp [validateInferenceTypeFuel, spine] at success
+              | mapping key value =>
+                  simp [validateInferenceTypeFuel, spine] at success
+              | proxy inner =>
+                  simp [validateInferenceTypeFuel, spine] at success
+              | comptime inner =>
+                  simp [validateInferenceTypeFuel, spine] at success
+              | error =>
+                  simp [validateInferenceTypeFuel, spine] at success
+      | function parameter result =>
+          cases parameterResult : validateInferenceTypeFuel signatures owner
+              parameters flexibleVariables fuel parameter with
+          | error error =>
+              simp [validateInferenceTypeFuel, parameterResult] at success
+          | ok parameterUnit =>
+              cases parameterUnit
+              have resultSuccess : validateInferenceTypeFuel signatures owner
+                  parameters flexibleVariables fuel result = .ok () := by
+                simpa [validateInferenceTypeFuel, parameterResult] using success
+              exact .function (induction parameterResult)
+                (induction resultSuccess)
+      | product left right =>
+          cases leftResult : validateInferenceTypeFuel signatures owner
+              parameters flexibleVariables fuel left with
+          | error error =>
+              simp [validateInferenceTypeFuel, leftResult] at success
+          | ok leftUnit =>
+              cases leftUnit
+              have rightSuccess : validateInferenceTypeFuel signatures owner
+                  parameters flexibleVariables fuel right = .ok () := by
+                simpa [validateInferenceTypeFuel, leftResult] using success
+              exact .product (induction leftResult) (induction rightSuccess)
+      | mapping key value =>
+          cases keyResult : validateInferenceTypeFuel signatures owner
+              parameters flexibleVariables fuel key with
+          | error error =>
+              simp [validateInferenceTypeFuel, keyResult] at success
+          | ok keyUnit =>
+              cases keyUnit
+              have valueSuccess : validateInferenceTypeFuel signatures owner
+                  parameters flexibleVariables fuel value = .ok () := by
+                simpa [validateInferenceTypeFuel, keyResult] using success
+              exact .mapping (induction keyResult) (induction valueSuccess)
+      | proxy inner =>
+          exact .proxy (induction (by
+            simpa [validateInferenceTypeFuel] using success))
+      | comptime inner =>
+          exact .comptime (induction (by
+            simpa [validateInferenceTypeFuel] using success))
+      | error =>
+          simp [validateInferenceTypeFuel] at success
+
+/-- Successful open-type validation returns the scoped structural witness. -/
+theorem validateInferenceTypeFormation_success
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (success : validateInferenceTypeFormation signatures owner parameters
+      flexibleVariables type = .ok ()) :
+    InferenceTypeFormationValidated signatures owner parameters
+      flexibleVariables type :=
+  validateInferenceTypeFuel_success success
+
+/-- Successful range validation certifies every actual substitution entry,
+including entries which would be shadowed by first-match lookup. -/
+theorem validateInferenceSubstitutionRangeFormation_success
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {substitution : TypeSystem.Substitution}
+    (success : validateInferenceSubstitutionRangeFormation signatures owner
+      parameters substitution = .ok ()) :
+    InferenceSubstitutionRangeFormationValidated signatures owner parameters
+      substitution := by
+  intro metavariable replacement member
+  have each := validateAll_success success
+    (fun entry entrySuccess =>
+      validateInferenceTypeFormation_success entrySuccess)
+  exact each (metavariable, replacement) member
 
 private theorem validateSignatureTypes_success
     {signatures : ProgramSignatures}

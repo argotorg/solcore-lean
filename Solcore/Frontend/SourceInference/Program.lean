@@ -297,6 +297,16 @@ def validateSourceLocalSchemeNoCapture (source : TypedSource)
     (substitution : Substitution) : Except Error Unit :=
   validateLocalSchemeBindersNoCapture substitution source.initializedLetBinders
 
+/-- Validate every replacement retained by the final inference substitution
+in the declaration's rigid and nominal formation scope.  Flexible variables
+remain open because finalized source bodies admit residual inference types. -/
+def validateFinalSubstitutionRangeFormation (context : Context)
+    (substitution : Substitution) : Except Error Unit :=
+  match validateInferenceSubstitutionRangeFormation context.signatures
+      context.scope.genericOwner context.typeParameters substitution with
+  | .ok () => .ok ()
+  | .error error => .error (.typeFormation error)
+
 /-- Validate that every retained origin names a metavariable already allocated
 by the supplied inference counter. -/
 def validateNumericOriginsBelow {α : Type} (next : Nat)
@@ -436,6 +446,7 @@ def finalize (context : Context) (type : Ty) (state : State)
   validateSourceRequirementOwnership (state.toTypedSource roots)
     state.requirements
   let substitution := state.inference.substitution
+  validateFinalSubstitutionRangeFormation context substitution
   validateSourceLocalSchemeNoCapture (state.toTypedSource roots) substitution
   let typedSource := (state.toTypedSource roots).applySubstitution substitution
   validateSourceTemplateScopes typedSource state

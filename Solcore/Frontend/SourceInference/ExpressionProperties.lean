@@ -1535,8 +1535,10 @@ private theorem withExpected_state_header
 @[simp] private theorem recordExpression_state_header
     (source : Syntax.Expr) (expression : InferredExpression)
     (form : ExpressionForm) (requirements : List RequirementId)
-    (coercions : List CoercionStep) (state : State) :
-    (recordExpression source expression form requirements coercions state).2.header =
+    (coercions : List CoercionStep) (state : State)
+    {localSchemeInstantiationStart : Option Nat} :
+    (recordExpression source expression form requirements coercions state
+      localSchemeInstantiationStart).2.header =
       state.header := by
   exact State.recordNode_header state _
 
@@ -1544,9 +1546,10 @@ private theorem recordExpressionWithExpected_state_header
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result) :
+      requirements expected state localSchemeInstantiationStart = .ok result) :
     result.2.header = state.header := by
   unfold recordExpressionWithExpected at success
   cases fittedResult : withExpected context state { id, type } expected with
@@ -1556,7 +1559,8 @@ private theorem recordExpressionWithExpected_state_header
       subst result
       exact (recordExpression_state_header source fitted.expression form
         (requirements ++ coercionRequirements fitted.coercions)
-        fitted.coercions fitted.state).trans
+        fitted.coercions fitted.state
+        (localSchemeInstantiationStart := localSchemeInstantiationStart)).trans
           (withExpected_state_header fittedResult)
 
 private theorem bindLambdaParameters_state_header
@@ -2769,13 +2773,14 @@ theorem recordExpressionWithExpected_inferenceProperties
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × State}
     (ready : state.InferenceReady)
     (typeBelow : type.VariablesBelow state.inference.next)
     (expectedBelow : ∀ expectedType ∈ expected,
       expectedType.VariablesBelow state.inference.next)
     (success : recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result) :
+      requirements expected state localSchemeInstantiationStart = .ok result) :
     state.InferenceProgress result.2 ∧
       result.2.InferenceReady ∧
       result.1.type.VariablesBelow result.2.inference.next := by
@@ -2793,6 +2798,7 @@ theorem recordExpressionWithExpected_inferenceProperties
       requirements := requirements ++
         coercionRequirements fitted.coercions
       coercions := fitted.coercions
+      localSchemeInstantiationStart
     }) fittedProperties.2.1.solved
   have recordedReady :=
     State.InferenceReady.recordNode (.expression {
@@ -2803,6 +2809,7 @@ theorem recordExpressionWithExpected_inferenceProperties
       requirements := requirements ++
         coercionRequirements fitted.coercions
       coercions := fitted.coercions
+      localSchemeInstantiationStart
     }) fittedProperties.2.1
   exact ⟨fittedProperties.1.trans recordedProgress, recordedReady,
     fittedProperties.2.2⟩
@@ -5264,8 +5271,9 @@ private theorem inferFuel_inferenceProperties_internal :
     simp_all [InferExprFuelInferenceProperties, inferExprFuel]
   case case7 =>
     intros context expression expected initial fuel id allocated allocationEq
-      name expressionEq binder lookupEq instantiated inference advanced
-      predicates requirements recorded requirementsEq
+      name expressionEq binder lookupEq localSchemeInstantiationStart
+      instantiated inference advanced predicates requirements recorded
+      requirementsEq
     unfold InferExprFuelInferenceProperties
     intro ready validated canonical expectedBelow result success
     have allocationProgress : initial.InferenceProgress allocated := by
@@ -5317,9 +5325,9 @@ private theorem inferFuel_inferenceProperties_internal :
         recordExpressionWithExpected context expression id
           (advanced.resolve instantiated.body)
           (.reference name.value (.local binder.id)) requirements expected
-          recorded = .ok result := by
+          recorded (some localSchemeInstantiationStart) = .ok result := by
       simpa only [instantiated, inference, advanced, predicates,
-        requirementsEq] using success
+        requirementsEq, localSchemeInstantiationStart] using success
     have recordedProperties :=
       recordExpressionWithExpected_inferenceProperties recordedReady
         bodyAtRecorded expectedAtRecorded recordSuccess
