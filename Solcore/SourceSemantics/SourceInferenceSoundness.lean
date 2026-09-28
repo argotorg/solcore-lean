@@ -4301,6 +4301,85 @@ theorem inferMatchScrutineesFuel_inferenceProperties
               exact finishTuple elements elementsState elementsProperties.1
                 elementsProperties.2.1 elementsProperties.2.2 success
 
+/-- The common match-scrutinee traversal restores the caller's visible
+binders and preserves their shared local-allocation bound.  Synthetic tuple
+allocation changes only occurrence identities. -/
+theorem inferMatchScrutineesFuel_preserves_localBindersBelowNextLocal
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {inferred : InferredExpression}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferMatchScrutineesFuel fuel inferenceContext span sources
+      state = .ok (inferred, final)) :
+    final.LocalBindersBelowNextLocal := by
+  have finishTuple
+      (expressions : List Syntax.Expr)
+      (elements : List InferredExpression)
+      (elementsState : Frontend.SourceInference.State)
+      (elementsSuccess : Detail.inferExprsFuel fuel inferenceContext
+        expressions state = .ok (elements, elementsState))
+      (residualSuccess :
+        ((do
+          let (tupleId, allocated) := elementsState.allocateExpressionId
+          let type := TypeSystem.Ty.productMany
+            (elements.map (fun element : InferredExpression => element.type))
+          let retained := allocated.recordNode (.expression {
+            id := tupleId
+            span
+            type
+            form := .tuple
+              (elements.map (fun element : InferredExpression => element.id))
+          })
+          pure ({ id := tupleId, type }, retained)) :
+            Except Frontend.SourceInference.Error
+              (InferredExpression × Frontend.SourceInference.State)) =
+            .ok (inferred, final)) :
+      final.LocalBindersBelowNextLocal := by
+    rcases allocation : elementsState.allocateExpressionId with
+      ⟨tupleId, allocated⟩
+    simp only [allocation, pure, Pure.pure, Except.pure] at residualSuccess
+    injection residualSuccess with resultEq
+    cases resultEq
+    have elementsBelow :=
+      Detail.inferExprsFuel_preserves_localBindersBelowNextLocal below
+        elementsSuccess
+    have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+      have retained :=
+        Frontend.SourceInference.State.allocateExpressionId_preserves_localBindersBelowNextLocal
+          elementsState elementsBelow
+      simpa only [allocation] using retained
+    exact
+      Frontend.SourceInference.State.recordNode_preserves_localBindersBelowNextLocal
+        allocated _ allocatedBelow
+  cases sources with
+  | nil =>
+      unfold inferMatchScrutineesFuel at success
+      cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext []
+          state with
+      | error error =>
+          simp [elementsSuccess, bind, Except.bind] at success
+      | ok elementsPair =>
+          rcases elementsPair with ⟨elements, elementsState⟩
+          simp only [elementsSuccess, bind, Except.bind] at success
+          exact finishTuple [] elements elementsState elementsSuccess success
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          exact Detail.inferExprFuel_preserves_localBindersBelowNextLocal below
+            (by simpa [inferMatchScrutineesFuel] using success)
+      | cons second tail =>
+          unfold inferMatchScrutineesFuel at success
+          cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext
+              (first :: second :: tail) state with
+          | error error =>
+              simp [elementsSuccess, bind, Except.bind] at success
+          | ok elementsPair =>
+              rcases elementsPair with ⟨elements, elementsState⟩
+              simp only [elementsSuccess, bind, Except.bind] at success
+              exact finishTuple (first :: second :: tail) elements
+                elementsState elementsSuccess success
+
 namespace ActiveLocalContextInvariant
 
 /-- The common match-scrutinee step preserves the caller's active lexical

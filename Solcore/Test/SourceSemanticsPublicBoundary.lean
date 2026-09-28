@@ -443,6 +443,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchCasesFuel_success_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchScrutineesFuel_preserves_localBindersBelowNextLocal
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_statementsHaveType
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_containsExpression
