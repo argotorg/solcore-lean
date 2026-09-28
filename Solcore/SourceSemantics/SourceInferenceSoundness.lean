@@ -1635,6 +1635,129 @@ theorem inferStatementFuel_success_letAnnotatedUninitialized_facts
         rfl, rfl, rfl, rfl, rfl, rfl,
         recordNode_containsStatement binding.2 _ roots⟩
 
+/-- The executable pipeline for an annotated declaration without an
+initializer reconstructs the declarative monomorphic `let` judgment after
+final substitution.  Closed source annotations make both local
+generalization and the closing substitution inert; stable-local alignment
+then supplies the exact semantic context extension. -/
+theorem letAnnotatedUninitializedStatementHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {sourceType : Syntax.TypeExpr} {id : StatementId}
+    {state final : Frontend.SourceInference.State}
+    {resolvedType valueType : TypeSystem.Ty}
+    {locals : TypeSystem.Environment}
+    {generalized : Detail.GeneralizedValue} {binder : TypedBinder}
+    (resolution : Detail.resolveSourceType inferenceContext sourceType =
+      .ok resolvedType)
+    (valueType_eq : valueType = state.resolve resolvedType)
+    (generalized_eq : generalized = Detail.generalizeValue state locals
+      state.nextRequirement valueType)
+    (allocated : (state.withLocals locals).allocateBinder name.value
+      generalized.scheme (some name.span) false generalized.requirements =
+        (binder, final))
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .letDecl binder none
+    })
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (parameters_eq : target.typeParameters = inferenceContext.typeParameters)
+    (declaration_eq : target.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (aligned : LocalEnvironmentAligned state outer target)
+    (below : state.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = state.owner) :
+    StatementHasType (source.applySubstitution outer) control target id
+      (target.withLocal binder.id
+        (binder.applySubstitution outer).scheme
+        (binder.applySubstitution outer).schemeRequirements) {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } := by
+  have typeWellFormed : TypeWellFormed target resolvedType :=
+    resolveSourceType_success_typeWellFormed canonical signatures_eq
+      parameters_eq declaration_eq resolution
+  have resolvedClosed : resolvedType.freeVariables = [] :=
+    StructuralSubstitution.TypeWellFormed.freeVariables_eq_nil typeWellFormed
+  have resolvedByState : state.resolve resolvedType = resolvedType := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using
+      (Detail.resolveSourceType_success_apply_eq_self
+        state.inference.substitution resolution)
+  have valueClosed : valueType.freeVariables = [] := by
+    rw [valueType_eq, resolvedByState]
+    exact resolvedClosed
+  have generalizedFacts := generalizeValue_closed_facts state locals
+    state.nextRequirement valueType target valueClosed
+  have generalizedSchemeEq : generalized.scheme = .mono resolvedType := by
+    calc
+      generalized.scheme =
+          (Detail.generalizeValue state locals state.nextRequirement
+            valueType).scheme :=
+        congrArg Detail.GeneralizedValue.scheme generalized_eq
+      _ = .mono valueType := generalizedFacts.1
+      _ = .mono resolvedType := by rw [valueType_eq, resolvedByState]
+  have generalizedRequirementsEq : generalized.requirements = [] := by
+    calc
+      generalized.requirements =
+          (Detail.generalizeValue state locals state.nextRequirement
+            valueType).requirements :=
+        congrArg Detail.GeneralizedValue.requirements generalized_eq
+      _ = [] := generalizedFacts.2.1
+  have binderEq :
+      ((state.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements).1 = binder :=
+    congrArg Prod.fst allocated
+  have binderSchemeEq : binder.scheme = generalized.scheme := by
+    rw [← binderEq]
+    rfl
+  have binderRequirementsEq : binder.schemeRequirements = [] := by
+    rw [← binderEq]
+    exact generalizedRequirementsEq
+  have resolvedByOuter : outer.apply resolvedType = resolvedType :=
+    Detail.resolveSourceType_success_apply_eq_self outer resolution
+  have closedSchemeEq :
+      (binder.applySubstitution outer).scheme = .mono resolvedType := by
+    simp [binderSchemeEq, generalizedSchemeEq, TypeSystem.Scheme.apply,
+      TypeSystem.Scheme.mono, TypeSystem.Substitution.without,
+      resolvedByOuter]
+  have closedRequirementsEq :
+      (binder.applySubstitution outer).schemeRequirements = [] := by
+    simp [binderRequirementsEq]
+  have generalizes :
+      SchemeGeneralizes target (binder.applySubstitution outer).scheme := by
+    rw [closedSchemeEq]
+    unfold SchemeGeneralizes SchemeGeneralizesExcept
+    simp [TypeSystem.Scheme.mono, resolvedClosed]
+  have extended : BinderExtends (state.withLocals locals).owner target
+      (binder.applySubstitution outer)
+      (target.withLocal binder.id
+        (binder.applySubstitution outer).scheme
+        (binder.applySubstitution outer).schemeRequirements) := by
+    apply
+      (aligned.withLocals locals).monomorphicBinderExtends_of_allocateBinder
+        (Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+          state locals below)
+        allocated closedSchemeEq closedRequirementsEq typeWellFormed
+  exact .letUninitialized
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl
+    (by rw [closedSchemeEq]; rfl)
+    generalizes
+    (by
+      simpa [Frontend.SourceInference.State.withLocals, owner_eq] using
+        extended)
+    (by simp [StatementNode.applySubstitution])
+
 /-- A successful unannotated initialized declaration exposes the initializer
 inference and the exact generalized binder subsequently entered into scope.
 The requirement barrier remains the pre-initializer position retained in the
