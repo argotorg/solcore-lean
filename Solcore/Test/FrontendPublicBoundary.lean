@@ -431,6 +431,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.contextualConstructorCandidate_success_facts
 example :=
+  @Solcore.Frontend.SourceInference.Detail.contextualConstructorCandidate_success_instantiation_variablesBelow
+example :=
   @Solcore.Frontend.SourceInference.Detail.instantiateDataConstructor_types_variablesBelow
 example :=
   @Solcore.Frontend.SourceInference.Detail.constructorCalleeCandidates_success_members

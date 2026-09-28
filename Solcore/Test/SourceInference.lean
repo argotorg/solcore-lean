@@ -337,6 +337,28 @@ example {context : SourceInference.Context} {state : SourceInference.State}
   exact SourceInference.Detail.contextualConstructorCandidate_success_facts
     success
 
+/-- A contextual constructor lookup plus validated signatures bounds its
+instantiated payload and result types at the current inference allocator. -/
+example {context : SourceInference.Context} {state : SourceInference.State}
+    {expected : Option TypeSystem.Ty} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    {arguments : List TypeSystem.Ty}
+    (ready : state.InferenceReady)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (success : SourceInference.Detail.contextualConstructorCandidate context
+      state expected name = .ok (dataType, constructor, arguments)) :
+    (∀ payload ∈
+        (SourceInference.Detail.instantiateDataConstructor dataType constructor
+          arguments).payloadTypes,
+      payload.VariablesBelow state.inference.next) ∧
+      (SourceInference.Detail.instantiateDataConstructor dataType constructor
+        arguments).resultType.VariablesBelow state.inference.next := by
+  exact SourceInference.Detail.contextualConstructorCandidate_success_instantiation_variablesBelow
+    ready expectedBelow validated success
+
 /-- Pure constructor instantiation preserves allocator bounds on substituted
 payload and nominal result types. -/
 example {dataType : ProgramDataSignature}

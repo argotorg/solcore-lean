@@ -2945,6 +2945,45 @@ theorem unify_preserves_resolve_eq
   exact congrArg (fun header : State.Header => header.inputs)
     (unify_state_header success)
 
+/-- A successful contextual-constructor lookup supplies allocator-bounded
+type arguments, so formation validation bounds every instantiated payload and
+the constructor result at the input state's allocator. -/
+theorem contextualConstructorCandidate_success_instantiation_variablesBelow
+    {context : Context} {state : State} {expected : Option Ty}
+    {name : String} {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
+    (ready : state.InferenceReady)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (success : contextualConstructorCandidate context state expected name =
+      .ok (dataType, constructor, arguments)) :
+    (∀ payload ∈
+        (instantiateDataConstructor dataType constructor arguments).payloadTypes,
+      payload.VariablesBelow state.inference.next) ∧
+      Ty.VariablesBelow state.inference.next
+        (instantiateDataConstructor dataType constructor arguments).resultType := by
+  rcases contextualConstructorCandidate_success_facts success with
+    ⟨dataMember, constructorMember, expectedType, expectedEq, nominalEq⟩
+  have expectedTypeBelow :
+      expectedType.VariablesBelow state.inference.next :=
+    expectedBelow expectedType (by simp [expectedEq])
+  have resolvedExpectedBelow :
+      (state.resolve expectedType).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply expectedTypeBelow
+  rw [nominalEq] at resolvedExpectedBelow
+  have argumentsBelow : ∀ argument ∈ arguments,
+      argument.VariablesBelow state.inference.next :=
+    ((Ty.variablesBelow_applyMany_iff state.inference.next
+      (.constructor (.declaration dataType.id)) arguments).mp (by
+        simpa only [Ty.nominal] using resolvedExpectedBelow)).2
+  have payloadTypesBelow : ∀ payload ∈ constructor.payloadTypes,
+      payload.VariablesBelow state.inference.next :=
+    validated.data_constructor_payloadTypes_variablesBelow dataMember
+      constructorMember state.inference.next
+  exact instantiateDataConstructor_types_variablesBelow argumentsBelow
+    payloadTypesBelow
+
 private theorem freshDataConstructorInstantiation_fold_inferenceProperties
     (parameters : List TypeParameterId) (arguments : List Ty) (state : State)
     (ready : state.InferenceReady)
