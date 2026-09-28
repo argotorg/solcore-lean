@@ -411,6 +411,22 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.cons
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternFlatInferenceCertificate
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternsFlatInferenceCertificate
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternInferenceCertificate
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternFlatStateCallbacks
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternRecursiveSoundnessCallbacks
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternBranchSoundnessCallbacks
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternsFlatFuel_success_sound_of_callbacks
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFlatFuel_success_sound_of_callbacks
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate.toMatchCaseHasType
