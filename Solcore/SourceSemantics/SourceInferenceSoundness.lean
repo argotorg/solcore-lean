@@ -2685,6 +2685,69 @@ theorem inferStatementFuel_success_assignValue_facts
       exact ⟨assignment, inferredValue, assignmentState, rfl, rfl,
         recordNode_containsStatement assignmentState _ roots⟩
 
+/-- A successful bit-not assignment exposes place inference, the exact
+unification forcing the place to `Word`, and the finalized assignment target
+stored in the recorded statement node. -/
+theorem inferStatementFuel_success_assignBitNot_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
+    {operatorSpan : Syntax.SourceSpan} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .assignBitNot targetExpression operatorSpan)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ place placeState unified,
+      Detail.inferPlaceFuel fuel context targetExpression allocated =
+        .ok (place, placeState) ∧
+      Detail.unify placeState place.type .word = .ok unified ∧
+      unified.resolve place.type = .word ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state := unified.recordNode (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .assignBitNot {
+            target := { place with type := unified.resolve place.type }
+          }
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .assignBitNot {
+          target := { place with type := unified.resolve place.type }
+        }
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases placeSuccess : Detail.inferPlaceFuel fuel context targetExpression
+      allocated with
+  | error error =>
+      simp [placeSuccess] at success
+  | ok placeResult =>
+      rcases placeResult with ⟨place, placeState⟩
+      simp only [placeSuccess] at success
+      cases unifySuccess : Detail.unify placeState place.type .word with
+      | error error =>
+          simp [unifySuccess] at success
+      | ok unified =>
+          simp only [unifySuccess, pure, Pure.pure, Except.pure] at success
+          injection success with resultEq
+          have resolvedEq : unified.resolve place.type = .word :=
+            (Detail.unify_resolve_eq unifySuccess).trans (by rfl)
+          rw [← resultEq]
+          exact ⟨place, placeState, unified, rfl, unifySuccess, resolvedEq, rfl,
+            recordNode_containsStatement unified _ roots⟩
+
 /-- A successful `if` without an `else` exposes condition inference, checking of
 the then-body, restoration of the condition state's lexical scope, and the
 canonical unit statement recorded after that restoration. -/
@@ -3203,6 +3266,60 @@ theorem assignValueStatementHasType_afterSubstitution
       control := .ordinary .unit
     } := by
   exact .assignValue
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl assignmentType (by simp [StatementNode.applySubstitution])
+
+/-- A retained bit-not assignment is well typed after successful `Word`
+unification.  Semantic extension transports the inferred place type and the
+stored resolved target annotation to the same finalized `Word` type. -/
+theorem assignBitNotStatementHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {place : PlaceResolution} {unified : Frontend.SourceInference.State}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .assignBitNot {
+        target := { place with type := unified.resolve place.type }
+      }
+    })
+    (placeType : SourcePlaceHasType (source.applySubstitution outer) target
+      (place.applySubstitution outer) (outer.apply place.type))
+    (resolvedEq : unified.resolve place.type = .word)
+    (extension : outer.SemanticallyExtends
+      unified.inference.substitution) :
+    StatementHasType (source.applySubstitution outer) control target id target {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    } := by
+  have resolvedFinal :
+      outer.apply (unified.resolve place.type) = outer.apply place.type := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension place.type
+  have placeWord : outer.apply place.type = .word := by
+    rw [← resolvedFinal, resolvedEq]
+    rfl
+  have storedPlaceEq :
+      ({ place with type := unified.resolve place.type } : PlaceResolution
+        ).applySubstitution outer = place.applySubstitution outer := by
+    cases place
+    simp [PlaceResolution.applySubstitution, resolvedFinal]
+  have storedPlaceType : SourcePlaceHasType
+      (source.applySubstitution outer) target
+      (({ place with type := unified.resolve place.type } : PlaceResolution
+        ).applySubstitution outer) .word := by
+    rw [storedPlaceEq, ← placeWord]
+    exact placeType
+  have assignmentType : SourceBitNotAssignmentValid
+      (source.applySubstitution outer) target
+      (({ target := { place with type := unified.resolve place.type } } :
+        AssignmentResolution).applySubstitution outer) := by
+    exact .intro storedPlaceType rfl
+  exact .assignBitNot
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl assignmentType (by simp [StatementNode.applySubstitution])
 
@@ -3868,6 +3985,71 @@ theorem inferStatementFuel_success_assignValue_sound
   refine ⟨assignmentInvariant.recordNode _, ?_, ?_⟩
   · exact assignValueStatementHasType_afterSubstitution contains
       assignmentTyping
+  · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
+
+/-- A successful bit-not assignment is compositional modulo recursive place
+soundness.  The statement layer discharges the `Word` unification, transports
+the finalized place annotation, and preserves the active lexical context. -/
+theorem inferStatementFuel_success_assignBitNot_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
+    {operatorSpan : Syntax.SourceSpan} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .assignBitNot targetExpression operatorSpan)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (placeSound :
+      ∀ {place : PlaceResolution}
+        {placeState : Frontend.SourceInference.State},
+        Detail.inferPlaceFuel fuel inferenceContext targetExpression allocated =
+            .ok (place, placeState) →
+          SourcePlaceHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target (place.applySubstitution outer) (outer.apply place.type)) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, resolvedEq,
+      resultEq, contains⟩ :=
+    inferStatementFuel_success_assignBitNot_facts statementEq allocationEq
+      success roots
+  have placeInvariant : ActiveLocalContextInvariant placeState outer target :=
+    allocatedInvariant.inferPlaceFuel placeSuccess
+  have unifiedInvariant : ActiveLocalContextInvariant unified outer target :=
+    placeInvariant.unify unifySuccess
+  have placeTyping := placeSound placeSuccess
+  subst result
+  have unifiedExtension : outer.SemanticallyExtends
+      unified.inference.substitution := by
+    change outer.SemanticallyExtends unified.inference.substitution at outerExtension
+    exact outerExtension
+  refine ⟨unifiedInvariant.recordNode _, ?_, ?_⟩
+  · exact assignBitNotStatementHasType_afterSubstitution contains placeTyping
+      resolvedEq unifiedExtension
   · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
 
 /-- A successful bare return preserves the active lexical context and is
