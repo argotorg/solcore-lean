@@ -3754,6 +3754,61 @@ theorem inferStatementFuel_success_continue_sound
   · exact continueStatementHasType_afterSubstitution contains allowed
   · exact StatementResultMatchesFactsAfterSubstitution.continueStmt outer id _
 
+/-- A successful scoped block is compositional modulo recursive soundness of
+its body.  The body may extend its own semantic context, but restoring the
+saved lexical scope makes the enclosing statement preserve the caller's
+active-local invariant and semantic context. -/
+theorem inferStatementFuel_success_block_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {body : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value = .block body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (roots : List NodeId := [])
+    (bodySound :
+      ∀ {bodyResult : Detail.BlockResult},
+        Detail.inferStatementsFuel fuel inferenceContext body expectedReturn
+            allocated = .ok bodyResult →
+          ∃ finalContext bodyFacts,
+            ActiveLocalContextInvariant bodyResult.state outer finalContext ∧
+            StatementsHaveType
+              ((result.state.toTypedSource roots).applySubstitution outer)
+              control target bodyResult.statements finalContext bodyFacts ∧
+            BlockResultMatchesFactsAfterSubstitution outer bodyResult
+              bodyFacts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨bodyResult, bodySuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_block_facts statementEq allocationEq success
+      roots
+  obtain ⟨finalContext, bodyFacts, _bodyInvariant, bodyTyping,
+      bodyAgreement⟩ := bodySound bodySuccess
+  subst result
+  refine ⟨{
+      type := bodyFacts.type
+      hasValue := bodyFacts.sawReturn
+      sawReturn := bodyFacts.sawReturn
+      control := bodyFacts.control.eraseValue
+    }, allocatedInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact blockStatementHasType_afterSubstitution contains bodyTyping
+      bodyAgreement
+  · exact StatementResultMatchesFactsAfterSubstitution.block bodyAgreement
+      id _
+
 /-- Empty executable block inference returns the canonical empty block
 without changing its input state. -/
 theorem inferStatementsFuel_success_nil_facts
