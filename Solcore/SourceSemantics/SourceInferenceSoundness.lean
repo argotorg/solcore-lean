@@ -389,6 +389,56 @@ theorem checkFunctionBody_success_initialLocalEnvironmentAligned
   simpa only [Frontend.SourceInference.State.initial_inputs_eq_localBinders]
     using extension
 
+/-- The frontend no-capture certificate already has exactly the
+predicate-wide shape required by the semantic substitution bridge. -/
+theorem localBinderInstantiationNoCapture_predicateRangeAvoids
+    {outer : TypeSystem.Substitution} {binder : TypedBinder}
+    (noCapture : Detail.LocalBinderInstantiationNoCapture outer binder) :
+    ∀ requirement, requirement ∈ binder.schemeRequirements →
+      FlexibleSubstitution.PredicateRangeAvoidsVariablesOn outer
+        binder.scheme.quantified requirement.predicate := by
+  intro requirement member
+  exact noCapture.requirement_ranges requirement member
+
+/-- Reconstruct a declaratively valid local-scheme use from the frontend's
+canonical fresh instantiation and its final no-capture certificate.  In a
+residually open target context, admissibility of the final inference
+substitution automatically supplies admissibility of the composed canonical
+instantiation range. -/
+theorem canonicalLocalSchemeInstantiationValid_afterSubstitution
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {binder : TypedBinder} {actualRequirements : List RequirementId}
+    (binders : TypeParameterBindersWellFormed target)
+    (residual : target.residualTypeVariables = true)
+    (outerRange : SubstitutionRangeAdmissible target outer)
+    (formation : LocalSchemeRequirementsWellFormed target
+      (binder.applySubstitution outer))
+    (schemeWellFormed : SchemeWellFormed target
+      (binder.applySubstitution outer).scheme)
+    (noCapture : Detail.LocalBinderInstantiationNoCapture outer binder)
+    (next : Nat)
+    (actualUnique : actualRequirements.Nodup)
+    (actualDisjoint : ∀ id, id ∈ actualRequirements →
+      id ∉ localSchemeTemplateIds (binder.applySubstitution outer))
+    (requirements : RequirementSequenceProves target actualRequirements
+      ((instantiateLocalSchemePredicates
+          (binder.scheme.instantiateWithSubstitution next).substitution
+          binder).map
+        (TypedTraitResolution.applySubstitution outer))) :
+    LocalSchemeInstantiationValid target
+      (binder.applySubstitution outer)
+      (outer.apply (binder.scheme.instantiateWithSubstitution next).body)
+      actualRequirements := by
+  apply
+    FlexibleSubstitution.LocalSchemeInstantiationValid.of_instantiateWithSubstitution_afterSubstitution_atTarget
+      formation schemeWellFormed noCapture.quantified_fresh
+      noCapture.body_range
+      (localBinderInstantiationNoCapture_predicateRangeAvoids noCapture)
+      next
+      (FlexibleSubstitution.SubstitutionRangeAdmissible.mapRange_instantiateWithSubstitution
+        binder.scheme next binders residual outerRange)
+      actualUnique actualDisjoint requirements
+
 /-- Agreement of the executable and declarative generalization barriers on
 the inferred type's candidate variables is enough to recover exact qualified
 rank-one generalization.  Variables outside `type.freeVariables` are
