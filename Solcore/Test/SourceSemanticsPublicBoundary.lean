@@ -436,6 +436,8 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.LocalSchemeRequirementW
 example := @Solcore.SourceSemantics.FlexibleSubstitution.LocalSchemeRequirementsWellFormed.applySubstitution_of_fresh
 example := @Solcore.SourceSemantics.FlexibleSubstitution.LocalSchemeRequirementsWellFormed.applySubstitution
 example := @Solcore.SourceSemantics.FlexibleSubstitution.instantiateLocalSchemePredicates_applySubstitution
+example :=
+  @Solcore.SourceSemantics.FlexibleSubstitution.LocalSchemeInstantiationValid.of_instantiateWithSubstitution_afterSubstitution
 example := @Solcore.SourceSemantics.FlexibleSubstitution.LocalSchemeInstantiationValid.applySubstitution_of_fresh
 example := @Solcore.SourceSemantics.FlexibleSubstitution.DeclarationInstantiation.Valid.applySubstitution
 example := @Solcore.SourceSemantics.FlexibleSubstitution.DeclarationInstantiation.Admissible.applySubstitution

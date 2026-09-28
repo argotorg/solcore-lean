@@ -9594,6 +9594,94 @@ theorem instantiateLocalSchemePredicates_applySubstitution
   exact PredicateAdmissible.applyFlexible_compose outer inner closes.range
     innerExact fresh (formation.entries requirement member).predicate
 
+/-- Canonical frontend instantiation remains a single shared local-scheme
+instantiation after a later outer closure.  The executable instantiator
+supplies the exact inner substitution and residual-range witnesses; the
+outer substitution is then composed through both the result type and the
+source-ordered qualified-predicate spine. -/
+theorem LocalSchemeInstantiationValid.of_instantiateWithSubstitution_afterSubstitution
+    {outer : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {binder : TypedBinder}
+    {actualRequirements : List RequirementId}
+    (contextValid : ContextSubstitutionValid outer closedVariables source target)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ outer.domain)
+    (formation : LocalSchemeRequirementsWellFormed source binder)
+    (schemeWellFormed : SchemeWellFormed source binder.scheme)
+    (residual : source.residualTypeVariables = true)
+    (next : Nat)
+    (actualUnique : actualRequirements.Nodup)
+    (actualDisjoint :
+      ∀ id, id ∈ actualRequirements → id ∉ localSchemeTemplateIds binder)
+    (requirements : RequirementSequenceProves target actualRequirements
+      ((instantiateLocalSchemePredicates
+          (binder.scheme.instantiateWithSubstitution next).substitution
+          binder).map
+        (TypedTraitResolution.applySubstitution outer))) :
+    LocalSchemeInstantiationValid target
+      (binder.applySubstitution outer)
+      (outer.apply (binder.scheme.instantiateWithSubstitution next).body)
+      actualRequirements := by
+  let instantiated := binder.scheme.instantiateWithSubstitution next
+  have innerExact :
+      ExactSubstitution instantiated.substitution
+        binder.scheme.quantified := {
+    variables_nodup := schemeWellFormed.quantified_nodup
+    domain_permutation := by
+      simpa only [instantiated] using
+        binder.scheme.instantiateWithSubstitution_substitution_domain_permutation
+          next schemeWellFormed.quantified_nodup
+  }
+  have innerRange :
+      SubstitutionRangeAdmissible source instantiated.substitution := by
+    intro metavariable replacement member
+    obtain ⟨generated, rfl, _, _⟩ :=
+      binder.scheme.instantiateWithSubstitution_substitution_range_fresh
+        next (by simpa only [instantiated] using member)
+    exact TypeAdmissible.variableOfResidual schemeWellFormed.binders residual
+      generated
+  have restricted_eq :
+      outer.without binder.scheme.quantified = outer :=
+    Substitution.without_eq_self_of_disjoint_domain outer
+      binder.scheme.quantified fresh
+  refine .intro
+    (LocalSchemeRequirementsWellFormed.applySubstitution_of_fresh
+      contextValid.closes fresh formation)
+    (by simpa using
+      (SchemeWellFormed.applySubstitution contextValid.closes schemeWellFormed))
+    (Substitution.mapRange outer instantiated.substitution)
+    (Substitution.ExactSubstitution.mapRange outer innerExact)
+    ?_ ?_ actualUnique ?_ ?_
+  · intro metavariable replacement member
+    rcases List.mem_map.mp member with
+      ⟨⟨innerVariable, innerReplacement⟩, innerMember, entryEq⟩
+    cases entryEq
+    exact TypeAdmissible.applySubstitution contextValid.closes
+      (innerRange innerVariable innerReplacement innerMember)
+  · change (Substitution.mapRange outer instantiated.substitution).apply
+      (binder.applySubstitution outer).scheme.body =
+        outer.apply instantiated.body
+    rw [applyTypedBinder_scheme]
+    change (Substitution.mapRange outer instantiated.substitution).apply
+        ((outer.without binder.scheme.quantified).apply binder.scheme.body) =
+      outer.apply instantiated.body
+    rw [restricted_eq]
+    change (Substitution.mapRange outer instantiated.substitution).apply
+        (outer.apply binder.scheme.body) =
+      outer.apply (instantiated.substitution.apply binder.scheme.body)
+    exact (TypeWellScoped.applyFlexible_compose outer
+      instantiated.substitution contextValid.closes.range innerExact fresh
+      schemeWellFormed.body).symm
+  · intro id actualMember templateMember
+    exact actualDisjoint id actualMember (by
+      simpa [localSchemeTemplateIds, TypedBinder.applySubstitution,
+        LocalSchemeRequirement.applySubstitution, List.map_map,
+        Function.comp_def] using templateMember)
+  · rw [← instantiateLocalSchemePredicates_applySubstitution
+      contextValid.closes fresh formation innerExact]
+    simpa only [instantiated] using requirements
+
 /-- Explicit scheme-binder freshness transports one complete local reference
 instantiation, including its shared type substitution and requirement spine. -/
 theorem LocalSchemeInstantiationValid.applySubstitution_of_fresh

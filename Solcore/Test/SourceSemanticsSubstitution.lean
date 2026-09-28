@@ -463,6 +463,128 @@ example (substitution : Substitution) (closedVariables : List TypeVarId)
     SchemeWellFormed target (scheme.apply substitution) :=
   FlexibleSubstitution.SchemeWellFormed.applySubstitution closes wellFormed
 
+private def canonicalLocalQuantified : TypeVarId := ⟨7⟩
+
+private def canonicalLocalOuterVariable : TypeVarId := ⟨3⟩
+
+private def canonicalLocalOuterSubstitution : Substitution :=
+  [(canonicalLocalOuterVariable, .word)]
+
+private def canonicalGenericLocalBinder
+    (owner : Resolved.DeclarationId) : TypedBinder := {
+  id := { owner, binderIndex := 0 }
+  name := "identity"
+  scheme := {
+    quantified := [canonicalLocalQuantified]
+    body := .function (.variable canonicalLocalQuantified)
+      (.variable canonicalLocalQuantified)
+  }
+}
+
+private def canonicalGenericLocalSource
+    (signatures : ProgramSignatures) : SourceSemantics.Context :=
+  ((SourceSemantics.Context.ofSignatures signatures)
+    |>.withResidualTypeVariables)
+    |>.withTypeVariables [canonicalLocalOuterVariable]
+
+private def canonicalGenericLocalTarget
+    (signatures : ProgramSignatures) : SourceSemantics.Context :=
+  (SourceSemantics.Context.ofSignatures signatures)
+    |>.withResidualTypeVariables
+
+/-- Canonical instantiation of a concrete generic local composes with a later
+outer closure: the outer metavariable closes to `word`, while the generic
+identity's freshly allocated occurrence variable remains shared by its
+parameter and result. -/
+theorem canonicalGenericLocalInstantiationAfterOuterClosure
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId) :
+    LocalSchemeInstantiationValid (canonicalGenericLocalTarget signatures)
+      ((canonicalGenericLocalBinder owner).applySubstitution
+        canonicalLocalOuterSubstitution)
+      (.function (.variable ⟨10⟩) (.variable ⟨10⟩)) [] := by
+  have closes : FlexibleSubstitution.ContextCloses
+      canonicalLocalOuterSubstitution [canonicalLocalOuterVariable]
+      (canonicalGenericLocalSource signatures)
+      (canonicalGenericLocalTarget signatures) := {
+    variables_eq := rfl
+    exact := ExactSubstitution.singleton canonicalLocalOuterVariable .word
+    retained_fresh := by
+      simp [canonicalGenericLocalTarget, Context.withResidualTypeVariables,
+        Context.ofSignatures]
+    range := by
+      intro metavariable replacement member
+      simp only [canonicalLocalOuterSubstitution, List.mem_singleton] at member
+      cases member
+      exact {
+        binders :=
+          (TypeParameterBindersWellFormed.ofSignatures signatures)
+            |>.withResidualTypeVariables
+        typeWellScoped := .builtin .word
+      }
+    target_eq := rfl
+  }
+  have contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      canonicalLocalOuterSubstitution [canonicalLocalOuterVariable]
+      (canonicalGenericLocalSource signatures)
+      (canonicalGenericLocalTarget signatures) := {
+    closes
+    localSchemesFresh := by
+      intro entry member
+      simp [canonicalGenericLocalSource, Context.withResidualTypeVariables,
+        Context.withTypeVariables, Context.ofSignatures] at member
+    implementationRequirements := by
+      intro requirement evidence member evidenceEq
+      simp [canonicalGenericLocalSource, Context.withResidualTypeVariables,
+        Context.withTypeVariables, Context.ofSignatures] at member
+  }
+  have formation : LocalSchemeRequirementsWellFormed
+      (canonicalGenericLocalSource signatures)
+      (canonicalGenericLocalBinder owner) :=
+    LocalSchemeRequirementsWellFormed.empty _ _ rfl
+  have schemeWellFormed : SchemeWellFormed
+      (canonicalGenericLocalSource signatures)
+      (canonicalGenericLocalBinder owner).scheme := {
+    binders :=
+      ((TypeParameterBindersWellFormed.ofSignatures signatures)
+        |>.withResidualTypeVariables)
+        |>.withTypeVariables [canonicalLocalOuterVariable]
+    quantified_nodup := by simp [canonicalGenericLocalBinder]
+    body := by
+      apply TypeWellScoped.function <;> apply TypeWellScoped.variable <;>
+        simp [canonicalGenericLocalBinder, canonicalLocalQuantified,
+          canonicalGenericLocalSource, admissibleTypeVariables,
+          Context.withResidualTypeVariables, Context.withTypeVariables,
+          Context.ofSignatures, TypeSystem.Ty.freeVariables]
+  }
+  have fresh : ∀ metavariable,
+      metavariable ∈
+          (canonicalGenericLocalBinder owner).scheme.quantified →
+        metavariable ∉ canonicalLocalOuterSubstitution.domain := by
+    intro metavariable quantified
+    simp [canonicalGenericLocalBinder, canonicalLocalQuantified] at quantified
+    subst metavariable
+    simp [canonicalLocalOuterSubstitution, canonicalLocalOuterVariable,
+      TypeSystem.Substitution.domain]
+  have instantiatedBody :
+      ((canonicalGenericLocalBinder owner).scheme
+        |>.instantiateWithSubstitution 10).body =
+        .function (.variable ⟨10⟩) (.variable ⟨10⟩) := by
+    rfl
+  have valid :=
+    FlexibleSubstitution.LocalSchemeInstantiationValid.of_instantiateWithSubstitution_afterSubstitution
+      (actualRequirements := []) contextValid fresh formation schemeWellFormed
+      (by rfl) 10 (by simp)
+      (by simp [localSchemeTemplateIds, canonicalGenericLocalBinder])
+      (by
+        simpa [instantiateLocalSchemePredicates, canonicalGenericLocalBinder]
+          using (RequirementSequenceProves.nil :
+            RequirementSequenceProves
+              (canonicalGenericLocalTarget signatures) [] []))
+  rw [instantiatedBody] at valid
+  simpa [canonicalGenericLocalBinder, canonicalLocalOuterSubstitution,
+    canonicalLocalOuterVariable, canonicalLocalQuantified,
+    TypeSystem.Substitution.apply, TypeSystem.Substitution.lookup?] using valid
+
 /-- Admissible predicates reuse type transport for the subject and every
 source-ordered argument without changing trait selection. -/
 example (substitution : Substitution) (closedVariables : List TypeVarId)
