@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.Substitution
 import Solcore.SourceSemantics.Static
 import Solcore.SourceSemantics.Program
 import Solcore.SourceSemantics.Dynamic.Evaluation
+import Solcore.Frontend.SourceInference.Expression
 import Solcore.TypeSystem.Properties
 
 /-!
@@ -12897,3 +12898,85 @@ theorem ExactSubstitution.localSchemeInitializerContext
   simpa using exact
 
 end Solcore.SourceSemantics.FlexibleSubstitution
+
+namespace Solcore.SourceSemantics.DataConstructorInstantiation.Admissible
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- Closing the frontend's canonical contextual constructor instantiation
+with an outer flexible substitution produces a declaratively admissible
+constructor occurrence.  Admissibility of the closed nominal result supplies
+both exact generic arity and admissibility of every mapped type argument. -/
+theorem instantiateDataConstructor_applySubstitution
+    {context : Context} {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (dataType_mem : dataType ∈ context.signatures.dataTypes)
+    (constructor_mem : constructor ∈ dataType.constructors)
+    (outer : Substitution)
+    (result_admissible : TypeAdmissible context
+      (outer.apply
+        (Detail.instantiateDataConstructor dataType constructor arguments).resultType)) :
+    SourceSemantics.DataConstructorInstantiation.Admissible context
+      ((Detail.instantiateDataConstructor dataType constructor arguments)
+        |>.applySubstitution outer) := by
+  have closedResultAdmissible : TypeAdmissible context
+      (Ty.nominal dataType.id (arguments.map outer.apply)) := by
+    simpa [Detail.instantiateDataConstructor,
+      StructuralSubstitution.applyFlexible_nominal] using result_admissible
+  obtain ⟨mappedArgumentsLength, mappedArgumentAdmissible⟩ :=
+    TypeAdmissible.nominal_data_arguments catalog dataType_mem
+      closedResultAdmissible
+  have argumentsLength : arguments.length = dataType.parameters.length := by
+    simpa using mappedArgumentsLength
+  have dataWellFormed := catalog.data_semantic dataType dataType_mem
+  have innerExact : ParameterSubstitution.Exact
+      (dataType.parameters.zip arguments) dataType.parameters :=
+    ParameterSubstitution.exact_zip dataWellFormed.parameters_nodup
+      argumentsLength
+  refine .intro dataType constructor dataType_mem constructor_mem
+    (dataWellFormed.constructor_owners constructor constructor_mem) rfl ?_ ?_
+      ?_ ?_
+  · change ParameterSubstitution.Exact
+      (FlexibleSubstitution.ParameterSubstitution.mapRange outer
+        (dataType.parameters.zip arguments)) dataType.parameters
+    exact FlexibleSubstitution.ParameterSubstitution.Exact.mapRange outer
+      innerExact
+  · change ParameterSubstitution.RangeAdmissible context
+      (FlexibleSubstitution.ParameterSubstitution.mapRange outer
+        (dataType.parameters.zip arguments))
+    intro parameter replacement member
+    rcases List.mem_map.mp member with
+      ⟨⟨sourceParameter, argument⟩, sourceMember, entryEq⟩
+    cases entryEq
+    exact mappedArgumentAdmissible (outer.apply argument)
+      (List.mem_map.mpr
+        ⟨argument, (List.of_mem_zip sourceMember).2, rfl⟩)
+  · change
+      (constructor.payloadTypes.map
+          (ParameterSubstitution.apply
+            (dataType.parameters.zip arguments))).map outer.apply =
+        constructor.payloadTypes.map
+          (ParameterSubstitution.apply
+            (FlexibleSubstitution.ParameterSubstitution.mapRange outer
+              (dataType.parameters.zip arguments)))
+    exact FlexibleSubstitution.TypesWellScoped.applyFlexible_composeParameters
+      (context := signatureContext context.signatures dataType.id
+        dataType.parameters)
+      outer (dataType.parameters.zip arguments) innerExact
+      (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+        (dataWellFormed.constructor_payloads constructor constructor_mem))
+  · change outer.apply (Ty.nominal dataType.id arguments) =
+      Ty.nominal dataType.id
+        (ParameterSubstitution.orderedArguments
+          (FlexibleSubstitution.ParameterSubstitution.mapRange outer
+            (dataType.parameters.zip arguments)) dataType.parameters)
+    rw [StructuralSubstitution.applyFlexible_nominal,
+      FlexibleSubstitution.ParameterSubstitution.orderedArguments_mapRange
+        outer innerExact,
+      ParameterSubstitution.orderedArguments_zip
+        dataWellFormed.parameters_nodup argumentsLength]
+
+end Solcore.SourceSemantics.DataConstructorInstantiation.Admissible

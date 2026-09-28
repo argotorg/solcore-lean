@@ -976,6 +976,8 @@ example := @Solcore.SourceSemantics.TypeAdmissible
 example := @Solcore.SourceSemantics.admissibleTypeVariables
 example := @Solcore.SourceSemantics.TypeAdmissible.toWellFormed
 example := @Solcore.SourceSemantics.TypeAdmissible.nominal_data_arguments
+example :=
+  @Solcore.SourceSemantics.DataConstructorInstantiation.Admissible.instantiateDataConstructor_applySubstitution
 example := @Solcore.SourceSemantics.TypeAdmissible.function_parameter
 example := @Solcore.SourceSemantics.TypeAdmissible.function_result
 example := @Solcore.SourceSemantics.TypeAdmissible.product_left
