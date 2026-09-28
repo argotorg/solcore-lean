@@ -10432,6 +10432,7 @@ theorem inferMatchPatternFuel_success_sound_of_flat
     {pattern : TypedMatchPattern}
     (flatSound :
       ∀ {result : Detail.InferredPattern},
+        outer.SemanticallyExtends result.state.inference.substitution →
         Detail.inferMatchPatternFlatFuel fuel inferenceContext patternSource
             expected [] initial = .ok result →
         Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
@@ -10452,7 +10453,7 @@ theorem inferMatchPatternFuel_success_sound_of_flat
         Except.pure] at success
       injection success with resultEq
       cases resultEq
-      obtain ⟨certificate⟩ := flatSound flatSuccess
+      obtain ⟨certificate⟩ := flatSound outerExtension flatSuccess
       have closedExpected : outer.apply (result.state.resolve expected) =
           outer.apply expected := by
         simpa [Frontend.SourceInference.State.resolve,
@@ -10488,6 +10489,47 @@ theorem inferMatchPatternFuel_success_sound_of_flat
         binders_extend := certificate.binders_extend
         pattern_invariant := certificate.invariant
       }⟩
+
+/-- Successful public pattern inference has a complete source-level semantic
+certificate.  Flat traversal soundness is instantiated at the declaration's
+semantic context, with no previously seen binder names. -/
+theorem inferMatchPatternFuel_success_sound
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {fuel : Nat} {patternSource : Syntax.Pattern}
+    {expected : TypeSystem.Ty}
+    {initial patternState : Frontend.SourceInference.State}
+    {pattern : TypedMatchPattern}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (branches : MatchPatternBranchSoundnessCallbacks source
+      inferenceContext semanticContext outer)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initial.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (semanticAdmissible :
+      TypeAdmissible semanticContext (outer.apply expected))
+    (invariant : ActiveLocalContextInvariant initial outer semanticContext)
+    (outerExtension : outer.SemanticallyExtends
+      patternState.inference.substitution)
+    (success : Detail.inferMatchPatternFuel fuel inferenceContext patternSource
+      expected initial = .ok (pattern, patternState)) :
+    Nonempty (MatchPatternInferenceCertificate source semanticContext outer
+      expected pattern patternState) := by
+  apply inferMatchPatternFuel_success_sound_of_flat
+    (outerExtension := outerExtension) (success := success)
+  intro result resultExtension flatSuccess
+  exact inferMatchPatternFlatFuel_success_sound validated catalog
+    semanticSignaturesEq rfl branches ready expectedBelow below owner_eq
+    semanticOwner (by simp) semanticAdmissible semanticAdmissible invariant
+    resultExtension flatSuccess
 
 /-- The semantic certificate for one successfully inferred explicit match
 arm.  Pattern inference supplies the substituted pattern typing and the exact
