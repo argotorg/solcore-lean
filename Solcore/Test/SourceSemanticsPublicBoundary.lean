@@ -963,6 +963,7 @@ example := @Solcore.SourceSemantics.Dynamic.StatementsExecute.controlCanFallthro
 example := @Solcore.SourceSemantics.ControlSummary.HasOutcome
 example := @Solcore.SourceSemantics.BodyCompletes.tail_of_cons_of_hasOutcome
 example := @Solcore.SourceSemantics.StatementsHaveType.controlHasOutcome
+example := @Solcore.SourceSemantics.StatementsHaveType.bodyCompletes_of_closed
 example := @Solcore.SourceSemantics.Dynamic.ProgramEntry
 example := @Solcore.SourceSemantics.Dynamic.ProgramEntryValid
 example := @Solcore.SourceSemantics.Dynamic.ProgramEvaluates

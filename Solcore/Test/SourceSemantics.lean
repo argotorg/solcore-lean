@@ -734,6 +734,37 @@ theorem generalizedInitializedLetBodyHasType
     simp [generalizedLetSource] at member
   · simp [BodyCompletes, BodyFacts.singleton, ControlSummary.ordinary]
 
+/-- Closed completion is recovered uniformly from sequence typing and its
+retained result annotation; callers do not need to reconstruct the control
+summary case by case. -/
+theorem generalizedInitializedLetBodyCompletes
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId)
+    (fresh : TypeVarId) (span : Syntax.SourceSpan) :
+    BodyCompletes .unit
+      (.singleton {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      }) := by
+  let source := generalizedLetSource owner fresh span
+  let context := Context.ofSignatures signatures
+  let statement := generalizedLetStatementId owner
+  let final := context.withLocal
+    (generalizedLetBinder owner fresh span).id
+    (generalizedLetBinder owner fresh span).scheme
+  have typing : StatementsHaveType source { returnType := .unit } context
+      [statement] final
+      (.singleton {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      }) := by
+    apply StatementsHaveType.singleton
+    exact generalizedInitializedLetHasType signatures owner fresh span
+  exact typing.bodyCompletes_of_closed rfl rfl
+
 /-- An exact rigid-parameter substitution validates the complete retained
 top-level declaration instantiation. -/
 theorem genericDeclarationReference

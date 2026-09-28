@@ -330,6 +330,587 @@ theorem StatementsHaveType.controlHasOutcome
       exact head_outcome
     · exact tail_outcome fact member
 
+/-- Static control information needed to turn a generated body annotation into
+the closed-body completion contract.  The `sawReturn` field prevents an
+unreachable ordinary path from being reintroduced while composing summaries. -/
+private structure TypingControlShape
+    (loopDepth : Nat) (sawReturn : Bool) (summary : ControlSummary)
+    (fallthroughType : TypeSystem.Ty) : Prop where
+  noBreak : loopDepth = 0 → summary.mayBreak = false
+  noContinue : loopDepth = 0 → summary.mayContinue = false
+  sawReturnStops : sawReturn = true → summary.fallthrough = none
+  fallthroughMatches :
+    summary.fallthrough = none ∨
+      summary.fallthrough = some fallthroughType
+
+private abbrev StatementTypingControlShape
+    (loopDepth : Nat) (facts : StatementFacts) : Prop :=
+  TypingControlShape loopDepth facts.sawReturn facts.control
+    (BodyFacts.singleton facts).type
+
+private abbrev BodyTypingControlShape
+    (loopDepth : Nat) (facts : BodyFacts) : Prop :=
+  TypingControlShape loopDepth facts.sawReturn facts.control facts.type
+
+private theorem TypingControlShape.ordinary
+    (loopDepth : Nat) (type : TypeSystem.Ty) :
+    TypingControlShape loopDepth false (.ordinary type) type := by
+  exact {
+    noBreak := by simp [ControlSummary.ordinary]
+    noContinue := by simp [ControlSummary.ordinary]
+    sawReturnStops := by simp
+    fallthroughMatches := Or.inr rfl
+  }
+
+private theorem TypingControlShape.returned
+    (loopDepth : Nat) (type : TypeSystem.Ty) :
+    TypingControlShape loopDepth true .returned type := by
+  exact {
+    noBreak := by simp [ControlSummary.returned]
+    noContinue := by simp [ControlSummary.returned]
+    sawReturnStops := by simp [ControlSummary.returned]
+    fallthroughMatches := Or.inl rfl
+  }
+
+private theorem TypingControlShape.breaking
+    {loopDepth : Nat} (allowed : 0 < loopDepth) :
+    TypingControlShape loopDepth false .breaking .unit := by
+  exact {
+    noBreak := by
+      intro closed
+      subst loopDepth
+      simp at allowed
+    noContinue := by simp [ControlSummary.breaking]
+    sawReturnStops := by simp
+    fallthroughMatches := Or.inl rfl
+  }
+
+private theorem TypingControlShape.continuing
+    {loopDepth : Nat} (allowed : 0 < loopDepth) :
+    TypingControlShape loopDepth false .continuing .unit := by
+  exact {
+    noBreak := by simp [ControlSummary.continuing]
+    noContinue := by
+      intro closed
+      subst loopDepth
+      simp at allowed
+    sawReturnStops := by simp
+    fallthroughMatches := Or.inl rfl
+  }
+
+private theorem TypingControlShape.sequence
+    {loopDepth : Nat} {head : StatementFacts} {tail : BodyFacts}
+    (headShape : StatementTypingControlShape loopDepth head)
+    (tailShape : BodyTypingControlShape loopDepth tail) :
+    BodyTypingControlShape loopDepth (.cons head tail) := by
+  refine {
+    noBreak := ?_
+    noContinue := ?_
+    sawReturnStops := ?_
+    fallthroughMatches := ?_
+  }
+  · intro closed
+    simp [BodyFacts.cons, ControlSummary.sequence,
+      headShape.noBreak closed, tailShape.noBreak closed]
+  · intro closed
+    simp [BodyFacts.cons, ControlSummary.sequence,
+      headShape.noContinue closed, tailShape.noContinue closed]
+  · intro sawReturn
+    cases headSawReturn : head.sawReturn with
+    | false =>
+        have tailSawReturn : tail.sawReturn = true := by
+          simpa [BodyFacts.cons, headSawReturn] using sawReturn
+        have tailStops := tailShape.sawReturnStops tailSawReturn
+        simp [BodyFacts.cons, ControlSummary.sequence, tailStops]
+    | true =>
+        have headStops := headShape.sawReturnStops headSawReturn
+        simp [BodyFacts.cons, ControlSummary.sequence,
+          ControlSummary.canFallthrough, headStops]
+  · rcases headShape.fallthroughMatches with headStops | headFalls
+    · exact Or.inl (by
+        simp [BodyFacts.cons, ControlSummary.sequence,
+          ControlSummary.canFallthrough, headStops])
+    · rcases tailShape.fallthroughMatches with tailStops | tailFalls
+      · exact Or.inl (by
+          simp [BodyFacts.cons, ControlSummary.sequence,
+            ControlSummary.canFallthrough, headFalls, tailStops])
+      · have headSawReturn : head.sawReturn = false := by
+          cases sawReturn : head.sawReturn with
+          | false => rfl
+          | true =>
+              have stopped := headShape.sawReturnStops sawReturn
+              rw [headFalls] at stopped
+              contradiction
+        have tailSawReturn : tail.sawReturn = false := by
+          cases sawReturn : tail.sawReturn with
+          | false => rfl
+          | true =>
+              have stopped := tailShape.sawReturnStops sawReturn
+              rw [tailFalls] at stopped
+              contradiction
+        exact Or.inr (by
+          simp [BodyFacts.cons, ControlSummary.sequence,
+            ControlSummary.canFallthrough, headFalls, tailFalls,
+            headSawReturn, tailSawReturn])
+
+private theorem TypingControlShape.branches
+    {loopDepth : Nat} {leftSawReturn rightSawReturn : Bool}
+    {left right : ControlSummary} {leftType rightType returnType : TypeSystem.Ty}
+    (leftShape : TypingControlShape loopDepth leftSawReturn left leftType)
+    (rightShape : TypingControlShape loopDepth rightSawReturn right rightType) :
+    TypingControlShape loopDepth (leftSawReturn && rightSawReturn)
+      (left.branches right)
+      (if leftSawReturn && rightSawReturn then returnType else .unit) := by
+  refine {
+    noBreak := ?_
+    noContinue := ?_
+    sawReturnStops := ?_
+    fallthroughMatches := ?_
+  }
+  · intro closed
+    simp [ControlSummary.branches, leftShape.noBreak closed,
+      rightShape.noBreak closed]
+  · intro closed
+    simp [ControlSummary.branches, leftShape.noContinue closed,
+      rightShape.noContinue closed]
+  · intro bothReturn
+    rcases Bool.and_eq_true_iff.mp bothReturn with
+      ⟨leftReturns, rightReturns⟩
+    have leftStops := leftShape.sawReturnStops leftReturns
+    have rightStops := rightShape.sawReturnStops rightReturns
+    simp [ControlSummary.branches, ControlSummary.canFallthrough,
+      leftStops, rightStops]
+  · by_cases bothReturn : (leftSawReturn && rightSawReturn) = true
+    · left
+      rcases Bool.and_eq_true_iff.mp bothReturn with
+        ⟨leftReturns, rightReturns⟩
+      have leftStops := leftShape.sawReturnStops leftReturns
+      have rightStops := rightShape.sawReturnStops rightReturns
+      simp [ControlSummary.branches, ControlSummary.canFallthrough,
+        leftStops, rightStops]
+    · cases falls : left.canFallthrough || right.canFallthrough with
+      | false =>
+          exact Or.inl (by simp [ControlSummary.branches, falls])
+      | true =>
+          exact Or.inr (by
+            simp [ControlSummary.branches, falls, bothReturn])
+
+private theorem TypingControlShape.eraseValue
+    {loopDepth : Nat} {sawReturn : Bool} {summary : ControlSummary}
+    {type : TypeSystem.Ty}
+    (shape : TypingControlShape loopDepth sawReturn summary type) :
+    TypingControlShape loopDepth sawReturn summary.eraseValue
+      (if sawReturn then type else .unit) := by
+  refine {
+    noBreak := ?_
+    noContinue := ?_
+    sawReturnStops := ?_
+    fallthroughMatches := ?_
+  }
+  · intro closed
+    simpa [ControlSummary.eraseValue] using shape.noBreak closed
+  · intro closed
+    simpa [ControlSummary.eraseValue] using shape.noContinue closed
+  · intro sawReturnTrue
+    have stops := shape.sawReturnStops sawReturnTrue
+    simp [ControlSummary.eraseValue, stops]
+  · rcases shape.fallthroughMatches with stops | falls
+    · exact Or.inl (by simp [ControlSummary.eraseValue, stops])
+    · have sawReturnFalse : sawReturn = false := by
+        cases returned : sawReturn with
+        | false => rfl
+        | true =>
+            have stopped := shape.sawReturnStops returned
+            rw [falls] at stopped
+            contradiction
+      exact Or.inr (by
+        simp [ControlSummary.eraseValue, falls, sawReturnFalse])
+
+private theorem TypingControlShape.loop
+    (loopDepth : Nat) (summary : ControlSummary) :
+    TypingControlShape loopDepth false summary.loop .unit := by
+  exact {
+    noBreak := by simp [ControlSummary.loop]
+    noContinue := by simp [ControlSummary.loop]
+    sawReturnStops := by simp
+    fallthroughMatches := Or.inr rfl
+  }
+
+private theorem mergeBodyControls_noBreak
+    {facts : List BodyFacts} {fallback : Option BodyFacts}
+    {summary : ControlSummary}
+    (factsNoBreak : ∀ fact, fact ∈ facts → fact.control.mayBreak = false)
+    (fallbackNoBreak : ∀ fact, fallback = some fact →
+      fact.control.mayBreak = false)
+    (merged : mergeBodyControls facts fallback = some summary) :
+    summary.mayBreak = false := by
+  induction facts generalizing summary with
+  | nil =>
+      cases fallback with
+      | none => simp [mergeBodyControls] at merged
+      | some fact =>
+          simp only [mergeBodyControls, Option.some.injEq] at merged
+          subst summary
+          exact fallbackNoBreak fact rfl
+  | cons head tail induction =>
+      have headNoBreak := factsNoBreak head (by simp)
+      cases tailMerged : mergeBodyControls tail fallback with
+      | none =>
+          simp only [mergeBodyControls, tailMerged, Option.some.injEq] at merged
+          subst summary
+          exact headNoBreak
+      | some tailSummary =>
+          simp only [mergeBodyControls, tailMerged, Option.some.injEq] at merged
+          subst summary
+          have tailNoBreak := induction
+            (fun fact member => factsNoBreak fact (by simp [member]))
+            tailMerged
+          simp [ControlSummary.branches, headNoBreak, tailNoBreak]
+
+private theorem mergeBodyControls_noContinue
+    {facts : List BodyFacts} {fallback : Option BodyFacts}
+    {summary : ControlSummary}
+    (factsNoContinue : ∀ fact, fact ∈ facts →
+      fact.control.mayContinue = false)
+    (fallbackNoContinue : ∀ fact, fallback = some fact →
+      fact.control.mayContinue = false)
+    (merged : mergeBodyControls facts fallback = some summary) :
+    summary.mayContinue = false := by
+  induction facts generalizing summary with
+  | nil =>
+      cases fallback with
+      | none => simp [mergeBodyControls] at merged
+      | some fact =>
+          simp only [mergeBodyControls, Option.some.injEq] at merged
+          subst summary
+          exact fallbackNoContinue fact rfl
+  | cons head tail induction =>
+      have headNoContinue := factsNoContinue head (by simp)
+      cases tailMerged : mergeBodyControls tail fallback with
+      | none =>
+          simp only [mergeBodyControls, tailMerged, Option.some.injEq] at merged
+          subst summary
+          exact headNoContinue
+      | some tailSummary =>
+          simp only [mergeBodyControls, tailMerged, Option.some.injEq] at merged
+          subst summary
+          have tailNoContinue := induction
+            (fun fact member => factsNoContinue fact (by simp [member]))
+            tailMerged
+          simp [ControlSummary.branches, headNoContinue, tailNoContinue]
+
+private theorem mergeBodyControls_noFallthrough
+    {facts : List BodyFacts} {fallback : Option BodyFacts}
+    {summary : ControlSummary}
+    (factsStop : ∀ fact, fact ∈ facts →
+      fact.control.fallthrough = none)
+    (fallbackStops : ∀ fact, fallback = some fact →
+      fact.control.fallthrough = none)
+    (merged : mergeBodyControls facts fallback = some summary) :
+    summary.fallthrough = none := by
+  induction facts generalizing summary with
+  | nil =>
+      cases fallback with
+      | none => simp [mergeBodyControls] at merged
+      | some fact =>
+          simp only [mergeBodyControls, Option.some.injEq] at merged
+          subst summary
+          exact fallbackStops fact rfl
+  | cons head tail induction =>
+      have headStops := factsStop head (by simp)
+      cases tailMerged : mergeBodyControls tail fallback with
+      | none =>
+          simp only [mergeBodyControls, tailMerged, Option.some.injEq] at merged
+          subst summary
+          exact headStops
+      | some tailSummary =>
+          simp only [mergeBodyControls, tailMerged, Option.some.injEq] at merged
+          subst summary
+          have tailStops := induction
+            (fun fact member => factsStop fact (by simp [member]))
+            tailMerged
+          simp [ControlSummary.branches, ControlSummary.canFallthrough,
+            headStops, tailStops]
+
+private theorem bodySawReturn_of_all
+    {facts : List BodyFacts} (allReturn : allBodiesSawReturn facts = true)
+    {fact : BodyFacts} (member : fact ∈ facts) :
+    fact.sawReturn = true := by
+  exact (List.all_eq_true.mp allReturn) fact member
+
+private theorem TypingControlShape.matchWithoutDefault
+    {loopDepth : Nat} {facts : List BodyFacts} {summary : ControlSummary}
+    {returnType : TypeSystem.Ty}
+    (factShapes : ∀ fact, fact ∈ facts →
+      BodyTypingControlShape loopDepth fact)
+    (merged : mergeBodyControls facts none = some summary) :
+    TypingControlShape loopDepth (allBodiesSawReturn facts)
+      summary.eraseValue
+      (if allBodiesSawReturn facts then returnType else .unit) := by
+  refine {
+    noBreak := ?_
+    noContinue := ?_
+    sawReturnStops := ?_
+    fallthroughMatches := ?_
+  }
+  · intro closed
+    apply mergeBodyControls_noBreak
+      (fun fact member => (factShapes fact member).noBreak closed)
+      (fun fact impossible => by simp at impossible) merged
+  · intro closed
+    apply mergeBodyControls_noContinue
+      (fun fact member => (factShapes fact member).noContinue closed)
+      (fun fact impossible => by simp at impossible) merged
+  · intro allReturn
+    have summaryStops := mergeBodyControls_noFallthrough
+      (fun fact member => (factShapes fact member).sawReturnStops
+        (bodySawReturn_of_all allReturn member))
+      (fun fact impossible => by simp at impossible) merged
+    simp [ControlSummary.eraseValue, summaryStops]
+  · by_cases allReturn : allBodiesSawReturn facts = true
+    · left
+      have summaryStops := mergeBodyControls_noFallthrough
+        (fun fact member => (factShapes fact member).sawReturnStops
+          (bodySawReturn_of_all allReturn member))
+        (fun fact impossible => by simp at impossible) merged
+      simp [ControlSummary.eraseValue, summaryStops]
+    · cases summaryFallthrough : summary.fallthrough with
+      | none =>
+          exact Or.inl (by
+            simp [ControlSummary.eraseValue, summaryFallthrough])
+      | some type =>
+          exact Or.inr (by
+            simp [ControlSummary.eraseValue, summaryFallthrough, allReturn])
+
+private theorem TypingControlShape.matchWithDefault
+    {loopDepth : Nat} {facts : List BodyFacts} {fallback : BodyFacts}
+    {summary : ControlSummary} {returnType : TypeSystem.Ty}
+    (factShapes : ∀ fact, fact ∈ facts →
+      BodyTypingControlShape loopDepth fact)
+    (fallbackShape : BodyTypingControlShape loopDepth fallback)
+    (merged : mergeBodyControls facts (some fallback) = some summary) :
+    TypingControlShape loopDepth
+      (allBodiesSawReturn facts && fallback.sawReturn) summary.eraseValue
+      (if allBodiesSawReturn facts && fallback.sawReturn
+        then returnType else .unit) := by
+  refine {
+    noBreak := ?_
+    noContinue := ?_
+    sawReturnStops := ?_
+    fallthroughMatches := ?_
+  }
+  · intro closed
+    apply mergeBodyControls_noBreak
+      (fun fact member => (factShapes fact member).noBreak closed)
+      (fun fact equality => by
+        injection equality with factEq
+        subst fact
+        exact fallbackShape.noBreak closed) merged
+  · intro closed
+    apply mergeBodyControls_noContinue
+      (fun fact member => (factShapes fact member).noContinue closed)
+      (fun fact equality => by
+        injection equality with factEq
+        subst fact
+        exact fallbackShape.noContinue closed) merged
+  · intro allReturn
+    rcases Bool.and_eq_true_iff.mp allReturn with
+      ⟨casesReturn, fallbackReturns⟩
+    have summaryStops := mergeBodyControls_noFallthrough
+      (fun fact member => (factShapes fact member).sawReturnStops
+        (bodySawReturn_of_all casesReturn member))
+      (fun fact equality => by
+        injection equality with factEq
+        subst fact
+        exact fallbackShape.sawReturnStops fallbackReturns) merged
+    simp [ControlSummary.eraseValue, summaryStops]
+  · by_cases allReturn :
+        (allBodiesSawReturn facts && fallback.sawReturn) = true
+    · left
+      rcases Bool.and_eq_true_iff.mp allReturn with
+        ⟨casesReturn, fallbackReturns⟩
+      have summaryStops := mergeBodyControls_noFallthrough
+        (fun fact member => (factShapes fact member).sawReturnStops
+          (bodySawReturn_of_all casesReturn member))
+        (fun fact equality => by
+          injection equality with factEq
+          subst fact
+          exact fallbackShape.sawReturnStops fallbackReturns) merged
+      simp [ControlSummary.eraseValue, summaryStops]
+    · cases summaryFallthrough : summary.fallthrough with
+      | none =>
+          exact Or.inl (by
+            simp [ControlSummary.eraseValue, summaryFallthrough])
+      | some type =>
+          exact Or.inr (by
+            simp [ControlSummary.eraseValue, summaryFallthrough, allReturn])
+
+/-- The control summary and legacy result annotation generated by source
+typing agree, and loop-local transfers cannot escape a depth-zero context. -/
+private theorem StatementsHaveType.controlShape
+    {source : Frontend.SourceInference.TypedSource}
+    {control : ControlContext} {context finalContext : Context}
+    {statements : List Frontend.SourceInference.StatementId}
+    {facts : BodyFacts}
+    (typing : StatementsHaveType source control context statements finalContext
+      facts) :
+    BodyTypingControlShape control.loopDepth facts := by
+  apply StatementsHaveType.rec (source := source) (t := typing)
+    (motive_1 := fun _ _ _ _ => True)
+    (motive_2 := fun _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ => True)
+    (motive_4 := fun _ _ _ _ _ => True)
+    (motive_5 := fun _ _ _ _ => True)
+    (motive_6 := fun _ _ _ _ _ => True)
+    (motive_7 := fun _ _ _ => True)
+    (motive_8 := fun control _ _ _ facts _ =>
+      StatementTypingControlShape control.loopDepth facts)
+    (motive_9 := fun control _ _ _ facts _ =>
+      BodyTypingControlShape control.loopDepth facts)
+    (motive_10 := fun _ _ _ _ _ => True)
+    (motive_11 := fun _ _ _ _ _ => True)
+    (motive_12 := fun control _ _ _ facts _ =>
+      BodyTypingControlShape control.loopDepth facts)
+    (motive_13 := fun control _ _ _ facts _ =>
+      ∀ fact, fact ∈ facts →
+        BodyTypingControlShape control.loopDepth fact)
+  all_goals try { intros; exact True.intro }
+  case letUninitialized =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.ordinary _ (.unit))
+  case letInitialized =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.ordinary _ (.unit))
+  case letInitializedGeneralized =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.ordinary _ (.unit))
+  case returnUnit =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.returned _ _)
+  case returnValue =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.returned _ _)
+  case expressionValue =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.ordinary _ _)
+  case expressionDiscard =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.ordinary _ (.unit))
+  case assignValue =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.ordinary _ (.unit))
+  case assignBitNot =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.ordinary _ (.unit))
+  case ifWithoutElse =>
+    intros
+    have combined := TypingControlShape.branches (returnType := .unit)
+      (by assumption)
+      (TypingControlShape.ordinary _ (.unit))
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using combined
+  case ifWithElse =>
+    intros
+    simp only [StatementTypingControlShape, BodyFacts.singleton,
+      Bool.or_self]
+    apply TypingControlShape.branches <;> assumption
+  case block =>
+    intros
+    simp only [StatementTypingControlShape, BodyFacts.singleton,
+      Bool.or_self]
+    apply TypingControlShape.eraseValue
+    assumption
+  case matchWithoutDefault =>
+    intros
+    simp only [StatementTypingControlShape, BodyFacts.singleton,
+      Bool.or_self]
+    apply TypingControlShape.matchWithoutDefault <;> assumption
+  case matchWithDefault =>
+    intros
+    simp only [StatementTypingControlShape, BodyFacts.singleton,
+      Bool.or_self]
+    apply TypingControlShape.matchWithDefault <;> assumption
+  case forLoop =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.loop _ _)
+  case whileLoop =>
+    intros
+    simpa [StatementTypingControlShape, BodyFacts.singleton] using
+      (TypingControlShape.loop _ _)
+  case breakStmt =>
+    intros
+    simp only [StatementTypingControlShape, BodyFacts.singleton,
+      Bool.false_or]
+    apply TypingControlShape.breaking
+    assumption
+  case continueStmt =>
+    intros
+    simp only [StatementTypingControlShape, BodyFacts.singleton,
+      Bool.false_or]
+    apply TypingControlShape.continuing
+    assumption
+  case nil =>
+    intros
+    simpa [BodyTypingControlShape, BodyFacts.empty] using
+      (TypingControlShape.ordinary _ (.unit))
+  case singleton =>
+    intros
+    assumption
+  case cons =>
+    intros
+    apply TypingControlShape.sequence <;> assumption
+  case intro =>
+    intros
+    assumption
+  case nil =>
+    simp
+  case cons =>
+    intro control' context' scrutineeType matchCase cases headFacts tailFacts
+      head tail headShape tailShapes fact member
+    simp only [List.mem_cons] at member
+    rcases member with equality | member
+    · subst fact
+      exact headShape
+    · exact tailShapes fact member
+
+/-- A typing-generated statement list in a closed control context satisfies
+the declaration-body completion contract as soon as its retained result
+annotation is identified with the expected result type. -/
+theorem StatementsHaveType.bodyCompletes_of_closed
+    {source : Frontend.SourceInference.TypedSource}
+    {control : ControlContext} {context finalContext : Context}
+    {statements : List Frontend.SourceInference.StatementId}
+    {facts : BodyFacts} {expected : TypeSystem.Ty}
+    (typing : StatementsHaveType source control context statements finalContext
+      facts)
+    (closed : control.loopDepth = 0)
+    (type_eq : facts.type = expected) :
+    BodyCompletes expected facts := by
+  have shape := typing.controlShape
+  refine ⟨shape.noBreak closed, shape.noContinue closed, ?_⟩
+  rcases shape.fallthroughMatches with stops | falls
+  · left
+    refine ⟨stops, ?_⟩
+    rcases typing.controlHasOutcome with
+      fallsThrough | returns | breaks | continues
+    · simp [ControlSummary.canFallthrough, stops] at fallsThrough
+    · exact returns
+    · rw [shape.noBreak closed] at breaks
+      contradiction
+    · rw [shape.noContinue closed] at continues
+      contradiction
+  · right
+    simpa [type_eq] using falls
+
 end Solcore.SourceSemantics
 
 /-!
