@@ -223,6 +223,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedInitialized_facts
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedInitialized_sound
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_expression_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithoutElse_facts

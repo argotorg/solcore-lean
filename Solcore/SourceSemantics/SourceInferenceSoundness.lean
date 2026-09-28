@@ -2321,6 +2321,177 @@ theorem inferStatementFuel_success_letAnnotatedInitialized_facts
             rfl,
             recordNode_containsStatement binding.2 _ roots⟩
 
+/-- The complete annotated-initialized branch is compositional modulo the
+recursive typing theorem for its initializer.  All remaining obligations are
+discharged from inference readiness, expected-type coherence, closed source
+annotation formation, stable-local preservation, and the exact executable
+branch inversion. -/
+theorem inferStatementFuel_success_letAnnotatedInitialized_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {sourceType : Syntax.TypeExpr} {initializer : Syntax.Expr}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .letDecl name (some sourceType) (some initializer))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (parameters_eq : target.typeParameters = inferenceContext.typeParameters)
+    (declaration_eq : target.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (ready : initial.InferenceReady)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (below : initial.LocalBindersBelowNextLocal)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (initializerSound :
+      ∀ {expected : TypeSystem.Ty} {inferred : InferredExpression}
+        {initializerState : Frontend.SourceInference.State},
+        Detail.resolveSourceType inferenceContext sourceType = .ok expected →
+        Detail.inferExprFuel fuel inferenceContext initializer (some expected)
+            allocated = .ok (inferred, initializerState) →
+        ExpressionHasType
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          target inferred.id (outer.apply inferred.type)) :
+    ∃ finalContext facts,
+      ActiveLocalContextInvariant result.state outer finalContext ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id finalContext facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+    have preserved :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+        initial below
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [finalEq] at preserved
+    exact preserved
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [finalEq] at preserved
+    exact preserved
+  obtain ⟨resolvedType, inferred, initializerState, locals, valueType,
+      generalized, binding, resolution, initializerSuccess, _, valueTypeEq,
+      generalizedEq, bindingEq, resultEq, contains⟩ :=
+    inferStatementFuel_success_letAnnotatedInitialized_facts statementEq
+      allocationEq success roots
+  have initializerProperties :=
+    Detail.inferExprFuel_inferenceProperties allocatedReady
+      signatureFormation functionsCanonical (by
+        intro expectedType member
+        simp only [Option.mem_def] at member
+        injection member with typeEq
+        subst expectedType
+        exact Detail.resolveSourceType_success_variablesBelow resolution _)
+      initializerSuccess
+  have initializerInvariant :
+      ActiveLocalContextInvariant initializerState outer target :=
+    allocatedInvariant.inferExprFuel initializerSuccess
+  have initializerBelow : initializerState.LocalBindersBelowNextLocal :=
+    Detail.inferExprFuel_preserves_localBindersBelowNextLocal allocatedBelow
+      initializerSuccess
+  have initializerTyping := initializerSound resolution initializerSuccess
+  subst result
+  have bindingStateEq :
+      ((initializerState.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements).2 = binding.2 :=
+    congrArg Prod.snd bindingEq
+  have bindingInferenceEq :
+      binding.2.inference = initializerState.inference := by
+    rw [← bindingStateEq]
+    rfl
+  have initializerExtension : outer.SemanticallyExtends
+      initializerState.inference.substitution := by
+    change outer.SemanticallyExtends
+      binding.2.inference.substitution at outerExtension
+    rw [bindingInferenceEq] at outerExtension
+    exact outerExtension
+  have rawExpected :
+      initializerState.resolve inferred.type =
+        initializerState.resolve resolvedType :=
+    inferExprFuel_success_expected_type_afterProgress initializerSuccess
+      (Frontend.SourceInference.State.InferenceProgress.refl
+        initializerProperties.2.1.solved)
+  have resolvedValueTypeEq :
+      valueType = initializerState.resolve resolvedType :=
+    valueTypeEq.trans rawExpected
+  let finalContext := target.withLocal binding.1.id
+    (binding.1.applySubstitution outer).scheme
+    (binding.1.applySubstitution outer).schemeRequirements
+  have bindingInvariant : ActiveLocalContextInvariant binding.2 outer
+      finalContext := by
+    exact
+      resolvedAnnotationBinderPreservesActiveLocalContextInvariant_afterSubstitution
+        resolution resolvedValueTypeEq generalizedEq bindingEq canonical
+        signatures_eq parameters_eq declaration_eq initializerInvariant
+        initializerBelow
+  have recordedInvariant : ActiveLocalContextInvariant
+      (binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 (some inferred.id)
+      })) outer finalContext :=
+    bindingInvariant.recordNode _
+  have sourceOwner :
+      ((binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 (some inferred.id)
+      })).toTypedSource roots).owner = initializerState.owner := by
+    change binding.2.owner = initializerState.owner
+    rw [← bindingStateEq]
+    rfl
+  have typing : StatementHasType
+      (((binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 (some inferred.id)
+      })).toTypedSource roots).applySubstitution outer)
+      control target id finalContext {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+    exact letAnnotatedInitializedStatementHasType_afterSubstitution
+      resolution initializerSuccess valueTypeEq generalizedEq bindingEq
+      contains canonical signatures_eq parameters_eq declaration_eq
+      initializerInvariant.aligned initializerBelow sourceOwner
+      initializerProperties.2.1.solved initializerExtension initializerTyping
+  refine ⟨finalContext, {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    }, recordedInvariant, typing, ?_⟩
+  constructor <;> rfl
+
 /-- A successful expression-statement branch exposes the exact child
 inference and the complete `StatementResult` recorded by the executable
 frontend.  Consequently the retained statement node has exactly the type and
