@@ -199,6 +199,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_expression_facts
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithoutElse_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithElse_facts
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.expressionStatementDiscardHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.expressionStatementValueHasType_afterSubstitution

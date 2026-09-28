@@ -1692,6 +1692,150 @@ theorem inferStatementFuel_success_expression_facts
       exact ⟨inferred, expressionState, rfl, rfl,
         recordNode_containsStatement expressionState _ roots⟩
 
+/-- A successful `if` without an `else` exposes condition inference, checking of
+the then-body, restoration of the condition state's lexical scope, and the
+canonical unit statement recorded after that restoration. -/
+theorem inferStatementFuel_success_ifWithoutElse_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {thenBody : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .ifThen condition thenBody none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ inferredCondition conditionState thenResult,
+      Detail.inferExprFuel fuel context condition (some .bool) allocated =
+        .ok (inferredCondition, conditionState) ∧
+      Detail.inferStatementsFuel fuel context thenBody.value expectedReturn
+        conditionState = .ok thenResult ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state :=
+          (thenResult.state.restoreLexicalScope
+            conditionState.lexicalScope).recordNode (.statement {
+              id
+              span := statement.span
+              type := .unit
+              form := .ifThen inferredCondition.id thenResult.statements none
+            })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .ifThen inferredCondition.id thenResult.statements none
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases conditionSuccess : Detail.inferExprFuel fuel context condition
+      (some .bool) allocated with
+  | error error =>
+      simp [conditionSuccess] at success
+  | ok conditionPair =>
+      rcases conditionPair with ⟨inferredCondition, conditionState⟩
+      simp only [conditionSuccess] at success
+      cases thenSuccess : Detail.inferStatementsFuel fuel context thenBody.value
+          expectedReturn conditionState with
+      | error error =>
+          simp [thenSuccess] at success
+      | ok thenResult =>
+          simp only [thenSuccess, pure, Pure.pure, Except.pure] at success
+          injection success with resultEq
+          rw [← resultEq]
+          exact ⟨inferredCondition, conditionState, thenResult,
+            rfl, thenSuccess, rfl,
+            recordNode_containsStatement
+              (thenResult.state.restoreLexicalScope conditionState.lexicalScope)
+              _ roots⟩
+
+/-- A successful `if` with an `else` exposes both branch traversals in their
+exact executable order.  The else branch starts from the restored then-state,
+and the retained statement is recorded only after the else scope is restored. -/
+theorem inferStatementFuel_success_ifWithElse_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {thenBody elseBody : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .ifThen condition thenBody (some elseBody))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ inferredCondition conditionState thenResult elseResult,
+      Detail.inferExprFuel fuel context condition (some .bool) allocated =
+        .ok (inferredCondition, conditionState) ∧
+      Detail.inferStatementsFuel fuel context thenBody.value expectedReturn
+        conditionState = .ok thenResult ∧
+      Detail.inferStatementsFuel fuel context elseBody.value expectedReturn
+        (thenResult.state.restoreLexicalScope conditionState.lexicalScope) =
+          .ok elseResult ∧
+      result = {
+        id
+        type := if thenResult.sawReturn && elseResult.sawReturn then
+          elseResult.state.resolve expectedReturn
+        else
+          .unit
+        hasValue := thenResult.sawReturn && elseResult.sawReturn
+        sawReturn := thenResult.sawReturn && elseResult.sawReturn
+        state :=
+          (elseResult.state.restoreLexicalScope
+            conditionState.lexicalScope).recordNode (.statement {
+              id
+              span := statement.span
+              type := if thenResult.sawReturn && elseResult.sawReturn then
+                elseResult.state.resolve expectedReturn
+              else
+                .unit
+              form := .ifThen inferredCondition.id thenResult.statements
+                (some elseResult.statements)
+            })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .ifThen inferredCondition.id thenResult.statements
+          (some elseResult.statements)
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases conditionSuccess : Detail.inferExprFuel fuel context condition
+      (some .bool) allocated with
+  | error error =>
+      simp [conditionSuccess] at success
+  | ok conditionPair =>
+      rcases conditionPair with ⟨inferredCondition, conditionState⟩
+      simp only [conditionSuccess] at success
+      cases thenSuccess : Detail.inferStatementsFuel fuel context thenBody.value
+          expectedReturn conditionState with
+      | error error =>
+          simp [thenSuccess] at success
+      | ok thenResult =>
+          simp only [thenSuccess] at success
+          cases elseSuccess : Detail.inferStatementsFuel fuel context
+              elseBody.value expectedReturn
+              (thenResult.state.restoreLexicalScope
+                conditionState.lexicalScope) with
+          | error error =>
+              simp [elseSuccess] at success
+          | ok elseResult =>
+              simp only [elseSuccess, pure, Pure.pure, Except.pure] at success
+              injection success with resultEq
+              rw [← resultEq]
+              exact ⟨inferredCondition, conditionState, thenResult, elseResult,
+                rfl, thenSuccess, elseSuccess, rfl,
+                recordNode_containsStatement
+                  (elseResult.state.restoreLexicalScope
+                    conditionState.lexicalScope) _ roots⟩
+
 /-- A successful bare-return branch exposes the exact unification which makes
 the declared return type unit, together with the statement node recorded after
 that unification. -/
