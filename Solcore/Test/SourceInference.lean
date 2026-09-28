@@ -331,6 +331,45 @@ private def numericPatternState : SourceInference.State := {
   unificationProgressInput with integerPatterns := [numericPatternOrigin]
 }
 
+private def numericPatternOutOfBoundsState : SourceInference.State := {
+  numericPatternState with
+  inference := { numericPatternState.inference with next := 0 }
+}
+
+private def numericLiteralOutOfBoundsOrigin :
+    SourceInference.IntegerLiteralOrigin := {
+  metavariable := ⟨1⟩
+  expression := ⟨⟨solverRegressionOwner, 0⟩⟩
+  requirement := ⟨0⟩
+}
+
+private def numericLiteralOutOfBoundsState : SourceInference.State := {
+  unificationProgressInput with
+  integerLiterals := [numericLiteralOutOfBoundsOrigin]
+}
+
+/-- The executable numeric-origin guard accepts an allocated pattern target. -/
+example :
+    SourceInference.Detail.validateNumericOriginsBelowNext
+        numericPatternState = .ok () := by
+  rfl
+
+/-- The guard reports the exact first pattern metavariable at the allocator
+boundary instead of passing malformed state to defaulting. -/
+example :
+    SourceInference.Detail.validateNumericOriginsBelowNext
+        numericPatternOutOfBoundsState =
+      .error (.numericOriginOutOfBounds numericPatternOrigin.metavariable 0) := by
+  rfl
+
+/-- Literal origins are checked after patterns by the same allocator guard. -/
+example :
+    SourceInference.Detail.validateNumericOriginsBelowNext
+        numericLiteralOutOfBoundsState =
+      .error (.numericOriginOutOfBounds
+        numericLiteralOutOfBoundsOrigin.metavariable 1) := by
+  rfl
+
 private def numericPatternResult : SourceInference.State := {
   numericPatternState with inference := unificationProgressResult.inference
 }
@@ -346,10 +385,8 @@ private theorem numericPatternState_ready :
 
 private theorem numericPatternState_originsBelow :
     numericPatternState.NumericOriginsBelowNext := by
-  simp [SourceInference.State.NumericOriginsBelowNext, numericPatternState,
-    numericPatternOrigin, unificationProgressInput,
-    SourceInference.State.initial, SourceInference.State.fresh,
-    TypeSystem.InferState.fresh]
+  exact
+    SourceInference.Detail.validateNumericOriginsBelowNext_success (by rfl)
 
 private theorem numericPatternDefault_success :
     SourceInference.Detail.defaultIntegerPatternTarget numericPatternState

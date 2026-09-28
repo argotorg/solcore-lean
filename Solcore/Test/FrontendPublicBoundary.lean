@@ -844,6 +844,10 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceForest
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceGraph
 example :=
+  @Solcore.Frontend.SourceInference.Detail.validateNumericOriginsBelow
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateNumericOriginsBelowNext
+example :=
   @Solcore.Frontend.SourceInference.Detail.sourceContainsNodeId_eq_true_iff
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateOccurrenceTable_success_nodesOwned
@@ -919,6 +923,12 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.defaultIntegerLiteralTarget_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.defaultIntegerLiteralTargets_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateNumericOriginsBelowNext_success
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateNumericOriginsBelowNext
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_numericOriginsBelowNext
 example :=
   @Solcore.Frontend.SourceInference.Detail.FinalizeSuccessWitness
 example :=

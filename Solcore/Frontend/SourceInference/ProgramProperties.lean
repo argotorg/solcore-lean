@@ -1579,6 +1579,71 @@ private theorem defaultIntegerLiteralTargets_toTypedSource
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_toTypedSource headResult)
 
+private theorem validateNumericOriginsBelow_success
+    {α : Type} {next : Nat} {metavariable : α → TypeVarId}
+    {origins : List α}
+    (success : validateNumericOriginsBelow next metavariable origins = .ok ()) :
+    ∀ origin ∈ origins, (metavariable origin).index < next := by
+  induction origins with
+  | nil => simp
+  | cons head tail induction =>
+      by_cases below : (metavariable head).index < next
+      · have tailSuccess :
+            validateNumericOriginsBelow next metavariable tail = .ok () := by
+          simpa [validateNumericOriginsBelow, below] using success
+        intro origin member
+        rcases List.mem_cons.mp member with rfl | member
+        · exact below
+        · exact induction tailSuccess origin member
+      · simp [validateNumericOriginsBelow, below] at success
+
+/-- Successful executable numeric-origin validation establishes the allocator
+bound consumed by the numeric-defaulting preservation lemmas. -/
+theorem validateNumericOriginsBelowNext_success
+    {state : State}
+    (success : validateNumericOriginsBelowNext state = .ok ()) :
+    state.NumericOriginsBelowNext := by
+  unfold validateNumericOriginsBelowNext at success
+  cases patternResult : validateNumericOriginsBelow state.inference.next
+      (fun origin : IntegerPatternOrigin => origin.metavariable)
+      state.integerPatterns with
+  | error error =>
+      simp [patternResult, bind, Except.bind] at success
+  | ok patternValidation =>
+      cases patternValidation
+      have literalResult :
+          validateNumericOriginsBelow state.inference.next
+              (fun origin : IntegerLiteralOrigin => origin.metavariable)
+              state.integerLiterals = .ok () := by
+        simpa [patternResult, bind, Except.bind] using success
+      exact ⟨validateNumericOriginsBelow_success patternResult,
+        validateNumericOriginsBelow_success literalResult⟩
+
+/-- A successful finalization necessarily passes its leading numeric-origin
+allocator validation. -/
+theorem finalize_validateNumericOriginsBelowNext
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    validateNumericOriginsBelowNext state = .ok () := by
+  unfold finalize at success
+  cases validation : validateNumericOriginsBelowNext state with
+  | error error =>
+      simp [validation, bind, Except.bind] at success
+  | ok validated =>
+      cases validated
+      rfl
+
+/-- Finalization success is a self-contained certificate that every retained
+numeric origin lies below the input inference allocator. -/
+theorem finalize_numericOriginsBelowNext
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    state.NumericOriginsBelowNext :=
+  validateNumericOriginsBelowNext_success
+    (finalize_validateNumericOriginsBelowNext success)
+
 /-- The complete successful execution trace of `finalize`.
 
 Keeping the intermediate states and their exact equations together gives
@@ -1634,7 +1699,10 @@ def finalize_success_witness
     {roots : List NodeId} {result : Result}
     (success : finalize context type state roots = .ok result) :
     FinalizeSuccessWitness context type state roots result := by
+  have numericOriginsValidation :=
+    finalize_validateNumericOriginsBelowNext success
   unfold finalize at success
+  simp only [numericOriginsValidation] at success
   have graphValidation :
       validateSourceGraph (state.toTypedSource roots) = .ok () := by
     cases graphResult : validateSourceGraph (state.toTypedSource roots) with
@@ -1771,19 +1839,20 @@ def finalize_success_witness
                                     result_eq := rfl
                                   }
 
-/-- Numeric-origin allocator safety lets finalization compose both defaulting
-passes as ordinary semantic inference progress.  The existential final state
-is the internal state whose substitution is exposed by the public result. -/
+/-- Finalization validates numeric-origin allocator safety before composing
+both defaulting passes as ordinary semantic inference progress.  The
+existential final state is the internal state whose substitution is exposed by
+the public result. -/
 theorem finalize_inferenceProperties
     {context : Context} {type : Ty} {state : State}
     {roots : List NodeId} {result : Result}
     (ready : state.InferenceReady)
-    (originsBelow : state.NumericOriginsBelowNext)
     (success : finalize context type state roots = .ok result) :
     ∃ finalState,
       state.InferenceProgress finalState ∧
         finalState.InferenceReady ∧
         result.substitution = finalState.inference.substitution := by
+  have originsBelow := finalize_numericOriginsBelowNext success
   obtain ⟨patternState, finalState, _, _, _, _, _, patternDefault,
       literalDefault, _, _, _, _, _, resultEq⟩ :=
     finalize_success_witness success
@@ -1807,18 +1876,17 @@ theorem finalize_inferenceProperties
   exact ⟨finalState, patternProperties.1.trans literalProperties.1,
     literalProperties.2, rfl⟩
 
-/-- Under the same allocator-safety premise, the substitution returned by
-finalization is solved below the allocator of its hidden final state.  This is
-the public certificate needed by later final-result soundness proofs. -/
+/-- The substitution returned by successful finalization is solved below the
+allocator of its hidden final state.  The leading executable validation makes
+the required numeric-origin bound internal to finalization. -/
 theorem finalize_substitution_solvedBelow
     {context : Context} {type : Ty} {state : State}
     {roots : List NodeId} {result : Result}
     (ready : state.InferenceReady)
-    (originsBelow : state.NumericOriginsBelowNext)
     (success : finalize context type state roots = .ok result) :
     ∃ next, result.substitution.SolvedBelow next := by
   obtain ⟨finalState, _, finalReady, substitutionEq⟩ :=
-    finalize_inferenceProperties ready originsBelow success
+    finalize_inferenceProperties ready success
   refine ⟨finalState.inference.next, ?_⟩
   rw [substitutionEq]
   exact finalReady.solved

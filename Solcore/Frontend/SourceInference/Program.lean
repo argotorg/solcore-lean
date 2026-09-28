@@ -252,6 +252,27 @@ def validateSourceGraph (source : TypedSource) : Except Error Unit := do
   validateSourceChildren source
   validateSourceForest source
 
+/-- Validate that every retained origin names a metavariable already allocated
+by the supplied inference counter. -/
+def validateNumericOriginsBelow {α : Type} (next : Nat)
+    (metavariable : α → TypeVarId) : List α → Except Error Unit
+  | [] => .ok ()
+  | origin :: rest =>
+      let metavariableId := metavariable origin
+      if metavariableId.index < next then
+        validateNumericOriginsBelow next metavariable rest
+      else
+        .error (.numericOriginOutOfBounds metavariableId next)
+
+/-- Validate the allocator bound required by both numeric-defaulting passes. -/
+def validateNumericOriginsBelowNext (state : State) : Except Error Unit := do
+  validateNumericOriginsBelow state.inference.next
+    (fun origin : IntegerPatternOrigin => origin.metavariable)
+    state.integerPatterns
+  validateNumericOriginsBelow state.inference.next
+    (fun origin : IntegerLiteralOrigin => origin.metavariable)
+    state.integerLiterals
+
 def defaultIntegerPatternTarget (state : State)
     (origin : IntegerPatternOrigin) : Except Error State :=
   match state.resolve (.variable origin.metavariable) with
@@ -358,6 +379,7 @@ def validateIntegerLiteralLedger (state : State) : Except Error Unit :=
 def finalize (context : Context) (type : Ty) (state : State)
     (roots : List NodeId) :
     Except Error Result := do
+  validateNumericOriginsBelowNext state
   validateSourceGraph (state.toTypedSource roots)
   validateSourceLocalIdentities (state.toTypedSource roots)
   validateSourceTemplateTracking (state.toTypedSource roots) state

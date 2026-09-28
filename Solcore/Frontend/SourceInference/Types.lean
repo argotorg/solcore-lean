@@ -89,6 +89,8 @@ inductive Error where
   | coercionDepthLimit (source target : Ty) (limit : Nat)
   | importVisibility (errors : List ProgramImportError)
   | operatorNotSupported (operator : String) (operand : Ty)
+  | numericOriginOutOfBounds
+      (metavariable : TypeVarId) (next : Nat)
   | unsupportedIntegerLiteralTarget
       (expression : ExpressionId) (type : Ty)
   | missingIntegerLiteralRequirement
