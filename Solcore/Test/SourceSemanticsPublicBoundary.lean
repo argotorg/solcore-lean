@@ -393,7 +393,7 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementInferenceSoundnessCallbacks
 example :=
-  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_sound
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_sound_of_callbacks
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_nil_facts
 example :=
@@ -411,7 +411,7 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate
 example :=
-  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternAndStatementsFuel_success_matchCaseHasType
+  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate.toMatchCaseHasType
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchCasesFuel_success_matchCasesHaveType
 example :=

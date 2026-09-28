@@ -8417,12 +8417,13 @@ structure StatementInferenceSoundnessCallbacks
         MatchExhaustive target (outer.apply scrutinee.type)
           (checked.cases.map (TypedMatchCase.applySubstitution outer)) none
 
-/-- Successful statement inference is sound for the fixed control context
-carried by executable inference.  This theorem is the constructor dispatcher:
-it selects one of the branch wrappers above, while the callback bundle
-contains only recursive semantic obligations which those wrappers deliberately
-leave to their caller. -/
-theorem inferStatementFuel_success_sound
+/-- Conditional statement soundness for the fixed control context carried by
+executable inference.  This theorem is the constructor dispatcher: it selects
+one of the branch wrappers above, while the uniform callback bundle contains
+recursive semantic obligations in the already chosen eventual source.  It
+does not itself discharge the callback bundle or establish child/source
+provenance. -/
+theorem inferStatementFuel_success_sound_of_callbacks
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
     {initial allocated : Frontend.SourceInference.State}
@@ -8859,30 +8860,18 @@ structure MatchCaseInferenceCertificate
     bodyResult.statements finalContext facts
   body_matches : BlockResultMatchesFactsAfterSubstitution outer bodyResult facts
 
-/-- One successful pattern/body pair is a declaratively typed match arm once
-its semantic certificate is available.  The inference premises deliberately
-mirror the callback consumed by
-`inferMatchCasesFuel_success_matchCasesHaveType`, so a certificate producer
-can be installed there without reshaping the successful branch. -/
-theorem inferMatchPatternAndStatementsFuel_success_matchCaseHasType
-    {childFuel : Nat}
-    {inferenceContext : Frontend.SourceInference.Context}
-    {scrutineeType expectedReturn : TypeSystem.Ty}
-    {input patternState : Frontend.SourceInference.State}
+/-- A complete semantic certificate assembles directly into declarative match
+arm typing and executable body-fact agreement.  This is only the final adapter:
+constructing the certificate from successful pattern and body inference is the
+remaining recursive soundness obligation. -/
+theorem MatchCaseInferenceCertificate.toMatchCaseHasType
+    {scrutineeType : TypeSystem.Ty}
+    {patternState : Frontend.SourceInference.State}
     {arm : Syntax.MatchCase} {pattern : TypedMatchPattern}
     {bodyResult : Detail.BlockResult}
     {source : TypedSource} {control : ControlContext}
     {outer : TypeSystem.Substitution}
     {semanticContext : SourceSemantics.Context}
-    (_initialInvariant :
-      ActiveLocalContextInvariant input outer semanticContext)
-    (_patternSuccess :
-      Detail.inferMatchPatternFuel childFuel inferenceContext
-          arm.value.pattern scrutineeType input =
-        .ok (pattern, patternState))
-    (_bodySuccess :
-      Detail.inferStatementsFuel childFuel inferenceContext
-          arm.value.body.value expectedReturn patternState = .ok bodyResult)
     (certificate : MatchCaseInferenceCertificate source control
       semanticContext outer scrutineeType pattern patternState bodyResult) :
     ∃ facts,
