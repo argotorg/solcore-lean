@@ -383,6 +383,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_whileLoop_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementInferenceSoundnessCallbacks
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_sound
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_nil_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_singleton_facts
@@ -396,6 +400,10 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.singleton
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.cons
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternAndStatementsFuel_success_matchCaseHasType
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchCasesFuel_success_matchCasesHaveType
 example :=
