@@ -1226,6 +1226,51 @@ theorem canonicalLocalReferenceExpressionHasType_afterSubstitution
       noCapture next actualUnique actualDisjoint requirements)
     rawAdmissible finalAdmissible path layout
 
+/-- Generalizing a type with no flexible variables is observationally the
+monomorphic scheme for that type.  Since every retained qualified requirement
+must mention a quantified variable, the accompanying requirement row is empty;
+the resulting scheme therefore satisfies exact generalization in every
+semantic context. -/
+theorem generalizeValue_closed_facts
+    (state : Frontend.SourceInference.State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat)
+    (type : TypeSystem.Ty) (context : SourceSemantics.Context)
+    (closed : type.freeVariables = []) :
+    (Detail.generalizeValue state locals requirementStart type).scheme =
+        .mono type ∧
+      (Detail.generalizeValue state locals requirementStart type).requirements =
+        [] ∧
+      SchemeGeneralizes context
+        (Detail.generalizeValue state locals requirementStart type).scheme := by
+  have quantifiedEmpty :
+      (Detail.generalizeValue state locals requirementStart type).scheme.quantified =
+        [] := by
+    rw [Detail.generalizeValue_scheme_quantified, closed]
+    rfl
+  have schemeEq :
+      (Detail.generalizeValue state locals requirementStart type).scheme =
+        .mono type := by
+    generalize schemeDef :
+      (Detail.generalizeValue state locals requirementStart type).scheme =
+        scheme at quantifiedEmpty ⊢
+    cases scheme with
+    | mk quantified body =>
+        change quantified = [] at quantifiedEmpty
+        have bodyEq : body = type := by
+          have bodyValue :=
+            Detail.generalizeValue_scheme_body state locals requirementStart type
+          rw [schemeDef] at bodyValue
+          exact bodyValue
+        cases quantifiedEmpty
+        cases bodyEq
+        rfl
+  refine ⟨schemeEq,
+    Detail.generalizeValue_requirements_empty_of_quantified_eq_nil
+      state locals requirementStart type quantifiedEmpty, ?_⟩
+  rw [schemeEq]
+  unfold SchemeGeneralizes SchemeGeneralizesExcept
+  simp [TypeSystem.Scheme.mono, closed]
+
 /-- Agreement of the executable and declarative generalization barriers on
 the inferred type's candidate variables is enough to recover exact qualified
 rank-one generalization.  Variables outside `type.freeVariables` are

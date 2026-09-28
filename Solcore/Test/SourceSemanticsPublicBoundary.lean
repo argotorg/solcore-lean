@@ -173,6 +173,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.canonicalLocalReferenceExpressionHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.generalizeValue_closed_facts
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.generalizeValue_schemeGeneralizesExcept_of_barrier
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.generalizeValue_binderFormation_afterSubstitution
