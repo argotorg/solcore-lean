@@ -211,6 +211,7 @@ private def reversedLocalEnvironmentState : SourceInference.State := {
   SourceInference.State.initial testOwner with
   localBinders := [templateBinder 0, templateBinder 1]
   nextLocal := 2
+  localSchemeAssumptions := [templateId]
 }
 
 private def reversedLocalEnvironmentContext : SourceSemantics.Context :=
