@@ -869,6 +869,47 @@ example {fuel : Nat} {context : SourceInference.Context}
   exact SourceInference.Detail.inferStatementsFuel_inferenceProperties ready
     validated canonical returnBelow success
 
+/-- Successful function-body checking exposes the body-inference stage and
+its semantic state invariants before return fitting and finalization. -/
+example {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature} {fuel : Nat}
+    {checked : SourceInference.CheckedFunction}
+    (validated : ProgramSignatureFormationValidated signatures)
+    (member : signature ∈ signatures.functions)
+    (canonical : ∀ candidate ∈ signatures.functions,
+      candidate.scheme.body = .function
+        (TypeSystem.Ty.productMany candidate.parameterTypes)
+        (TypeSystem.Ty.productMany candidate.returnTypes))
+    (success : SourceInference.checkFunctionBody environment signatures
+      signature fuel = .ok checked) :
+    ∃ declaration body,
+      environment.declaration? signature.id = some declaration ∧
+        SourceInference.Detail.inferStatementsFuel fuel
+            {
+              environment
+              signatures
+              scope := .ofDeclaration declaration
+              typeParameters := signature.scheme.parameters
+              assumptions := signature.scheme.predicates
+            }
+            signature.source.value.body.value
+            (TypeSystem.Ty.productMany signature.returnTypes)
+            (SourceInference.State.initial declaration.id
+              ((signature.parameterNames.zip signature.parameterTypes).map
+                fun parameter =>
+                  (parameter.1, TypeSystem.Scheme.mono parameter.2))
+              signature.parameterComptime) = .ok body ∧
+          (SourceInference.State.initial declaration.id
+              ((signature.parameterNames.zip signature.parameterTypes).map
+                fun parameter =>
+                  (parameter.1, TypeSystem.Scheme.mono parameter.2))
+              signature.parameterComptime).InferenceProgress body.state ∧
+            body.state.InferenceReady ∧
+              body.type.VariablesBelow body.state.inference.next := by
+  exact SourceInference.checkFunctionBody_success_body_inferenceProperties
+    validated member canonical success
+
 private def solverRegressionRequirement : SourceInference.Requirement := {
   id := ⟨0⟩
   predicate := solverRegressionSource

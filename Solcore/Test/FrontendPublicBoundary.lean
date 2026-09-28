@@ -581,6 +581,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_inputs
+example :=
+  @Solcore.Frontend.SourceInference.checkFunctionBody_success_body_inferenceProperties
 example := @Solcore.Frontend.SourceInference.checkFunctionBody_success_type
 example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_returnComptime
