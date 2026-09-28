@@ -237,6 +237,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.expressionStatementValueHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_expression_sound
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_returnUnit_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_returnValue_facts

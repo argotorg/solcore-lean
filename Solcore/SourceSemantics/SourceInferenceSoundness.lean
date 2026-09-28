@@ -3001,6 +3001,73 @@ theorem expressionStatementValueHasType_afterSubstitution
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl expressionType (by simp [StatementNode.applySubstitution])
 
+/-- A successful expression-statement branch is compositional modulo recursive
+typing of its child expression.  Expression inference preserves lexical
+locals; recording the parent preserves that invariant again, while the
+semicolon flag selects the exact declarative facts and constructor. -/
+theorem inferStatementFuel_success_expression_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expression : Syntax.Expr}
+    {trailingSemicolon : Bool} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .expression expression trailingSemicolon)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (roots : List NodeId := [])
+    (expressionSound :
+      ∀ {inferred : InferredExpression}
+        {expressionState : Frontend.SourceInference.State},
+        Detail.inferExprFuel fuel inferenceContext expression none allocated =
+            .ok (inferred, expressionState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target inferred.id (outer.apply inferred.type)) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨inferred, expressionState, expressionSuccess, resultEq,
+      contains⟩ :=
+    inferStatementFuel_success_expression_facts statementEq allocationEq
+      success roots
+  have expressionInvariant :
+      ActiveLocalContextInvariant expressionState outer target :=
+    allocatedInvariant.inferExprFuel expressionSuccess
+  have expressionTyping := expressionSound expressionSuccess
+  subst result
+  cases trailingSemicolon with
+  | false =>
+      refine ⟨{
+          type := outer.apply inferred.type
+          hasValue := true
+          sawReturn := false
+          control := .ordinary (outer.apply inferred.type)
+        }, expressionInvariant.recordNode _, ?_, ?_⟩
+      · exact expressionStatementValueHasType_afterSubstitution contains
+          expressionTyping
+      · constructor <;> rfl
+  | true =>
+      refine ⟨{
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        }, expressionInvariant.recordNode _, ?_, ?_⟩
+      · exact expressionStatementDiscardHasType_afterSubstitution contains
+          expressionTyping
+      · constructor <;> rfl
+
 /-- A retained bare return is well typed once its local unification result is
 transported through the final substitution. -/
 theorem returnUnitStatementHasType_afterSubstitution
