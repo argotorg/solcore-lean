@@ -321,6 +321,100 @@ private def solverRegressionContext : SourceInference.Context := {
 private def solverRegressionSpan : Syntax.SourceSpan :=
   ⟨⟨.main, "source_inference_solver.sol"⟩, 0, 0⟩
 
+private def noCaptureQuantified : TypeSystem.TypeVarId := ⟨10⟩
+private def noCaptureSourceVariable : TypeSystem.TypeVarId := ⟨11⟩
+
+private def zeroRequirementGenericBinder : SourceInference.TypedBinder := {
+  id := ⟨solverRegressionOwner, 0⟩
+  name := "generic"
+  scheme := {
+    quantified := [noCaptureQuantified]
+    body := .variable noCaptureSourceVariable
+  }
+  schemeRequirements := []
+  span := some solverRegressionSpan
+}
+
+private def noCaptureInitializer : SourceInference.ExpressionNode := {
+  id := ⟨⟨solverRegressionOwner, 0⟩⟩
+  span := solverRegressionSpan
+  type := .variable noCaptureSourceVariable
+  form := .literal (.decimal "0")
+  requirements := []
+}
+
+private def noCaptureStatement : SourceInference.StatementNode := {
+  id := ⟨⟨solverRegressionOwner, 1⟩⟩
+  span := solverRegressionSpan
+  type := .unit
+  form := .letDecl zeroRequirementGenericBinder
+    (some noCaptureInitializer.id)
+}
+
+private def noCaptureSource : SourceInference.TypedSource := {
+  owner := solverRegressionOwner
+  inputs := []
+  roots := [.statement noCaptureStatement.id]
+  nodes := [
+    .expression noCaptureInitializer,
+    .statement noCaptureStatement
+  ]
+}
+
+private def captureSubstitution : TypeSystem.Substitution :=
+  [(noCaptureSourceVariable, .variable noCaptureQuantified)]
+
+private def safeSubstitution : TypeSystem.Substitution :=
+  [(noCaptureSourceVariable, .word)]
+
+/-- The initialized-let inventory includes a generalized binder even when its
+qualified-requirement spine is empty. -/
+example : noCaptureSource.initializedLetBinders =
+    [zeroRequirementGenericBinder] := by
+  rfl
+
+/-- A closed replacement cannot capture the generalized binder. -/
+example :
+    SourceInference.Detail.validateSourceLocalSchemeNoCapture noCaptureSource
+        safeSubstitution = .ok () := by
+  rfl
+
+/-- A forged final substitution whose selected range mentions the protected
+quantifier is rejected even for a zero-requirement generic scheme. -/
+example :
+    SourceInference.Detail.validateSourceLocalSchemeNoCapture noCaptureSource
+        captureSubstitution =
+      .error (.localSchemeInstantiationCapture
+        zeroRequirementGenericBinder.id) := by
+  rfl
+
+/-- Successful executable validation exposes the reusable proof-facing
+binder-local no-capture certificate. -/
+example : SourceInference.Detail.LocalBinderInstantiationNoCapture
+    safeSubstitution zeroRequirementGenericBinder := by
+  exact SourceInference.Detail.validateSourceLocalSchemeNoCapture_success
+    (source := noCaptureSource) (substitution := safeSubstitution) (by rfl)
+    zeroRequirementGenericBinder (by
+      change zeroRequirementGenericBinder ∈ [zeroRequirementGenericBinder]
+      simp)
+
+private def forgedCaptureState : SourceInference.State := {
+  SourceInference.State.initial solverRegressionOwner with
+  inference := { next := 12, substitution := captureSubstitution }
+  nextLocal := 1
+  nextOccurrence := 2
+  nodes := noCaptureSource.nodes
+}
+
+/-- Finalization runs capture validation after defaulting and before exposing
+the substituted source or invoking requirement solving. -/
+example :
+    SourceInference.Detail.finalize solverRegressionContext .unit
+        forgedCaptureState noCaptureSource.roots =
+      .error (.localSchemeInstantiationCapture
+        zeroRequirementGenericBinder.id) := by
+  rfl
+
 private def numericPatternOrigin : SourceInference.IntegerPatternOrigin := {
   metavariable := ⟨0⟩
   span := solverRegressionSpan

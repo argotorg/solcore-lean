@@ -252,6 +252,51 @@ def validateSourceGraph (source : TypedSource) : Except Error Unit := do
   validateSourceChildren source
   validateSourceForest source
 
+/-- Executable first-match range check used to protect one generalized local
+scheme from capture by the final inference substitution.  Only substitution
+entries selected by variables occurring in `type` are relevant. -/
+def substitutionRangeAvoidsVariablesOn (substitution : Substitution)
+    (protectedVariables : List TypeVarId) (type : Ty) : Bool :=
+  type.freeVariables.all fun sourceVariable =>
+    match substitution.lookup? sourceVariable with
+    | none => true
+    | some replacement =>
+        replacement.freeVariables.all fun rangeVariable =>
+          !protectedVariables.contains rangeVariable
+
+/-- Decidable binder-local side condition needed to commute final inference
+substitution through a fresh instantiation of a generalized local scheme. -/
+def localBinderInstantiationNoCapture (substitution : Substitution)
+    (binder : TypedBinder) : Bool :=
+  (binder.scheme.quantified.all fun metavariable =>
+      !substitution.domain.contains metavariable) &&
+    substitutionRangeAvoidsVariablesOn substitution binder.scheme.quantified
+      binder.scheme.body &&
+    (binder.schemeRequirements.all fun requirement =>
+      substitutionRangeAvoidsVariablesOn substitution binder.scheme.quantified
+          requirement.predicate.subject &&
+        requirement.predicate.arguments.all fun argument =>
+          substitutionRangeAvoidsVariablesOn substitution
+            binder.scheme.quantified argument)
+
+/-- Reject the first initialized local scheme whose quantified binders could
+be captured by the final substitution. -/
+def validateLocalSchemeBindersNoCapture (substitution : Substitution) :
+    List TypedBinder → Except Error Unit
+  | [] => .ok ()
+  | binder :: rest =>
+      if localBinderInstantiationNoCapture substitution binder then
+        validateLocalSchemeBindersNoCapture substitution rest
+      else
+        .error (.localSchemeInstantiationCapture binder.id)
+
+/-- Validate every initialized local scheme retained by a typed source.  The
+inventory includes generalized binders with an empty qualified-predicate
+spine. -/
+def validateSourceLocalSchemeNoCapture (source : TypedSource)
+    (substitution : Substitution) : Except Error Unit :=
+  validateLocalSchemeBindersNoCapture substitution source.initializedLetBinders
+
 /-- Validate that every retained origin names a metavariable already allocated
 by the supplied inference counter. -/
 def validateNumericOriginsBelow {α : Type} (next : Nat)
@@ -391,6 +436,7 @@ def finalize (context : Context) (type : Ty) (state : State)
   validateSourceRequirementOwnership (state.toTypedSource roots)
     state.requirements
   let substitution := state.inference.substitution
+  validateSourceLocalSchemeNoCapture (state.toTypedSource roots) substitution
   let typedSource := (state.toTypedSource roots).applySubstitution substitution
   validateSourceTemplateScopes typedSource state
   let solvedRequirements ← solveRequirements context state state.requirements

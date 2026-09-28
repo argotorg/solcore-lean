@@ -788,6 +788,10 @@ example := @Solcore.Frontend.SourceInference.ExpressionForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.StatementForm.definedLocalIds
 example := @Solcore.Frontend.SourceInference.Node.definedLocalIds
 example := @Solcore.Frontend.SourceInference.TypedSource.definedLocalIds
+example := @Solcore.Frontend.SourceInference.ForItemForm.initializedLetBinders
+example := @Solcore.Frontend.SourceInference.StatementForm.initializedLetBinders
+example := @Solcore.Frontend.SourceInference.Node.initializedLetBinders
+example := @Solcore.Frontend.SourceInference.TypedSource.initializedLetBinders
 example := @Solcore.Frontend.SourceInference.ForItemForm.localSchemeTemplateSites
 example := @Solcore.Frontend.SourceInference.StatementForm.localSchemeTemplateSites
 example := @Solcore.Frontend.SourceInference.Node.localSchemeTemplateSites
@@ -844,6 +848,14 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceForest
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceGraph
 example :=
+  @Solcore.Frontend.SourceInference.Detail.substitutionRangeAvoidsVariablesOn
+example :=
+  @Solcore.Frontend.SourceInference.Detail.localBinderInstantiationNoCapture
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateLocalSchemeBindersNoCapture
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceLocalSchemeNoCapture
+example :=
   @Solcore.Frontend.SourceInference.Detail.validateNumericOriginsBelow
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateNumericOriginsBelowNext
@@ -893,6 +905,14 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_incomingNodeIds_nodup
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_allNodesReached
+example :=
+  @Solcore.Frontend.SourceInference.Detail.LocalBinderInstantiationNoCapture
+example :=
+  @Solcore.Frontend.SourceInference.Detail.substitutionRangeAvoidsVariablesOn_eq_true_iff
+example :=
+  @Solcore.Frontend.SourceInference.Detail.localBinderInstantiationNoCapture_eq_true_iff
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceLocalSchemeNoCapture_success
 example :=
   @Solcore.Frontend.SourceInference.Detail.supportedIntegerTarget_eq_true_iff
 example :=
@@ -944,6 +964,10 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceLocalIdentities
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceTemplateTracking
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceLocalSchemeNoCapture
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_localBinderInstantiationNoCapture
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceRequirementOwnership
 example :=

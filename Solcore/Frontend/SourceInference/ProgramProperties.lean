@@ -812,6 +812,140 @@ theorem validateSourceGraph_success_allNodesReached
   validateSourceForest_success_allNodesReached
     (validateSourceGraph_success_witness success).forest
 
+/-- The proof-facing binder-local form of the executable capture check.  It
+contains exactly the freshness and relevance-restricted range facts consumed
+by canonical local-scheme instantiation; formation, admissibility, and
+evidence remain separate semantic obligations. -/
+structure LocalBinderInstantiationNoCapture
+    (substitution : Substitution) (binder : TypedBinder) : Prop where
+  quantified_fresh : ∀ metavariable,
+    metavariable ∈ binder.scheme.quantified →
+      metavariable ∉ substitution.domain
+  body_range : substitution.RangeAvoidsVariablesOn
+    binder.scheme.quantified binder.scheme.body
+  requirement_ranges : ∀ requirement,
+    requirement ∈ binder.schemeRequirements →
+      substitution.RangeAvoidsVariablesOn binder.scheme.quantified
+          requirement.predicate.subject ∧
+        ∀ argument, argument ∈ requirement.predicate.arguments →
+          substitution.RangeAvoidsVariablesOn binder.scheme.quantified argument
+
+/-- The finite executable range check is equivalent to the first-match
+relevance-restricted no-capture proposition. -/
+theorem substitutionRangeAvoidsVariablesOn_eq_true_iff
+    (substitution : Substitution) (protectedVariables : List TypeVarId)
+    (type : Ty) :
+    substitutionRangeAvoidsVariablesOn substitution protectedVariables type =
+        true ↔
+      substitution.RangeAvoidsVariablesOn protectedVariables type := by
+  constructor
+  · intro accepted sourceVariable sourceMember replacement found
+      protectedVariable protectedMember
+    have sourceAccepted :=
+      List.all_eq_true.mp accepted sourceVariable sourceMember
+    have rangeAccepted : replacement.freeVariables.all (fun rangeVariable =>
+        !protectedVariables.contains rangeVariable) = true := by
+      simpa only [found] using sourceAccepted
+    have protectedAccepted :=
+      List.all_eq_true.mp rangeAccepted protectedVariable protectedMember
+    simpa using protectedAccepted
+  · intro avoids
+    apply List.all_eq_true.mpr
+    intro sourceVariable sourceMember
+    cases found : substitution.lookup? sourceVariable with
+    | none => rfl
+    | some replacement =>
+        apply List.all_eq_true.mpr
+        intro protectedVariable protectedMember
+        have absent := avoids sourceVariable sourceMember replacement found
+          protectedVariable protectedMember
+        simpa using absent
+
+/-- The aggregate executable binder check recognizes exactly
+`LocalBinderInstantiationNoCapture`. -/
+theorem localBinderInstantiationNoCapture_eq_true_iff
+    (substitution : Substitution) (binder : TypedBinder) :
+    localBinderInstantiationNoCapture substitution binder = true ↔
+      LocalBinderInstantiationNoCapture substitution binder := by
+  constructor
+  · intro accepted
+    rcases Bool.and_eq_true_iff.mp accepted with
+      ⟨bodySideAccepted, requirementsAccepted⟩
+    rcases Bool.and_eq_true_iff.mp bodySideAccepted with
+      ⟨freshAccepted, bodyAccepted⟩
+    constructor
+    · intro metavariable member
+      have absent := List.all_eq_true.mp freshAccepted metavariable member
+      simpa using absent
+    · exact (substitutionRangeAvoidsVariablesOn_eq_true_iff _ _ _).mp
+        bodyAccepted
+    · intro requirement member
+      have requirementAccepted :=
+        List.all_eq_true.mp requirementsAccepted requirement member
+      rcases Bool.and_eq_true_iff.mp requirementAccepted with
+        ⟨subjectAccepted, argumentsAccepted⟩
+      constructor
+      · exact (substitutionRangeAvoidsVariablesOn_eq_true_iff _ _ _).mp
+          subjectAccepted
+      · intro argument argumentMember
+        exact (substitutionRangeAvoidsVariablesOn_eq_true_iff _ _ _).mp
+          (List.all_eq_true.mp argumentsAccepted argument argumentMember)
+  · intro certificate
+    apply Bool.and_eq_true_iff.mpr
+    constructor
+    · apply Bool.and_eq_true_iff.mpr
+      constructor
+      · apply List.all_eq_true.mpr
+        intro metavariable member
+        simpa using certificate.quantified_fresh metavariable member
+      · exact (substitutionRangeAvoidsVariablesOn_eq_true_iff _ _ _).mpr
+          certificate.body_range
+    · apply List.all_eq_true.mpr
+      intro requirement member
+      apply Bool.and_eq_true_iff.mpr
+      constructor
+      · exact (substitutionRangeAvoidsVariablesOn_eq_true_iff _ _ _).mpr
+          (certificate.requirement_ranges requirement member).1
+      · apply List.all_eq_true.mpr
+        intro argument argumentMember
+        exact (substitutionRangeAvoidsVariablesOn_eq_true_iff _ _ _).mpr
+          ((certificate.requirement_ranges requirement member).2 argument
+            argumentMember)
+
+private theorem validateLocalSchemeBindersNoCapture_success
+    {substitution : Substitution} {binders : List TypedBinder}
+    (success : validateLocalSchemeBindersNoCapture substitution binders =
+      .ok ()) :
+    ∀ binder, binder ∈ binders →
+      LocalBinderInstantiationNoCapture substitution binder := by
+  induction binders with
+  | nil => simp
+  | cons head tail induction =>
+      cases accepted : localBinderInstantiationNoCapture substitution head with
+      | false =>
+          simp [validateLocalSchemeBindersNoCapture, accepted] at success
+      | true =>
+          have tailSuccess :
+              validateLocalSchemeBindersNoCapture substitution tail =
+                .ok () := by
+            simpa [validateLocalSchemeBindersNoCapture, accepted] using success
+          intro binder member
+          rcases List.mem_cons.mp member with rfl | member
+          · exact (localBinderInstantiationNoCapture_eq_true_iff _ _).mp
+              accepted
+          · exact induction tailSuccess binder member
+
+/-- Successful whole-source validation supplies the binder-local no-capture
+certificate for every initialized let, including generic binders with no
+qualified requirements. -/
+theorem validateSourceLocalSchemeNoCapture_success
+    {source : TypedSource} {substitution : Substitution}
+    (success : validateSourceLocalSchemeNoCapture source substitution =
+      .ok ()) :
+    ∀ binder, binder ∈ source.initializedLetBinders →
+      LocalBinderInstantiationNoCapture substitution binder := by
+  exact validateLocalSchemeBindersNoCapture_success success
+
 @[simp] theorem supportedIntegerTarget_eq_true_iff
     (type : Ty) :
     supportedIntegerTarget type = true ↔
@@ -1784,24 +1918,26 @@ def finalize_success_witness
                             ownershipResult, bind, Except.bind] at success
                       | ok ownershipValidation =>
                           cases ownershipValidation
-                          cases templateScopeResult :
-                              validateSourceTemplateScopes
-                                ((finalState.toTypedSource roots).applySubstitution
-                                  finalState.inference.substitution)
-                                finalState with
+                          cases captureResult :
+                              validateSourceLocalSchemeNoCapture
+                                (finalState.toTypedSource roots)
+                                finalState.inference.substitution with
                           | error error =>
                               simp [graphValidation, localIdentityValidation,
                                 templateTrackingValidation, ledgerResult,
                                 patternResult, literalResult,
                                 patternValidationResult,
                                 literalValidationResult, ownershipResult,
-                                templateScopeResult, bind, Except.bind]
+                                captureResult, bind, Except.bind]
                                 at success
-                          | ok templateScopeValidation =>
-                              cases templateScopeValidation
-                              cases requirementsResult :
-                                  solveRequirements context finalState
-                                    finalState.requirements with
+                          | ok captureValidation =>
+                              cases captureValidation
+                              cases templateScopeResult :
+                                  validateSourceTemplateScopes
+                                    ((finalState.toTypedSource roots
+                                      ).applySubstitution
+                                        finalState.inference.substitution)
+                                    finalState with
                               | error error =>
                                   simp [graphValidation,
                                     localIdentityValidation,
@@ -1809,35 +1945,57 @@ def finalize_success_witness
                                     patternResult, literalResult,
                                     patternValidationResult,
                                     literalValidationResult, ownershipResult,
-                                    templateScopeResult, requirementsResult,
-                                    bind, Except.bind] at success
-                              | ok requirements =>
-                                  simp [graphValidation,
-                                    localIdentityValidation,
-                                    templateTrackingValidation, ledgerResult,
-                                    patternResult, literalResult,
-                                    patternValidationResult,
-                                    literalValidationResult, ownershipResult,
-                                    templateScopeResult, requirementsResult,
-                                    bind, Except.bind] at success
-                                  cases success
-                                  exact {
-                                    patternState
-                                    finalState
-                                    solvedRequirements := requirements
-                                    graphValidation
-                                    localIdentityValidation
-                                    templateTrackingValidation
-                                    ledgerValidation := ledgerResult
-                                    patternDefault := patternResult
-                                    literalDefault := literalResult
-                                    patternValidation := patternValidationResult
-                                    literalValidation := literalValidationResult
-                                    requirementOwnershipValidation := ownershipResult
-                                    templateScopeValidation := templateScopeResult
-                                    requirementsSolved := requirementsResult
-                                    result_eq := rfl
-                                  }
+                                    captureResult, templateScopeResult, bind,
+                                    Except.bind] at success
+                              | ok templateScopeValidation =>
+                                  cases templateScopeValidation
+                                  cases requirementsResult :
+                                      solveRequirements context finalState
+                                        finalState.requirements with
+                                  | error error =>
+                                      simp [graphValidation,
+                                        localIdentityValidation,
+                                        templateTrackingValidation,
+                                        ledgerResult, patternResult,
+                                        literalResult, patternValidationResult,
+                                        literalValidationResult,
+                                        ownershipResult, captureResult,
+                                        templateScopeResult,
+                                        requirementsResult, bind, Except.bind]
+                                        at success
+                                  | ok requirements =>
+                                      simp [graphValidation,
+                                        localIdentityValidation,
+                                        templateTrackingValidation,
+                                        ledgerResult, patternResult,
+                                        literalResult, patternValidationResult,
+                                        literalValidationResult,
+                                        ownershipResult, captureResult,
+                                        templateScopeResult,
+                                        requirementsResult, bind, Except.bind]
+                                        at success
+                                      cases success
+                                      exact {
+                                        patternState
+                                        finalState
+                                        solvedRequirements := requirements
+                                        graphValidation
+                                        localIdentityValidation
+                                        templateTrackingValidation
+                                        ledgerValidation := ledgerResult
+                                        patternDefault := patternResult
+                                        literalDefault := literalResult
+                                        patternValidation :=
+                                          patternValidationResult
+                                        literalValidation :=
+                                          literalValidationResult
+                                        requirementOwnershipValidation :=
+                                          ownershipResult
+                                        templateScopeValidation :=
+                                          templateScopeResult
+                                        requirementsSolved := requirementsResult
+                                        result_eq := rfl
+                                      }
 
 /-- Finalization validates numeric-origin allocator safety before composing
 both defaulting passes as ordinary semantic inference progress.  The
@@ -1918,6 +2076,74 @@ theorem finalize_validateSourceTemplateTracking
     validateSourceTemplateTracking (state.toTypedSource roots) state =
       .ok () := by
   exact (finalize_success_witness success).templateTrackingValidation
+
+/-- Successful finalization exposes the hidden post-defaulting state at which
+local-scheme capture was checked.  The source carrier is unchanged by both
+defaulting passes and the state's substitution is exactly the public result
+substitution. -/
+theorem finalize_validateSourceLocalSchemeNoCapture
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    ∃ finalState : State,
+      finalState.toTypedSource roots = state.toTypedSource roots ∧
+        result.substitution = finalState.inference.substitution ∧
+        validateSourceLocalSchemeNoCapture
+          (finalState.toTypedSource roots)
+          finalState.inference.substitution = .ok () := by
+  let witness := finalize_success_witness success
+  have sourceEq : witness.finalState.toTypedSource roots =
+      state.toTypedSource roots :=
+    (defaultIntegerLiteralTargets_toTypedSource witness.literalDefault).trans
+      (defaultIntegerPatternTargets_toTypedSource witness.patternDefault)
+  have substitutionEq :
+      result.substitution = witness.finalState.inference.substitution := by
+    exact congrArg Result.substitution witness.result_eq
+  have captureValidation :
+      validateSourceLocalSchemeNoCapture
+          (witness.finalState.toTypedSource roots)
+          witness.finalState.inference.substitution = .ok () := by
+    have pipeline := success
+    have numericValidation := finalize_validateNumericOriginsBelowNext success
+    unfold finalize at pipeline
+    simp only [numericValidation, bind, Except.bind] at pipeline
+    simp only [witness.graphValidation] at pipeline
+    simp only [witness.localIdentityValidation] at pipeline
+    simp only [witness.templateTrackingValidation] at pipeline
+    simp only [witness.ledgerValidation] at pipeline
+    simp only [witness.patternDefault] at pipeline
+    simp only [witness.literalDefault] at pipeline
+    simp only [witness.patternValidation] at pipeline
+    simp only [witness.literalValidation] at pipeline
+    simp only [witness.requirementOwnershipValidation] at pipeline
+    cases validation : validateSourceLocalSchemeNoCapture
+        (witness.finalState.toTypedSource roots)
+        witness.finalState.inference.substitution with
+    | error error =>
+        simp only [validation, reduceCtorEq] at pipeline
+    | ok validated =>
+        cases validated
+        rfl
+  exact ⟨witness.finalState, sourceEq, substitutionEq, captureValidation⟩
+
+/-- Finalization success is a directly usable certificate that every
+initialized binder in the input typed source is protected from capture by the
+returned substitution. -/
+theorem finalize_localBinderInstantiationNoCapture
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    ∀ binder, binder ∈ (state.toTypedSource roots).initializedLetBinders →
+      LocalBinderInstantiationNoCapture result.substitution binder := by
+  obtain ⟨finalState, sourceEq, substitutionEq, validation⟩ :=
+    finalize_validateSourceLocalSchemeNoCapture success
+  intro binder member
+  have finalMember :
+      binder ∈ (finalState.toTypedSource roots).initializedLetBinders := by
+    rw [sourceEq]
+    exact member
+  rw [substitutionEq]
+  exact validateSourceLocalSchemeNoCapture_success validation binder finalMember
 
 /-- Successful finalization establishes the exact primary-to-ledger ownership
 boundary.  Numeric defaulting changes neither the source carrier nor the raw

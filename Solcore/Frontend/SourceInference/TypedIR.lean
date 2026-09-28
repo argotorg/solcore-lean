@@ -864,6 +864,13 @@ def definedLocalIds : ForItemForm → List Resolved.LocalId
   | .letDecl selectedBinder _ => [selectedBinder.id]
   | .expression _ | .assignValue .. | .assignBitNot _ => []
 
+/-- Initialized lexical binders retained directly by one `for` header item.
+This inventory deliberately includes generalized binders with no qualified
+requirements, unlike the template-site inventory below. -/
+def initializedLetBinders : ForItemForm → List TypedBinder
+  | .letDecl binder (some _) => [binder]
+  | .letDecl _ none | .expression _ | .assignValue .. | .assignBitNot _ => []
+
 /-- Qualified-local template identities materialized by an initialized `let`
 in a `for` initializer or post clause.  Uninitialized declarations do not own
 an initializer scope and therefore contribute no templates. -/
@@ -909,6 +916,17 @@ def definedLocalIds : StatementForm → List Resolved.LocalId
         post.flatMap ForItemForm.definedLocalIds
   | .returnStmt _ | .expression .. | .assignValue .. | .assignBitNot _ |
       .ifThen .. | .block _ | .whileLoop .. | .breakStmt | .continueStmt => []
+
+/-- Initialized lexical binders materialized directly by one statement node,
+including initialized lets in `for` initializer and post clauses. -/
+def initializedLetBinders : StatementForm → List TypedBinder
+  | .letDecl binder (some _) => [binder]
+  | .forLoop initializer _ post _ =>
+      initializer.flatMap ForItemForm.initializedLetBinders ++
+        post.flatMap ForItemForm.initializedLetBinders
+  | .letDecl _ none | .returnStmt _ | .expression .. | .assignValue .. |
+      .assignBitNot _ | .ifThen .. | .block _ | .matchWith _ | .whileLoop .. |
+      .breakStmt | .continueStmt => []
 
 /-- Qualified-local template identities materialized directly by initialized
 statement lets, including initialized lets in `for` initializer and post
@@ -992,6 +1010,12 @@ def definedLocalIds : Node → List Resolved.LocalId
   | .expression node => node.form.definedLocalIds
   | .statement node => node.form.definedLocalIds
 
+/-- Initialized lexical binders materialized directly by one heterogeneous
+source node. -/
+def initializedLetBinders : Node → List TypedBinder
+  | .expression _ => []
+  | .statement node => node.form.initializedLetBinders
+
 /-- Qualified-local template identities materialized directly by one
 heterogeneous source node. -/
 def localSchemeTemplateSites : Node → List LocalSchemeTemplateSite
@@ -1032,6 +1056,12 @@ the declarative ownership judgment. -/
 def definedLocalIds (source : TypedSource) : List Resolved.LocalId :=
   source.inputs.map (fun binder => binder.id) ++
     source.nodes.flatMap Node.definedLocalIds
+
+/-- Every initialized lexical binder in node-table order.  The inventory is
+independent of qualified-requirement cardinality so that capture validation
+also covers ordinary generalized values. -/
+def initializedLetBinders (source : TypedSource) : List TypedBinder :=
+  source.nodes.flatMap Node.initializedLetBinders
 
 /-- Stable qualified-local template inventory in node-table and predicate
 order.  Only initialized lexical lets own template requirements. -/

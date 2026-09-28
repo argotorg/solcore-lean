@@ -118,6 +118,7 @@ inductive Error where
   | missingLocalSchemePrimaryRequirement (id : RequirementId)
   | localSchemeTemplateOutOfScope
       (id : RequirementId) (initializer occurrence : NodeId)
+  | localSchemeInstantiationCapture (binder : Resolved.LocalId)
   | missingRoot (root : NodeId)
   | missingChild (parent child : NodeId)
   | duplicateIncomingNode (id : NodeId)
