@@ -352,6 +352,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.TypeAdmissible.transportContext
 example :=
+  @Solcore.SourceSemantics.StructuralSubstitution.SchemeWellFormed.ofLocalSchemeInitializerAdmissible
+example :=
   @Solcore.SourceSemantics.StructuralSubstitution.LocalSchemeRequirementWellFormed.transportContext
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.LocalSchemeRequirementsWellFormed.transportContext
@@ -359,6 +361,8 @@ example :=
   @Solcore.SourceSemantics.StructuralSubstitution.LocalSchemeRequirementWellFormed.afterBinderExtends
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.LocalSchemeRequirementsWellFormed.afterBinderExtends
+example :=
+  @Solcore.SourceSemantics.FlexibleSubstitution.ScopedRequirementLedgerWellFormed.localSchemeRequirementsWellFormed_afterSubstitution
 example :=
   @Solcore.SourceSemantics.StructuralSubstitution.PredicateWellFormed.applyParametersTo
 example :=

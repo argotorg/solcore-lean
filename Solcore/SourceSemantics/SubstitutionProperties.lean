@@ -1327,6 +1327,43 @@ theorem SchemeWellFormed.transportContext
       parameters_eq declaration_eq wellFormed.body
 }
 
+/-- Admissibility of a generalized initializer body supplies the scoped body
+component of its retained rank-1 scheme.  The initializer context orders the
+new quantified variables before the residual occurrence scope, whereas the
+scheme judgment orders them after that scope; `TypeWellScoped` depends only on
+membership, so the two presentations are equivalent. -/
+theorem SchemeWellFormed.ofLocalSchemeInitializerAdmissible
+    {context : Context} {binder : TypedBinder}
+    (admissible : TypeAdmissible
+      (localSchemeInitializerContext context binder) binder.scheme.body)
+    (quantified_nodup : binder.scheme.quantified.Nodup) :
+    SchemeWellFormed context binder.scheme := by
+  refine {
+    binders := ?_
+    quantified_nodup
+    body := ?_
+  }
+  · exact
+      StructuralSubstitution.TypeParameterBindersWellFormed.transportContext
+        (source := localSchemeInitializerContext context binder)
+        (target := context) rfl rfl admissible.binders
+  · have bodyScoped : TypeWellScoped context
+        (admissibleTypeVariables
+          (localSchemeInitializerContext context binder) binder.scheme.body)
+        binder.scheme.body :=
+      StructuralSubstitution.TypeWellScoped.transportContext
+        (source := localSchemeInitializerContext context binder)
+        (target := context) rfl rfl rfl admissible.typeWellScoped
+    apply TypeWellScoped.weakenTo ?_ bodyScoped
+    intro metavariable member
+    simp only [admissibleTypeVariables, localSchemeInitializerContext,
+      Context.withTypeVariables, Context.withAssumptions,
+      List.mem_append] at member ⊢
+    rcases member with (ambient | quantified) | residual
+    · exact .inl (.inl ambient)
+    · exact .inr quantified
+    · exact .inl (.inr residual)
+
 /-- Qualified local-scheme formation is insensitive to lexical and assumption
 fields when the type scopes and solved-requirement ledger agree. -/
 theorem LocalSchemeRequirementWellFormed.transportContext
@@ -9785,6 +9822,69 @@ theorem LocalSchemeRequirementsWellFormed.applySubstitution
       (binder.applySubstitution substitution) := by
   exact LocalSchemeRequirementsWellFormed.applySubstitution_of_fresh closes
     (quantified_fresh_for_closure closes generalizes) wellFormed
+
+/-- A final scoped ledger supplies template identity and evidence formation,
+while an outer context closure transports the raw predicate and quantified
+dependency facts of one generalized local scheme.  This avoids requiring a
+pre-finalization solved ledger merely to form the source requirements. -/
+theorem ScopedRequirementLedgerWellFormed.localSchemeRequirementsWellFormed_afterSubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {sourceContext targetContext : Context} {source : TypedSource}
+    {binder : TypedBinder} {initializer : NodeId}
+    (closes : ContextCloses substitution closedVariables sourceContext
+      targetContext)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ substitution.domain)
+    (ledger : ScopedRequirementLedgerWellFormed targetContext
+      (source.applySubstitution substitution))
+    (contains : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        ContainsLocalSchemeTemplate source {
+          binder := binder
+          initializer := initializer
+          requirement := requirement
+        })
+    (predicates : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        PredicateAdmissible
+          (localSchemeInitializerContext sourceContext binder)
+          requirement.predicate)
+    (depends : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        ∃ metavariable,
+          metavariable ∈ binder.scheme.quantified ∧
+            metavariable ∈
+              TypedTraitResolution.predicateVariables requirement.predicate) :
+    LocalSchemeRequirementsWellFormed targetContext
+      (binder.applySubstitution substitution) := by
+  have restricted_eq :
+      substitution.without binder.scheme.quantified = substitution :=
+    Substitution.without_eq_self_of_disjoint_domain substitution
+      binder.scheme.quantified fresh
+  have initializerCloses := closes.localSchemeInitializer binder fresh
+  apply ledger.localSchemeRequirementsWellFormed
+      (initializer := initializer)
+  · intro requirement member
+    rw [applyTypedBinder_schemeRequirements] at member
+    rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
+    exact ContainsLocalSchemeTemplate.applySubstitution substitution
+      (contains original originalMember)
+  · intro requirement member
+    rw [applyTypedBinder_schemeRequirements] at member
+    rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
+    simpa [LocalSchemeRequirement.applySubstitution, restricted_eq] using
+      (PredicateAdmissible.applySubstitution initializerCloses
+        (predicates original originalMember))
+  · intro requirement member
+    rw [applyTypedBinder_schemeRequirements] at member
+    rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
+    rcases depends original originalMember with
+      ⟨metavariable, quantified, occurs⟩
+    refine ⟨metavariable, by simpa using quantified, ?_⟩
+    simpa [LocalSchemeRequirement.applySubstitution, restricted_eq] using
+      (Substitution.mem_predicateVariables_applySubstitution_of_not_mem_domain
+        substitution (fresh metavariable quantified) occurs)
 
 /-- Mapping an outer flexible substitution over a shared local-scheme
 instantiation commutes with its ordered qualified-predicate spine. -/
