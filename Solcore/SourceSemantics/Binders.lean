@@ -510,6 +510,19 @@ theorem schemes_eq
   | nil => rfl
   | cons scheme_eq _ _ tail_ih => simp [scheme_eq, tail_ih]
 
+/-- A monomorphic binder extension records exactly the supplied body types.
+This static projection is shared by typing inversions and does not depend on
+the dynamic preservation development. -/
+theorem bodyTypes_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder} {types : List TypeSystem.Ty}
+    (extension : MonoBindersExtend owner context binders types final) :
+    binders.map (fun binder => binder.scheme.body) = types := by
+  induction extension with
+  | nil => rfl
+  | cons scheme_eq _ _ tail_ih =>
+      simp [scheme_eq, TypeSystem.Scheme.mono, tail_ih]
+
 end MonoBindersExtend
 
 end Solcore.SourceSemantics

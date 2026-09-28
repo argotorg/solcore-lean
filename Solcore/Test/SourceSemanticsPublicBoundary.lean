@@ -643,6 +643,8 @@ example := @Solcore.SourceSemantics.TypedMatchPatternHasType
 example := @Solcore.SourceSemantics.PlaceHasType
 example := @Solcore.SourceSemantics.ExpressionHasType
 example := @Solcore.SourceSemantics.ExpressionHasType.ofOrdinary
+example :=
+  @Solcore.SourceSemantics.ExpressionHasType.lambda_annotation_of_uncoerced
 example := @Solcore.SourceSemantics.ExpressionsHaveTypes.each_type_admissible
 example := @Solcore.SourceSemantics.ExpressionsHaveTypes.product_type_admissible
 example := @Solcore.SourceSemantics.StatementHasType
@@ -654,6 +656,7 @@ example := @Solcore.SourceSemantics.MonoBindersExtend.locals_eq
 example :=
   @Solcore.SourceSemantics.MonoBindersExtend.localSchemeRequirements_eq
 example := @Solcore.SourceSemantics.MonoBindersExtend.functional
+example := @Solcore.SourceSemantics.MonoBindersExtend.bodyTypes_eq
 example := @Solcore.SourceSemantics.MonoBindersExtend.each_type_admissible
 example := @Solcore.SourceSemantics.MonoBindersExtend.product_type_admissible
 example := @Solcore.SourceSemantics.MonomorphicBinders
@@ -673,6 +676,27 @@ example := @Solcore.SourceSemantics.BodyHasType
 example := @Solcore.SourceSemantics.BodyDefinition
 example := @Solcore.SourceSemantics.BodyDefinitionHasType
 example := @Solcore.SourceSemantics.FunctionDefinition
+
+example
+    {source : Solcore.Frontend.SourceInference.TypedSource}
+    {context : Solcore.SourceSemantics.Context}
+    {id : Solcore.Frontend.SourceInference.ExpressionId}
+    {type : Solcore.TypeSystem.Ty}
+    (unique : Solcore.SourceSemantics.NodeOccurrencesUnique source)
+    (typing : Solcore.SourceSemantics.ExpressionHasType source context id type)
+    {node : Solcore.Frontend.SourceInference.ExpressionNode}
+    (contains : Solcore.SourceSemantics.ContainsExpression source id node)
+    {parameters : List Solcore.Frontend.SourceInference.TypedBinder}
+    {resultType : Solcore.TypeSystem.Ty}
+    {body : List Solcore.Frontend.SourceInference.StatementId}
+    (shape : node.form = .lambda parameters resultType body)
+    (uncoerced : node.coercions = []) :
+    node.type = .function
+      (Solcore.TypeSystem.Ty.productMany
+        (parameters.map (·.scheme.body))) resultType :=
+  Solcore.SourceSemantics.ExpressionHasType.lambda_annotation_of_uncoerced
+    unique typing contains shape uncoerced
+
 example := @Solcore.SourceSemantics.FunctionDefinition.Valid
 example := @Solcore.SourceSemantics.MethodDefinition
 example := @Solcore.SourceSemantics.MethodDefinition.Valid

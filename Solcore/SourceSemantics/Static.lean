@@ -1099,6 +1099,37 @@ theorem requirements_valid
   | @intro _ _ node rawType plan contains _ _ _ _ requirements =>
       exact ⟨node, contains, requirements.requirementsValid⟩
 
+/-- An uncoerced lambda's retained annotation is the function type determined
+by its monomorphic parameter binders and declared result.  Occurrence
+uniqueness aligns an independently selected runtime node with the node carried
+by the declarative typing derivation. -/
+theorem lambda_annotation_of_uncoerced
+    {source : TypedSource} {context : Context}
+    {id : ExpressionId} {type : TypeSystem.Ty}
+    (unique : NodeOccurrencesUnique source)
+    (typing : ExpressionHasType source context id type)
+    {node : ExpressionNode}
+    (contains : ContainsExpression source id node)
+    {parameters : List TypedBinder} {resultType : TypeSystem.Ty}
+    {body : List StatementId}
+    (shape : node.form = .lambda parameters resultType body)
+    (uncoerced : node.coercions = []) :
+    node.type = .function
+      (TypeSystem.Ty.productMany (parameters.map (·.scheme.body)))
+      resultType := by
+  cases typing with
+  | @intro _ _ typedNode rawType plan typedContains formType rawTypeEq _ _ _ =>
+      have typedLookup := lookupExpression?_complete unique typedContains
+      have selectedLookup := lookupExpression?_complete unique contains
+      rw [typedLookup] at selectedLookup
+      have typedNodeEq : typedNode = node := Option.some.inj selectedLookup
+      subst node
+      rw [shape] at formType
+      cases formType with
+      | lambda _ parametersExtend _ _ =>
+          simpa [ExpressionNode.rawType, uncoerced,
+            parametersExtend.bodyTypes_eq] using rawTypeEq
+
 end ExpressionHasType
 
 namespace ExpressionsHaveTypes
