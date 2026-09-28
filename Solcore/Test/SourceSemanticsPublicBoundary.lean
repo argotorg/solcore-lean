@@ -262,6 +262,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed_bodyContext
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_integerLiteralValid_of_mem
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.finalize_solvedRequirementsValid
 example :=
@@ -534,6 +536,8 @@ example := @Solcore.SourceSemantics.RequirementLedgerWellFormed
 example := @Solcore.SourceSemantics.LocalSchemeTemplateRowScoped
 example := @Solcore.SourceSemantics.ScopedRequirementEntryValid
 example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed
+example :=
+  @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.transportContext
 example := @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.template_exact
 example :=
   @Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed.localSchemeRequirementWellFormed

@@ -191,4 +191,44 @@ theorem SignatureTypesFormationValidated.apply_productMany_eq_self
   rw [TypeSystem.Substitution.apply_productMany,
     validated.apply_eq_self substitution]
 
+/-- A formation-validated predicate contains no flexible metavariables, so a
+flexible substitution fixes every one of its type positions. -/
+theorem SignaturePredicateFormationValidated.apply_eq_self
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeParameterId}
+    {predicate : ProgramPredicate}
+    (validated : SignaturePredicateFormationValidated signatures owner
+      parameters predicate)
+    (substitution : Substitution) :
+    TypedTraitResolution.applySubstitution substitution predicate =
+      predicate := by
+  cases predicate with
+  | mk trait subject arguments =>
+      simp only [TypedTraitResolution.applySubstitution]
+      congr 1
+      · exact validated.subject.apply_eq_self substitution
+      · exact validated.arguments.apply_eq_self substitution
+
+/-- Pointwise predicate formation makes a declaration's complete assumption
+row invariant under every flexible substitution. -/
+theorem SignaturePredicatesFormationValidated.apply_eq_self
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeParameterId}
+    {predicates : List ProgramPredicate}
+    (validated : SignaturePredicatesFormationValidated signatures owner
+      parameters predicates)
+    (substitution : Substitution) :
+    predicates.map (TypedTraitResolution.applySubstitution substitution) =
+      predicates := by
+  induction predicates with
+  | nil => rfl
+  | cons head tail induction =>
+      simp only [List.map_cons, List.cons.injEq]
+      constructor
+      · exact (validated head (by simp)).apply_eq_self substitution
+      · exact induction (fun predicate member =>
+          validated predicate (by simp [member]))
+
 end Solcore.Frontend

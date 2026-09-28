@@ -3249,6 +3249,35 @@ theorem checkFunctionBody_success_scopedRequirementLedgerWellFormed
   simpa [checkedFinalizedRequirementContext, finalizedRequirementContext]
     using finalize_scopedRequirementLedgerWellFormed finalizeSuccess
 
+/-- Signature formation removes the final inference substitution from the
+declaration predicates, transporting the finalized scoped ledger into the
+complete declaration context used by deep body typing. -/
+theorem checkFunctionBody_success_scopedRequirementLedgerWellFormed_bodyContext
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (formation : ProgramSignatureFormationValidated signatures)
+    (member : signature ∈ signatures.functions)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    ScopedRequirementLedgerWellFormed
+      (checkedBodyContext signatures signature checked)
+      checked.typedBody := by
+  apply ScopedRequirementLedgerWellFormed.transportContext
+    (source := checkedFinalizedRequirementContext signatures signature checked)
+    (target := checkedBodyContext signatures signature checked)
+  · rfl
+  · change signature.scheme.predicates =
+      signature.scheme.predicates.map
+        (TypedTraitResolution.applySubstitution checked.substitution)
+    exact ((formation.functions signature member).2.2.apply_eq_self
+      checked.substitution).symm
+  · rfl
+  · exact checkFunctionBody_success_scopedRequirementLedgerWellFormed
+      success
+
 /-- Executable finalization connects one retained integer-literal node to the
 declarative validity judgment through its exact requirement row. -/
 theorem finalize_integerLiteralValid_of_mem

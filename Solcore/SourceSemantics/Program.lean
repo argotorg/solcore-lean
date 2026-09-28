@@ -117,6 +117,41 @@ structure RuntimeRequirementLedgerValid (context : Context) : Prop where
 
 namespace ScopedRequirementLedgerWellFormed
 
+/-- Transport a scoped ledger between contexts with the same signatures,
+declaration assumptions, and solved rows.  The remaining context fields are
+irrelevant to retained evidence and source-scoped template bookkeeping. -/
+theorem transportContext
+    {source target : Context} {typedSource : TypedSource}
+    (signatures_eq : target.signatures = source.signatures)
+    (assumptions_eq : target.assumptions = source.assumptions)
+    (solved_eq : target.solvedRequirements = source.solvedRequirements)
+    (wellFormed : ScopedRequirementLedgerWellFormed source typedSource) :
+    ScopedRequirementLedgerWellFormed target typedSource := by
+  refine {
+    idsUnique := ?_
+    templateOwnership := wellFormed.templateOwnership
+    entriesValid := ?_
+    templatesComplete := ?_
+  }
+  · simpa [RequirementIdsUnique, solved_eq] using wellFormed.idsUnique
+  · intro row member
+    have sourceMember : row ∈ source.solvedRequirements := by
+      simpa [solved_eq] using member
+    have transportValid (valid : SolvedRequirementValid source row) :
+        SolvedRequirementValid target row := by
+      cases valid with
+      | intro evidenceValid =>
+          exact .intro (by
+            simpa [signatures_eq, assumptions_eq] using evidenceValid)
+    cases wellFormed.entriesValid row sourceMember with
+    | ordinary notTemplate valid =>
+        exact .ordinary notTemplate (transportValid valid)
+    | template scopeProof => exact .template scopeProof
+  · intro owner contains
+    obtain ⟨row, member, idEq⟩ :=
+      wellFormed.templatesComplete owner contains
+    exact ⟨row, by simpa [solved_eq] using member, idEq⟩
+
 /-- A non-template ledger row retains ordinary declaration-context evidence
 validity. -/
 theorem ordinary_valid

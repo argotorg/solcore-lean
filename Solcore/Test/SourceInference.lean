@@ -910,6 +910,23 @@ example {environment : ProgramEnvironment}
   exact SourceInference.checkFunctionBody_success_body_inferenceProperties
     validated member canonical success
 
+/-- Successful checking of a formation-validated catalog exposes the scoped
+requirement ledger in the exact declaration context used by body typing. -/
+example {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature} {fuel : Nat}
+    {checked : SourceInference.CheckedFunction}
+    (validated : ProgramSignatureFormationValidated signatures)
+    (member : signature ∈ signatures.functions)
+    (success : SourceInference.checkFunctionBody environment signatures
+      signature fuel = .ok checked) :
+    Solcore.SourceSemantics.ScopedRequirementLedgerWellFormed
+      (Solcore.SourceSemantics.checkedBodyContext signatures signature checked)
+      checked.typedBody := by
+  exact
+    Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed_bodyContext
+      validated member success
+
 private def solverRegressionRequirement : SourceInference.Requirement := {
   id := ⟨0⟩
   predicate := solverRegressionSource

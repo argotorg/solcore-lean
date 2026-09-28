@@ -103,6 +103,9 @@ example := @Solcore.Frontend.SignatureTypeFormationValidated.apply_eq_self
 example := @Solcore.Frontend.SignatureTypesFormationValidated.apply_eq_self
 example :=
   @Solcore.Frontend.SignatureTypesFormationValidated.apply_productMany_eq_self
+example := @Solcore.Frontend.SignaturePredicateFormationValidated.apply_eq_self
+example :=
+  @Solcore.Frontend.SignaturePredicatesFormationValidated.apply_eq_self
 example :=
   @Solcore.Frontend.ImplementationSignatureStructuralWellFormed.method_ids_nodup
 example := @Solcore.Frontend.buildProgramSignatures_success_implementation_structure
