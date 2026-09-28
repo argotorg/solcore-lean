@@ -2632,6 +2632,59 @@ theorem inferStatementFuel_success_expression_facts
       exact ⟨inferred, expressionState, rfl, rfl,
         recordNode_containsStatement expressionState _ roots⟩
 
+/-- A successful value-assignment statement exposes the complete delegated
+assignment inference result and the exact ordinary-unit node recorded by the
+statement layer. -/
+theorem inferStatementFuel_success_assignValue_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression value : Syntax.Expr}
+    {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .assignValue targetExpression operator value)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ assignment inferredValue assignmentState,
+      Detail.inferAssignedValueFuel fuel context targetExpression
+        operator.value value allocated =
+          .ok (assignment, inferredValue, assignmentState) ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state := assignmentState.recordNode (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .assignValue assignment operator.value inferredValue.id
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .assignValue assignment operator.value inferredValue.id
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases assignmentSuccess : Detail.inferAssignedValueFuel fuel context
+      targetExpression operator.value value allocated with
+  | error error =>
+      simp [assignmentSuccess] at success
+  | ok assignmentResult =>
+      rcases assignmentResult with
+        ⟨assignment, inferredValue, assignmentState⟩
+      simp only [assignmentSuccess, pure, Pure.pure, Except.pure] at success
+      injection success with resultEq
+      rw [← resultEq]
+      exact ⟨assignment, inferredValue, assignmentState, rfl, rfl,
+        recordNode_containsStatement assignmentState _ roots⟩
+
 /-- A successful `if` without an `else` exposes condition inference, checking of
 the then-body, restoration of the condition state's lexical scope, and the
 canonical unit statement recorded after that restoration. -/
@@ -3125,6 +3178,34 @@ theorem expressionStatementValueHasType_afterSubstitution
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl expressionType (by simp [StatementNode.applySubstitution])
 
+/-- A retained value-assignment statement is well typed once recursive place
+and right-hand-side soundness establish the substituted assignment
+resolution. -/
+theorem assignValueStatementHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {operator : Syntax.ValueAssignOp}
+    {assignment : AssignmentResolution} {inferredValue : InferredExpression}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .assignValue assignment operator inferredValue.id
+    })
+    (assignmentType : SourceAssignmentHasType
+      (source.applySubstitution outer) target
+      (assignment.applySubstitution outer) operator inferredValue.id) :
+    StatementHasType (source.applySubstitution outer) control target id target {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    } := by
+  exact .assignValue
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl assignmentType (by simp [StatementNode.applySubstitution])
+
 /-- A successful expression-statement branch is compositional modulo recursive
 typing of its child expression.  Expression inference preserves lexical
 locals; recording the parent preserves that invariant again, while the
@@ -3515,6 +3596,25 @@ theorem whileLoopStatementHasType_afterSubstitution
 
 namespace StatementResultMatchesFactsAfterSubstitution
 
+/-- Every executable statement with the canonical unit/non-value/non-returning
+projection agrees with the declarative ordinary-unit summary. -/
+theorem ordinaryUnit
+    (substitution : TypeSystem.Substitution) (id : StatementId)
+    (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      state
+    } {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    } := by
+  constructor <;> rfl
+
 /-- Every executable local declaration returns the canonical ordinary-unit
 summary, independently of the declared scheme and initializer. -/
 theorem letDecl
@@ -3532,7 +3632,7 @@ theorem letDecl
       sawReturn := false
       control := .ordinary .unit
     } := by
-  constructor <;> rfl
+  exact ordinaryUnit substitution id state
 
 /-- The executable result shared by bare and value returns agrees with the
 declarative returned summary after any semantically extending substitution. -/
@@ -3707,6 +3807,68 @@ theorem whileLoop
   constructor <;> rfl
 
 end StatementResultMatchesFactsAfterSubstitution
+
+/-- A successful value-assignment statement is compositional modulo recursive
+soundness of the delegated place/RHS inference.  That traversal and parent
+recording both preserve the active lexical context. -/
+theorem inferStatementFuel_success_assignValue_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression value : Syntax.Expr}
+    {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .assignValue targetExpression operator value)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (roots : List NodeId := [])
+    (assignmentSound :
+      ∀ {assignment : AssignmentResolution}
+        {inferredValue : InferredExpression}
+        {assignmentState : Frontend.SourceInference.State},
+        Detail.inferAssignedValueFuel fuel inferenceContext targetExpression
+            operator.value value allocated =
+              .ok (assignment, inferredValue, assignmentState) →
+          SourceAssignmentHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target (assignment.applySubstitution outer) operator.value
+            inferredValue.id) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨assignment, inferredValue, assignmentState, assignmentSuccess,
+      resultEq, contains⟩ :=
+    inferStatementFuel_success_assignValue_facts statementEq allocationEq
+      success roots
+  have assignmentInvariant :
+      ActiveLocalContextInvariant assignmentState outer target :=
+    allocatedInvariant.inferAssignedValueFuel assignmentSuccess
+  have assignmentTyping := assignmentSound assignmentSuccess
+  subst result
+  refine ⟨assignmentInvariant.recordNode _, ?_, ?_⟩
+  · exact assignValueStatementHasType_afterSubstitution contains
+      assignmentTyping
+  · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
 
 /-- A successful bare return preserves the active lexical context and is
 declaratively typed once the final substitution extends its unification
