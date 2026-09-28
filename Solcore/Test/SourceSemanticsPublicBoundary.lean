@@ -379,6 +379,14 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithDefault_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ForItemInferenceSoundnessCallbacks
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ForItemInferenceSoundnessCallbacks.weakenSource
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferForItemFuel_success_forItemHasType_of_callbacks
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferForItemsFuel_success_forItemsHaveType_of_callbacks
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_forLoop_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_whileLoop_sound

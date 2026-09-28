@@ -7225,6 +7225,776 @@ theorem inferStatementFuel_success_matchWithDefault_sound
   · exact StatementResultMatchesFactsAfterSubstitution.matchWithDefault
       caseReturnEq defaultAgreement defaultExtension id _
 
+/-- Uniform conditional obligations used by the restricted `for`-header
+dispatchers below.  Every callback is indexed by the active semantic context
+and its matching executable-local invariant, so a source-ordered item list can
+extend the context after a declaration.  This bundle deliberately assumes
+typing for every supplied successful child computation in one already chosen
+eventual source; it does not itself prove that the child belongs to that
+source.  Discharging that provenance boundary is a later deep-recursion step. -/
+structure ForItemInferenceSoundnessCallbacks
+    (inferenceContext : Frontend.SourceInference.Context)
+    (source : TypedSource) (outer : TypeSystem.Substitution) : Prop where
+  unannotatedInitializedLet :
+    ∀ {childFuel : Nat} {semanticContext : SourceSemantics.Context}
+      {initial : Frontend.SourceInference.State}
+      {name : Syntax.Identifier} {initializer : Syntax.Expr}
+      {inferred : InferredExpression}
+      {initializerState : Frontend.SourceInference.State}
+      {locals : TypeSystem.Environment} {valueType : TypeSystem.Ty}
+      {generalized : Detail.GeneralizedValue}
+      {binding : TypedBinder × Frontend.SourceInference.State},
+      ActiveLocalContextInvariant initial outer semanticContext →
+      Detail.inferExprFuel childFuel inferenceContext initializer none initial =
+        .ok (inferred, initializerState) →
+      locals = initializerState.binderEnvironment.apply
+        initializerState.inference.substitution →
+      valueType = initializerState.resolve inferred.type →
+      generalized = Detail.generalizeValue initializerState locals
+        initial.nextRequirement valueType →
+      (initializerState.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false generalized.requirements =
+          binding →
+      UnannotatedInitializedLetCertificate source semanticContext outer
+        binding.1 inferred.id
+  expression :
+    ∀ {childFuel : Nat} {semanticContext : SourceSemantics.Context}
+      {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+      {initial final : Frontend.SourceInference.State}
+      {inferred : InferredExpression},
+      ActiveLocalContextInvariant initial outer semanticContext →
+      Detail.inferExprFuel childFuel inferenceContext expression expected initial =
+        .ok (inferred, final) →
+      ExpressionHasType (source.applySubstitution outer) semanticContext
+        inferred.id (outer.apply inferred.type)
+  assignedValue :
+    ∀ {childFuel : Nat} {semanticContext : SourceSemantics.Context}
+      {targetExpression value : Syntax.Expr}
+      {operator : Syntax.ValueAssignOp}
+      {initial final : Frontend.SourceInference.State}
+      {assignment : AssignmentResolution}
+      {inferredValue : InferredExpression},
+      initial.InferenceReady →
+      ActiveLocalContextInvariant initial outer semanticContext →
+      outer.SemanticallyExtends final.inference.substitution →
+      Detail.inferAssignedValueFuel childFuel inferenceContext targetExpression
+          operator value initial = .ok (assignment, inferredValue, final) →
+      SourceAssignmentHasType (source.applySubstitution outer)
+        semanticContext (assignment.applySubstitution outer) operator
+        inferredValue.id
+  place :
+    ∀ {childFuel : Nat} {semanticContext : SourceSemantics.Context}
+      {targetExpression : Syntax.Expr}
+      {initial final : Frontend.SourceInference.State}
+      {place : PlaceResolution},
+      initial.InferenceReady →
+      ActiveLocalContextInvariant initial outer semanticContext →
+      outer.SemanticallyExtends final.inference.substitution →
+      Detail.inferPlaceFuel childFuel inferenceContext targetExpression initial =
+        .ok (place, final) →
+      SourcePlaceHasType (source.applySubstitution outer) semanticContext
+        (place.applySubstitution outer) (outer.apply place.type)
+
+/-- Uniform callback evidence available in an intermediate typed source
+remains valid after later inference appends nodes.  This transports an already
+discharged callback boundary; it does not establish the child/source
+provenance needed to construct that boundary. -/
+theorem ForItemInferenceSoundnessCallbacks.weakenSource
+    {inferenceContext : Frontend.SourceInference.Context}
+    {before after : TypedSource} {outer : TypeSystem.Substitution}
+    (extension : TypingSourceExtends before after)
+    (callbacks : ForItemInferenceSoundnessCallbacks inferenceContext before
+      outer) :
+    ForItemInferenceSoundnessCallbacks inferenceContext after outer := by
+  let appliedExtension := extension.applySubstitution outer
+  constructor
+  · intro childFuel semanticContext initial name initializer inferred
+      initializerState locals valueType generalized binding invariant success
+      localsEq valueTypeEq generalizedEq bindingEq
+    have certificate := callbacks.unannotatedInitializedLet invariant success
+      localsEq valueTypeEq generalizedEq bindingEq
+    exact {
+      initializer_type := ExpressionHasType.weakenSource appliedExtension
+        certificate.initializer_type
+      requirements_well_formed := certificate.requirements_well_formed
+      generalizes := certificate.generalizes
+      quantified_fresh := certificate.quantified_fresh
+    }
+  · intro childFuel semanticContext expression expected initial final
+      inferred invariant success
+    exact ExpressionHasType.weakenSource appliedExtension
+      (callbacks.expression invariant success)
+  · intro childFuel semanticContext targetExpression value operator initial
+      final assignment inferredValue ready invariant outerExtension success
+    exact SourceAssignmentHasType.weakenSource appliedExtension
+      (callbacks.assignedValue ready invariant outerExtension success)
+  · intro childFuel semanticContext targetExpression initial final place
+      ready invariant outerExtension success
+    exact SourcePlaceHasType.weakenSource appliedExtension
+      (callbacks.place ready invariant outerExtension success)
+
+private theorem forItemHasType_context_fields
+    {source : TypedSource} {control : ControlContext}
+    {context final : SourceSemantics.Context} {item : ForItemForm}
+    (typing : ForItemHasType source control context item final) :
+    final.signatures = context.signatures ∧
+      final.typeParameters = context.typeParameters ∧
+      final.currentDeclaration = context.currentDeclaration := by
+  cases typing with
+  | letUninitialized _ _ extension =>
+      exact ⟨extension.context_fields.1, extension.context_fields.2.2.1,
+        extension.context_fields.2.1⟩
+  | letInitialized _ _ _ extension =>
+      exact ⟨extension.context_fields.1, extension.context_fields.2.2.1,
+        extension.context_fields.2.1⟩
+  | letInitializedGeneralized _ _ _ _ extension =>
+      exact ⟨extension.context_fields.1, extension.context_fields.2.2.1,
+        extension.context_fields.2.1⟩
+  | expression | assignValue | assignBitNot => exact ⟨rfl, rfl, rfl⟩
+
+/-- Install the generalized binder produced by an unannotated initialized
+`for` item.  This is the node-free counterpart of the ordinary statement
+wrapper: the semantic certificate supplies the genuine generalization facts,
+while allocation alignment supplies the final lexical context. -/
+private theorem unannotatedInitializedForItemHasType_afterSubstitution
+    {source : TypedSource} {outer : TypeSystem.Substitution}
+    {control : ControlContext} {target : SourceSemantics.Context}
+    {name : Syntax.Identifier} {initializer : ExpressionId}
+    {state final : Frontend.SourceInference.State}
+    {requirementStart : Nat}
+    {locals : TypeSystem.Environment} {valueType : TypeSystem.Ty}
+    {generalized : Detail.GeneralizedValue} {binder : TypedBinder}
+    (generalized_eq : generalized = Detail.generalizeValue state locals
+      requirementStart valueType)
+    (allocated : (state.withLocals locals).allocateBinder name.value
+      generalized.scheme (some name.span) false generalized.requirements =
+        (binder, final))
+    (invariant : ActiveLocalContextInvariant state outer target)
+    (below : state.LocalBindersBelowNextLocal)
+    (sourceOwner : source.owner = state.owner)
+    (certificate : UnannotatedInitializedLetCertificate source target outer
+      binder initializer) :
+    ∃ finalContext,
+      ActiveLocalContextInvariant final outer finalContext ∧
+      ForItemHasType (source.applySubstitution outer) control target
+        (.letDecl (binder.applySubstitution outer) (some initializer))
+        finalContext := by
+  have binderEq :
+      ((state.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements).1 = binder :=
+    congrArg Prod.fst allocated
+  have rawSchemeEq : binder.scheme = generalized.scheme := by
+    rw [← binderEq]
+    rfl
+  have rawRequirementsEq :
+      binder.schemeRequirements = generalized.requirements := by
+    rw [← binderEq]
+    rfl
+  have rawQuantifiedNodup : binder.scheme.quantified.Nodup := by
+    rw [rawSchemeEq, generalized_eq]
+    exact Detail.generalizeValue_scheme_quantified_nodup state locals
+      requirementStart valueType
+  have closedQuantifiedNodup :
+      (binder.applySubstitution outer).scheme.quantified.Nodup := by
+    simpa using rawQuantifiedNodup
+  have schemeWellFormed : SchemeWellFormed target
+      (binder.applySubstitution outer).scheme :=
+    StructuralSubstitution.SchemeWellFormed.ofLocalSchemeInitializerAdmissible
+      certificate.initializer_type.type_admissible closedQuantifiedNodup
+  have monomorphicRequirementsEmpty :
+      (binder.applySubstitution outer).scheme.quantified = [] →
+        (binder.applySubstitution outer).schemeRequirements = [] := by
+    intro closedQuantifiedEmpty
+    have rawQuantifiedEmpty : binder.scheme.quantified = [] := by
+      simpa using closedQuantifiedEmpty
+    have generalizedQuantifiedEmpty : generalized.scheme.quantified = [] := by
+      rw [← rawSchemeEq]
+      exact rawQuantifiedEmpty
+    have canonicalQuantifiedEmpty :
+        (Detail.generalizeValue state locals requirementStart
+          valueType).scheme.quantified = [] := by
+      rw [← generalized_eq]
+      exact generalizedQuantifiedEmpty
+    have canonicalRequirementsEmpty :=
+      Detail.generalizeValue_requirements_empty_of_quantified_eq_nil state
+        locals requirementStart valueType canonicalQuantifiedEmpty
+    have generalizedRequirementsEmpty : generalized.requirements = [] := by
+      rw [generalized_eq]
+      exact canonicalRequirementsEmpty
+    have rawRequirementsEmpty : binder.schemeRequirements = [] := by
+      rw [rawRequirementsEq, generalizedRequirementsEmpty]
+    simp [rawRequirementsEmpty]
+  let finalContext := target.withLocal binder.id
+    (binder.applySubstitution outer).scheme
+    (binder.applySubstitution outer).schemeRequirements
+  have finalInvariant : ActiveLocalContextInvariant final outer
+      finalContext := by
+    exact (invariant.withLocals locals)
+      |>.allocateBinder_of_localBindersBelowNextLocal name.value
+        generalized.scheme (some name.span) false generalized.requirements
+        allocated
+        (Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+          state locals below)
+        schemeWellFormed certificate.requirements_well_formed
+  have extended : BinderExtends source.owner target
+      (binder.applySubstitution outer) finalContext := by
+    have rawExtension : BinderExtends (state.withLocals locals).owner target
+        (binder.applySubstitution outer) finalContext :=
+      (invariant.aligned.withLocals locals)
+        |>.binderExtends_of_allocateBinder
+          (Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+            state locals below)
+          allocated schemeWellFormed certificate.quantified_fresh
+          monomorphicRequirementsEmpty
+    rw [sourceOwner]
+    simpa [Frontend.SourceInference.State.withLocals] using rawExtension
+  refine ⟨finalContext, finalInvariant, ?_⟩
+  by_cases monomorphic :
+      (binder.applySubstitution outer).scheme.quantified = []
+  · have requirementsEmpty := monomorphicRequirementsEmpty monomorphic
+    have initializerContextEq :
+        localSchemeInitializerContext target
+            (binder.applySubstitution outer) = target := by
+      rw [localSchemeInitializerContext_eq_withTypeVariables target _
+        requirementsEmpty, monomorphic]
+      exact SourceSemantics.Context.withTypeVariables_nil target
+    have initializerType : ExpressionHasType
+        (source.applySubstitution outer) target initializer
+        (binder.applySubstitution outer).scheme.body := by
+      simpa only [initializerContextEq] using certificate.initializer_type
+    have generalizes : SchemeGeneralizes target
+        (binder.applySubstitution outer).scheme := by
+      have exactGeneralizes := certificate.generalizes
+      have templateIdsEmpty : localSchemeTemplateIds
+          (binder.applySubstitution outer) = [] :=
+        localSchemeTemplateIds_eq_nil _ requirementsEmpty
+      rw [templateIdsEmpty] at exactGeneralizes
+      exact (SchemeGeneralizesExcept_nil target _).mp exactGeneralizes
+    exact .letInitialized initializerType monomorphic generalizes extended
+  · exact .letInitializedGeneralized monomorphic
+      certificate.requirements_well_formed certificate.generalizes
+      certificate.initializer_type extended
+
+/-- Successful inference of one restricted `for` item reconstructs its
+declarative typing in an eventual common typed source and advances the active
+semantic local context exactly when the item declares a binder. -/
+theorem inferForItemFuel_success_forItemHasType_of_callbacks
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {item : Syntax.ForItem}
+    {initial final : Frontend.SourceInference.State}
+    {inferred : ForItemForm} {source : TypedSource}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (ready : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes))
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (parameters_eq : target.typeParameters = inferenceContext.typeParameters)
+    (declaration_eq : target.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (below : initial.LocalBindersBelowNextLocal)
+    (sourceOwner : source.owner = initial.owner)
+    (outerExtension : outer.SemanticallyExtends
+      final.inference.substitution)
+    (callbacks : ForItemInferenceSoundnessCallbacks inferenceContext
+      source outer)
+    (success : Detail.inferForItemFuel fuel inferenceContext item initial =
+      .ok (inferred, final)) :
+    ∃ finalContext,
+      ActiveLocalContextInvariant final outer finalContext ∧
+      ForItemHasType (source.applySubstitution outer) control target
+        (inferred.applySubstitution outer) finalContext := by
+  have ownerPreserved :=
+    Detail.inferForItemFuel_preserves_owner success
+  cases fuel with
+  | zero => simp [Detail.inferForItemFuel] at success
+  | succ fuel =>
+      cases itemEq : item.value with
+      | letDecl name sourceType initializer =>
+          unfold Detail.inferForItemFuel at success
+          simp only [itemEq, bind, Except.bind] at success
+          cases sourceType with
+          | none =>
+              cases initializer with
+              | none => simp at success
+              | some initializer =>
+                  cases initializerResult : Detail.inferExprFuel fuel
+                      inferenceContext initializer none initial with
+                  | error error => simp [initializerResult] at success
+                  | ok initializerPair =>
+                      rcases initializerPair with
+                        ⟨inferredInitializer, initializerState⟩
+                      simp only [initializerResult, pure, Pure.pure,
+                        Except.pure] at success
+                      let locals := initializerState.binderEnvironment.apply
+                        initializerState.inference.substitution
+                      let valueType :=
+                        initializerState.resolve inferredInitializer.type
+                      let generalized := Detail.generalizeValue
+                        initializerState locals initial.nextRequirement
+                        valueType
+                      let binding :=
+                        (initializerState.withLocals locals).allocateBinder
+                          name.value generalized.scheme (some name.span) false
+                          generalized.requirements
+                      injection success with resultEq
+                      injection resultEq with inferredEq finalEq
+                      subst inferred
+                      subst final
+                      have initializerInvariant :
+                          ActiveLocalContextInvariant initializerState outer
+                            target :=
+                        invariant.inferExprFuel initializerResult
+                      have initializerBelow :
+                          initializerState.LocalBindersBelowNextLocal :=
+                        Detail.inferExprFuel_preserves_localBindersBelowNextLocal
+                          below initializerResult
+                      have certificate :=
+                        callbacks.unannotatedInitializedLet
+                          (name := name) (binding := binding) invariant
+                          initializerResult rfl rfl rfl rfl
+                      have initializerOwner :
+                          source.owner = initializerState.owner := by
+                        calc
+                          source.owner = initial.owner := sourceOwner
+                          _ = binding.2.owner := ownerPreserved.symm
+                          _ = initializerState.owner := by rfl
+                      exact
+                        unannotatedInitializedForItemHasType_afterSubstitution
+                          (control := control) (name := name)
+                          (initializer := inferredInitializer.id)
+                          (requirementStart := initial.nextRequirement)
+                          (generalized_eq := rfl)
+                          (allocated := rfl) initializerInvariant
+                          initializerBelow initializerOwner certificate
+          | some sourceType =>
+              cases initializer with
+              | none =>
+                  cases resolution : Detail.resolveSourceType inferenceContext
+                      sourceType with
+                  | error error => simp [resolution] at success
+                  | ok resolvedType =>
+                      simp only [resolution, pure, Pure.pure, Except.pure]
+                        at success
+                      let locals := initial.binderEnvironment.apply
+                        initial.inference.substitution
+                      let valueType := initial.resolve resolvedType
+                      let generalized := Detail.generalizeValue initial locals
+                        initial.nextRequirement valueType
+                      let binding :=
+                        (initial.withLocals locals).allocateBinder name.value
+                          generalized.scheme (some name.span) false
+                          generalized.requirements
+                      injection success with resultEq
+                      injection resultEq with inferredEq finalEq
+                      subst inferred
+                      subst final
+                      obtain ⟨typeWellFormed, closedSchemeEq,
+                          closedRequirementsEq, generalizes⟩ :=
+                        resolvedAnnotationBinderFacts_afterSubstitution
+                          (target := target) (outer := outer)
+                          (inferenceContext := inferenceContext)
+                          (name := name) (sourceType := sourceType)
+                          (state := initial) (final := binding.2)
+                          (requirementStart := initial.nextRequirement)
+                          (resolvedType := resolvedType)
+                          (valueType := valueType) (locals := locals)
+                          (generalized := generalized) (binder := binding.1)
+                          resolution rfl rfl rfl canonical signatures_eq
+                          parameters_eq declaration_eq
+                      let finalContext := target.withLocal binding.1.id
+                        (binding.1.applySubstitution outer).scheme
+                        (binding.1.applySubstitution outer).schemeRequirements
+                      have finalInvariant : ActiveLocalContextInvariant
+                          binding.2 outer finalContext :=
+                        resolvedAnnotationBinderPreservesActiveLocalContextInvariant_afterSubstitution
+                          (target := target) (outer := outer)
+                          (inferenceContext := inferenceContext)
+                          (name := name) (sourceType := sourceType)
+                          (state := initial) (final := binding.2)
+                          (requirementStart := initial.nextRequirement)
+                          (resolvedType := resolvedType)
+                          (valueType := valueType) (locals := locals)
+                          (generalized := generalized) (binder := binding.1)
+                          resolution rfl rfl rfl canonical signatures_eq
+                          parameters_eq declaration_eq invariant below
+                      have rawExtension : BinderExtends
+                          (initial.withLocals locals).owner target
+                          (binding.1.applySubstitution outer) finalContext := by
+                        apply (invariant.aligned.withLocals locals)
+                          |>.monomorphicBinderExtends_of_allocateBinder
+                            (Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+                              initial locals below)
+                            rfl closedSchemeEq closedRequirementsEq
+                            typeWellFormed
+                      have semanticExtension : BinderExtends source.owner
+                          target (binding.1.applySubstitution outer)
+                          finalContext := by
+                        rw [sourceOwner]
+                        simpa [Frontend.SourceInference.State.withLocals]
+                          using rawExtension
+                      refine ⟨finalContext, finalInvariant, ?_⟩
+                      have monomorphic :
+                          (binding.1.applySubstitution outer).scheme.quantified =
+                            [] := by
+                        rw [closedSchemeEq]
+                        rfl
+                      exact .letUninitialized monomorphic generalizes
+                        semanticExtension
+              | some initializer =>
+                  cases resolution : Detail.resolveSourceType inferenceContext
+                      sourceType with
+                  | error error => simp [resolution] at success
+                  | ok resolvedType =>
+                      simp only [resolution] at success
+                      cases initializerResult : Detail.inferExprFuel fuel
+                          inferenceContext initializer (some resolvedType)
+                          initial with
+                      | error error => simp [initializerResult] at success
+                      | ok initializerPair =>
+                          rcases initializerPair with
+                            ⟨inferredInitializer, initializerState⟩
+                          simp only [initializerResult, pure,
+                            Pure.pure, Except.pure] at success
+                          let locals :=
+                            initializerState.binderEnvironment.apply
+                              initializerState.inference.substitution
+                          let valueType := initializerState.resolve
+                            inferredInitializer.type
+                          let generalized := Detail.generalizeValue
+                            initializerState locals initial.nextRequirement
+                            valueType
+                          let binding :=
+                            (initializerState.withLocals locals).allocateBinder
+                              name.value generalized.scheme (some name.span)
+                              false generalized.requirements
+                          injection success with resultEq
+                          injection resultEq with inferredEq finalEq
+                          subst inferred
+                          subst final
+                          have resolvedBelow : resolvedType.VariablesBelow
+                              initial.inference.next :=
+                            Detail.resolveSourceType_success_variablesBelow
+                              resolution _
+                          have initializerProperties :=
+                            Detail.inferExprFuel_inferenceProperties ready
+                              signatureFormation functionsCanonical (by
+                                intro expected member
+                                simp only [Option.mem_def] at member
+                                injection member with typeEq
+                                subst expected
+                                exact resolvedBelow) initializerResult
+                          have initializerInvariant :
+                              ActiveLocalContextInvariant initializerState
+                                outer target :=
+                            invariant.inferExprFuel initializerResult
+                          have initializerBelow :
+                              initializerState.LocalBindersBelowNextLocal :=
+                            Detail.inferExprFuel_preserves_localBindersBelowNextLocal
+                              below initializerResult
+                          have rawExpected :
+                              initializerState.resolve inferredInitializer.type =
+                                initializerState.resolve resolvedType :=
+                            inferExprFuel_success_expected_type_afterProgress
+                              initializerResult
+                              (Frontend.SourceInference.State.InferenceProgress.refl
+                                initializerProperties.2.1.solved)
+                          obtain ⟨typeWellFormed, closedSchemeEq,
+                              closedRequirementsEq, generalizes⟩ :=
+                            resolvedAnnotationBinderFacts_afterSubstitution
+                              (target := target) (outer := outer)
+                              (inferenceContext := inferenceContext)
+                              (name := name) (sourceType := sourceType)
+                              (state := initializerState)
+                              (final := binding.2)
+                              (requirementStart := initial.nextRequirement)
+                              (resolvedType := resolvedType)
+                              (valueType := valueType) (locals := locals)
+                              (generalized := generalized)
+                              (binder := binding.1)
+                              resolution rawExpected rfl rfl canonical
+                              signatures_eq parameters_eq declaration_eq
+                          have initializerExtension :
+                              outer.SemanticallyExtends
+                                initializerState.inference.substitution := by
+                            simpa [binding, Frontend.SourceInference.State.withLocals,
+                              Frontend.SourceInference.State.allocateBinder]
+                              using outerExtension
+                          have outerExpected : outer.apply
+                              inferredInitializer.type =
+                                outer.apply resolvedType :=
+                            Detail.inferExprFuel_expected_type_apply_eq
+                              initializerResult initializerExtension
+                          have resolvedByOuter : outer.apply resolvedType =
+                              resolvedType :=
+                            Detail.resolveSourceType_success_apply_eq_self outer
+                              resolution
+                          have initializerTypeRaw := callbacks.expression
+                            invariant initializerResult
+                          have initializerType : ExpressionHasType
+                              (source.applySubstitution outer) target
+                              inferredInitializer.id
+                              (binding.1.applySubstitution outer).scheme.body := by
+                            rw [closedSchemeEq]
+                            change ExpressionHasType
+                              (source.applySubstitution outer) target
+                              inferredInitializer.id resolvedType
+                            rw [← resolvedByOuter, ← outerExpected]
+                            exact initializerTypeRaw
+                          let finalContext := target.withLocal binding.1.id
+                            (binding.1.applySubstitution outer).scheme
+                            (binding.1.applySubstitution outer).schemeRequirements
+                          have finalInvariant : ActiveLocalContextInvariant
+                              binding.2 outer finalContext :=
+                            resolvedAnnotationBinderPreservesActiveLocalContextInvariant_afterSubstitution
+                              (target := target) (outer := outer)
+                              (inferenceContext := inferenceContext)
+                              (name := name) (sourceType := sourceType)
+                              (state := initializerState)
+                              (final := binding.2)
+                              (requirementStart := initial.nextRequirement)
+                              (resolvedType := resolvedType)
+                              (valueType := valueType) (locals := locals)
+                              (generalized := generalized)
+                              (binder := binding.1)
+                              resolution rawExpected rfl rfl canonical
+                              signatures_eq parameters_eq declaration_eq
+                              initializerInvariant initializerBelow
+                          have initializerOwner : source.owner =
+                              initializerState.owner := by
+                            calc
+                              source.owner = initial.owner := sourceOwner
+                              _ = binding.2.owner := ownerPreserved.symm
+                              _ = initializerState.owner := by rfl
+                          have rawExtension : BinderExtends
+                              (initializerState.withLocals locals).owner target
+                              (binding.1.applySubstitution outer)
+                              finalContext := by
+                            apply (initializerInvariant.aligned.withLocals locals)
+                              |>.monomorphicBinderExtends_of_allocateBinder
+                                (Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+                                  initializerState locals initializerBelow)
+                                rfl closedSchemeEq closedRequirementsEq
+                                typeWellFormed
+                          have semanticExtension : BinderExtends source.owner
+                              target (binding.1.applySubstitution outer)
+                              finalContext := by
+                            rw [initializerOwner]
+                            simpa [Frontend.SourceInference.State.withLocals]
+                              using rawExtension
+                          refine ⟨finalContext, finalInvariant, ?_⟩
+                          have monomorphic :
+                              (binding.1.applySubstitution outer).scheme.quantified =
+                                [] := by
+                            rw [closedSchemeEq]
+                            rfl
+                          exact .letInitialized initializerType monomorphic
+                            generalizes semanticExtension
+      | expression expression =>
+          unfold Detail.inferForItemFuel at success
+          simp only [itemEq, bind, Except.bind] at success
+          cases expressionResult : Detail.inferExprFuel fuel inferenceContext
+              expression none initial with
+          | error error => simp [expressionResult] at success
+          | ok expressionPair =>
+              rcases expressionPair with ⟨inferredExpression, expressionState⟩
+              simp only [expressionResult, pure, Pure.pure,
+                Except.pure] at success
+              injection success with resultEq
+              injection resultEq with inferredEq finalEq
+              subst inferred
+              subst final
+              exact ⟨target, invariant.inferExprFuel expressionResult,
+                .expression (callbacks.expression invariant expressionResult)⟩
+      | assignValue targetExpression operator value =>
+          unfold Detail.inferForItemFuel at success
+          simp only [itemEq, bind, Except.bind] at success
+          cases assignmentResult : Detail.inferAssignedValueFuel fuel
+              inferenceContext targetExpression operator.value value initial with
+          | error error => simp [assignmentResult] at success
+          | ok assignmentTriple =>
+              rcases assignmentTriple with
+                ⟨assignment, inferredValue, assignmentState⟩
+              simp only [assignmentResult, pure, Pure.pure,
+                Except.pure] at success
+              injection success with resultEq
+              injection resultEq with inferredEq finalEq
+              subst inferred
+              subst final
+              exact ⟨target, invariant.inferAssignedValueFuel assignmentResult,
+                .assignValue
+                  (callbacks.assignedValue ready invariant outerExtension
+                    assignmentResult)⟩
+      | assignBitNot targetExpression operatorSpan =>
+          unfold Detail.inferForItemFuel at success
+          simp only [itemEq, bind, Except.bind] at success
+          cases placeResult : Detail.inferPlaceFuel fuel inferenceContext
+              targetExpression initial with
+          | error error => simp [placeResult] at success
+          | ok placePair =>
+              rcases placePair with ⟨place, placeState⟩
+              simp only [placeResult] at success
+              cases unifyResult : Detail.unify placeState place.type .word with
+              | error error => simp [unifyResult] at success
+              | ok unifiedState =>
+                  simp only [unifyResult, pure, Pure.pure, Except.pure]
+                    at success
+                  injection success with resultEq
+                  injection resultEq with inferredEq finalEq
+                  subst inferred
+                  subst final
+                  have placeProperties :=
+                    Detail.inferPlaceFuel_inferenceProperties ready
+                      signatureFormation functionsCanonical placeResult
+                  have unifyProgress := Detail.unify_inferenceProgress
+                    placeProperties.2.1.solved placeProperties.2.2
+                    (TypeSystem.Ty.variablesBelow_constructor _ _) unifyResult
+                  have placeExtension : outer.SemanticallyExtends
+                      placeState.inference.substitution :=
+                    TypeSystem.Substitution.SemanticallyExtends.trans
+                      outerExtension unifyProgress.substitution_extends
+                  have placeType := callbacks.place ready invariant
+                    placeExtension placeResult
+                  have resolvedWord :
+                      unifiedState.resolve place.type = .word :=
+                    (Detail.unify_resolve_eq unifyResult).trans (by rfl)
+                  have resolvedFinal : outer.apply
+                      (unifiedState.resolve place.type) =
+                        outer.apply place.type := by
+                    simpa [Frontend.SourceInference.State.resolve,
+                      TypeSystem.InferState.resolve] using
+                        outerExtension place.type
+                  have placeWord : outer.apply place.type = .word := by
+                    rw [← resolvedFinal, resolvedWord]
+                    rfl
+                  have storedPlaceEq :
+                      ({ place with type := unifiedState.resolve place.type } :
+                        PlaceResolution).applySubstitution outer =
+                          place.applySubstitution outer := by
+                    cases place
+                    simp [PlaceResolution.applySubstitution, resolvedFinal]
+                  have assignmentType : SourceBitNotAssignmentValid
+                      (source.applySubstitution outer) target
+                      (({ target := { place with
+                        type := unifiedState.resolve place.type } } :
+                          AssignmentResolution).applySubstitution outer) := by
+                    apply SourceBitNotAssignmentValid.intro
+                    · change SourcePlaceHasType
+                        (source.applySubstitution outer) target
+                        (({ place with
+                          type := unifiedState.resolve place.type } :
+                            PlaceResolution).applySubstitution outer) .word
+                      rw [storedPlaceEq, ← placeWord]
+                      exact placeType
+                    · rfl
+                  exact ⟨target, (invariant.inferPlaceFuel placeResult).unify
+                    unifyResult, .assignBitNot assignmentType⟩
+
+/-- Source-ordered `for`-item inference composes the single-item callback
+dispatcher, threading both executable and declarative lexical contexts.  All
+items are typed in the same eventual source; the final substitution is
+transported back across the tail's monotone inference progress before typing
+the head. -/
+theorem inferForItemsFuel_success_forItemsHaveType_of_callbacks
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {items : List Syntax.ForItem}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredForItems} {source : TypedSource}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (ready : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes))
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (parameters_eq : target.typeParameters = inferenceContext.typeParameters)
+    (declaration_eq : target.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (below : initial.LocalBindersBelowNextLocal)
+    (sourceOwner : source.owner = initial.owner)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (callbacks : ForItemInferenceSoundnessCallbacks inferenceContext
+      source outer)
+    (success : Detail.inferForItemsFuel fuel inferenceContext items initial =
+      .ok result) :
+    ∃ finalContext,
+      ActiveLocalContextInvariant result.state outer finalContext ∧
+      ForItemsHaveType (source.applySubstitution outer) control target
+        (result.items.map (ForItemForm.applySubstitution outer))
+        finalContext := by
+  induction items generalizing initial result target with
+  | nil =>
+      simp only [Detail.inferForItemsFuel, pure, Pure.pure, Except.pure]
+        at success
+      injection success with resultEq
+      subst result
+      exact ⟨target, invariant, .nil control target⟩
+  | cons item items induction =>
+      unfold Detail.inferForItemsFuel at success
+      cases itemResult : Detail.inferForItemFuel fuel inferenceContext item
+          initial with
+      | error error => simp [itemResult, bind, Except.bind] at success
+      | ok itemPair =>
+          rcases itemPair with ⟨inferredItem, itemState⟩
+          simp only [itemResult, bind, Except.bind] at success
+          cases tailResult : Detail.inferForItemsFuel fuel inferenceContext
+              items itemState with
+          | error error => simp [tailResult] at success
+          | ok tail =>
+              simp only [tailResult, pure, Pure.pure, Except.pure] at success
+              injection success with resultEq
+              subst result
+              have itemProperties :=
+                Detail.inferForItemFuel_inferenceProperties ready
+                  signatureFormation functionsCanonical itemResult
+              have tailProperties :=
+                Detail.inferForItemsFuel_inferenceProperties
+                  itemProperties.2 signatureFormation functionsCanonical
+                  tailResult
+              have itemExtension : outer.SemanticallyExtends
+                  itemState.inference.substitution :=
+                TypeSystem.Substitution.SemanticallyExtends.trans
+                  outerExtension tailProperties.1.substitution_extends
+              obtain ⟨middleContext, itemInvariant, itemTyping⟩ :=
+                inferForItemFuel_success_forItemHasType_of_callbacks
+                  (control := control)
+                  ready signatureFormation functionsCanonical canonical
+                  signatures_eq parameters_eq declaration_eq invariant below
+                  sourceOwner itemExtension callbacks itemResult
+              have fields := forItemHasType_context_fields itemTyping
+              have tailBelow : itemState.LocalBindersBelowNextLocal :=
+                Detail.inferForItemFuel_preserves_localBindersBelowNextLocal
+                  below itemResult
+              have tailSourceOwner : source.owner = itemState.owner :=
+                sourceOwner.trans
+                  (Detail.inferForItemFuel_preserves_owner itemResult).symm
+              obtain ⟨finalContext, finalInvariant, tailTyping⟩ :=
+                induction (initial := itemState) (result := tail)
+                  (target := middleContext) itemProperties.2
+                  (fields.1.trans signatures_eq)
+                  (fields.2.1.trans parameters_eq)
+                  (fields.2.2.trans declaration_eq) itemInvariant tailBelow
+                  tailSourceOwner outerExtension tailResult
+              refine ⟨finalContext, finalInvariant, ?_⟩
+              exact .cons itemTyping tailTyping
+
 /-- A successful `for` statement is compositional modulo recursive typing of
 its initializer, condition, body, and post-item sequence in one finalized
 typed source.  Executable scope restoration keeps all loop-local binders from
