@@ -574,6 +574,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_apply_eq_self
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_inputs

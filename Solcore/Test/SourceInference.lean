@@ -826,6 +826,49 @@ example {context : SourceInference.Context} {source : Syntax.Expr}
     SourceInference.Detail.recordInstantiatedFunctionReference_inferenceProperties
       ready schemeBodyBelow expectedBelow success
 
+/-- Successful recursive expression inference packages semantic progress,
+readiness, and an allocator bound for the inferred expression type. -/
+example {fuel : Nat} {context : SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {state : SourceInference.State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    {result : SourceInference.InferredExpression × SourceInference.State}
+    (success : SourceInference.Detail.inferExprFuel fuel context expression
+      expected state = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  exact SourceInference.Detail.inferExprFuel_inferenceProperties ready
+    validated canonical expectedBelow success
+
+/-- Successful recursive statement-list inference packages semantic progress,
+readiness, and an allocator bound for the inferred block type. -/
+example {fuel : Nat} {context : SourceInference.Context}
+    {statements : List Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {state : SourceInference.State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (returnBelow : expectedReturn.VariablesBelow state.inference.next)
+    {result : SourceInference.Detail.BlockResult}
+    (success : SourceInference.Detail.inferStatementsFuel fuel context
+      statements expectedReturn state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  exact SourceInference.Detail.inferStatementsFuel_inferenceProperties ready
+    validated canonical returnBelow success
+
 private def solverRegressionRequirement : SourceInference.Requirement := {
   id := ⟨0⟩
   predicate := solverRegressionSource
