@@ -617,6 +617,12 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_requirements_subset
 example :=
+  @Solcore.Frontend.SourceInference.Detail.unify_integerPatternMetadata_eq
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_integerLiteral_metadata
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_integerLiteral_metadata
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.unifyBuiltinFunctionArgumentsEqual_requirements_subset

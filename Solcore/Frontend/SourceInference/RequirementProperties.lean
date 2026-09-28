@@ -1784,6 +1784,21 @@ theorem freshDataConstructorInstantiation_requirements_subset
   unfold freshDataConstructorInstantiation
   exact foldSubset dataType.parameters ([], state)
 
+/-- Unification changes only the inference substitution, so the numeric-pattern
+origin list and canonical requirement ledger remain byte-for-byte identical.
+This packages the two equalities needed to transport the exact origin-to-row
+correspondence established by the integer-pattern inference branch. -/
+theorem unify_integerPatternMetadata_eq
+    {before after : State} {left right : Ty}
+    (success : unify before left right = .ok after) :
+    after.integerPatterns = before.integerPatterns ∧
+      after.requirements = before.requirements := by
+  unfold unify at success
+  cases unified : before.inference.unify left right <;>
+    simp [liftUnification, unified, bind, Except.bind] at success
+  cases success
+  exact ⟨rfl, rfl⟩
+
 private def PreservesRequirements {alpha : Type} (stateOf : alpha → State)
     (initial : State) (computation : Except Error alpha) : Prop :=
   ∀ result, computation = .ok result →
@@ -1850,6 +1865,128 @@ theorem inferMatchPatternFuel_requirements_subset
       subst result
       exact inferMatchPatternFlatFuel_preserves_requirements fuel context pattern
         expected [] state inferred flatResult
+
+/-- A successful direct numeric-pattern branch retains one exact metadata
+origin and its matching builtin-`Int` requirement row.  In particular, this
+does not merely recover a requirement identity from the pattern resolution:
+it reconnects that identity to both ledgers which finalization later uses. -/
+theorem inferMatchPatternFlatFuel_integerLiteral_metadata
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {literal : Syntax.CoreLiteral} {value : Syntax.CoreLiteralValue}
+    {expected : Ty} {seen : List String} {state : State}
+    {result : InferredPattern} {rawValue : Nat}
+    (patternValue : pattern.value = .literal literal)
+    (literalValue : literal.value = value)
+    (numeric : Frontend.numericLiteralValue? value = some rawValue)
+    (success : inferMatchPatternFlatFuel fuel context pattern expected seen state =
+      .ok result) :
+    ∃ resolution origin,
+      result.resolution = .integerLiteral value resolution ∧
+      result.requirements = [resolution.requirement] ∧
+      resolution.rawValue = rawValue ∧
+      resolution.targetType = .variable origin.metavariable ∧
+      resolution.requirement = origin.requirement ∧
+      origin.span = pattern.span ∧
+      origin ∈ result.state.integerPatterns ∧
+      ({ id := origin.requirement,
+          predicate := ProgramSignatures.builtinIntPredicate
+            (.variable origin.metavariable) } : Requirement) ∈
+        result.state.requirements := by
+  cases fuel with
+  | zero => simp [inferMatchPatternFlatFuel] at success
+  | succ fuel =>
+      cases value with
+      | string spelling => simp [Frontend.numericLiteralValue?] at numeric
+      | decimal spelling =>
+          unfold inferMatchPatternFlatFuel at success
+          simp only [patternValue, literalValue, numeric, bind, Except.bind]
+            at success
+          simp [State.fresh, TypeSystem.InferState.fresh,
+            State.addRequirementWithId] at success
+          repeat' first | split at success
+          all_goals try simp_all only [exceptPure_eq_ok]
+          all_goals try simp_all
+          all_goals try cases success
+          all_goals try subst result
+          all_goals
+            obtain ⟨patternsEq, requirementsEq⟩ :=
+              unify_integerPatternMetadata_eq (by assumption)
+            rw [patternsEq, requirementsEq]
+            refine ⟨{
+                rawValue
+                targetType := .variable ⟨state.inference.next⟩
+                requirement := ⟨state.nextRequirement⟩
+              }, ?_⟩
+            simp_all
+            refine ⟨({
+                metavariable := ⟨state.inference.next⟩
+                span := pattern.span
+                requirement := ⟨state.nextRequirement⟩
+              } : IntegerPatternOrigin), ?_⟩
+            simp
+      | hexadecimal spelling =>
+          unfold inferMatchPatternFlatFuel at success
+          simp only [patternValue, literalValue, numeric, bind, Except.bind]
+            at success
+          simp [State.fresh, TypeSystem.InferState.fresh,
+            State.addRequirementWithId] at success
+          repeat' first | split at success
+          all_goals try simp_all only [exceptPure_eq_ok]
+          all_goals try simp_all
+          all_goals try cases success
+          all_goals try subst result
+          all_goals
+            obtain ⟨patternsEq, requirementsEq⟩ :=
+              unify_integerPatternMetadata_eq (by assumption)
+            rw [patternsEq, requirementsEq]
+            refine ⟨{
+                rawValue
+                targetType := .variable ⟨state.inference.next⟩
+                requirement := ⟨state.nextRequirement⟩
+              }, ?_⟩
+            simp_all
+            refine ⟨({
+                metavariable := ⟨state.inference.next⟩
+                span := pattern.span
+                requirement := ⟨state.nextRequirement⟩
+              } : IntegerPatternOrigin), ?_⟩
+            simp
+
+/-- Public-wrapper form of
+`inferMatchPatternFlatFuel_integerLiteral_metadata` for a root numeric
+pattern. -/
+theorem inferMatchPatternFuel_integerLiteral_metadata
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {literal : Syntax.CoreLiteral} {value : Syntax.CoreLiteralValue}
+    {expected : Ty} {state next : State} {typed : TypedMatchPattern}
+    {rawValue : Nat}
+    (patternValue : pattern.value = .literal literal)
+    (literalValue : literal.value = value)
+    (numeric : Frontend.numericLiteralValue? value = some rawValue)
+    (success : inferMatchPatternFuel fuel context pattern expected state =
+      .ok (typed, next)) :
+    ∃ resolution origin,
+      typed.resolution = .integerLiteral value resolution ∧
+      typed.requirements = [resolution.requirement] ∧
+      resolution.rawValue = rawValue ∧
+      resolution.targetType = .variable origin.metavariable ∧
+      resolution.requirement = origin.requirement ∧
+      origin.span = pattern.span ∧
+      origin ∈ next.integerPatterns ∧
+      ({ id := origin.requirement,
+          predicate := ProgramSignatures.builtinIntPredicate
+            (.variable origin.metavariable) } : Requirement) ∈
+        next.requirements := by
+  unfold inferMatchPatternFuel at success
+  cases flatResult :
+      inferMatchPatternFlatFuel fuel context pattern expected [] state with
+  | error error => simp [flatResult, bind, Except.bind] at success
+  | ok inferred =>
+      simp only [flatResult, bind, Except.bind] at success
+      injection success with resultEq
+      cases resultEq
+      exact inferMatchPatternFlatFuel_integerLiteral_metadata patternValue
+        literalValue numeric flatResult
 
 /-- Pairwise builtin argument unification does not remove requirement rows. -/
 theorem unifyBuiltinFunctionArgumentsEqual_requirements_subset
