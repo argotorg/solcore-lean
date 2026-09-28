@@ -1330,6 +1330,24 @@ theorem recordExpressionWithExpected_success_containsExpression
   rw [resultState, resultExpression]
   exact recordNode_containsExpression fitted.state _ roots
 
+/-- Successful expression inference against a concrete expectation remains
+equal to that expectation in every later inference state.  This is the
+frontend-wide coherence fact used by returns, conditions, annotated locals,
+and other expected-typed expression consumers. -/
+theorem inferExprFuel_success_expected_type_afterProgress
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : TypeSystem.Ty}
+    {initial finalState : Frontend.SourceInference.State}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (success : Detail.inferExprFuel fuel context expression (some expected)
+      initial = .ok result)
+    (progress : result.2.InferenceProgress finalState) :
+    finalState.resolve result.1.type = finalState.resolve expected := by
+  simpa [Frontend.SourceInference.State.resolve,
+    TypeSystem.InferState.resolve] using
+      (Detail.inferExprFuel_expected_type_apply_eq success
+        progress.substitution_extends)
+
 /-- A successful grouped-expression branch exposes both recursive inference
 and the exact parent recording operation.  The retained parent points to the
 child occurrence returned by that recursive call and owns only requirements

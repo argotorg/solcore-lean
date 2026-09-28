@@ -183,6 +183,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_containsExpression
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_expected_type_afterProgress
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_group_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.groupBranchExpressionHasType_afterSubstitution
