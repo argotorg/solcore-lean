@@ -715,6 +715,99 @@ theorem allocateBinder
 
 end ActiveLocalFormation
 
+/-- The complete lexical invariant threaded by recursive statement typing:
+stable executable binders are aligned with the declarative local context, and
+every active closed scheme and qualified-requirement template is formed in
+that same context. -/
+structure ActiveLocalContextInvariant
+    (state : Frontend.SourceInference.State)
+    (substitution : TypeSystem.Substitution)
+    (context : SourceSemantics.Context) : Prop where
+  aligned : LocalEnvironmentAligned state substitution context
+  formation : ActiveLocalFormation state substitution context
+
+namespace ActiveLocalContextInvariant
+
+/-- Any update which preserves the active binder stack preserves the combined
+lexical invariant. -/
+theorem congr_localBinders
+    {state final : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (localBinders_eq : final.localBinders = state.localBinders) :
+    ActiveLocalContextInvariant final substitution context :=
+  ⟨invariant.aligned.congr_localBinders localBinders_eq,
+    invariant.formation.congr_localBinders localBinders_eq⟩
+
+/-- Replacing the compatibility-only name environment does not affect the
+stable lexical invariant. -/
+theorem withLocals
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (locals : TypeSystem.Environment) :
+    ActiveLocalContextInvariant (state.withLocals locals) substitution
+      context :=
+  ⟨invariant.aligned.withLocals locals,
+    invariant.formation.withLocals locals⟩
+
+/-- Restoring an enclosing lexical snapshot restores both halves of the
+combined invariant. -/
+theorem restoreLexicalScope
+    {outer inner : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant outer substitution context) :
+    ActiveLocalContextInvariant
+      (inner.restoreLexicalScope outer.lexicalScope) substitution context :=
+  ⟨invariant.aligned.restoreLexicalScope,
+    invariant.formation.restoreLexicalScope⟩
+
+/-- Recording the enclosing statement after lexical restoration preserves
+the complete outer invariant. -/
+theorem restoreLexicalScope_recordNode
+    {outer inner : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant outer substitution context)
+    (node : Node) :
+    ActiveLocalContextInvariant
+      ((inner.restoreLexicalScope outer.lexicalScope).recordNode node)
+      substitution context :=
+  ⟨invariant.aligned.restoreLexicalScope_recordNode node,
+    invariant.formation.restoreLexicalScope_recordNode node⟩
+
+/-- One fresh visible binder extends executable and declarative local scopes
+in lockstep while preserving lookup alignment and active formation. -/
+theorem allocateBinder_of_localBindersBelowNextLocal
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false)
+    (schemeRequirements : List LocalSchemeRequirement := [])
+    {binder : TypedBinder} {final : Frontend.SourceInference.State}
+    (allocated : state.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, final))
+    (below : state.LocalBindersBelowNextLocal)
+    (schemeWellFormed : SchemeWellFormed context
+      (binder.applySubstitution substitution).scheme)
+    (requirementsWellFormed : LocalSchemeRequirementsWellFormed context
+      (binder.applySubstitution substitution)) :
+    ActiveLocalContextInvariant final substitution
+      (context.withLocal binder.id
+        (binder.applySubstitution substitution).scheme
+        (binder.applySubstitution substitution).schemeRequirements) :=
+  ⟨invariant.aligned.allocateBinder_of_localBindersBelowNextLocal
+      name scheme span comptime schemeRequirements allocated below,
+    invariant.formation.allocateBinder name scheme span comptime
+      schemeRequirements allocated schemeWellFormed requirementsWellFormed⟩
+
+end ActiveLocalContextInvariant
+
 /-- Alignment supplies the two semantic lookups for a guarded local name,
 while active formation supplies the corresponding closed scheme judgments. -/
 theorem localReferenceEnvironmentFacts_of_lookupBinder?
@@ -826,6 +919,36 @@ theorem checkFunctionBody_success_initialLocalEnvironmentFacts
   rw [inputsEq] at initialExtension
   simpa only [Frontend.SourceInference.State.initial_inputs_eq_localBinders]
     using initialExtension
+
+/-- Package the initial lookup alignment and active formation supplied by a
+successful body check into the invariant consumed by recursive statement
+typing. -/
+theorem checkFunctionBody_success_initialActiveLocalContextInvariant
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (parameterTypes : TypesWellFormed
+      (checkedBodyContext signatures signature checked)
+      signature.parameterTypes)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    ∃ lexicalContext,
+      MonoBindersExtend signature.id
+          (checkedBodyContext signatures signature checked)
+          checked.typedBody.inputs signature.parameterTypes lexicalContext ∧
+        ActiveLocalContextInvariant
+          (Frontend.SourceInference.State.initial signature.id
+            ((signature.parameterNames.zip signature.parameterTypes).map
+              fun parameter =>
+                (parameter.1, TypeSystem.Scheme.mono parameter.2))
+            signature.parameterComptime)
+          checked.substitution lexicalContext := by
+  obtain ⟨lexicalContext, extension, aligned, formation⟩ :=
+    checkFunctionBody_success_initialLocalEnvironmentFacts parameterTypes
+      success
+  exact ⟨lexicalContext, extension, ⟨aligned, formation⟩⟩
 
 /-- The frontend no-capture certificate already has exactly the
 predicate-wide shape required by the semantic substitution bridge. -/

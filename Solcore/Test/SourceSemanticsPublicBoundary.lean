@@ -137,9 +137,23 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.allocateBinder
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.congr_localBinders
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.withLocals
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.restoreLexicalScope
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.restoreLexicalScope_recordNode
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.allocateBinder_of_localBindersBelowNextLocal
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.localReferenceEnvironmentFacts_of_lookupBinder?
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_initialLocalEnvironmentFacts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_initialActiveLocalContextInvariant
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.localBinderInstantiationNoCapture_predicateRangeAvoids
 example :=
