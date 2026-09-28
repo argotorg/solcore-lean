@@ -19,6 +19,7 @@ example := @Solcore.SourceSemantics.Context.LocalLookup
 example := @Solcore.SourceSemantics.Context.LocalSchemeRequirementsLookup
 example := @Solcore.SourceSemantics.Context.localSchemeRequirementsLookup_withLocal_self
 example := @Solcore.SourceSemantics.Context.HasAssumption
+example := @Solcore.SourceSemantics.SourceProjectionsHaveType.append
 
 example := @Solcore.SourceSemantics.ContainsNode
 example := @Solcore.SourceSemantics.ContainsExpression

@@ -10338,6 +10338,20 @@ private theorem inferStatementsFuel_inferenceProperties_internal
   inferFuel_inferenceProperties_internal.2.2.2.1 fuel context statements
     expectedReturn state
 
+private theorem inferPlaceFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (target : Syntax.Expr) (state : State) :
+    InferPlaceFuelInferenceProperties fuel context target state :=
+  inferFuel_inferenceProperties_internal.2.2.2.2.2.2.2.1
+    fuel context target state
+
+private theorem inferAssignedValueFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (target : Syntax.Expr)
+    (operator : Syntax.ValueAssignOp) (value : Syntax.Expr) (state : State) :
+    InferAssignedValueFuelInferenceProperties fuel context target operator
+      value state :=
+  inferFuel_inferenceProperties_internal.2.2.2.2.2.2.2.2.1
+    fuel context target operator value state
+
 /-- Successful expression inference makes monotone inference progress, leaves
 the resulting state ready for further inference, and returns a type whose
 variables are allocated by that state. -/
@@ -10383,6 +10397,45 @@ theorem inferStatementsFuel_inferenceProperties
   exact inferStatementsFuel_inferenceProperties_internal fuel context
     statements expectedReturn state ready validated canonical returnBelow
     result success
+
+/-- Successful place inference makes monotone inference progress, preserves
+readiness, and returns a place type bounded by the resulting allocator. -/
+theorem inferPlaceFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {target : Syntax.Expr} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  exact inferPlaceFuel_inferenceProperties_internal fuel context target state
+    ready validated canonical result success
+
+/-- Successful value-assignment inference makes monotone inference progress,
+preserves readiness, and bounds both finalized target and value types. -/
+theorem inferAssignedValueFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {target value : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result) :
+    state.InferenceProgress result.2.2 ∧
+      result.2.2.InferenceReady ∧
+      result.1.target.type.VariablesBelow result.2.2.inference.next ∧
+      result.2.1.type.VariablesBelow result.2.2.inference.next := by
+  exact inferAssignedValueFuel_inferenceProperties_internal fuel context target
+    operator value state ready validated canonical result success
 
 set_option maxHeartbeats 1000000 in
 private theorem inferFuel_preserves_lexicalScope_internal :

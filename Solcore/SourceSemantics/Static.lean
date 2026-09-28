@@ -1003,6 +1003,35 @@ mutual
 
 end
 
+namespace SourceProjectionsHaveType
+
+/-- Typed place-projection paths compose in source order.  This is the
+structural bridge used when executable place inference appends a freshly
+checked index projection to an already resolved base place. -/
+theorem append
+    {source : TypedSource} {context : Context}
+    {initial middle final : TypeSystem.Ty}
+    {leading trailing : List PlaceProjection}
+    (leadingType : SourceProjectionsHaveType source context initial leading
+      middle)
+    (trailingType : SourceProjectionsHaveType source context middle trailing
+      final) :
+    SourceProjectionsHaveType source context initial (leading ++ trailing)
+      final := by
+  cases leading with
+  | nil =>
+    cases leadingType
+    exact trailingType
+  | cons projection rest =>
+    cases leadingType with
+    | index keyType restType =>
+      exact .index keyType (append restType trailingType)
+    | member selected restType =>
+      exact .member selected (append restType trailingType)
+termination_by leading.length
+
+end SourceProjectionsHaveType
+
 /-- A declaration body is a statement-root list with no escaping loop control
 and with every ordinary completion producing the declared result type. -/
 def BodyHasType (source : TypedSource) (context : Context)
