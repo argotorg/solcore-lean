@@ -369,6 +369,20 @@ theorem restoreLexicalScope
   apply aligned.congr_localBinders
   rfl
 
+/-- Recording the enclosing statement after restoring an outer lexical
+snapshot preserves the outer environment alignment. -/
+theorem restoreLexicalScope_recordNode
+    {outer inner : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (aligned : LocalEnvironmentAligned outer substitution context)
+    (node : Node) :
+    LocalEnvironmentAligned
+      ((inner.restoreLexicalScope outer.lexicalScope).recordNode node)
+      substitution context := by
+  apply (aligned.restoreLexicalScope (inner := inner)).congr_localBinders
+  rfl
+
 end LocalEnvironmentAligned
 
 /-- Every stable binder in the currently active executable lexical scope has
@@ -482,6 +496,20 @@ theorem restoreLexicalScope
     ActiveLocalFormation
       (inner.restoreLexicalScope outer.lexicalScope) substitution context := by
   apply formation.congr_localBinders
+  rfl
+
+/-- Recording the enclosing statement after restoring an outer lexical
+snapshot preserves the outer active-binder formation. -/
+theorem restoreLexicalScope_recordNode
+    {outer inner : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (formation : ActiveLocalFormation outer substitution context)
+    (node : Node) :
+    ActiveLocalFormation
+      ((inner.restoreLexicalScope outer.lexicalScope).recordNode node)
+      substitution context := by
+  apply (formation.restoreLexicalScope (inner := inner)).congr_localBinders
   rfl
 
 /-- Adding one semantic local changes none of the context fields observed by
@@ -1492,6 +1520,58 @@ theorem inferStatementFuel_success_continue_facts
     exact ⟨loopNonzero, rfl,
       recordNode_containsStatement allocated _ roots⟩
 
+/-- A successful block branch exposes the recursively inferred statement
+sequence, the restoration of the enclosing lexical scope, and the exact block
+node recorded after that restoration. -/
+theorem inferStatementFuel_success_block_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {body : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .block body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ bodyResult,
+      Detail.inferStatementsFuel fuel context body expectedReturn allocated =
+        .ok bodyResult ∧
+      result = {
+        id
+        type := bodyResult.type
+        hasValue := bodyResult.sawReturn
+        sawReturn := bodyResult.sawReturn
+        state :=
+          (bodyResult.state.restoreLexicalScope allocated.lexicalScope
+            ).recordNode (.statement {
+              id
+              span := statement.span
+              type := bodyResult.type
+              form := .block bodyResult.statements
+            })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .block bodyResult.statements
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases bodySuccess :
+      Detail.inferStatementsFuel fuel context body expectedReturn allocated with
+  | error error =>
+      simp [bodySuccess] at success
+  | ok bodyResult =>
+      simp only [bodySuccess, pure, Pure.pure, Except.pure] at success
+      injection success with resultEq
+      rw [← resultEq]
+      exact ⟨bodyResult, rfl, rfl,
+        recordNode_containsStatement
+          (bodyResult.state.restoreLexicalScope allocated.lexicalScope)
+          _ roots⟩
+
 /-- A retained semicolon-terminated expression statement discards its child's
 value.  Final substitution changes the child proof but leaves the statement's
 unit result and ordinary control summary unchanged. -/
@@ -1702,6 +1782,35 @@ structure BlockResultMatchesFactsAfterSubstitution
   type_eq : facts.type = substitution.apply result.type
   sawReturn_eq : facts.sawReturn = result.sawReturn
 
+/-- A retained block is typed by the recursively reconstructed statement
+sequence.  The sequence agreement supplies the final type annotation on the
+substituted block node, while lexical effects remain scoped to the body. -/
+theorem blockStatementHasType_afterSubstitution
+    {source : TypedSource} {target innerFinal : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {bodyResult : Detail.BlockResult} {bodyFacts : BodyFacts}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := bodyResult.type
+      form := .block bodyResult.statements
+    })
+    (bodyType : StatementsHaveType (source.applySubstitution outer) control
+      target bodyResult.statements innerFinal bodyFacts)
+    (agreement : BlockResultMatchesFactsAfterSubstitution outer bodyResult
+      bodyFacts) :
+    StatementHasType (source.applySubstitution outer) control target id target {
+      type := bodyFacts.type
+      hasValue := bodyFacts.sawReturn
+      sawReturn := bodyFacts.sawReturn
+      control := bodyFacts.control.eraseValue
+    } := by
+  exact .block
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl bodyType (by
+      simpa [StatementNode.applySubstitution] using agreement.type_eq.symm)
+
 namespace StatementResultMatchesFactsAfterSubstitution
 
 /-- The executable result shared by bare and value returns agrees with the
@@ -1768,6 +1877,30 @@ theorem continueStmt
       control := .continuing
     } := by
   constructor <;> rfl
+
+/-- A scoped block statement inherits the finalized type and return flag of
+its recursively inferred body; erasing the body's ordinary value affects only
+the control summary. -/
+theorem block
+    {substitution : TypeSystem.Substitution}
+    {bodyResult : Detail.BlockResult} {bodyFacts : BodyFacts}
+    (agreement : BlockResultMatchesFactsAfterSubstitution substitution
+      bodyResult bodyFacts)
+    (id : StatementId) (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := bodyResult.type
+      hasValue := bodyResult.sawReturn
+      sawReturn := bodyResult.sawReturn
+      state
+    } {
+      type := bodyFacts.type
+      hasValue := bodyFacts.sawReturn
+      sawReturn := bodyFacts.sawReturn
+      control := bodyFacts.control.eraseValue
+    } := by
+  exact ⟨agreement.type_eq, agreement.sawReturn_eq,
+    agreement.sawReturn_eq⟩
 
 end StatementResultMatchesFactsAfterSubstitution
 

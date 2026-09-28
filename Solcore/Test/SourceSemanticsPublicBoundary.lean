@@ -117,6 +117,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.restoreLexicalScope
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.restoreLexicalScope_recordNode
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.facts_of_lookupBinder?
@@ -126,6 +128,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.withLocals
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.restoreLexicalScope
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.restoreLexicalScope_recordNode
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.withLocal
 example :=
@@ -183,6 +187,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_continue_facts
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_block_facts
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.returnUnitStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.returnValueStatementHasType_afterSubstitution
@@ -190,6 +196,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.breakStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.continueStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.blockStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution
 example :=
@@ -200,6 +208,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.breakStmt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.continueStmt
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.block
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_nil_facts
 example :=
