@@ -566,6 +566,45 @@ example {context : SourceInference.Context}
   exact SourceInference.Detail.applyFunctionType_inferenceProperties ready
     calleeBelow argumentsBelow expectedBelow success
 
+/-- Unary operator inference preserves progress and readiness and returns an
+allocator-bounded type. -/
+example {context : SourceInference.Context} {operator : Syntax.UnaryOp}
+    {operandType : TypeSystem.Ty} {expected : Option TypeSystem.Ty}
+    {integerLiterals : List SourceInference.IntegerLiteralOrigin}
+    {state : SourceInference.State}
+    {result : SourceInference.Detail.OperatorInferenceResult}
+    (ready : state.InferenceReady)
+    (operandBelow : operandType.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.inferUnaryOperator context operator
+      operandType expected integerLiterals state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  exact SourceInference.Detail.inferUnaryOperator_inferenceProperties ready
+    operandBelow expectedBelow success
+
+/-- Binary operator inference preserves progress and readiness after operand
+unification and returns an allocator-bounded type. -/
+example {context : SourceInference.Context} {operator : Syntax.BinaryOp}
+    {left right : TypeSystem.Ty} {expected : Option TypeSystem.Ty}
+    {integerLiterals : List SourceInference.IntegerLiteralOrigin}
+    {state : SourceInference.State}
+    {result : SourceInference.Detail.OperatorInferenceResult}
+    (ready : state.InferenceReady)
+    (leftBelow : left.VariablesBelow state.inference.next)
+    (rightBelow : right.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.inferBinaryOperator context operator left
+      right expected integerLiterals state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  exact SourceInference.Detail.inferBinaryOperator_inferenceProperties ready
+    leftBelow rightBelow expectedBelow success
+
 /-- Attaching delayed argument coercions preserves semantic inference progress
 and readiness. -/
 example (state : SourceInference.State)

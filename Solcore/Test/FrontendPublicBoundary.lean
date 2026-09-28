@@ -478,6 +478,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferBinaryOperator_requirements_subset
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferUnaryOperator_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferBinaryOperator_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.attachExpressionCoercions_preserves_requirementsWellFormed
 example :=
   @Solcore.Frontend.SourceInference.Detail.attachExpressionCoercions_requirements_subset

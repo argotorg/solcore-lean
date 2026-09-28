@@ -1674,6 +1674,404 @@ theorem unify_preserves_inferenceReady
       · change state.binderEnvironment.BodiesBelow inference.next
         exact ready.bindersBelow.weaken progress.next_le
 
+private abbrev finishOperator (context : Context) (dispatch : OperatorDispatch)
+    (operand builtin builtinResult resultType : Ty)
+    (parameterTypes : List Ty) (hasOpenLiteralOperand : Bool)
+    (state : State) : Except Error OperatorInferenceResult :=
+  if operand = builtin then
+    pure {
+      type := builtinResult
+      requirements := []
+      state
+    }
+  else
+    match dispatch with
+    | .function name =>
+        if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+              builtin operand ||
+            isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+              builtin operand then
+          pure {
+            type := resultType
+            requirements := []
+            state
+          }
+        else
+          throw (.unknownVariable name)
+    | .traitMethod traitName methodName => do
+        match ← operatorTrait? context traitName with
+        | some trait =>
+            let predicates ← operatorTraitPredicates context trait methodName
+              operand parameterTypes [resultType]
+            let (requirements, state) :=
+              state.addRequirementsWithIds predicates
+            pure {
+              type := resultType
+              requirements
+              state
+            }
+        | none =>
+            if isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                  builtin operand ||
+                isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                  builtin operand then
+              pure {
+                type := resultType
+                requirements := []
+                state
+              }
+            else
+              throw (.operatorNotSupported traitName operand)
+
+private theorem finishOperator_inferenceProperties
+    {context : Context} {dispatch : OperatorDispatch}
+    {operand builtin builtinResult resultType : Ty}
+    {parameterTypes : List Ty} {hasOpenLiteralOperand : Bool}
+    {state : State} {result : OperatorInferenceResult}
+    (ready : state.InferenceReady)
+    (builtinResultBelow :
+      builtinResult.VariablesBelow state.inference.next)
+    (resultTypeBelow : resultType.VariablesBelow state.inference.next)
+    (success : finishOperator context dispatch operand builtin builtinResult
+      resultType parameterTypes hasOpenLiteralOperand state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  unfold finishOperator at success
+  by_cases builtinMatch : operand = builtin
+  · simp only [builtinMatch, if_true] at success
+    injection success with resultEq
+    subst result
+    exact ⟨.refl ready.solved, ready, builtinResultBelow⟩
+  · simp only [builtinMatch, if_false] at success
+    cases dispatch with
+    | function name =>
+        cases deferredResult :
+            (isDeferredBuiltinOperatorTarget state hasOpenLiteralOperand
+                builtin operand ||
+              isStagedIntegerOperatorTarget state hasOpenLiteralOperand
+                builtin operand) with
+        | false =>
+          simp [deferredResult] at success
+        | true =>
+          simp only [deferredResult, if_true] at success
+          injection success with resultEq
+          subst result
+          exact ⟨.refl ready.solved, ready, resultTypeBelow⟩
+    | traitMethod traitName methodName =>
+        cases traitResult : operatorTrait? context traitName with
+        | error error =>
+            simp [traitResult, bind, Except.bind] at success
+        | ok traitOption =>
+            cases traitOption with
+            | none =>
+                simp only [traitResult, bind, Except.bind] at success
+                cases deferredResult :
+                    (isDeferredBuiltinOperatorTarget state
+                        hasOpenLiteralOperand builtin operand ||
+                      isStagedIntegerOperatorTarget state
+                        hasOpenLiteralOperand builtin operand) with
+                | false =>
+                  simp [deferredResult] at success
+                | true =>
+                  simp only [deferredResult, if_true] at success
+                  injection success with resultEq
+                  subst result
+                  exact ⟨.refl ready.solved, ready, resultTypeBelow⟩
+            | some trait =>
+                simp only [traitResult, bind, Except.bind] at success
+                cases predicatesResult : operatorTraitPredicates context trait
+                    methodName operand parameterTypes [resultType] with
+                | error error =>
+                    simp [predicatesResult, bind, Except.bind] at success
+                | ok predicates =>
+                    simp only [predicatesResult, bind, Except.bind] at success
+                    change Except.ok {
+                      type := resultType
+                      requirements :=
+                        (state.addRequirementsWithIds predicates).1
+                      state := (state.addRequirementsWithIds predicates).2
+                    } = Except.ok result at success
+                    injection success with resultEq
+                    subst result
+                    have progress :=
+                      State.InferenceProgress.addRequirementsWithIds state
+                        predicates ready.solved
+                    have resultReady :=
+                      State.InferenceReady.addRequirementsWithIds predicates
+                        ready
+                    exact ⟨progress, resultReady,
+                      resultTypeBelow.weaken progress.next_le⟩
+
+private abbrev finishUnaryOperator (context : Context)
+    (operator : Syntax.UnaryOp) (operandType : Ty)
+    (hasOpenLiteralOperand : Bool) (state : State) :
+    Except Error OperatorInferenceResult :=
+  let operand := state.resolve operandType
+  let builtin := match operator with
+    | .logicalNot => Ty.bool
+    | .bitNot => Ty.word
+  finishOperator context (unaryOperatorDispatch operator) operand builtin
+    builtin (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
+    [operand] hasOpenLiteralOperand state
+
+private theorem finishUnaryOperator_inferenceProperties
+    {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {hasOpenLiteralOperand : Bool} {state : State}
+    {result : OperatorInferenceResult}
+    (ready : state.InferenceReady)
+    (operandBelow : operandType.VariablesBelow state.inference.next)
+    (success : finishUnaryOperator context operator operandType
+      hasOpenLiteralOperand state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  have resolvedOperandBelow :
+      (state.resolve operandType).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply operandBelow
+  have builtinBelow :
+      (match operator with
+        | .logicalNot => Ty.bool
+        | .bitNot => Ty.word).VariablesBelow state.inference.next := by
+    cases operator <;>
+      exact Ty.variablesBelow_constructor state.inference.next _
+  have resultTypeBelow :
+      (if operator == Syntax.UnaryOp.logicalNot then .bool
+        else state.resolve operandType).VariablesBelow
+          state.inference.next := by
+    by_cases returnsBool :
+        (operator == Syntax.UnaryOp.logicalNot) = true
+    · simpa only [returnsBool, if_true, Ty.bool] using
+        (Ty.variablesBelow_constructor state.inference.next
+          (.builtin .bool))
+    · simpa only [returnsBool, Bool.false_eq_true, if_false] using
+        resolvedOperandBelow
+  exact finishOperator_inferenceProperties ready builtinBelow resultTypeBelow
+    (by simpa only [finishUnaryOperator] using success)
+
+private abbrev finishBinaryOperator (context : Context)
+    (operator : Syntax.BinaryOp) (left : Ty)
+    (hasOpenLiteralOperand : Bool) (state : State) :
+    Except Error OperatorInferenceResult :=
+  let operand := state.resolve left
+  let builtin := binaryBuiltinType operator
+  finishOperator context (binaryOperatorDispatch operator) operand builtin
+    (if binaryResultIsBool operator then .bool else builtin)
+    (if binaryResultIsBool operator then .bool else operand)
+    [operand, operand] hasOpenLiteralOperand state
+
+private theorem finishBinaryOperator_inferenceProperties
+    {context : Context} {operator : Syntax.BinaryOp} {left : Ty}
+    {hasOpenLiteralOperand : Bool} {state : State}
+    {result : OperatorInferenceResult}
+    (ready : state.InferenceReady)
+    (leftBelow : left.VariablesBelow state.inference.next)
+    (success : finishBinaryOperator context operator left
+      hasOpenLiteralOperand state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  have resolvedLeftBelow :
+      (state.resolve left).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply leftBelow
+  have builtinBelow :
+      (if binaryResultIsBool operator then .bool
+        else binaryBuiltinType operator).VariablesBelow
+          state.inference.next := by
+    by_cases returnsBool : binaryResultIsBool operator = true
+    · simpa only [returnsBool, if_true, Ty.bool] using
+        (Ty.variablesBelow_constructor state.inference.next
+          (.builtin .bool))
+    · simp only [returnsBool, Bool.false_eq_true, if_false]
+      cases operator <;>
+        simpa only [binaryBuiltinType, Ty.word, Ty.bool] using
+          (Ty.variablesBelow_constructor state.inference.next _)
+  have resultTypeBelow :
+      (if binaryResultIsBool operator then .bool
+        else state.resolve left).VariablesBelow state.inference.next := by
+    by_cases returnsBool : binaryResultIsBool operator = true
+    · simpa only [returnsBool, if_true, Ty.bool] using
+        (Ty.variablesBelow_constructor state.inference.next
+          (.builtin .bool))
+    · simpa only [returnsBool, Bool.false_eq_true, if_false] using
+        resolvedLeftBelow
+  exact finishOperator_inferenceProperties ready builtinBelow resultTypeBelow
+    (by simpa only [finishBinaryOperator] using success)
+
+/-- Successful unary-operator inference makes semantic inference progress,
+preserves readiness, and returns an allocator-bounded result type. -/
+theorem inferUnaryOperator_inferenceProperties
+    {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (ready : state.InferenceReady)
+    (operandBelow : operandType.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : inferUnaryOperator context operator operandType expected
+      integerLiterals state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  let hasOpenLiteralOperand :=
+    isOpenIntegerLiteralTarget state integerLiterals operandType
+  unfold inferUnaryOperator at success
+  cases expected with
+  | none =>
+      simp only [bind, Except.bind, pure, Pure.pure, Except.pure] at success
+      have tailSuccess : finishUnaryOperator context operator operandType
+          hasOpenLiteralOperand state = .ok result := by
+        change finishUnaryOperator context operator operandType
+          hasOpenLiteralOperand state = .ok result at success
+        exact success
+      exact finishUnaryOperator_inferenceProperties ready operandBelow
+        tailSuccess
+  | some expectedType =>
+      have expectedTypeBelow := expectedBelow expectedType (by simp)
+      cases skipResult :
+          (operator == Syntax.UnaryOp.logicalNot ||
+            (state.resolve operandType).freeVariables.isEmpty ||
+              !hasOpenLiteralOperand) with
+      | true =>
+          simp only [hasOpenLiteralOperand, skipResult, if_true, bind,
+            Except.bind, pure, Pure.pure, Except.pure] at success
+          have tailSuccess : finishUnaryOperator context operator operandType
+              hasOpenLiteralOperand state = .ok result := by
+            change finishUnaryOperator context operator operandType
+              hasOpenLiteralOperand state = .ok result at success
+            exact success
+          exact finishUnaryOperator_inferenceProperties ready operandBelow
+            tailSuccess
+      | false =>
+          simp only [hasOpenLiteralOperand, skipResult, Bool.false_eq_true,
+            if_false] at success
+          cases unifyResult : unify state (state.resolve operandType)
+              expectedType with
+          | error error =>
+              simp [unifyResult, bind, Except.bind] at success
+          | ok fittedState =>
+              simp only [unifyResult, bind, Except.bind] at success
+              have resolvedOperandBelow :
+                  (state.resolve operandType).VariablesBelow
+                    state.inference.next :=
+                ready.solved.variablesBelow_apply operandBelow
+              have fitProgress := unify_inferenceProgress ready.solved
+                resolvedOperandBelow expectedTypeBelow unifyResult
+              have fittedReady := unify_preserves_inferenceReady ready
+                resolvedOperandBelow expectedTypeBelow unifyResult
+              have operandAtFitted : operandType.VariablesBelow
+                  fittedState.inference.next :=
+                operandBelow.weaken fitProgress.next_le
+              have tailSuccess : finishUnaryOperator context operator
+                  operandType hasOpenLiteralOperand fittedState = .ok result := by
+                change finishUnaryOperator context operator operandType
+                  hasOpenLiteralOperand fittedState = .ok result at success
+                exact success
+              have tailProperties :=
+                finishUnaryOperator_inferenceProperties fittedReady
+                  operandAtFitted tailSuccess
+              exact ⟨fitProgress.trans tailProperties.1,
+                tailProperties.2⟩
+
+/-- Successful binary-operator inference makes semantic inference progress,
+preserves readiness, and returns an allocator-bounded result type. -/
+theorem inferBinaryOperator_inferenceProperties
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (ready : state.InferenceReady)
+    (leftBelow : left.VariablesBelow state.inference.next)
+    (rightBelow : right.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  let hasOpenLiteralOperand :=
+    isOpenIntegerLiteralTarget state integerLiterals left ||
+      isOpenIntegerLiteralTarget state integerLiterals right
+  unfold inferBinaryOperator at success
+  cases unifyResult : unify state left right with
+  | error error =>
+      simp [unifyResult, bind, Except.bind] at success
+  | ok unifiedState =>
+      simp only [unifyResult, bind, Except.bind] at success
+      have unifyProgress := unify_inferenceProgress ready.solved leftBelow
+        rightBelow unifyResult
+      have unifiedReady := unify_preserves_inferenceReady ready leftBelow
+        rightBelow unifyResult
+      have leftAtUnified :
+          left.VariablesBelow unifiedState.inference.next :=
+        leftBelow.weaken unifyProgress.next_le
+      cases expected with
+      | none =>
+          simp only [bind, Except.bind, pure, Pure.pure, Except.pure]
+            at success
+          have tailSuccess : finishBinaryOperator context operator left
+              hasOpenLiteralOperand unifiedState = .ok result := by
+            change finishBinaryOperator context operator left
+              hasOpenLiteralOperand unifiedState = .ok result at success
+            exact success
+          have tailProperties := finishBinaryOperator_inferenceProperties
+            unifiedReady leftAtUnified tailSuccess
+          exact ⟨unifyProgress.trans tailProperties.1,
+            tailProperties.2⟩
+      | some expectedType =>
+          have expectedTypeBelow : expectedType.VariablesBelow
+              unifiedState.inference.next :=
+            (expectedBelow expectedType (by simp)).weaken
+              unifyProgress.next_le
+          cases skipResult :
+              (binaryResultIsBool operator ||
+                (unifiedState.resolve left).freeVariables.isEmpty ||
+                  !hasOpenLiteralOperand) with
+          | true =>
+              simp only [hasOpenLiteralOperand, skipResult, if_true, bind,
+                Except.bind, pure, Pure.pure, Except.pure] at success
+              have tailSuccess : finishBinaryOperator context operator left
+                  hasOpenLiteralOperand unifiedState = .ok result := by
+                change finishBinaryOperator context operator left
+                  hasOpenLiteralOperand unifiedState = .ok result at success
+                exact success
+              have tailProperties := finishBinaryOperator_inferenceProperties
+                unifiedReady leftAtUnified tailSuccess
+              exact ⟨unifyProgress.trans tailProperties.1,
+                tailProperties.2⟩
+          | false =>
+              simp only [hasOpenLiteralOperand, skipResult,
+                Bool.false_eq_true, if_false] at success
+              have resolvedLeftBelow :
+                  (unifiedState.resolve left).VariablesBelow
+                    unifiedState.inference.next :=
+                unifiedReady.solved.variablesBelow_apply leftAtUnified
+              cases fittedResult : unify unifiedState
+                  (unifiedState.resolve left) expectedType with
+              | error error =>
+                  simp [fittedResult, bind, Except.bind] at success
+              | ok fittedState =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  have fitProgress := unify_inferenceProgress
+                    unifiedReady.solved resolvedLeftBelow expectedTypeBelow
+                      fittedResult
+                  have fittedReady := unify_preserves_inferenceReady
+                    unifiedReady resolvedLeftBelow expectedTypeBelow fittedResult
+                  have leftAtFitted : left.VariablesBelow
+                      fittedState.inference.next :=
+                    leftAtUnified.weaken fitProgress.next_le
+                  have tailSuccess : finishBinaryOperator context operator left
+                      hasOpenLiteralOperand fittedState = .ok result := by
+                    change finishBinaryOperator context operator left
+                      hasOpenLiteralOperand fittedState = .ok result at success
+                    exact success
+                  have tailProperties :=
+                    finishBinaryOperator_inferenceProperties fittedReady
+                      leftAtFitted tailSuccess
+                  exact ⟨unifyProgress.trans
+                      (fitProgress.trans tailProperties.1),
+                    tailProperties.2⟩
+
 /-- Instantiating a successfully looked-up local binder by advancing only the
 inference allocator makes semantic progress, preserves readiness, and leaves
 the resolved instantiated body below the new allocator bound. -/
