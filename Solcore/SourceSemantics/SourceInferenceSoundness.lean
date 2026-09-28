@@ -1312,6 +1312,186 @@ theorem inferStatementFuel_success_expression_facts
       exact ⟨inferred, expressionState, rfl, rfl,
         recordNode_containsStatement expressionState _ roots⟩
 
+/-- A successful bare-return branch exposes the exact unification which makes
+the declared return type unit, together with the statement node recorded after
+that unification. -/
+theorem inferStatementFuel_success_returnUnit_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .returnStmt none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ unified,
+      Detail.unify allocated .unit expectedReturn = .ok unified ∧
+      unified.resolve expectedReturn = .unit ∧
+      result = {
+        id
+        type := unified.resolve expectedReturn
+        hasValue := true
+        sawReturn := true
+        state := unified.recordNode (.statement {
+          id
+          span := statement.span
+          type := unified.resolve expectedReturn
+          form := .returnStmt none
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .returnStmt none
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases unifySuccess : Detail.unify allocated .unit expectedReturn with
+  | error error =>
+      simp [unifySuccess] at success
+  | ok unified =>
+      simp only [unifySuccess, pure, Pure.pure, Except.pure] at success
+      injection success with resultEq
+      have resolvedEq : unified.resolve expectedReturn = .unit := by
+        exact (Detail.unify_resolve_eq unifySuccess).symm.trans (by rfl)
+      rw [← resultEq]
+      exact ⟨unified, rfl, resolvedEq, rfl,
+        recordNode_containsStatement unified _ roots⟩
+
+/-- A successful value-return branch exposes the recursively inferred value
+and the exact return node recorded by the frontend.  Expected-type coherence
+of the child is intentionally kept separate because it is a property of the
+whole expression traversal, not of statement recording. -/
+theorem inferStatementFuel_success_returnValue_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {value : Syntax.Expr}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .returnStmt (some value))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ inferred valueState,
+      Detail.inferExprFuel fuel context value (some expectedReturn) allocated =
+        .ok (inferred, valueState) ∧
+      result = {
+        id
+        type := valueState.resolve expectedReturn
+        hasValue := true
+        sawReturn := true
+        state := valueState.recordNode (.statement {
+          id
+          span := statement.span
+          type := valueState.resolve expectedReturn
+          form := .returnStmt (some inferred.id)
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .returnStmt (some inferred.id)
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases valueSuccess :
+      Detail.inferExprFuel fuel context value (some expectedReturn) allocated with
+  | error error =>
+      simp [valueSuccess] at success
+  | ok valuePair =>
+      rcases valuePair with ⟨inferred, valueState⟩
+      simp only [valueSuccess, pure, Pure.pure, Except.pure] at success
+      injection success with resultEq
+      rw [← resultEq]
+      exact ⟨inferred, valueState, rfl, rfl,
+        recordNode_containsStatement valueState _ roots⟩
+
+/-- Successful `break` inference records the canonical unit statement and
+simultaneously exposes the nonzero loop depth which justifies it. -/
+theorem inferStatementFuel_success_break_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .breakStmt)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    context.loopDepth ≠ 0 ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state := allocated.recordNode (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .breakStmt
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .breakStmt
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq] at success
+  split at success
+  · simp_all
+  · rename_i loopNonzero
+    injection success with resultEq
+    rw [← resultEq]
+    exact ⟨loopNonzero, rfl,
+      recordNode_containsStatement allocated _ roots⟩
+
+/-- Successful `continue` inference has the same allocation shape as `break`
+and exposes the same loop-availability fact. -/
+theorem inferStatementFuel_success_continue_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value = .continueStmt)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    context.loopDepth ≠ 0 ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state := allocated.recordNode (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .continueStmt
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .continueStmt
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq] at success
+  split at success
+  · simp_all
+  · rename_i loopNonzero
+    injection success with resultEq
+    rw [← resultEq]
+    exact ⟨loopNonzero, rfl,
+      recordNode_containsStatement allocated _ roots⟩
+
 /-- A retained semicolon-terminated expression statement discards its child's
 value.  Final substitution changes the child proof but leaves the statement's
 unit result and ordinary control summary unchanged. -/
@@ -1365,6 +1545,144 @@ theorem expressionStatementValueHasType_afterSubstitution
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl expressionType (by simp [StatementNode.applySubstitution])
 
+/-- A retained bare return is well typed once its local unification result is
+transported through the final substitution. -/
+theorem returnUnitStatementHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {loopDepth : Nat}
+    {statement : Syntax.Statement} {id : StatementId}
+    {expectedReturn : TypeSystem.Ty}
+    {returnState : Frontend.SourceInference.State}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := returnState.resolve expectedReturn
+      form := .returnStmt none
+    })
+    (resolvedEq : returnState.resolve expectedReturn = .unit)
+    (extension : outer.SemanticallyExtends
+      returnState.inference.substitution) :
+    StatementHasType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target id target {
+      type := outer.apply expectedReturn
+      hasValue := true
+      sawReturn := true
+      control := .returned
+    } := by
+  have resolvedFinal :
+      outer.apply (returnState.resolve expectedReturn) =
+        outer.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  have expectedUnit : outer.apply expectedReturn = .unit := by
+    rw [← resolvedFinal, resolvedEq]
+    rfl
+  exact .returnUnit
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl expectedUnit (by
+      simpa [StatementNode.applySubstitution] using resolvedFinal)
+
+/-- A value return is well typed after final substitution once recursive
+expression typing and expected-type coherence identify the child's finalized
+type with the declaration return type. -/
+theorem returnValueStatementHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {loopDepth : Nat}
+    {statement : Syntax.Statement} {id : StatementId}
+    {expectedReturn : TypeSystem.Ty}
+    {valueState : Frontend.SourceInference.State}
+    {inferred : InferredExpression}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := valueState.resolve expectedReturn
+      form := .returnStmt (some inferred.id)
+    })
+    (valueType : ExpressionHasType (source.applySubstitution outer) target
+      inferred.id (outer.apply inferred.type))
+    (expectedEq : outer.apply inferred.type = outer.apply expectedReturn)
+    (extension : outer.SemanticallyExtends
+      valueState.inference.substitution) :
+    StatementHasType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target id target {
+      type := outer.apply expectedReturn
+      hasValue := true
+      sawReturn := true
+      control := .returned
+    } := by
+  have resolvedFinal :
+      outer.apply (valueState.resolve expectedReturn) =
+        outer.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  have valueExpected : ExpressionHasType
+      (source.applySubstitution outer) target inferred.id
+      (outer.apply expectedReturn) := by
+    rw [← expectedEq]
+    exact valueType
+  exact .returnValue
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl valueExpected (by
+      simpa [StatementNode.applySubstitution] using resolvedFinal)
+
+/-- `break` is substitution-invariant; successful frontend loop validation is
+exactly the declarative loop-availability premise. -/
+theorem breakStatementHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {returnType : TypeSystem.Ty}
+    {loopDepth : Nat} {statement : Syntax.Statement} {id : StatementId}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .breakStmt
+    })
+    (allowed : loopDepth ≠ 0) :
+    StatementHasType (source.applySubstitution outer) {
+      returnType
+      loopDepth
+    } target id target {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .breaking
+    } := by
+  exact .breakStmt
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl (Nat.zero_lt_of_ne_zero allowed)
+    (by simp [StatementNode.applySubstitution])
+
+/-- `continue` has the same substitution-invariant typing boundary as
+`break`, with its distinct control summary retained. -/
+theorem continueStatementHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {returnType : TypeSystem.Ty}
+    {loopDepth : Nat} {statement : Syntax.Statement} {id : StatementId}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .continueStmt
+    })
+    (allowed : loopDepth ≠ 0) :
+    StatementHasType (source.applySubstitution outer) {
+      returnType
+      loopDepth
+    } target id target {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .continuing
+    } := by
+  exact .continueStmt
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl (Nat.zero_lt_of_ne_zero allowed)
+    (by simp [StatementNode.applySubstitution])
+
 /-- The proof-facing facts of one finalized statement agree with the three
 fields retained by executable statement inference.  Control is deliberately
 absent: it is determined by `StatementHasType`, whereas `StatementResult`
@@ -1383,6 +1701,75 @@ structure BlockResultMatchesFactsAfterSubstitution
     (result : Detail.BlockResult) (facts : BodyFacts) : Prop where
   type_eq : facts.type = substitution.apply result.type
   sawReturn_eq : facts.sawReturn = result.sawReturn
+
+namespace StatementResultMatchesFactsAfterSubstitution
+
+/-- The executable result shared by bare and value returns agrees with the
+declarative returned summary after any semantically extending substitution. -/
+theorem returned
+    {substitution : TypeSystem.Substitution}
+    {returnState resultState : Frontend.SourceInference.State}
+    {expectedReturn : TypeSystem.Ty} {id : StatementId}
+    (extension : substitution.SemanticallyExtends
+      returnState.inference.substitution) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := returnState.resolve expectedReturn
+      hasValue := true
+      sawReturn := true
+      state := resultState
+    } {
+      type := substitution.apply expectedReturn
+      hasValue := true
+      sawReturn := true
+      control := .returned
+    } := by
+  have resolvedFinal :
+      substitution.apply (returnState.resolve expectedReturn) =
+        substitution.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  exact ⟨resolvedFinal.symm, rfl, rfl⟩
+
+/-- The canonical executable `break` result agrees with its declarative
+control summary under every substitution. -/
+theorem breakStmt
+    (substitution : TypeSystem.Substitution) (id : StatementId)
+    (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      state
+    } {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .breaking
+    } := by
+  constructor <;> rfl
+
+/-- The canonical executable `continue` result agrees with its declarative
+control summary under every substitution. -/
+theorem continueStmt
+    (substitution : TypeSystem.Substitution) (id : StatementId)
+    (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      state
+    } {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .continuing
+    } := by
+  constructor <;> rfl
+
+end StatementResultMatchesFactsAfterSubstitution
 
 /-- Empty executable block inference returns the canonical empty block
 without changing its input state. -/

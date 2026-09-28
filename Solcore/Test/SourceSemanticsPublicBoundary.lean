@@ -175,9 +175,31 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.expressionStatementValueHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_returnUnit_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_returnValue_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_break_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_continue_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.returnUnitStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.returnValueStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.breakStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.continueStatementHasType_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.returned
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.breakStmt
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.continueStmt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_nil_facts
 example :=
