@@ -4585,6 +4585,57 @@ private theorem unifyBuiltinFunctionArgumentsEqual_state_header
               simp only [unifyResult, bind, Except.bind] at success
               exact (induction success).trans (unify_state_header unifyResult)
 
+private theorem generalizeValue_allocateBinder_inferenceProperties
+    {state : State} {requirementStart : Nat} {valueType : Ty}
+    {name : String} {span : Option Syntax.SourceSpan}
+    (ready : state.InferenceReady)
+    (valueTypeBelow : valueType.VariablesBelow state.inference.next) :
+    let locals :=
+      state.binderEnvironment.apply state.inference.substitution
+    let resolvedType := state.resolve valueType
+    let generalized :=
+      generalizeValue state locals requirementStart resolvedType
+    let result :=
+      (state.withLocals locals).allocateBinder name generalized.scheme span
+        false generalized.requirements
+    state.InferenceProgress result.2 ∧ result.2.InferenceReady := by
+  let locals :=
+    state.binderEnvironment.apply state.inference.substitution
+  let resolvedType := state.resolve valueType
+  let generalized :=
+    generalizeValue state locals requirementStart resolvedType
+  let localState := state.withLocals locals
+  let result := localState.allocateBinder name generalized.scheme span false
+    generalized.requirements
+  change state.InferenceProgress result.2 ∧ result.2.InferenceReady
+  have resolvedTypeBelow :
+      resolvedType.VariablesBelow state.inference.next := by
+    change (state.inference.substitution.apply valueType).VariablesBelow
+      state.inference.next
+    exact ready.solved.variablesBelow_apply valueTypeBelow
+  have generalizedBodyBelow :
+      generalized.scheme.body.VariablesBelow state.inference.next := by
+    simpa only [generalized, generalizeValue_scheme_body] using
+      resolvedTypeBelow
+  have localProgress : state.InferenceProgress localState := by
+    simpa only [localState] using
+      State.InferenceProgress.withLocals state locals ready.solved
+  have localReady : localState.InferenceReady := by
+    simpa only [localState] using State.InferenceReady.withLocals locals ready
+  have bodyAtLocal :
+      generalized.scheme.body.VariablesBelow localState.inference.next := by
+    simpa only [localState, State.withLocals] using generalizedBodyBelow
+  have allocationProgress : localState.InferenceProgress result.2 := by
+    simpa only [result] using
+      State.InferenceProgress.allocateBinder localState name
+        generalized.scheme span false generalized.requirements
+        localReady.solved
+  have resultReady : result.2.InferenceReady := by
+    simpa only [result] using
+      State.InferenceReady.allocateBinder name generalized.scheme span false
+        generalized.requirements localReady bodyAtLocal
+  exact ⟨localProgress.trans allocationProgress, resultReady⟩
+
 private theorem recordBuiltinFunctionCall_state_header
     {source callee : Syntax.Expr} {name : String}
     {function : BuiltinFunctionId} {arguments : List InferredExpression}
@@ -4604,6 +4655,63 @@ private theorem recordBuiltinFunctionCall_state_header
   all_goals try simp_all [State.header, State.allocateExpressionId,
     State.recordNode, recordExpression, bind, Except.bind]
   all_goals grind [unify_preserves_owner, unify_preserves_inputs]
+
+private theorem syntheticTuple_result_inferenceProperties
+    {elements : List InferredExpression} {span : Syntax.SourceSpan}
+    {state : State} {result : InferredExpression × State}
+    (ready : state.InferenceReady)
+    (elementsBelow : ∀ element ∈ elements,
+      element.type.VariablesBelow state.inference.next)
+    (success : (pure ({
+        id := state.allocateExpressionId.fst
+        type := Ty.productMany (elements.map (·.type))
+      }, state.allocateExpressionId.snd.recordNode (.expression {
+        id := state.allocateExpressionId.fst
+        span
+        type := Ty.productMany (elements.map (·.type))
+        form := .tuple (elements.map (·.id))
+      })) : Except Error (InferredExpression × State)) = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  have resultEq : ({
+      id := state.allocateExpressionId.fst
+      type := Ty.productMany (elements.map (·.type))
+    }, state.allocateExpressionId.snd.recordNode (.expression {
+      id := state.allocateExpressionId.fst
+      span
+      type := Ty.productMany (elements.map (·.type))
+      form := .tuple (elements.map (·.id))
+    })) = result := by
+    simpa only [except_pure_eq_ok] using success
+  rw [← resultEq]
+  have elementTypesBelow : ∀ type ∈ elements.map (·.type),
+      type.VariablesBelow state.inference.next := by
+    intro type member
+    rcases List.mem_map.mp member with ⟨element, elementMember, rfl⟩
+    exact elementsBelow element elementMember
+  have tupleTypeBelow :
+      (Ty.productMany (elements.map (·.type))).VariablesBelow
+        state.inference.next :=
+    Ty.variablesBelow_productMany elementTypesBelow
+  have allocationProgress :=
+    State.InferenceProgress.allocateExpressionId state ready.solved
+  have allocationReady := State.InferenceReady.allocateExpressionId ready
+  have recordProgress := State.InferenceProgress.recordNode
+    state.allocateExpressionId.snd (.expression {
+      id := state.allocateExpressionId.fst
+      span
+      type := Ty.productMany (elements.map (·.type))
+      form := .tuple (elements.map (·.id))
+    }) allocationReady.solved
+  have recordReady := State.InferenceReady.recordNode (.expression {
+    id := state.allocateExpressionId.fst
+    span
+    type := Ty.productMany (elements.map (·.type))
+    form := .tuple (elements.map (·.id))
+  }) allocationReady
+  have progress := allocationProgress.trans recordProgress
+  exact ⟨progress, recordReady, tupleTypeBelow.weaken progress.next_le⟩
 
 private theorem syntheticTuple_result_state_header
     {elements : List InferredExpression} {span : Syntax.SourceSpan}
