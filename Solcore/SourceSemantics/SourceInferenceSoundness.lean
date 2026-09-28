@@ -9813,6 +9813,77 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
       | error =>
           simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
 
+/-- Lift a complete flat traversal certificate through the public pattern
+wrapper.  The wrapper only closes the retained expected type and packages the
+already proved prefix typing, binder extension, and active-context invariant. -/
+theorem inferMatchPatternFuel_success_sound_of_flat
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {fuel : Nat} {patternSource : Syntax.Pattern}
+    {expected : TypeSystem.Ty}
+    {initial patternState : Frontend.SourceInference.State}
+    {pattern : TypedMatchPattern}
+    (flatSound :
+      ∀ {result : Detail.InferredPattern},
+        Detail.inferMatchPatternFlatFuel fuel inferenceContext patternSource
+            expected [] initial = .ok result →
+        Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+          semanticContext outer expected [] initial result))
+    (outerExtension : outer.SemanticallyExtends
+      patternState.inference.substitution)
+    (success : Detail.inferMatchPatternFuel fuel inferenceContext patternSource
+      expected initial = .ok (pattern, patternState)) :
+    Nonempty (MatchPatternInferenceCertificate source semanticContext outer
+      expected pattern patternState) := by
+  unfold Detail.inferMatchPatternFuel at success
+  cases flatSuccess : Detail.inferMatchPatternFlatFuel fuel inferenceContext
+      patternSource expected [] initial with
+  | error error =>
+      simp [flatSuccess, bind, Except.bind] at success
+  | ok result =>
+      simp only [flatSuccess, bind, Except.bind, pure, Pure.pure,
+        Except.pure] at success
+      injection success with resultEq
+      cases resultEq
+      obtain ⟨certificate⟩ := flatSound flatSuccess
+      have closedExpected : outer.apply (result.state.resolve expected) =
+          outer.apply expected := by
+        simpa [Frontend.SourceInference.State.resolve,
+          TypeSystem.InferState.resolve] using outerExtension expected
+      have resolutionType : MatchPatternResolutionHasType semanticContext
+          (result.resolution.applySubstitution outer) (outer.apply expected)
+          result.requirements certificate.binders certificate.rootArity := by
+        unfold MatchPatternResolutionHasType
+        rw [FlexibleSubstitution.matchPatternResolutionInstructions_applySubstitution,
+          ← certificate.instructions_eq]
+        simpa using certificate.instruction_type []
+      have binderNamesNodup :
+          (certificate.binders.map fun binder => binder.name).Nodup := by
+        have namesEq : result.names =
+            certificate.binders.map (fun binder => binder.name) := by
+          simpa using certificate.names_eq
+        rw [← namesEq]
+        exact certificate.names_nodup
+      exact ⟨{
+        binders := certificate.binders
+        rootArity := certificate.rootArity
+        armContext := certificate.finalContext
+        pattern_type := {
+          type_eq := by
+            simpa [TypedMatchPattern.applySubstitution] using closedExpected
+          source_represents := certificate.source_represents
+          resolution_type := resolutionType
+          binders_distinct := {
+            ids := certificate.binders_extend.ids_nodup
+            names := binderNamesNodup
+          }
+        }
+        binders_extend := certificate.binders_extend
+        pattern_invariant := certificate.invariant
+      }⟩
+
 /-- The semantic certificate for one successfully inferred explicit match
 arm.  Pattern inference supplies the substituted pattern typing and the exact
 binder extension; statement inference starts from the corresponding active

@@ -243,6 +243,46 @@ end BinderExtends
 
 namespace BindersExtend
 
+/-- Every binder installed by an extension is fresh for the lexical scope at
+the start of that extension. -/
+theorem ids_fresh_for_source
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder}
+    (extension : BindersExtend owner context binders final) :
+    ∀ binder, binder ∈ binders →
+      binder.id ∉ context.locals.map Prod.fst := by
+  induction extension with
+  | nil => simp
+  | @cons context middle final binder binders head tail induction =>
+      intro candidate member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact head.local_fresh
+      · have fresh := induction candidate member
+        intro sourceMember
+        apply fresh
+        cases head
+        simp [Context.withLocal, sourceMember]
+
+/-- Stable identities introduced by one source-ordered binder extension are
+pairwise distinct. -/
+theorem ids_nodup
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder}
+    (extension : BindersExtend owner context binders final) :
+    (binders.map fun binder => binder.id).Nodup := by
+  induction extension with
+  | nil => simp
+  | @cons context middle final binder binders head tail induction =>
+      rw [List.map_cons, List.nodup_cons]
+      refine ⟨?_, induction⟩
+      intro member
+      obtain ⟨candidate, candidateMember, candidateEq⟩ :=
+        List.mem_map.mp member
+      have fresh := tail.ids_fresh_for_source candidate candidateMember
+      apply fresh
+      cases head
+      simp [Context.withLocal, candidateEq]
+
 /-- Source-ordered binder installation prepends semantic locals in reverse
 order, leaving the ambient lexical scope as the suffix. -/
 theorem locals_eq

@@ -429,6 +429,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFlatFuel_success_sound_of_callbacks
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFuel_success_sound_of_flat
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate.toMatchCaseHasType
@@ -962,6 +964,8 @@ example := @Solcore.SourceSemantics.TypeWellScoped.withLocal
 example := @Solcore.SourceSemantics.TypeWellScoped.product_components
 example := @Solcore.SourceSemantics.TypeWellFormed
 example := @Solcore.SourceSemantics.TypeWellFormed.withLocal
+example := @Solcore.SourceSemantics.BindersExtend.ids_fresh_for_source
+example := @Solcore.SourceSemantics.BindersExtend.ids_nodup
 example := @Solcore.SourceSemantics.TypeAdmissible
 example := @Solcore.SourceSemantics.admissibleTypeVariables
 example := @Solcore.SourceSemantics.TypeAdmissible.toWellFormed
