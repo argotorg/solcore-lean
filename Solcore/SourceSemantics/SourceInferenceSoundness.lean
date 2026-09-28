@@ -10560,6 +10560,72 @@ structure MatchCaseInferenceCertificate
     bodyResult.statements finalContext facts
   body_matches : BlockResultMatchesFactsAfterSubstitution outer bodyResult facts
 
+/-- Successful inference of one explicit match arm assembles a complete
+semantic certificate once recursive statement-list soundness is available in
+the context installed by the pattern binders.  Pattern inference itself is
+discharged by the complete public pattern theorem above. -/
+theorem inferMatchCaseFuel_success_sound
+    {source : TypedSource} {control : ControlContext}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {fuel : Nat} {arm : Syntax.MatchCase}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {input patternState : Frontend.SourceInference.State}
+    {pattern : TypedMatchPattern} {bodyResult : Detail.BlockResult}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (branches : MatchPatternBranchSoundnessCallbacks source
+      inferenceContext semanticContext outer)
+    (ready : input.InferenceReady)
+    (scrutineeBelow :
+      scrutineeType.VariablesBelow input.inference.next)
+    (below : input.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = input.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (scrutineeAdmissible :
+      TypeAdmissible semanticContext (outer.apply scrutineeType))
+    (invariant : ActiveLocalContextInvariant input outer semanticContext)
+    (patternOuterExtension : outer.SemanticallyExtends
+      patternState.inference.substitution)
+    (bodySound :
+      ∀ {armContext : SourceSemantics.Context},
+        ActiveLocalContextInvariant patternState outer armContext →
+        Detail.inferStatementsFuel fuel inferenceContext arm.value.body.value
+            expectedReturn patternState = .ok bodyResult →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant bodyResult.state outer finalContext ∧
+            StatementsHaveType source control armContext
+              bodyResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer bodyResult facts)
+    (patternSuccess : Detail.inferMatchPatternFuel fuel inferenceContext
+      arm.value.pattern scrutineeType input = .ok (pattern, patternState))
+    (bodySuccess : Detail.inferStatementsFuel fuel inferenceContext
+      arm.value.body.value expectedReturn patternState = .ok bodyResult) :
+    Nonempty (MatchCaseInferenceCertificate source control semanticContext
+      outer scrutineeType pattern patternState bodyResult) := by
+  obtain ⟨patternCertificate⟩ := inferMatchPatternFuel_success_sound
+    validated catalog semanticSignaturesEq branches ready scrutineeBelow below
+    owner_eq semanticOwner scrutineeAdmissible invariant
+    patternOuterExtension patternSuccess
+  obtain ⟨finalContext, facts, _bodyInvariant, bodyTyping, bodyMatches⟩ :=
+    bodySound patternCertificate.pattern_invariant bodySuccess
+  exact ⟨{
+    binders := patternCertificate.binders
+    rootArity := patternCertificate.rootArity
+    armContext := patternCertificate.armContext
+    finalContext
+    facts
+    pattern_type := patternCertificate.pattern_type
+    binders_extend := patternCertificate.binders_extend
+    pattern_invariant := patternCertificate.pattern_invariant
+    body_type := bodyTyping
+    body_matches := bodyMatches
+  }⟩
+
 /-- A complete semantic certificate assembles directly into declarative match
 arm typing and executable body-fact agreement.  This is only the final adapter:
 constructing the certificate from successful pattern and body inference is the

@@ -435,6 +435,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchCaseFuel_success_sound
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate.toMatchCaseHasType
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchCasesFuel_success_matchCasesHaveType
