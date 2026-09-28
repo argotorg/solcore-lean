@@ -8991,12 +8991,12 @@ structure MatchPatternRecursiveSoundnessCallbacks
       Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
         activeContext outer expected seen initial result)
 
-/-- Exact semantic frontiers for the three non-group pattern forms whose
-one-layer proofs still depend on catalog/literal formation or aggregate
-formation lemmas.  Every callback is tied to one concrete syntax constructor,
-the successful executable call, and the complete invariant/admissibility
-premises used by that call; in particular this is not a catch-all certificate
-oracle.  Wildcards and groups are proved directly by the dispatcher below. -/
+/-- Exact semantic frontiers for literal and constructor patterns, plus the
+narrow structural admissibility projection used by the direct tuple proof.
+The certificate-producing callbacks are tied to one concrete syntax
+constructor, its successful executable call, and the complete premises used
+by that call; in particular this is not a catch-all certificate oracle.
+Wildcards, binders, groups, and tuple assembly are proved by the dispatcher. -/
 structure MatchPatternBranchSoundnessCallbacks
     (source : TypedSource)
     (inferenceContext : Frontend.SourceInference.Context)
@@ -9050,29 +9050,16 @@ structure MatchPatternBranchSoundnessCallbacks
           seen initial = .ok result →
       Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
         activeContext outer expected seen initial result)
-  tuple :
-    ∀ {fuel : Nat} {pattern : Syntax.Pattern}
-      {elements : Syntax.DelimitedList (Syntax.Located Syntax.PatternValue)}
-      {expected : TypeSystem.Ty} {seen : List String}
-      {initial : Frontend.SourceInference.State}
-      {result : Detail.InferredPattern}
-      {activeContext : SourceSemantics.Context},
-      pattern.value = .tuple elements →
-      initial.InferenceReady →
-      expected.VariablesBelow initial.inference.next →
-      ProgramSignatureFormationValidated inferenceContext.signatures →
-      initial.LocalBindersBelowNextLocal →
-      source.owner = initial.owner →
-      semanticContext.currentDeclaration = some source.owner →
-      seen.Nodup →
+  tuple_elements_admissible :
+    ∀ {activeContext : SourceSemantics.Context}
+      {expected : TypeSystem.Ty} {elementTypes : List TypeSystem.Ty},
       TypeAdmissible semanticContext (outer.apply expected) →
       TypeAdmissible activeContext (outer.apply expected) →
-      ActiveLocalContextInvariant initial outer activeContext →
-      outer.SemanticallyExtends result.state.inference.substitution →
-      Detail.inferMatchPatternFlatFuel fuel inferenceContext pattern expected
-          seen initial = .ok result →
-      Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
-        activeContext outer expected seen initial result)
+      outer.apply expected =
+        TypeSystem.Ty.productMany (elementTypes.map outer.apply) →
+      ∀ element, element ∈ elementTypes →
+        TypeAdmissible semanticContext (outer.apply element) ∧
+          TypeAdmissible activeContext (outer.apply element)
 
 private theorem bindersExtend_append
     {owner : Resolved.DeclarationId}
@@ -9503,14 +9490,215 @@ private theorem inferMatchPatternFlatFuel_success_binder_sound
         exact nameAbsent (candidateEq ▸ candidateMem)
     }⟩
 
+private theorem freshTypes_length
+    (count : Nat) (state : Frontend.SourceInference.State) :
+    (Detail.freshTypes count state).1.length = count := by
+  induction count generalizing state with
+  | zero => rfl
+  | succ count induction =>
+      simp only [Detail.freshTypes, List.length_cons]
+      rw [induction state.fresh.2]
+
+private theorem freshTypes_preserves_localBinders
+    (count : Nat) (state : Frontend.SourceInference.State) :
+    (Detail.freshTypes count state).2.localBinders = state.localBinders := by
+  induction count generalizing state with
+  | zero => rfl
+  | succ count induction =>
+      simp only [Detail.freshTypes]
+      exact (induction state.fresh.2).trans rfl
+
+private theorem freshTypes_preserves_owner
+    (count : Nat) (state : Frontend.SourceInference.State) :
+    (Detail.freshTypes count state).2.owner = state.owner := by
+  induction count generalizing state with
+  | zero => rfl
+  | succ count induction =>
+      simp only [Detail.freshTypes]
+      exact (induction state.fresh.2).trans rfl
+
+/-- Tuple-pattern inference allocates one fresh expected type per source
+element, unifies their product with the caller's expected type, and delegates
+the source-ordered children to the recursive list theorem.  The only semantic
+boundary retained in `MatchPatternBranchSoundnessCallbacks` is the structural
+projection of admissibility from that unified product to its elements. -/
+private theorem inferMatchPatternFlatFuel_success_tuple_sound
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {fuel : Nat}
+    {pattern : Syntax.Pattern}
+    {elements : Syntax.DelimitedList (Syntax.Located Syntax.PatternValue)}
+    {expected : TypeSystem.Ty} {seen : List String}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (pattern_eq : pattern.value = .tuple elements)
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
+    (recursive : MatchPatternRecursiveSoundnessCallbacks source
+      inferenceContext semanticContext outer)
+    (branches : MatchPatternBranchSoundnessCallbacks source
+      inferenceContext semanticContext outer)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initial.owner)
+    (seen_nodup : seen.Nodup)
+    (semanticAdmissible :
+      TypeAdmissible semanticContext (outer.apply expected))
+    (activeAdmissible :
+      TypeAdmissible activeContext (outer.apply expected))
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (success : Detail.inferMatchPatternFlatFuel (fuel + 1) inferenceContext
+      pattern expected seen initial = .ok result) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  have properties := stateCallbacks.pattern ready expectedBelow validated below
+    success
+  unfold Detail.inferMatchPatternFlatFuel at success
+  simp only [pattern_eq, bind, Except.bind] at success
+  let elementTypes :=
+    (Detail.freshTypes elements.elements.length initial).1
+  let allocated :=
+    (Detail.freshTypes elements.elements.length initial).2
+  have freshEq : Detail.freshTypes elements.elements.length initial =
+      (elementTypes, allocated) := by
+    exact (Prod.eta _).symm
+  simp only [freshEq] at success
+  cases unifyResult : Detail.unify allocated expected
+      (TypeSystem.Ty.productMany elementTypes) with
+  | error error => simp [unifyResult] at success
+  | ok unified =>
+      simp only [unifyResult] at success
+      cases childrenResult : Detail.inferMatchPatternsFlatFuel fuel
+          inferenceContext elements.elements elementTypes seen unified with
+      | error error => simp [childrenResult] at success
+      | ok children =>
+          simp only [childrenResult, pure, Pure.pure, Except.pure] at success
+          injection success with resultEq
+          subst result
+          have allocatedProperties := Detail.freshTypes_inferenceProperties
+            elements.elements.length initial ready
+          simp only [freshEq] at allocatedProperties
+          have expectedBelowAllocated :=
+            expectedBelow.weaken allocatedProperties.1.next_le
+          have productBelow :
+              (TypeSystem.Ty.productMany elementTypes).VariablesBelow
+                allocated.inference.next :=
+            TypeSystem.Ty.variablesBelow_productMany
+              allocatedProperties.2.2
+          have unifiedProgress := Detail.unify_inferenceProgress
+            allocatedProperties.2.1.solved expectedBelowAllocated productBelow
+            unifyResult
+          have unifiedReady := Detail.unify_preserves_inferenceReady
+            allocatedProperties.2.1 expectedBelowAllocated productBelow
+            unifyResult
+          have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+            have preserved := Detail.freshTypes_preserves_localBindersBelowNextLocal
+              elements.elements.length initial below
+            simpa only [freshEq] using preserved
+          have unifiedBelow : unified.LocalBindersBelowNextLocal :=
+            Detail.unify_preserves_localBindersBelowNextLocal allocatedBelow
+              unifyResult
+          have elementTypesBelow : ∀ type ∈ elementTypes,
+              type.VariablesBelow unified.inference.next := by
+            intro type member
+            exact (allocatedProperties.2.2 type member).weaken
+              unifiedProgress.next_le
+          have childrenProperties := stateCallbacks.patterns unifiedReady
+            elementTypesBelow validated unifiedBelow childrenResult
+          have outerUnified : outer.SemanticallyExtends
+              unified.inference.substitution :=
+            TypeSystem.Substitution.SemanticallyExtends.trans outerExtension
+              childrenProperties.1.substitution_extends
+          have productEq : outer.apply expected =
+              TypeSystem.Ty.productMany (elementTypes.map outer.apply) := by
+            calc
+              outer.apply expected =
+                  outer.apply (unified.resolve expected) :=
+                (outerUnified expected).symm
+              _ = outer.apply
+                  (unified.resolve
+                    (TypeSystem.Ty.productMany elementTypes)) :=
+                congrArg outer.apply
+                  (Detail.unify_resolve_eq unifyResult)
+              _ = outer.apply (TypeSystem.Ty.productMany elementTypes) :=
+                outerUnified (TypeSystem.Ty.productMany elementTypes)
+              _ = TypeSystem.Ty.productMany
+                  (elementTypes.map outer.apply) :=
+                FlexibleSubstitution.apply_productMany outer elementTypes
+          have eachAdmissible := branches.tuple_elements_admissible
+            semanticAdmissible activeAdmissible productEq
+          have allocatedInvariant : ActiveLocalContextInvariant allocated outer
+              activeContext := by
+            apply invariant.congr_localBinders
+            have preserved := freshTypes_preserves_localBinders
+              elements.elements.length initial
+            simpa only [freshEq] using preserved
+          have unifiedInvariant : ActiveLocalContextInvariant unified outer
+              activeContext :=
+            allocatedInvariant.unify unifyResult
+          have allocatedOwner : allocated.owner = initial.owner := by
+            have preserved := freshTypes_preserves_owner
+              elements.elements.length initial
+            simpa only [freshEq] using preserved
+          have unifiedOwner : unified.owner = allocated.owner := by
+            have headerEq := Detail.unify_state_header unifyResult
+            simpa [Frontend.SourceInference.State.header] using
+              congrArg Frontend.SourceInference.State.Header.owner headerEq
+          have recursiveOwner : source.owner = unified.owner :=
+            owner_eq.trans (allocatedOwner.symm.trans unifiedOwner.symm)
+          obtain ⟨childrenCertificate⟩ := recursive.patterns
+            unifiedReady elementTypesBelow unifiedBelow recursiveOwner
+            seen_nodup
+            (fun type member => (eachAdmissible type member).1)
+            (fun type member => (eachAdmissible type member).2)
+            unifiedInvariant outerExtension childrenResult
+          have arity : elements.elements.length =
+              (elementTypes.map outer.apply).length := by
+            have lengthEq := freshTypes_length elements.elements.length initial
+            simp only [freshEq] at lengthEq
+            simpa using lengthEq.symm
+          exact ⟨{
+            binders := childrenCertificate.binders
+            rootArity := elements.elements.length
+            finalContext := childrenCertificate.finalContext
+            source_represents := .tuple
+            instructions_eq := rfl
+            instruction_type := fun suffix => by
+              have typed := PatternInstructionHasType.tuple
+                (context := semanticContext)
+                (instructions := children.instructions.map
+                  (MatchPatternInstruction.applySubstitution outer) ++ suffix)
+                (rest := suffix)
+                (elementCount := elements.elements.length)
+                (elementTypes := elementTypes.map outer.apply)
+                (requirements := children.requirements)
+                (binders := childrenCertificate.binders)
+                arity (childrenCertificate.instructions_type suffix)
+              rw [productEq]
+              simpa [MatchPatternInstruction.applySubstitution] using typed
+            binders_extend := childrenCertificate.binders_extend
+            invariant := childrenCertificate.invariant
+            progress := properties.1
+            ready := properties.2.1
+            below := properties.2.2.1
+            owner_eq := properties.2.2.2
+            names_eq := childrenCertificate.names_eq
+            names_nodup := childrenCertificate.names_nodup
+          }⟩
+
 /-- Public one-layer dispatcher for successful flat pattern inference.
 
 The dispatcher rules out the two executable error-only forms, proves
 wildcards directly, and transports every field of a strict recursive
-certificate through grouping.  The remaining three syntax forms cross the
-explicit branch-specific boundary above; unlike the recursive callbacks,
-those obligations are not available at arbitrary syntax and must retain the
-exact successful call being certified. -/
+certificate through grouping.  Literal and constructor forms cross the
+explicit branch-specific certificate boundary above.  Tuple assembly is
+proved directly and retains only the narrow structural fact that admissibility
+of a product projects to each element. -/
 theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
     {source : TypedSource}
     {inferenceContext : Frontend.SourceInference.Context}
@@ -9604,9 +9792,11 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
                 names_nodup := certificate.names_nodup
               }⟩
       | tuple elements =>
-          exact branches.tuple valueEq ready expectedBelow validated below
-            owner_eq semanticOwner seen_nodup semanticAdmissible
-            activeAdmissible invariant outerExtension success
+          exact inferMatchPatternFlatFuel_success_tuple_sound valueEq validated
+            stateCallbacks recursive branches ready expectedBelow below owner_eq
+            seen_nodup semanticAdmissible activeAdmissible invariant
+            outerExtension (by
+              simpa only [Nat.succ_eq_add_one] using success)
       | error =>
           simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
 
