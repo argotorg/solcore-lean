@@ -419,6 +419,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternFlatStateCallbacks
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.matchPatternFlatStateCallbacks
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternRecursiveSoundnessCallbacks
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternBranchSoundnessCallbacks

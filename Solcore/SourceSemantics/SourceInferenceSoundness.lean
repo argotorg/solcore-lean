@@ -8905,10 +8905,10 @@ structure MatchPatternInferenceCertificate
   binders_extend : BindersExtend source.owner semanticContext binders armContext
   pattern_invariant : ActiveLocalContextInvariant patternState outer armContext
 
-/-- Algorithmic state facts used by the semantic dispatcher.  These are kept
-separate because the frontend currently proves the corresponding flat mutual
-theorem privately; exposing that theorem later will discharge this bundle
-without changing the semantic proof. -/
+/-- Algorithmic state facts used by the semantic dispatcher.  Keeping the two
+frontend theorems in one package lets the private branch helpers share a
+uniform interface without making them assumptions of the public soundness
+theorems. -/
 structure MatchPatternFlatStateCallbacks
     (inferenceContext : Frontend.SourceInference.Context) : Prop where
   pattern :
@@ -8941,6 +8941,19 @@ structure MatchPatternFlatStateCallbacks
         result.state.InferenceReady ∧
         result.state.LocalBindersBelowNextLocal ∧
         result.state.owner = initial.owner
+
+/-- The canonical flat-pattern state package, discharged entirely by the
+public frontend preservation theorems. -/
+theorem matchPatternFlatStateCallbacks
+    (inferenceContext : Frontend.SourceInference.Context) :
+    MatchPatternFlatStateCallbacks inferenceContext := {
+  pattern := fun ready expectedBelow validated below success =>
+    Detail.inferMatchPatternFlatFuel_stateProperties ready expectedBelow
+      validated below success
+  patterns := fun ready expectedBelow validated below success =>
+    Detail.inferMatchPatternsFlatFuel_stateProperties ready expectedBelow
+      validated below success
+}
 
 /-- Recursive obligations of the one-layer pattern dispatcher.  They mention
 only strict recursive calls made by `inferMatchPatternFlatFuel`; all leaf and
@@ -9114,7 +9127,6 @@ theorem inferMatchPatternsFlatFuel_success_sound_of_callbacks
     {result : Detail.InferredPatterns}
     (validated : ProgramSignatureFormationValidated
       inferenceContext.signatures)
-    (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
     (recursive : MatchPatternRecursiveSoundnessCallbacks source
       inferenceContext semanticContext outer)
     (ready : initial.InferenceReady)
@@ -9134,6 +9146,7 @@ theorem inferMatchPatternsFlatFuel_success_sound_of_callbacks
       expected seen initial = .ok result) :
     Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
       activeContext outer expected seen initial result) := by
+  let stateCallbacks := matchPatternFlatStateCallbacks inferenceContext
   have properties := stateCallbacks.patterns ready expectedBelow validated below
     success
   cases patterns with
@@ -9709,7 +9722,6 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
     {result : Detail.InferredPattern}
     (validated : ProgramSignatureFormationValidated
       inferenceContext.signatures)
-    (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
     (recursive : MatchPatternRecursiveSoundnessCallbacks source
       inferenceContext semanticContext outer)
     (branches : MatchPatternBranchSoundnessCallbacks source
@@ -9731,6 +9743,7 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
       expected seen initial = .ok result) :
     Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
       activeContext outer expected seen initial result) := by
+  let stateCallbacks := matchPatternFlatStateCallbacks inferenceContext
   cases fuel with
   | zero =>
       simp [Detail.inferMatchPatternFlatFuel] at success
