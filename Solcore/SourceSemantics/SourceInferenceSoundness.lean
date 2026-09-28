@@ -1261,6 +1261,110 @@ theorem groupBranchExpressionHasType_afterSubstitution
     rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
     rfl
 
+/-- A successful expression-statement branch exposes the exact child
+inference and the complete `StatementResult` recorded by the executable
+frontend.  Consequently the retained statement node has exactly the type and
+semicolon flag used to choose between value production and discard. -/
+theorem inferStatementFuel_success_expression_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expression : Syntax.Expr}
+    {trailingSemicolon : Bool} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .expression expression trailingSemicolon)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ inferred expressionState,
+      Detail.inferExprFuel fuel context expression none allocated =
+        .ok (inferred, expressionState) ∧
+      result = {
+        id
+        type := if trailingSemicolon then .unit else inferred.type
+        hasValue := !trailingSemicolon
+        sawReturn := false
+        state := expressionState.recordNode (.statement {
+          id
+          span := statement.span
+          type := if trailingSemicolon then .unit else inferred.type
+          form := .expression inferred.id trailingSemicolon
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .expression inferred.id trailingSemicolon
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases expressionSuccess :
+      Detail.inferExprFuel fuel context expression none allocated with
+  | error error =>
+      simp [expressionSuccess] at success
+  | ok expressionPair =>
+      rcases expressionPair with ⟨inferred, expressionState⟩
+      simp only [expressionSuccess, pure, Pure.pure, Except.pure] at success
+      injection success with resultEq
+      rw [← resultEq]
+      exact ⟨inferred, expressionState, rfl, rfl,
+        recordNode_containsStatement expressionState _ roots⟩
+
+/-- A retained semicolon-terminated expression statement discards its child's
+value.  Final substitution changes the child proof but leaves the statement's
+unit result and ordinary control summary unchanged. -/
+theorem expressionStatementDiscardHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {inferred : InferredExpression}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .expression inferred.id true
+    })
+    (expressionType : ExpressionHasType
+      (source.applySubstitution outer) target inferred.id
+      (outer.apply inferred.type)) :
+    StatementHasType (source.applySubstitution outer) control target id target {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    } := by
+  exact .expressionDiscard
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl expressionType (by simp [StatementNode.applySubstitution])
+
+/-- A retained expression statement without a trailing semicolon exposes its
+child's finalized type as both statement value and ordinary fallthrough type. -/
+theorem expressionStatementValueHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {inferred : InferredExpression}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := inferred.type
+      form := .expression inferred.id false
+    })
+    (expressionType : ExpressionHasType
+      (source.applySubstitution outer) target inferred.id
+      (outer.apply inferred.type)) :
+    StatementHasType (source.applySubstitution outer) control target id target {
+      type := outer.apply inferred.type
+      hasValue := true
+      sawReturn := false
+      control := .ordinary (outer.apply inferred.type)
+    } := by
+  exact .expressionValue
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl expressionType (by simp [StatementNode.applySubstitution])
+
 /-- A successful local-identifier branch materializes the exact local
 reference node used by source semantics.  In particular, the node retains the
 canonical allocator position from immediately before scheme instantiation and

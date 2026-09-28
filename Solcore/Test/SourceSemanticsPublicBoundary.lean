@@ -169,6 +169,12 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.groupBranchExpressionHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_expression_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.expressionStatementDiscardHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.expressionStatementValueHasType_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_containsExpression
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_facts
