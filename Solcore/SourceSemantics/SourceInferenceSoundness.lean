@@ -12155,6 +12155,26 @@ theorem localIdentifierBranchExpressionHasType_afterProgress
       rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
       rfl)
 
+/-- Decoding, a supported closed target, and exact retained evidence are the
+minimal semantic ingredients of integer-literal validity. -/
+theorem integerLiteralValid_of_evidence
+    {semanticContext : SourceSemantics.Context}
+    {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (decoded : Frontend.numericLiteralValue? source = some resolution.rawValue)
+    (target_supported : resolution.targetType = .word ∨
+      resolution.targetType = .integer)
+    (evidence : RequirementProves semanticContext resolution.requirement
+      resolution.predicate) :
+    IntegerLiteralValid semanticContext source resolution := by
+  have meaning : Frontend.NumericLiteralDenotes source resolution.rawValue :=
+    Frontend.numericLiteralValue?_sound decoded
+  rcases target_supported with target_eq | target_eq
+  · exact .word meaning target_eq
+      (by simpa [IntegerLiteralResolution.predicate] using evidence)
+  · exact .integer meaning target_eq
+      (by simpa [IntegerLiteralResolution.predicate] using evidence)
+
 /-- Decoding, final carrier closure, exact ledger ownership, and solver
 soundness compose into the declarative validity judgment for one inferred
 integer literal. -/
@@ -12191,14 +12211,7 @@ theorem integerLiteralValid_of_solved
     rw [IntegerLiteralResolution.applySubstitution_requirement,
       IntegerLiteralResolution.applySubstitution_predicate]
     simpa [Detail.applyPredicate] using proves.head
-  have meaning : Frontend.NumericLiteralDenotes source
-      (resolution.applySubstitution state.inference.substitution).rawValue := by
-    simpa using Frontend.numericLiteralValue?_sound decoded
-  rcases target_supported with target_eq | target_eq
-  · exact .word meaning target_eq
-      (by simpa [IntegerLiteralResolution.predicate] using evidence)
-  · exact .integer meaning target_eq
-      (by simpa [IntegerLiteralResolution.predicate] using evidence)
+  exact integerLiteralValid_of_evidence decoded target_supported evidence
 
 /-- A validated unary trait profile and its source-ordered rows in the final
 solved ledger assemble the declarative unary-operator judgment after applying
@@ -13754,6 +13767,10 @@ structure FinalInferenceResources
     (finalizedRequirementContext inferenceContext result) result.typedSource
   ownership : RequirementOwnership
     (finalizedRequirementContext inferenceContext result) result.typedSource
+  integer_pattern_target_supported : ∀ origin,
+    origin ∈ state.integerPatterns →
+      result.substitution.apply (.variable origin.metavariable) = .word ∨
+        result.substitution.apply (.variable origin.metavariable) = .integer
   local_no_capture : ∀ binder,
     binder ∈ (state.toTypedSource roots).initializedLetBinders →
       Detail.LocalBinderInstantiationNoCapture result.substitution binder
@@ -13800,6 +13817,8 @@ def ofFinalize
     local_identity_ownership := finalize_localIdentityOwnership success
     ledger := finalize_scopedRequirementLedgerWellFormed success
     ownership := finalize_requirementOwnership rfl success
+    integer_pattern_target_supported :=
+      Detail.finalize_integerPatternTarget_supported success
     local_no_capture :=
       Detail.finalize_localBinderInstantiationNoCapture success
   }
@@ -13825,6 +13844,107 @@ def ofFinalize
     exact patternProperties.1.trans literalProperties.1
   · rw [solvedEq]
     exact witness.requirementsSolved
+
+/-- Any requirement retained by the pre-finalization state proves its closed
+predicate at the exact covered source occurrence which owns its identity. -/
+theorem requirementProvesAt
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {active : SourceSemantics.Context} {occurrence : NodeId}
+    {requirement : Requirement}
+    (signatures_eq : active.signatures =
+      (finalizedRequirementContext inferenceContext result).signatures)
+    (requirements_eq : active.solvedRequirements =
+      (finalizedRequirementContext inferenceContext result).solvedRequirements)
+    (assumptions_mono :
+      (finalizedRequirementContext inferenceContext result).assumptions ⊆
+        active.assumptions)
+    (covered : TemplateScopeCovered result.typedSource active occurrence)
+    (member : requirement ∈ state.requirements)
+    (occurs : PrimaryRequirementOccursAt result.typedSource occurrence
+      requirement.id) :
+    RequirementProves active requirement.id
+      (TypedTraitResolution.applySubstitution result.substitution
+        requirement.predicate) := by
+  have finalMember : requirement ∈ resources.finalState.requirements := by
+    rw [resources.requirements_eq]
+    exact member
+  have proves := solveRequirements_correspondingSequenceProvesAt
+    (inferenceContext := inferenceContext)
+    (base := finalizedRequirementContext inferenceContext result)
+    (active := active) (source := result.typedSource)
+    (occurrence := occurrence)
+    (RequirementPredicatesCorrespond.cons finalMember
+      RequirementPredicatesCorrespond.nil)
+    resources.solve_success resources.solved_context_eq resources.ledger
+    resources.ownership signatures_eq requirements_eq assumptions_mono covered
+    (by
+      intro id idMember
+      simp only [List.mem_singleton] at idMember
+      subst id
+      exact occurs)
+  simpa [Detail.applyPredicate, resources.substitution_eq] using proves.head
+
+/-- Finalization turns the exact origin and requirement row retained for one
+integer pattern into declarative literal validity at its owning occurrence. -/
+theorem integerPatternValidAt
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {active : SourceSemantics.Context} {occurrence : NodeId}
+    {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    {origin : IntegerPatternOrigin}
+    (decoded : Frontend.numericLiteralValue? source = some resolution.rawValue)
+    (resolution_target : resolution.targetType =
+      .variable origin.metavariable)
+    (resolution_requirement : resolution.requirement = origin.requirement)
+    (origin_member : origin ∈ state.integerPatterns)
+    (requirement_member :
+      ({ id := origin.requirement,
+          predicate := ProgramSignatures.builtinIntPredicate
+            (.variable origin.metavariable) } : Requirement) ∈
+        state.requirements)
+    (signatures_eq : active.signatures =
+      (finalizedRequirementContext inferenceContext result).signatures)
+    (requirements_eq : active.solvedRequirements =
+      (finalizedRequirementContext inferenceContext result).solvedRequirements)
+    (assumptions_mono :
+      (finalizedRequirementContext inferenceContext result).assumptions ⊆
+        active.assumptions)
+    (covered : TemplateScopeCovered result.typedSource active occurrence)
+    (occurs : PrimaryRequirementOccursAt result.typedSource occurrence
+      resolution.requirement) :
+    IntegerLiteralValid active source
+      (resolution.applySubstitution result.substitution) := by
+  have supported := resources.integer_pattern_target_supported origin
+    origin_member
+  have closedSupported :
+      (resolution.applySubstitution result.substitution).targetType = .word ∨
+        (resolution.applySubstitution result.substitution).targetType =
+          .integer := by
+    simpa [IntegerLiteralResolution.applySubstitution, resolution_target] using
+      supported
+  have evidence := resources.requirementProvesAt signatures_eq requirements_eq
+    assumptions_mono covered requirement_member (by
+      simpa [resolution_requirement] using occurs)
+  have closedEvidence : RequirementProves active
+      (resolution.applySubstitution result.substitution).requirement
+      (resolution.applySubstitution result.substitution).predicate := by
+    simpa [IntegerLiteralResolution.applySubstitution,
+      IntegerLiteralResolution.predicate, resolution_target,
+      resolution_requirement, ProgramSignatures.builtinIntPredicate,
+      TypedTraitResolution.applySubstitution] using evidence
+  exact integerLiteralValid_of_evidence decoded closedSupported closedEvidence
 
 end FinalInferenceResources
 

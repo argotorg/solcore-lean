@@ -544,6 +544,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.localIdentifierBranchExpressionHasType_afterProgress
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.integerLiteralValid_of_evidence
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.integerLiteralValid_of_solved
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_committedCoercionStepSequenceProves
@@ -611,6 +613,10 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.ofFinalize
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.requirementProvesAt
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed
 example :=
