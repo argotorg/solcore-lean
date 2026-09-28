@@ -1135,4 +1135,42 @@ example : RequirementIdsValid
     subst id
     exact templateOccursAtInitializer
 
+/-- Solving a qualified-local template preserves its exact normalized
+predicate and source order at the covered initializer occurrence; no global
+`SolvedRequirementsValid` premise is needed for the assumption row. -/
+example : RequirementSequenceProves
+    (localSchemeInitializerContext templateContext (templateBinder 0))
+    [templateId] [templatePredicate] := by
+  have corresponds : RequirementPredicatesCorrespond
+      [templateInputRequirement] [templatePredicate] [templateId] := by
+    apply RequirementPredicatesCorrespond.cons
+    · simp [templateInputRequirement]
+    · exact .nil
+  have proves :=
+    SourceInferenceSoundness.solveRequirements_correspondingSequenceProvesAt
+      (inferenceContext := templateInferenceContext)
+      (state := templateSolverState)
+      (requirements := [templateInputRequirement])
+      (solved := [templateRow])
+      (base := templateContext)
+      (active := localSchemeInitializerContext templateContext
+        (templateBinder 0))
+      (source := scopedTemplateSource)
+      (occurrence := .expression (expressionId 0))
+      corresponds rfl rfl initializerRootTemplateAccepted
+      scopedTemplateRequirementOwnership rfl rfl
+      (by
+        intro predicate member
+        simp [templateContext, Context.withSolvedRequirements,
+          Context.ofSignatures] at member)
+      templateInitializerScopeCovered
+      (by
+        intro id member
+        have idEq : id = templateId := by simpa using member
+        subst id
+        exact templateOccursAtInitializer)
+  simpa [SourceInference.Detail.applyPredicate, templateSolverState,
+    SourceInference.State.initial, TypeSystem.InferState.initial,
+    predicate_apply_empty] using proves
+
 end Solcore.Test.SourceSemanticsScopedRequirements

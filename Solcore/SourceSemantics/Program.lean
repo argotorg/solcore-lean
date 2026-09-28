@@ -179,6 +179,48 @@ theorem template_scoped
   | ordinary notTemplate _ => exact False.elim (notTemplate templateId)
   | template scopeProof => exact scopeProof
 
+/-- A retained ledger row proves its exact predicate at a primary source
+occurrence when every qualified template active at that occurrence is covered
+by the local assumption context.  Unlike `requirementValidAt`, this theorem
+preserves the row's predicate rather than existentially forgetting it. -/
+theorem requirementProvesAt
+    {base active : Context} {source : TypedSource}
+    {occurrence : NodeId} {row : SolvedRequirement}
+    (wellFormed : ScopedRequirementLedgerWellFormed base source)
+    (ownership : RequirementOwnership base source)
+    (signatures_eq : active.signatures = base.signatures)
+    (requirements_eq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptions_mono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered source active occurrence)
+    (row_mem : row ∈ base.solvedRequirements)
+    (occurs : PrimaryRequirementOccursAt source occurrence row.id) :
+    RequirementProves active row.id row.predicate := by
+  have activeMember : row ∈ active.solvedRequirements := by
+    rw [requirements_eq]
+    exact row_mem
+  refine ⟨row, ⟨activeMember, rfl⟩, rfl, ?_⟩
+  cases wellFormed.entriesValid row row_mem with
+  | ordinary _ valid =>
+      cases valid with
+      | intro evidenceValid =>
+          apply SolvedRequirementValid.intro
+          simpa [signatures_eq] using
+            evidenceValid.weakenAssumptions assumptions_mono
+  | template rowScoped =>
+      rcases rowScoped.exact_owner with
+        ⟨owner, scopedOccurrence, _, _, predicateEq, evidenceEq,
+          scopedOccurs, inScope⟩
+      have occurrenceEq : scopedOccurrence = occurrence :=
+        ownership.primaryOccurrence_unique scopedOccurs occurs
+      subst scopedOccurrence
+      have assumptionMember :
+          owner.requirement.predicate ∈ active.assumptions :=
+        covered owner inScope
+      apply SolvedRequirementValid.intro
+      rw [predicateEq, evidenceEq]
+      exact .intro (.assumption _) (.assumption assumptionMember)
+
 /-- A primary requirement is valid at its exact source occurrence when every
 qualified template whose initializer scope contains that occurrence is active
 in the local assumption context.  Ordinary ledger evidence is transported by
@@ -202,33 +244,13 @@ theorem requirementValidAt
     (ownership.primary_mem_iff_ledger id).mp primaryMember
   rcases List.mem_map.mp ledgerMember with
     ⟨row, rowMember, rowIdEq⟩
-  have activeMember : row ∈ active.solvedRequirements := by
-    rw [requirements_eq]
-    exact rowMember
-  refine ⟨row.predicate, row, ⟨activeMember, rowIdEq⟩, rfl, ?_⟩
-  cases wellFormed.entriesValid row rowMember with
-  | ordinary _ valid =>
-      cases valid with
-      | intro evidenceValid =>
-          apply SolvedRequirementValid.intro
-          simpa [signatures_eq] using
-            evidenceValid.weakenAssumptions assumptions_mono
-  | template rowScoped =>
-      rcases rowScoped.exact_owner with
-        ⟨owner, scopedOccurrence, _, _, predicateEq, evidenceEq,
-          scopedOccurs, inScope⟩
-      have currentOccurs :
-          PrimaryRequirementOccursAt source occurrence row.id := by
-        simpa [rowIdEq] using occurs
-      have occurrenceEq : scopedOccurrence = occurrence :=
-        ownership.primaryOccurrence_unique scopedOccurs currentOccurs
-      subst scopedOccurrence
-      have assumptionMember :
-          owner.requirement.predicate ∈ active.assumptions :=
-        covered owner inScope
-      apply SolvedRequirementValid.intro
-      rw [predicateEq, evidenceEq]
-      exact .intro (.assumption _) (.assumption assumptionMember)
+  have rowOccurs :
+      PrimaryRequirementOccursAt source occurrence row.id := by
+    simpa [rowIdEq] using occurs
+  refine ⟨row.predicate, ?_⟩
+  simpa [rowIdEq] using
+    (wellFormed.requirementProvesAt ownership signatures_eq requirements_eq
+      assumptions_mono covered rowMember rowOccurs)
 
 /-- Pointwise source ownership lifts `requirementValidAt` to every stable
 requirement identity attached at one occurrence. -/

@@ -2069,6 +2069,55 @@ theorem solveRequirements_correspondingSequenceProves
           predicateEq, valid row rowMember⟩
       · exact induction
 
+/-- A source-ordered predicate/identity correspondence into a successfully
+solved scoped ledger supplies the exact declarative evidence sequence at one
+covered source occurrence.  Qualified local-scheme template rows are justified
+by their occurrence-local assumptions rather than by declaration-wide solved
+requirement validity. -/
+theorem solveRequirements_correspondingSequenceProvesAt
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {requirements : List Requirement}
+    {solved : List SolvedRequirement}
+    {base active : SourceSemantics.Context}
+    {source : TypedSource}
+    {occurrence : NodeId}
+    {predicates : List ProgramPredicate}
+    {ids : List RequirementId}
+    (corresponds : RequirementPredicatesCorrespond requirements predicates ids)
+    (success : Detail.solveRequirements inferenceContext state requirements =
+      .ok solved)
+    (solved_eq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base source)
+    (ownership : RequirementOwnership base source)
+    (signatures_eq : active.signatures = base.signatures)
+    (requirements_eq : active.solvedRequirements = base.solvedRequirements)
+    (assumptions_mono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered source active occurrence)
+    (occurs : ∀ id, id ∈ ids →
+      PrimaryRequirementOccursAt source occurrence id) :
+    RequirementSequenceProves active ids
+      (predicates.map (Detail.applyPredicate state)) := by
+  have solverCorresponds := solveRequirements_corresponds success
+  clear success
+  induction corresponds with
+  | nil => exact .nil
+  | @cons predicate id predicates ids member tail induction =>
+      apply RequirementSequenceProves.cons
+      · obtain ⟨row, rowMember, idEq, predicateEq⟩ :=
+          solved_row_of_requirement_mem solverCorresponds member
+        have baseMember : row ∈ base.solvedRequirements := by
+          simpa [solved_eq] using rowMember
+        have rowOccurs :
+            PrimaryRequirementOccursAt source occurrence row.id := by
+          simpa [idEq] using occurs id (by simp)
+        simpa [idEq, predicateEq] using
+          (ledger.requirementProvesAt ownership signatures_eq requirements_eq
+            assumptions_mono covered baseMember rowOccurs)
+      · apply induction
+        intro tailId tailMember
+        exact occurs tailId (by simp [tailMember])
+
 /-- Decoding, final carrier closure, exact ledger ownership, and solver
 soundness compose into the declarative validity judgment for one inferred
 integer literal. -/
