@@ -39,6 +39,68 @@ theorem unify_occurrenceState_eq
       subst next
       exact ⟨rfl, rfl⟩
 
+/-! Small prefix-preservation adapters used by the eventual mutually
+recursive occurrence proof.  The primitive state updates below do not touch
+the node table, so an arbitrary older prefix remains exact across them. -/
+
+private theorem unify_preserves_nodesPrefix
+    {state next : State} {left right : Ty} {baseNodes : List Node}
+    (success : unify state left right = .ok next)
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: next.nodes := by
+  rw [(unify_occurrenceState_eq success).1]
+  exact nodesPrefix
+
+private theorem fresh_preserves_nodesPrefix
+    (state : State) {baseNodes : List Node}
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: state.fresh.2.nodes := by
+  change baseNodes <+: state.nodes
+  exact nodesPrefix
+
+private theorem withLocals_preserves_nodesPrefix
+    (state : State) (locals : TypeSystem.Environment)
+    {baseNodes : List Node} (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: (state.withLocals locals).nodes := by
+  change baseNodes <+: state.nodes
+  exact nodesPrefix
+
+private theorem restoreLexicalScope_preserves_nodesPrefix
+    (state : State) (scope : LexicalScope) {baseNodes : List Node}
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: (state.restoreLexicalScope scope).nodes := by
+  simpa only [State.restoreLexicalScope_nodes] using nodesPrefix
+
+private theorem allocateBinder_preserves_nodesPrefix
+    (state : State) (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement)
+    {baseNodes : List Node} (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+:
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).2.nodes := by
+  change baseNodes <+: state.nodes
+  exact nodesPrefix
+
+private theorem allocateHiddenLocal_preserves_nodesPrefix
+    (state : State) {baseNodes : List Node}
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: state.allocateHiddenLocal.2.nodes := by
+  change baseNodes <+: state.nodes
+  exact nodesPrefix
+
+private theorem allocateExpressionId_preserves_nodesPrefix
+    (state : State) {baseNodes : List Node}
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: state.allocateExpressionId.2.nodes := by
+  simpa only [State.allocateExpressionId_nodes] using nodesPrefix
+
+private theorem allocateStatementId_preserves_nodesPrefix
+    (state : State) {baseNodes : List Node}
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: state.allocateStatementId.2.nodes := by
+  simpa only [State.allocateStatementId_nodes] using nodesPrefix
+
 /-- Successful unification changes no occurrence allocation state. -/
 theorem unify_occurrenceBoundExtends
     {state next : State} {left right : Ty}
@@ -215,6 +277,17 @@ theorem withExpected_occurrenceState_eq
                       subst result
                       exact ⟨commitCoercionPlan_nodes state plan,
                         commitCoercionPlan_nextOccurrence state plan⟩
+
+/-- Expected-type fitting retains any node prefix visible on entry. -/
+private theorem withExpected_preserves_nodesPrefix
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    {baseNodes : List Node}
+    (success : withExpected context state actual expected = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: result.state.nodes := by
+  rw [(withExpected_occurrenceState_eq success).1]
+  exact nodesPrefix
 
 /-- Retaining one expected-type candidate preserves the occurrence bound. -/
 theorem candidateWithExpected_some_occurrenceBoundExtends
@@ -1314,6 +1387,19 @@ theorem inferMatchPatternFuel_occurrenceBoundExtends
   have exactState := inferMatchPatternFuel_occurrenceState_eq success
   exact .of_nodes_eq_nextOccurrence_eq exactState.1 exactState.2
 
+/-- Expression recording appends one node and therefore retains any older
+node prefix. -/
+private theorem recordExpression_preserves_nodesPrefix
+    (source : Syntax.Expr) (expression : InferredExpression)
+    (form : ExpressionForm) (requirements : List RequirementId)
+    (coercions : List CoercionStep) (state : State)
+    {localSchemeInstantiationStart : Option Nat}
+    {baseNodes : List Node} (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+:
+      (recordExpression source expression form requirements coercions state
+        localSchemeInstantiationStart).2.nodes := by
+  exact nodesPrefix.trans (State.recordNode_nodesPrefix state _)
+
 /-- Recording one expression is safe once its identity has already been
 allocated below the current occurrence bound. -/
 theorem recordExpression_occurrenceBoundExtends
@@ -1423,6 +1509,26 @@ theorem recordExpressionWithExpected_success_nodes
   refine ⟨fitted, fittedSuccess, resultExpression, ?_⟩
   rw [resultState]
   exact State.recordNode_nodes _ _
+
+/-- Expected-type recording preserves every node prefix visible before
+fitting, then appends the newly recorded expression node. -/
+private theorem recordExpressionWithExpected_preserves_nodesPrefix
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State} {baseNodes : List Node}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: result.2.nodes := by
+  obtain ⟨fitted, fittedSuccess, _, resultState⟩ :=
+    recordExpressionWithExpected_success_record success
+  rw [resultState]
+  exact recordExpression_preserves_nodesPrefix source fitted.expression form
+    (requirements ++ coercionRequirements fitted.coercions) fitted.coercions
+    fitted.state (withExpected_preserves_nodesPrefix fittedSuccess nodesPrefix)
+    (localSchemeInstantiationStart := localSchemeInstantiationStart)
 
 /-- Successful recording retains the caller-supplied local-instantiation
 allocator start on the exact expression node returned to the traversal. -/
@@ -1563,6 +1669,16 @@ theorem recordIndirectCall_occurrenceBoundExtends
   unfold recordIndirectCall
   exact recordExpression_occurrenceBoundExtends _ _ _ _ _ _ resultBelow
 
+/-- Indirect-call recording only appends its outer call node. -/
+private theorem recordIndirectCall_preserves_nodesPrefix
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult)
+    {baseNodes : List Node}
+    (nodesPrefix : baseNodes <+: result.state.nodes) :
+    baseNodes <+: (recordIndirectCall source callee arguments result).2.nodes := by
+  unfold recordIndirectCall
+  exact recordExpression_preserves_nodesPrefix _ _ _ _ _ _ nodesPrefix
+
 /-- Selected-call recording retains any exact older prefix when every delayed
 argument-coercion target is fresh relative to that prefix. -/
 theorem recordSelectedCallResult_preserves_nodesPrefix_of_fresh
@@ -1610,6 +1726,25 @@ theorem recordSelectedCallResult_preserves_nodesPrefix_of_fresh
         coercionRequirements trailingCoercions)
       (attempt.callCoercions ++ trailingCoercions) calleeRecord.2).2.nodes
   exact calleePrefix.trans (State.recordNode_nodesPrefix calleeRecord.2 _)
+
+/-- The ordinary selected-call wrapper inherits the anchored prefix theorem;
+its only potentially destructive step is coercion attachment to fresh argument
+occurrences. -/
+private theorem recordSelectedCall_preserves_nodesPrefix_of_fresh
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (baseNodes : List Node) (cutoff : Nat)
+    (nodesPrefix : baseNodes <+: attempt.state.nodes)
+    (baseBelow :
+      ∀ node ∈ baseNodes, node.occurrenceId.index < cutoff)
+    (entriesFresh : ∀ entry ∈ attempt.argumentCoercions,
+      cutoff ≤ entry.expression.occurrence.index) :
+    baseNodes <+:
+      (recordSelectedCall source callee name arguments attempt).2.nodes := by
+  unfold recordSelectedCall
+  exact recordSelectedCallResult_preserves_nodesPrefix_of_fresh
+    source callee name arguments attempt attempt.result [] attempt.state
+    baseNodes cutoff nodesPrefix baseBelow entriesFresh
 
 /-- Invert selected-call recording into the exact synthetic callee node and
 the exact call node appended after coercion attachment. -/
@@ -1739,6 +1874,18 @@ theorem unifyBuiltinFunctionArgumentsEqual_occurrenceState_eq
               have tailEq := induction success
               exact ⟨tailEq.1.trans headEq.1, tailEq.2.trans headEq.2⟩
 
+/-- Builtin argument unification retains every node prefix visible before the
+first argument is checked. -/
+private theorem unifyBuiltinFunctionArgumentsEqual_preserves_nodesPrefix
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {state next : State} {baseNodes : List Node}
+    (success : unifyBuiltinFunctionArgumentsEqual arguments parameters state =
+      .ok next)
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: next.nodes := by
+  rw [(unifyBuiltinFunctionArgumentsEqual_occurrenceState_eq success).1]
+  exact nodesPrefix
+
 /-- Builtin-function argument unification preserves the occurrence bound. -/
 theorem unifyBuiltinFunctionArgumentsEqual_occurrenceBoundExtends
     {arguments : List InferredExpression} {parameters : List Ty}
@@ -1864,6 +2011,97 @@ theorem recordBuiltinFunctionCall_occurrenceBoundExtends
                 exact beforeResult.trans
                   (recordExpression_occurrenceBoundExtends source _ _ [] [] _
                     resultBelow)
+  · simp [arity, bind, Except.bind] at success
+
+/-- Successful builtin-call recording keeps every input node as an exact
+prefix and appends the synthetic callee and outer call nodes. -/
+private theorem recordBuiltinFunctionCall_preserves_nodesPrefix
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State} {baseNodes : List Node}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes) :
+    baseNodes <+: result.2.nodes := by
+  unfold recordBuiltinFunctionCall at success
+  by_cases arity : arguments.length = function.parameterTypes.length
+  · simp only [arity, ↓reduceIte, bind, Except.bind] at success
+    cases argumentsResult :
+        unifyBuiltinFunctionArgumentsEqual arguments function.parameterTypes
+          state with
+    | error error =>
+        simp [argumentsResult, bind, Except.bind] at success
+    | ok argumentsState =>
+        simp only [argumentsResult, bind, Except.bind] at success
+        have argumentsPrefix : baseNodes <+: argumentsState.nodes :=
+          unifyBuiltinFunctionArgumentsEqual_preserves_nodesPrefix
+            argumentsResult nodesPrefix
+        cases expected with
+        | none =>
+            simp only at success
+            let fittedState := argumentsState
+            have fittedPrefix : baseNodes <+: fittedState.nodes :=
+              argumentsPrefix
+            let allocation := fittedState.allocateExpressionId
+            have allocatedPrefix : baseNodes <+: allocation.2.nodes :=
+              allocateExpressionId_preserves_nodesPrefix fittedState
+                fittedPrefix
+            let calleeExpression : InferredExpression := {
+              id := allocation.1
+              type := function.type
+            }
+            let calleeRecord := recordExpression callee calleeExpression
+              (.reference name (.builtinFunction function)) [] [] allocation.2
+            have calleePrefix : baseNodes <+: calleeRecord.2.nodes :=
+              recordExpression_preserves_nodesPrefix callee calleeExpression
+                (.reference name (.builtinFunction function)) [] [] allocation.2
+                allocatedPrefix
+            change Except.ok (recordExpression source {
+              id := call
+              type := calleeRecord.2.resolve function.returnType
+            } (.call allocation.1 (arguments.map (fun argument => argument.id))
+              (.builtinFunction function)) [] [] calleeRecord.2) =
+                Except.ok result at success
+            injection success with resultEq
+            subst result
+            exact recordExpression_preserves_nodesPrefix source _ _ [] []
+              calleeRecord.2 calleePrefix
+        | some expectedType =>
+            cases expectedResult :
+                unify argumentsState function.returnType expectedType with
+            | error error =>
+                simp [expectedResult, bind, Except.bind] at success
+            | ok fittedState =>
+                simp only [expectedResult, bind, Except.bind] at success
+                have fittedPrefix : baseNodes <+: fittedState.nodes :=
+                  unify_preserves_nodesPrefix expectedResult argumentsPrefix
+                let allocation := fittedState.allocateExpressionId
+                have allocatedPrefix : baseNodes <+: allocation.2.nodes :=
+                  allocateExpressionId_preserves_nodesPrefix fittedState
+                    fittedPrefix
+                let calleeExpression : InferredExpression := {
+                  id := allocation.1
+                  type := function.type
+                }
+                let calleeRecord := recordExpression callee calleeExpression
+                  (.reference name (.builtinFunction function)) [] []
+                    allocation.2
+                have calleePrefix : baseNodes <+: calleeRecord.2.nodes :=
+                  recordExpression_preserves_nodesPrefix callee calleeExpression
+                    (.reference name (.builtinFunction function)) [] []
+                    allocation.2 allocatedPrefix
+                change Except.ok (recordExpression source {
+                  id := call
+                  type := calleeRecord.2.resolve function.returnType
+                } (.call allocation.1
+                  (arguments.map (fun argument => argument.id))
+                  (.builtinFunction function)) [] [] calleeRecord.2) =
+                    Except.ok result at success
+                injection success with resultEq
+                subst result
+                exact recordExpression_preserves_nodesPrefix source _ _ [] []
+                  calleeRecord.2 calleePrefix
   · simp [arity, bind, Except.bind] at success
 
 /-- Successful builtin-call recording returns the caller-allocated call
