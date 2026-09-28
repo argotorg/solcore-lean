@@ -6479,6 +6479,35 @@ theorem result_type_admissible
           rw [StructuralSubstitution.mem_freeVariables_nominal_iff]
           exact ⟨argument, member, occurs⟩
 
+/-- Every payload exposed by an admissible constructor instantiation is an
+admissible occurrence type.  Catalog well-formedness closes each declared
+payload in the constructor's rigid parameter scope, while the instantiation's
+exact admissible substitution transports it to the use-site context. -/
+theorem payload_type_admissible
+    {context : Context}
+    {instantiation : Frontend.SourceInference.DataConstructorInstantiation}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (valid : SourceSemantics.DataConstructorInstantiation.Admissible context
+      instantiation)
+    {type : Ty}
+    (member : type ∈ instantiation.payloadTypes) :
+    TypeAdmissible context type := by
+  cases valid with
+  | intro dataType constructor dataTypeMember constructorMember _ _
+      substitutionExact substitutionRange payloadTypesEq _ =>
+      rw [payloadTypesEq] at member
+      rcases List.mem_map.mp member with ⟨payload, payloadMember, rfl⟩
+      have dataWellFormed := catalog.data_semantic dataType dataTypeMember
+      exact StructuralSubstitution.TypeWellScoped.applyParametersAdmissibleTo
+        (source := signatureContext context.signatures dataType.id
+          dataType.parameters)
+        (target := context)
+        instantiation.parameterSubstitution substitutionExact substitutionRange
+        rfl binders
+        ((dataWellFormed.constructor_payloads constructor constructorMember
+          payload payloadMember).typeWellScoped)
+
 end Solcore.SourceSemantics.DataConstructorInstantiation.Admissible
 
 namespace Solcore.SourceSemantics.FlexibleSubstitution

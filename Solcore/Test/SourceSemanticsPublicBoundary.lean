@@ -67,6 +67,8 @@ example := @Solcore.SourceSemantics.DataConstructorInstantiation.Valid.toAdmissi
 example := @Solcore.SourceSemantics.DataConstructorInstantiation.Admissible.toValid
 example :=
   @Solcore.SourceSemantics.DataConstructorInstantiation.Admissible.result_type_admissible
+example :=
+  @Solcore.SourceSemantics.DataConstructorInstantiation.Admissible.payload_type_admissible
 
 example := @Solcore.SourceSemantics.Forall₂
 example := @Solcore.SourceSemantics.Forall₂.functional
