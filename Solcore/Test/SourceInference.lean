@@ -81,6 +81,14 @@ example :
     freshProgress.solved
   exact reflexive.trans (freshProgress.trans stateOnlyProgress)
 
+/-- A type bounded in the input state remains bounded after applying the
+solved substitution of any later inference state. -/
+example {before after : SourceInference.State} {type : TypeSystem.Ty}
+    (progress : before.InferenceProgress after)
+    (below : type.VariablesBelow before.inference.next) :
+    (after.resolve type).VariablesBelow after.inference.next := by
+  exact progress.resolve_variablesBelow below
+
 /-- Readiness starts from the input environment, survives fresh allocation,
 and admits a binder whose monomorphic body is the freshly allocated type. -/
 example :
@@ -114,6 +122,12 @@ example {outer inner : SourceInference.State}
       (inner.restoreLexicalScope outer.lexicalScope).InferenceReady := by
   exact SourceInference.State.restoreLexicalScope_inferenceProperties
     ready progress
+
+/-- Lexical restoration exposes exactly the captured scope. -/
+example (state : SourceInference.State)
+    (scope : SourceInference.LexicalScope) :
+    (state.restoreLexicalScope scope).lexicalScope = scope := by
+  simp
 
 /-- Repeated fresh-type allocation packages progress, readiness, and exact
 allocator bounds for every returned metavariable. -/

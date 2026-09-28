@@ -180,6 +180,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.InferenceProgress.of_inference_eq
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.trans
+example :=
+  @Solcore.Frontend.SourceInference.State.InferenceProgress.resolve_variablesBelow
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.fresh
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.withLocals
 example :=
@@ -248,6 +250,8 @@ example :=
   @Solcore.Frontend.SourceInference.State.withLocals_binderEnvironment
 example :=
   @Solcore.Frontend.SourceInference.State.restoreLexicalScope_binderEnvironment
+example :=
+  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_lexicalScope
 example :=
   @Solcore.Frontend.SourceInference.State.allocateBinder_binderEnvironment
 example :=
