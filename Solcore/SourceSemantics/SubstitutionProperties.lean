@@ -5827,6 +5827,93 @@ private theorem component
       exact StructuralSubstitution.TypeWellScoped.toAdmissibleOfResidual
         outerAdmissible.binders residual innerScoped
 
+/-- Equality with a nominal type fixes the left application-spine head to
+that declaration constructor. -/
+private theorem applicationHead_eq_of_eq_nominal
+    {type : Ty} {declaration : Resolved.DeclarationId}
+    {arguments : List Ty}
+    (equal : type = Ty.nominal declaration arguments) :
+    StructuralSubstitution.substitutionApplicationHead type =
+      .constructor (.declaration declaration) := by
+  rw [equal]
+  simp [Ty.nominal,
+    StructuralSubstitution.substitutionApplicationHead_applyMany,
+    StructuralSubstitution.substitutionApplicationHead]
+
+/-- An admissible application of a cataloged data declaration has exactly its
+declared parameter arity, and every retained type argument is independently
+admissible in the same occurrence context. -/
+theorem nominal_data_arguments
+    {context : Context} {dataType : Frontend.ProgramDataSignature}
+    {arguments : List Ty}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (dataTypeMember : dataType ∈ context.signatures.dataTypes)
+    (admissible : TypeAdmissible context
+      (Ty.nominal dataType.id arguments)) :
+    arguments.length = dataType.parameters.length ∧
+      ∀ argument, argument ∈ arguments →
+        TypeAdmissible context argument := by
+  have components :
+      arguments.length = dataType.parameters.length ∧
+        TypesWellScoped context
+          (admissibleTypeVariables context
+            (Ty.nominal dataType.id arguments)) arguments := by
+    refine TypeWellScoped.rec
+      (motive_1 := fun type _ =>
+        type = Ty.nominal dataType.id arguments →
+          arguments.length = dataType.parameters.length ∧
+            TypesWellScoped context
+              (admissibleTypeVariables context
+                (Ty.nominal dataType.id arguments)) arguments)
+      (motive_2 := fun _ _ => True)
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+      admissible.typeWellScoped rfl
+    · intro _ _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · intro _ _ _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · intro _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · intro retainedData retainedArguments retainedMember retainedArity
+        retainedScoped _ equal
+      have nominalParts := StructuralSubstitution.nominal_injective equal
+      have dataEq : retainedData = dataType :=
+        StructuralSubstitution.eq_of_mem_of_mapped_nodup catalog.data_ids
+          retainedMember dataTypeMember nominalParts.1
+      constructor
+      · simpa [nominalParts.2, dataEq] using retainedArity
+      · simpa [nominalParts.2] using retainedScoped
+    · intro contract retainedArguments contractMember _ _ _ equal
+      have nominalParts := StructuralSubstitution.nominal_injective equal
+      exact False.elim
+        (catalog.data_contract_ids_ne dataTypeMember contractMember
+          nominalParts.1.symm)
+    · intro _ _ _ _ _ _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · intro _ _ _ _ _ _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · intro _ _ _ _ _ _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · intro _ _ _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · intro _ _ _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · trivial
+    · intros
+      trivial
+  refine ⟨components.1, ?_⟩
+  intro argument member
+  exact component admissible
+    (TypesWellScoped.member components.2 member)
+
 /-- The parameter component of an admissible function type is admissible. -/
 theorem function_parameter
     {context : Context} {parameter result : Ty}
