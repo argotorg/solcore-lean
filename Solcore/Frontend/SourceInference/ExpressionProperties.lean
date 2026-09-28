@@ -11733,13 +11733,257 @@ theorem inferExprFuel_preserves_localBindersBelowNextLocal
   exact congrArg LexicalScope.binders
     (inferExprFuel_success_lexicalScope_eq success)
 
+/-- Successful inference of a source-ordered `for`-item sequence never moves
+the declaration-local identity cutoff backwards. -/
+theorem inferForItemsFuel_nextLocal_le
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    state.nextLocal ≤ result.state.nextLocal :=
+  inferFuel_advances_nextLocal_internal.2.2.2.2.2.1
+    fuel context items state result success
+
+/-- Successful inference of one restricted `for` item never moves the
+declaration-local identity cutoff backwards. -/
+theorem inferForItemFuel_nextLocal_le
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    state.nextLocal ≤ result.2.nextLocal :=
+  inferFuel_advances_nextLocal_internal.2.2.2.2.2.2.1
+    fuel context item state result success
+
+private theorem inferPlaceFuel_preserves_localBindersBelowNextLocal
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    result.2.LocalBindersBelowNextLocal := by
+  apply State.LocalBindersBelowNextLocal.transport
+      (before := state) (after := result.2) ?_
+      (inferFuel_advances_nextLocal_internal.2.2.2.2.2.2.2.1
+        fuel context target state result success) below
+  exact congrArg LexicalScope.binders
+    (inferPlaceFuel_success_lexicalScope_eq success)
+
+private theorem inferAssignedValueFuel_preserves_localBindersBelowNextLocal
+    {fuel : Nat} {context : Context} {target value : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result) :
+    result.2.2.LocalBindersBelowNextLocal := by
+  apply State.LocalBindersBelowNextLocal.transport
+      (before := state) (after := result.2.2) ?_
+      (inferFuel_advances_nextLocal_internal.2.2.2.2.2.2.2.2.1
+        fuel context target operator value state result success) below
+  rcases result with ⟨assignment, inferredValue, final⟩
+  exact congrArg LexicalScope.binders
+    (inferAssignedValueFuel_success_lexicalScope_eq success)
+
+/-- Successful inference of one restricted `for` item preserves the stable
+local-identity bound, including the binder introduced by a header `let`. -/
+theorem inferForItemFuel_preserves_localBindersBelowNextLocal
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    result.2.LocalBindersBelowNextLocal := by
+  cases fuel with
+  | zero => simp [inferForItemFuel] at success
+  | succ fuel =>
+    unfold inferForItemFuel at success
+    cases itemEq : item.value with
+    | letDecl name sourceType initializer =>
+        simp only [itemEq, bind, Except.bind] at success
+        cases sourceType with
+        | none =>
+            cases initializer with
+            | none => simp at success
+            | some initializer =>
+                cases initializerResult :
+                    inferExprFuel fuel context initializer none state with
+                | error error =>
+                    simp [initializerResult, bind, Except.bind] at success
+                | ok initializerPair =>
+                    rcases initializerPair with
+                      ⟨inferredInitializer, initializerState⟩
+                    simp only [initializerResult, bind, Except.bind,
+                      Prod.eta, pure, Pure.pure, Except.pure] at success
+                    injection success with resultEq
+                    rw [← resultEq]
+                    apply State.allocateBinder_preserves_localBindersBelowNextLocal
+                    exact State.withLocals_preserves_localBindersBelowNextLocal
+                      initializerState _
+                      (inferExprFuel_preserves_localBindersBelowNextLocal below
+                        initializerResult)
+        | some sourceType =>
+            cases initializer with
+            | none =>
+                cases sourceTypeResult : resolveSourceType context sourceType with
+                | error error =>
+                    simp [sourceTypeResult, bind, Except.bind] at success
+                | ok resolvedType =>
+                    simp only [sourceTypeResult, bind, Except.bind, pure,
+                      Pure.pure, Except.pure] at success
+                    injection success with resultEq
+                    rw [← resultEq]
+                    apply State.allocateBinder_preserves_localBindersBelowNextLocal
+                    exact State.withLocals_preserves_localBindersBelowNextLocal
+                      state _ below
+            | some initializer =>
+                cases sourceTypeResult : resolveSourceType context sourceType with
+                | error error =>
+                    simp [sourceTypeResult, bind, Except.bind] at success
+                | ok resolvedType =>
+                    simp only [sourceTypeResult, bind, Except.bind] at success
+                    cases initializerResult : inferExprFuel fuel context
+                        initializer (some resolvedType) state with
+                    | error error =>
+                        simp [initializerResult, bind, Except.bind] at success
+                    | ok initializerPair =>
+                        rcases initializerPair with
+                          ⟨inferredInitializer, initializerState⟩
+                        simp only [initializerResult, bind, Except.bind,
+                          Prod.eta, pure, Pure.pure, Except.pure] at success
+                        injection success with resultEq
+                        rw [← resultEq]
+                        apply
+                          State.allocateBinder_preserves_localBindersBelowNextLocal
+                        exact
+                          State.withLocals_preserves_localBindersBelowNextLocal
+                            initializerState _
+                            (inferExprFuel_preserves_localBindersBelowNextLocal
+                              below initializerResult)
+    | expression expression =>
+        simp only [itemEq, bind, Except.bind] at success
+        cases expressionResult :
+            inferExprFuel fuel context expression none state with
+        | error error =>
+            simp [expressionResult, bind, Except.bind] at success
+        | ok expressionPair =>
+            rcases expressionPair with ⟨inferredExpression, expressionState⟩
+            simp only [expressionResult, bind, Except.bind, Prod.eta, pure,
+              Pure.pure, Except.pure] at success
+            injection success with resultEq
+            rw [← resultEq]
+            exact inferExprFuel_preserves_localBindersBelowNextLocal below
+              expressionResult
+    | assignValue target operator value =>
+        simp only [itemEq, bind, Except.bind] at success
+        cases assignmentResult : inferAssignedValueFuel fuel context target
+            operator.value value state with
+        | error error =>
+            simp [assignmentResult, bind, Except.bind] at success
+        | ok assignmentTriple =>
+            rcases assignmentTriple with
+              ⟨assignment, inferredValue, assignmentState⟩
+            simp only [assignmentResult, bind, Except.bind, Prod.eta, pure,
+              Pure.pure, Except.pure] at success
+            injection success with resultEq
+            rw [← resultEq]
+            exact
+              inferAssignedValueFuel_preserves_localBindersBelowNextLocal
+                below assignmentResult
+    | assignBitNot target operator =>
+        simp only [itemEq, bind, Except.bind] at success
+        cases placeResult : inferPlaceFuel fuel context target state with
+        | error error =>
+            simp [placeResult, bind, Except.bind] at success
+        | ok placePair =>
+            rcases placePair with ⟨place, placeState⟩
+            simp only [placeResult, bind, Except.bind, Prod.eta] at success
+            cases unifyResult : unify placeState place.type .word with
+            | error error =>
+                simp [unifyResult, bind, Except.bind] at success
+            | ok unifiedState =>
+                simp only [unifyResult, bind, Except.bind, pure, Pure.pure,
+                  Except.pure] at success
+                injection success with resultEq
+                rw [← resultEq]
+                apply State.LocalBindersBelowNextLocal.transport
+                    (before := placeState) (after := unifiedState) ?_
+                    (by
+                      rw [unify_preserves_nextLocal unifyResult]
+                      exact Nat.le_refl _)
+                    (inferPlaceFuel_preserves_localBindersBelowNextLocal below
+                      placeResult)
+                exact congrArg LexicalScope.binders
+                  (unify_preserves_lexicalScope unifyResult)
+
+/-- Source-ordered `for`-item traversal preserves the stable local-identity
+bound through every header declaration and update. -/
+theorem inferForItemsFuel_preserves_localBindersBelowNextLocal
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    result.state.LocalBindersBelowNextLocal := by
+  induction items generalizing state result with
+  | nil =>
+      simp only [inferForItemsFuel, pure, Pure.pure, Except.pure] at success
+      injection success with resultEq
+      rw [← resultEq]
+      exact below
+  | cons item items induction =>
+      unfold inferForItemsFuel at success
+      cases itemResult : inferForItemFuel fuel context item state with
+      | error error => simp [itemResult, bind, Except.bind] at success
+      | ok itemPair =>
+          rcases itemPair with ⟨inferredItem, itemState⟩
+          simp only [itemResult, bind, Except.bind] at success
+          cases tailResult : inferForItemsFuel fuel context items itemState with
+          | error error => simp [tailResult, bind, Except.bind] at success
+          | ok tail =>
+              simp only [tailResult, bind, Except.bind, pure, Pure.pure,
+                Except.pure] at success
+              have tailBelow := induction
+                (inferForItemFuel_preserves_localBindersBelowNextLocal below
+                  itemResult)
+                tailResult
+              injection success with resultEq
+              subst result
+              exact tailBelow
+
 set_option maxHeartbeats 500000 in
-private theorem inferStatementsFuel_preserves_header_internal
-    (fuel : Nat) (context : Context) (statements : List Syntax.Statement)
-    (expectedReturn : Ty) (state : State) :
-    PreservesStateHeader BlockResult.state state
-      (inferStatementsFuel fuel context statements expectedReturn state) := by
-  apply inferStatementsFuel.induct
+private theorem inferStatementsFuel_preserves_header_internal :
+    (∀ fuel context expression expected state,
+      PreservesStateHeader Prod.snd state
+        (inferExprFuel fuel context expression expected state)) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      PreservesStateHeader Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state)) ∧
+    (∀ fuel context sources expected state,
+      PreservesStateHeader Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state)) ∧
+    (∀ fuel context statements expectedReturn state,
+      PreservesStateHeader BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state)) ∧
+    (∀ fuel context statement expectedReturn state,
+      PreservesStateHeader StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state)) ∧
+    (∀ fuel context items state,
+      PreservesStateHeader InferredForItems.state state
+        (inferForItemsFuel fuel context items state)) ∧
+    (∀ fuel context item state,
+      PreservesStateHeader Prod.snd state
+        (inferForItemFuel fuel context item state)) ∧
+    (∀ fuel context target state,
+      PreservesStateHeader Prod.snd state
+        (inferPlaceFuel fuel context target state)) ∧
+    (∀ fuel context target operator value state,
+      PreservesStateHeader (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state)) ∧
+    (∀ fuel context expressions state,
+      PreservesStateHeader Prod.snd state
+        (inferExprsFuel fuel context expressions state)) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      PreservesStateHeader MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state)) := by
+  apply inferExprFuel.mutual_induct
     (motive1 := fun fuel context expression expected state =>
       PreservesStateHeader Prod.snd state
         (inferExprFuel fuel context expression expected state))
@@ -11920,6 +12164,14 @@ private theorem inferStatementsFuel_preserves_header_internal
       freshDataConstructorInstantiation_preserves_inputs,
       freshTypes_preserves_owner, freshTypes_preserves_inputs]
 
+private theorem inferStatementListFuel_preserves_header_internal
+    (fuel : Nat) (context : Context) (statements : List Syntax.Statement)
+    (expectedReturn : Ty) (state : State) :
+    PreservesStateHeader BlockResult.state state
+      (inferStatementsFuel fuel context statements expectedReturn state) :=
+  inferStatementsFuel_preserves_header_internal.2.2.2.1 fuel context statements
+    expectedReturn state
+
 /-- Successful statement-list inference preserves the declaration owner and
 the original input binders. -/
 theorem inferStatementsFuel_state_header
@@ -11928,7 +12180,7 @@ theorem inferStatementsFuel_state_header
     (success : inferStatementsFuel fuel context statements expectedReturn state =
       .ok result) :
     result.state.header = state.header := by
-  exact inferStatementsFuel_preserves_header_internal fuel context statements
+  exact inferStatementListFuel_preserves_header_internal fuel context statements
     expectedReturn state result success
 
 @[simp] theorem inferStatementsFuel_preserves_owner
@@ -11948,5 +12200,57 @@ theorem inferStatementsFuel_state_header
     result.state.inputs = state.inputs :=
   congrArg (fun header : State.Header => header.inputs)
     (inferStatementsFuel_state_header success)
+
+/-- Successful `for`-item sequence inference preserves declaration identity
+and the original input-binder metadata. -/
+theorem inferForItemsFuel_state_header
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    result.state.header = state.header := by
+  exact inferStatementsFuel_preserves_header_internal.2.2.2.2.2.1
+    fuel context items state result success
+
+@[simp] theorem inferForItemsFuel_preserves_owner
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    result.state.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (inferForItemsFuel_state_header success)
+
+@[simp] theorem inferForItemsFuel_preserves_inputs
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    result.state.inputs = state.inputs :=
+  congrArg (fun header : State.Header => header.inputs)
+    (inferForItemsFuel_state_header success)
+
+/-- Successful inference of one restricted `for` item preserves declaration
+identity and the original input-binder metadata. -/
+theorem inferForItemFuel_state_header
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    result.2.header = state.header := by
+  exact inferStatementsFuel_preserves_header_internal.2.2.2.2.2.2.1
+    fuel context item state result success
+
+@[simp] theorem inferForItemFuel_preserves_owner
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    result.2.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (inferForItemFuel_state_header success)
+
+@[simp] theorem inferForItemFuel_preserves_inputs
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    result.2.inputs = state.inputs :=
+  congrArg (fun header : State.Header => header.inputs)
+    (inferForItemFuel_state_header success)
 
 end Solcore.Frontend.SourceInference.Detail

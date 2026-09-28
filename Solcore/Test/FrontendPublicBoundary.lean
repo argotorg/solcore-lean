@@ -663,6 +663,14 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_localBindersBelowNextLocal
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_nextLocal_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_nextLocal_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_preserves_localBindersBelowNextLocal
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_localIdentifier_record
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_inferenceProperties
@@ -682,6 +690,18 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_inputs
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_preserves_owner
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_preserves_inputs
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_preserves_owner
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_preserves_inputs
 example :=
   @Solcore.Frontend.SourceInference.checkFunctionBody_success_body_inferenceProperties
 example := @Solcore.Frontend.SourceInference.checkFunctionBody_success_type
