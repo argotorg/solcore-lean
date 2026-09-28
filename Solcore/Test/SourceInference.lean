@@ -566,6 +566,65 @@ example {context : SourceInference.Context}
   exact SourceInference.Detail.applyFunctionType_inferenceProperties ready
     calleeBelow argumentsBelow expectedBelow success
 
+/-- Pairwise unification of bounded builtin arguments and parameters makes
+inference progress and preserves readiness. -/
+example {arguments : List SourceInference.InferredExpression}
+    {parameters : List TypeSystem.Ty}
+    {state next : SourceInference.State}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (parametersBelow : ∀ parameter ∈ parameters,
+      parameter.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.unifyBuiltinFunctionArgumentsEqual
+      arguments parameters state = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  exact
+    SourceInference.Detail.unifyBuiltinFunctionArgumentsEqual_inferenceProperties
+      ready argumentsBelow parametersBelow success
+
+/-- Recording a fixed builtin-function call preserves inference readiness and
+returns an allocator-bounded result type. -/
+example {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId}
+    {arguments : List SourceInference.InferredExpression}
+    {call : SourceInference.ExpressionId}
+    {expected : Option TypeSystem.Ty} {state : SourceInference.State}
+    {result : SourceInference.InferredExpression × SourceInference.State}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : SourceInference.Detail.recordBuiltinFunctionCall source callee
+      name function arguments call expected state = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  exact
+    SourceInference.Detail.recordBuiltinFunctionCall_inferenceProperties
+      ready argumentsBelow expectedBelow success
+
+/-- Recording an already inferred indirect call changes only typed-source
+metadata and preserves the result-type allocator bound. -/
+example (source : Syntax.Expr) (callee : SourceInference.InferredExpression)
+    (arguments : List SourceInference.InferredExpression)
+    (result : SourceInference.Detail.IndirectApplicationResult)
+    (ready : result.state.InferenceReady)
+    (resultBelow : result.result.type.VariablesBelow
+      result.state.inference.next) :
+    result.state.InferenceProgress
+        (SourceInference.Detail.recordIndirectCall source callee arguments
+          result).2 ∧
+      (SourceInference.Detail.recordIndirectCall source callee arguments
+        result).2.InferenceReady ∧
+      (SourceInference.Detail.recordIndirectCall source callee arguments
+        result).1.type.VariablesBelow
+        (SourceInference.Detail.recordIndirectCall source callee arguments
+          result).2.inference.next := by
+  exact SourceInference.Detail.recordIndirectCall_inferenceProperties source
+    callee arguments result ready resultBelow
+
 /-- Unary operator inference preserves progress and readiness and returns an
 allocator-bounded type. -/
 example {context : SourceInference.Context} {operator : Syntax.UnaryOp}

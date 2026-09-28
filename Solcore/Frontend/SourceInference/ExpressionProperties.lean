@@ -3728,6 +3728,330 @@ theorem applyFunctionType_inferenceProperties
               exact ⟨prefixProgress.trans resultProperties.1,
                 resultProperties.2⟩
 
+/-- Every parameter of a compiler-provided function is a closed builtin type,
+so it lies below every flexible-variable allocator bound. -/
+private theorem builtinFunction_parameterTypes_variablesBelow
+    (function : BuiltinFunctionId) (next : Nat) :
+    ∀ type ∈ function.parameterTypes, type.VariablesBelow next := by
+  cases function <;>
+    simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word, Ty.bool]
+
+/-- The result of a compiler-provided function is a closed builtin type. -/
+private theorem builtinFunction_returnType_variablesBelow
+    (function : BuiltinFunctionId) (next : Nat) :
+    function.returnType.VariablesBelow next := by
+  cases function <;>
+    simp [BuiltinFunctionId.returnType, Ty.integer, Ty.word, Ty.bool]
+
+/-- Consequently, the complete monomorphic type of a compiler-provided
+function is allocator-bounded at every bound. -/
+private theorem builtinFunction_type_variablesBelow
+    (function : BuiltinFunctionId) (next : Nat) :
+    function.type.VariablesBelow next := by
+  unfold BuiltinFunctionId.type
+  exact (Ty.variablesBelow_function_iff _ _ _).2 ⟨
+    Ty.variablesBelow_productMany
+      (builtinFunction_parameterTypes_variablesBelow function next),
+    builtinFunction_returnType_variablesBelow function next⟩
+
+/-- Pairwise builtin-argument unification makes semantic inference progress
+and preserves readiness when both input rows are allocator-bounded.  The
+underlying operation deliberately stops when either row is exhausted. -/
+theorem unifyBuiltinFunctionArgumentsEqual_inferenceProperties
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {state next : State}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (parametersBelow : ∀ parameter ∈ parameters,
+      parameter.VariablesBelow state.inference.next)
+    (success : unifyBuiltinFunctionArgumentsEqual arguments parameters state =
+      .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  induction arguments generalizing parameters state next with
+  | nil =>
+      simp only [unifyBuiltinFunctionArgumentsEqual] at success
+      injection success with nextEq
+      subst next
+      exact ⟨.refl ready.solved, ready⟩
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          injection success with nextEq
+          subst next
+          exact ⟨.refl ready.solved, ready⟩
+      | cons parameter parameters =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          cases unifyResult : unify state argument.type parameter with
+          | error error =>
+              simp [unifyResult, bind, Except.bind] at success
+          | ok unifiedState =>
+              simp only [unifyResult, bind, Except.bind] at success
+              have argumentBelow := argumentsBelow argument (by simp)
+              have parameterBelow := parametersBelow parameter (by simp)
+              have headProgress := unify_inferenceProgress ready.solved
+                argumentBelow parameterBelow unifyResult
+              have headReady := unify_preserves_inferenceReady ready
+                argumentBelow parameterBelow unifyResult
+              have tailArgumentsBelow : ∀ tail ∈ arguments,
+                  tail.type.VariablesBelow
+                    unifiedState.inference.next := by
+                intro tail member
+                exact (argumentsBelow tail (by simp [member])).weaken
+                  headProgress.next_le
+              have tailParametersBelow : ∀ tail ∈ parameters,
+                  tail.VariablesBelow unifiedState.inference.next := by
+                intro tail member
+                exact (parametersBelow tail (by simp [member])).weaken
+                  headProgress.next_le
+              have tailProperties := induction headReady tailArgumentsBelow
+                tailParametersBelow success
+              exact ⟨headProgress.trans tailProperties.1,
+                tailProperties.2⟩
+
+/-- Allocating and recording the synthetic callee of a builtin call changes
+only source metadata.  Its closed result type therefore remains bounded. -/
+private theorem recordBuiltinFunctionCall_tail_inferenceProperties
+    (source callee : Syntax.Expr) (name : String)
+    (function : BuiltinFunctionId) (arguments : List InferredExpression)
+    (call : ExpressionId) (state : State) (ready : state.InferenceReady) :
+    let allocation := state.allocateExpressionId
+    let calleeExpression : InferredExpression := {
+      id := allocation.1
+      type := function.type
+    }
+    let calleeRecord := recordExpression callee calleeExpression
+      (.reference name (.builtinFunction function)) [] [] allocation.2
+    let result : InferredExpression := {
+      id := call
+      type := calleeRecord.2.resolve function.returnType
+    }
+    let callRecord := recordExpression source result
+      (.call allocation.1 (arguments.map (fun argument => argument.id))
+        (.builtinFunction function)) [] [] calleeRecord.2
+    state.InferenceProgress callRecord.2 ∧
+      callRecord.2.InferenceReady ∧
+      callRecord.1.type.VariablesBelow callRecord.2.inference.next := by
+  let allocation := state.allocateExpressionId
+  let calleeExpression : InferredExpression := {
+    id := allocation.1
+    type := function.type
+  }
+  let calleeRecord := recordExpression callee calleeExpression
+    (.reference name (.builtinFunction function)) [] [] allocation.2
+  let result : InferredExpression := {
+    id := call
+    type := calleeRecord.2.resolve function.returnType
+  }
+  let callRecord := recordExpression source result
+    (.call allocation.1 (arguments.map (fun argument => argument.id))
+      (.builtinFunction function)) [] [] calleeRecord.2
+  change state.InferenceProgress callRecord.2 ∧
+    callRecord.2.InferenceReady ∧
+    callRecord.1.type.VariablesBelow callRecord.2.inference.next
+  have allocatedProgress : state.InferenceProgress allocation.2 :=
+    State.InferenceProgress.allocateExpressionId state ready.solved
+  have allocatedReady : allocation.2.InferenceReady :=
+    State.InferenceReady.allocateExpressionId ready
+  have calleeProgress : allocation.2.InferenceProgress calleeRecord.2 := by
+    simpa only [calleeRecord, recordExpression] using
+      State.InferenceProgress.recordNode allocation.2 (.expression {
+        id := calleeExpression.id
+        span := callee.span
+        type := calleeExpression.type
+        form := .reference name (.builtinFunction function)
+        requirements := []
+        coercions := []
+      }) allocatedReady.solved
+  have calleeReady : calleeRecord.2.InferenceReady := by
+    simpa only [calleeRecord, recordExpression] using
+      State.InferenceReady.recordNode (.expression {
+        id := calleeExpression.id
+        span := callee.span
+        type := calleeExpression.type
+        form := .reference name (.builtinFunction function)
+        requirements := []
+        coercions := []
+      }) allocatedReady
+  have resultBelow : result.type.VariablesBelow
+      calleeRecord.2.inference.next := by
+    exact calleeReady.solved.variablesBelow_apply
+      (builtinFunction_returnType_variablesBelow function _)
+  have callProgress : calleeRecord.2.InferenceProgress callRecord.2 := by
+    simpa only [callRecord, recordExpression] using
+      State.InferenceProgress.recordNode calleeRecord.2 (.expression {
+        id := result.id
+        span := source.span
+        type := result.type
+        form := .call allocation.1
+          (arguments.map (fun argument => argument.id))
+          (.builtinFunction function)
+        requirements := []
+        coercions := []
+      }) calleeReady.solved
+  have callReady : callRecord.2.InferenceReady := by
+    simpa only [callRecord, recordExpression] using
+      State.InferenceReady.recordNode (.expression {
+        id := result.id
+        span := source.span
+        type := result.type
+        form := .call allocation.1
+          (arguments.map (fun argument => argument.id))
+          (.builtinFunction function)
+        requirements := []
+        coercions := []
+      }) calleeReady
+  have totalProgress := allocatedProgress.trans
+    (calleeProgress.trans callProgress)
+  have returnedBelow : callRecord.1.type.VariablesBelow
+      callRecord.2.inference.next := by
+    simpa only [callRecord, recordExpression] using
+      resultBelow.weaken callProgress.next_le
+  exact ⟨totalProgress, callReady, returnedBelow⟩
+
+/-- Recording a fixed compiler-function call inherits pairwise unification
+progress, optional expected-type unification, and the metadata-only recording
+guarantees of its synthetic callee and call nodes. -/
+theorem recordBuiltinFunctionCall_inferenceProperties
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  unfold recordBuiltinFunctionCall at success
+  by_cases arity : arguments.length = function.parameterTypes.length
+  · simp only [arity, ↓reduceIte, bind, Except.bind] at success
+    cases argumentsResult :
+        unifyBuiltinFunctionArgumentsEqual arguments function.parameterTypes
+          state with
+    | error error =>
+        simp [argumentsResult, bind, Except.bind] at success
+    | ok argumentsState =>
+        simp only [argumentsResult, bind, Except.bind] at success
+        have argumentsProperties :=
+          unifyBuiltinFunctionArgumentsEqual_inferenceProperties ready
+            argumentsBelow
+            (builtinFunction_parameterTypes_variablesBelow function _)
+            argumentsResult
+        cases expected with
+        | none =>
+            simp only at success
+            let allocation := argumentsState.allocateExpressionId
+            let calleeExpression : InferredExpression := {
+              id := allocation.1
+              type := function.type
+            }
+            let calleeRecord := recordExpression callee calleeExpression
+              (.reference name (.builtinFunction function)) [] [] allocation.2
+            let returned : InferredExpression := {
+              id := call
+              type := calleeRecord.2.resolve function.returnType
+            }
+            let callRecord := recordExpression source returned
+              (.call allocation.1
+                (arguments.map (fun argument => argument.id))
+                (.builtinFunction function)) [] [] calleeRecord.2
+            change Except.ok callRecord = Except.ok result at success
+            injection success with resultEq
+            subst result
+            have tailProperties :=
+              recordBuiltinFunctionCall_tail_inferenceProperties source callee
+                name function arguments call argumentsState
+                argumentsProperties.2
+            change state.InferenceProgress callRecord.2 ∧
+              callRecord.2.InferenceReady ∧
+              callRecord.1.type.VariablesBelow callRecord.2.inference.next
+            exact ⟨argumentsProperties.1.trans tailProperties.1,
+              tailProperties.2⟩
+        | some expectedType =>
+            cases expectedResult :
+                unify argumentsState function.returnType expectedType with
+            | error error =>
+                simp [expectedResult, bind, Except.bind] at success
+            | ok fittedState =>
+                simp only [expectedResult, bind, Except.bind] at success
+                have expectedAtArguments : expectedType.VariablesBelow
+                    argumentsState.inference.next :=
+                  (expectedBelow expectedType (by simp)).weaken
+                    argumentsProperties.1.next_le
+                have expectedProgress := unify_inferenceProgress
+                  argumentsProperties.2.solved
+                  (builtinFunction_returnType_variablesBelow function _)
+                  expectedAtArguments expectedResult
+                have fittedReady := unify_preserves_inferenceReady
+                  argumentsProperties.2
+                  (builtinFunction_returnType_variablesBelow function _)
+                  expectedAtArguments expectedResult
+                let allocation := fittedState.allocateExpressionId
+                let calleeExpression : InferredExpression := {
+                  id := allocation.1
+                  type := function.type
+                }
+                let calleeRecord := recordExpression callee calleeExpression
+                  (.reference name (.builtinFunction function)) [] []
+                    allocation.2
+                let returned : InferredExpression := {
+                  id := call
+                  type := calleeRecord.2.resolve function.returnType
+                }
+                let callRecord := recordExpression source returned
+                  (.call allocation.1
+                    (arguments.map (fun argument => argument.id))
+                    (.builtinFunction function)) [] [] calleeRecord.2
+                change Except.ok callRecord = Except.ok result at success
+                injection success with resultEq
+                subst result
+                have tailProperties :=
+                  recordBuiltinFunctionCall_tail_inferenceProperties source
+                    callee name function arguments call fittedState fittedReady
+                change state.InferenceProgress callRecord.2 ∧
+                  callRecord.2.InferenceReady ∧
+                  callRecord.1.type.VariablesBelow
+                    callRecord.2.inference.next
+                exact ⟨argumentsProperties.1.trans
+                    (expectedProgress.trans tailProperties.1),
+                  tailProperties.2⟩
+  · simp [arity, bind, Except.bind] at success
+
+/-- Recording an indirect call changes only typed-source metadata, so it
+preserves readiness and the allocator bound already established for the
+application result. -/
+theorem recordIndirectCall_inferenceProperties
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult)
+    (ready : result.state.InferenceReady)
+    (resultBelow : result.result.type.VariablesBelow
+      result.state.inference.next) :
+    result.state.InferenceProgress
+        (recordIndirectCall source callee arguments result).2 ∧
+      (recordIndirectCall source callee arguments result).2.InferenceReady ∧
+      (recordIndirectCall source callee arguments result).1.type.VariablesBelow
+        (recordIndirectCall source callee arguments result).2.inference.next := by
+  let recorded := recordIndirectCall source callee arguments result
+  have progress : result.state.InferenceProgress recorded.2 := by
+    apply State.InferenceProgress.of_inference_eq ready.solved
+    rfl
+  have recordedReady : recorded.2.InferenceReady :=
+    State.InferenceReady.of_progress_of_binderEnvironment_eq ready progress rfl
+  have returnedBelow : recorded.1.type.VariablesBelow
+      recorded.2.inference.next := by
+    simpa only [recorded, recordIndirectCall, recordExpression] using
+      resultBelow.weaken progress.next_le
+  change result.state.InferenceProgress recorded.2 ∧
+    recorded.2.InferenceReady ∧
+    recorded.1.type.VariablesBelow recorded.2.inference.next
+  exact ⟨progress, recordedReady, returnedBelow⟩
+
 private theorem applyFunctionType_state_header
     {context : Context} {call : ExpressionId} {calleeType : Ty}
     {arguments : List InferredExpression} {expected : Option Ty}

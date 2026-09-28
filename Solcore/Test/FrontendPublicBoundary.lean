@@ -413,6 +413,12 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.applyFunctionType_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.unifyBuiltinFunctionArgumentsEqual_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordBuiltinFunctionCall_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordIndirectCall_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.attachExpressionCoercions_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordSelectedCallResult_inferenceProperties
