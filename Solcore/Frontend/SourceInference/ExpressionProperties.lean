@@ -6693,7 +6693,9 @@ private theorem allocateStatementId_eq_inferenceProperties
   rw [allocation] at progress nextReady
   exact ⟨progress, nextReady⟩
 
-private theorem fresh_eq_inferenceProperties
+/-- An explicitly named fresh allocation advances inference, preserves
+readiness, and returns a metavariable below the advanced allocator. -/
+theorem fresh_eq_inferenceProperties
     {initial next : State} {type : Ty}
     (ready : initial.InferenceReady)
     (allocation : initial.fresh = (type, next)) :

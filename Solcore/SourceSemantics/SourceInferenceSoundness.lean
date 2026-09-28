@@ -903,6 +903,32 @@ theorem inferAssignedValueFuel
   simpa [Frontend.SourceInference.State.lexicalScope] using
     congrArg (fun scope : LexicalScope => scope.binders) scopeEq
 
+/-- A guarded lookup of a monomorphic active binder yields a writable source
+local at its type resolved by any semantic extension of the current inference
+substitution. -/
+theorem writableLocal_of_lookupBinder?
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    {name : String} {binder : TypedBinder}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (found : state.lookupBinder? name = some binder)
+    (monomorphic : binder.scheme.quantified = [])
+    (extension : substitution.SemanticallyExtends
+      state.inference.substitution) :
+    WritableLocal context binder.id
+      (substitution.apply (state.resolve binder.scheme.body)) := by
+  have lookup := (invariant.aligned.lookup_of_lookupBinder? found).1
+  have formed := (invariant.formation.facts_of_lookupBinder? found).1
+  refine .intro lookup formed (by simpa using monomorphic) ?_
+  have resolvedEq :
+      substitution.apply (state.resolve binder.scheme.body) =
+        substitution.apply binder.scheme.body := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension binder.scheme.body
+  simpa [TypeSystem.Scheme.apply, TypeSystem.Substitution.without,
+    monomorphic] using resolvedEq.symm
+
 /-- Replacing the compatibility-only name environment does not affect the
 stable lexical invariant. -/
 theorem withLocals
@@ -1020,6 +1046,66 @@ theorem allocateBinder_of_localBindersBelowNextLocal
       schemeRequirements allocated schemeWellFormed requirementsWellFormed⟩
 
 end ActiveLocalContextInvariant
+
+/-- A successful local-identifier place exposes the selected monomorphic
+binder and the exact unprojected place returned by executable inference. -/
+theorem inferPlaceFuel_success_identifier_facts
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {target : Syntax.Expr} {name : Syntax.Identifier}
+    {state : Frontend.SourceInference.State}
+    {result : PlaceResolution × Frontend.SourceInference.State}
+    (targetEq : target.value = .identifier name)
+    (success : Detail.inferPlaceFuel (fuel + 1) inferenceContext target state =
+      .ok result) :
+    ∃ binder,
+      state.lookupBinder? name.value = some binder ∧
+      binder.scheme.quantified = [] ∧
+      result = ({
+        root := binder.id
+        projections := []
+        type := state.resolve binder.scheme.body
+      }, state) := by
+  unfold Detail.inferPlaceFuel at success
+  simp only [targetEq] at success
+  cases lookupEq : state.lookupBinder? name.value with
+  | none =>
+      simp [lookupEq] at success
+  | some binder =>
+      simp only [lookupEq] at success
+      cases emptyEq : binder.scheme.quantified.isEmpty with
+      | false =>
+          simp [emptyEq] at success
+      | true =>
+          simp only [emptyEq, if_true, pure, Pure.pure, Except.pure] at success
+          injection success with resultEq
+          rw [← resultEq]
+          exact ⟨binder, rfl, List.isEmpty_iff.mp emptyEq, rfl⟩
+
+/-- A successful identifier place is a declaratively typed writable local in
+any fixed typed source once the closing substitution extends the returned
+inference state. -/
+theorem inferPlaceFuel_success_identifier_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression : Syntax.Expr} {name : Syntax.Identifier}
+    {initial final : Frontend.SourceInference.State}
+    {place : PlaceResolution} {source : TypedSource}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (targetEq : targetExpression.value = .identifier name)
+    (success : Detail.inferPlaceFuel (fuel + 1) inferenceContext
+      targetExpression initial = .ok (place, final))
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      final.inference.substitution) :
+    SourcePlaceHasType (source.applySubstitution outer) target
+      (place.applySubstitution outer) (outer.apply place.type) := by
+  obtain ⟨binder, lookupEq, monomorphic, resultEq⟩ :=
+    inferPlaceFuel_success_identifier_facts targetEq success
+  injection resultEq with placeEq finalEq
+  subst place
+  subst final
+  have writable := invariant.writableLocal_of_lookupBinder? lookupEq
+    monomorphic outerExtension
+  exact .intro writable (.nil _) rfl
 
 /-- Alignment supplies the two semantic lookups for a guarded local name,
 while active formation supplies the corresponding closed scheme judgments. -/

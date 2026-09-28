@@ -20,6 +20,7 @@ example := @Solcore.SourceSemantics.Context.LocalSchemeRequirementsLookup
 example := @Solcore.SourceSemantics.Context.localSchemeRequirementsLookup_withLocal_self
 example := @Solcore.SourceSemantics.Context.HasAssumption
 example := @Solcore.SourceSemantics.SourceProjectionsHaveType.append
+example := @Solcore.SourceSemantics.SourcePlaceHasType.snocIndex
 
 example := @Solcore.SourceSemantics.ContainsNode
 example := @Solcore.SourceSemantics.ContainsExpression
@@ -154,6 +155,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferAssignedValueFuel
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.writableLocal_of_lookupBinder?
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.withLocals
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.allocateStatementId
@@ -167,6 +170,10 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.restoreLexicalScope_recordNode
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.allocateBinder_of_localBindersBelowNextLocal
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferPlaceFuel_success_identifier_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferPlaceFuel_success_identifier_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.localReferenceEnvironmentFacts_of_lookupBinder?
 example :=

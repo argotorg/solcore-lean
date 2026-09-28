@@ -1032,6 +1032,30 @@ termination_by leading.length
 
 end SourceProjectionsHaveType
 
+namespace SourcePlaceHasType
+
+/-- Appending one already typed mapping index to a well-typed base place
+produces a place at the mapping's value type. -/
+theorem snocIndex
+    {source : TypedSource} {context : Context}
+    {place : PlaceResolution} {key : ExpressionId}
+    {keyType valueType : TypeSystem.Ty}
+    (baseType : SourcePlaceHasType source context place
+      (.mapping keyType valueType))
+    (keyTypeProof : ExpressionHasType source context key keyType) :
+    SourcePlaceHasType source context {
+      place with
+      projections := place.projections ++ [.index key]
+      type := valueType
+    } valueType := by
+  cases baseType with
+  | intro rootType projectionsType storedTypeEq =>
+    exact .intro rootType
+      (SourceProjectionsHaveType.append projectionsType
+        (.index keyTypeProof (.nil _))) rfl
+
+end SourcePlaceHasType
+
 /-- A declaration body is a statement-root list with no escaping loop control
 and with every ordinary completion producing the declared result type. -/
 def BodyHasType (source : TypedSource) (context : Context)
