@@ -326,9 +326,58 @@ theorem localFresh_of_not_mem_localBinders
     simpa [closedBinderRequirements, List.map_map, Function.comp_def,
       TypedBinder.applySubstitution] using sourceMember
 
-/-- Closing an allocated monomorphic binder produces the declarative context
-extension used by monomorphic `let` statements.  Alignment transfers the
-allocator's freshness fact to both semantic local tables. -/
+/-- Closing any allocated binder produces its declarative context extension
+once scheme formation, quantifier freshness, and the monomorphic-requirement
+restriction have been established.  Alignment transfers the allocator's
+freshness fact to both semantic local tables. -/
+theorem binderExtends_of_allocateBinder
+    {state final : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    {name : String} {scheme : TypeSystem.Scheme}
+    {span : Option Syntax.SourceSpan} {comptime : Bool}
+    {schemeRequirements : List LocalSchemeRequirement}
+    {binder : TypedBinder}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (below : state.LocalBindersBelowNextLocal)
+    (allocated : state.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, final))
+    (schemeWellFormed : SchemeWellFormed context
+      (binder.applySubstitution substitution).scheme)
+    (quantifiedFresh : SchemeQuantifiersFresh context
+      (binder.applySubstitution substitution).scheme)
+    (monomorphicRequirementsEmpty :
+      (binder.applySubstitution substitution).scheme.quantified = [] →
+        (binder.applySubstitution substitution).schemeRequirements = []) :
+    BinderExtends state.owner context
+      (binder.applySubstitution substitution)
+      (context.withLocal binder.id
+        (binder.applySubstitution substitution).scheme
+        (binder.applySubstitution substitution).schemeRequirements) := by
+  have binderEq :
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).1 = binder :=
+    congrArg Prod.fst allocated
+  have rawOwned : binder.id.owner = state.owner := by
+    rw [← binderEq]
+    rfl
+  have rawFresh :
+      binder.id ∉ state.localBinders.map fun retained => retained.id :=
+    Frontend.SourceInference.State.allocateBinder_success_id_fresh below
+      allocated
+  apply BinderExtends.intro
+  · exact {
+      owned := by
+        simpa [TypedBinder.applySubstitution] using rawOwned
+      scheme := schemeWellFormed
+      quantified_fresh := quantifiedFresh
+      monomorphic_requirements_empty := monomorphicRequirementsEmpty
+    }
+  · apply aligned.localFresh_of_not_mem_localBinders
+    simpa [TypedBinder.applySubstitution] using rawFresh
+
+/-- The general allocated-binder extension specializes directly to the
+monomorphic `let` case. -/
 theorem monomorphicBinderExtends_of_allocateBinder
     {state final : Frontend.SourceInference.State}
     {substitution : TypeSystem.Substitution}
@@ -350,34 +399,14 @@ theorem monomorphicBinderExtends_of_allocateBinder
       (context.withLocal binder.id
         (binder.applySubstitution substitution).scheme
         (binder.applySubstitution substitution).schemeRequirements) := by
-  have binderEq :
-      (state.allocateBinder name scheme span comptime
-        schemeRequirements).1 = binder :=
-    congrArg Prod.fst allocated
-  have rawOwned : binder.id.owner = state.owner := by
-    rw [← binderEq]
-    rfl
-  have rawFresh :
-      binder.id ∉ state.localBinders.map fun retained => retained.id :=
-    Frontend.SourceInference.State.allocateBinder_success_id_fresh below
-      allocated
-  apply BinderExtends.intro
-  · exact {
-      owned := by
-        simpa [TypedBinder.applySubstitution] using rawOwned
-      scheme := by
-        rw [scheme_eq]
-        exact SchemeWellFormed.mono typeWellFormed
-      quantified_fresh := by
-        rw [scheme_eq]
-        intro metavariable member
-        simp [TypeSystem.Scheme.mono] at member
-      monomorphic_requirements_empty := by
-        intro _
-        exact requirements_eq
-    }
-  · apply aligned.localFresh_of_not_mem_localBinders
-    simpa [TypedBinder.applySubstitution] using rawFresh
+  apply aligned.binderExtends_of_allocateBinder below allocated
+  · rw [scheme_eq]
+    exact SchemeWellFormed.mono typeWellFormed
+  · rw [scheme_eq]
+    intro metavariable member
+    simp [TypeSystem.Scheme.mono] at member
+  · intro _
+    exact requirements_eq
 
 /-- The executable environment and aligned semantic local scope block
 exactly the same flexible variables during local-value generalization. -/
