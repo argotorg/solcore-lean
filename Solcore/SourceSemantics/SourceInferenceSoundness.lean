@@ -865,6 +865,24 @@ theorem inferExprFuel
   simpa [Frontend.SourceInference.State.lexicalScope] using
     congrArg (fun scope : LexicalScope => scope.binders) scopeEq
 
+/-- Source-ordered expression-list inference restores the caller's active
+lexical scope, so it preserves the combined executable/declarative invariant. -/
+theorem inferExprsFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {expressions : List Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {inferred : List InferredExpression}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (success : Detail.inferExprsFuel fuel inferenceContext expressions state =
+      .ok (inferred, final)) :
+    ActiveLocalContextInvariant final substitution context := by
+  apply invariant.congr_localBinders
+  have scopeEq := Detail.inferExprsFuel_success_lexicalScope_eq success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
 /-- Place inference traverses index expressions and member projections but
 restores the caller's active lexical scope before returning. -/
 theorem inferPlaceFuel
@@ -953,6 +971,21 @@ theorem allocateStatementId
     ActiveLocalContextInvariant final substitution context := by
   apply invariant.congr_localBinders
   have finalEq : (state.allocateStatementId).2 = final :=
+    congrArg Prod.snd allocated
+  rw [← finalEq]
+  rfl
+
+/-- Reserving the hidden local used by match lowering advances only the shared
+local allocator; it does not enter a source-visible binder. -/
+theorem allocateHiddenLocal
+    {state final : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context} {id : Resolved.LocalId}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (allocated : state.allocateHiddenLocal = (id, final)) :
+    ActiveLocalContextInvariant final substitution context := by
+  apply invariant.congr_localBinders
+  have finalEq : state.allocateHiddenLocal.2 = final :=
     congrArg Prod.snd allocated
   rw [← finalEq]
   rfl
@@ -3936,6 +3969,79 @@ def inferMatchScrutineesFuel
       })
       pure ({ id := tupleId, type }, state)
 
+namespace ActiveLocalContextInvariant
+
+/-- The common match-scrutinee step preserves the caller's active lexical
+context in both the singleton path and the synthetic-tuple path. -/
+theorem inferMatchScrutineesFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {inferred : InferredExpression}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (success : SourceInferenceSoundness.inferMatchScrutineesFuel fuel
+      inferenceContext span sources state = .ok (inferred, final)) :
+    ActiveLocalContextInvariant final substitution context := by
+  cases sources with
+  | nil =>
+      unfold SourceInferenceSoundness.inferMatchScrutineesFuel at success
+      cases elementsSuccess :
+          Detail.inferExprsFuel fuel inferenceContext [] state with
+      | error error =>
+          simp [elementsSuccess, bind, Except.bind] at success
+      | ok elementsPair =>
+          rcases elementsPair with ⟨elements, elementsState⟩
+          simp only [elementsSuccess, bind, Except.bind, pure, Pure.pure,
+            Except.pure] at success
+          injection success with resultEq
+          cases resultEq
+          exact (invariant.inferExprsFuel elementsSuccess).congr_localBinders
+            rfl
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          apply invariant.inferExprFuel
+          simpa [SourceInferenceSoundness.inferMatchScrutineesFuel] using
+            success
+      | cons second tail =>
+          unfold SourceInferenceSoundness.inferMatchScrutineesFuel at success
+          cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext
+              (first :: second :: tail) state with
+          | error error =>
+              simp [elementsSuccess, bind, Except.bind] at success
+          | ok elementsPair =>
+              rcases elementsPair with ⟨elements, elementsState⟩
+              simp only [elementsSuccess, bind, Except.bind, pure, Pure.pure,
+                Except.pure] at success
+              injection success with resultEq
+              cases resultEq
+              exact
+                (invariant.inferExprsFuel elementsSuccess).congr_localBinders
+                  rfl
+
+/-- Explicit match-case traversal restores the lexical scope supplied at its
+entry, so pattern-local binders and arm-local declarations do not escape. -/
+theorem inferMatchCasesFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {cases : List Syntax.MatchCase}
+    {state : Frontend.SourceInference.State}
+    {result : Detail.MatchCasesResult}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (success : Detail.inferMatchCasesFuel fuel inferenceContext scrutineeType
+      expectedReturn state.lexicalScope cases state = .ok result) :
+    ActiveLocalContextInvariant result.state substitution context := by
+  apply invariant.congr_localBinders
+  have scopeEq := Detail.inferMatchCasesFuel_success_lexicalScope_eq rfl success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
+end ActiveLocalContextInvariant
+
 /-- A successful `match` without a default arm exposes the common executable
 scrutinee step, hidden-local allocation, explicit-case traversal, the passed
 exhaustiveness guard, and the exact retained statement.  The existential
@@ -5130,6 +5236,183 @@ theorem blockStatementHasType_afterSubstitution
     rfl bodyType (by
       simpa [StatementNode.applySubstitution] using agreement.type_eq.symm)
 
+/-- A retained default-free match is typed from its finalized scrutinee and
+explicit cases.  Case agreement transports the executable all-return flag,
+while semantic extension identifies the stored resolved return annotation. -/
+theorem matchWithoutDefaultStatementHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {loopDepth : Nat}
+    {statement : Syntax.Statement} {id : StatementId}
+    {expectedReturn : TypeSystem.Ty}
+    {scrutinee : InferredExpression} {hiddenScrutinee : Resolved.LocalId}
+    {checked : Detail.MatchCasesResult}
+    {caseFacts : List BodyFacts} {summary : ControlSummary}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := if checked.allReturn then
+        checked.state.resolve expectedReturn
+      else
+        .unit
+      form := .matchWith {
+        scrutinee := scrutinee.id
+        hiddenScrutinee
+        cases := checked.cases
+        defaultBody := none
+        requirements := checked.cases.flatMap fun arm =>
+          arm.pattern.requirements
+      }
+    })
+    (scrutineeType : ExpressionHasType (source.applySubstitution outer)
+      target scrutinee.id (outer.apply scrutinee.type))
+    (casesType : MatchCasesHaveType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target (outer.apply scrutinee.type)
+      (checked.cases.map (TypedMatchCase.applySubstitution outer)) caseFacts)
+    (exhaustive : MatchExhaustive target (outer.apply scrutinee.type)
+      (checked.cases.map (TypedMatchCase.applySubstitution outer)) none)
+    (allReturnEq : allBodiesSawReturn caseFacts = checked.allReturn)
+    (merged : mergeBodyControls caseFacts none = some summary)
+    (extension : outer.SemanticallyExtends
+      checked.state.inference.substitution) :
+    StatementHasType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target id target {
+      type := if allBodiesSawReturn caseFacts then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts
+      sawReturn := allBodiesSawReturn caseFacts
+      control := summary.eraseValue
+    } := by
+  have resolvedFinal :
+      outer.apply (checked.state.resolve expectedReturn) =
+        outer.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  have typeEq :
+      outer.apply (if checked.allReturn then
+          checked.state.resolve expectedReturn
+        else
+          .unit) =
+        if allBodiesSawReturn caseFacts then
+          outer.apply expectedReturn
+        else
+          .unit := by
+    rw [← allReturnEq]
+    cases checked.allReturn <;> simp [resolvedFinal]
+  exact .matchWithoutDefault
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl rfl scrutineeType casesType
+    (by simp [MatchResolution.applySubstitution]) exhaustive merged
+    (by simpa [StatementNode.applySubstitution] using typeEq)
+
+/-- Adding a default body makes `mergeBodyControls` total independently of
+the number of explicit cases. -/
+theorem mergeBodyControls_withDefault_eq_some
+    (caseFacts : List BodyFacts) (defaultFacts : BodyFacts) :
+    ∃ summary,
+      mergeBodyControls caseFacts (some defaultFacts) = some summary := by
+  induction caseFacts with
+  | nil => exact ⟨defaultFacts.control, rfl⟩
+  | cons head tail induction =>
+      obtain ⟨summary, merged⟩ := induction
+      exact ⟨head.control.branches summary, by
+        simp [mergeBodyControls, merged]⟩
+
+/-- A retained match with a default arm is typed from its finalized
+scrutinee, explicit cases, and fallback body.  The fallback itself supplies
+exhaustiveness, so only the common body-control merge remains. -/
+theorem matchWithDefaultStatementHasType_afterSubstitution
+    {source : TypedSource} {target defaultFinal : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {loopDepth : Nat}
+    {statement : Syntax.Statement} {id : StatementId}
+    {expectedReturn : TypeSystem.Ty}
+    {scrutinee : InferredExpression} {hiddenScrutinee : Resolved.LocalId}
+    {checked : Detail.MatchCasesResult} {defaultResult : Detail.BlockResult}
+    {outerScope : LexicalScope}
+    {caseFacts : List BodyFacts} {defaultFacts : BodyFacts}
+    {summary : ControlSummary}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := if checked.allReturn && defaultResult.sawReturn then
+        (defaultResult.state.restoreLexicalScope
+          outerScope).resolve expectedReturn
+      else
+        .unit
+      form := .matchWith {
+        scrutinee := scrutinee.id
+        hiddenScrutinee
+        cases := checked.cases
+        defaultBody := some defaultResult.statements
+        requirements := checked.cases.flatMap fun arm =>
+          arm.pattern.requirements
+      }
+    })
+    (scrutineeType : ExpressionHasType (source.applySubstitution outer)
+      target scrutinee.id (outer.apply scrutinee.type))
+    (casesType : MatchCasesHaveType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target (outer.apply scrutinee.type)
+      (checked.cases.map (TypedMatchCase.applySubstitution outer)) caseFacts)
+    (defaultType : StatementsHaveType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target defaultResult.statements defaultFinal defaultFacts)
+    (caseReturnEq : allBodiesSawReturn caseFacts = checked.allReturn)
+    (defaultAgreement : BlockResultMatchesFactsAfterSubstitution outer
+      defaultResult defaultFacts)
+    (merged : mergeBodyControls caseFacts (some defaultFacts) = some summary)
+    (extension : outer.SemanticallyExtends
+      defaultResult.state.inference.substitution) :
+    StatementHasType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target id target {
+      type := if allBodiesSawReturn caseFacts && defaultFacts.sawReturn then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      sawReturn := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      control := summary.eraseValue
+    } := by
+  have resolvedFinal :
+      outer.apply (defaultResult.state.resolve expectedReturn) =
+        outer.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  have restoredResolve :
+      (defaultResult.state.restoreLexicalScope outerScope).resolve
+          expectedReturn =
+        defaultResult.state.resolve expectedReturn := by
+    rfl
+  have typeEq :
+      outer.apply (if checked.allReturn && defaultResult.sawReturn then
+          (defaultResult.state.restoreLexicalScope outerScope).resolve
+            expectedReturn
+        else
+          .unit) =
+        if allBodiesSawReturn caseFacts && defaultFacts.sawReturn then
+          outer.apply expectedReturn
+        else
+          .unit := by
+    rw [restoredResolve]
+    rw [← caseReturnEq, ← defaultAgreement.sawReturn_eq]
+    cases checked.allReturn <;> cases defaultResult.sawReturn <;>
+      simp [resolvedFinal]
+  exact .matchWithDefault
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl rfl scrutineeType casesType defaultType
+    (by simp [MatchResolution.applySubstitution]) merged
+    (by
+      simpa [StatementNode.applySubstitution] using typeEq)
+
 /-- A retained `for` statement is typed from its finalized initializer and
 post-item sequences, Boolean condition, and recursively reconstructed body.
 The executable statement restores the enclosing lexical scope after these
@@ -5374,6 +5657,97 @@ theorem ifWithElse
       simp [resolvedFinal]
   · rw [thenAgreement.sawReturn_eq, elseAgreement.sawReturn_eq]
   · rw [thenAgreement.sawReturn_eq, elseAgreement.sawReturn_eq]
+
+/-- Case agreement aligns the executable all-return flag of a default-free
+match with the declarative fold; semantic extension closes its result type. -/
+theorem matchWithoutDefault
+    {substitution : TypeSystem.Substitution}
+    {expectedReturn : TypeSystem.Ty}
+    {checked : Detail.MatchCasesResult} {caseFacts : List BodyFacts}
+    {summary : ControlSummary}
+    (allReturnEq : allBodiesSawReturn caseFacts = checked.allReturn)
+    (extension : substitution.SemanticallyExtends
+      checked.state.inference.substitution)
+    (id : StatementId) (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := if checked.allReturn then
+        checked.state.resolve expectedReturn
+      else
+        .unit
+      hasValue := checked.allReturn
+      sawReturn := checked.allReturn
+      state
+    } {
+      type := if allBodiesSawReturn caseFacts then
+        substitution.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts
+      sawReturn := allBodiesSawReturn caseFacts
+      control := summary.eraseValue
+    } := by
+  have resolvedFinal :
+      substitution.apply (checked.state.resolve expectedReturn) =
+        substitution.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  constructor
+  · rw [← allReturnEq]
+    cases checked.allReturn <;> simp [resolvedFinal]
+  · exact allReturnEq
+  · exact allReturnEq
+
+/-- Explicit-case and fallback agreements align both Boolean projections of a
+match with default; the fallback state's substitution closes the result type. -/
+theorem matchWithDefault
+    {substitution : TypeSystem.Substitution}
+    {expectedReturn : TypeSystem.Ty}
+    {checked : Detail.MatchCasesResult} {defaultResult : Detail.BlockResult}
+    {caseFacts : List BodyFacts} {defaultFacts : BodyFacts}
+    {summary : ControlSummary} {outerScope : LexicalScope}
+    (caseReturnEq : allBodiesSawReturn caseFacts = checked.allReturn)
+    (defaultAgreement : BlockResultMatchesFactsAfterSubstitution substitution
+      defaultResult defaultFacts)
+    (extension : substitution.SemanticallyExtends
+      defaultResult.state.inference.substitution)
+    (id : StatementId) (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := if checked.allReturn && defaultResult.sawReturn then
+        (defaultResult.state.restoreLexicalScope outerScope).resolve
+          expectedReturn
+      else
+        .unit
+      hasValue := checked.allReturn && defaultResult.sawReturn
+      sawReturn := checked.allReturn && defaultResult.sawReturn
+      state
+    } {
+      type := if allBodiesSawReturn caseFacts && defaultFacts.sawReturn then
+        substitution.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      sawReturn := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      control := summary.eraseValue
+    } := by
+  have resolvedFinal :
+      substitution.apply (defaultResult.state.resolve expectedReturn) =
+        substitution.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  have restoredResolve :
+      (defaultResult.state.restoreLexicalScope outerScope).resolve
+          expectedReturn =
+        defaultResult.state.resolve expectedReturn := by
+    rfl
+  constructor
+  · rw [← caseReturnEq, ← defaultAgreement.sawReturn_eq]
+    rw [restoredResolve]
+    cases checked.allReturn <;> cases defaultResult.sawReturn <;>
+      simp [resolvedFinal]
+  · rw [caseReturnEq, defaultAgreement.sawReturn_eq]
+  · rw [caseReturnEq, defaultAgreement.sawReturn_eq]
 
 /-- A scoped block statement inherits the finalized type and return flag of
 its recursively inferred body; erasing the body's ordinary value affects only
@@ -6284,6 +6658,240 @@ theorem inferStatementFuel_success_ifWithElse_sound
       elseAgreement elseExtension
   · exact StatementResultMatchesFactsAfterSubstitution.ifWithElse
       thenAgreement elseAgreement elseExtension id _
+
+/-- A successful default-free match is compositional modulo semantic typing
+of the common scrutinee step, explicit cases, and the accepted exhaustiveness
+certificate.  The case callback also supplies the nonempty control merge that
+is not implied by inference success for arbitrary parser-independent ASTs. -/
+theorem inferStatementFuel_success_matchWithoutDefault_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (scrutineeSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState : Frontend.SourceInference.State},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type))
+    (casesSound :
+      ∀ {scrutinee : InferredExpression}
+        {hiddenState : Frontend.SourceInference.State}
+        {checked : Detail.MatchCasesResult},
+        ActiveLocalContextInvariant hiddenState outer target →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type) →
+          Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
+              expectedReturn hiddenState.lexicalScope arms.value.cases
+              hiddenState = .ok checked →
+            ∃ caseFacts summary,
+              MatchCasesHaveType
+                ((result.state.toTypedSource roots).applySubstitution outer) {
+                  returnType := outer.apply expectedReturn
+                  loopDepth := inferenceContext.loopDepth
+                } target (outer.apply scrutinee.type)
+                (checked.cases.map
+                  (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+              allBodiesSawReturn caseFacts = checked.allReturn ∧
+              mergeBodyControls caseFacts none = some summary)
+    (exhaustivenessSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState hiddenState : Frontend.SourceInference.State}
+        {checked : Detail.MatchCasesResult} {nominallyExhaustive : Bool},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
+              expectedReturn hiddenState.lexicalScope arms.value.cases
+              hiddenState = .ok checked →
+          (checked.hasWildcard || false || nominallyExhaustive) = true →
+          MatchExhaustive target (outer.apply scrutinee.type)
+            (checked.cases.map
+              (TypedMatchCase.applySubstitution outer)) none) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
+      nominallyExhaustive, scrutineeSuccess, hiddenAllocation, casesSuccess,
+      guardPassed, resultEq, contains⟩ :=
+    inferStatementFuel_success_matchWithoutDefault_facts statementEq defaultEq
+      allocationEq success roots
+  have scrutineeInvariant :
+      ActiveLocalContextInvariant scrutineeState outer target :=
+    allocatedInvariant.inferMatchScrutineesFuel scrutineeSuccess
+  have hiddenInvariant :
+      ActiveLocalContextInvariant hiddenState outer target :=
+    scrutineeInvariant.allocateHiddenLocal hiddenAllocation
+  have checkedInvariant :
+      ActiveLocalContextInvariant checked.state outer target :=
+    hiddenInvariant.inferMatchCasesFuel casesSuccess
+  have scrutineeTyping := scrutineeSound scrutineeSuccess
+  obtain ⟨caseFacts, summary, casesTyping, allReturnEq, merged⟩ :=
+    casesSound hiddenInvariant scrutineeTyping casesSuccess
+  have exhaustive := exhaustivenessSound scrutineeSuccess casesSuccess
+    guardPassed
+  subst result
+  have checkedExtension : outer.SemanticallyExtends
+      checked.state.inference.substitution := by
+    change outer.SemanticallyExtends checked.state.inference.substitution at outerExtension
+    exact outerExtension
+  refine ⟨{
+      type := if allBodiesSawReturn caseFacts then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts
+      sawReturn := allBodiesSawReturn caseFacts
+      control := summary.eraseValue
+    }, checkedInvariant.recordNode _, ?_, ?_⟩
+  · exact matchWithoutDefaultStatementHasType_afterSubstitution contains
+      scrutineeTyping casesTyping exhaustive allReturnEq merged
+      checkedExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.matchWithoutDefault
+      allReturnEq checkedExtension id _
+
+/-- A successful match with a fallback arm is compositional modulo semantic
+typing of the common scrutinee, explicit cases, and fallback statement list.
+The fallback makes both exhaustiveness and body-control merging total. -/
+theorem inferStatementFuel_success_matchWithDefault_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = some defaultBody)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (scrutineeSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState : Frontend.SourceInference.State},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type))
+    (casesSound :
+      ∀ {scrutinee : InferredExpression}
+        {hiddenState : Frontend.SourceInference.State}
+        {checked : Detail.MatchCasesResult},
+        ActiveLocalContextInvariant hiddenState outer target →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type) →
+          Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
+              expectedReturn hiddenState.lexicalScope arms.value.cases
+              hiddenState = .ok checked →
+            ∃ caseFacts,
+              MatchCasesHaveType
+                ((result.state.toTypedSource roots).applySubstitution outer) {
+                  returnType := outer.apply expectedReturn
+                  loopDepth := inferenceContext.loopDepth
+                } target (outer.apply scrutinee.type)
+                (checked.cases.map
+                  (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+              allBodiesSawReturn caseFacts = checked.allReturn)
+    (defaultSound :
+      ∀ {checked : Detail.MatchCasesResult}
+        {defaultResult : Detail.BlockResult},
+        ActiveLocalContextInvariant checked.state outer target →
+          Detail.inferStatementsFuel fuel inferenceContext defaultBody.value
+              expectedReturn checked.state = .ok defaultResult →
+            ∃ defaultFinal defaultFacts,
+              ActiveLocalContextInvariant defaultResult.state outer
+                  defaultFinal ∧
+              StatementsHaveType
+                ((result.state.toTypedSource roots).applySubstitution outer) {
+                  returnType := outer.apply expectedReturn
+                  loopDepth := inferenceContext.loopDepth
+                } target defaultResult.statements defaultFinal defaultFacts ∧
+              BlockResultMatchesFactsAfterSubstitution outer defaultResult
+                defaultFacts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
+      defaultResult, scrutineeSuccess, hiddenAllocation, casesSuccess,
+      defaultSuccess, _guardPassed, resultEq, contains⟩ :=
+    inferStatementFuel_success_matchWithDefault_facts statementEq defaultEq
+      allocationEq success roots
+  have scrutineeInvariant :
+      ActiveLocalContextInvariant scrutineeState outer target :=
+    allocatedInvariant.inferMatchScrutineesFuel scrutineeSuccess
+  have hiddenInvariant :
+      ActiveLocalContextInvariant hiddenState outer target :=
+    scrutineeInvariant.allocateHiddenLocal hiddenAllocation
+  have checkedInvariant :
+      ActiveLocalContextInvariant checked.state outer target :=
+    hiddenInvariant.inferMatchCasesFuel casesSuccess
+  have scrutineeTyping := scrutineeSound scrutineeSuccess
+  obtain ⟨caseFacts, casesTyping, caseReturnEq⟩ :=
+    casesSound hiddenInvariant scrutineeTyping casesSuccess
+  obtain ⟨defaultFinal, defaultFacts, _defaultInvariant, defaultTyping,
+      defaultAgreement⟩ := defaultSound checkedInvariant defaultSuccess
+  obtain ⟨summary, merged⟩ :=
+    mergeBodyControls_withDefault_eq_some caseFacts defaultFacts
+  subst result
+  have defaultExtension : outer.SemanticallyExtends
+      defaultResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      defaultResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  refine ⟨{
+      type := if allBodiesSawReturn caseFacts && defaultFacts.sawReturn then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      sawReturn := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      control := summary.eraseValue
+    }, hiddenInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact matchWithDefaultStatementHasType_afterSubstitution contains
+      scrutineeTyping casesTyping defaultTyping caseReturnEq defaultAgreement
+      merged defaultExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.matchWithDefault
+      caseReturnEq defaultAgreement defaultExtension id _
 
 /-- A successful `for` statement is compositional modulo recursive typing of
 its initializer, condition, body, and post-item sequence in one finalized

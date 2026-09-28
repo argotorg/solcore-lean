@@ -151,6 +151,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferExprFuel
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferExprsFuel
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferPlaceFuel
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferAssignedValueFuel
@@ -160,6 +162,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.withLocals
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.allocateStatementId
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.allocateHiddenLocal
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.recordNode
 example :=
@@ -281,6 +285,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchScrutineesFuel
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferMatchScrutineesFuel
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferMatchCasesFuel
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithoutDefault_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithDefault_facts
@@ -303,6 +311,12 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.blockStatementHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.matchWithoutDefaultStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.mergeBodyControls_withDefault_eq_some
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.matchWithDefaultStatementHasType_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.forLoopStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.whileLoopStatementHasType_afterSubstitution
@@ -322,6 +336,10 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.ifWithoutElse
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.ifWithElse
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.matchWithoutDefault
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.matchWithDefault
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.block
 example :=
@@ -350,6 +368,10 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithoutElse_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithElse_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithoutDefault_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithDefault_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_forLoop_sound
 example :=
