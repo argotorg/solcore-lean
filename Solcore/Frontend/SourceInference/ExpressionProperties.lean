@@ -4585,6 +4585,22 @@ private theorem unifyBuiltinFunctionArgumentsEqual_state_header
               simp only [unifyResult, bind, Except.bind] at success
               exact (induction success).trans (unify_state_header unifyResult)
 
+private theorem functionCandidates_scheme_body_variablesBelow
+    {context : Context} {candidates : List ProgramFunctionSignature}
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (subset : candidates ⊆ context.signatures.functions)
+    (next : Nat) :
+    ∀ signature ∈ candidates,
+      signature.scheme.body.VariablesBelow next := by
+  intro signature member
+  have catalogMember := subset member
+  exact validated.function_scheme_body_variablesBelow catalogMember
+    (canonical signature catalogMember) next
+
 private theorem generalizeValue_allocateBinder_inferenceProperties
     {state : State} {requirementStart : Nat} {valueType : Ty}
     {name : String} {span : Option Syntax.SourceSpan}
