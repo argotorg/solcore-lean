@@ -439,6 +439,136 @@ theorem canonicalLocalSchemeInstantiationValid_afterSubstitution
         binder.scheme next binders residual outerRange)
       actualUnique actualDisjoint requirements
 
+/-- Adding the two semantic local-environment lookups turns the canonical
+frontend instantiation certificate into a complete valid local reference
+use. -/
+theorem canonicalLocalReferenceUseValid_afterSubstitution
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {binder : TypedBinder} {actualRequirements : List RequirementId}
+    (schemeLookup : target.LocalLookup binder.id
+      (binder.applySubstitution outer).scheme)
+    (requirementsLookup : target.LocalSchemeRequirementsLookup binder.id
+      (binder.applySubstitution outer).schemeRequirements)
+    (binders : TypeParameterBindersWellFormed target)
+    (residual : target.residualTypeVariables = true)
+    (outerRange : SubstitutionRangeAdmissible target outer)
+    (formation : LocalSchemeRequirementsWellFormed target
+      (binder.applySubstitution outer))
+    (schemeWellFormed : SchemeWellFormed target
+      (binder.applySubstitution outer).scheme)
+    (noCapture : Detail.LocalBinderInstantiationNoCapture outer binder)
+    (next : Nat)
+    (actualUnique : actualRequirements.Nodup)
+    (actualDisjoint : ∀ id, id ∈ actualRequirements →
+      id ∉ localSchemeTemplateIds (binder.applySubstitution outer))
+    (requirements : RequirementSequenceProves target actualRequirements
+      ((instantiateLocalSchemePredicates
+          (binder.scheme.instantiateWithSubstitution next).substitution
+          binder).map
+        (TypedTraitResolution.applySubstitution outer))) :
+    ReferenceUseValid target (.local binder.id)
+      (outer.apply (binder.scheme.instantiateWithSubstitution next).body)
+      actualRequirements := by
+  simpa only [FlexibleSubstitution.applyTypedBinder_id] using
+    (ReferenceUseValid.local
+      (binder := binder.applySubstitution outer)
+      schemeLookup requirementsLookup
+      (canonicalLocalSchemeInstantiationValid_afterSubstitution binders
+        residual outerRange formation schemeWellFormed noCapture next
+        actualUnique actualDisjoint requirements))
+
+/-- Every complete reference-use certificate validates all requirement
+identities owned by that reference shape. -/
+theorem referenceUseValid_requirementIdsValid
+    {context : SourceSemantics.Context} {resolution : ReferenceResolution}
+    {type : TypeSystem.Ty} {requirements : List RequirementId}
+    (valid : ReferenceUseValid context resolution type requirements) :
+    RequirementIdsValid context requirements := by
+  cases valid with
+  | «local» _ _ instantiation =>
+      exact instantiation.actual_requirements_valid
+  | declaration _ proves => exact proves.ids_valid
+  | builtinFunction _ =>
+      intro requirement member
+      simp at member
+  | builtinBoolean _ =>
+      intro requirement member
+      simp at member
+
+/-- A semantically valid local reference and its ordinary requirement/coercion
+layout assemble directly into the common expression-typing envelope. -/
+theorem localReferenceExpressionHasType_of_referenceUseValid
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {id : ExpressionId} {node : ExpressionNode} {name : String}
+    {binder : TypedBinder} {rawType : TypeSystem.Ty}
+    {actualRequirements : List RequirementId}
+    (contains : ContainsExpression source id node)
+    (formEq : node.form = .reference name (.local binder.id))
+    (referenceValid : ReferenceUseValid target (.local binder.id) rawType
+      actualRequirements)
+    (rawAdmissible : TypeAdmissible target rawType)
+    (finalAdmissible : TypeAdmissible target node.type)
+    (path : CoercionPathValid target rawType node.type node.coercions)
+    (layout : node.requirements =
+      actualRequirements ++ coercionRequirementIds node.coercions) :
+    ExpressionHasType source target id node.type := by
+  apply ExpressionHasType.ofOrdinary contains
+    (rawType := rawType) (owned := actualRequirements)
+  · rw [formEq]
+    exact .reference referenceValid
+  · exact rawAdmissible
+  · exact finalAdmissible
+  · exact referenceUseValid_requirementIdsValid referenceValid
+  · exact path
+  · exact layout
+
+/-- The complete canonical frontend-local certificate therefore types a
+retained local-reference expression once its ordinary output path is known. -/
+theorem canonicalLocalReferenceExpressionHasType_afterSubstitution
+    {source : TypedSource}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {id : ExpressionId} {node : ExpressionNode} {name : String}
+    {binder : TypedBinder} {actualRequirements : List RequirementId}
+    (contains : ContainsExpression source id node)
+    (formEq : node.form = .reference name (.local binder.id))
+    (schemeLookup : target.LocalLookup binder.id
+      (binder.applySubstitution outer).scheme)
+    (requirementsLookup : target.LocalSchemeRequirementsLookup binder.id
+      (binder.applySubstitution outer).schemeRequirements)
+    (binders : TypeParameterBindersWellFormed target)
+    (residual : target.residualTypeVariables = true)
+    (outerRange : SubstitutionRangeAdmissible target outer)
+    (formation : LocalSchemeRequirementsWellFormed target
+      (binder.applySubstitution outer))
+    (schemeWellFormed : SchemeWellFormed target
+      (binder.applySubstitution outer).scheme)
+    (noCapture : Detail.LocalBinderInstantiationNoCapture outer binder)
+    (next : Nat)
+    (actualUnique : actualRequirements.Nodup)
+    (actualDisjoint : ∀ requirement,
+      requirement ∈ actualRequirements →
+        requirement ∉ localSchemeTemplateIds
+          (binder.applySubstitution outer))
+    (requirements : RequirementSequenceProves target actualRequirements
+      ((instantiateLocalSchemePredicates
+          (binder.scheme.instantiateWithSubstitution next).substitution
+          binder).map
+        (TypedTraitResolution.applySubstitution outer)))
+    (rawAdmissible : TypeAdmissible target
+      (outer.apply (binder.scheme.instantiateWithSubstitution next).body))
+    (finalAdmissible : TypeAdmissible target node.type)
+    (path : CoercionPathValid target
+      (outer.apply (binder.scheme.instantiateWithSubstitution next).body)
+      node.type node.coercions)
+    (layout : node.requirements =
+      actualRequirements ++ coercionRequirementIds node.coercions) :
+    ExpressionHasType source target id node.type := by
+  apply localReferenceExpressionHasType_of_referenceUseValid contains formEq
+    (canonicalLocalReferenceUseValid_afterSubstitution schemeLookup
+      requirementsLookup binders residual outerRange formation schemeWellFormed
+      noCapture next actualUnique actualDisjoint requirements)
+    rawAdmissible finalAdmissible path layout
+
 /-- Agreement of the executable and declarative generalization barriers on
 the inferred type's candidate variables is enough to recover exact qualified
 rank-one generalization.  Variables outside `type.freeVariables` are

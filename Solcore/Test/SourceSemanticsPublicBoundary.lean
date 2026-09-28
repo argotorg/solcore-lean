@@ -117,6 +117,14 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.canonicalLocalSchemeInstantiationValid_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.canonicalLocalReferenceUseValid_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.referenceUseValid_requirementIdsValid
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.localReferenceExpressionHasType_of_referenceUseValid
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.canonicalLocalReferenceExpressionHasType_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.generalizeValue_schemeGeneralizesExcept_of_barrier
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.toTypedSource_containsExpression_of_mem
