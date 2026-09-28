@@ -1332,6 +1332,237 @@ theorem inferPlaceFuel_success_sound
       | error =>
           simp [Detail.inferPlaceFuel, targetEq] at success
 
+/-- Successful value-assignment inference reconstructs the complete
+declarative assignment judgment.  Plain assignment retains the inferred place
+type; every compound operator is checked at `Word`. -/
+theorem inferAssignedValueFuel_success_sound
+    {source : TypedSource} {outer : TypeSystem.Substitution}
+    {target : SourceSemantics.Context}
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression value : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp}
+    {initial final : Frontend.SourceInference.State}
+    {assignment : AssignmentResolution}
+    {inferredValue : InferredExpression}
+    (ready : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes))
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      final.inference.substitution)
+    (expressionSound :
+      ∀ {expressionFuel : Nat} {expression : Syntax.Expr}
+        {expected : Option TypeSystem.Ty}
+        {expressionInitial expressionFinal : Frontend.SourceInference.State}
+        {inferred : InferredExpression},
+        Detail.inferExprFuel expressionFuel inferenceContext expression
+            expected expressionInitial = .ok (inferred, expressionFinal) →
+          ExpressionHasType (source.applySubstitution outer) target
+            inferred.id (outer.apply inferred.type))
+    (success : Detail.inferAssignedValueFuel fuel inferenceContext
+      targetExpression operator value initial =
+        .ok (assignment, inferredValue, final)) :
+    SourceAssignmentHasType (source.applySubstitution outer) target
+      (assignment.applySubstitution outer) operator inferredValue.id := by
+  unfold Detail.inferAssignedValueFuel at success
+  cases placeResult : Detail.inferPlaceFuel fuel inferenceContext
+      targetExpression initial with
+  | error error =>
+      simp [placeResult, bind, Except.bind] at success
+  | ok placePair =>
+      rcases placePair with ⟨place, placeState⟩
+      simp only [placeResult, bind, Except.bind, Prod.eta] at success
+      have placeProperties := Detail.inferPlaceFuel_inferenceProperties ready
+        signatureFormation functionsCanonical placeResult
+      have finishNonEqual
+          (operatorKind : WordCompoundAssignmentOperator operator)
+          (tailSuccess :
+            (do
+              let fittedState ← Detail.unify placeState place.type .word
+              let (inferredValue, finalState) ←
+                Detail.inferExprFuel fuel inferenceContext value (some .word)
+                  fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue, finalState)) =
+                .ok (assignment, inferredValue, final)) :
+          SourceAssignmentHasType (source.applySubstitution outer) target
+            (assignment.applySubstitution outer) operator inferredValue.id := by
+        cases unifyResult : Detail.unify placeState place.type .word with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+            simp only [unifyResult, bind, Except.bind] at tailSuccess
+            have fitProgress := Detail.unify_inferenceProgress
+              placeProperties.2.1.solved placeProperties.2.2
+              (TypeSystem.Ty.variablesBelow_constructor _ _) unifyResult
+            have fittedReady := Detail.unify_preserves_inferenceReady
+              placeProperties.2.1 placeProperties.2.2
+              (TypeSystem.Ty.variablesBelow_constructor _ _) unifyResult
+            cases valueResult : Detail.inferExprFuel fuel inferenceContext
+                value (some .word) fittedState with
+            | error error =>
+                simp [valueResult] at tailSuccess
+            | ok valuePair =>
+                rcases valuePair with ⟨inferred, finalState⟩
+                simp only [valueResult, pure, Pure.pure, Except.pure]
+                  at tailSuccess
+                injection tailSuccess with resultEq
+                injection resultEq with assignmentEq valueStateEq
+                injection valueStateEq with inferredEq finalEq
+                subst assignment
+                subst inferredValue
+                subst final
+                have valueProperties :=
+                  Detail.inferExprFuel_inferenceProperties fittedReady
+                    signatureFormation functionsCanonical (by
+                      intro expectedType member
+                      simp only [Option.mem_def] at member
+                      injection member with typeEq
+                      subst expectedType
+                      exact TypeSystem.Ty.variablesBelow_constructor _ _)
+                    valueResult
+                have outerFitted : outer.SemanticallyExtends
+                    fittedState.inference.substitution :=
+                  TypeSystem.Substitution.SemanticallyExtends.trans
+                    outerExtension valueProperties.1.substitution_extends
+                have outerPlace : outer.SemanticallyExtends
+                    placeState.inference.substitution :=
+                  TypeSystem.Substitution.SemanticallyExtends.trans
+                    outerFitted fitProgress.substitution_extends
+                have placeType := inferPlaceFuel_success_sound ready
+                  signatureFormation functionsCanonical invariant outerPlace
+                  expressionSound placeResult
+                have resolvedWord : fittedState.resolve place.type = .word :=
+                  (Detail.unify_resolve_eq unifyResult).trans (by rfl)
+                have placeWordEq : outer.apply place.type = .word := by
+                  calc
+                    outer.apply place.type =
+                        outer.apply (fittedState.resolve place.type) := by
+                      simpa [Frontend.SourceInference.State.resolve,
+                        TypeSystem.InferState.resolve] using
+                          (outerFitted place.type).symm
+                    _ = outer.apply .word := congrArg outer.apply resolvedWord
+                    _ = .word := rfl
+                have placeWord : SourcePlaceHasType
+                    (source.applySubstitution outer) target
+                    (place.applySubstitution outer) .word := by
+                  rw [← placeWordEq]
+                  exact placeType
+                have valueExpectedEq : outer.apply inferred.type = .word := by
+                  simpa using
+                    (Detail.inferExprFuel_expected_type_apply_eq valueResult
+                      outerExtension)
+                have valueWord : ExpressionHasType
+                    (source.applySubstitution outer) target inferred.id
+                    .word := by
+                  rw [← valueExpectedEq]
+                  exact expressionSound valueResult
+                have resolvedFinal :
+                    outer.apply (finalState.resolve place.type) =
+                      outer.apply place.type := by
+                  simpa [Frontend.SourceInference.State.resolve,
+                    TypeSystem.InferState.resolve] using
+                      outerExtension place.type
+                have storedPlaceEq :
+                    ({ place with type := finalState.resolve place.type } :
+                      PlaceResolution).applySubstitution outer =
+                        place.applySubstitution outer := by
+                  cases place
+                  simp [PlaceResolution.applySubstitution, resolvedFinal]
+                have storedPlaceWord : SourcePlaceHasType
+                    (source.applySubstitution outer) target
+                    (({ place with type := finalState.resolve place.type } :
+                      PlaceResolution).applySubstitution outer) .word := by
+                  rw [storedPlaceEq]
+                  exact placeWord
+                exact .wordCompound operatorKind storedPlaceWord valueWord rfl
+      cases operator with
+      | equal =>
+          simp only [pure, Pure.pure, Except.pure] at success
+          cases valueResult : Detail.inferExprFuel fuel inferenceContext value
+              (some (placeState.resolve place.type)) placeState with
+          | error error =>
+              simp [valueResult] at success
+          | ok valuePair =>
+              rcases valuePair with ⟨inferred, finalState⟩
+              simp only [valueResult] at success
+              injection success with resultEq
+              injection resultEq with assignmentEq valueStateEq
+              injection valueStateEq with inferredEq finalEq
+              subst assignment
+              subst inferredValue
+              subst final
+              have expectedBelow :
+                  (placeState.resolve place.type).VariablesBelow
+                    placeState.inference.next :=
+                placeProperties.2.1.solved.variablesBelow_apply
+                  placeProperties.2.2
+              have valueProperties :=
+                Detail.inferExprFuel_inferenceProperties
+                  placeProperties.2.1 signatureFormation functionsCanonical
+                  (by
+                    intro expectedType member
+                    simp only [Option.mem_def] at member
+                    injection member with typeEq
+                    subst expectedType
+                    exact expectedBelow) valueResult
+              have outerPlace : outer.SemanticallyExtends
+                  placeState.inference.substitution :=
+                TypeSystem.Substitution.SemanticallyExtends.trans
+                  outerExtension valueProperties.1.substitution_extends
+              have placeType := inferPlaceFuel_success_sound ready
+                signatureFormation functionsCanonical invariant outerPlace
+                expressionSound placeResult
+              have valueExpectedEq : outer.apply inferred.type =
+                  outer.apply place.type := by
+                calc
+                  outer.apply inferred.type =
+                      outer.apply (placeState.resolve place.type) :=
+                    Detail.inferExprFuel_expected_type_apply_eq valueResult
+                      outerExtension
+                  _ = outer.apply place.type := by
+                    simpa [Frontend.SourceInference.State.resolve,
+                      TypeSystem.InferState.resolve] using outerPlace place.type
+              have valueType : ExpressionHasType
+                  (source.applySubstitution outer) target inferred.id
+                  (outer.apply place.type) := by
+                rw [← valueExpectedEq]
+                exact expressionSound valueResult
+              have resolvedFinal :
+                  outer.apply (finalState.resolve place.type) =
+                    outer.apply place.type := by
+                simpa [Frontend.SourceInference.State.resolve,
+                  TypeSystem.InferState.resolve] using
+                    outerExtension place.type
+              have storedPlaceEq :
+                  ({ place with type := finalState.resolve place.type } :
+                    PlaceResolution).applySubstitution outer =
+                      place.applySubstitution outer := by
+                cases place
+                simp [PlaceResolution.applySubstitution, resolvedFinal]
+              have storedPlaceType : SourcePlaceHasType
+                  (source.applySubstitution outer) target
+                  (({ place with type := finalState.resolve place.type } :
+                    PlaceResolution).applySubstitution outer)
+                  (outer.apply place.type) := by
+                rw [storedPlaceEq]
+                exact placeType
+              exact .equal storedPlaceType valueType rfl
+      | add => exact finishNonEqual .add success
+      | subtract => exact finishNonEqual .subtract success
+      | multiply => exact finishNonEqual .multiply success
+      | divide => exact finishNonEqual .divide success
+      | modulo => exact finishNonEqual .modulo success
+      | bitAnd => exact finishNonEqual .bitAnd success
+      | bitXor => exact finishNonEqual .bitXor success
+      | bitOr => exact finishNonEqual .bitOr success
+
 /-- Alignment supplies the two semantic lookups for a guarded local name,
 while active formation supplies the corresponding closed scheme judgments. -/
 theorem localReferenceEnvironmentFacts_of_lookupBinder?

@@ -177,6 +177,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferPlaceFuel_success_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferAssignedValueFuel_success_sound
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.localReferenceEnvironmentFacts_of_lookupBinder?
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_initialLocalEnvironmentFacts
