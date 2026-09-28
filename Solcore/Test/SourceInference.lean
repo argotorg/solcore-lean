@@ -458,6 +458,29 @@ example (dataType : ProgramDataSignature)
     SourceInference.Detail.freshDataConstructorInstantiation_inferenceProperties
       dataType constructor state ready payloadTypesBelow
 
+/-- A complete semantic application of constructor freshening: catalog
+membership and a residually open declaration context suffice to admit the
+exact generic instantiation returned by the executable allocator. -/
+example {semanticContext : Solcore.SourceSemantics.Context}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    (state : SourceInference.State)
+    (catalog : Solcore.SourceSemantics.SignatureCatalogWellFormed
+      semanticContext.signatures)
+    (binders : Solcore.SourceSemantics.TypeParameterBindersWellFormed
+      semanticContext)
+    (residual : semanticContext.residualTypeVariables = true)
+    (dataType_mem : dataType ∈ semanticContext.signatures.dataTypes)
+    (constructor_mem : constructor ∈ dataType.constructors) :
+    let result := SourceInference.Detail.freshDataConstructorInstantiation
+      dataType constructor state
+    Solcore.SourceSemantics.DataConstructorInstantiation.Admissible
+      semanticContext result.1 := by
+  dsimp only
+  exact
+    Solcore.SourceSemantics.SourceInferenceSoundness.freshDataConstructorInstantiation_admissible
+      catalog binders residual dataType_mem constructor_mem rfl
+
 /-- Formation validation rejects the recovery sentinel independently of how
 the resolved type was produced. -/
 example : validateResolvedTypeFormation solverRegressionContext.signatures

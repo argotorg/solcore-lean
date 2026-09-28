@@ -2984,6 +2984,76 @@ theorem contextualConstructorCandidate_success_instantiation_variablesBelow
   exact instantiateDataConstructor_types_variablesBelow argumentsBelow
     payloadTypesBelow
 
+private theorem freshDataConstructorInstantiation_fold_length
+    (parameters : List TypeParameterId) (arguments : List Ty) (state : State) :
+    let result := parameters.foldl
+      (fun (result : List Ty × State) _ =>
+        (result.1 ++ [result.2.fresh.1], result.2.fresh.2))
+      (arguments, state)
+    result.1.length = arguments.length + parameters.length := by
+  induction parameters generalizing arguments state with
+  | nil => simp
+  | cons parameter parameters induction =>
+      simp only [List.foldl_cons]
+      rw [induction]
+      simp
+      omega
+
+private theorem freshDataConstructorInstantiation_fold_range_is_variable
+    (parameters : List TypeParameterId) (arguments : List Ty) (state : State)
+    (arguments_are_variables : ∀ argument ∈ arguments,
+      ∃ metavariable, argument = Ty.variable metavariable) :
+    let result := parameters.foldl
+      (fun (result : List Ty × State) _ =>
+        (result.1 ++ [result.2.fresh.1], result.2.fresh.2))
+      (arguments, state)
+    ∀ argument ∈ result.1,
+      ∃ metavariable, argument = Ty.variable metavariable := by
+  induction parameters generalizing arguments state with
+  | nil => simpa using arguments_are_variables
+  | cons parameter parameters induction =>
+      simp only [List.foldl_cons]
+      apply induction
+      intro argument member
+      rcases List.mem_append.mp member with old | fresh
+      · exact arguments_are_variables argument old
+      · simp only [List.mem_singleton] at fresh
+        subst argument
+        exact ⟨⟨state.inference.next⟩, rfl⟩
+
+/-- Successful constructor freshening exposes the source-ordered row of fresh
+flexible arguments used by the canonical constructor instantiation. -/
+theorem freshDataConstructorInstantiation_success_shape
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    {state next : State} {instantiation : DataConstructorInstantiation}
+    (success : freshDataConstructorInstantiation dataType constructor state =
+      (instantiation, next)) :
+    ∃ arguments,
+      arguments.length = dataType.parameters.length ∧
+        (∀ argument ∈ arguments,
+          ∃ metavariable, argument = Ty.variable metavariable) ∧
+        instantiation =
+          instantiateDataConstructor dataType constructor arguments := by
+  let allocation := dataType.parameters.foldl
+    (fun (result : List Ty × State) _ =>
+      (result.1 ++ [result.2.fresh.1], result.2.fresh.2))
+    ([], state)
+  have allocation_length :
+      allocation.1.length = dataType.parameters.length := by
+    simpa only [allocation, List.length_nil, Nat.zero_add] using
+      freshDataConstructorInstantiation_fold_length dataType.parameters [] state
+  have allocation_range : ∀ argument ∈ allocation.1,
+      ∃ metavariable, argument = Ty.variable metavariable := by
+    simpa only [allocation] using
+      freshDataConstructorInstantiation_fold_range_is_variable
+        dataType.parameters [] state (by simp)
+  have instantiation_eq := congrArg Prod.fst success
+  change instantiateDataConstructor dataType constructor allocation.1 =
+    instantiation at instantiation_eq
+  exact ⟨allocation.1, allocation_length, allocation_range,
+    instantiation_eq.symm⟩
+
 private theorem freshDataConstructorInstantiation_fold_inferenceProperties
     (parameters : List TypeParameterId) (arguments : List Ty) (state : State)
     (ready : state.InferenceReady)

@@ -48,6 +48,8 @@ example := @Solcore.SourceSemantics.SubstitutionRangeWellFormed
 example := @Solcore.SourceSemantics.SubstitutionRangeAdmissible
 example := @Solcore.SourceSemantics.SubstitutionRangeAdmissible.toWellFormed
 example := @Solcore.SourceSemantics.ParameterSubstitution.Exact
+example := @Solcore.SourceSemantics.ParameterSubstitution.exact_zip
+example := @Solcore.SourceSemantics.ParameterSubstitution.orderedArguments_zip
 example := @Solcore.SourceSemantics.ParameterSubstitution.RangeWellFormed
 example := @Solcore.SourceSemantics.ParameterSubstitution.RangeAdmissible
 example := @Solcore.SourceSemantics.ParameterSubstitution.RangeAdmissible.toWellFormed
@@ -188,6 +190,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.unaryOperatorTrait_hasTypeAfterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.binaryOperatorTrait_hasTypeAfterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.freshDataConstructorInstantiation_admissible
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_instantiationAdmissible
 example :=

@@ -1527,6 +1527,47 @@ theorem plannedCoercionStep_profileInstantiatesAfterSubstitution
   exact FlexibleSubstitution.CoercionProfileInstantiates.applySubstitution
     catalog contextValid raw
 
+/-- The frontend's canonical constructor freshening is a declaratively
+admissible occurrence in every residually open semantic context carrying the
+same well-formed data catalog. -/
+theorem freshDataConstructorInstantiation_admissible
+    {semanticContext : SourceSemantics.Context}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    {state next : Frontend.SourceInference.State}
+    {instantiation : DataConstructorInstantiation}
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (binders : TypeParameterBindersWellFormed semanticContext)
+    (residual : semanticContext.residualTypeVariables = true)
+    (dataType_mem : dataType ∈ semanticContext.signatures.dataTypes)
+    (constructor_mem : constructor ∈ dataType.constructors)
+    (fresh : Detail.freshDataConstructorInstantiation dataType constructor
+      state = (instantiation, next)) :
+    SourceSemantics.DataConstructorInstantiation.Admissible semanticContext
+      instantiation := by
+  obtain ⟨arguments, arguments_length, arguments_are_variables,
+    instantiation_eq⟩ :=
+    Detail.freshDataConstructorInstantiation_success_shape fresh
+  subst instantiation
+  have dataWellFormed := catalog.data_semantic dataType dataType_mem
+  refine .intro dataType constructor dataType_mem constructor_mem
+    (dataWellFormed.constructor_owners constructor constructor_mem) rfl ?_ ?_
+      rfl ?_
+  · exact ParameterSubstitution.exact_zip
+      dataWellFormed.parameters_nodup arguments_length
+  · intro parameter replacement member
+    have argument_mem : replacement ∈ arguments :=
+      (List.of_mem_zip member).2
+    obtain ⟨metavariable, rfl⟩ :=
+      arguments_are_variables replacement argument_mem
+    exact TypeAdmissible.variableOfResidual binders residual metavariable
+  · change TypeSystem.Ty.nominal dataType.id arguments =
+      TypeSystem.Ty.nominal dataType.id
+        (ParameterSubstitution.orderedArguments
+          (dataType.parameters.zip arguments) dataType.parameters)
+    rw [ParameterSubstitution.orderedArguments_zip
+      dataWellFormed.parameters_nodup arguments_length]
+
 /-- A successful executable candidate check retains a declaratively
 admissible occurrence of the candidate signature.  Argument fitting,
 expected-type fitting, predicate validation, and ledger allocation happen

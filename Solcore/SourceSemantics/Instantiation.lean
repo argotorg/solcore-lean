@@ -260,6 +260,64 @@ theorem exact_singleton (parameter : TypeSystem.TypeParameterId)
     Exact [(parameter, replacement)] [parameter] := by
   constructor <;> simp [domain]
 
+/-- Zipping a duplicate-free rigid-parameter row with an equally sized
+argument row covers that parameter row exactly once. -/
+theorem exact_zip {parameters : List TypeSystem.TypeParameterId}
+    {arguments : List TypeSystem.Ty}
+    (parameters_nodup : parameters.Nodup)
+    (length_eq : arguments.length = parameters.length) :
+    Exact (parameters.zip arguments) parameters := by
+  refine {
+    parameters_nodup
+    domain_permutation := ?_
+  }
+  unfold domain
+  have length_le : parameters.length ≤ arguments.length := by omega
+  rw [List.map_fst_zip length_le]
+
+/-- Lookup through an exact positional zip recovers the argument row in
+declaration-parameter order. -/
+theorem orderedArguments_zip {parameters : List TypeSystem.TypeParameterId}
+    {arguments : List TypeSystem.Ty}
+    (parameters_nodup : parameters.Nodup)
+    (length_eq : arguments.length = parameters.length) :
+    orderedArguments (parameters.zip arguments) parameters = arguments := by
+  induction parameters generalizing arguments with
+  | nil =>
+      cases arguments with
+      | nil => rfl
+      | cons argument arguments => simp at length_eq
+  | cons parameter parameters induction =>
+      cases arguments with
+      | nil => simp at length_eq
+      | cons argument arguments =>
+          simp only [List.length_cons, Nat.succ.injEq] at length_eq
+          simp only [List.nodup_cons] at parameters_nodup
+          rcases parameters_nodup with
+            ⟨parameter_fresh, parameters_nodup⟩
+          unfold orderedArguments
+          simp only [List.zip_cons_cons, List.map_cons]
+          simp only [List.cons.injEq]
+          constructor
+          · simp [TypeSystem.ParameterSubstitution.lookup?]
+          · calc
+              parameters.map (fun candidate =>
+                  (TypeSystem.ParameterSubstitution.lookup?
+                    ((parameter, argument) :: parameters.zip arguments)
+                    candidate).getD (.parameter candidate)) =
+                  parameters.map (fun candidate =>
+                    (TypeSystem.ParameterSubstitution.lookup?
+                      (parameters.zip arguments) candidate).getD
+                        (.parameter candidate)) := by
+                    apply List.map_congr_left
+                    intro candidate candidate_mem
+                    have different : parameter ≠ candidate := by
+                      intro same
+                      apply parameter_fresh
+                      simpa [same] using candidate_mem
+                    simp [TypeSystem.ParameterSubstitution.lookup?, different]
+              _ = arguments := induction parameters_nodup length_eq
+
 theorem Exact.domain_nodup {substitution : TypeSystem.ParameterSubstitution}
     {parameters : List TypeSystem.TypeParameterId}
     (exact : Exact substitution parameters) :

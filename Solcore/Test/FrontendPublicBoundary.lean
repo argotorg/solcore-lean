@@ -476,6 +476,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_success_shape
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.explicitConstructorCandidate_success_members
