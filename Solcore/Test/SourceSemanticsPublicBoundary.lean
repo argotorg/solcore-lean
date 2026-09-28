@@ -189,6 +189,14 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.groupBranchExpressionHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.letDecl
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedUninitialized_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letUnannotatedInitialized_facts
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedInitialized_facts
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_expression_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.expressionStatementDiscardHasType_afterSubstitution

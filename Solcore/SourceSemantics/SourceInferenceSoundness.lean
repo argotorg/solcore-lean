@@ -1430,6 +1430,217 @@ theorem groupBranchExpressionHasType_afterSubstitution
     rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
     rfl
 
+/-- A successful annotated declaration without an initializer exposes the
+exact source-type resolution and binder-allocation pipeline.  Its
+generalization barrier is the requirement position immediately after
+statement-ID allocation. -/
+theorem inferStatementFuel_success_letAnnotatedUninitialized_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {sourceType : Syntax.TypeExpr} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .letDecl name (some sourceType) none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ resolvedType locals valueType generalized binding,
+      Detail.resolveSourceType context sourceType = .ok resolvedType ∧
+      locals = allocated.binderEnvironment.apply
+        allocated.inference.substitution ∧
+      valueType = allocated.resolve resolvedType ∧
+      generalized = Detail.generalizeValue allocated locals
+        allocated.nextRequirement valueType ∧
+      (allocated.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements = binding ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state := binding.2.recordNode (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .letDecl binding.1 none
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .letDecl binding.1 none
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases resolution : Detail.resolveSourceType context sourceType with
+  | error error =>
+      simp [resolution] at success
+  | ok resolvedType =>
+      simp only [resolution, pure, Pure.pure, Except.pure] at success
+      let locals := allocated.binderEnvironment.apply
+        allocated.inference.substitution
+      let valueType := allocated.resolve resolvedType
+      let generalized := Detail.generalizeValue allocated locals
+        allocated.nextRequirement valueType
+      let binding := (allocated.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false generalized.requirements
+      injection success with resultEq
+      rw [← resultEq]
+      exact ⟨resolvedType, locals, valueType, generalized, binding,
+        rfl, rfl, rfl, rfl, rfl, rfl,
+        recordNode_containsStatement binding.2 _ roots⟩
+
+/-- A successful unannotated initialized declaration exposes the initializer
+inference and the exact generalized binder subsequently entered into scope.
+The requirement barrier remains the pre-initializer position retained in the
+allocated statement state. -/
+theorem inferStatementFuel_success_letUnannotatedInitialized_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {initializer : Syntax.Expr} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .letDecl name none (some initializer))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ inferred initializerState locals valueType generalized binding,
+      Detail.inferExprFuel fuel context initializer none allocated =
+        .ok (inferred, initializerState) ∧
+      locals = initializerState.binderEnvironment.apply
+        initializerState.inference.substitution ∧
+      valueType = initializerState.resolve inferred.type ∧
+      generalized = Detail.generalizeValue initializerState locals
+        allocated.nextRequirement valueType ∧
+      (initializerState.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements = binding ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state := binding.2.recordNode (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .letDecl binding.1 (some inferred.id)
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .letDecl binding.1 (some inferred.id)
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases initializerSuccess :
+      Detail.inferExprFuel fuel context initializer none allocated with
+  | error error =>
+      simp [initializerSuccess] at success
+  | ok initializerPair =>
+      rcases initializerPair with ⟨inferred, initializerState⟩
+      simp only [initializerSuccess, pure, Pure.pure, Except.pure] at success
+      let locals := initializerState.binderEnvironment.apply
+        initializerState.inference.substitution
+      let valueType := initializerState.resolve inferred.type
+      let generalized := Detail.generalizeValue initializerState locals
+        allocated.nextRequirement valueType
+      let binding :=
+        (initializerState.withLocals locals).allocateBinder name.value
+          generalized.scheme (some name.span) false generalized.requirements
+      injection success with resultEq
+      rw [← resultEq]
+      exact ⟨inferred, initializerState, locals, valueType, generalized,
+        binding, rfl, rfl, rfl, rfl, rfl, rfl,
+        recordNode_containsStatement binding.2 _ roots⟩
+
+/-- A successful annotated initialized declaration exposes both source-type
+resolution and expected-type initializer inference before the same exact
+generalization and binder-allocation pipeline.  Generalization still starts
+at the requirement position captured before initializer inference. -/
+theorem inferStatementFuel_success_letAnnotatedInitialized_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {sourceType : Syntax.TypeExpr} {initializer : Syntax.Expr}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .letDecl name (some sourceType) (some initializer))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ resolvedType inferred initializerState locals valueType generalized
+        binding,
+      Detail.resolveSourceType context sourceType = .ok resolvedType ∧
+      Detail.inferExprFuel fuel context initializer (some resolvedType)
+        allocated = .ok (inferred, initializerState) ∧
+      locals = initializerState.binderEnvironment.apply
+        initializerState.inference.substitution ∧
+      valueType = initializerState.resolve inferred.type ∧
+      generalized = Detail.generalizeValue initializerState locals
+        allocated.nextRequirement valueType ∧
+      (initializerState.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements = binding ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state := binding.2.recordNode (.statement {
+          id
+          span := statement.span
+          type := .unit
+          form := .letDecl binding.1 (some inferred.id)
+        })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .letDecl binding.1 (some inferred.id)
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases resolution : Detail.resolveSourceType context sourceType with
+  | error error =>
+      simp [resolution] at success
+  | ok resolvedType =>
+      simp only [resolution] at success
+      cases initializerSuccess : Detail.inferExprFuel fuel context initializer
+          (some resolvedType) allocated with
+      | error error =>
+          simp [initializerSuccess] at success
+      | ok initializerPair =>
+          rcases initializerPair with ⟨inferred, initializerState⟩
+          simp only [initializerSuccess, pure, Pure.pure, Except.pure]
+            at success
+          let locals := initializerState.binderEnvironment.apply
+            initializerState.inference.substitution
+          let valueType := initializerState.resolve inferred.type
+          let generalized := Detail.generalizeValue initializerState locals
+            allocated.nextRequirement valueType
+          let binding :=
+            (initializerState.withLocals locals).allocateBinder name.value
+              generalized.scheme (some name.span) false
+              generalized.requirements
+          injection success with resultEq
+          rw [← resultEq]
+          exact ⟨resolvedType, inferred, initializerState, locals, valueType,
+            generalized, binding, rfl, initializerSuccess, rfl, rfl, rfl, rfl,
+            rfl,
+            recordNode_containsStatement binding.2 _ roots⟩
+
 /-- A successful expression-statement branch exposes the exact child
 inference and the complete `StatementResult` recorded by the executable
 frontend.  Consequently the retained statement node has exactly the type and
@@ -1953,6 +2164,25 @@ theorem blockStatementHasType_afterSubstitution
       simpa [StatementNode.applySubstitution] using agreement.type_eq.symm)
 
 namespace StatementResultMatchesFactsAfterSubstitution
+
+/-- Every executable local declaration returns the canonical ordinary-unit
+summary, independently of the declared scheme and initializer. -/
+theorem letDecl
+    (substitution : TypeSystem.Substitution) (id : StatementId)
+    (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      state
+    } {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    } := by
+  constructor <;> rfl
 
 /-- The executable result shared by bare and value returns agrees with the
 declarative returned summary after any semantically extending substitution. -/
