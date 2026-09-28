@@ -125,6 +125,15 @@ theorem trans {first second third : State}
     TypeSystem.Substitution.SemanticallyExtends.trans
       secondThird.substitution_extends firstSecond.substitution_extends⟩
 
+/-- Resolving a type that was bounded before semantic inference progress
+produces a type bounded by the advanced allocator. -/
+theorem resolve_variablesBelow {before after : State}
+    (progress : before.InferenceProgress after) {type : TypeSystem.Ty}
+    (below : type.VariablesBelow before.inference.next) :
+    (after.resolve type).VariablesBelow after.inference.next := by
+  exact progress.solved.variablesBelow_apply
+    (below.weaken progress.next_le)
+
 end InferenceProgress
 
 private theorem map_mapIdx {α β γ : Type} (items : List α)
@@ -280,6 +289,13 @@ theorem withLocals_preserves_nodesBelowNextOccurrence
 @[simp] theorem restoreLexicalScope_header (state : State)
     (scope : LexicalScope) :
     (state.restoreLexicalScope scope).header = state.header := by
+  rfl
+
+/-- Restoring a captured lexical scope makes that scope observable again. -/
+@[simp] theorem restoreLexicalScope_lexicalScope (state : State)
+    (scope : LexicalScope) :
+    (state.restoreLexicalScope scope).lexicalScope = scope := by
+  cases scope
   rfl
 
 /-- Restoring a lexical scope reconstructs its binder environment, regardless
