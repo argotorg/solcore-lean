@@ -8975,6 +8975,7 @@ structure MatchPatternRecursiveSoundnessCallbacks
       seen.Nodup →
       TypeAdmissible semanticContext (outer.apply expected) →
       TypeAdmissible activeContext (outer.apply expected) →
+      activeContext.signatures = semanticContext.signatures →
       ActiveLocalContextInvariant initial outer activeContext →
       outer.SemanticallyExtends result.state.inference.substitution →
       Detail.inferMatchPatternFlatFuel fuel inferenceContext pattern expected
@@ -8997,6 +8998,7 @@ structure MatchPatternRecursiveSoundnessCallbacks
         TypeAdmissible semanticContext (outer.apply type)) →
       (∀ type ∈ expected,
         TypeAdmissible activeContext (outer.apply type)) →
+      activeContext.signatures = semanticContext.signatures →
       ActiveLocalContextInvariant initial outer activeContext →
       outer.SemanticallyExtends result.state.inference.substitution →
       Detail.inferMatchPatternsFlatFuel fuel inferenceContext patterns expected
@@ -9004,11 +9006,10 @@ structure MatchPatternRecursiveSoundnessCallbacks
       Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
         activeContext outer expected seen initial result)
 
-/-- Exact semantic frontiers for literal and constructor patterns.  Integer
-literals expose only their irreducible solved-evidence obligation; their
-source correspondence, instruction typing, and state facts are proved by the
-dispatcher.  Constructor soundness remains a temporary certificate boundary.
-Wildcards, binders, groups, and tuple assembly are proved by the dispatcher. -/
+/-- Exact semantic frontier for integer patterns.  Only irreducible solved
+literal evidence crosses this boundary; source correspondence, instruction
+typing, state facts, and every other pattern form are proved by the
+dispatcher. -/
 structure MatchPatternBranchSoundnessCallbacks
     (source : TypedSource)
     (inferenceContext : Frontend.SourceInference.Context)
@@ -9026,32 +9027,6 @@ structure MatchPatternBranchSoundnessCallbacks
       result.resolution = .integerLiteral literalSource resolution →
       IntegerLiteralValid semanticContext literalSource
         (resolution.applySubstitution outer)
-  constructor :
-    ∀ {fuel : Nat} {pattern : Syntax.Pattern}
-      {leadingDot : Option Syntax.SourceSpan}
-      {qualifiers : List Syntax.Identifier} {name : Syntax.Identifier}
-      {arguments : Option
-        (Syntax.NonemptyDelimitedList (Syntax.Located Syntax.PatternValue))}
-      {expected : TypeSystem.Ty} {seen : List String}
-      {initial : Frontend.SourceInference.State}
-      {result : Detail.InferredPattern}
-      {activeContext : SourceSemantics.Context},
-      pattern.value = .constructor leadingDot qualifiers name arguments →
-      initial.InferenceReady →
-      expected.VariablesBelow initial.inference.next →
-      ProgramSignatureFormationValidated inferenceContext.signatures →
-      initial.LocalBindersBelowNextLocal →
-      source.owner = initial.owner →
-      semanticContext.currentDeclaration = some source.owner →
-      seen.Nodup →
-      TypeAdmissible semanticContext (outer.apply expected) →
-      TypeAdmissible activeContext (outer.apply expected) →
-      ActiveLocalContextInvariant initial outer activeContext →
-      outer.SemanticallyExtends result.state.inference.substitution →
-      Detail.inferMatchPatternFlatFuel fuel inferenceContext pattern expected
-          seen initial = .ok result →
-      Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
-        activeContext outer expected seen initial result)
 
 private theorem bindersExtend_append
     {owner : Resolved.DeclarationId}
@@ -9118,6 +9093,8 @@ theorem inferMatchPatternsFlatFuel_success_sound_of_callbacks
       TypeAdmissible semanticContext (outer.apply type))
     (activeAdmissible : ∀ type ∈ expected,
       TypeAdmissible activeContext (outer.apply type))
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
     (invariant : ActiveLocalContextInvariant initial outer activeContext)
     (outerExtension : outer.SemanticallyExtends
       result.state.inference.substitution)
@@ -9189,8 +9166,8 @@ theorem inferMatchPatternsFlatFuel_success_sound_of_callbacks
                   obtain ⟨headCertificate⟩ := recursive.pattern ready
                     (expectedBelow type (by simp)) below owner_eq seen_nodup
                     (semanticAdmissible type (by simp))
-                    (activeAdmissible type (by simp)) invariant outerHead
-                    headSuccess
+                    (activeAdmissible type (by simp)) activeSignaturesEq
+                    invariant outerHead headSuccess
                   have tailOwner : source.owner = head.state.owner :=
                     owner_eq.trans headProperties.2.2.2.symm
                   have tailSemanticAdmissible : ∀ candidate ∈ types,
@@ -9205,13 +9182,18 @@ theorem inferMatchPatternsFlatFuel_success_sound_of_callbacks
                     exact typeAdmissible_of_bindersExtend
                       headCertificate.binders_extend
                       (activeAdmissible candidate (by simp [member]))
+                  have tailActiveSignaturesEq :
+                      headCertificate.finalContext.signatures =
+                        semanticContext.signatures :=
+                    (BindersExtend.signatures_eq
+                      headCertificate.binders_extend).trans activeSignaturesEq
                   obtain ⟨tailCertificate⟩ := recursive.patterns
                     (result := tail)
                     headProperties.2.1 tailExpectedBelow
                     headProperties.2.2.1 tailOwner
                     headCertificate.names_nodup tailSemanticAdmissible
-                    tailActiveAdmissible headCertificate.invariant
-                    outerExtension tailSuccess
+                    tailActiveAdmissible tailActiveSignaturesEq
+                    headCertificate.invariant outerExtension tailSuccess
                   exact ⟨{
                     binders := headCertificate.binders ++
                       tailCertificate.binders
@@ -9563,6 +9545,439 @@ private theorem inferMatchPatternFlatFuel_success_binder_sound
         exact nameAbsent (candidateEq ▸ candidateMem)
     }⟩
 
+/-- Common semantic assembly for both contextual and explicitly qualified
+constructor selection.  The branch-specific wrapper below supplies candidate
+provenance and the state facts for either the unchanged or freshly allocated
+prefix state. -/
+private theorem inferMatchPatternFlatFuel_success_constructor_core
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {fuel : Nat}
+    {span : Syntax.SourceSpan} {leadingDot : Option Syntax.SourceSpan}
+    {qualifierNames : List String} {name : String}
+    {sourceArguments : List Syntax.Pattern}
+    {expected : TypeSystem.Ty} {seen : List String}
+    {initial allocated unified : Frontend.SourceInference.State}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    {arguments : List TypeSystem.Ty}
+    {instantiation : DataConstructorInstantiation}
+    {retainedInstantiation : DataConstructorInstantiation}
+    {children : Detail.InferredPatterns}
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
+    (recursive : MatchPatternRecursiveSoundnessCallbacks source
+      inferenceContext semanticContext outer)
+    (owner_eq : source.owner = initial.owner)
+    (seen_nodup : seen.Nodup)
+    (semanticAdmissible :
+      TypeAdmissible semanticContext (outer.apply expected))
+    (activeAdmissible :
+      TypeAdmissible activeContext (outer.apply expected))
+    (outerExtension : outer.SemanticallyExtends
+      children.state.inference.substitution)
+    (finalProgress : initial.InferenceProgress children.state)
+    (finalReady : children.state.InferenceReady)
+    (finalBelow : children.state.LocalBindersBelowNextLocal)
+    (finalOwner : children.state.owner = initial.owner)
+    (dataTypeMember : dataType ∈ inferenceContext.signatures.dataTypes)
+    (constructorMember : constructor ∈ dataType.constructors)
+    (constructorName : constructor.name = name)
+    (instantiationEq : instantiation =
+      Detail.instantiateDataConstructor dataType constructor arguments)
+    (retainedInstantiationEq : retainedInstantiation = {
+      instantiation with
+      payloadTypes := instantiation.payloadTypes.map children.state.resolve
+      resultType := children.state.resolve instantiation.resultType
+    })
+    (unifiedReady : unified.InferenceReady)
+    (payloadBelow : ∀ payload ∈ instantiation.payloadTypes,
+      payload.VariablesBelow unified.inference.next)
+    (unifiedBelow : unified.LocalBindersBelowNextLocal)
+    (unifiedInvariant : ActiveLocalContextInvariant unified outer activeContext)
+    (unifyResult : Detail.unify allocated instantiation.resultType expected =
+      .ok unified)
+    (childrenResult : Detail.inferMatchPatternsFlatFuel fuel inferenceContext
+      sourceArguments instantiation.payloadTypes seen unified = .ok children)
+    (arity : sourceArguments.length = instantiation.payloadTypes.length) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial {
+        source := .constructor span leadingDot qualifierNames name
+          sourceArguments.length
+        resolution := .constructor retainedInstantiation
+          children.instructions
+        instructions := .constructor retainedInstantiation
+          sourceArguments.length :: children.instructions
+        requirements := children.requirements
+        names := children.names
+        state := children.state
+      }) := by
+  subst instantiation
+  subst retainedInstantiation
+  let instantiation :=
+    Detail.instantiateDataConstructor dataType constructor arguments
+  let retainedInstantiation : DataConstructorInstantiation := {
+    instantiation with
+    payloadTypes := instantiation.payloadTypes.map children.state.resolve
+    resultType := children.state.resolve instantiation.resultType
+  }
+  have childrenProperties := stateCallbacks.patterns unifiedReady payloadBelow
+    validated unifiedBelow childrenResult
+  have outerUnified : outer.SemanticallyExtends
+      unified.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans outerExtension
+      childrenProperties.1.substitution_extends
+  have resultTypeEq : outer.apply instantiation.resultType =
+      outer.apply expected := by
+    calc
+      outer.apply instantiation.resultType =
+          outer.apply (unified.resolve instantiation.resultType) :=
+        (outerUnified instantiation.resultType).symm
+      _ = outer.apply (unified.resolve expected) :=
+        congrArg outer.apply (Detail.unify_resolve_eq unifyResult)
+      _ = outer.apply expected := outerUnified expected
+  have dataTypeSemantic :
+      dataType ∈ semanticContext.signatures.dataTypes := by
+    rw [semanticSignaturesEq]
+    exact dataTypeMember
+  have semanticResultAdmissible : TypeAdmissible semanticContext
+      (outer.apply instantiation.resultType) := by
+    rw [resultTypeEq]
+    exact semanticAdmissible
+  have semanticInstantiation :
+      SourceSemantics.DataConstructorInstantiation.Admissible semanticContext
+        (instantiation.applySubstitution outer) :=
+    DataConstructorInstantiation.Admissible.instantiateDataConstructor_applySubstitution
+      catalog dataTypeSemantic constructorMember outer
+        semanticResultAdmissible
+  have activeCatalog :
+      SignatureCatalogWellFormed activeContext.signatures := by
+    rw [activeSignaturesEq]
+    exact catalog
+  have dataTypeActive : dataType ∈ activeContext.signatures.dataTypes := by
+    rw [activeSignaturesEq]
+    exact dataTypeSemantic
+  have activeResultAdmissible : TypeAdmissible activeContext
+      (outer.apply instantiation.resultType) := by
+    rw [resultTypeEq]
+    exact activeAdmissible
+  have activeInstantiation :
+      SourceSemantics.DataConstructorInstantiation.Admissible activeContext
+        (instantiation.applySubstitution outer) :=
+    DataConstructorInstantiation.Admissible.instantiateDataConstructor_applySubstitution
+      activeCatalog dataTypeActive constructorMember outer
+        activeResultAdmissible
+  have closedPayloadTypesEq :
+      retainedInstantiation.payloadTypes.map outer.apply =
+        instantiation.payloadTypes.map outer.apply := by
+    simp only [retainedInstantiation, List.map_map]
+    apply List.map_congr_left
+    intro payload member
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using outerExtension payload
+  have closedResultTypeEq :
+      outer.apply retainedInstantiation.resultType =
+        outer.apply instantiation.resultType := by
+    simpa [retainedInstantiation, Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using outerExtension instantiation.resultType
+  have closedInstantiationEq :
+      retainedInstantiation.applySubstitution outer =
+        instantiation.applySubstitution outer := by
+    simp only [retainedInstantiation] at closedPayloadTypesEq
+    simp only [retainedInstantiation] at closedResultTypeEq
+    simp only [retainedInstantiation,
+      DataConstructorInstantiation.applySubstitution]
+    congr
+  have retainedResultTypeEq :
+      (retainedInstantiation.applySubstitution outer).resultType =
+        outer.apply expected := by
+    rw [closedInstantiationEq]
+    exact resultTypeEq
+  have semanticPayloadAdmissible : ∀ payload ∈ instantiation.payloadTypes,
+      TypeAdmissible semanticContext (outer.apply payload) := by
+    intro payload member
+    apply DataConstructorInstantiation.Admissible.payload_type_admissible
+      catalog semanticResultAdmissible.binders semanticInstantiation
+    exact List.mem_map.mpr ⟨payload, member, rfl⟩
+  have activePayloadAdmissible : ∀ payload ∈ instantiation.payloadTypes,
+      TypeAdmissible activeContext (outer.apply payload) := by
+    intro payload member
+    apply DataConstructorInstantiation.Admissible.payload_type_admissible
+      activeCatalog activeResultAdmissible.binders activeInstantiation
+    exact List.mem_map.mpr ⟨payload, member, rfl⟩
+  have recursiveOwner : source.owner = unified.owner :=
+    owner_eq.trans (finalOwner.symm.trans childrenProperties.2.2.2)
+  obtain ⟨childrenCertificate⟩ := recursive.patterns unifiedReady payloadBelow
+    unifiedBelow recursiveOwner seen_nodup semanticPayloadAdmissible
+    activePayloadAdmissible activeSignaturesEq unifiedInvariant outerExtension
+    childrenResult
+  have closedArity : sourceArguments.length =
+      (instantiation.applySubstitution outer).payloadTypes.length := by
+    simpa [DataConstructorInstantiation.applySubstitution] using arity
+  have spelling : ConstructorPatternSpellingValid semanticContext name
+      (retainedInstantiation.applySubstitution outer) := by
+    exact ⟨dataType, dataTypeSemantic, constructor, constructorMember, rfl,
+      constructorName⟩
+  exact ⟨{
+    binders := childrenCertificate.binders
+    rootArity := sourceArguments.length
+    finalContext := childrenCertificate.finalContext
+    source_represents := .constructor spelling
+    instructions_eq := rfl
+    instruction_type := fun suffix => by
+      have typed := PatternInstructionHasType.constructor
+        semanticInstantiation closedArity
+        (childrenCertificate.instructions_type suffix)
+      rw [← closedInstantiationEq, retainedResultTypeEq] at typed
+      simpa [MatchPatternInstruction.applySubstitution] using typed
+    binders_extend := childrenCertificate.binders_extend
+    invariant := childrenCertificate.invariant
+    progress := finalProgress
+    ready := finalReady
+    below := finalBelow
+    owner_eq := finalOwner
+    names_eq := childrenCertificate.names_eq
+    names_nodup := childrenCertificate.names_nodup
+  }⟩
+
+/-- Constructor-pattern inference proves catalog provenance, closes the
+selected generic instantiation under the outer substitution, and delegates
+only the strict payload-pattern traversal to the recursive callback. -/
+private theorem inferMatchPatternFlatFuel_success_constructor_sound
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {fuel : Nat}
+    {pattern : Syntax.Pattern} {leadingDot : Option Syntax.SourceSpan}
+    {qualifiers : List Syntax.Identifier} {name : Syntax.Identifier}
+    {arguments : Option
+      (Syntax.NonemptyDelimitedList (Syntax.Located Syntax.PatternValue))}
+    {expected : TypeSystem.Ty} {seen : List String}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (pattern_eq : pattern.value =
+      .constructor leadingDot qualifiers name arguments)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
+    (recursive : MatchPatternRecursiveSoundnessCallbacks source
+      inferenceContext semanticContext outer)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initial.owner)
+    (seen_nodup : seen.Nodup)
+    (semanticAdmissible :
+      TypeAdmissible semanticContext (outer.apply expected))
+    (activeAdmissible :
+      TypeAdmissible activeContext (outer.apply expected))
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (success : Detail.inferMatchPatternFlatFuel (fuel + 1) inferenceContext
+      pattern expected seen initial = .ok result) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  have properties := stateCallbacks.pattern ready expectedBelow validated below
+    success
+  unfold Detail.inferMatchPatternFlatFuel at success
+  simp only [pattern_eq, bind, Except.bind] at success
+  let qualifierNames := qualifiers.map (fun qualifier => qualifier.value)
+  let sourceArguments :=
+    (arguments.map (fun retained => retained.elements.toList)).getD []
+  by_cases contextual : leadingDot.isSome || qualifierNames.isEmpty
+  · simp only [qualifierNames, contextual, if_true] at success
+    cases selected : Detail.contextualConstructorCandidate inferenceContext
+        initial (some expected) name.value with
+    | error error => simp [selected] at success
+    | ok selectedResult =>
+        rcases selectedResult with ⟨dataType, constructor, typeArguments⟩
+        simp only [selected, pure, Pure.pure, Except.pure] at success
+        let instantiation := Detail.instantiateDataConstructor dataType
+          constructor typeArguments
+        by_cases arity :
+            sourceArguments.length = instantiation.payloadTypes.length
+        · simp only [sourceArguments, instantiation, arity, if_true]
+            at success
+          cases unifyResult : Detail.unify initial
+              (Detail.instantiateDataConstructor dataType constructor
+                typeArguments).resultType expected with
+          | error error => simp [unifyResult] at success
+          | ok unified =>
+              simp only [unifyResult] at success
+              cases childrenResult : Detail.inferMatchPatternsFlatFuel fuel
+                  inferenceContext
+                  ((arguments.map
+                    (fun retained => retained.elements.toList)).getD [])
+                  (Detail.instantiateDataConstructor dataType constructor
+                    typeArguments).payloadTypes seen unified with
+              | error error => simp [childrenResult] at success
+              | ok children =>
+                  simp only [childrenResult] at success
+                  let retainedInstantiation : DataConstructorInstantiation := {
+                    instantiation with
+                    payloadTypes := instantiation.payloadTypes.map
+                      children.state.resolve
+                    resultType := children.state.resolve
+                      instantiation.resultType
+                  }
+                  injection success with resultEq
+                  subst result
+                  have candidateFacts :=
+                    Detail.contextualConstructorCandidate_success_facts_with_name
+                      selected
+                  have bounded :=
+                    Detail.contextualConstructorCandidate_success_instantiation_variablesBelow
+                      ready (by
+                        intro retained member
+                        simp only [Option.mem_def] at member
+                        injection member with retainedEq
+                        subst retained
+                        exact expectedBelow) validated selected
+                  have unifiedProgress := Detail.unify_inferenceProgress
+                    ready.solved bounded.2 expectedBelow unifyResult
+                  have unifiedReady :=
+                    Detail.unify_preserves_inferenceReady ready bounded.2
+                      expectedBelow unifyResult
+                  have payloadBelow : ∀ payload ∈ instantiation.payloadTypes,
+                      payload.VariablesBelow unified.inference.next := by
+                    intro payload member
+                    exact (bounded.1 payload member).weaken
+                      unifiedProgress.next_le
+                  have unifiedBelow : unified.LocalBindersBelowNextLocal :=
+                    Detail.unify_preserves_localBindersBelowNextLocal below
+                      unifyResult
+                  have unifiedInvariant : ActiveLocalContextInvariant unified
+                      outer activeContext := invariant.unify unifyResult
+                  simpa [qualifierNames, sourceArguments, arity] using
+                    (inferMatchPatternFlatFuel_success_constructor_core
+                      (span := pattern.span) (leadingDot := leadingDot)
+                      (qualifierNames := qualifierNames) (name := name.value)
+                      catalog semanticSignaturesEq activeSignaturesEq validated
+                      stateCallbacks recursive owner_eq seen_nodup
+                      semanticAdmissible activeAdmissible outerExtension
+                      properties.1 properties.2.1 properties.2.2.1
+                      properties.2.2.2 candidateFacts.1 candidateFacts.2.1
+                      candidateFacts.2.2.1 rfl rfl unifiedReady payloadBelow
+                      unifiedBelow unifiedInvariant unifyResult childrenResult
+                      arity)
+        · simp [sourceArguments, instantiation, arity] at success
+  · simp only [qualifierNames, contextual] at success
+    cases selected : Detail.explicitConstructorCandidate inferenceContext
+        (qualifiers.map (fun qualifier => qualifier.value)) name.value with
+    | error error => simp [selected] at success
+    | ok selectedResult =>
+        rcases selectedResult with ⟨dataType, constructor⟩
+        simp only [selected, pure, Pure.pure, Except.pure] at success
+        cases freshEq : Detail.freshDataConstructorInstantiation dataType
+            constructor initial with
+        | mk instantiation allocated =>
+            simp [freshEq] at success
+            by_cases arity :
+                sourceArguments.length = instantiation.payloadTypes.length
+            · simp only [sourceArguments, arity, if_true] at success
+              cases unifyResult : Detail.unify allocated
+                  instantiation.resultType expected with
+              | error error => simp [unifyResult] at success
+              | ok unified =>
+                  simp only [unifyResult] at success
+                  cases childrenResult : Detail.inferMatchPatternsFlatFuel fuel
+                      inferenceContext
+                      ((arguments.map
+                        (fun retained => retained.elements.toList)).getD [])
+                      instantiation.payloadTypes seen unified with
+                  | error error => simp [childrenResult] at success
+                  | ok children =>
+                      simp only [childrenResult] at success
+                      let retainedInstantiation :
+                          DataConstructorInstantiation := {
+                        instantiation with
+                        payloadTypes := instantiation.payloadTypes.map
+                          children.state.resolve
+                        resultType := children.state.resolve
+                          instantiation.resultType
+                      }
+                      injection success with resultEq
+                      subst result
+                      have candidateFacts :=
+                        Detail.explicitConstructorCandidate_success_facts
+                          selected
+                      obtain ⟨typeArguments, _, _, instantiationEq⟩ :=
+                        Detail.freshDataConstructorInstantiation_success_shape
+                          freshEq
+                      have rawPayloadBelow :=
+                        validated.data_constructor_payloadTypes_variablesBelow
+                          candidateFacts.1 candidateFacts.2.1
+                          initial.inference.next
+                      have allocatedProperties :=
+                        Detail.freshDataConstructorInstantiation_inferenceProperties
+                          dataType constructor initial ready rawPayloadBelow
+                      simp only [freshEq] at allocatedProperties
+                      have expectedBelowAllocated := expectedBelow.weaken
+                        allocatedProperties.1.next_le
+                      have unifiedProgress := Detail.unify_inferenceProgress
+                        allocatedProperties.2.1.solved
+                        allocatedProperties.2.2.2.2
+                        expectedBelowAllocated unifyResult
+                      have unifiedReady :=
+                        Detail.unify_preserves_inferenceReady
+                          allocatedProperties.2.1
+                          allocatedProperties.2.2.2.2
+                          expectedBelowAllocated unifyResult
+                      have payloadBelow :
+                          ∀ payload ∈ instantiation.payloadTypes,
+                            payload.VariablesBelow unified.inference.next := by
+                        intro payload member
+                        exact (allocatedProperties.2.2.2.1 payload member).weaken
+                          unifiedProgress.next_le
+                      have allocatedBelow :
+                          allocated.LocalBindersBelowNextLocal := by
+                        have preserved :=
+                          Detail.freshDataConstructorInstantiation_preserves_localBindersBelowNextLocal
+                            dataType constructor initial below
+                        simpa only [freshEq] using preserved
+                      have unifiedBelow :
+                          unified.LocalBindersBelowNextLocal :=
+                        Detail.unify_preserves_localBindersBelowNextLocal
+                          allocatedBelow unifyResult
+                      have allocatedInvariant : ActiveLocalContextInvariant
+                          allocated outer activeContext := by
+                        apply invariant.congr_localBinders
+                        have scopeEq :=
+                          Detail.freshDataConstructorInstantiation_preserves_lexicalScope
+                            dataType constructor initial
+                        simp only [freshEq] at scopeEq
+                        exact congrArg LexicalScope.binders scopeEq
+                      have unifiedInvariant : ActiveLocalContextInvariant
+                          unified outer activeContext :=
+                        allocatedInvariant.unify unifyResult
+                      simpa [qualifierNames, sourceArguments, arity] using
+                        (inferMatchPatternFlatFuel_success_constructor_core
+                          (span := pattern.span) (leadingDot := leadingDot)
+                          (qualifierNames := qualifierNames)
+                          (name := name.value) catalog semanticSignaturesEq
+                          activeSignaturesEq validated stateCallbacks recursive
+                          owner_eq seen_nodup semanticAdmissible
+                          activeAdmissible outerExtension properties.1
+                          properties.2.1 properties.2.2.1 properties.2.2.2
+                          candidateFacts.1 candidateFacts.2.1
+                          candidateFacts.2.2 instantiationEq rfl unifiedReady
+                          payloadBelow unifiedBelow unifiedInvariant unifyResult
+                          childrenResult arity)
+            · simp [sourceArguments, arity] at success
+
 private theorem freshTypes_length
     (count : Nat) (state : Frontend.SourceInference.State) :
     (Detail.freshTypes count state).1.length = count := by
@@ -9619,6 +10034,8 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
       TypeAdmissible semanticContext (outer.apply expected))
     (activeAdmissible :
       TypeAdmissible activeContext (outer.apply expected))
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
     (invariant : ActiveLocalContextInvariant initial outer activeContext)
     (outerExtension : outer.SemanticallyExtends
       result.state.inference.substitution)
@@ -9741,7 +10158,7 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
             unifiedReady elementTypesBelow unifiedBelow recursiveOwner
             seen_nodup
             eachSemantic eachActive
-            unifiedInvariant outerExtension childrenResult
+            activeSignaturesEq unifiedInvariant outerExtension childrenResult
           have arity : elements.elements.length =
               (elementTypes.map outer.apply).length := by
             have lengthEq := freshTypes_length elements.elements.length initial
@@ -9778,12 +10195,10 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
 
 /-- Public one-layer dispatcher for successful flat pattern inference.
 
-The dispatcher rules out the two executable error-only forms, proves
-wildcards directly, and transports every field of a strict recursive
+The dispatcher rules out the two executable error-only forms, proves every
+structural branch directly, and transports every field of a strict recursive
 certificate through grouping.  Literal forms cross only the exact
-integer-evidence boundary above, while constructors still cross the temporary
-certificate boundary.  Tuple assembly and admissibility projection are proved
-directly. -/
+integer-evidence boundary above. -/
 theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
     {source : TypedSource}
     {inferenceContext : Frontend.SourceInference.Context}
@@ -9794,6 +10209,11 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
     {result : Detail.InferredPattern}
     (validated : ProgramSignatureFormationValidated
       inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
     (recursive : MatchPatternRecursiveSoundnessCallbacks source
       inferenceContext semanticContext outer)
     (branches : MatchPatternBranchSoundnessCallbacks source
@@ -9839,9 +10259,12 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
             invariant outerExtension (by
               simpa only [Nat.succ_eq_add_one] using success)
       | constructor leadingDot qualifiers name arguments =>
-          exact branches.constructor valueEq ready expectedBelow validated below
-            owner_eq semanticOwner seen_nodup semanticAdmissible
-            activeAdmissible invariant outerExtension success
+          exact inferMatchPatternFlatFuel_success_constructor_sound valueEq
+            catalog semanticSignaturesEq activeSignaturesEq validated
+            stateCallbacks recursive ready expectedBelow below owner_eq
+            seen_nodup semanticAdmissible activeAdmissible invariant
+            outerExtension (by
+              simpa only [Nat.succ_eq_add_one] using success)
       | comptime keyword expression =>
           simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
       | group inner =>
@@ -9859,7 +10282,7 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
               obtain ⟨certificate⟩ := recursive.pattern
                 (result := innerResult) ready expectedBelow
                 below owner_eq seen_nodup semanticAdmissible activeAdmissible
-                invariant innerOuter innerSuccess
+                activeSignaturesEq invariant innerOuter innerSuccess
               exact ⟨{
                 binders := certificate.binders
                 rootArity := certificate.rootArity
@@ -9881,8 +10304,8 @@ theorem inferMatchPatternFlatFuel_success_sound_of_callbacks
       | tuple elements =>
           exact inferMatchPatternFlatFuel_success_tuple_sound valueEq validated
             stateCallbacks recursive ready expectedBelow below owner_eq
-            seen_nodup semanticAdmissible activeAdmissible invariant
-            outerExtension (by
+            seen_nodup semanticAdmissible activeAdmissible activeSignaturesEq
+            invariant outerExtension (by
               simpa only [Nat.succ_eq_add_one] using success)
       | error =>
           simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
