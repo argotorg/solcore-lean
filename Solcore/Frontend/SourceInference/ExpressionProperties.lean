@@ -1527,6 +1527,18 @@ private def PreservesStateHeader {α : Type} (stateOf : α → State)
   ∀ result, computation = .ok result →
     (stateOf result).header = initial.header
 
+private def PreservesLexicalScope {α : Type} (stateOf : α → State)
+    (initial : State) (computation : Except Error α) : Prop :=
+  ∀ result, computation = .ok result →
+    (stateOf result).lexicalScope = initial.lexicalScope
+
+private def RestoresOuterScope {α : Type} (stateOf : α → State)
+    (outerScope : LexicalScope) (initial : State)
+    (computation : Except Error α) : Prop :=
+  ∀ result, computation = .ok result →
+    initial.lexicalScope = outerScope →
+      (stateOf result).lexicalScope = outerScope
+
 private theorem pair_success_state_header {α : Type}
     {operation : α × State} {value : α} {next initial : State}
     (operationHeader : operation.2.header = initial.header)
@@ -1536,6 +1548,16 @@ private theorem pair_success_state_header {α : Type}
     next.header = operation.2.header := by
       exact (congrArg (fun result => result.2.header) success).symm
     _ = initial.header := operationHeader
+
+private theorem pair_success_lexicalScope {α : Type}
+    {operation : α × State} {value : α} {next initial : State}
+    (operationScope : operation.2.lexicalScope = initial.lexicalScope)
+    (success : operation = (value, next)) :
+    next.lexicalScope = initial.lexicalScope := by
+  calc
+    next.lexicalScope = operation.2.lexicalScope := by
+      exact (congrArg (fun result => result.2.lexicalScope) success).symm
+    _ = initial.lexicalScope := operationScope
 
 private theorem pair_eq_property {α β : Type} {result : α × β}
     {property : β → Prop}
@@ -1560,17 +1582,35 @@ private theorem allocateExpressionId_success_header
     next.header = state.header :=
   pair_success_state_header (State.allocateExpressionId_header state) success
 
+private theorem allocateExpressionId_success_lexicalScope
+    {state next : State} {id : ExpressionId}
+    (success : state.allocateExpressionId = (id, next)) :
+    next.lexicalScope = state.lexicalScope :=
+  pair_success_lexicalScope rfl success
+
 private theorem allocateStatementId_success_header
     {state next : State} {id : StatementId}
     (success : state.allocateStatementId = (id, next)) :
     next.header = state.header :=
   pair_success_state_header (State.allocateStatementId_header state) success
 
+private theorem allocateStatementId_success_lexicalScope
+    {state next : State} {id : StatementId}
+    (success : state.allocateStatementId = (id, next)) :
+    next.lexicalScope = state.lexicalScope :=
+  pair_success_lexicalScope rfl success
+
 private theorem state_fresh_success_header
     {state next : State} {type : Ty}
     (success : state.fresh = (type, next)) :
     next.header = state.header :=
   pair_success_state_header (State.fresh_header state) success
+
+private theorem state_fresh_success_lexicalScope
+    {state next : State} {type : Ty}
+    (success : state.fresh = (type, next)) :
+    next.lexicalScope = state.lexicalScope :=
+  pair_success_lexicalScope rfl success
 
 private theorem allocateHiddenLocal_success_header
     {state next : State} {id : Resolved.LocalId}
@@ -1594,6 +1634,42 @@ private theorem addRequirementsWithIds_success_header
   pair_success_state_header
     (State.addRequirementsWithIds_header state predicates) success
 
+@[simp] private theorem addRequirementsWithIds_lexicalScope
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.lexicalScope =
+      state.lexicalScope := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate rest induction =>
+      simp only [State.addRequirementsWithIds]
+      rw [induction]
+      rfl
+
+@[simp] private theorem addRequirementsWithIds_locals
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.locals = state.locals := by
+  exact congrArg LexicalScope.locals
+    (addRequirementsWithIds_lexicalScope state predicates)
+
+@[simp] private theorem addRequirementsWithIds_localBinders
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.localBinders =
+      state.localBinders := by
+  exact congrArg LexicalScope.binders
+    (addRequirementsWithIds_lexicalScope state predicates)
+
+private theorem addRequirementsWithIds_success_lexicalScope
+    {state next : State} {predicates : List ProgramPredicate}
+    {requirements : List RequirementId}
+    (success : state.addRequirementsWithIds predicates =
+      (requirements, next)) :
+    next.lexicalScope = state.lexicalScope := by
+  calc
+    next.lexicalScope = (requirements, next).2.lexicalScope := rfl
+    _ = (state.addRequirementsWithIds predicates).2.lexicalScope :=
+      congrArg (fun pair => pair.2.lexicalScope) success.symm
+    _ = state.lexicalScope := addRequirementsWithIds_lexicalScope state predicates
+
 private theorem allocateBinder_success_header
     {state next : State} {name : String} {scheme : Scheme}
     {span : Option Syntax.SourceSpan} {comptime : Bool}
@@ -1614,6 +1690,17 @@ private theorem allocateBinder_success_header
       simp only [commitCoercionPlan]
       rw [induction]
       simp
+
+@[simp] private theorem commitCoercionPlan_lexicalScope
+    (state : State) (plan : List PlannedCoercionStep) :
+    (commitCoercionPlan state plan).2.lexicalScope = state.lexicalScope := by
+  induction plan generalizing state with
+  | nil => rfl
+  | cons step rest induction =>
+      simp only [commitCoercionPlan]
+      rw [induction]
+      rw [addRequirementsWithIds_lexicalScope]
+      rfl
 
 private theorem withExpected_state_header
     {context : Context} {state : State} {actual : InferredExpression}
@@ -1653,6 +1740,44 @@ private theorem withExpected_state_header
                       subst result
                       exact commitCoercionPlan_state_header state plan
 
+private theorem withExpected_lexicalScope
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    result.state.lexicalScope = state.lexicalScope := by
+  cases expected with
+  | none =>
+      simp only [withExpected] at success
+      injection success with resultEq
+      subst result
+      rfl
+  | some expected =>
+      cases unification : state.inference.unify actual.type expected with
+      | ok inference =>
+          simp only [withExpected, unification] at success
+          injection success with resultEq
+          subst result
+          rfl
+      | error error =>
+          cases error with
+          | occursCheck metavariable type =>
+              simp [withExpected, unification] at success
+          | exhausted => simp [withExpected, unification] at success
+          | mismatch left right =>
+              simp only [withExpected, unification] at success
+              cases planResult : coercionPlan? context state
+                  (state.resolve actual.type) (state.resolve expected) with
+              | error error => simp [planResult, bind, Except.bind] at success
+              | ok plan? =>
+                  cases plan? with
+                  | none => simp [planResult, bind, Except.bind] at success
+                  | some plan =>
+                      simp only [planResult, bind, Except.bind] at success
+                      change Except.ok _ = Except.ok result at success
+                      injection success with resultEq
+                      subst result
+                      exact commitCoercionPlan_lexicalScope state plan
+
 @[simp] private theorem withExpected_preserves_owner
     {context : Context} {state : State} {actual : InferredExpression}
     {expected : Option Ty} {result : ExpectationResult}
@@ -1679,6 +1804,29 @@ private theorem withExpected_state_header
       state.header := by
   exact State.recordNode_header state _
 
+@[simp] private theorem recordNode_lexicalScope
+    (state : State) (node : Node) :
+    (state.recordNode node).lexicalScope = state.lexicalScope := by
+  rfl
+
+@[simp] private theorem recordNode_locals (state : State) (node : Node) :
+    (state.recordNode node).locals = state.locals := by
+  rfl
+
+@[simp] private theorem recordNode_localBinders (state : State) (node : Node) :
+    (state.recordNode node).localBinders = state.localBinders := by
+  rfl
+
+@[simp] private theorem recordExpression_lexicalScope
+    (source : Syntax.Expr) (expression : InferredExpression)
+    (form : ExpressionForm) (requirements : List RequirementId)
+    (coercions : List CoercionStep) (state : State)
+    {localSchemeInstantiationStart : Option Nat} :
+    (recordExpression source expression form requirements coercions state
+      localSchemeInstantiationStart).2.lexicalScope =
+      state.lexicalScope := by
+  rfl
+
 private theorem recordExpressionWithExpected_state_header
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
@@ -1699,6 +1847,23 @@ private theorem recordExpressionWithExpected_state_header
         fitted.coercions fitted.state
         (localSchemeInstantiationStart := localSchemeInstantiationStart)).trans
           (withExpected_state_header fittedResult)
+
+private theorem recordExpressionWithExpected_lexicalScope
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result) :
+    result.2.lexicalScope = state.lexicalScope := by
+  unfold recordExpressionWithExpected at success
+  cases fittedResult : withExpected context state { id, type } expected with
+  | error error => simp [fittedResult, bind, Except.bind] at success
+  | ok fitted =>
+      simp only [fittedResult, bind, Except.bind, except_pure_eq_ok] at success
+      subst result
+      exact withExpected_lexicalScope fittedResult
 
 private theorem bindLambdaParameters_state_header
     {context : Context} {parameters : List Syntax.LambdaParameter}
@@ -1759,6 +1924,32 @@ the declaration owner and original input binders. -/
       injection success with nextEq
       subst next
       rfl
+
+@[simp] private theorem unify_preserves_lexicalScope
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    next.lexicalScope = state.lexicalScope := by
+  unfold unify at success
+  cases inferenceResult : liftUnification (state.inference.unify left right) with
+  | error error => simp [inferenceResult, bind, Except.bind] at success
+  | ok inference =>
+      simp only [inferenceResult, bind, Except.bind] at success
+      change Except.ok { state with inference } = Except.ok next at success
+      injection success with nextEq
+      subst next
+      rfl
+
+@[simp] private theorem unify_preserves_locals
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    next.locals = state.locals :=
+  congrArg LexicalScope.locals (unify_preserves_lexicalScope success)
+
+@[simp] private theorem unify_preserves_localBinders
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    next.localBinders = state.localBinders :=
+  congrArg LexicalScope.binders (unify_preserves_lexicalScope success)
 
 /-- Successful source-inference unification makes semantic inference progress
 when both raw operands lie below the input allocator. -/
@@ -3354,6 +3545,27 @@ theorem freshDataConstructorInstantiation_inferenceProperties
   unfold freshDataConstructorInstantiation
   exact foldHeader dataType.parameters ([], state)
 
+@[simp] private theorem freshDataConstructorInstantiation_preserves_lexicalScope
+    (dataType : ProgramDataSignature)
+    (constructor : ProgramDataConstructorSignature) (state : State) :
+    (freshDataConstructorInstantiation dataType constructor state).2.lexicalScope =
+      state.lexicalScope := by
+  let step : List Ty × State → TypeParameterId → List Ty × State :=
+    fun result _ =>
+      (result.1 ++ [result.2.fresh.1], result.2.fresh.2)
+  have foldScope (parameters : List TypeParameterId)
+      (accumulator : List Ty × State) :
+      (parameters.foldl step accumulator).2.lexicalScope =
+        accumulator.2.lexicalScope := by
+    induction parameters generalizing accumulator with
+    | nil => rfl
+    | cons parameter parameters induction =>
+        simp only [List.foldl_cons]
+        rw [induction]
+        rfl
+  unfold freshDataConstructorInstantiation
+  exact foldScope dataType.parameters ([], state)
+
 @[simp] private theorem freshDataConstructorInstantiation_preserves_owner
     (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature) (state : State) :
@@ -3603,6 +3815,7 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
       exact integerPatternPrefix_inferenceProperties ready expectedBelow
         (by assumption)
         (by assumption) (by assumption) (by rfl) (by rfl)
+  -- Parenthesized/grouped expression.
   case case10 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
@@ -3628,6 +3841,7 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
         have children := childrenIH _ _ _ constructorPrefix.2.1
           constructorPrefix.2.2 validated (by assumption)
         exact ⟨constructorPrefix.1.trans children.1, children.2⟩
+  -- Tuple expression.
   case case11 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
@@ -3841,6 +4055,28 @@ private theorem inferUnaryOperator_state_header
     State.addRequirementWithId]
   all_goals grind [unify_preserves_owner, unify_preserves_inputs]
 
+private theorem inferUnaryOperator_lexicalScope
+    {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferUnaryOperator context operator operandType expected
+      integerLiterals state = .ok result) :
+    result.state.lexicalScope = state.lexicalScope := by
+  unfold inferUnaryOperator at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have firstUnifiedScope : v.lexicalScope = state.lexicalScope :=
+    unify_preserves_lexicalScope heq
+  all_goals try have secondUnifiedScope :
+      v_1.lexicalScope = v.lexicalScope :=
+    unify_preserves_lexicalScope heq_1
+  all_goals try have unifiedScope :=
+    unify_preserves_lexicalScope (by assumption)
+  all_goals simp_all [pure, Pure.pure, Except.pure, State.lexicalScope,
+    State.addRequirementsWithIds, State.addRequirementWithId]
+  all_goals grind [unify_preserves_lexicalScope]
+
 private theorem inferBinaryOperator_state_header
     {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
     {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
@@ -3857,6 +4093,30 @@ private theorem inferBinaryOperator_state_header
   all_goals simp_all [State.header, State.addRequirementsWithIds,
     State.addRequirementWithId]
   all_goals grind [unify_preserves_owner, unify_preserves_inputs]
+
+private theorem inferBinaryOperator_lexicalScope
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    result.state.lexicalScope = state.lexicalScope := by
+  unfold inferBinaryOperator at success
+  simp only [bind, Except.bind] at success
+  cases firstResult : unify state left right with
+  | error error =>
+      simp [firstResult, bind, Except.bind] at success
+  | ok firstState =>
+      simp only [firstResult, bind, Except.bind] at success
+      have firstScope := unify_preserves_lexicalScope firstResult
+      repeat' first | split at success
+      all_goals try cases success
+      all_goals try have secondScope :=
+        unify_preserves_lexicalScope (by assumption)
+      all_goals simp_all [pure, Pure.pure, Except.pure,
+        State.lexicalScope, State.addRequirementsWithIds,
+        State.addRequirementWithId]
+      all_goals grind [unify_preserves_lexicalScope]
 
 private theorem candidateWithExpected_some_state_header
     {context : Context} {state : State} {actual : InferredExpression}
@@ -3875,6 +4135,24 @@ private theorem candidateWithExpected_some_state_header
       have fittedEq : fitted = result := Option.some.inj resultEq
       subst result
       exact withExpected_state_header fittedResult
+
+private theorem candidateWithExpected_some_lexicalScope
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : candidateWithExpected context state actual expected =
+      .ok (some result)) :
+    result.state.lexicalScope = state.lexicalScope := by
+  unfold candidateWithExpected at success
+  cases fittedResult : withExpected context state actual expected with
+  | error error =>
+      cases error <;> simp [fittedResult] at success
+      all_goals cases ‹Unification.Error› <;> simp_all [fittedResult]
+  | ok fitted =>
+      simp only [fittedResult] at success
+      injection success with resultEq
+      have fittedEq : fitted = result := Option.some.inj resultEq
+      subst result
+      exact withExpected_lexicalScope fittedResult
 
 private theorem fitArguments_some_state_header
     {context : Context} {state : State}
@@ -3918,6 +4196,48 @@ private theorem fitArguments_some_state_header
                           exact (induction tailResult).trans
                             (candidateWithExpected_some_state_header fittedResult)
 
+private theorem fitArguments_some_lexicalScope
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    result.state.lexicalScope = state.lexicalScope := by
+  induction arguments generalizing parameters state result with
+  | nil =>
+      cases parameters <;> simp [fitArguments] at success
+      subst result
+      rfl
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil => simp [fitArguments] at success
+      | cons parameter parameters =>
+          simp only [fitArguments] at success
+          cases fittedResult :
+              candidateWithExpected context state argument (some parameter) with
+          | error error =>
+              simp [fittedResult, bind, Except.bind] at success
+          | ok fitted? =>
+              cases fitted? with
+              | none => simp [fittedResult, bind, Except.bind] at success
+              | some fitted =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  cases tailResult : fitArguments context fitted.state arguments
+                      parameters with
+                  | error error =>
+                      simp [tailResult, bind, Except.bind] at success
+                  | ok tail? =>
+                      cases tail? with
+                      | none => simp [tailResult, bind, Except.bind] at success
+                      | some tail =>
+                          simp only [tailResult, bind, Except.bind,
+                            except_pure_eq_ok] at success
+                          have resultEq : _ = result := Option.some.inj success
+                          clear success
+                          subst result
+                          exact (induction tailResult).trans
+                            (candidateWithExpected_some_lexicalScope fittedResult)
+
 /-- A successful function-candidate attempt retains exactly the generic
 instantiation allocated before argument fitting, expected-type fitting, and
 predicate validation.  None of those later checks may replace the selected
@@ -3956,6 +4276,26 @@ private theorem tryFunctionCandidate_some_state_header
     candidateWithExpected_some_state_header (by assumption)
   all_goals try simp_all
   all_goals simp_all [State.header, State.addRequirementsWithIds,
+    State.addRequirementWithId, State.markDirectCallRequirements]
+
+private theorem tryFunctionCandidate_some_lexicalScope
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    result.state.lexicalScope = state.lexicalScope := by
+  unfold tryFunctionCandidate at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have fitScope :=
+    fitArguments_some_lexicalScope (by assumption)
+  all_goals try have expectedScope :=
+    candidateWithExpected_some_lexicalScope (by assumption)
+  all_goals try simp_all
+  all_goals simp_all [State.lexicalScope, State.addRequirementsWithIds,
     State.addRequirementWithId, State.markDirectCallRequirements]
 
 private theorem collectCandidateAttempts_success_header
@@ -4391,6 +4731,20 @@ private theorem selectFunctionCandidateFrom_state_header
                 tryFunctionCandidate_some_state_header attemptSuccess)
               candidates candidate member
 
+private theorem selectFunctionCandidateFrom_lexicalScope
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    result.state.lexicalScope = state.lexicalScope := by
+  obtain ⟨signature, _, candidateSuccess⟩ :=
+    selectFunctionCandidateFrom_success_candidate success
+  exact tryFunctionCandidate_some_lexicalScope candidateSuccess
+
 @[simp] private theorem attachExpressionCoercions_state_header
     (state : State) (entries : List ExpressionCoercions) :
     (attachExpressionCoercions state entries).header = state.header := by
@@ -4402,9 +4756,25 @@ private theorem selectFunctionCandidateFrom_state_header
       exact (induction _).trans
         (State.modifyExpressionNode_header state entry.expression _)
 
+@[simp] private theorem attachExpressionCoercions_lexicalScope
+    (state : State) (entries : List ExpressionCoercions) :
+    (attachExpressionCoercions state entries).lexicalScope =
+      state.lexicalScope := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil => rfl
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      exact (induction _).trans (by rfl)
+
 @[simp] private theorem allocateExpressionId_inference
     (state : State) :
     state.allocateExpressionId.2.inference = state.inference := by
+  rfl
+
+@[simp] private theorem allocateExpressionId_lexicalScope
+    (state : State) :
+    state.allocateExpressionId.2.lexicalScope = state.lexicalScope := by
   rfl
 
 @[simp] private theorem attachExpressionCoercions_resolve
@@ -4434,7 +4804,14 @@ private theorem selectFunctionCandidateFrom_state_header
     (source callee : Syntax.Expr) (name : String)
     (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
     (recordSelectedCall source callee name arguments attempt).2.header =
-      attempt.state.header := by
+    attempt.state.header := by
+  simp [recordSelectedCall, recordSelectedCallResult]
+
+@[simp] private theorem recordSelectedCall_lexicalScope
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+    (recordSelectedCall source callee name arguments attempt).2.lexicalScope =
+      attempt.state.lexicalScope := by
   simp [recordSelectedCall, recordSelectedCallResult]
 
 @[simp] private theorem recordSelectedCallResult_state_header
@@ -4444,6 +4821,15 @@ private theorem selectFunctionCandidateFrom_state_header
     (state : State) :
     (recordSelectedCallResult source callee name arguments attempt result
       trailingCoercions state).2.header = state.header := by
+  simp [recordSelectedCallResult]
+
+@[simp] private theorem recordSelectedCallResult_lexicalScope
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) :
+    (recordSelectedCallResult source callee name arguments attempt result
+      trailingCoercions state).2.lexicalScope = state.lexicalScope := by
   simp [recordSelectedCallResult]
 
 @[simp] private theorem recordSelectedCallResult_resolve
@@ -5208,11 +5594,82 @@ private theorem applyFunctionType_state_header
                 ((unify_state_header unifyResult).trans
                   (state_fresh_success_header freshResultEq))
 
+private theorem applyFunctionType_lexicalScope
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Option Ty}
+    {state : State} {result : IndirectApplicationResult}
+    (success : applyFunctionType context call calleeType arguments expected
+      state = .ok result) :
+    result.state.lexicalScope = state.lexicalScope := by
+  unfold applyFunctionType at success
+  cases partsResult : functionParts? (state.resolve calleeType) with
+  | some parts =>
+      rcases parts with ⟨parameter, returnType⟩
+      simp only [partsResult] at success
+      cases argumentResult : withExpected context state
+          { id := call, type := Ty.productMany (arguments.map (fun x => x.type)) }
+          (some parameter) with
+      | error error =>
+          simp [argumentResult, bind, Except.bind] at success
+      | ok fittedArgument =>
+          simp only [argumentResult, bind, Except.bind] at success
+          cases resultResult : withExpected context fittedArgument.state
+              { id := call, type := returnType } expected with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := fittedArgument.coercions
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              exact (withExpected_lexicalScope resultResult).trans
+                (withExpected_lexicalScope argumentResult)
+  | none =>
+      simp only [partsResult] at success
+      generalize freshResultEq : state.fresh = freshResult at success
+      rcases freshResult with ⟨resultType, freshState⟩
+      cases unifyResult : unify freshState calleeType
+          (.function (Ty.productMany (arguments.map fun x => x.type))
+            resultType) with
+      | error error =>
+          simp [unifyResult, bind, Except.bind] at success
+      | ok unifiedState =>
+          simp only [unifyResult, bind, Except.bind] at success
+          cases resultResult : withExpected context unifiedState
+              { id := call, type := resultType } expected with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := []
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              exact (withExpected_lexicalScope resultResult).trans
+                ((unify_preserves_lexicalScope unifyResult).trans
+                  (state_fresh_success_lexicalScope freshResultEq))
+
 @[simp] private theorem recordIndirectCall_state_header
     (source : Syntax.Expr) (callee : InferredExpression)
     (arguments : List InferredExpression) (result : IndirectApplicationResult) :
     (recordIndirectCall source callee arguments result).2.header =
-      result.state.header := by
+    result.state.header := by
+  simp [recordIndirectCall]
+
+@[simp] private theorem recordIndirectCall_lexicalScope
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult) :
+    (recordIndirectCall source callee arguments result).2.lexicalScope =
+      result.state.lexicalScope := by
   simp [recordIndirectCall]
 
 @[simp] private theorem recordIndirectCall_resolve
@@ -5312,6 +5769,35 @@ private theorem unifyBuiltinFunctionArgumentsEqual_state_header
               simp only [unifyResult, bind, Except.bind] at success
               exact (induction success).trans (unify_state_header unifyResult)
 
+private theorem unifyBuiltinFunctionArgumentsEqual_lexicalScope
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {state next : State}
+    (success : unifyBuiltinFunctionArgumentsEqual arguments parameters state =
+      .ok next) :
+    next.lexicalScope = state.lexicalScope := by
+  induction arguments generalizing parameters state next with
+  | nil =>
+      simp only [unifyBuiltinFunctionArgumentsEqual] at success
+      injection success with nextEq
+      subst next
+      rfl
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          injection success with nextEq
+          subst next
+          rfl
+      | cons parameter parameters =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          cases unifyResult : unify state argument.type parameter with
+          | error error =>
+              simp [unifyResult, bind, Except.bind] at success
+          | ok unifiedState =>
+              simp only [unifyResult, bind, Except.bind] at success
+              exact (induction success).trans
+                (unify_preserves_lexicalScope unifyResult)
+
 private theorem functionCandidates_scheme_body_variablesBelow
     {context : Context} {candidates : List ProgramFunctionSignature}
     (validated : ProgramSignatureFormationValidated context.signatures)
@@ -5398,6 +5884,26 @@ private theorem recordBuiltinFunctionCall_state_header
   all_goals try simp_all [State.header, State.allocateExpressionId,
     State.recordNode, recordExpression, bind, Except.bind]
   all_goals grind [unify_preserves_owner, unify_preserves_inputs]
+
+private theorem recordBuiltinFunctionCall_lexicalScope
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    result.2.lexicalScope = state.lexicalScope := by
+  unfold recordBuiltinFunctionCall at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have argumentsScope :=
+    unifyBuiltinFunctionArgumentsEqual_lexicalScope (by assumption)
+  all_goals try have unifiedScope :=
+    unify_preserves_lexicalScope (by assumption)
+  all_goals try simp_all
+  all_goals try simp_all [State.lexicalScope, State.allocateExpressionId,
+    State.recordNode, recordExpression, bind, Except.bind]
 
 private theorem syntheticTuple_result_inferenceProperties
     {elements : List InferredExpression} {span : Syntax.SourceSpan}
@@ -6245,6 +6751,7 @@ private theorem inferFuel_inferenceProperties_internal :
             success
         exact ⟨prefixProgress.trans recordedProperties.1,
           recordedProperties.2⟩
+  -- Unary operator expression, including overloaded dispatch.
   case case12 =>
     intros context expression expected initial fuel id allocated allocationEq
       operator operand expressionEq operandInduction
@@ -6370,6 +6877,7 @@ private theorem inferFuel_inferenceProperties_internal :
                         exact ⟨prefixProgress.trans
                             (selectedProperties.1.trans recordedProperties.1),
                           recordedProperties.2⟩
+  -- Binary operator expression, including overloaded dispatch.
   case case13 =>
     intros context expression expected initial fuel id allocated allocationEq
       left operator right expressionEq leftInduction rightInduction
@@ -6549,6 +7057,7 @@ private theorem inferFuel_inferenceProperties_internal :
                                       (fittedProperties.1.trans
                                         recordedProperties.1)),
                                   recordedProperties.2⟩
+  -- Conditional expression.
   case case14 =>
     intros context expression expected initial fuel id allocated allocationEq
       condition question thenBranch colon elseBranch expressionEq
@@ -7768,6 +8277,7 @@ private theorem inferFuel_inferenceProperties_internal :
                       fittedReady
                       (partsBelow.2.weaken fitProgress.next_le)
                       success
+  -- Direct, indirect, builtin, and constructor application.
   case case16 =>
     intros context expression expected initial fuel id allocated allocationEq
       callee sourceArguments expressionEq constructorInduction
@@ -9221,6 +9731,839 @@ theorem inferStatementsFuel_inferenceProperties
       result.type.VariablesBelow result.state.inference.next := by
   exact inferStatementsFuel_inferenceProperties_internal fuel context
     statements expectedReturn state ready validated canonical returnBelow
+    result success
+
+set_option maxHeartbeats 1000000 in
+private theorem inferFuel_preserves_lexicalScope_internal :
+    (∀ fuel context expression expected state,
+      PreservesLexicalScope Prod.snd state
+        (inferExprFuel fuel context expression expected state)) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      PreservesLexicalScope Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state)) ∧
+    (∀ fuel context sources expected state,
+      PreservesLexicalScope Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state)) ∧
+    (∀ (_fuel : Nat) (_context : Context)
+      (_statements : List Syntax.Statement) (_expectedReturn : Ty)
+      (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_statement : Syntax.Statement)
+      (_expectedReturn : Ty) (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context)
+      (_items : List Syntax.ForItem) (_state : State), True) ∧
+    (∀ (_fuel : Nat) (_context : Context) (_item : Syntax.ForItem)
+      (_state : State), True) ∧
+    (∀ fuel context target state,
+      PreservesLexicalScope Prod.snd state
+        (inferPlaceFuel fuel context target state)) ∧
+    (∀ fuel context target operator value state,
+      PreservesLexicalScope (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state)) ∧
+    (∀ fuel context expressions state,
+      PreservesLexicalScope Prod.snd state
+        (inferExprsFuel fuel context expressions state)) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      RestoresOuterScope MatchCasesResult.state outerScope state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn
+          outerScope cases state)) := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := fun fuel context expression expected state =>
+      PreservesLexicalScope Prod.snd state
+        (inferExprFuel fuel context expression expected state))
+    (motive2 := fun fuel context source id instantiation arguments expected
+        state =>
+      PreservesLexicalScope Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state))
+    (motive3 := fun fuel context sources expected state =>
+      PreservesLexicalScope Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state))
+    (motive4 := fun _ _ _ _ _ => True)
+    (motive5 := fun _ _ _ _ _ => True)
+    (motive6 := fun _ _ _ _ => True)
+    (motive7 := fun _ _ _ _ => True)
+    (motive8 := fun fuel context target state =>
+      PreservesLexicalScope Prod.snd state
+        (inferPlaceFuel fuel context target state))
+    (motive9 := fun fuel context target operator value state =>
+      PreservesLexicalScope (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state))
+    (motive10 := fun fuel context expressions state =>
+      PreservesLexicalScope Prod.snd state
+        (inferExprsFuel fuel context expressions state))
+    (motive11 := fun fuel context scrutineeType expectedReturn outerScope
+        cases state =>
+      RestoresOuterScope MatchCasesResult.state outerScope state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn
+          outerScope cases state))
+  case case10 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      inner expressionEq innerInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases innerResult : inferExprFuel fuel context inner expected allocated with
+    | error error => simp [innerResult, bind, Except.bind] at success
+    | ok inferred =>
+        simp only [innerResult, bind, Except.bind] at success
+        have innerScope := innerInduction inferred innerResult
+        have allocationScope :=
+          allocateExpressionId_success_lexicalScope allocationEq
+        have recordedScope :=
+          recordExpressionWithExpected_lexicalScope success
+        exact recordedScope.trans (innerScope.trans allocationScope)
+  case case11 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      elements expressionEq elementsInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases elementsResult :
+        inferExprsFuel fuel context elements.elements allocated with
+    | error error => simp [elementsResult, bind, Except.bind] at success
+    | ok inferred =>
+        simp only [elementsResult, bind, Except.bind] at success
+        have elementsScope := elementsInduction inferred elementsResult
+        have allocationScope :=
+          allocateExpressionId_success_lexicalScope allocationEq
+        have recordedScope :=
+          recordExpressionWithExpected_lexicalScope success
+        exact recordedScope.trans (elementsScope.trans allocationScope)
+  case case12 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      operator operand expressionEq operandInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases operandResult : inferExprFuel fuel context operand none allocated with
+    | error error =>
+        simp [operandResult, bind, Except.bind] at success
+    | ok inferredOperand =>
+        have operandScope := operandInduction inferredOperand operandResult
+        have allocationScope :=
+          allocateExpressionId_success_lexicalScope allocationEq
+        have throughOperand := operandScope.trans allocationScope
+        simp only [operandResult, bind, Except.bind] at success
+        repeat' first | split at success
+        all_goals try cases success
+        all_goals try have operatorScope :=
+          inferUnaryOperator_lexicalScope (by assumption)
+        all_goals try have selectionScope :=
+          selectFunctionCandidateFrom_lexicalScope (by assumption)
+        all_goals try have recordedScope :=
+          recordExpressionWithExpected_lexicalScope (by assumption)
+        all_goals try
+          exact (recordSelectedCall_lexicalScope _ _ _ _ _).trans
+            (selectionScope.trans throughOperand)
+        all_goals simp_all [State.lexicalScope]
+        all_goals grind
+  case case13 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      left operator right expressionEq leftInduction rightInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases leftResult : inferExprFuel fuel context left none allocated with
+    | error error =>
+        simp [leftResult, bind, Except.bind] at success
+    | ok leftPair =>
+        rcases leftPair with ⟨inferredLeft, leftState⟩
+        simp only [leftResult, bind, Except.bind, Prod.eta] at success
+        have leftScope := leftInduction
+          (inferredLeft, leftState) leftResult
+        cases rightResult : inferExprFuel fuel context right none leftState with
+        | error error =>
+            simp [rightResult, bind, Except.bind] at success
+        | ok rightPair =>
+            rcases rightPair with ⟨inferredRight, rightState⟩
+            simp only [rightResult, bind, Except.bind, Prod.eta] at success
+            have rightScope := rightInduction leftState
+              (inferredRight, rightState) rightResult
+            have allocationScope :=
+              allocateExpressionId_success_lexicalScope allocationEq
+            have throughArguments :=
+              rightScope.trans (leftScope.trans allocationScope)
+            let integerLiterals := relevantIntegerLiterals rightState
+              allocated.integerLiterals.length [inferredLeft, inferredRight]
+            have finishInferred (inferred : OperatorInferenceResult)
+                (inferenceSuccess : inferBinaryOperator context operator.value
+                  inferredLeft.type inferredRight.type expected integerLiterals
+                    rightState = .ok inferred)
+                (recordSuccess : recordExpressionWithExpected context
+                  expression id inferred.type
+                  (.binary inferredLeft.id operator.value inferredRight.id)
+                  inferred.requirements expected inferred.state = .ok result) :
+                result.2.lexicalScope = initial.lexicalScope := by
+              exact (recordExpressionWithExpected_lexicalScope recordSuccess).trans
+                ((inferBinaryOperator_lexicalScope inferenceSuccess).trans
+                  throughArguments)
+            cases dispatchEq : binaryOperatorDispatch operator.value with
+            | traitMethod traitName methodName =>
+                simp only [integerLiterals, dispatchEq] at success
+                cases inferredResult : inferBinaryOperator context
+                    operator.value inferredLeft.type inferredRight.type expected
+                    integerLiterals rightState with
+                | error error =>
+                    simp [integerLiterals, inferredResult, bind, Except.bind]
+                      at success
+                | ok inferred =>
+                    simp only [integerLiterals, inferredResult, bind,
+                      Except.bind] at success
+                    exact finishInferred inferred inferredResult success
+            | function name =>
+                simp only [integerLiterals, dispatchEq] at success
+                cases functionsResult : functionsNamed context name with
+                | error error =>
+                    simp [functionsResult, bind, Except.bind] at success
+                | ok candidates =>
+                    simp only [functionsResult, bind, Except.bind] at success
+                    cases candidates with
+                    | nil =>
+                        cases inferredResult : inferBinaryOperator context
+                            operator.value inferredLeft.type inferredRight.type
+                            expected integerLiterals rightState with
+                        | error error =>
+                            simp [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                        | ok inferred =>
+                            simp only [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                            exact finishInferred inferred inferredResult success
+                    | cons candidate rest =>
+                        cases selectionResult : selectFunctionCandidateFrom
+                            context name (candidate :: rest)
+                            [inferredLeft, inferredRight] integerLiterals id
+                            (some .bool) rightState with
+                        | error error =>
+                            simp [integerLiterals, selectionResult, bind,
+                              Except.bind] at success
+                        | ok attempt =>
+                            simp only [integerLiterals, selectionResult, bind,
+                              Except.bind] at success
+                            have selectedScope :=
+                              selectFunctionCandidateFrom_lexicalScope
+                                selectionResult
+                            cases fittedResult : withExpected context
+                                attempt.state attempt.result expected with
+                            | error error =>
+                                simp [fittedResult, bind, Except.bind]
+                                  at success
+                            | ok fitted =>
+                                simp only [fittedResult, bind, Except.bind,
+                                  pure, Pure.pure, Except.pure] at success
+                                have fittedScope :=
+                                  withExpected_lexicalScope fittedResult
+                                injection success with resultEq
+                                subst result
+                                exact
+                                  recordSelectedCallResult_lexicalScope
+                                      expression
+                                      { span := operator.span
+                                        value := .identifier {
+                                          span := operator.span
+                                          value := name
+                                        } }
+                                      name [inferredLeft, inferredRight] attempt
+                                      fitted.expression fitted.coercions
+                                      fitted.state
+                                    |>.trans (fittedScope.trans
+                                      (selectedScope.trans throughArguments))
+  case case14 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      condition question thenBranch colon elseBranch expressionEq
+      conditionInduction thenInduction elseInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases conditionResult : inferExprFuel fuel context condition
+        (some .bool) allocated with
+    | error error =>
+        simp [conditionResult, bind, Except.bind] at success
+    | ok conditionPair =>
+        rcases conditionPair with ⟨inferredCondition, conditionState⟩
+        simp only [conditionResult, bind, Except.bind, Prod.eta] at success
+        have conditionScope := conditionInduction
+          (inferredCondition, conditionState) conditionResult
+        cases thenResult : inferExprFuel fuel context thenBranch expected
+            conditionState with
+        | error error =>
+            simp [thenResult, bind, Except.bind] at success
+        | ok thenPair =>
+            rcases thenPair with ⟨inferredThen, thenState⟩
+            simp only [thenResult, bind, Except.bind, Prod.eta] at success
+            have thenScope := thenInduction conditionState
+              (inferredThen, thenState) thenResult
+            cases elseResult : inferExprFuel fuel context elseBranch expected
+                thenState with
+            | error error =>
+                simp [elseResult, bind, Except.bind] at success
+            | ok elsePair =>
+                rcases elsePair with ⟨inferredElse, elseState⟩
+                simp only [elseResult, bind, Except.bind, Prod.eta] at success
+                have elseScope := elseInduction thenState
+                  (inferredElse, elseState) elseResult
+                cases unifyResult : unify elseState inferredThen.type
+                    inferredElse.type with
+                | error error =>
+                    simp [unifyResult, bind, Except.bind] at success
+                | ok unifiedState =>
+                    simp only [unifyResult, bind, Except.bind] at success
+                    have unifiedScope :=
+                      unify_preserves_lexicalScope unifyResult
+                    have recordedScope :=
+                      recordExpressionWithExpected_lexicalScope success
+                    have allocationScope :=
+                      allocateExpressionId_success_lexicalScope allocationEq
+                    exact recordedScope.trans (unifiedScope.trans
+                      (elseScope.trans (thenScope.trans
+                        (conditionScope.trans allocationScope))))
+  case case16 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      callee sourceArguments expressionEq constructorInduction
+      argumentsInduction calleeInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    have allocationScope :=
+      allocateExpressionId_success_lexicalScope allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases candidatesResult :
+        constructorCalleeCandidates context allocated callee with
+    | error error =>
+        simp [candidatesResult, bind, Except.bind] at success
+    | ok candidates =>
+        simp only [candidatesResult, bind, Except.bind] at success
+        cases candidates with
+        | cons candidate rest =>
+            cases rest with
+            | cons second tail =>
+                simp at success
+            | nil =>
+                rcases candidate with ⟨dataType, constructor⟩
+                let freshResult :=
+                  freshDataConstructorInstantiation dataType constructor
+                    allocated
+                have constructorScope := constructorInduction
+                  freshResult.1 freshResult.2 result
+                  (by simpa only [freshResult] using success)
+                exact constructorScope.trans
+                  ((freshDataConstructorInstantiation_preserves_lexicalScope
+                    dataType constructor allocated).trans allocationScope)
+        | nil =>
+            simp only [bind, Except.bind] at success
+            split at success
+            · cases success
+            · next _ missing _ =>
+              cases missing with
+              | some missing =>
+                  rcases missing with ⟨qualifiers, name⟩
+                  simp at success
+              | none =>
+                cases argumentsResult : inferExprsFuel fuel context
+                    sourceArguments.elements allocated with
+                | error error =>
+                    simp [argumentsResult, bind, Except.bind] at success
+                | ok argumentsPair =>
+                    rcases argumentsPair with ⟨arguments, argumentState⟩
+                    simp only [argumentsResult, bind, Except.bind,
+                      Prod.eta] at success
+                    have argumentsScope := argumentsInduction
+                      (arguments, argumentState) argumentsResult
+                    have throughArguments :=
+                      argumentsScope.trans allocationScope
+                    have finishSelected
+                        (name : String)
+                        (candidates : List ProgramFunctionSignature)
+                        (attempt : CandidateAttemptResult)
+                        (selectionSuccess :
+                          selectFunctionCandidateFrom context name candidates
+                            arguments
+                            (relevantIntegerLiterals argumentState
+                              allocated.integerLiterals.length arguments)
+                            id expected argumentState = .ok attempt)
+                        (resultEq :
+                          recordSelectedCall expression callee name arguments
+                            attempt = result) :
+                        result.2.lexicalScope = initial.lexicalScope := by
+                      have selectedScope :=
+                        selectFunctionCandidateFrom_lexicalScope
+                          selectionSuccess
+                      rw [← resultEq]
+                      exact (recordSelectedCall_lexicalScope
+                        expression callee name arguments attempt).trans
+                          (selectedScope.trans throughArguments)
+                    have finishIndirect
+                        (calleeResult : InferredExpression)
+                        (calleeState : State)
+                        (calleeSuccess :
+                          inferExprFuel fuel context callee none argumentState =
+                            .ok (calleeResult, calleeState))
+                        (application : IndirectApplicationResult)
+                        (applicationSuccess :
+                          applyFunctionType context id calleeResult.type
+                            arguments expected calleeState = .ok application)
+                        (resultEq :
+                          recordIndirectCall expression calleeResult arguments
+                            application = result) :
+                        result.2.lexicalScope = initial.lexicalScope := by
+                      have calleeScope := calleeInduction argumentState
+                        (calleeResult, calleeState) calleeSuccess
+                      have applicationScope :=
+                        applyFunctionType_lexicalScope applicationSuccess
+                      rw [← resultEq]
+                      exact (recordIndirectCall_lexicalScope expression
+                        calleeResult arguments application).trans
+                          (applicationScope.trans
+                            (calleeScope.trans throughArguments))
+                    cases qualifiedEq : calleeQualifiedIdentifier? callee with
+                    | some qualified =>
+                        rcases qualified with ⟨namespacePath, name⟩
+                        simp only [qualifiedEq] at success
+                        cases binderEq :
+                            argumentState.lookupBinder? namespacePath.head! with
+                        | some binder =>
+                            simp only [binderEq] at success
+                            cases calleeResult : inferExprFuel fuel context callee
+                                none argumentState with
+                            | error error =>
+                                simp [calleeResult, bind, Except.bind] at success
+                            | ok calleePair =>
+                                rcases calleePair with
+                                  ⟨inferredCallee, calleeState⟩
+                                simp only [calleeResult, bind, Except.bind,
+                                  Prod.eta] at success
+                                cases applicationResult : applyFunctionType
+                                    context id inferredCallee.type arguments
+                                    expected calleeState with
+                                | error error =>
+                                    simp [applicationResult, bind, Except.bind]
+                                      at success
+                                | ok application =>
+                                    simp only [applicationResult, bind,
+                                      Except.bind, pure, Pure.pure,
+                                      Except.pure] at success
+                                    injection success with resultEq
+                                    exact finishIndirect inferredCallee
+                                      calleeState calleeResult application
+                                      applicationResult resultEq
+                        | none =>
+                            simp only [binderEq] at success
+                            cases functionsResult : qualifiedFunctionsNamed
+                                context namespacePath name with
+                            | error error =>
+                                simp [functionsResult, bind, Except.bind]
+                                  at success
+                            | ok candidatesOption =>
+                                simp only [functionsResult, bind, Except.bind]
+                                  at success
+                                cases candidatesOption with
+                                | some candidates =>
+                                    cases selectionResult :
+                                        selectFunctionCandidateFrom context
+                                          (String.intercalate "."
+                                            (namespacePath ++ [name]))
+                                          candidates arguments
+                                          (relevantIntegerLiterals
+                                            argumentState
+                                            allocated.integerLiterals.length
+                                            arguments)
+                                          id expected argumentState with
+                                    | error error =>
+                                        simp [selectionResult, bind,
+                                          Except.bind] at success
+                                    | ok attempt =>
+                                        simp only [selectionResult, bind,
+                                          Except.bind, pure, Pure.pure,
+                                          Except.pure] at success
+                                        injection success with resultEq
+                                        exact finishSelected
+                                          (String.intercalate "."
+                                            (namespacePath ++ [name]))
+                                          candidates attempt selectionResult
+                                          resultEq
+                                | none =>
+                                    cases calleeResult : inferExprFuel fuel
+                                        context callee none argumentState with
+                                    | error error =>
+                                        simp [calleeResult, bind, Except.bind]
+                                          at success
+                                    | ok calleePair =>
+                                        rcases calleePair with
+                                          ⟨inferredCallee, calleeState⟩
+                                        simp only [calleeResult, bind,
+                                          Except.bind, Prod.eta] at success
+                                        cases applicationResult :
+                                            applyFunctionType context id
+                                              inferredCallee.type arguments
+                                              expected calleeState with
+                                        | error error =>
+                                            simp [applicationResult, bind,
+                                              Except.bind] at success
+                                        | ok application =>
+                                            simp only [applicationResult, bind,
+                                              Except.bind, pure, Pure.pure,
+                                              Except.pure] at success
+                                            injection success with resultEq
+                                            exact finishIndirect inferredCallee
+                                              calleeState calleeResult
+                                              application applicationResult
+                                              resultEq
+                    | none =>
+                        simp only [qualifiedEq] at success
+                        cases identifierEq : calleeIdentifier? callee with
+                        | none =>
+                            simp only [identifierEq] at success
+                            cases calleeResult : inferExprFuel fuel context callee
+                                none argumentState with
+                            | error error =>
+                                simp [calleeResult, bind, Except.bind] at success
+                            | ok calleePair =>
+                                rcases calleePair with
+                                  ⟨inferredCallee, calleeState⟩
+                                simp only [calleeResult, bind, Except.bind,
+                                  Prod.eta] at success
+                                cases applicationResult : applyFunctionType
+                                    context id inferredCallee.type arguments
+                                    expected calleeState with
+                                | error error =>
+                                    simp [applicationResult, bind, Except.bind]
+                                      at success
+                                | ok application =>
+                                    simp only [applicationResult, bind,
+                                      Except.bind, pure, Pure.pure,
+                                      Except.pure] at success
+                                    injection success with resultEq
+                                    exact finishIndirect inferredCallee
+                                      calleeState calleeResult application
+                                      applicationResult resultEq
+                        | some name =>
+                            simp only [identifierEq] at success
+                            cases binderEq : argumentState.lookupBinder? name with
+                            | some binder =>
+                                simp only [binderEq] at success
+                                cases calleeResult : inferExprFuel fuel context
+                                    callee none argumentState with
+                                | error error =>
+                                    simp [calleeResult, bind, Except.bind]
+                                      at success
+                                | ok calleePair =>
+                                    rcases calleePair with
+                                      ⟨inferredCallee, calleeState⟩
+                                    simp only [calleeResult, bind, Except.bind,
+                                      Prod.eta] at success
+                                    cases applicationResult : applyFunctionType
+                                        context id inferredCallee.type arguments
+                                        expected calleeState with
+                                    | error error =>
+                                        simp [applicationResult, bind,
+                                          Except.bind] at success
+                                    | ok application =>
+                                        simp only [applicationResult, bind,
+                                          Except.bind, pure, Pure.pure,
+                                          Except.pure] at success
+                                        injection success with resultEq
+                                        exact finishIndirect inferredCallee
+                                          calleeState calleeResult application
+                                          applicationResult resultEq
+                            | none =>
+                                simp only [binderEq] at success
+                                cases functionsResult : functionsNamed context
+                                    name with
+                                | error error =>
+                                    simp [functionsResult, bind, Except.bind]
+                                      at success
+                                | ok candidates =>
+                                    simp only [functionsResult, bind,
+                                      Except.bind] at success
+                                    cases candidates with
+                                    | nil =>
+                                        cases builtinEq :
+                                            builtinFunctionNamed? name with
+                                        | none =>
+                                            simp [builtinEq] at success
+                                        | some function =>
+                                            simp only [builtinEq] at success
+                                            exact
+                                              (recordBuiltinFunctionCall_lexicalScope
+                                                success).trans throughArguments
+                                    | cons candidate rest =>
+                                        cases selectionResult :
+                                            selectFunctionCandidateFrom context
+                                              name (candidate :: rest) arguments
+                                              (relevantIntegerLiterals
+                                                argumentState
+                                                allocated.integerLiterals.length
+                                                arguments)
+                                              id expected argumentState with
+                                        | error error =>
+                                            simp [selectionResult, bind,
+                                              Except.bind] at success
+                                        | ok attempt =>
+                                            simp only [selectionResult, bind,
+                                              Except.bind, pure, Pure.pure,
+                                              Except.pure] at success
+                                            injection success with resultEq
+                                            exact finishSelected name
+                                              (candidate :: rest) attempt
+                                              selectionResult resultEq
+  -- Mapping index expression.
+  case case19 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      base brackets index expressionEq baseInduction indexInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    have allocationScope :=
+      allocateExpressionId_success_lexicalScope allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases baseResult : inferExprFuel fuel context base none allocated with
+    | error error =>
+        simp [baseResult, bind, Except.bind] at success
+    | ok basePair =>
+        rcases basePair with ⟨inferredBase, baseState⟩
+        simp only [baseResult, bind, Except.bind, Prod.eta] at success
+        have baseScope := baseInduction
+          (inferredBase, baseState) baseResult
+        let keyAllocation := baseState.fresh
+        let valueAllocation := keyAllocation.2.fresh
+        have keyScope :
+            keyAllocation.2.lexicalScope = baseState.lexicalScope := by
+          rfl
+        have valueScope :
+            valueAllocation.2.lexicalScope = keyAllocation.2.lexicalScope := by
+          rfl
+        cases unifyResult : unify valueAllocation.2 inferredBase.type
+            (.mapping keyAllocation.1 valueAllocation.1) with
+        | error error =>
+            simp [keyAllocation, valueAllocation, unifyResult, bind,
+              Except.bind] at success
+        | ok unifiedState =>
+            simp only [keyAllocation, valueAllocation, unifyResult, bind,
+              Except.bind] at success
+            have unifiedScope :=
+              unify_preserves_lexicalScope unifyResult
+            cases indexResult : inferExprFuel fuel context index
+                (some (unifiedState.resolve baseState.fresh.1))
+                unifiedState with
+            | error error =>
+                simp [indexResult, bind, Except.bind] at success
+            | ok indexPair =>
+                rcases indexPair with ⟨inferredIndex, indexState⟩
+                simp only [indexResult, bind, Except.bind, Prod.eta]
+                  at success
+                have indexScope := indexInduction baseState.fresh.1
+                  unifiedState (inferredIndex, indexState) indexResult
+                have recordedScope :=
+                  recordExpressionWithExpected_lexicalScope success
+                exact recordedScope.trans (indexScope.trans
+                  (unifiedScope.trans (valueScope.trans (keyScope.trans
+                    (baseScope.trans allocationScope)))))
+  -- Field selection or qualified constructor reference.
+  case case20 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      base dot name expressionEq constructorInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    have allocationScope :=
+      allocateExpressionId_success_lexicalScope allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases candidatesResult :
+        constructorCalleeCandidates context allocated expression with
+    | error error =>
+        simp [candidatesResult, bind, Except.bind] at success
+    | ok candidates =>
+        simp only [candidatesResult, bind, Except.bind] at success
+        cases candidates with
+        | nil =>
+            simp_all [bind, Except.bind]
+            repeat' first | split at success
+            all_goals contradiction
+        | cons candidate rest =>
+            cases rest with
+            | cons second tail => simp at success
+            | nil =>
+                rcases candidate with ⟨dataType, constructor⟩
+                let freshResult :=
+                  freshDataConstructorInstantiation dataType constructor
+                    allocated
+                have constructorScope := constructorInduction
+                  freshResult.1 freshResult.2 result
+                  (by simpa only [freshResult] using success)
+                exact constructorScope.trans
+                  ((freshDataConstructorInstantiation_preserves_lexicalScope
+                    dataType constructor allocated).trans allocationScope)
+  -- Assignment-value inference threads place and value inference.
+  case case70 =>
+    intros fuel context target operator value initial placeInduction
+      valueInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    unfold inferAssignedValueFuel at success
+    cases placeResult : inferPlaceFuel fuel context target initial with
+    | error error =>
+        simp [placeResult, bind, Except.bind] at success
+    | ok placePair =>
+      rcases placePair with ⟨place, placeState⟩
+      simp only [placeResult, bind, Except.bind, Prod.eta] at success
+      have placeScope := placeInduction (place, placeState) placeResult
+      have finishValue (fittedState : State)
+          (fittedScope : fittedState.lexicalScope = placeState.lexicalScope)
+          (expected : Ty)
+          (valueProperties : PreservesLexicalScope Prod.snd fittedState
+            (inferExprFuel fuel context value (some expected) fittedState))
+          (tailSuccess :
+            (do
+              let (inferredValue, finalState) ← inferExprFuel fuel context
+                value (some expected) fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue,
+                finalState)) = .ok result) :
+          result.2.2.lexicalScope = initial.lexicalScope := by
+        cases valueResult : inferExprFuel fuel context value (some expected)
+            fittedState with
+        | error error =>
+            simp [valueResult, bind, Except.bind] at tailSuccess
+        | ok valuePair =>
+          rcases valuePair with ⟨inferredValue, finalState⟩
+          simp only [valueResult, bind, Except.bind, Prod.eta, pure,
+            Pure.pure, Except.pure] at tailSuccess
+          injection tailSuccess with resultEq
+          rw [← resultEq]
+          exact (valueProperties (inferredValue, finalState) valueResult).trans
+            (fittedScope.trans placeScope)
+      have finishNonEqual
+          (valueProperties : ∀ fittedState : State,
+            PreservesLexicalScope Prod.snd fittedState
+              (inferExprFuel fuel context value (some .word) fittedState))
+          (tailSuccess :
+            (do
+              let fittedState ← unify placeState place.type .word
+              let (inferredValue, finalState) ← inferExprFuel fuel context
+                value (some .word) fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue,
+                finalState)) = .ok result) :
+          result.2.2.lexicalScope = initial.lexicalScope := by
+        cases unifyResult : unify placeState place.type .word with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+          simp only [unifyResult, bind, Except.bind] at tailSuccess
+          exact finishValue fittedState
+            (unify_preserves_lexicalScope unifyResult) .word
+            (valueProperties fittedState) tailSuccess
+      cases operator with
+      | equal =>
+          simp only [pure, Pure.pure, Except.pure] at success
+          exact finishValue placeState rfl (placeState.resolve place.type)
+            (valueInduction place placeState) success
+      | add => exact finishNonEqual (valueInduction place) success
+      | subtract => exact finishNonEqual (valueInduction place) success
+      | multiply => exact finishNonEqual (valueInduction place) success
+      | divide => exact finishNonEqual (valueInduction place) success
+      | modulo => exact finishNonEqual (valueInduction place) success
+      | bitAnd => exact finishNonEqual (valueInduction place) success
+      | bitXor => exact finishNonEqual (valueInduction place) success
+      | bitOr => exact finishNonEqual (valueInduction place) success
+  -- A grouped place delegates directly to its inner place.
+  case case67 =>
+    intros
+    simp_all only [PreservesLexicalScope, inferPlaceFuel]
+    exact fun _ _ => True.intro
+  -- The remaining structurally uniform branches are discharged by threading
+  -- their recursive scope equalities through state-only helper operations.
+  all_goals
+    intros
+  all_goals try trivial
+  all_goals
+    simp only [PreservesLexicalScope, RestoresOuterScope] at *
+    intro result success
+    first
+      | unfold inferExprFuel at success
+      | unfold inferConstructorApplicationFuel at success
+      | unfold inferConstructorArgumentsFuel at success
+      | unfold inferStatementsFuel at success
+      | unfold inferStatementFuel at success
+      | unfold inferForItemsFuel at success
+      | unfold inferForItemFuel at success
+      | unfold inferPlaceFuel at success
+      | unfold inferAssignedValueFuel at success
+      | unfold inferExprsFuel at success
+      | unfold inferMatchCasesFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals first
+      | have ih1Applied := ih1 _ _ _ _ (by assumption); clear ih1
+      | have ih1Applied := ih1 _ _ _ (by assumption); clear ih1
+      | have ih1Applied := ih1 _ _ (by assumption); clear ih1
+      | have ih1Applied := ih1 _ (by assumption); clear ih1
+      | have ih1Applied := ih1 _ _ (by simp); clear ih1
+      | skip
+    all_goals first
+      | have ih2Applied := ih2 _ _ _ _ (by assumption); clear ih2
+      | have ih2Applied := ih2 _ _ _ (by assumption); clear ih2
+      | have ih2Applied := ih2 _ _ (by assumption); clear ih2
+      | have ih2Applied := ih2 _ (by assumption); clear ih2
+      | have ih2Applied := ih2 _ _ (by simp); clear ih2
+      | skip
+    all_goals first
+      | have ih3Applied := ih3 _ _ _ _ (by assumption); clear ih3
+      | have ih3Applied := ih3 _ _ _ (by assumption); clear ih3
+      | have ih3Applied := ih3 _ _ (by assumption); clear ih3
+      | have ih3Applied := ih3 _ (by assumption); clear ih3
+      | have ih3Applied := ih3 _ _ (by simp); clear ih3
+      | skip
+    all_goals try have allocationScope :=
+      allocateExpressionId_success_lexicalScope (by assumption)
+    all_goals try have statementAllocationScope :=
+      allocateStatementId_success_lexicalScope (by assumption)
+    all_goals try have requirementsScope :=
+      addRequirementsWithIds_success_lexicalScope (by assumption)
+    all_goals try have unifiedScope :=
+      unify_preserves_lexicalScope (by assumption)
+    all_goals try have recordedProperties :=
+      recordExpressionWithExpected_lexicalScope (by assumption)
+    all_goals try simp_all [State.lexicalScope, State.fresh,
+      State.withLocals, State.allocateBinder, State.allocateHiddenLocal,
+      State.restoreLexicalScope, State.recordNode, State.addRequirementWithId,
+      State.addRequirementsWithIds, bind, Except.bind]
+    all_goals try simp_all [recordExpression]
+    all_goals grind
+
+private theorem inferExprFuel_preserves_lexicalScope
+    (fuel : Nat) (context : Context) (expression : Syntax.Expr)
+    (expected : Option Ty) (state : State) :
+    PreservesLexicalScope Prod.snd state
+      (inferExprFuel fuel context expression expected state) :=
+  inferFuel_preserves_lexicalScope_internal.1 fuel context expression expected
+    state
+
+/-- Successful expression inference restores every transient lexical scope
+introduced while checking lambdas, match arms, and loop bodies. -/
+theorem inferExprFuel_success_lexicalScope_eq
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    result.2.lexicalScope = state.lexicalScope :=
+  inferExprFuel_preserves_lexicalScope fuel context expression expected state
     result success
 
 set_option maxHeartbeats 500000 in
