@@ -1327,6 +1327,113 @@ theorem SchemeWellFormed.transportContext
       parameters_eq declaration_eq wellFormed.body
 }
 
+/-- Qualified local-scheme formation is insensitive to lexical and assumption
+fields when the type scopes and solved-requirement ledger agree. -/
+theorem LocalSchemeRequirementWellFormed.transportContext
+    {source target : Context} {binder : TypedBinder}
+    {requirement : LocalSchemeRequirement}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (variables_eq : target.typeVariables = source.typeVariables)
+    (residualVariables_eq :
+      target.residualTypeVariables = source.residualTypeVariables)
+    (solvedRequirements_eq :
+      target.solvedRequirements = source.solvedRequirements)
+    (wellFormed :
+      LocalSchemeRequirementWellFormed source binder requirement) :
+    LocalSchemeRequirementWellFormed target binder requirement := by
+  refine {
+    predicate := {
+      subject := ?_
+      arguments := ?_
+      trait := ?_
+    }
+    depends_on_quantified := wellFormed.depends_on_quantified
+    template := ?_
+  }
+  · exact StructuralSubstitution.TypeAdmissible.transportContext
+      (source := localSchemeInitializerContext source binder)
+      (target := localSchemeInitializerContext target binder)
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using signatures_eq)
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using parameters_eq)
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using declaration_eq)
+      (by simp [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions, variables_eq])
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using residualVariables_eq)
+      wellFormed.predicate.subject
+  · intro argument member
+    exact StructuralSubstitution.TypeAdmissible.transportContext
+      (source := localSchemeInitializerContext source binder)
+      (target := localSchemeInitializerContext target binder)
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using signatures_eq)
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using parameters_eq)
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using declaration_eq)
+      (by simp [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions, variables_eq])
+      (by simpa [localSchemeInitializerContext, Context.withTypeVariables,
+          Context.withAssumptions] using residualVariables_eq)
+      (wellFormed.predicate.arguments argument member)
+  · simpa [localSchemeInitializerContext, Context.withTypeVariables,
+      Context.withAssumptions, signatures_eq] using wellFormed.predicate.trait
+  · simpa [solvedRequirements_eq] using wellFormed.template
+
+/-- Pointwise qualified local-scheme formation transports with the same
+context fields as one requirement. -/
+theorem LocalSchemeRequirementsWellFormed.transportContext
+    {source target : Context} {binder : TypedBinder}
+    (signatures_eq : target.signatures = source.signatures)
+    (parameters_eq : target.typeParameters = source.typeParameters)
+    (declaration_eq : target.currentDeclaration = source.currentDeclaration)
+    (variables_eq : target.typeVariables = source.typeVariables)
+    (residualVariables_eq :
+      target.residualTypeVariables = source.residualTypeVariables)
+    (solvedRequirements_eq :
+      target.solvedRequirements = source.solvedRequirements)
+    (wellFormed : LocalSchemeRequirementsWellFormed source binder) :
+    LocalSchemeRequirementsWellFormed target binder := {
+  ids_unique := wellFormed.ids_unique
+  entries := fun requirement member =>
+    StructuralSubstitution.LocalSchemeRequirementWellFormed.transportContext
+      signatures_eq parameters_eq declaration_eq variables_eq
+      residualVariables_eq solvedRequirements_eq
+      (wellFormed.entries requirement member)
+}
+
+/-- Extending only the retained lexical scope preserves one qualified
+local-scheme requirement's formation. -/
+theorem LocalSchemeRequirementWellFormed.afterBinderExtends
+    {owner : Resolved.DeclarationId} {source target : Context}
+    {added binder : TypedBinder} {requirement : LocalSchemeRequirement}
+    (wellFormed :
+      LocalSchemeRequirementWellFormed source binder requirement)
+    (extension : BinderExtends owner source added target) :
+    LocalSchemeRequirementWellFormed target binder requirement := by
+  have fields := extension.context_fields
+  exact StructuralSubstitution.LocalSchemeRequirementWellFormed.transportContext
+    fields.1 fields.2.2.1 fields.2.1 extension.typeVariables_eq
+    extension.residualTypeVariables_eq fields.2.2.2.2 wellFormed
+
+/-- Extending only the retained lexical scope preserves complete qualified
+local-scheme formation. -/
+theorem LocalSchemeRequirementsWellFormed.afterBinderExtends
+    {owner : Resolved.DeclarationId} {source target : Context}
+    {added binder : TypedBinder}
+    (wellFormed : LocalSchemeRequirementsWellFormed source binder)
+    (extension : BinderExtends owner source added target) :
+    LocalSchemeRequirementsWellFormed target binder := by
+  have fields := extension.context_fields
+  exact StructuralSubstitution.LocalSchemeRequirementsWellFormed.transportContext
+    fields.1 fields.2.2.1 fields.2.1 extension.typeVariables_eq
+    extension.residualTypeVariables_eq fields.2.2.2.2 wellFormed
+
 /-- Exact substitution of every rigid binder transports a generic well-scoped
 type to any target context whose catalog agrees with the source and in which
 every replacement is well formed.  The target may bind a different
