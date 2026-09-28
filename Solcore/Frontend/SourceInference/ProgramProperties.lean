@@ -1982,6 +1982,68 @@ private theorem functionParameterBinders_applySubstitution_eq_self
           (fun index parameter => schemes (index + 1) parameter)
           (fun index parameter => requirements (index + 1) parameter)
 
+/-- Successful checking of a cataloged function exposes the body-inference
+stage together with the semantic state invariants needed by downstream
+soundness proofs.  This deliberately projects only the declaration and body
+from the larger execution witness, before return unification and finalization.
+-/
+theorem checkFunctionBody_success_body_inferenceProperties
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (validated : ProgramSignatureFormationValidated signatures)
+    (member : signature ∈ signatures.functions)
+    (canonical : ∀ candidate ∈ signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes))
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    ∃ declaration body,
+      environment.declaration? signature.id = some declaration ∧
+        Detail.inferStatementsFuel fuel
+            {
+              environment
+              signatures
+              scope := .ofDeclaration declaration
+              typeParameters := signature.scheme.parameters
+              assumptions := signature.scheme.predicates
+            }
+            signature.source.value.body.value
+            (Ty.productMany signature.returnTypes)
+            (State.initial declaration.id
+              ((signature.parameterNames.zip signature.parameterTypes).map
+                fun parameter => (parameter.1, Scheme.mono parameter.2))
+              signature.parameterComptime) = .ok body ∧
+          (State.initial declaration.id
+              ((signature.parameterNames.zip signature.parameterTypes).map
+                fun parameter => (parameter.1, Scheme.mono parameter.2))
+              signature.parameterComptime).InferenceProgress body.state ∧
+            body.state.InferenceReady ∧
+              body.type.VariablesBelow body.state.inference.next := by
+  obtain ⟨declaration, body, _, _, declarationEq, bodyEq, _, _, _⟩ :=
+    checkFunctionBody_success_witness success
+  let locals : TypeSystem.Environment :=
+    (signature.parameterNames.zip signature.parameterTypes).map
+      fun parameter => (parameter.1, Scheme.mono parameter.2)
+  let initial := State.initial declaration.id locals signature.parameterComptime
+  have initialReady : initial.InferenceReady := by
+    simpa only [initial, locals] using
+      State.InferenceReady.initial declaration.id locals
+        signature.parameterComptime
+  have returnBelow : (Ty.productMany signature.returnTypes).VariablesBelow
+      initial.inference.next :=
+    Ty.variablesBelow_productMany
+      ((validated.functions signature member).2.1.variablesBelow
+        initial.inference.next)
+  have bodyProperties := Detail.inferStatementsFuel_inferenceProperties
+    initialReady validated canonical returnBelow (by
+      simpa only [initial, locals] using bodyEq)
+  refine ⟨declaration, body, declarationEq, bodyEq, ?_⟩
+  simpa only [initial, locals] using bodyProperties
+
 /-- Successful checking retains the callable type assembled by the signature
 builder. -/
 theorem checkFunctionBody_success_type
