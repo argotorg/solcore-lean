@@ -1038,6 +1038,17 @@ theorem coercionPlan?_some_profileConsistent
       rw [induction]
       rfl
 
+@[simp] private theorem addRequirementsWithIds_inference
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.inference =
+      state.inference := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate rest induction =>
+      simp only [State.addRequirementsWithIds]
+      rw [induction]
+      rfl
+
 /-- Allocating coercion requirement identities leaves type resolution
 unchanged. -/
 @[simp] theorem commitCoercionPlan_resolve
@@ -1196,6 +1207,98 @@ theorem withExpected_success_cases
                       injection success with resultEq
                       subst result
                       exact .inr ⟨expectedType, plan, rfl, planResult, rfl⟩
+
+/-- A successful concrete expected-type fit remains equal to that expectation
+under every substitution which semantically extends the returned inference
+substitution.  This direct inversion covers both ordinary unification and a
+committed coercion plan. -/
+private theorem withExpected_some_apply_eq
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Ty} {result : ExpectationResult} {outer : Substitution}
+    (success : withExpected context state actual (some expected) = .ok result)
+    (extension : outer.SemanticallyExtends
+      result.state.inference.substitution) :
+    outer.apply result.expression.type = outer.apply expected := by
+  cases unification : state.inference.unify actual.type expected with
+  | ok inference =>
+      simp only [withExpected, unification] at success
+      injection success with resultEq
+      subst result
+      exact extension expected
+  | error error =>
+      cases error with
+      | occursCheck metavariable type =>
+          simp [withExpected, unification] at success
+      | exhausted =>
+          simp [withExpected, unification] at success
+      | mismatch left right =>
+          simp only [withExpected, unification] at success
+          cases planResult : coercionPlan? context state
+              (state.resolve actual.type) (state.resolve expected) with
+          | error error =>
+              simp [planResult, bind, Except.bind] at success
+          | ok planOption =>
+              cases planOption with
+              | none =>
+                  simp [planResult, bind, Except.bind] at success
+              | some plan =>
+                  simp only [planResult, bind, Except.bind] at success
+                  change Except.ok _ = Except.ok result at success
+                  injection success with resultEq
+                  subst result
+                  change outer.apply (state.resolve expected) =
+                    outer.apply expected
+                  rw [← commitCoercionPlan_resolve state plan expected]
+                  exact extension expected
+
+/-- Expected-type fitting followed by node recording retains the same
+semantic equality; recording changes source metadata but not inference. -/
+private theorem recordExpressionWithExpected_some_apply_eq
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State} {outer : Substitution}
+    (success : recordExpressionWithExpected context source id type form
+      requirements (some expected) state localSchemeInstantiationStart =
+        .ok result)
+    (extension : outer.SemanticallyExtends
+      result.2.inference.substitution) :
+    outer.apply result.1.type = outer.apply expected := by
+  unfold recordExpressionWithExpected at success
+  cases fittedResult : withExpected context state { id, type }
+      (some expected) with
+  | error error =>
+      simp [fittedResult, bind, Except.bind] at success
+  | ok fitted =>
+      simp only [fittedResult, bind, Except.bind] at success
+      change Except.ok _ = Except.ok result at success
+      injection success with resultEq
+      subst result
+      apply withExpected_some_apply_eq fittedResult
+      simpa only [recordExpression, State.recordNode] using extension
+
+/-- Retaining an expected-type candidate does not weaken the semantic
+equality established by the underlying successful fit. -/
+private theorem candidateWithExpected_some_apply_eq
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Ty} {result : ExpectationResult} {outer : Substitution}
+    (success : candidateWithExpected context state actual (some expected) =
+      .ok (some result))
+    (extension : outer.SemanticallyExtends
+      result.state.inference.substitution) :
+    outer.apply result.expression.type = outer.apply expected := by
+  unfold candidateWithExpected at success
+  cases fittedResult : withExpected context state actual (some expected) with
+  | error error =>
+      cases error <;> simp [fittedResult] at success
+      all_goals cases ‹Unification.Error› <;> simp_all [fittedResult]
+  | ok fitted =>
+      simp only [fittedResult] at success
+      injection success with resultEq
+      have fittedEq : fitted = result := Option.some.inj resultEq
+      subst result
+      exact withExpected_some_apply_eq fittedResult extension
 
 /-- A successfully resolved source annotation contains no flexible
 metavariables, so it lies below every inference allocator bound. -/
@@ -3987,6 +4090,202 @@ theorem selectFunctionCandidateFrom_success_candidate
               (collectCandidateAttempts_success_provenance
                 candidates candidate member)
 
+/-- A successful candidate attempt checked against a concrete expectation
+retains that equality after its bookkeeping-only requirement allocations. -/
+private theorem tryFunctionCandidate_some_apply_eq
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    {outer : Substitution}
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call (some expected) state signature = .ok (some result))
+    (extension : outer.SemanticallyExtends
+      result.state.inference.substitution) :
+    outer.apply result.result.type = outer.apply expected := by
+  let instantiated := signature.scheme.instantiate state.inference.next
+  let advancedState : State := {
+    state with inference := {
+      state.inference with next := instantiated.next
+    }
+  }
+  unfold tryFunctionCandidate at success
+  dsimp only at success
+  cases partsResult : functionParts?
+      (signature.scheme.instantiate state.inference.next).body with
+  | none =>
+      rw [partsResult] at success
+      simp at success
+  | some parts =>
+      rcases parts with ⟨parameterType, resultType⟩
+      rw [partsResult] at success
+      cases parametersResult : parameterTypesForArity?
+          signature.parameterTypes.length parameterType with
+      | none => simp [parametersResult] at success
+      | some parameterTypes =>
+          simp only [parametersResult] at success
+          cases argumentsResult : fitArguments context advancedState arguments
+              parameterTypes with
+          | error error =>
+              simp [instantiated, advancedState, argumentsResult, bind,
+                Except.bind] at success
+          | ok fittedArgumentsOption =>
+              cases fittedArgumentsOption with
+              | none =>
+                  simp [instantiated, advancedState, argumentsResult, bind,
+                    Except.bind] at success
+              | some fittedArguments =>
+                  simp only [instantiated, advancedState, argumentsResult,
+                    bind, Except.bind] at success
+                  cases fittedResultResult : candidateWithExpected context
+                      fittedArguments.state { id := call, type := resultType }
+                      (some expected) with
+                  | error error =>
+                      simp [fittedResultResult, bind, Except.bind] at success
+                  | ok fittedResultOption =>
+                      cases fittedResultOption with
+                      | none =>
+                          simp [fittedResultResult, bind, Except.bind]
+                            at success
+                      | some fittedResult =>
+                          simp only [fittedResultResult, bind, Except.bind]
+                            at success
+                          cases integerValidation :
+                              validateCandidateIntegerLiterals context
+                                fittedResult.state integerLiteralOrigins with
+                          | error error =>
+                              simp [integerValidation, bind, Except.bind]
+                                at success
+                          | ok hasDeferredIntegerLiterals =>
+                              simp only [integerValidation, bind, Except.bind]
+                                at success
+                              cases predicateValidation :
+                                  validateCandidatePredicates context
+                                    fittedResult.state
+                                    (instantiated.predicates ++
+                                      fittedResult.state.requirements.map
+                                        (fun requirement =>
+                                          requirement.predicate)) with
+                              | error error =>
+                                  have expandedPredicateValidation :
+                                      validateCandidatePredicates context
+                                          fittedResult.state
+                                          ((signature.scheme.instantiate
+                                                state.inference.next).predicates ++
+                                            fittedResult.state.requirements.map
+                                              (fun requirement =>
+                                                requirement.predicate)) =
+                                        .error error := by
+                                    simpa only [instantiated] using
+                                      predicateValidation
+                                  rw [expandedPredicateValidation] at success
+                                  simp at success
+                              | ok validated =>
+                                  cases validated
+                                  have expandedPredicateValidation :
+                                      validateCandidatePredicates context
+                                          fittedResult.state
+                                          ((signature.scheme.instantiate
+                                                state.inference.next).predicates ++
+                                            fittedResult.state.requirements.map
+                                              (fun requirement =>
+                                                requirement.predicate)) =
+                                        .ok () := by
+                                    simpa only [instantiated] using
+                                      predicateValidation
+                                  rw [expandedPredicateValidation] at success
+                                  simp at success
+                                  let allocation :=
+                                    fittedResult.state.addRequirementsWithIds
+                                      instantiated.predicates
+                                  let finalState :=
+                                    allocation.2.markDirectCallRequirements
+                                      allocation.1
+                                  have resultEq : ({
+                                      instantiation :=
+                                        DeclarationInstantiation.ofInstantiated
+                                          signature instantiated
+                                      result := {
+                                        fittedResult.expression with
+                                        type := finalState.resolve
+                                          fittedResult.expression.type
+                                      }
+                                      argumentCoercions :=
+                                        fittedArguments.coercions
+                                      callCoercions := fittedResult.coercions
+                                      signatureRequirements := allocation.1
+                                      hasDeferredIntegerLiterals
+                                      state := finalState
+                                      cost := fittedArguments.cost +
+                                        fittedResult.coercions.length
+                                    } : CandidateAttemptResult) = result := by
+                                    simpa only [instantiated, allocation,
+                                      finalState,
+                                      ConstrainedDeclarationScheme.instantiate_predicates]
+                                      using success
+                                  subst result
+                                  have finalStateInference :
+                                      finalState.inference =
+                                        fittedResult.state.inference := by
+                                    simp only [finalState, allocation,
+                                      State.markDirectCallRequirements,
+                                      addRequirementsWithIds_inference]
+                                  have fittedExtension :
+                                      outer.SemanticallyExtends
+                                        fittedResult.state.inference.substitution := by
+                                    change outer.SemanticallyExtends
+                                      finalState.inference.substitution at extension
+                                    rw [finalStateInference] at extension
+                                    exact extension
+                                  change outer.apply
+                                      (finalState.resolve
+                                        fittedResult.expression.type) =
+                                    outer.apply expected
+                                  calc
+                                    outer.apply (finalState.resolve
+                                        fittedResult.expression.type) =
+                                        outer.apply fittedResult.expression.type :=
+                                      by
+                                        calc
+                                          outer.apply (finalState.resolve
+                                              fittedResult.expression.type) =
+                                              outer.apply
+                                                (fittedResult.state.resolve
+                                                  fittedResult.expression.type) := by
+                                            congr 1
+                                            change finalState.inference.resolve
+                                                fittedResult.expression.type =
+                                              fittedResult.state.inference.resolve
+                                                fittedResult.expression.type
+                                            rw [finalStateInference]
+                                          _ = outer.apply
+                                              fittedResult.expression.type := by
+                                            simpa only [State.resolve,
+                                              TypeSystem.InferState.resolve]
+                                              using fittedExtension
+                                                fittedResult.expression.type
+                                    _ = outer.apply expected :=
+                                      candidateWithExpected_some_apply_eq
+                                        fittedResultResult fittedExtension
+
+/-- Overload ranking can only retain an unchanged successful attempt, so the
+selected result also agrees with its concrete expectation. -/
+private theorem selectFunctionCandidateFrom_some_apply_eq
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Ty} {state : State}
+    {result : CandidateAttemptResult} {outer : Substitution}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call (some expected) state = .ok result)
+    (extension : outer.SemanticallyExtends
+      result.state.inference.substitution) :
+    outer.apply result.result.type = outer.apply expected := by
+  obtain ⟨signature, _, candidateSuccess⟩ :=
+    selectFunctionCandidateFrom_success_candidate success
+  exact tryFunctionCandidate_some_apply_eq candidateSuccess extension
+
 /-- Selecting an overload preserves the inference guarantees established for
 the retained candidate attempt. -/
 theorem selectFunctionCandidateFrom_inferenceProperties
@@ -4103,6 +4402,34 @@ private theorem selectFunctionCandidateFrom_state_header
       exact (induction _).trans
         (State.modifyExpressionNode_header state entry.expression _)
 
+@[simp] private theorem allocateExpressionId_inference
+    (state : State) :
+    state.allocateExpressionId.2.inference = state.inference := by
+  rfl
+
+@[simp] private theorem attachExpressionCoercions_resolve
+    (state : State) (entries : List ExpressionCoercions) (type : Ty) :
+    (attachExpressionCoercions state entries).resolve type =
+      state.resolve type := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil => rfl
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      rw [induction]
+      rfl
+
+@[simp] private theorem attachExpressionCoercions_inference
+    (state : State) (entries : List ExpressionCoercions) :
+    (attachExpressionCoercions state entries).inference = state.inference := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil => rfl
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      rw [induction]
+      rfl
+
 @[simp] private theorem recordSelectedCall_state_header
     (source callee : Syntax.Expr) (name : String)
     (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
@@ -4118,6 +4445,88 @@ private theorem selectFunctionCandidateFrom_state_header
     (recordSelectedCallResult source callee name arguments attempt result
       trailingCoercions state).2.header = state.header := by
   simp [recordSelectedCallResult]
+
+@[simp] private theorem recordSelectedCallResult_resolve
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) (type : Ty) :
+    (recordSelectedCallResult source callee name arguments attempt result
+      trailingCoercions state).2.resolve type = state.resolve type := by
+  unfold recordSelectedCallResult
+  simp only [recordExpression, State.recordNode, State.resolve,
+    TypeSystem.InferState.resolve, allocateExpressionId_inference,
+    attachExpressionCoercions_inference]
+
+@[simp] private theorem recordSelectedCallResult_inference
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) :
+    (recordSelectedCallResult source callee name arguments attempt result
+      trailingCoercions state).2.inference = state.inference := by
+  unfold recordSelectedCallResult
+  simp only [recordExpression, State.recordNode,
+    allocateExpressionId_inference, attachExpressionCoercions_inference]
+
+@[simp] private theorem recordSelectedCall_resolve
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (type : Ty) :
+    (recordSelectedCall source callee name arguments attempt).2.resolve type =
+      attempt.state.resolve type := by
+  simp [recordSelectedCall]
+
+@[simp] private theorem recordSelectedCall_inference
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+    (recordSelectedCall source callee name arguments attempt).2.inference =
+      attempt.state.inference := by
+  simp only [recordSelectedCall, recordSelectedCallResult_inference]
+
+/-- Recording a successfully selected direct call changes only source
+metadata, so the selected expected-type equality is retained. -/
+private theorem recordSelectedCall_selected_apply_eq
+    {context : Context} {source callee : Syntax.Expr} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Ty} {state : State}
+    {attempt : CandidateAttemptResult} {outer : Substitution}
+    (selected : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call (some expected) state = .ok attempt)
+    (extension : outer.SemanticallyExtends
+      (recordSelectedCall source callee name arguments attempt).2.inference.substitution) :
+    outer.apply
+        (recordSelectedCall source callee name arguments attempt).1.type =
+      outer.apply expected := by
+  have attemptExtension : outer.SemanticallyExtends
+      attempt.state.inference.substitution := by
+    simpa only [recordSelectedCall_inference] using extension
+  change outer.apply attempt.result.type = outer.apply expected
+  exact selectFunctionCandidateFrom_some_apply_eq selected attemptExtension
+
+/-- The binary-overload suffix performs one final fit after overload
+selection.  Recording the fitted result preserves that final equality. -/
+private theorem recordSelectedCallResult_withExpected_apply_eq
+    {context : Context} {source callee : Syntax.Expr} {name : String}
+    {arguments : List InferredExpression} {attempt : CandidateAttemptResult}
+    {actual : InferredExpression} {expected : Ty} {state : State}
+    {fitted : ExpectationResult} {outer : Substitution}
+    (fittedSuccess : withExpected context state actual (some expected) =
+      .ok fitted)
+    (extension : outer.SemanticallyExtends
+      (recordSelectedCallResult source callee name arguments attempt
+        fitted.expression fitted.coercions fitted.state).2.inference.substitution) :
+    outer.apply
+        (recordSelectedCallResult source callee name arguments attempt
+          fitted.expression fitted.coercions fitted.state).1.type =
+      outer.apply expected := by
+  have fittedExtension : outer.SemanticallyExtends
+      fitted.state.inference.substitution := by
+    simpa only [recordSelectedCallResult_inference] using extension
+  change outer.apply fitted.expression.type = outer.apply expected
+  exact withExpected_some_apply_eq fittedSuccess fittedExtension
 
 /-- Applying an indirectly obtained function type makes semantic inference
 progress, preserves readiness, and returns an allocator-bounded result type. -/
@@ -4272,6 +4681,73 @@ theorem applyFunctionType_inferenceProperties
                 unifiedReady resultTypeAtUnified expectedAtUnified resultResult
               exact ⟨prefixProgress.trans resultProperties.1,
                 resultProperties.2⟩
+
+/-- Successful indirect application against a concrete expectation returns a
+result equal to that expectation under every semantic extension of its final
+inference substitution. -/
+private theorem applyFunctionType_some_apply_eq
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Ty} {state : State}
+    {result : IndirectApplicationResult} {outer : Substitution}
+    (success : applyFunctionType context call calleeType arguments
+      (some expected) state = .ok result)
+    (extension : outer.SemanticallyExtends
+      result.state.inference.substitution) :
+    outer.apply result.result.type = outer.apply expected := by
+  unfold applyFunctionType at success
+  cases partsResult : functionParts? (state.resolve calleeType) with
+  | some parts =>
+      rcases parts with ⟨parameter, returnType⟩
+      simp only [partsResult] at success
+      cases argumentResult : withExpected context state
+          { id := call, type := Ty.productMany
+              (arguments.map (fun argument => argument.type)) }
+          (some parameter) with
+      | error error =>
+          simp [argumentResult, bind, Except.bind] at success
+      | ok fittedArgument =>
+          simp only [argumentResult, bind, Except.bind] at success
+          cases resultResult : withExpected context fittedArgument.state
+              { id := call, type := returnType } (some expected) with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := fittedArgument.coercions
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              exact withExpected_some_apply_eq resultResult extension
+  | none =>
+      simp only [partsResult] at success
+      generalize freshResultEq : state.fresh = freshResult at success
+      rcases freshResult with ⟨resultType, freshState⟩
+      cases unifyResult : unify freshState calleeType
+          (.function (Ty.productMany
+            (arguments.map fun argument => argument.type)) resultType) with
+      | error error =>
+          simp [unifyResult, bind, Except.bind] at success
+      | ok unifiedState =>
+          simp only [unifyResult, bind, Except.bind] at success
+          cases resultResult : withExpected context unifiedState
+              { id := call, type := resultType } (some expected) with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := []
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              exact withExpected_some_apply_eq resultResult extension
 
 /-- Every parameter of a compiler-provided function is a closed builtin type,
 so it lies below every flexible-variable allocator bound. -/
@@ -4568,6 +5044,77 @@ theorem recordBuiltinFunctionCall_inferenceProperties
                   tailProperties.2⟩
   · simp [arity, bind, Except.bind] at success
 
+/-- A fixed compiler-function call explicitly unifies its closed return type
+with the supplied expectation before recording metadata. -/
+private theorem recordBuiltinFunctionCall_some_apply_eq
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Ty} {state : State}
+    {result : InferredExpression × State} {outer : Substitution}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call (some expected) state = .ok result)
+    (extension : outer.SemanticallyExtends
+      result.2.inference.substitution) :
+    outer.apply result.1.type = outer.apply expected := by
+  unfold recordBuiltinFunctionCall at success
+  by_cases arity : arguments.length = function.parameterTypes.length
+  · simp only [arity, ↓reduceIte, bind, Except.bind] at success
+    cases argumentsResult :
+        unifyBuiltinFunctionArgumentsEqual arguments function.parameterTypes
+          state with
+    | error error =>
+        simp [argumentsResult, bind, Except.bind] at success
+    | ok argumentsState =>
+        simp only [argumentsResult, bind, Except.bind] at success
+        cases expectedResult :
+            unify argumentsState function.returnType expected with
+        | error error =>
+            simp [expectedResult, bind, Except.bind] at success
+        | ok fittedState =>
+            simp only [expectedResult, bind, Except.bind] at success
+            let allocation := fittedState.allocateExpressionId
+            let calleeExpression : InferredExpression := {
+              id := allocation.1
+              type := function.type
+            }
+            let calleeRecord := recordExpression callee calleeExpression
+              (.reference name (.builtinFunction function)) [] [] allocation.2
+            let returned : InferredExpression := {
+              id := call
+              type := calleeRecord.2.resolve function.returnType
+            }
+            let callRecord := recordExpression source returned
+              (.call allocation.1
+                (arguments.map (fun argument => argument.id))
+                (.builtinFunction function)) [] [] calleeRecord.2
+            change Except.ok callRecord = Except.ok result at success
+            injection success with resultEq
+            subst result
+            have unifiedEq := unify_resolve_eq expectedResult
+            have calleeInference :
+                calleeRecord.2.inference = fittedState.inference := by
+              simpa only [calleeRecord, allocation, recordExpression,
+                State.recordNode] using
+                  (allocateExpressionId_inference fittedState)
+            have recordedEq :
+                calleeRecord.2.resolve function.returnType =
+                  calleeRecord.2.resolve expected := by
+              unfold State.resolve
+              rw [calleeInference]
+              exact unifiedEq
+            change outer.apply
+                (calleeRecord.2.resolve function.returnType) =
+              outer.apply expected
+            calc
+              outer.apply (calleeRecord.2.resolve function.returnType) =
+                  outer.apply (calleeRecord.2.resolve expected) :=
+                congrArg outer.apply recordedEq
+              _ = outer.apply expected := by
+                have applied := extension expected
+                simpa only [callRecord, recordExpression, State.recordNode,
+                  State.resolve, TypeSystem.InferState.resolve] using applied
+  · simp [arity, bind, Except.bind] at success
+
 /-- Recording an indirect call changes only typed-source metadata, so it
 preserves readiness and the allocator bound already established for the
 application result. -/
@@ -4667,6 +5214,75 @@ private theorem applyFunctionType_state_header
     (recordIndirectCall source callee arguments result).2.header =
       result.state.header := by
   simp [recordIndirectCall]
+
+@[simp] private theorem recordIndirectCall_resolve
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult)
+    (type : Ty) :
+    (recordIndirectCall source callee arguments result).2.resolve type =
+      result.state.resolve type := by
+  simp only [recordIndirectCall, recordExpression, State.recordNode,
+    State.resolve, TypeSystem.InferState.resolve]
+
+@[simp] private theorem recordIndirectCall_inference
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression)
+    (result : IndirectApplicationResult) :
+    (recordIndirectCall source callee arguments result).2.inference =
+      result.state.inference := by
+  simp only [recordIndirectCall, recordExpression, State.recordNode]
+
+/-- Recording an indirect application leaves its already fitted result type
+and inference substitution unchanged. -/
+private theorem recordIndirectCall_application_apply_eq
+    {context : Context} {source : Syntax.Expr}
+    {callee : InferredExpression} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Ty} {state : State}
+    {application : IndirectApplicationResult} {outer : Substitution}
+    (applicationSuccess : applyFunctionType context call callee.type arguments
+      (some expected) state = .ok application)
+    (extension : outer.SemanticallyExtends
+      (recordIndirectCall source callee arguments application).2.inference.substitution) :
+    outer.apply
+        (recordIndirectCall source callee arguments application).1.type =
+      outer.apply expected := by
+  have applicationExtension : outer.SemanticallyExtends
+      application.state.inference.substitution := by
+    simpa only [recordIndirectCall_inference] using extension
+  change outer.apply application.result.type = outer.apply expected
+  exact applyFunctionType_some_apply_eq applicationSuccess
+    applicationExtension
+
+/-- Constructor application performs a final ordinary expected-type record
+after checking all payloads, so its returned type has the same coherence
+property as that record. -/
+private theorem inferConstructorApplicationFuel_some_apply_eq
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Ty} {state : State}
+    {result : InferredExpression × State} {outer : Substitution}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments (some expected) state = .ok result)
+    (extension : outer.SemanticallyExtends
+      result.2.inference.substitution) :
+    outer.apply result.1.type = outer.apply expected := by
+  unfold inferConstructorApplicationFuel at success
+  by_cases arity : arguments.length = instantiation.payloadTypes.length
+  · simp only [arity, if_false, bind, Except.bind] at success
+    cases fittedResult : unify state instantiation.resultType expected with
+    | error error =>
+        simp [fittedResult, bind, Except.bind] at success
+    | ok fittedState =>
+        simp only [fittedResult, bind, Except.bind] at success
+        cases argumentsResult : inferConstructorArgumentsFuel fuel context
+            arguments instantiation.payloadTypes fittedState with
+        | error error =>
+            simp [argumentsResult, bind, Except.bind] at success
+        | ok argumentsPair =>
+            rcases argumentsPair with ⟨inferredArguments, argumentsState⟩
+            simp only [argumentsResult, bind, Except.bind, Prod.eta] at success
+            exact recordExpressionWithExpected_some_apply_eq success extension
+  · simp [arity, bind, Except.bind] at success
 
 private theorem unifyBuiltinFunctionArgumentsEqual_state_header
     {arguments : List InferredExpression} {parameters : List Ty}
