@@ -1015,6 +1015,74 @@ theorem generalizeValue_schemeGeneralizesExcept_of_barrier
       exact executableBlocked (barrierAt.mpr semanticBlocked)
     simp [executableBlocked, semanticUnblocked]
 
+/-- A raw binder allocated from `generalizeValue` acquires both formation
+judgments after final substitution.  Scheme-body formation comes from the
+already typed final initializer; qualified-template identity and evidence
+come from the final scoped ledger, while raw predicate and dependency facts
+are transported through the closing substitution. -/
+theorem generalizeValue_binderFormation_afterSubstitution
+    (state : Frontend.SourceInference.State)
+    (locals : TypeSystem.Environment) (requirementStart : Nat)
+    (type : TypeSystem.Ty)
+    {substitution : TypeSystem.Substitution}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {sourceContext targetContext : SourceSemantics.Context}
+    {rawSource : TypedSource} {binder : TypedBinder} {initializer : NodeId}
+    (scheme_eq : binder.scheme =
+      (Detail.generalizeValue state locals requirementStart type).scheme)
+    (requirements_eq : binder.schemeRequirements =
+      (Detail.generalizeValue state locals requirementStart type).requirements)
+    (closes : FlexibleSubstitution.ContextCloses substitution closedVariables
+      sourceContext targetContext)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ substitution.domain)
+    (ledger : ScopedRequirementLedgerWellFormed targetContext
+      (rawSource.applySubstitution substitution))
+    (contains : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        ContainsLocalSchemeTemplate rawSource {
+          binder := binder
+          initializer := initializer
+          requirement := requirement
+        })
+    (predicates : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        PredicateAdmissible
+          (localSchemeInitializerContext sourceContext binder)
+          requirement.predicate)
+    (bodyAdmissible : TypeAdmissible
+      (localSchemeInitializerContext targetContext
+        (binder.applySubstitution substitution))
+      (binder.applySubstitution substitution).scheme.body) :
+    SchemeWellFormed targetContext
+        (binder.applySubstitution substitution).scheme ∧
+      LocalSchemeRequirementsWellFormed targetContext
+        (binder.applySubstitution substitution) := by
+  have rawQuantifiedNodup : binder.scheme.quantified.Nodup := by
+    rw [scheme_eq]
+    exact Detail.generalizeValue_scheme_quantified_nodup state locals
+      requirementStart type
+  have finalQuantifiedNodup :
+      (binder.applySubstitution substitution).scheme.quantified.Nodup := by
+    simpa using rawQuantifiedNodup
+  constructor
+  · exact
+      StructuralSubstitution.SchemeWellFormed.ofLocalSchemeInitializerAdmissible
+        bodyAdmissible finalQuantifiedNodup
+  · apply
+      FlexibleSubstitution.ScopedRequirementLedgerWellFormed.localSchemeRequirementsWellFormed_afterSubstitution
+        (binder := binder) (initializer := initializer)
+        closes fresh ledger contains predicates
+    intro requirement member
+    rw [requirements_eq] at member
+    rcases Detail.generalizeValue_requirement_depends_on_quantified state
+        locals requirementStart type requirement member with
+      ⟨metavariable, quantified, occurs⟩
+    refine ⟨metavariable, ?_, occurs⟩
+    rw [scheme_eq]
+    exact quantified
+
 /-- Any expression node retained by an inference state is declaratively
 contained in every typed-source view of that state. -/
 theorem toTypedSource_containsExpression_of_mem
