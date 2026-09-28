@@ -139,6 +139,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_containsExpression
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_containsExpression
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_occurrenceGraphWellFormed
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceLocalIdentities_success_localIdentityOwnership
@@ -260,6 +262,10 @@ example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.in
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.ofValidation
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.replaceLocals
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.addRequirementsWithIds
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.lookupBinderRequirementAllocationCertificate
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.allocateBinder
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.TemplateTracking.allocateGeneralizedValue

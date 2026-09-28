@@ -653,10 +653,11 @@ theorem recordExpression_containsExpression
     (source : Syntax.Expr) (expression : InferredExpression)
     (form : ExpressionForm) (requirements : List RequirementId)
     (coercions : List CoercionStep)
-    (state : Frontend.SourceInference.State) (roots : List NodeId := []) :
+    (state : Frontend.SourceInference.State) (roots : List NodeId := [])
+    (localSchemeInstantiationStart : Option Nat := none) :
     ContainsExpression
       ((Detail.recordExpression source expression form requirements coercions
-        state).2.toTypedSource roots)
+        state localSchemeInstantiationStart).2.toTypedSource roots)
       expression.id {
         id := expression.id
         span := source.span
@@ -664,6 +665,7 @@ theorem recordExpression_containsExpression
         form
         requirements
         coercions
+        localSchemeInstantiationStart
       } := by
   unfold Detail.recordExpression
   exact recordNode_containsExpression state _ roots
@@ -677,9 +679,10 @@ theorem recordExpressionWithExpected_success_containsExpression
     {requirements : List RequirementId}
     {expected : Option TypeSystem.Ty}
     {state : Frontend.SourceInference.State}
+    {localSchemeInstantiationStart : Option Nat}
     {result : InferredExpression × Frontend.SourceInference.State}
     (success : Detail.recordExpressionWithExpected context source id type form
-      requirements expected state = .ok result)
+      requirements expected state localSchemeInstantiationStart = .ok result)
     (roots : List NodeId := []) :
     ∃ coercions,
       ContainsExpression (result.2.toTypedSource roots) result.1.id {
@@ -690,12 +693,80 @@ theorem recordExpressionWithExpected_success_containsExpression
         requirements := requirements ++
           Detail.coercionRequirements coercions
         coercions
+        localSchemeInstantiationStart
       } := by
   obtain ⟨fitted, _, resultExpression, resultState⟩ :=
     Detail.recordExpressionWithExpected_success_record success
   refine ⟨fitted.coercions, ?_⟩
   rw [resultState, resultExpression]
   exact recordNode_containsExpression fitted.state _ roots
+
+/-- A successful local-identifier branch materializes the exact local
+reference node used by source semantics.  In particular, the node retains the
+canonical allocator position from immediately before scheme instantiation and
+keeps the local-scheme requirements as the prefix of any fitted coercion
+requirements. -/
+theorem inferExprFuel_success_localIdentifier_containsExpression
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier} {binder : TypedBinder}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : Detail.inferExprFuel (fuel + 1) context expression expected
+      initial = .ok result)
+    (roots : List NodeId := []) :
+    (let instantiationStart := allocated.inference.next
+     let instantiated :=
+       binder.scheme.instantiateWithSubstitution instantiationStart
+     let inference := {
+       allocated.inference with next := instantiated.next
+     }
+     let advanced : Frontend.SourceInference.State := {
+       allocated with inference
+     }
+     let predicates := binder.schemeRequirements.map fun requirement =>
+       Detail.applyPredicate advanced
+         (TypedTraitResolution.applySubstitution instantiated.substitution
+           requirement.predicate)
+     let requirementAllocation := advanced.addRequirementsWithIds predicates
+     ∃ coercions,
+       ContainsExpression (result.2.toTypedSource roots) result.1.id {
+         id := result.1.id
+         span := expression.span
+         type := result.1.type
+         form := .reference name.value (.local binder.id)
+         requirements := requirementAllocation.1 ++
+           Detail.coercionRequirements coercions
+         coercions
+         localSchemeInstantiationStart := some instantiationStart
+       }) := by
+  let instantiationStart := allocated.inference.next
+  let instantiated :=
+    binder.scheme.instantiateWithSubstitution instantiationStart
+  let inference := {
+    allocated.inference with next := instantiated.next
+  }
+  let advanced : Frontend.SourceInference.State := {
+    allocated with inference
+  }
+  let predicates := binder.schemeRequirements.map fun requirement =>
+    Detail.applyPredicate advanced
+      (TypedTraitResolution.applySubstitution instantiated.substitution
+        requirement.predicate)
+  let requirementAllocation := advanced.addRequirementsWithIds predicates
+  have recorded :
+      Detail.recordExpressionWithExpected context expression id
+        (advanced.resolve instantiated.body)
+        (.reference name.value (.local binder.id)) requirementAllocation.1
+        expected requirementAllocation.2
+        (localSchemeInstantiationStart := some instantiationStart) =
+          .ok result := by
+    exact Detail.inferExprFuel_success_localIdentifier_record expressionEq
+      allocationEq lookupEq success
+  exact recordExpressionWithExpected_success_containsExpression recorded roots
 
 /-- Successful executable graph validation establishes the complete initial
 declarative occurrence-graph well-formedness layer. -/
@@ -3154,6 +3225,68 @@ theorem replaceLocals
   · change ∀ id, id ∈ state.localSchemeAssumptions →
       id ∈ state.requirements.map (fun requirement => requirement.id)
     exact tracked.covered
+
+/-- Allocating a batch of ordinary use-site requirements leaves template
+classification and uniqueness unchanged.  Its only effect on template
+tracking is to extend the requirement ledger that covers every classified
+template identity. -/
+theorem addRequirementsWithIds
+    {state : Frontend.SourceInference.State}
+    {pending : List RequirementId}
+    (tracked : TemplateTracking state pending)
+    (predicates : List ProgramPredicate) :
+    TemplateTracking
+      (state.addRequirementsWithIds predicates).2 pending := by
+  have assumptions_eq :
+      (state.addRequirementsWithIds predicates).2.localSchemeAssumptions =
+        state.localSchemeAssumptions := by
+    clear tracked
+    induction predicates generalizing state with
+    | nil => rfl
+    | cons predicate rest induction =>
+        simp only [Frontend.SourceInference.State.addRequirementsWithIds]
+        simpa [Frontend.SourceInference.State.addRequirementWithId] using
+          (induction (state := (state.addRequirementWithId predicate).2))
+  have source_eq :
+      (state.addRequirementsWithIds predicates).2.toTypedSource [] =
+        state.toTypedSource [] := by
+    clear tracked assumptions_eq
+    induction predicates generalizing state with
+    | nil => rfl
+    | cons predicate rest induction =>
+        simp only [Frontend.SourceInference.State.addRequirementsWithIds]
+        simpa [Frontend.SourceInference.State.addRequirementWithId,
+          Frontend.SourceInference.State.toTypedSource] using
+          (induction (state := (state.addRequirementWithId predicate).2))
+  constructor
+  · rw [assumptions_eq, source_eq]
+    exact tracked.classified
+  · rw [assumptions_eq]
+    exact tracked.unique
+  · intro id member
+    rw [assumptions_eq] at member
+    rcases List.mem_map.mp (tracked.covered id member) with
+      ⟨requirement, requirementMember, requirementId⟩
+    exact List.mem_map.mpr ⟨requirement,
+      Frontend.SourceInference.State.addRequirementsWithIds_requirements_subset
+        state predicates requirementMember,
+      requirementId⟩
+
+/-- Template-ledger tracking supplies the containment premise that turns a
+guarded stable-binder lookup into the frontend's complete batch-allocation
+certificate for one generalized-local reference. -/
+theorem lookupBinderRequirementAllocationCertificate
+    {state : Frontend.SourceInference.State}
+    {pending : List RequirementId}
+    (tracked : TemplateTracking state pending)
+    (requirementsWellFormed : state.RequirementsWellFormed)
+    (name : String) (binder : TypedBinder)
+    (predicates : List ProgramPredicate)
+    (found : state.lookupBinder? name = some binder) :
+    Frontend.SourceInference.State.LookupBinderRequirementAllocationCertificate
+      state binder predicates :=
+  Frontend.SourceInference.State.addRequirementsWithIds_lookupBinder_certificate
+    state name binder predicates requirementsWellFormed tracked.covered found
 
 /-- Allocating a binder moves its qualified requirement identities into the
 pending suffix.  Canonical generalization supplies the three side conditions:
