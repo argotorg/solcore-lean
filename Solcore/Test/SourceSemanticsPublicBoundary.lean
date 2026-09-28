@@ -209,6 +209,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.letAnnotatedUninitializedStatementHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.letInitializedMonomorphicStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.letInitializedGeneralizedStatementHasType_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedUninitialized_sound

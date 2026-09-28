@@ -1824,6 +1824,80 @@ theorem letAnnotatedUninitializedStatementHasType_afterSubstitution
         extended)
     (by simp [StatementNode.applySubstitution])
 
+/-- A retained initialized `let` with a monomorphic closed binder is typed by
+the finalized initializer, exact generalization, and the matching lexical
+context extension. -/
+theorem letInitializedMonomorphicStatementHasType_afterSubstitution
+    {source : TypedSource} {target final : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {binder : TypedBinder} {initializer : ExpressionId}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .letDecl binder (some initializer)
+    })
+    (initializerType : ExpressionHasType
+      (source.applySubstitution outer) target initializer
+      (binder.applySubstitution outer).scheme.body)
+    (monomorphic :
+      (binder.applySubstitution outer).scheme.quantified = [])
+    (generalizes : SchemeGeneralizes target
+      (binder.applySubstitution outer).scheme)
+    (extension : BinderExtends source.owner target
+      (binder.applySubstitution outer) final) :
+    StatementHasType (source.applySubstitution outer) control target id final {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    } := by
+  exact .letInitialized
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl initializerType monomorphic generalizes
+    (by simpa using extension)
+    (by simp [StatementNode.applySubstitution])
+
+/-- The generalized initialized `let` constructor has the same substitution
+boundary, with qualified requirement formation and initializer typing in the
+scheme's scoped initializer context supplied explicitly. -/
+theorem letInitializedGeneralizedStatementHasType_afterSubstitution
+    {source : TypedSource} {target final : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {binder : TypedBinder} {initializer : ExpressionId}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .letDecl binder (some initializer)
+    })
+    (polymorphic :
+      (binder.applySubstitution outer).scheme.quantified ≠ [])
+    (requirementsWellFormed : LocalSchemeRequirementsWellFormed target
+      (binder.applySubstitution outer))
+    (generalizes : SchemeGeneralizesExcept target
+      (localSchemeTemplateIds (binder.applySubstitution outer))
+      (binder.applySubstitution outer).scheme)
+    (initializerType : ExpressionHasType (source.applySubstitution outer)
+      (localSchemeInitializerContext target
+        (binder.applySubstitution outer))
+      initializer (binder.applySubstitution outer).scheme.body)
+    (extension : BinderExtends source.owner target
+      (binder.applySubstitution outer) final) :
+    StatementHasType (source.applySubstitution outer) control target id final {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    } := by
+  exact .letInitializedGeneralized
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl polymorphic requirementsWellFormed generalizes initializerType
+    (by simpa using extension)
+    (by simp [StatementNode.applySubstitution])
+
 /-- The same annotated-uninitialized binder certificate advances the complete
 active-local invariant.  This is the compositional lexical result required to
 continue typing statements after the declaration. -/
