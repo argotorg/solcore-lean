@@ -590,6 +590,13 @@ private def canonicalGenericLocalTarget
   (SourceSemantics.Context.ofSignatures signatures)
     |>.withResidualTypeVariables
 
+private def canonicalLocalFinalSubstitution : Substitution :=
+  [(⟨10⟩, .word), (canonicalLocalOuterVariable, .word)]
+
+private def canonicalGenericLocalFinalTarget
+    (signatures : ProgramSignatures) : SourceSemantics.Context :=
+  SourceSemantics.Context.ofSignatures signatures
+
 /-- Canonical instantiation of a concrete generic local composes with a later
 outer closure: the outer metavariable closes to `word`, while the generic
 identity's freshly allocated occurrence variable remains shared by its
@@ -681,6 +688,106 @@ theorem canonicalGenericLocalInstantiationAfterOuterClosure
   rw [instantiatedBody] at valid
   simpa [canonicalGenericLocalBinder, canonicalLocalOuterSubstitution,
     canonicalLocalOuterVariable, canonicalLocalQuantified,
+    TypeSystem.Substitution.apply, TypeSystem.Substitution.lookup?] using valid
+
+/-- The same canonical local use can be reconstructed directly in its closed
+final context.  Only the binder's relevant body and predicate ranges need to
+avoid capture; no source context closure or generalization transport is used. -/
+theorem canonicalGenericLocalInstantiationAtFinalTarget
+    (signatures : ProgramSignatures) (owner : Resolved.DeclarationId) :
+    LocalSchemeInstantiationValid
+      (canonicalGenericLocalFinalTarget signatures)
+      ((canonicalGenericLocalBinder owner).applySubstitution
+        canonicalLocalFinalSubstitution)
+      (.function .word .word) [] := by
+  have formation : LocalSchemeRequirementsWellFormed
+      (canonicalGenericLocalFinalTarget signatures)
+      ((canonicalGenericLocalBinder owner).applySubstitution
+        canonicalLocalFinalSubstitution) :=
+    LocalSchemeRequirementsWellFormed.empty _ _ (by
+      simp [canonicalGenericLocalBinder])
+  have schemeWellFormed : SchemeWellFormed
+      (canonicalGenericLocalFinalTarget signatures)
+      ((canonicalGenericLocalBinder owner).applySubstitution
+        canonicalLocalFinalSubstitution).scheme := {
+    binders := TypeParameterBindersWellFormed.ofSignatures signatures
+    quantified_nodup := by simp [canonicalGenericLocalBinder]
+    body := by
+      apply TypeWellScoped.function <;> apply TypeWellScoped.variable <;>
+        simp [canonicalGenericLocalBinder, canonicalLocalQuantified,
+          canonicalLocalFinalSubstitution, canonicalLocalOuterVariable,
+          canonicalGenericLocalFinalTarget, admissibleTypeVariables,
+          Context.ofSignatures]
+  }
+  have fresh : ∀ metavariable,
+      metavariable ∈
+          (canonicalGenericLocalBinder owner).scheme.quantified →
+        metavariable ∉ canonicalLocalFinalSubstitution.domain := by
+    intro metavariable quantified
+    simp [canonicalGenericLocalBinder, canonicalLocalQuantified] at quantified
+    subst metavariable
+    simp [canonicalLocalFinalSubstitution, canonicalLocalOuterVariable,
+      TypeSystem.Substitution.domain]
+  have bodyRangeAvoids :
+      canonicalLocalFinalSubstitution.RangeAvoidsVariablesOn
+        (canonicalGenericLocalBinder owner).scheme.quantified
+        (canonicalGenericLocalBinder owner).scheme.body := by
+    intro sourceVariable occurs replacement found
+    change sourceVariable ∈
+      (Ty.function (Ty.variable canonicalLocalQuantified)
+        (Ty.variable canonicalLocalQuantified)).freeVariables at occurs
+    rw [Ty.mem_freeVariables_function_iff] at occurs
+    have sourceEq : sourceVariable = canonicalLocalQuantified := by
+      rcases occurs with occurs | occurs <;>
+        simpa [TypeSystem.Ty.freeVariables] using occurs
+    subst sourceVariable
+    simp [canonicalLocalFinalSubstitution, canonicalLocalOuterVariable,
+      canonicalLocalQuantified, TypeSystem.Substitution.lookup?] at found
+  have predicateRangeAvoids : ∀ requirement,
+      requirement ∈
+          (canonicalGenericLocalBinder owner).schemeRequirements →
+        FlexibleSubstitution.PredicateRangeAvoidsVariablesOn
+          canonicalLocalFinalSubstitution
+          (canonicalGenericLocalBinder owner).scheme.quantified
+          requirement.predicate := by
+    intro requirement member
+    simp [canonicalGenericLocalBinder] at member
+  have instantiatedSubstitution :
+      ((canonicalGenericLocalBinder owner).scheme
+        |>.instantiateWithSubstitution 10).substitution =
+        [(canonicalLocalQuantified, .variable ⟨10⟩)] := by
+    rfl
+  have composedRange : SubstitutionRangeAdmissible
+      (canonicalGenericLocalFinalTarget signatures)
+      (FlexibleSubstitution.Substitution.mapRange
+        canonicalLocalFinalSubstitution
+        ((canonicalGenericLocalBinder owner).scheme
+          |>.instantiateWithSubstitution 10).substitution) := by
+    rw [instantiatedSubstitution]
+    intro metavariable replacement member
+    simp [FlexibleSubstitution.Substitution.mapRange,
+      canonicalLocalFinalSubstitution, canonicalLocalOuterVariable,
+      TypeSystem.Substitution.apply, TypeSystem.Substitution.lookup?] at member
+    rcases member with ⟨rfl, rfl⟩
+    exact TypeAdmissible.builtin
+      (TypeParameterBindersWellFormed.ofSignatures signatures) .word
+  have valid :=
+    FlexibleSubstitution.LocalSchemeInstantiationValid.of_instantiateWithSubstitution_afterSubstitution_atTarget
+      (actualRequirements := []) formation schemeWellFormed fresh
+      bodyRangeAvoids predicateRangeAvoids 10 composedRange (by simp)
+      (by simp [localSchemeTemplateIds, canonicalGenericLocalBinder])
+      (by
+        simpa [instantiateLocalSchemePredicates, canonicalGenericLocalBinder]
+          using (RequirementSequenceProves.nil :
+            RequirementSequenceProves
+              (canonicalGenericLocalFinalTarget signatures) [] []))
+  have instantiatedBody :
+      ((canonicalGenericLocalBinder owner).scheme
+        |>.instantiateWithSubstitution 10).body =
+        .function (.variable ⟨10⟩) (.variable ⟨10⟩) := by
+    rfl
+  rw [instantiatedBody] at valid
+  simpa [canonicalLocalFinalSubstitution,
     TypeSystem.Substitution.apply, TypeSystem.Substitution.lookup?] using valid
 
 /-- Admissible predicates reuse type transport for the subject and every

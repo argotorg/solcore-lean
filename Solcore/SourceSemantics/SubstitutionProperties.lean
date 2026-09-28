@@ -9676,6 +9676,110 @@ theorem instantiateLocalSchemePredicates_applySubstitution
   exact PredicateAdmissible.applyFlexible_compose outer inner closes.range
     innerExact fresh (formation.entries requirement member).predicate
 
+/-- Relevance-restricted no-capture is enough to commute a later flexible
+substitution through the source-ordered predicate spine of one local-scheme
+instantiation.  Unlike the context-transport theorem above, this statement
+depends only on the predicates actually retained by the binder. -/
+theorem instantiateLocalSchemePredicates_applySubstitution_of_rangeAvoidsVariablesOn
+    {outer : Substitution} {binder : TypedBinder} {inner : Substitution}
+    (innerExact : ExactSubstitution inner binder.scheme.quantified)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ outer.domain)
+    (rangeAvoids : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        PredicateRangeAvoidsVariablesOn outer binder.scheme.quantified
+          requirement.predicate) :
+    (instantiateLocalSchemePredicates inner binder).map
+        (TypedTraitResolution.applySubstitution outer) =
+      instantiateLocalSchemePredicates (Substitution.mapRange outer inner)
+        (binder.applySubstitution outer) := by
+  have restricted_eq : outer.without binder.scheme.quantified = outer :=
+    Substitution.without_eq_self_of_disjoint_domain outer
+      binder.scheme.quantified fresh
+  unfold instantiateLocalSchemePredicates
+  simp only [applyTypedBinder_schemeRequirements, restricted_eq, List.map_map]
+  apply List.map_congr_left
+  intro requirement member
+  simpa [LocalSchemeRequirement.applySubstitution] using
+    (TypedTraitResolution.applySubstitution_compose_of_rangeAvoidsVariablesOn
+      outer inner innerExact fresh (rangeAvoids requirement member))
+
+/-- Reconstruct a canonical local-scheme use directly in its final semantic
+context.  The caller supplies target-side formation and admissibility facts;
+only the binder body and retained predicates need the local no-capture facts
+used to commute the final inference substitution through fresh
+instantiation.  No source context closure or transported generalization
+judgment is required. -/
+theorem LocalSchemeInstantiationValid.of_instantiateWithSubstitution_afterSubstitution_atTarget
+    {outer : Substitution} {target : Context} {binder : TypedBinder}
+    {actualRequirements : List RequirementId}
+    (formation : LocalSchemeRequirementsWellFormed target
+      (binder.applySubstitution outer))
+    (schemeWellFormed : SchemeWellFormed target
+      (binder.applySubstitution outer).scheme)
+    (fresh : ∀ metavariable,
+      metavariable ∈ binder.scheme.quantified →
+        metavariable ∉ outer.domain)
+    (bodyRangeAvoids : outer.RangeAvoidsVariablesOn
+      binder.scheme.quantified binder.scheme.body)
+    (predicateRangeAvoids : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        PredicateRangeAvoidsVariablesOn outer binder.scheme.quantified
+          requirement.predicate)
+    (next : Nat)
+    (composedRange : SubstitutionRangeAdmissible target
+      (Substitution.mapRange outer
+        (binder.scheme.instantiateWithSubstitution next).substitution))
+    (actualUnique : actualRequirements.Nodup)
+    (actualDisjoint : ∀ id, id ∈ actualRequirements →
+      id ∉ localSchemeTemplateIds (binder.applySubstitution outer))
+    (requirements : RequirementSequenceProves target actualRequirements
+      ((instantiateLocalSchemePredicates
+          (binder.scheme.instantiateWithSubstitution next).substitution
+          binder).map
+        (TypedTraitResolution.applySubstitution outer))) :
+    LocalSchemeInstantiationValid target
+      (binder.applySubstitution outer)
+      (outer.apply (binder.scheme.instantiateWithSubstitution next).body)
+      actualRequirements := by
+  let instantiated := binder.scheme.instantiateWithSubstitution next
+  have quantifiedUnique : binder.scheme.quantified.Nodup := by
+    simpa using schemeWellFormed.quantified_nodup
+  have innerExact :
+      ExactSubstitution instantiated.substitution
+        binder.scheme.quantified := {
+    variables_nodup := quantifiedUnique
+    domain_permutation := by
+      simpa only [instantiated] using
+        binder.scheme.instantiateWithSubstitution_substitution_domain_permutation
+          next quantifiedUnique
+  }
+  have restricted_eq :
+      outer.without binder.scheme.quantified = outer :=
+    Substitution.without_eq_self_of_disjoint_domain outer
+      binder.scheme.quantified fresh
+  refine .intro formation schemeWellFormed
+    (Substitution.mapRange outer instantiated.substitution)
+    (Substitution.ExactSubstitution.mapRange outer innerExact)
+    (by simpa only [instantiated] using composedRange) ?_ actualUnique
+    actualDisjoint ?_
+  · change (Substitution.mapRange outer instantiated.substitution).apply
+      (binder.applySubstitution outer).scheme.body = outer.apply instantiated.body
+    rw [applyTypedBinder_scheme]
+    change (Substitution.mapRange outer instantiated.substitution).apply
+        ((outer.without binder.scheme.quantified).apply binder.scheme.body) =
+      outer.apply instantiated.body
+    rw [restricted_eq]
+    change (Substitution.mapRange outer instantiated.substitution).apply
+        (outer.apply binder.scheme.body) =
+      outer.apply (instantiated.substitution.apply binder.scheme.body)
+    exact (Ty.applyFlexible_compose_of_rangeAvoidsVariablesOn outer
+      instantiated.substitution innerExact fresh bodyRangeAvoids).symm
+  · rw [← instantiateLocalSchemePredicates_applySubstitution_of_rangeAvoidsVariablesOn
+      innerExact fresh predicateRangeAvoids]
+    simpa only [instantiated] using requirements
+
 /-- Canonical frontend instantiation remains a single shared local-scheme
 instantiation after a later outer closure.  The executable instantiator
 supplies the exact inner substitution and residual-range witnesses; the
