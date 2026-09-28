@@ -99,6 +99,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.allocateBinder
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.allocateBinder_of_localBindersBelowNextLocal
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.lookup_of_lookupBinder?
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.localSchemes_perm

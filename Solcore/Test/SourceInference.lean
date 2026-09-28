@@ -112,6 +112,20 @@ example :
     freshReady (by
       simpa [TypeSystem.Scheme.mono] using freshTypeBelow)
 
+/-- Initial parameters are below the stable-local cutoff, so the next visible
+binder receives an identity distinct from every retained input binder. -/
+example :
+    let locals : TypeSystem.Environment :=
+      [("left", .mono .word), ("right", .mono .bool)]
+    let state := SourceInference.State.initial solverRegressionOwner locals []
+    let allocated := state.allocateBinder "fresh" (.mono .unit)
+    allocated.1.id ∉ state.localBinders.map fun binder => binder.id := by
+  dsimp only
+  apply SourceInference.State.allocateBinder_id_fresh
+  exact SourceInference.State.initial_localBindersBelowNextLocal
+    solverRegressionOwner
+    [("left", .mono .word), ("right", .mono .bool)] []
+
 /-- Restoring an outer lexical scope after inner inference preserves the
 inner semantic progress while re-establishing outer-binder readiness. -/
 example {outer inner : SourceInference.State}

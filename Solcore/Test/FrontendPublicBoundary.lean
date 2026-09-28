@@ -176,6 +176,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.lookupBinder?_eq_some_mem_binderEnvironment
 example := @Solcore.Frontend.SourceInference.State.NodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.LocalBindersBelowNextLocal.transport
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress
 example := @Solcore.Frontend.SourceInference.State.InferenceProgress.refl
 example :=
@@ -260,6 +264,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.initial_nodesBelowNextOccurrence
 example :=
+  @Solcore.Frontend.SourceInference.State.initial_localBindersBelowNextLocal
+example :=
   @Solcore.Frontend.SourceInference.State.fresh_preserves_nodesBelowNextOccurrence
 example :=
   @Solcore.Frontend.SourceInference.State.withLocals_preserves_nodesBelowNextOccurrence
@@ -294,6 +300,42 @@ example :=
   @Solcore.Frontend.SourceInference.State.addRequirements_preserves_nodesBelowNextOccurrence
 example :=
   @Solcore.Frontend.SourceInference.State.markDirectCallRequirements_preserves_nodesBelowNextOccurrence
+example :=
+  @Solcore.Frontend.SourceInference.State.fresh_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.restoreLexicalScope_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateBinder_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateBinder_id_fresh
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateBinder_success_id_fresh
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateHiddenLocal_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateHiddenLocal_id_fresh
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateExpressionId_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.recordNode_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.modifyExpressionNode_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.modifyStatementNode_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementWithId_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirement_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementsWithIds_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirements_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.State.markDirectCallRequirements_preserves_localBindersBelowNextLocal
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_nextOccurrence_le
 example :=

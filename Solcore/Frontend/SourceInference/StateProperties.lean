@@ -15,6 +15,14 @@ def NodesBelowNextOccurrence (state : State) : Prop :=
   ∀ node ∈ state.nodes,
     node.occurrenceId.index < state.nextOccurrence
 
+/-- Every visible stable binder was allocated strictly before the next
+declaration-local identity.  Hidden locals advance the same allocator without
+appearing in `localBinders`, so this is exactly the bound needed to prove the
+next visible binder identity fresh. -/
+def LocalBindersBelowNextLocal (state : State) : Prop :=
+  ∀ binder ∈ state.localBinders,
+    binder.id.binderIndex < state.nextLocal
+
 /-- The part of source-inference state evolution needed to preserve occurrence
 allocation safety.  This deliberately says nothing about exact node payloads:
 `attachExpressionCoercions` may refine freshly recorded expression nodes while
@@ -73,6 +81,21 @@ theorem trans {first second third : State}
       (left.nodesBelowNextOccurrence below)⟩
 
 end OccurrenceBoundExtends
+
+namespace LocalBindersBelowNextLocal
+
+/-- A state update which retains the visible binders and monotonically
+advances the shared local allocator preserves the stable-binder bound. -/
+theorem transport {before after : State}
+    (bindersEq : after.localBinders = before.localBinders)
+    (nextLocalLe : before.nextLocal ≤ after.nextLocal)
+    (below : before.LocalBindersBelowNextLocal) :
+    after.LocalBindersBelowNextLocal := by
+  intro binder member
+  rw [bindersEq] at member
+  exact Nat.lt_of_lt_of_le (below binder member) nextLocalLe
+
+end LocalBindersBelowNextLocal
 
 namespace InferenceProgress
 
@@ -253,6 +276,20 @@ theorem initial_nodesBelowNextOccurrence (owner : Resolved.DeclarationId)
     (initial owner locals inputComptime).NodesBelowNextOccurrence := by
   intro node member
   simp [initial] at member
+
+/-- Initial parameter binders occupy exactly the indices below the initial
+local allocator. -/
+theorem initial_localBindersBelowNextLocal
+    (owner : Resolved.DeclarationId) (locals : TypeSystem.Environment)
+    (inputComptime : List Bool) :
+    (initial owner locals inputComptime).LocalBindersBelowNextLocal := by
+  intro binder member
+  change binder.id.binderIndex < locals.length
+  rw [← initial_inputs_eq_localBinders] at member
+  rw [initial_inputs_definition] at member
+  obtain ⟨index, indexLt, binderEq⟩ := List.exists_of_mem_mapIdx member
+  subst binder
+  exact indexLt
 
 @[simp] theorem fresh_header (state : State) :
     state.fresh.2.header = state.header := by
@@ -639,6 +676,202 @@ theorem markDirectCallRequirements_preserves_nodesBelowNextOccurrence
     (below : state.NodesBelowNextOccurrence) :
     (state.markDirectCallRequirements requirements).NodesBelowNextOccurrence := by
   change state.NodesBelowNextOccurrence
+  exact below
+
+/-! Stable-local allocator preservation.  These lemmas mirror the primitive
+state updates used by recursive inference without coupling the local identity
+invariant to type-inference or requirement-ledger invariants. -/
+
+/-- Fresh type-variable allocation leaves stable locals unchanged. -/
+theorem fresh_preserves_localBindersBelowNextLocal
+    (state : State) (below : state.LocalBindersBelowNextLocal) :
+    state.fresh.2.LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
+  exact below
+
+/-- Replacing the compatibility name environment leaves stable locals
+unchanged. -/
+theorem withLocals_preserves_localBindersBelowNextLocal
+    (state : State) (locals : TypeSystem.Environment)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.withLocals locals).LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
+  exact below
+
+/-- Restoring a captured outer scope preserves its binder bound when the
+inner traversal has only advanced the declaration-wide local allocator. -/
+theorem restoreLexicalScope_preserves_localBindersBelowNextLocal
+    {outer inner : State}
+    (below : outer.LocalBindersBelowNextLocal)
+    (nextLocalLe : outer.nextLocal ≤ inner.nextLocal) :
+    (inner.restoreLexicalScope outer.lexicalScope)
+      |>.LocalBindersBelowNextLocal := by
+  intro binder member
+  change binder ∈ outer.localBinders at member
+  change binder.id.binderIndex < inner.nextLocal
+  exact Nat.lt_of_lt_of_le (below binder member) nextLocalLe
+
+/-- Visible binder allocation preserves the bound by placing the new binder at
+the old cutoff and advancing that cutoff once. -/
+theorem allocateBinder_preserves_localBindersBelowNextLocal
+    (state : State) (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.allocateBinder name scheme span comptime schemeRequirements).2
+      |>.LocalBindersBelowNextLocal := by
+  intro binder member
+  simp only [allocateBinder, List.mem_cons] at member
+  change binder.id.binderIndex < state.nextLocal + 1
+  rcases member with rfl | member
+  · exact Nat.lt_succ_self _
+  · exact Nat.lt_succ_of_lt (below binder member)
+
+/-- The binder returned by visible allocation is fresh for the entire retained
+stable-binder stack. -/
+theorem allocateBinder_id_fresh
+    (state : State) (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.allocateBinder name scheme span comptime schemeRequirements).1.id ∉
+      state.localBinders.map fun binder => binder.id := by
+  intro member
+  rcases List.mem_map.mp member with
+    ⟨retained, retainedMember, idEq⟩
+  have indexEq := congrArg
+    (fun id : Resolved.LocalId => id.binderIndex) idEq
+  have retainedBelow := below retained retainedMember
+  exact (Nat.ne_of_lt retainedBelow) (by
+    simpa [allocateBinder] using indexEq)
+
+/-- The freshness result can be consumed directly from the usual successful
+allocation equation used by traversal proofs. -/
+theorem allocateBinder_success_id_fresh
+    {state final : State} {name : String} {scheme : TypeSystem.Scheme}
+    {span : Option Syntax.SourceSpan} {comptime : Bool}
+    {schemeRequirements : List LocalSchemeRequirement}
+    {binder : TypedBinder}
+    (below : state.LocalBindersBelowNextLocal)
+    (allocated : state.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, final)) :
+    binder.id ∉ state.localBinders.map fun retained => retained.id := by
+  have binderEq :
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).1 = binder :=
+    congrArg Prod.fst allocated
+  subst binder
+  exact allocateBinder_id_fresh state name scheme span comptime
+    schemeRequirements below
+
+/-- Hidden-local reservation advances the shared cutoff, so all visible
+binders remain below it. -/
+theorem allocateHiddenLocal_preserves_localBindersBelowNextLocal
+    (state : State) (below : state.LocalBindersBelowNextLocal) :
+    state.allocateHiddenLocal.2.LocalBindersBelowNextLocal := by
+  intro binder member
+  change binder.id.binderIndex < state.nextLocal + 1
+  exact Nat.lt_succ_of_lt (below binder member)
+
+/-- The hidden identity reserved at the current cutoff is also fresh for the
+visible stable-binder stack. -/
+theorem allocateHiddenLocal_id_fresh
+    (state : State) (below : state.LocalBindersBelowNextLocal) :
+    state.allocateHiddenLocal.1 ∉
+      state.localBinders.map fun binder => binder.id := by
+  intro member
+  rcases List.mem_map.mp member with
+    ⟨retained, retainedMember, idEq⟩
+  have indexEq := congrArg
+    (fun id : Resolved.LocalId => id.binderIndex) idEq
+  exact (Nat.ne_of_lt (below retained retainedMember)) (by
+    simpa [allocateHiddenLocal] using indexEq)
+
+/-- Expression identity allocation leaves the local allocator unchanged. -/
+theorem allocateExpressionId_preserves_localBindersBelowNextLocal
+    (state : State) (below : state.LocalBindersBelowNextLocal) :
+    state.allocateExpressionId.2.LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
+  exact below
+
+/-- Statement identity allocation leaves the local allocator unchanged. -/
+theorem allocateStatementId_preserves_localBindersBelowNextLocal
+    (state : State) (below : state.LocalBindersBelowNextLocal) :
+    state.allocateStatementId.2.LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
+  exact below
+
+/-- Recording a node leaves the local allocator unchanged. -/
+theorem recordNode_preserves_localBindersBelowNextLocal
+    (state : State) (node : Node)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.recordNode node).LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
+  exact below
+
+/-- Refining an expression node leaves the local allocator unchanged. -/
+theorem modifyExpressionNode_preserves_localBindersBelowNextLocal
+    (state : State) (id : ExpressionId)
+    (modify : ExpressionNode → ExpressionNode)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.modifyExpressionNode id modify).LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
+  exact below
+
+/-- Refining a statement node leaves the local allocator unchanged. -/
+theorem modifyStatementNode_preserves_localBindersBelowNextLocal
+    (state : State) (id : StatementId)
+    (modify : StatementNode → StatementNode)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.modifyStatementNode id modify).LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
+  exact below
+
+/-- Allocating one requirement leaves the local allocator unchanged. -/
+theorem addRequirementWithId_preserves_localBindersBelowNextLocal
+    (state : State) (predicate : ProgramPredicate)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.addRequirementWithId predicate).2.LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
+  exact below
+
+/-- Adding one requirement leaves the local allocator unchanged. -/
+theorem addRequirement_preserves_localBindersBelowNextLocal
+    (state : State) (predicate : ProgramPredicate)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.addRequirement predicate).LocalBindersBelowNextLocal := by
+  exact addRequirementWithId_preserves_localBindersBelowNextLocal
+    state predicate below
+
+/-- Allocating a requirement row leaves the local allocator unchanged. -/
+theorem addRequirementsWithIds_preserves_localBindersBelowNextLocal
+    (state : State) (predicates : List ProgramPredicate)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.addRequirementsWithIds predicates).2
+      |>.LocalBindersBelowNextLocal := by
+  induction predicates generalizing state with
+  | nil => simpa [addRequirementsWithIds] using below
+  | cons predicate rest induction =>
+      simp only [addRequirementsWithIds]
+      exact induction (state.addRequirementWithId predicate).2
+        (addRequirementWithId_preserves_localBindersBelowNextLocal
+          state predicate below)
+
+/-- Adding requirements leaves the local allocator unchanged. -/
+theorem addRequirements_preserves_localBindersBelowNextLocal
+    (state : State) (predicates : List ProgramPredicate)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.addRequirements predicates).LocalBindersBelowNextLocal := by
+  exact addRequirementsWithIds_preserves_localBindersBelowNextLocal
+    state predicates below
+
+/-- Direct-call provenance metadata leaves the local allocator unchanged. -/
+theorem markDirectCallRequirements_preserves_localBindersBelowNextLocal
+    (state : State) (requirements : List RequirementId)
+    (below : state.LocalBindersBelowNextLocal) :
+    (state.markDirectCallRequirements requirements)
+      |>.LocalBindersBelowNextLocal := by
+  change state.LocalBindersBelowNextLocal
   exact below
 
 @[simp] theorem allocateBinder_id (state : State) (name : String)

@@ -212,6 +212,29 @@ theorem allocateBinder
             schemeRequirements).1.applySubstitution
               substitution).schemeRequirements)
 
+/-- The source-inference allocator invariant discharges the explicit stable-ID
+freshness premise of `allocateBinder`. -/
+theorem allocateBinder_of_localBindersBelowNextLocal
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false)
+    (schemeRequirements : List LocalSchemeRequirement := [])
+    {binder : TypedBinder} {final : Frontend.SourceInference.State}
+    (allocated : state.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, final))
+    (below : state.LocalBindersBelowNextLocal) :
+    LocalEnvironmentAligned final substitution
+      (context.withLocal binder.id
+        (binder.applySubstitution substitution).scheme
+        (binder.applySubstitution substitution).schemeRequirements) := by
+  exact aligned.allocateBinder name scheme span comptime schemeRequirements
+    allocated
+    (Frontend.SourceInference.State.allocateBinder_success_id_fresh
+      below allocated)
+
 /-- Executable first-match name lookup identifies a stable binder whose
 closed scheme and qualified metadata are both available in the aligned
 semantic context. -/

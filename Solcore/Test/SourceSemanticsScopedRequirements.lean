@@ -315,8 +315,14 @@ lockstep with executable binder allocation. -/
 example :
     SourceInferenceSoundness.LocalEnvironmentAligned
       alignedLifecycleAllocation.2 [] alignedLifecycleContext := by
-  exact reversedLocalEnvironmentAligned.allocateBinder
-    "fresh" (.mono .unit) none false [] rfl (by decide)
+  exact
+    reversedLocalEnvironmentAligned.allocateBinder_of_localBindersBelowNextLocal
+      "fresh" (.mono .unit) none false [] rfl (by
+        intro binder member
+        change binder ∈ [templateBinder 0, templateBinder 1] at member
+        change binder.id.binderIndex < 2
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+        rcases member with rfl | rfl <;> simp [templateBinder])
 
 /-- A name selected by executable first-match lookup yields both paired
 stable-ID lookups even though the semantic list order is reversed. -/
