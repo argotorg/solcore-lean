@@ -502,6 +502,24 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.unify_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.Detail.freshTypes_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternsFlatFuel_preserves_localBindersBelowNextLocal
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternsFlatFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFlatFuel_stateProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternsFlatFuel_stateProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.explicitConstructorCandidate_success_members
 example :=
   @Solcore.Frontend.SourceInference.Detail.explicitConstructorCandidate_success_name

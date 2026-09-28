@@ -2136,6 +2136,16 @@ the declaration owner and original input binders. -/
     next.localBinders = state.localBinders :=
   congrArg LexicalScope.binders (unify_preserves_lexicalScope success)
 
+theorem unify_preserves_localBindersBelowNextLocal
+    {state next : State} {left right : Ty}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : unify state left right = .ok next) :
+    next.LocalBindersBelowNextLocal := by
+  apply State.LocalBindersBelowNextLocal.transport
+      (unify_preserves_localBinders success) ?_ below
+  rw [unify_preserves_nextLocal success]
+  exact Nat.le_refl _
+
 /-- Successful source-inference unification makes semantic inference progress
 when both raw operands lie below the input allocator. -/
 theorem unify_inferenceProgress
@@ -3719,6 +3729,17 @@ theorem freshDataConstructorInstantiation_inferenceProperties
       rw [induction]
       rfl
 
+theorem freshTypes_preserves_localBindersBelowNextLocal
+    (count : Nat) (state : State)
+    (below : state.LocalBindersBelowNextLocal) :
+    (freshTypes count state).2.LocalBindersBelowNextLocal := by
+  induction count generalizing state with
+  | zero => exact below
+  | succ count induction =>
+      simp only [freshTypes]
+      exact induction state.fresh.2
+        (State.fresh_preserves_localBindersBelowNextLocal state below)
+
 @[simp] private theorem freshDataConstructorInstantiation_preserves_header
     (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature) (state : State) :
@@ -3781,6 +3802,21 @@ theorem freshDataConstructorInstantiation_inferenceProperties
         rfl
   unfold freshDataConstructorInstantiation
   exact foldNextLocal dataType.parameters ([], state)
+
+theorem
+    freshDataConstructorInstantiation_preserves_localBindersBelowNextLocal
+    (dataType : ProgramDataSignature)
+    (constructor : ProgramDataConstructorSignature) (state : State)
+    (below : state.LocalBindersBelowNextLocal) :
+    (freshDataConstructorInstantiation dataType constructor state).2
+      |>.LocalBindersBelowNextLocal := by
+  apply State.LocalBindersBelowNextLocal.transport
+  · exact congrArg LexicalScope.binders
+      (freshDataConstructorInstantiation_preserves_lexicalScope
+        dataType constructor state)
+  · rw [freshDataConstructorInstantiation_preserves_nextLocal]
+    exact Nat.le_refl _
+  · exact below
 
 @[simp] private theorem freshDataConstructorInstantiation_preserves_owner
     (dataType : ProgramDataSignature)
@@ -4347,6 +4383,428 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
     all_goals try simp_all [State.fresh, State.addRequirementWithId,
       State.allocateBinder, bind, Except.bind]
     all_goals omega
+
+private def PatternPreservesBinderBound (context : Context)
+    (fuel : Nat) (pattern : Syntax.Pattern) (expected : Ty)
+    (seen : List String) (state : State) : Prop :=
+  ∀ result,
+    state.LocalBindersBelowNextLocal →
+    inferMatchPatternFlatFuel fuel context pattern expected seen state =
+      .ok result →
+    result.state.LocalBindersBelowNextLocal
+
+private def PatternsPreserveBinderBound (context : Context)
+    (fuel : Nat) (patterns : List Syntax.Pattern) (expected : List Ty)
+    (seen : List String) (state : State) : Prop :=
+  ∀ result,
+    state.LocalBindersBelowNextLocal →
+    inferMatchPatternsFlatFuel fuel context patterns expected seen state =
+      .ok result →
+    result.state.LocalBindersBelowNextLocal
+
+private theorem unify_preserves_binder_bound_from_success
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next)
+    (below : state.LocalBindersBelowNextLocal) :
+    next.LocalBindersBelowNextLocal :=
+  unify_preserves_localBindersBelowNextLocal below success
+
+/- Flat pattern traversal preserves the stable local-identity bound while it
+enters every binder introduced by the pattern. -/
+set_option maxHeartbeats 1000000 in
+theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
+    (fuel : Nat) (context : Context) (pattern : Syntax.Pattern)
+    (expected : Ty) (seen : List String) (state : State) :
+    ∀ result,
+      state.LocalBindersBelowNextLocal →
+      inferMatchPatternFlatFuel fuel context pattern expected seen state =
+        .ok result →
+      result.state.LocalBindersBelowNextLocal := by
+  change PatternPreservesBinderBound context fuel pattern expected seen state
+  apply inferMatchPatternFlatFuel.induct context
+      (motive1 := PatternPreservesBinderBound context)
+      (motive2 := PatternsPreserveBinderBound context)
+  case case10 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
+      flatArguments contextualBranch childrenIH
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | exact childrenIH _ _ _
+          (unify_preserves_localBindersBelowNextLocal below (by assumption))
+          (by assumption)
+      | exact childrenIH _ _ _
+          (unify_preserves_localBindersBelowNextLocal
+            (freshDataConstructorInstantiation_preserves_localBindersBelowNextLocal
+              _ _ inputState below)
+            (by assumption))
+          (by assumption)
+  case case11 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
+      flatArguments explicitBranch childrenIH
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | exact childrenIH _ _ _
+          (unify_preserves_localBindersBelowNextLocal below (by assumption))
+          (by assumption)
+      | exact childrenIH _ _ _
+          (unify_preserves_localBindersBelowNextLocal
+            (freshDataConstructorInstantiation_preserves_localBindersBelowNextLocal
+              _ _ inputState below)
+            (by assumption))
+          (by assumption)
+  case case13 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      elements patternEq sources argumentTypes allocatedState freshEq childrenIH
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp only [patternEq, sources, freshEq, bind, Except.bind] at success
+    cases unifiedResult :
+        unify allocatedState sourceExpected (Ty.productMany argumentTypes) with
+    | error error =>
+        simp [unifiedResult, bind, Except.bind] at success
+    | ok unifiedState =>
+        simp only [unifiedResult, bind, Except.bind] at success
+        cases childrenResult : inferMatchPatternsFlatFuel sourceFuel context
+            elements.elements argumentTypes sourceSeen unifiedState with
+        | error error =>
+            simp [childrenResult, bind, Except.bind] at success
+        | ok children =>
+            simp only [childrenResult, pure, Pure.pure, Except.pure] at success
+            injection success with resultEq
+            subst result
+            have allocatedStateEq :
+                (freshTypes sources.length inputState).2 = allocatedState :=
+              congrArg Prod.snd freshEq
+            have allocatedBelow :
+                allocatedState.LocalBindersBelowNextLocal := by
+              rw [← allocatedStateEq]
+              exact freshTypes_preserves_localBindersBelowNextLocal
+                sources.length inputState below
+            exact childrenIH unifiedState children
+              (unify_preserves_localBindersBelowNextLocal allocatedBelow
+                unifiedResult)
+              (by simpa only [sources] using childrenResult)
+  case case17 =>
+    intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
+    unfold PatternsPreserveBinderBound at *
+    unfold PatternPreservesBinderBound at ihHead
+    intro result below success
+    simp only [inferMatchPatternsFlatFuel] at success
+    cases headResult : inferMatchPatternFlatFuel fuel context head expectedHead
+        seen state with
+    | error error =>
+        simp [headResult, bind, Except.bind] at success
+    | ok inferredHead =>
+        simp only [headResult, bind, Except.bind] at success
+        cases tailResult : inferMatchPatternsFlatFuel fuel context rest
+            expectedTail inferredHead.names inferredHead.state with
+        | error error =>
+            simp [tailResult, bind, Except.bind] at success
+        | ok inferredTail =>
+            simp only [tailResult, bind, Except.bind] at success
+            injection success with resultEq
+            subst result
+            exact ihTail inferredHead inferredTail
+              (ihHead inferredHead below headResult) tailResult
+  case case3 =>
+    intros
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try subst_vars
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals
+      exact unify_preserves_binder_bound_from_success (by assumption) (by
+          simpa [State.LocalBindersBelowNextLocal, State.fresh,
+            State.addRequirementWithId] using below)
+  case case5 =>
+    intros
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try subst_vars
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals
+      exact unify_preserves_binder_bound_from_success (by assumption) (by
+          simpa [State.LocalBindersBelowNextLocal, State.fresh,
+            State.addRequirementWithId] using below)
+  case case9 =>
+    intros
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try subst_vars
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals
+      apply State.allocateBinder_preserves_localBindersBelowNextLocal
+      exact below
+  case case12 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel inner
+      patternEq induction
+    unfold PatternPreservesBinderBound at *
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp only [patternEq, bind, Except.bind] at success
+    cases innerResult : inferMatchPatternFlatFuel sourceFuel context inner
+        sourceExpected sourceSeen inputState with
+    | error error => simp [innerResult, bind, Except.bind] at success
+    | ok inferred =>
+        simp only [innerResult, bind, Except.bind, pure, Pure.pure,
+          Except.pure] at success
+        injection success with resultEq
+        subst result
+        exact induction inferred below innerResult
+  case case2 =>
+    intros
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind, pure, Pure.pure, Except.pure]
+    subst result
+    exact below
+  case case16 =>
+    intros
+    unfold PatternsPreserveBinderBound
+    intro result below success
+    simp only [inferMatchPatternsFlatFuel, pure, Pure.pure, Except.pure] at success
+    injection success with resultEq
+    subst result
+    exact below
+  all_goals
+    intros
+    first
+      | unfold PatternPreservesBinderBound at *
+      | unfold PatternsPreserveBinderBound at *
+    intro result below success
+    first
+      | unfold inferMatchPatternFlatFuel at success
+      | unfold inferMatchPatternsFlatFuel at success
+    simp_all [bind, Except.bind]
+    all_goals try subst_vars
+    all_goals assumption
+
+/-- Flat traversal of sibling patterns preserves the stable local-identity
+bound across the source-ordered list. -/
+theorem inferMatchPatternsFlatFuel_preserves_localBindersBelowNextLocal
+    {fuel : Nat} {context : Context} {patterns : List Syntax.Pattern}
+    {expected : List Ty} {seen : List String} {state : State}
+    {result : InferredPatterns}
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferMatchPatternsFlatFuel fuel context patterns expected seen
+      state = .ok result) :
+    result.state.LocalBindersBelowNextLocal := by
+  induction patterns generalizing expected seen state result with
+  | nil =>
+      cases expected with
+      | nil =>
+          simp only [inferMatchPatternsFlatFuel, pure, Pure.pure,
+            Except.pure] at success
+          injection success with resultEq
+          subst result
+          exact below
+      | cons expected expectedTypes =>
+          simp [inferMatchPatternsFlatFuel] at success
+  | cons pattern patterns induction =>
+      cases expected with
+      | nil => simp [inferMatchPatternsFlatFuel] at success
+      | cons expected expectedTypes =>
+          simp only [inferMatchPatternsFlatFuel] at success
+          cases headResult : inferMatchPatternFlatFuel fuel context pattern
+              expected seen state with
+          | error error =>
+              simp [headResult, bind, Except.bind] at success
+          | ok inferredHead =>
+              simp only [headResult, bind, Except.bind] at success
+              cases tailResult : inferMatchPatternsFlatFuel fuel context
+                  patterns expectedTypes inferredHead.names inferredHead.state
+                  with
+              | error error =>
+                  simp [tailResult, bind, Except.bind] at success
+              | ok inferredTail =>
+                  simp only [tailResult, bind, Except.bind, pure, Pure.pure,
+                    Except.pure] at success
+                  have tailBelow := induction (result := inferredTail)
+                    (inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
+                      fuel context pattern expected seen state inferredHead below
+                      headResult)
+                    tailResult
+                  injection success with resultEq
+                  subst result
+                  exact tailBelow
+
+/-- Successful flat inference of one pattern preserves the declaration-scoped
+state header for every incoming binder-name accumulator. -/
+theorem inferMatchPatternFlatFuel_state_header
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {seen : List String} {state : State}
+    {result : InferredPattern}
+    (success : inferMatchPatternFlatFuel fuel context pattern expected seen
+      state = .ok result) :
+    result.state.header = state.header :=
+  inferMatchPatternFlatFuel_preserves_header fuel context pattern expected seen
+    state result success
+
+/-- Successful flat inference of sibling patterns preserves the same
+declaration-scoped state header. -/
+theorem inferMatchPatternsFlatFuel_state_header
+    {fuel : Nat} {context : Context} {patterns : List Syntax.Pattern}
+    {expected : List Ty} {seen : List String} {state : State}
+    {result : InferredPatterns}
+    (success : inferMatchPatternsFlatFuel fuel context patterns expected seen
+      state = .ok result) :
+    result.state.header = state.header := by
+  induction patterns generalizing expected seen state result with
+  | nil =>
+      cases expected with
+      | nil =>
+          simp only [inferMatchPatternsFlatFuel, pure, Pure.pure,
+            Except.pure] at success
+          injection success with resultEq
+          subst result
+          rfl
+      | cons expected expectedTypes =>
+          simp [inferMatchPatternsFlatFuel] at success
+  | cons pattern patterns induction =>
+      cases expected with
+      | nil => simp [inferMatchPatternsFlatFuel] at success
+      | cons expected expectedTypes =>
+          simp only [inferMatchPatternsFlatFuel] at success
+          cases headResult : inferMatchPatternFlatFuel fuel context pattern
+              expected seen state with
+          | error error =>
+              simp [headResult, bind, Except.bind] at success
+          | ok inferredHead =>
+              simp only [headResult, bind, Except.bind] at success
+              cases tailResult : inferMatchPatternsFlatFuel fuel context
+                  patterns expectedTypes inferredHead.names inferredHead.state
+                  with
+              | error error =>
+                  simp [tailResult, bind, Except.bind] at success
+              | ok inferredTail =>
+                  simp only [tailResult, bind, Except.bind, pure, Pure.pure,
+                    Except.pure] at success
+                  have tailHeader := induction (result := inferredTail)
+                    tailResult
+                  injection success with resultEq
+                  subst result
+                  exact tailHeader.trans
+                    (inferMatchPatternFlatFuel_state_header headResult)
+
+/-- The complete algorithmic state package needed by source-pattern
+soundness, with no assumption about the incoming `seen` accumulator. -/
+theorem inferMatchPatternFlatFuel_stateProperties
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {seen : List String} {state : State}
+    {result : InferredPattern}
+    (ready : state.InferenceReady)
+    (expectedBelow : expected.VariablesBelow state.inference.next)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferMatchPatternFlatFuel fuel context pattern expected seen
+      state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.state.LocalBindersBelowNextLocal ∧
+      result.state.owner = state.owner := by
+  have inference := inferMatchPatternFlatFuel_inferenceProperties_internal
+    fuel context pattern expected seen state result ready expectedBelow
+    validated success
+  have header := inferMatchPatternFlatFuel_state_header success
+  exact ⟨inference.1, inference.2,
+    inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
+      fuel context pattern expected seen state result below success,
+    congrArg (fun stable : State.Header => stable.owner) header⟩
+
+/-- The corresponding algorithmic state package for a source-ordered list of
+sibling patterns. -/
+theorem inferMatchPatternsFlatFuel_stateProperties
+    {fuel : Nat} {context : Context} {patterns : List Syntax.Pattern}
+    {expected : List Ty} {seen : List String} {state : State}
+    {result : InferredPatterns}
+    (ready : state.InferenceReady)
+    (expectedBelow : ∀ type ∈ expected,
+      type.VariablesBelow state.inference.next)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (below : state.LocalBindersBelowNextLocal)
+    (success : inferMatchPatternsFlatFuel fuel context patterns expected seen
+      state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.state.LocalBindersBelowNextLocal ∧
+      result.state.owner = state.owner := by
+  induction patterns generalizing expected seen state result with
+  | nil =>
+      cases expected with
+      | nil =>
+          simp only [inferMatchPatternsFlatFuel, pure, Pure.pure,
+            Except.pure] at success
+          injection success with resultEq
+          subst result
+          exact ⟨State.InferenceProgress.refl ready.solved, ready, below, rfl⟩
+      | cons expected expectedTypes =>
+          simp [inferMatchPatternsFlatFuel] at success
+  | cons pattern patterns induction =>
+      cases expected with
+      | nil => simp [inferMatchPatternsFlatFuel] at success
+      | cons expected expectedTypes =>
+          simp only [inferMatchPatternsFlatFuel] at success
+          cases headResult : inferMatchPatternFlatFuel fuel context pattern
+              expected seen state with
+          | error error =>
+              simp [headResult, bind, Except.bind] at success
+          | ok inferredHead =>
+              simp only [headResult, bind, Except.bind] at success
+              cases tailResult : inferMatchPatternsFlatFuel fuel context
+                  patterns expectedTypes inferredHead.names inferredHead.state
+                  with
+              | error error =>
+                  simp [tailResult, bind, Except.bind] at success
+              | ok inferredTail =>
+                  simp only [tailResult, bind, Except.bind, pure, Pure.pure,
+                    Except.pure] at success
+                  have headProperties :=
+                    inferMatchPatternFlatFuel_stateProperties ready
+                      (expectedBelow expected (by simp)) validated below
+                      headResult
+                  have tailProperties := induction
+                    (expected := expectedTypes) (seen := inferredHead.names)
+                    (state := inferredHead.state) (result := inferredTail)
+                    headProperties.2.1 (by
+                      intro type member
+                      exact (expectedBelow type (by simp [member])).weaken
+                        headProperties.1.next_le)
+                    headProperties.2.2.1 tailResult
+                  injection success with resultEq
+                  subst result
+                  exact ⟨headProperties.1.trans tailProperties.1,
+                    tailProperties.2.1, tailProperties.2.2.1,
+                    tailProperties.2.2.2.trans headProperties.2.2.2⟩
 
 /-- Successful pattern inference preserves the declaration-scoped state
 header. -/
