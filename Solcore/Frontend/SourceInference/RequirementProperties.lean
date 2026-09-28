@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Expression
+import Solcore.Frontend.SourceInference.StateProperties
 
 /-! Small preservation laws for function-local source obligation identities. -/
 
@@ -553,6 +554,63 @@ theorem mono {smaller larger : List Requirement}
 
 end RequirementPredicatesCorrespond
 
+namespace State
+
+/-- Batch allocation retains the exact predicate/identity pairing returned to
+the caller.  In particular, the correspondence is stated against the final
+ledger, so later source-semantics proofs can consume it without replaying the
+recursive allocator. -/
+theorem addRequirementsWithIds_correspond
+    (state : State) (predicates : List ProgramPredicate) :
+    RequirementPredicatesCorrespond
+      (state.addRequirementsWithIds predicates).2.requirements
+      predicates (state.addRequirementsWithIds predicates).1 := by
+  induction predicates generalizing state with
+  | nil => exact .nil
+  | cons predicate rest induction =>
+      simp only [addRequirementsWithIds]
+      apply RequirementPredicatesCorrespond.cons
+      · exact addRequirementsWithIds_requirements_subset
+          (state.addRequirementWithId predicate).2 rest
+          (by simp [addRequirementWithId])
+      · exact induction (state.addRequirementWithId predicate).2
+
+/-- The allocation facts needed by a generalized-local reference: its actual
+obligation IDs follow the instantiated predicate spine, are pairwise fresh,
+and cannot reuse any template ID owned by the selected binder. -/
+structure LookupBinderRequirementAllocationCertificate
+    (state : State) (binder : TypedBinder)
+    (predicates : List ProgramPredicate) : Prop where
+  correspondence : RequirementPredicatesCorrespond
+    (state.addRequirementsWithIds predicates).2.requirements
+    predicates (state.addRequirementsWithIds predicates).1
+  ids_nodup : (state.addRequirementsWithIds predicates).1.Nodup
+  actual_ids_fresh_for_templates :
+    ∀ id, id ∈ (state.addRequirementsWithIds predicates).1 →
+      id ∉ binder.schemeRequirements.map
+        (fun requirement => requirement.templateRequirement)
+
+/-- Successful guarded lookup and canonical ledger tracking turn one batch
+allocation into the complete identity certificate required at a generalized
+local use site. -/
+theorem addRequirementsWithIds_lookupBinder_certificate
+    (state : State) (name : String) (binder : TypedBinder)
+    (predicates : List ProgramPredicate)
+    (wellFormed : state.RequirementsWellFormed)
+    (assumptionsContained : state.localSchemeAssumptions ⊆
+      state.requirements.map (fun requirement => requirement.id))
+    (found : state.lookupBinder? name = some binder) :
+    LookupBinderRequirementAllocationCertificate state binder predicates := by
+  refine ⟨addRequirementsWithIds_correspond state predicates,
+    addRequirementsWithIds_ids_nodup state predicates, ?_⟩
+  intro id allocated template
+  exact addRequirementsWithIds_ids_fresh state predicates wellFormed id
+    allocated
+    (assumptionsContained
+      (lookupBinder?_eq_some_templates_subset found template))
+
+end State
+
 namespace Detail.PlannedCoercionStep
 
 /-- One committed coercion step retains the selected edge and gives every
@@ -704,21 +762,6 @@ private theorem addRequirementsWithIds_requirements_subset
         (addRequirementWithId_requirements_subset state predicate)
         (induction (state.addRequirementWithId predicate).2)
 
-private theorem addRequirementsWithIds_correspond
-    (state : State) (predicates : List ProgramPredicate) :
-    RequirementPredicatesCorrespond
-      (state.addRequirementsWithIds predicates).2.requirements
-      predicates (state.addRequirementsWithIds predicates).1 := by
-  induction predicates generalizing state with
-  | nil => exact .nil
-  | cons predicate rest induction =>
-      simp only [State.addRequirementsWithIds]
-      apply RequirementPredicatesCorrespond.cons
-      · exact addRequirementsWithIds_requirements_subset
-          (state.addRequirementWithId predicate).2 rest
-          (by simp [State.addRequirementWithId])
-      · exact induction (state.addRequirementWithId predicate).2
-
 private theorem addRequirementsWithIds_predicates
     (state : State) (predicates : List ProgramPredicate) :
     (state.addRequirementsWithIds predicates).2.requirements.map
@@ -806,7 +849,7 @@ theorem commitCoercionPlan_corresponds
             (commitCoercionPlan_requirements_subset
               (((state.addRequirementWithId step.predicate).2
                 |>.addRequirementsWithIds step.methodPredicates).2) rest)
-          exact addRequirementsWithIds_correspond
+          exact State.addRequirementsWithIds_correspond
             (state.addRequirementWithId step.predicate).2
             step.methodPredicates
       · exact induction

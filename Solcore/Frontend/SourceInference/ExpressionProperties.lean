@@ -89,6 +89,40 @@ theorem qualifiedFunctionsNamed_success_subset_catalog
                   simp [qualifiedFunctionsNamed, imported, root, targets]
                     at success
 
+/-- Invert the successful local-identifier branch through its canonical scheme
+instantiation and requirement allocation, stopping at the exact expression
+recording operation used by the traversal. -/
+theorem inferExprFuel_success_localIdentifier_record
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {name : Syntax.Identifier} {binder : TypedBinder}
+    {result : InferredExpression × State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    (let instantiationStart := allocated.inference.next
+     let instantiated :=
+       binder.scheme.instantiateWithSubstitution instantiationStart
+     let inference := {
+       allocated.inference with next := instantiated.next
+     }
+     let advanced : State := { allocated with inference }
+     let predicates := binder.schemeRequirements.map fun requirement =>
+       applyPredicate advanced
+         (TypedTraitResolution.applySubstitution instantiated.substitution
+           requirement.predicate)
+     let (requirements, recorded) :=
+       advanced.addRequirementsWithIds predicates
+     recordExpressionWithExpected context expression id
+       (advanced.resolve instantiated.body)
+       (.reference name.value (.local binder.id)) requirements expected recorded
+       (localSchemeInstantiationStart := some instantiationStart) = .ok result) := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, lookupEq] at success
+  simpa only using success
+
 namespace PlannedCoercionStep
 
 /-- A planned coercion edge retains the canonical `Coerce<source, target>`

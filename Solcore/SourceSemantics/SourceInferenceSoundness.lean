@@ -1211,18 +1211,9 @@ theorem addRequirementsWithIds_correspond
     (predicates : List ProgramPredicate) :
     RequirementPredicatesCorrespond
       (state.addRequirementsWithIds predicates).2.requirements predicates
-      (state.addRequirementsWithIds predicates).1 := by
-  induction predicates generalizing state with
-  | nil => exact .nil
-  | cons predicate rest induction =>
-      simp only [Frontend.SourceInference.State.addRequirementsWithIds]
-      apply RequirementPredicatesCorrespond.cons
-      · have included :=
-          Frontend.SourceInference.State.addRequirementsWithIds_requirements_subset
-            (state.addRequirementWithId predicate).2 rest
-        apply included
-        simp [Frontend.SourceInference.State.addRequirementWithId]
-      · exact induction (state.addRequirementWithId predicate).2
+      (state.addRequirementsWithIds predicates).1 :=
+  Frontend.SourceInference.State.addRequirementsWithIds_correspond
+    state predicates
 
 /-- Every successful unary-operator inference step is already a declarative
 primitive or trait typing, except for the one open Word-literal target which
@@ -2297,6 +2288,51 @@ theorem solveRequirements_correspondingSequenceProvesAt
       · apply induction
         intro tailId tailMember
         exact occurs tailId (by simp [tailMember])
+
+/-- The ordered evidence row allocated for one canonical local-scheme
+instantiation remains valid after the enclosing inference traversal advances
+to its final state.  Requirement solving normalizes the already-normalized
+allocation row once more; semantic substitution extension removes that
+redundant earlier normalization. -/
+theorem localReferenceRequirementSequenceProves_afterProgress
+    {inferenceContext : Frontend.SourceInference.Context}
+    {instantiationState finalState : Frontend.SourceInference.State}
+    {solved : List SolvedRequirement}
+    {base active : SourceSemantics.Context}
+    {source : TypedSource}
+    {occurrence : NodeId}
+    {binder : TypedBinder}
+    {instantiationStart : Nat}
+    {ids : List RequirementId}
+    (progress : instantiationState.InferenceProgress finalState)
+    (corresponds : RequirementPredicatesCorrespond finalState.requirements
+      ((instantiateLocalSchemePredicates
+          (binder.scheme.instantiateWithSubstitution
+            instantiationStart).substitution binder).map
+        (Detail.applyPredicate instantiationState)) ids)
+    (success : Detail.solveRequirements inferenceContext finalState
+      finalState.requirements = .ok solved)
+    (solved_eq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base source)
+    (ownership : RequirementOwnership base source)
+    (signatures_eq : active.signatures = base.signatures)
+    (requirements_eq : active.solvedRequirements = base.solvedRequirements)
+    (assumptions_mono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered source active occurrence)
+    (occurs : ∀ id, id ∈ ids →
+      PrimaryRequirementOccursAt source occurrence id) :
+    RequirementSequenceProves active ids
+      ((instantiateLocalSchemePredicates
+          (binder.scheme.instantiateWithSubstitution
+            instantiationStart).substitution binder).map
+        (TypedTraitResolution.applySubstitution
+          finalState.inference.substitution)) := by
+  have proves := solveRequirements_correspondingSequenceProvesAt corresponds
+    success solved_eq ledger ownership signatures_eq requirements_eq
+    assumptions_mono covered occurs
+  simpa only [List.map_map, Function.comp_def, Detail.applyPredicate,
+    TypedTraitResolution.applySubstitution_semanticallyExtends
+      progress.substitution_extends] using proves
 
 /-- Decoding, final carrier closure, exact ledger ownership, and solver
 soundness compose into the declarative validity judgment for one inferred

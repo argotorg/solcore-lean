@@ -232,6 +232,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_correspondingSequenceProvesAt
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.localReferenceRequirementSequenceProves_afterProgress
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.integerLiteralValid_of_solved
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_committedCoercionStepSequenceProves

@@ -517,6 +517,12 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.commitCoercionPlan_preserves_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.RequirementPredicatesCorrespond
 example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementsWithIds_correspond
+example :=
+  @Solcore.Frontend.SourceInference.State.LookupBinderRequirementAllocationCertificate
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementsWithIds_lookupBinder_certificate
+example :=
   @Solcore.Frontend.SourceInference.Detail.PlannedCoercionStep.CommitCorresponds
 example :=
   @Solcore.Frontend.SourceInference.Detail.CoercionPlanCommitCorresponds
@@ -640,6 +646,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.resolveSourceType_success_apply_eq_self
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_localIdentifier_record
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_inferenceProperties
 example :=
