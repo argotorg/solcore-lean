@@ -3858,7 +3858,10 @@ private def MatchPatternsFlatInferenceProperties (context : Context)
     computation = .ok result →
     state.InferenceProgress result.state ∧ result.state.InferenceReady
 
-private theorem contextualConstructorPrefix_inferenceProperties
+/-- Contextual constructor selection followed by result-type unification
+advances inference monotonically, preserves readiness, and bounds every
+instantiated payload type at the returned allocator. -/
+theorem contextualConstructorPrefix_inferenceProperties
     {context : Context} {state next : State} {expected : Ty} {name : String}
     {dataType : ProgramDataSignature}
     {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
@@ -3888,7 +3891,10 @@ private theorem contextualConstructorPrefix_inferenceProperties
   exact ⟨progress, nextReady, fun payload member =>
     (bounded.1 payload member).weaken progress.next_le⟩
 
-private theorem explicitConstructorPrefix_inferenceProperties
+/-- Explicit constructor selection, fresh generic instantiation, and
+result-type unification advance inference monotonically, preserve readiness,
+and bound every instantiated payload type at the returned allocator. -/
+theorem explicitConstructorPrefix_inferenceProperties
     {context : Context} {state allocated next : State} {expected : Ty}
     {qualifiers : List String} {name : String}
     {dataType : ProgramDataSignature}

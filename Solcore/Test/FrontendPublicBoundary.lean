@@ -538,6 +538,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.contextualConstructorCandidate_success_instantiation_variablesBelow
 example :=
+  @Solcore.Frontend.SourceInference.Detail.contextualConstructorPrefix_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.explicitConstructorPrefix_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.instantiateDataConstructor_types_variablesBelow
 example :=
   @Solcore.Frontend.SourceInference.Detail.constructorCalleeCandidates_success_members
