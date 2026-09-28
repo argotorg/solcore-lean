@@ -1178,6 +1178,137 @@ theorem inferExprFuel_success_localIdentifier_containsExpression
       allocationEq lookupEq success
   exact recordExpressionWithExpected_success_containsExpression recorded roots
 
+/-- The concrete local-identifier branch exposes, in one place, the exact
+recorded node and the three allocation facts later consumed by declarative
+local-scheme instantiation.  Keeping this inversion separate from semantic
+context closure avoids hiding the executable branch under a large soundness
+theorem. -/
+theorem inferExprFuel_success_localIdentifier_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier} {binder : TypedBinder}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : Detail.inferExprFuel (fuel + 1) context expression expected
+      initial = .ok result)
+    (certificate :
+      let instantiationStart := allocated.inference.next
+      let instantiated :=
+        binder.scheme.instantiateWithSubstitution instantiationStart
+      let inference := {
+        allocated.inference with next := instantiated.next
+      }
+      let advanced : Frontend.SourceInference.State := {
+        allocated with inference
+      }
+      let predicates := binder.schemeRequirements.map fun requirement =>
+        Detail.applyPredicate advanced
+          (TypedTraitResolution.applySubstitution instantiated.substitution
+            requirement.predicate)
+      Frontend.SourceInference.State.LookupBinderRequirementAllocationCertificate
+        advanced binder predicates)
+    (roots : List NodeId := []) :
+    (let instantiationStart := allocated.inference.next
+     let instantiated :=
+       binder.scheme.instantiateWithSubstitution instantiationStart
+     let inference := {
+       allocated.inference with next := instantiated.next
+     }
+     let advanced : Frontend.SourceInference.State := {
+       allocated with inference
+     }
+     let predicates := binder.schemeRequirements.map fun requirement =>
+       Detail.applyPredicate advanced
+         (TypedTraitResolution.applySubstitution instantiated.substitution
+           requirement.predicate)
+     let requirementAllocation := advanced.addRequirementsWithIds predicates
+     ∃ coercions,
+       ContainsExpression (result.2.toTypedSource roots) result.1.id {
+         id := result.1.id
+         span := expression.span
+         type := result.1.type
+         form := .reference name.value (.local binder.id)
+         requirements := requirementAllocation.1 ++
+           Detail.coercionRequirements coercions
+         coercions
+         localSchemeInstantiationStart := some instantiationStart
+       } ∧
+       requirementAllocation.1.Nodup ∧
+       (∀ requirement, requirement ∈ requirementAllocation.1 →
+         requirement ∉ localSchemeTemplateIds binder) ∧
+       RequirementPredicatesCorrespond result.2.requirements
+         ((instantiateLocalSchemePredicates instantiated.substitution
+            binder).map (Detail.applyPredicate advanced))
+         requirementAllocation.1) := by
+  let instantiationStart := allocated.inference.next
+  let instantiated :=
+    binder.scheme.instantiateWithSubstitution instantiationStart
+  let inference := {
+    allocated.inference with next := instantiated.next
+  }
+  let advanced : Frontend.SourceInference.State := {
+    allocated with inference
+  }
+  let predicates := binder.schemeRequirements.map fun requirement =>
+    Detail.applyPredicate advanced
+      (TypedTraitResolution.applySubstitution instantiated.substitution
+        requirement.predicate)
+  let requirementAllocation := advanced.addRequirementsWithIds predicates
+  change
+    Frontend.SourceInference.State.LookupBinderRequirementAllocationCertificate
+      advanced binder predicates at certificate
+  change ∃ coercions,
+    ContainsExpression (result.2.toTypedSource roots) result.1.id {
+      id := result.1.id
+      span := expression.span
+      type := result.1.type
+      form := .reference name.value (.local binder.id)
+      requirements := requirementAllocation.1 ++
+        Detail.coercionRequirements coercions
+      coercions
+      localSchemeInstantiationStart := some instantiationStart
+    } ∧
+    requirementAllocation.1.Nodup ∧
+    (∀ requirement, requirement ∈ requirementAllocation.1 →
+      requirement ∉ localSchemeTemplateIds binder) ∧
+    RequirementPredicatesCorrespond result.2.requirements
+      ((instantiateLocalSchemePredicates instantiated.substitution binder).map
+        (Detail.applyPredicate advanced)) requirementAllocation.1
+  have containsResult :=
+    inferExprFuel_success_localIdentifier_containsExpression expressionEq
+      allocationEq lookupEq success roots
+  change ∃ coercions,
+    ContainsExpression (result.2.toTypedSource roots) result.1.id {
+      id := result.1.id
+      span := expression.span
+      type := result.1.type
+      form := .reference name.value (.local binder.id)
+      requirements := requirementAllocation.1 ++
+        Detail.coercionRequirements coercions
+      coercions
+      localSchemeInstantiationStart := some instantiationStart
+    } at containsResult
+  obtain ⟨coercions, contains⟩ := containsResult
+  have recorded := Detail.inferExprFuel_success_localIdentifier_record
+    expressionEq allocationEq lookupEq success
+  change Detail.recordExpressionWithExpected context expression id
+    (advanced.resolve instantiated.body)
+    (.reference name.value (.local binder.id)) requirementAllocation.1
+    expected requirementAllocation.2
+    (localSchemeInstantiationStart := some instantiationStart) = .ok result
+      at recorded
+  have correspondence := certificate.correspondence.mono
+    (Detail.recordExpressionWithExpected_requirements_subset recorded)
+  refine ⟨coercions, contains, certificate.ids_nodup, ?_, ?_⟩
+  · intro requirement member
+    simpa [localSchemeTemplateIds] using
+      certificate.actual_ids_fresh_for_templates requirement member
+  · simpa [predicates, instantiateLocalSchemePredicates, List.map_map,
+      Function.comp_def] using correspondence
+
 /-- Successful executable graph validation establishes the complete initial
 declarative occurrence-graph well-formedness layer. -/
 theorem validateSourceGraph_success_occurrenceGraphWellFormed
@@ -2814,6 +2945,122 @@ theorem localReferenceRequirementSequenceProves_afterProgress
   simpa only [List.map_map, Function.comp_def, Detail.applyPredicate,
     TypedTraitResolution.applySubstitution_semanticallyExtends
       progress.substitution_extends] using proves
+
+/-- The exact node and allocation facts exposed by the executable
+local-identifier branch assemble into declarative expression typing after the
+enclosing inference traversal reaches its final substitution.  Global solver
+and scope premises remain explicit because they belong to whole-body
+finalization, not to identifier inference itself. -/
+theorem localIdentifierBranchExpressionHasType_afterProgress
+    {inferenceContext : Frontend.SourceInference.Context}
+    {lookupState instantiationState finalState :
+      Frontend.SourceInference.State}
+    {solved : List SolvedRequirement}
+    {base target : SourceSemantics.Context}
+    {source ledgerSource : TypedSource}
+    {expression : Syntax.Expr} {name : Syntax.Identifier}
+    {binder : TypedBinder} {result : InferredExpression}
+    {instantiationStart : Nat} {actualRequirements : List RequirementId}
+    {coercions : List CoercionStep}
+    (lookupEq : lookupState.lookupBinder? name.value = some binder)
+    (contains : ContainsExpression source result.id {
+      id := result.id
+      span := expression.span
+      type := result.type
+      form := .reference name.value (.local binder.id)
+      requirements := actualRequirements ++
+        Detail.coercionRequirements coercions
+      coercions
+      localSchemeInstantiationStart := some instantiationStart
+    })
+    (aligned : LocalEnvironmentAligned lookupState
+      finalState.inference.substitution target)
+    (formation : ActiveLocalFormation lookupState
+      finalState.inference.substitution target)
+    (binders : TypeParameterBindersWellFormed target)
+    (residual : target.residualTypeVariables = true)
+    (outerRange : SubstitutionRangeAdmissible target
+      finalState.inference.substitution)
+    (noCapture : Detail.LocalBinderInstantiationNoCapture
+      finalState.inference.substitution binder)
+    (actualUnique : actualRequirements.Nodup)
+    (actualDisjoint : ∀ requirement,
+      requirement ∈ actualRequirements →
+        requirement ∉ localSchemeTemplateIds binder)
+    (progress : instantiationState.InferenceProgress finalState)
+    (corresponds : RequirementPredicatesCorrespond finalState.requirements
+      ((instantiateLocalSchemePredicates
+          (binder.scheme.instantiateWithSubstitution
+            instantiationStart).substitution binder).map
+        (Detail.applyPredicate instantiationState)) actualRequirements)
+    (solveSuccess : Detail.solveRequirements inferenceContext finalState
+      finalState.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (signaturesEq : target.signatures = base.signatures)
+    (requirementsEq : target.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ target.assumptions)
+    (covered : TemplateScopeCovered ledgerSource target
+      (.expression result.id))
+    (occurs : ∀ requirement, requirement ∈ actualRequirements →
+      PrimaryRequirementOccursAt ledgerSource (.expression result.id)
+        requirement)
+    (finalAdmissible : TypeAdmissible target
+      (finalState.inference.substitution.apply result.type))
+    (path : CoercionPathValid target
+      (finalState.inference.substitution.apply
+        (binder.scheme.instantiateWithSubstitution
+          instantiationStart).body)
+      (finalState.inference.substitution.apply result.type)
+      (coercions.map (CoercionStep.applySubstitution
+        finalState.inference.substitution))) :
+    ExpressionHasType
+      (source.applySubstitution finalState.inference.substitution)
+      target result.id
+      (finalState.inference.substitution.apply result.type) := by
+  let outer := finalState.inference.substitution
+  have environment := localReferenceEnvironmentFacts_of_lookupBinder?
+    aligned formation lookupEq
+  have requirements := localReferenceRequirementSequenceProves_afterProgress
+    progress corresponds solveSuccess solvedEq ledger ownership signaturesEq
+    requirementsEq assumptionsMono covered occurs
+  have appliedDisjoint : ∀ requirement,
+      requirement ∈ actualRequirements →
+        requirement ∉
+          localSchemeTemplateIds (binder.applySubstitution outer) := by
+    simpa only
+      [FlexibleSubstitution.localSchemeTemplateIds_applySubstitution] using
+        actualDisjoint
+  have instantiationValid :=
+    canonicalLocalSchemeInstantiationValid_afterSubstitution binders residual
+      outerRange environment.2.2.2 environment.2.2.1 noCapture
+      instantiationStart actualUnique appliedDisjoint requirements
+  exact canonicalLocalReferenceExpressionHasType_afterSubstitution
+    (source := source.applySubstitution outer)
+    (outer := outer) (target := target) (id := result.id)
+    (node := ({
+      id := result.id
+      span := expression.span
+      type := result.type
+      form := .reference name.value (.local binder.id)
+      requirements := actualRequirements ++
+        Detail.coercionRequirements coercions
+      coercions
+      localSchemeInstantiationStart := some instantiationStart
+    } : ExpressionNode).applySubstitution outer)
+    (name := name.value) (binder := binder)
+    (actualRequirements := actualRequirements)
+    (FlexibleSubstitution.ContainsExpression.applySubstitution outer contains)
+    rfl environment.1 environment.2.1 binders residual outerRange
+    environment.2.2.2 environment.2.2.1 noCapture instantiationStart
+    actualUnique appliedDisjoint requirements instantiationValid.type_admissible
+    finalAdmissible path (by
+      change actualRequirements ++ Detail.coercionRequirements coercions =
+        actualRequirements ++ coercionRequirementIds
+          (coercions.map (CoercionStep.applySubstitution outer))
+      rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
+      rfl)
 
 /-- Decoding, final carrier closure, exact ledger ownership, and solver
 soundness compose into the declarative validity judgment for one inferred

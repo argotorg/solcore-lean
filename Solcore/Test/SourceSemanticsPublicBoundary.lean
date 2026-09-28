@@ -165,6 +165,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_containsExpression
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_facts
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_occurrenceGraphWellFormed
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceLocalIdentities_success_localIdentityOwnership
@@ -259,6 +261,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_correspondingSequenceProvesAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.localReferenceRequirementSequenceProves_afterProgress
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.localIdentifierBranchExpressionHasType_afterProgress
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.integerLiteralValid_of_solved
 example :=
