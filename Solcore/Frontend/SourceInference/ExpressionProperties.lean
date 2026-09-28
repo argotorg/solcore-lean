@@ -4375,7 +4375,7 @@ theorem inferMatchPatternFuel_state_header
 
 /-- Successful nested-pattern inference preserves or advances the shared
 declaration-local cutoff. -/
-private theorem inferMatchPatternFuel_nextLocal_le
+theorem inferMatchPatternFuel_nextLocal_le
     {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
     {expected : Ty} {state : State} {result : TypedMatchPattern × State}
     (success : inferMatchPatternFuel fuel context pattern expected state =
@@ -4397,6 +4397,24 @@ private theorem inferMatchPatternFuel_nextLocal_le
       subst result
       exact inferMatchPatternFlatFuel_advances_nextLocal fuel context pattern
         expected [] state inferred flatResult
+
+@[simp] theorem inferMatchPatternFuel_preserves_owner
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {state : State} {result : TypedMatchPattern × State}
+    (success : inferMatchPatternFuel fuel context pattern expected state =
+      .ok result) :
+    result.2.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (inferMatchPatternFuel_state_header success)
+
+@[simp] theorem inferMatchPatternFuel_preserves_inputs
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {state : State} {result : TypedMatchPattern × State}
+    (success : inferMatchPatternFuel fuel context pattern expected state =
+      .ok result) :
+    result.2.inputs = state.inputs :=
+  congrArg (fun header : State.Header => header.inputs)
+    (inferMatchPatternFuel_state_header success)
 
 private theorem inferUnaryOperator_state_header
     {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}

@@ -659,6 +659,14 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_success_lexicalScope_eq
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_nextLocal_le
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_preserves_owner
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchPatternFuel_preserves_inputs
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_nextLocal_le
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_localBindersBelowNextLocal
