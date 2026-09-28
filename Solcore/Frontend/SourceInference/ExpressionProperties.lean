@@ -11217,6 +11217,43 @@ theorem inferExprFuel_success_lexicalScope_eq
   inferExprFuel_preserves_lexicalScope fuel context expression expected state
     result success
 
+private theorem inferPlaceFuel_preserves_lexicalScope
+    (fuel : Nat) (context : Context) (target : Syntax.Expr) (state : State) :
+    PreservesLexicalScope Prod.snd state
+      (inferPlaceFuel fuel context target state) :=
+  inferFuel_preserves_lexicalScope_internal.2.2.2.2.2.2.2.1
+    fuel context target state
+
+/-- Successful place inference preserves the caller's stable lexical scope;
+index expressions and other transient traversals cannot leak binders. -/
+theorem inferPlaceFuel_success_lexicalScope_eq
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    result.2.lexicalScope = state.lexicalScope :=
+  inferPlaceFuel_preserves_lexicalScope fuel context target state result
+    success
+
+private theorem inferAssignedValueFuel_preserves_lexicalScope
+    (fuel : Nat) (context : Context) (target : Syntax.Expr)
+    (operator : Syntax.ValueAssignOp) (value : Syntax.Expr) (state : State) :
+    PreservesLexicalScope (fun result => result.2.2) state
+      (inferAssignedValueFuel fuel context target operator value state) :=
+  inferFuel_preserves_lexicalScope_internal.2.2.2.2.2.2.2.2.1
+    fuel context target operator value state
+
+/-- Successful value-assignment inference preserves the caller's stable
+lexical scope across both place and right-hand-side traversal. -/
+theorem inferAssignedValueFuel_success_lexicalScope_eq
+    {fuel : Nat} {context : Context} {target value : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {state final : State}
+    {assignment : AssignmentResolution} {inferredValue : InferredExpression}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok (assignment, inferredValue, final)) :
+    final.lexicalScope = state.lexicalScope :=
+  inferAssignedValueFuel_preserves_lexicalScope fuel context target operator
+    value state (assignment, inferredValue, final) success
+
 private theorem pair_except_nextLocal {ε α β : Type}
     {computation : Except ε (α × β)} {result : α × β}
     {initial : State} {nextLocal : β → Nat}

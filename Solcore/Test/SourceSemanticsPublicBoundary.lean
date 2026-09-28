@@ -149,6 +149,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferExprFuel
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferPlaceFuel
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferAssignedValueFuel
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.withLocals
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.allocateStatementId

@@ -865,6 +865,44 @@ theorem inferExprFuel
   simpa [Frontend.SourceInference.State.lexicalScope] using
     congrArg (fun scope : LexicalScope => scope.binders) scopeEq
 
+/-- Place inference traverses index expressions and member projections but
+restores the caller's active lexical scope before returning. -/
+theorem inferPlaceFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression : Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {place : PlaceResolution}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (success : Detail.inferPlaceFuel fuel inferenceContext targetExpression
+      state = .ok (place, final)) :
+    ActiveLocalContextInvariant final substitution context := by
+  apply invariant.congr_localBinders
+  have scopeEq := Detail.inferPlaceFuel_success_lexicalScope_eq success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
+/-- Assignment-value inference preserves the caller's active lexical scope
+across both place traversal and right-hand-side expression inference. -/
+theorem inferAssignedValueFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression value : Syntax.Expr} {operator : Syntax.ValueAssignOp}
+    {state final : Frontend.SourceInference.State}
+    {assignment : AssignmentResolution} {inferredValue : InferredExpression}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (success : Detail.inferAssignedValueFuel fuel inferenceContext
+      targetExpression operator value state =
+        .ok (assignment, inferredValue, final)) :
+    ActiveLocalContextInvariant final substitution context := by
+  apply invariant.congr_localBinders
+  have scopeEq :=
+    Detail.inferAssignedValueFuel_success_lexicalScope_eq success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
 /-- Replacing the compatibility-only name environment does not affect the
 stable lexical invariant. -/
 theorem withLocals
