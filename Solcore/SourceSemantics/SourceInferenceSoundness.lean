@@ -906,6 +906,28 @@ theorem recordNode
   apply invariant.congr_localBinders
   rfl
 
+/-- Unification updates only the inference substitution, so it preserves the
+complete active-local invariant. -/
+theorem unify
+    {state final : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context} {left right : TypeSystem.Ty}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (success : Detail.unify state left right = .ok final) :
+    ActiveLocalContextInvariant final substitution context := by
+  apply invariant.congr_localBinders
+  unfold Detail.unify at success
+  cases inferenceResult : Detail.liftUnification
+      (state.inference.unify left right) with
+  | error error =>
+      simp [inferenceResult, bind, Except.bind] at success
+  | ok inference =>
+      simp only [inferenceResult, bind, Except.bind] at success
+      change Except.ok { state with inference } = Except.ok final at success
+      injection success with finalEq
+      subst final
+      rfl
+
 /-- Restoring an enclosing lexical snapshot restores both halves of the
 combined invariant. -/
 theorem restoreLexicalScope
@@ -3530,6 +3552,207 @@ theorem block
     agreement.sawReturn_eq⟩
 
 end StatementResultMatchesFactsAfterSubstitution
+
+/-- A successful bare return preserves the active lexical context and is
+declaratively typed once the final substitution extends its unification
+state. -/
+theorem inferStatementFuel_success_returnUnit_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .returnStmt none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := []) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target {
+          type := outer.apply expectedReturn
+          hasValue := true
+          sawReturn := true
+          control := .returned
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := outer.apply expectedReturn
+        hasValue := true
+        sawReturn := true
+        control := .returned
+      } := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨unified, unifySuccess, resolvedEq, resultEq, contains⟩ :=
+    inferStatementFuel_success_returnUnit_facts statementEq allocationEq
+      success roots
+  have unifiedInvariant :
+      ActiveLocalContextInvariant unified outer target :=
+    allocatedInvariant.unify unifySuccess
+  subst result
+  refine ⟨unifiedInvariant.recordNode _, ?_, ?_⟩
+  · exact returnUnitStatementHasType_afterSubstitution contains resolvedEq
+      outerExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.returned outerExtension
+
+/-- A successful value return is compositional modulo typing of its child
+expression.  Expected-type coherence identifies the finalized child type
+with the function return type, and recording the parent keeps the active
+lexical context unchanged. -/
+theorem inferStatementFuel_success_returnValue_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {value : Syntax.Expr}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .returnStmt (some value))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (valueSound :
+      ∀ {inferred : InferredExpression}
+        {valueState : Frontend.SourceInference.State},
+        Detail.inferExprFuel fuel inferenceContext value
+            (some expectedReturn) allocated = .ok (inferred, valueState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target inferred.id (outer.apply inferred.type)) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target {
+          type := outer.apply expectedReturn
+          hasValue := true
+          sawReturn := true
+          control := .returned
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := outer.apply expectedReturn
+        hasValue := true
+        sawReturn := true
+        control := .returned
+      } := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨inferred, valueState, valueSuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_returnValue_facts statementEq allocationEq
+      success roots
+  have valueInvariant :
+      ActiveLocalContextInvariant valueState outer target :=
+    allocatedInvariant.inferExprFuel valueSuccess
+  have valueTyping := valueSound valueSuccess
+  subst result
+  have valueExtension : outer.SemanticallyExtends
+      valueState.inference.substitution := by
+    change outer.SemanticallyExtends valueState.inference.substitution at outerExtension
+    exact outerExtension
+  have expectedEq :
+      outer.apply inferred.type = outer.apply expectedReturn :=
+    Detail.inferExprFuel_expected_type_apply_eq valueSuccess valueExtension
+  refine ⟨valueInvariant.recordNode _, ?_, ?_⟩
+  · exact returnValueStatementHasType_afterSubstitution contains valueTyping
+      expectedEq valueExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.returned valueExtension
+
+/-- Successful `break` inference preserves the active lexical context.  The
+frontend loop-depth guard is exactly the premise needed by declarative
+typing. -/
+theorem inferStatementFuel_success_break_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .breakStmt)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (roots : List NodeId := []) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .breaking
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .breaking
+      } := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨allowed, resultEq, contains⟩ :=
+    inferStatementFuel_success_break_facts statementEq allocationEq success
+      roots
+  subst result
+  refine ⟨allocatedInvariant.recordNode _, ?_, ?_⟩
+  · exact breakStatementHasType_afterSubstitution contains allowed
+  · exact StatementResultMatchesFactsAfterSubstitution.breakStmt outer id _
+
+/-- Successful `continue` inference has the same stable-context boundary as
+`break`, while retaining its distinct declarative control result. -/
+theorem inferStatementFuel_success_continue_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .continueStmt)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (roots : List NodeId := []) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .continuing
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .continuing
+      } := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨allowed, resultEq, contains⟩ :=
+    inferStatementFuel_success_continue_facts statementEq allocationEq success
+      roots
+  subst result
+  refine ⟨allocatedInvariant.recordNode _, ?_, ?_⟩
+  · exact continueStatementHasType_afterSubstitution contains allowed
+  · exact StatementResultMatchesFactsAfterSubstitution.continueStmt outer id _
 
 /-- Empty executable block inference returns the canonical empty block
 without changing its input state. -/
