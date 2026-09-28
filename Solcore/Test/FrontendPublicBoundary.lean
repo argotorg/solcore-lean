@@ -421,6 +421,14 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.freshDataConstructorInstantiation_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.explicitConstructorCandidate_success_members
+example :=
+  @Solcore.Frontend.SourceInference.Detail.contextualConstructorCandidate_success_facts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.instantiateDataConstructor_types_variablesBelow
+example :=
+  @Solcore.Frontend.SourceInference.Detail.constructorCalleeCandidates_success_members
+example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_coercions_isValid
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_success_cases

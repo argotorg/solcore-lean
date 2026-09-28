@@ -307,6 +307,68 @@ example {signatures : ProgramSignatures}
     ProgramSignatureFormationValidated.data_constructor_payloadTypes_variablesBelow
       validated dataMember constructorMember next
 
+/-- Explicit constructor lookup preserves the owning data declaration and
+constructor's membership in the whole-program signature catalog. -/
+example {context : SourceInference.Context} {qualifiers : List String}
+    {name : String} {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    (success : SourceInference.Detail.explicitConstructorCandidate context
+      qualifiers name = .ok (dataType, constructor)) :
+    dataType ∈ context.signatures.dataTypes ∧
+      constructor ∈ dataType.constructors := by
+  exact SourceInference.Detail.explicitConstructorCandidate_success_members
+    success
+
+/-- Contextual constructor lookup additionally records the nominal expected
+type that supplied the constructor's type arguments. -/
+example {context : SourceInference.Context} {state : SourceInference.State}
+    {expected : Option TypeSystem.Ty} {name : String}
+    {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    {arguments : List TypeSystem.Ty}
+    (success : SourceInference.Detail.contextualConstructorCandidate context
+      state expected name = .ok (dataType, constructor, arguments)) :
+    dataType ∈ context.signatures.dataTypes ∧
+      constructor ∈ dataType.constructors ∧
+      ∃ expectedType,
+        expected = some expectedType ∧
+          state.resolve expectedType =
+            TypeSystem.Ty.nominal dataType.id arguments := by
+  exact SourceInference.Detail.contextualConstructorCandidate_success_facts
+    success
+
+/-- Pure constructor instantiation preserves allocator bounds on substituted
+payload and nominal result types. -/
+example {dataType : ProgramDataSignature}
+    {constructor : ProgramDataConstructorSignature}
+    {arguments : List TypeSystem.Ty} {next : Nat}
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.VariablesBelow next)
+    (payloadTypesBelow : ∀ payload ∈ constructor.payloadTypes,
+      payload.VariablesBelow next) :
+    (∀ payload ∈
+        (SourceInference.Detail.instantiateDataConstructor dataType constructor
+          arguments).payloadTypes,
+      payload.VariablesBelow next) ∧
+      (SourceInference.Detail.instantiateDataConstructor dataType constructor
+        arguments).resultType.VariablesBelow next := by
+  exact SourceInference.Detail.instantiateDataConstructor_types_variablesBelow
+    argumentsBelow payloadTypesBelow
+
+/-- Every constructor-callee candidate retains whole-program ownership
+provenance. -/
+example {context : SourceInference.Context} {state : SourceInference.State}
+    {callee : Syntax.Expr}
+    {candidates : List
+      (ProgramDataSignature × ProgramDataConstructorSignature)}
+    (success : SourceInference.Detail.constructorCalleeCandidates context state
+      callee = .ok candidates) :
+    ∀ dataType constructor, (dataType, constructor) ∈ candidates →
+      dataType ∈ context.signatures.dataTypes ∧
+        constructor ∈ dataType.constructors := by
+  exact SourceInference.Detail.constructorCalleeCandidates_success_members
+    success
+
 /-- Fresh constructor instantiation packages allocator progress, readiness,
 bounded parameter replacements, bounded payloads, and a bounded nominal
 result without relying on a concrete constructor fixture. -/
