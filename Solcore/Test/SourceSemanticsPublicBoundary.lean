@@ -205,7 +205,7 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedUninitialized_facts
 example :=
-  @Solcore.SourceSemantics.SourceInferenceSoundness.annotatedUninitializedBinderFacts_afterSubstitution
+  @Solcore.SourceSemantics.SourceInferenceSoundness.resolvedAnnotationBinderFacts_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.letAnnotatedUninitializedStatementHasType_afterSubstitution
 example :=
@@ -213,7 +213,9 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.letInitializedGeneralizedStatementHasType_afterSubstitution
 example :=
-  @Solcore.SourceSemantics.SourceInferenceSoundness.annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSubstitution
+  @Solcore.SourceSemantics.SourceInferenceSoundness.letAnnotatedInitializedStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.resolvedAnnotationBinderPreservesActiveLocalContextInvariant_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedUninitialized_sound
 example :=

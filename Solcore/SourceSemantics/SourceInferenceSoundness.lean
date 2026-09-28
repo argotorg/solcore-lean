@@ -1663,17 +1663,17 @@ theorem inferStatementFuel_success_letAnnotatedUninitialized_facts
         rfl, rfl, rfl, rfl, rfl, rfl,
         recordNode_containsStatement binding.2 _ roots⟩
 
-/-- Closing the binder produced by an annotated declaration without an
-initializer yields a well-formed monomorphic scheme, no qualified local
-requirements, and the exact declarative generalization judgment.  This is the
-shared closure certificate used by both statement typing and recursive
-lexical-invariant preservation. -/
-theorem annotatedUninitializedBinderFacts_afterSubstitution
+/-- Closing a binder generalized from a resolved source annotation yields a
+well-formed monomorphic scheme, no qualified local requirements, and the exact
+declarative generalization judgment.  The generalization barrier position is
+explicit so the certificate serves both initialized and uninitialized lets. -/
+theorem resolvedAnnotationBinderFacts_afterSubstitution
     {target : SourceSemantics.Context}
     {outer : TypeSystem.Substitution}
     {inferenceContext : Frontend.SourceInference.Context}
     {name : Syntax.Identifier} {sourceType : Syntax.TypeExpr}
     {state final : Frontend.SourceInference.State}
+    {requirementStart : Nat}
     {resolvedType valueType : TypeSystem.Ty}
     {locals : TypeSystem.Environment}
     {generalized : Detail.GeneralizedValue} {binder : TypedBinder}
@@ -1681,7 +1681,7 @@ theorem annotatedUninitializedBinderFacts_afterSubstitution
       .ok resolvedType)
     (valueType_eq : valueType = state.resolve resolvedType)
     (generalized_eq : generalized = Detail.generalizeValue state locals
-      state.nextRequirement valueType)
+      requirementStart valueType)
     (allocated : (state.withLocals locals).allocateBinder name.value
       generalized.scheme (some name.span) false generalized.requirements =
         (binder, final))
@@ -1710,11 +1710,11 @@ theorem annotatedUninitializedBinderFacts_afterSubstitution
     rw [valueType_eq, resolvedByState]
     exact resolvedClosed
   have generalizedFacts := generalizeValue_closed_facts state locals
-    state.nextRequirement valueType target valueClosed
+    requirementStart valueType target valueClosed
   have generalizedSchemeEq : generalized.scheme = .mono resolvedType := by
     calc
       generalized.scheme =
-          (Detail.generalizeValue state locals state.nextRequirement
+          (Detail.generalizeValue state locals requirementStart
             valueType).scheme :=
         congrArg Detail.GeneralizedValue.scheme generalized_eq
       _ = .mono valueType := generalizedFacts.1
@@ -1722,7 +1722,7 @@ theorem annotatedUninitializedBinderFacts_afterSubstitution
   have generalizedRequirementsEq : generalized.requirements = [] := by
     calc
       generalized.requirements =
-          (Detail.generalizeValue state locals state.nextRequirement
+          (Detail.generalizeValue state locals requirementStart
             valueType).requirements :=
         congrArg Detail.GeneralizedValue.requirements generalized_eq
       _ = [] := generalizedFacts.2.1
@@ -1801,7 +1801,7 @@ theorem letAnnotatedUninitializedStatementHasType_afterSubstitution
         } := by
   obtain ⟨typeWellFormed, closedSchemeEq, closedRequirementsEq,
       generalizes⟩ :=
-    annotatedUninitializedBinderFacts_afterSubstitution resolution
+    resolvedAnnotationBinderFacts_afterSubstitution resolution
       valueType_eq generalized_eq allocated canonical signatures_eq
       parameters_eq declaration_eq
   have extended : BinderExtends (state.withLocals locals).owner target
@@ -1898,15 +1898,126 @@ theorem letInitializedGeneralizedStatementHasType_afterSubstitution
     (by simpa using extension)
     (by simp [StatementNode.applySubstitution])
 
-/-- The same annotated-uninitialized binder certificate advances the complete
+/-- Expected-type coherence makes an initialized declaration with a source
+annotation monomorphic before generalization.  Given recursive initializer
+typing and a final substitution extending its inference state, the complete
+executable binder pipeline therefore reconstructs the ordinary initialized
+`let` judgment. -/
+theorem letAnnotatedInitializedStatementHasType_afterSubstitution
+    {fuel : Nat} {source : TypedSource}
+    {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {sourceType : Syntax.TypeExpr} {initializer : Syntax.Expr}
+    {id : StatementId}
+    {expressionState initializerState final :
+      Frontend.SourceInference.State}
+    {resolvedType valueType : TypeSystem.Ty}
+    {inferred : InferredExpression} {requirementStart : Nat}
+    {locals : TypeSystem.Environment}
+    {generalized : Detail.GeneralizedValue} {binder : TypedBinder}
+    (resolution : Detail.resolveSourceType inferenceContext sourceType =
+      .ok resolvedType)
+    (initializerSuccess : Detail.inferExprFuel fuel inferenceContext
+      initializer (some resolvedType) expressionState =
+        .ok (inferred, initializerState))
+    (valueType_eq : valueType = initializerState.resolve inferred.type)
+    (generalized_eq : generalized = Detail.generalizeValue initializerState
+      locals requirementStart valueType)
+    (allocated : (initializerState.withLocals locals).allocateBinder
+      name.value generalized.scheme (some name.span) false
+      generalized.requirements = (binder, final))
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .letDecl binder (some inferred.id)
+    })
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (parameters_eq : target.typeParameters = inferenceContext.typeParameters)
+    (declaration_eq : target.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (aligned : LocalEnvironmentAligned initializerState outer target)
+    (below : initializerState.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initializerState.owner)
+    (initializerSolved : initializerState.inference.Solved)
+    (outerExtension : outer.SemanticallyExtends
+      initializerState.inference.substitution)
+    (initializerType : ExpressionHasType
+      (source.applySubstitution outer) target inferred.id
+      (outer.apply inferred.type)) :
+    StatementHasType (source.applySubstitution outer) control target id
+      (target.withLocal binder.id
+        (binder.applySubstitution outer).scheme
+        (binder.applySubstitution outer).schemeRequirements) {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } := by
+  have rawExpected :
+      initializerState.resolve inferred.type =
+        initializerState.resolve resolvedType :=
+    inferExprFuel_success_expected_type_afterProgress initializerSuccess
+      (Frontend.SourceInference.State.InferenceProgress.refl
+        initializerSolved)
+  have resolvedValueTypeEq :
+      valueType = initializerState.resolve resolvedType :=
+    valueType_eq.trans rawExpected
+  obtain ⟨typeWellFormed, closedSchemeEq, closedRequirementsEq,
+      generalizes⟩ :=
+    resolvedAnnotationBinderFacts_afterSubstitution resolution
+      resolvedValueTypeEq generalized_eq allocated canonical signatures_eq
+      parameters_eq declaration_eq
+  have outerExpected :
+      outer.apply inferred.type = outer.apply resolvedType :=
+    Detail.inferExprFuel_expected_type_apply_eq initializerSuccess
+      outerExtension
+  have resolvedByOuter : outer.apply resolvedType = resolvedType :=
+    Detail.resolveSourceType_success_apply_eq_self outer resolution
+  have initializerFinalEq : outer.apply inferred.type = resolvedType :=
+    outerExpected.trans resolvedByOuter
+  have binderBodyEq :
+      (binder.applySubstitution outer).scheme.body = resolvedType := by
+    rw [closedSchemeEq]
+    rfl
+  have closedInitializerType : ExpressionHasType
+      (source.applySubstitution outer) target inferred.id
+      (binder.applySubstitution outer).scheme.body := by
+    rw [binderBodyEq, ← initializerFinalEq]
+    exact initializerType
+  have extended : BinderExtends
+      (initializerState.withLocals locals).owner target
+      (binder.applySubstitution outer)
+      (target.withLocal binder.id
+        (binder.applySubstitution outer).scheme
+        (binder.applySubstitution outer).schemeRequirements) := by
+    apply
+      (aligned.withLocals locals).monomorphicBinderExtends_of_allocateBinder
+        (Frontend.SourceInference.State.withLocals_preserves_localBindersBelowNextLocal
+          initializerState locals below)
+        allocated closedSchemeEq closedRequirementsEq typeWellFormed
+  apply letInitializedMonomorphicStatementHasType_afterSubstitution
+    contains closedInitializerType
+  · rw [closedSchemeEq]
+    rfl
+  · exact generalizes
+  · simpa [Frontend.SourceInference.State.withLocals, owner_eq] using
+      extended
+
+/-- The resolved-annotation binder certificate advances the complete
 active-local invariant.  This is the compositional lexical result required to
-continue typing statements after the declaration. -/
-theorem annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSubstitution
+continue typing statements after either annotated declaration form. -/
+theorem resolvedAnnotationBinderPreservesActiveLocalContextInvariant_afterSubstitution
     {target : SourceSemantics.Context}
     {outer : TypeSystem.Substitution}
     {inferenceContext : Frontend.SourceInference.Context}
     {name : Syntax.Identifier} {sourceType : Syntax.TypeExpr}
     {state final : Frontend.SourceInference.State}
+    {requirementStart : Nat}
     {resolvedType valueType : TypeSystem.Ty}
     {locals : TypeSystem.Environment}
     {generalized : Detail.GeneralizedValue} {binder : TypedBinder}
@@ -1914,7 +2025,7 @@ theorem annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSu
       .ok resolvedType)
     (valueType_eq : valueType = state.resolve resolvedType)
     (generalized_eq : generalized = Detail.generalizeValue state locals
-      state.nextRequirement valueType)
+      requirementStart valueType)
     (allocated : (state.withLocals locals).allocateBinder name.value
       generalized.scheme (some name.span) false generalized.requirements =
         (binder, final))
@@ -1931,7 +2042,7 @@ theorem annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSu
         (binder.applySubstitution outer).scheme
         (binder.applySubstitution outer).schemeRequirements) := by
   obtain ⟨typeWellFormed, closedSchemeEq, closedRequirementsEq, _⟩ :=
-    annotatedUninitializedBinderFacts_afterSubstitution resolution
+    resolvedAnnotationBinderFacts_afterSubstitution resolution
       valueType_eq generalized_eq allocated canonical signatures_eq
       parameters_eq declaration_eq
   apply
@@ -2011,7 +2122,7 @@ theorem inferStatementFuel_success_letAnnotatedUninitialized_sound
   have bindingInvariant : ActiveLocalContextInvariant binding.2 outer
       finalContext := by
     exact
-      annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSubstitution
+      resolvedAnnotationBinderPreservesActiveLocalContextInvariant_afterSubstitution
         resolution valueTypeEq generalizedEq bindingEq canonical
         signatures_eq parameters_eq declaration_eq allocatedInvariant
         allocatedBelow
