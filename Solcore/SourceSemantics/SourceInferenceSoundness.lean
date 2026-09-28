@@ -341,7 +341,373 @@ theorem mem_local_freeVariables_iff
     exact ⟨sourceEntry, sourceEntryMember, by
       simpa [schemeEq] using variableMember⟩
 
+/-- Local-environment alignment depends on an inference state only through
+its stable binder stack.  This packages preservation for state updates which
+affect inference, evidence, or occurrences but not the active lexical scope. -/
+theorem congr_localBinders
+    {state final : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (localBinders_eq : final.localBinders = state.localBinders) :
+    LocalEnvironmentAligned final substitution context := by
+  constructor
+  · simpa [localBinders_eq] using aligned.ids_nodup
+  · simpa [closedBinderLocals, localBinders_eq] using aligned.locals_perm
+  · simpa [closedBinderRequirements, localBinders_eq] using
+      aligned.requirements_perm
+
+/-- Restoring an outer executable lexical snapshot also restores its exact
+alignment with the unchanged declarative context. -/
+theorem restoreLexicalScope
+    {outer inner : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (aligned : LocalEnvironmentAligned outer substitution context) :
+    LocalEnvironmentAligned
+      (inner.restoreLexicalScope outer.lexicalScope) substitution context := by
+  apply aligned.congr_localBinders
+  rfl
+
 end LocalEnvironmentAligned
+
+/-- Every stable binder in the currently active executable lexical scope has
+both a well-formed closed scheme and well-formed qualified-requirement
+metadata in the matching declarative context.  This invariant is deliberately
+independent of local-environment alignment: formation and lookup alignment
+evolve for different reasons during inference. -/
+structure ActiveLocalFormation
+    (state : Frontend.SourceInference.State)
+    (substitution : TypeSystem.Substitution)
+    (context : SourceSemantics.Context) : Prop where
+  schemes : ∀ binder, binder ∈ state.localBinders →
+    SchemeWellFormed context
+      (binder.applySubstitution substitution).scheme
+  requirements : ∀ binder, binder ∈ state.localBinders →
+    LocalSchemeRequirementsWellFormed context
+      (binder.applySubstitution substitution)
+
+namespace ActiveLocalFormation
+
+/-- Direct membership in the active binder stack exposes both formation
+judgments for the corresponding closed binder. -/
+theorem facts_of_mem
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context} {binder : TypedBinder}
+    (formation : ActiveLocalFormation state substitution context)
+    (member : binder ∈ state.localBinders) :
+    SchemeWellFormed context
+        (binder.applySubstitution substitution).scheme ∧
+      LocalSchemeRequirementsWellFormed context
+        (binder.applySubstitution substitution) :=
+  ⟨formation.schemes binder member, formation.requirements binder member⟩
+
+/-- Scheme formation projected from active-binder membership. -/
+theorem schemeWellFormed_of_mem
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context} {binder : TypedBinder}
+    (formation : ActiveLocalFormation state substitution context)
+    (member : binder ∈ state.localBinders) :
+    SchemeWellFormed context
+      (binder.applySubstitution substitution).scheme :=
+  formation.schemes binder member
+
+/-- Qualified-requirement formation projected from active-binder
+membership. -/
+theorem localSchemeRequirementsWellFormed_of_mem
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context} {binder : TypedBinder}
+    (formation : ActiveLocalFormation state substitution context)
+    (member : binder ∈ state.localBinders) :
+    LocalSchemeRequirementsWellFormed context
+      (binder.applySubstitution substitution) :=
+  formation.requirements binder member
+
+/-- A successful guarded source-name lookup selects an active binder, so it
+inherits both formation judgments. -/
+theorem facts_of_lookupBinder?
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    {name : String} {binder : TypedBinder}
+    (formation : ActiveLocalFormation state substitution context)
+    (found : state.lookupBinder? name = some binder) :
+    SchemeWellFormed context
+        (binder.applySubstitution substitution).scheme ∧
+      LocalSchemeRequirementsWellFormed context
+        (binder.applySubstitution substitution) := by
+  exact formation.facts_of_mem
+    (Frontend.SourceInference.State.lookupBinder?_eq_some_facts found).1
+
+/-- Active formation depends on an inference state only through its stable
+binder stack. -/
+theorem congr_localBinders
+    {state final : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (formation : ActiveLocalFormation state substitution context)
+    (localBinders_eq : final.localBinders = state.localBinders) :
+    ActiveLocalFormation final substitution context := by
+  constructor
+  · intro binder member
+    rw [localBinders_eq] at member
+    exact formation.schemes binder member
+  · intro binder member
+    rw [localBinders_eq] at member
+    exact formation.requirements binder member
+
+/-- Replacing the legacy name-keyed local cache leaves active stable-binder
+formation unchanged. -/
+theorem withLocals
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (formation : ActiveLocalFormation state substitution context)
+    (locals : TypeSystem.Environment) :
+    ActiveLocalFormation (state.withLocals locals) substitution context := by
+  apply formation.congr_localBinders
+  rfl
+
+/-- Restoring an outer lexical snapshot recovers exactly the outer state's
+active-binder formation, independently of facts accumulated in the inner
+state. -/
+theorem restoreLexicalScope
+    {outer inner : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (formation : ActiveLocalFormation outer substitution context) :
+    ActiveLocalFormation
+      (inner.restoreLexicalScope outer.lexicalScope) substitution context := by
+  apply formation.congr_localBinders
+  rfl
+
+/-- Adding one semantic local changes none of the context fields observed by
+scheme or qualified-requirement formation. -/
+theorem withLocal
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (formation : ActiveLocalFormation state substitution context)
+    (id : Resolved.LocalId) (scheme : TypeSystem.Scheme)
+    (requirements : List LocalSchemeRequirement := []) :
+    ActiveLocalFormation state substitution
+      (context.withLocal id scheme requirements) := by
+  constructor
+  · intro binder member
+    exact StructuralSubstitution.SchemeWellFormed.transportContext
+      (source := context)
+      (target := context.withLocal id scheme requirements)
+      rfl rfl rfl rfl rfl (formation.schemes binder member)
+  · intro binder member
+    exact
+      StructuralSubstitution.LocalSchemeRequirementsWellFormed.transportContext
+        (source := context)
+        (target := context.withLocal id scheme requirements)
+        rfl rfl rfl rfl rfl rfl
+        (formation.requirements binder member)
+
+private structure FormationContextFields
+    (source target : SourceSemantics.Context) : Prop where
+  signatures_eq : target.signatures = source.signatures
+  parameters_eq : target.typeParameters = source.typeParameters
+  declaration_eq : target.currentDeclaration = source.currentDeclaration
+  variables_eq : target.typeVariables = source.typeVariables
+  residualVariables_eq :
+    target.residualTypeVariables = source.residualTypeVariables
+  solvedRequirements_eq :
+    target.solvedRequirements = source.solvedRequirements
+
+private theorem FormationContextFields.ofBinderExtends
+    {owner : Resolved.DeclarationId} {source target : SourceSemantics.Context}
+    {binder : TypedBinder}
+    (extension : BinderExtends owner source binder target) :
+    FormationContextFields source target := by
+  have fields := extension.context_fields
+  exact {
+    signatures_eq := fields.1
+    parameters_eq := fields.2.2.1
+    declaration_eq := fields.2.1
+    variables_eq := extension.typeVariables_eq
+    residualVariables_eq := extension.residualTypeVariables_eq
+    solvedRequirements_eq := fields.2.2.2.2
+  }
+
+private theorem FormationContextFields.trans
+    {source middle target : SourceSemantics.Context}
+    (first : FormationContextFields source middle)
+    (second : FormationContextFields middle target) :
+    FormationContextFields source target := {
+  signatures_eq := second.signatures_eq.trans first.signatures_eq
+  parameters_eq := second.parameters_eq.trans first.parameters_eq
+  declaration_eq := second.declaration_eq.trans first.declaration_eq
+  variables_eq := second.variables_eq.trans first.variables_eq
+  residualVariables_eq :=
+    second.residualVariables_eq.trans first.residualVariables_eq
+  solvedRequirements_eq :=
+    second.solvedRequirements_eq.trans first.solvedRequirements_eq
+}
+
+private theorem formationContextFields_of_monoBindersExtend
+    {owner : Resolved.DeclarationId}
+    {context final : SourceSemantics.Context}
+    {binders : List TypedBinder} {types : List TypeSystem.Ty}
+    (extension : MonoBindersExtend owner context binders types final) :
+    FormationContextFields context final := by
+  induction extension with
+  | nil => exact ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
+  | cons _ head _ induction =>
+      exact (FormationContextFields.ofBinderExtends head).trans induction
+
+private theorem monoBindersExtend_member_formation
+    {owner : Resolved.DeclarationId}
+    {context final : SourceSemantics.Context}
+    {binders : List TypedBinder} {types : List TypeSystem.Ty}
+    (extension : MonoBindersExtend owner context binders types final) :
+    ∀ binder, binder ∈ binders →
+      SchemeWellFormed final binder.scheme ∧
+        LocalSchemeRequirementsWellFormed final binder := by
+  induction extension with
+  | nil =>
+      intro binder member
+      simp at member
+  | cons scheme_eq head tail induction =>
+      intro binder member
+      rcases List.mem_cons.mp member with rfl | member
+      · have fields := formationContextFields_of_monoBindersExtend
+          (MonoBindersExtend.cons scheme_eq head tail)
+        cases head with
+        | intro binderWellFormed _ =>
+            constructor
+            · exact StructuralSubstitution.SchemeWellFormed.transportContext
+                fields.signatures_eq fields.parameters_eq
+                fields.declaration_eq fields.variables_eq
+                fields.residualVariables_eq binderWellFormed.scheme
+            · apply LocalSchemeRequirementsWellFormed.empty
+              apply binderWellFormed.monomorphic_requirements_empty
+              simp [scheme_eq, TypeSystem.Scheme.mono]
+      · exact induction binder member
+
+/-- Installing the substituted active binder stack as monomorphic semantic
+parameters establishes active formation in the final lexical context. -/
+theorem ofMonoBindersExtend
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context final : SourceSemantics.Context}
+    {owner : Resolved.DeclarationId} {types : List TypeSystem.Ty}
+    (extension : MonoBindersExtend owner context
+      (state.localBinders.map
+        (TypedBinder.applySubstitution substitution)) types final) :
+    ActiveLocalFormation state substitution final := by
+  constructor
+  · intro binder member
+    exact (monoBindersExtend_member_formation extension
+      (binder.applySubstitution substitution)
+      (List.mem_map.mpr ⟨binder, member, rfl⟩)).1
+  · intro binder member
+    exact (monoBindersExtend_member_formation extension
+      (binder.applySubstitution substitution)
+      (List.mem_map.mpr ⟨binder, member, rfl⟩)).2
+
+/-- Visible allocation preserves all old active formation and adds the newly
+closed binder in lockstep with the matching semantic local extension. -/
+theorem allocateBinder
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (formation : ActiveLocalFormation state substitution context)
+    (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan := none) (comptime : Bool := false)
+    (schemeRequirements : List LocalSchemeRequirement := [])
+    {binder : TypedBinder} {final : Frontend.SourceInference.State}
+    (allocated : state.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, final))
+    (schemeWellFormed : SchemeWellFormed context
+      (binder.applySubstitution substitution).scheme)
+    (requirementsWellFormed : LocalSchemeRequirementsWellFormed context
+      (binder.applySubstitution substitution)) :
+    ActiveLocalFormation final substitution
+      (context.withLocal binder.id
+        (binder.applySubstitution substitution).scheme
+        (binder.applySubstitution substitution).schemeRequirements) := by
+  have binder_eq :
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).1 = binder :=
+    congrArg Prod.fst allocated
+  have final_eq :
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).2 = final :=
+    congrArg Prod.snd allocated
+  subst binder
+  subst final
+  have retained := formation.withLocal
+    (state.allocateBinder name scheme span comptime schemeRequirements).1.id
+    ((state.allocateBinder name scheme span comptime
+      schemeRequirements).1.applySubstitution substitution).scheme
+    ((state.allocateBinder name scheme span comptime
+      schemeRequirements).1.applySubstitution substitution).schemeRequirements
+  constructor
+  · intro candidate member
+    change candidate ∈
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).1 :: state.localBinders at member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact StructuralSubstitution.SchemeWellFormed.transportContext
+        (source := context)
+        (target := context.withLocal
+          (state.allocateBinder name scheme span comptime
+            schemeRequirements).1.id
+          ((state.allocateBinder name scheme span comptime
+            schemeRequirements).1.applySubstitution substitution).scheme
+          ((state.allocateBinder name scheme span comptime
+            schemeRequirements).1.applySubstitution
+              substitution).schemeRequirements)
+        rfl rfl rfl rfl rfl schemeWellFormed
+    · exact retained.schemes candidate member
+  · intro candidate member
+    change candidate ∈
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).1 :: state.localBinders at member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact
+        StructuralSubstitution.LocalSchemeRequirementsWellFormed.transportContext
+          (source := context)
+          (target := context.withLocal
+            (state.allocateBinder name scheme span comptime
+              schemeRequirements).1.id
+            ((state.allocateBinder name scheme span comptime
+              schemeRequirements).1.applySubstitution substitution).scheme
+            ((state.allocateBinder name scheme span comptime
+              schemeRequirements).1.applySubstitution
+                substitution).schemeRequirements)
+          rfl rfl rfl rfl rfl rfl requirementsWellFormed
+    · exact retained.requirements candidate member
+
+end ActiveLocalFormation
+
+/-- Alignment supplies the two semantic lookups for a guarded local name,
+while active formation supplies the corresponding closed scheme judgments. -/
+theorem localReferenceEnvironmentFacts_of_lookupBinder?
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    {name : String} {binder : TypedBinder}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (formation : ActiveLocalFormation state substitution context)
+    (found : state.lookupBinder? name = some binder) :
+    context.LocalLookup binder.id
+        (binder.applySubstitution substitution).scheme ∧
+      context.LocalSchemeRequirementsLookup binder.id
+        (binder.applySubstitution substitution).schemeRequirements ∧
+      SchemeWellFormed context
+        (binder.applySubstitution substitution).scheme ∧
+      LocalSchemeRequirementsWellFormed context
+        (binder.applySubstitution substitution) := by
+  have lookups := aligned.lookup_of_lookupBinder? found
+  have formed := formation.facts_of_lookupBinder? found
+  exact ⟨lookups.1, lookups.2, formed.1, formed.2⟩
 
 /-- A successful body check installs the finalized input binders into one
 declarative lexical context and simultaneously aligns that context with the
@@ -388,6 +754,50 @@ theorem checkFunctionBody_success_initialLocalEnvironmentAligned
   rw [inputsEq] at extension
   simpa only [Frontend.SourceInference.State.initial_inputs_eq_localBinders]
     using extension
+
+/-- The initial semantic lexical context simultaneously carries exact lookup
+alignment and formation for every finalized input binder.  This is the
+complete lexical starting invariant for recursive body-typing reconstruction. -/
+theorem checkFunctionBody_success_initialLocalEnvironmentFacts
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (parameterTypes : TypesWellFormed
+      (checkedBodyContext signatures signature checked)
+      signature.parameterTypes)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    ∃ lexicalContext,
+      MonoBindersExtend signature.id
+          (checkedBodyContext signatures signature checked)
+          checked.typedBody.inputs signature.parameterTypes lexicalContext ∧
+        LocalEnvironmentAligned
+          (Frontend.SourceInference.State.initial signature.id
+            ((signature.parameterNames.zip signature.parameterTypes).map
+              fun parameter =>
+                (parameter.1, TypeSystem.Scheme.mono parameter.2))
+            signature.parameterComptime)
+          checked.substitution lexicalContext ∧
+        ActiveLocalFormation
+          (Frontend.SourceInference.State.initial signature.id
+            ((signature.parameterNames.zip signature.parameterTypes).map
+              fun parameter =>
+                (parameter.1, TypeSystem.Scheme.mono parameter.2))
+            signature.parameterComptime)
+          checked.substitution lexicalContext := by
+  obtain ⟨lexicalContext, extension, aligned⟩ :=
+    checkFunctionBody_success_initialLocalEnvironmentAligned parameterTypes
+      success
+  refine ⟨lexicalContext, extension, aligned, ?_⟩
+  apply ActiveLocalFormation.ofMonoBindersExtend
+  have initialExtension := extension
+  have inputsEq :=
+    Frontend.SourceInference.checkFunctionBody_success_typedBody_inputs success
+  rw [inputsEq] at initialExtension
+  simpa only [Frontend.SourceInference.State.initial_inputs_eq_localBinders]
+    using initialExtension
 
 /-- The frontend no-capture certificate already has exactly the
 predicate-wide shape required by the semantic substitution bridge. -/

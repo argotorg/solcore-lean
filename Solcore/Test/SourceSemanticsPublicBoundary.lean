@@ -113,6 +113,30 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.mem_local_freeVariables_iff
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.congr_localBinders
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.restoreLexicalScope
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.facts_of_lookupBinder?
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.congr_localBinders
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.withLocals
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.restoreLexicalScope
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.withLocal
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.ofMonoBindersExtend
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.allocateBinder
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.localReferenceEnvironmentFacts_of_lookupBinder?
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_initialLocalEnvironmentFacts
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.localBinderInstantiationNoCapture_predicateRangeAvoids
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.canonicalLocalSchemeInstantiationValid_afterSubstitution
