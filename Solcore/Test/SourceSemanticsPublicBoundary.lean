@@ -149,6 +149,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.withLocals
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.allocateStatementId
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.recordNode
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.restoreLexicalScope
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.restoreLexicalScope_recordNode
@@ -206,6 +210,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.letAnnotatedUninitializedStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letAnnotatedUninitialized_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_letUnannotatedInitialized_facts
 example :=

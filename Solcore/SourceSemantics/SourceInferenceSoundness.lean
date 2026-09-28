@@ -849,6 +849,34 @@ theorem withLocals
   ⟨invariant.aligned.withLocals locals,
     invariant.formation.withLocals locals⟩
 
+/-- Reserving a statement occurrence changes no stable local binder, so it
+preserves the complete active-local invariant. -/
+theorem allocateStatementId
+    {state final : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context} {id : StatementId}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (allocated : state.allocateStatementId = (id, final)) :
+    ActiveLocalContextInvariant final substitution context := by
+  apply invariant.congr_localBinders
+  have finalEq : (state.allocateStatementId).2 = final :=
+    congrArg Prod.snd allocated
+  rw [← finalEq]
+  rfl
+
+/-- Recording an already allocated occurrence changes only the node table and
+therefore preserves the complete active-local invariant. -/
+theorem recordNode
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (node : Node) :
+    ActiveLocalContextInvariant (state.recordNode node) substitution
+      context := by
+  apply invariant.congr_localBinders
+  rfl
+
 /-- Restoring an enclosing lexical snapshot restores both halves of the
 combined invariant. -/
 theorem restoreLexicalScope
@@ -1843,6 +1871,124 @@ theorem annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSu
   · exact LocalSchemeRequirementsWellFormed.empty target _
       closedRequirementsEq
 
+/-- The proof-facing facts of one finalized statement agree with the three
+fields retained by executable statement inference.  Control is deliberately
+absent: it is determined by `StatementHasType`, whereas `StatementResult`
+stores only the observable type/value/return projections. -/
+structure StatementResultMatchesFactsAfterSubstitution
+    (substitution : TypeSystem.Substitution)
+    (result : Detail.StatementResult) (facts : StatementFacts) : Prop where
+  type_eq : facts.type = substitution.apply result.type
+  hasValue_eq : facts.hasValue = result.hasValue
+  sawReturn_eq : facts.sawReturn = result.sawReturn
+
+/-- The complete annotated-uninitialized branch is compositional: successful
+inference yields a declaratively typed statement, advances the active lexical
+invariant to the recorded output state, and agrees exactly with the
+executable statement summary. -/
+theorem inferStatementFuel_success_letAnnotatedUninitialized_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {sourceType : Syntax.TypeExpr} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .letDecl name (some sourceType) none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (parameters_eq : target.typeParameters = inferenceContext.typeParameters)
+    (declaration_eq : target.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (below : initial.LocalBindersBelowNextLocal)
+    (roots : List NodeId := []) :
+    ∃ finalContext facts,
+      ActiveLocalContextInvariant result.state outer finalContext ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id finalContext facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+    have preserved :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+        initial below
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [finalEq] at preserved
+    exact preserved
+  obtain ⟨resolvedType, locals, valueType, generalized, binding,
+      resolution, _, valueTypeEq, generalizedEq, bindingEq, resultEq,
+      contains⟩ :=
+    inferStatementFuel_success_letAnnotatedUninitialized_facts statementEq
+      allocationEq success roots
+  subst result
+  let finalContext := target.withLocal binding.1.id
+    (binding.1.applySubstitution outer).scheme
+    (binding.1.applySubstitution outer).schemeRequirements
+  have bindingInvariant : ActiveLocalContextInvariant binding.2 outer
+      finalContext := by
+    exact
+      annotatedUninitializedBinderPreservesActiveLocalContextInvariant_afterSubstitution
+        resolution valueTypeEq generalizedEq bindingEq canonical
+        signatures_eq parameters_eq declaration_eq allocatedInvariant
+        allocatedBelow
+  have recordedInvariant : ActiveLocalContextInvariant
+      (binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 none
+      })) outer finalContext :=
+    bindingInvariant.recordNode _
+  have bindingStateEq :
+      ((allocated.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements).2 = binding.2 :=
+    congrArg Prod.snd bindingEq
+  have sourceOwner :
+      ((binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 none
+      })).toTypedSource roots).owner = allocated.owner := by
+    change binding.2.owner = allocated.owner
+    rw [← bindingStateEq]
+    rfl
+  have typing : StatementHasType
+      (((binding.2.recordNode (.statement {
+        id
+        span := statement.span
+        type := .unit
+        form := .letDecl binding.1 none
+      })).toTypedSource roots).applySubstitution outer)
+      control target id finalContext {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+    exact letAnnotatedUninitializedStatementHasType_afterSubstitution
+      resolution valueTypeEq generalizedEq bindingEq contains canonical
+      signatures_eq parameters_eq declaration_eq allocatedInvariant.aligned
+      allocatedBelow sourceOwner
+  refine ⟨finalContext, {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .ordinary .unit
+    }, recordedInvariant, typing, ?_⟩
+  constructor <;> rfl
+
 /-- A successful unannotated initialized declaration exposes the initializer
 inference and the exact generalized binder subsequently entered into scope.
 The requirement barrier remains the pre-initializer position retained in the
@@ -2607,17 +2753,6 @@ theorem continueStatementHasType_afterSubstitution
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl (Nat.zero_lt_of_ne_zero allowed)
     (by simp [StatementNode.applySubstitution])
-
-/-- The proof-facing facts of one finalized statement agree with the three
-fields retained by executable statement inference.  Control is deliberately
-absent: it is determined by `StatementHasType`, whereas `StatementResult`
-stores only the observable type/value/return projections. -/
-structure StatementResultMatchesFactsAfterSubstitution
-    (substitution : TypeSystem.Substitution)
-    (result : Detail.StatementResult) (facts : StatementFacts) : Prop where
-  type_eq : facts.type = substitution.apply result.type
-  hasValue_eq : facts.hasValue = result.hasValue
-  sawReturn_eq : facts.sawReturn = result.sawReturn
 
 /-- The proof-facing facts of a finalized statement sequence agree with the
 type and return summary retained by executable block inference. -/
