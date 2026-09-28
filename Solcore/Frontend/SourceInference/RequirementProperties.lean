@@ -332,6 +332,48 @@ theorem requirement_id_lt_nextRequirement (state : State)
   rw [wellFormed] at indexMember
   exact List.mem_range.mp indexMember
 
+/-- Batch allocation returns the consecutive identity interval beginning at
+the input state's fresh-requirement boundary, in predicate order. -/
+theorem addRequirementsWithIds_id_indices
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).1.map (fun id => id.index) =
+      List.range' state.nextRequirement predicates.length := by
+  induction predicates generalizing state with
+  | nil => simp [addRequirementsWithIds]
+  | cons predicate rest induction =>
+      simp [addRequirementsWithIds, addRequirementWithId,
+        List.range'_succ, induction]
+
+/-- Identities returned by one batch allocation are pairwise distinct even
+when the requested predicates themselves contain duplicates. -/
+theorem addRequirementsWithIds_ids_nodup
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).1.Nodup := by
+  apply requirementIds_nodup_of_indices_nodup
+  rw [addRequirementsWithIds_id_indices]
+  exact List.nodup_range'
+
+/-- In a canonical state, every identity returned by batch allocation is
+fresh for the complete input ledger. -/
+theorem addRequirementsWithIds_ids_fresh
+    (state : State) (predicates : List ProgramPredicate)
+    (wellFormed : state.RequirementsWellFormed) :
+    ∀ id, id ∈ (state.addRequirementsWithIds predicates).1 →
+      id ∉ state.requirements.map (fun requirement => requirement.id) := by
+  intro id allocated existing
+  have allocatedIndex : id.index ∈
+      List.range' state.nextRequirement predicates.length := by
+    rw [← addRequirementsWithIds_id_indices state predicates]
+    exact List.mem_map.mpr ⟨id, allocated, rfl⟩
+  have atLeast : state.nextRequirement ≤ id.index :=
+    (List.mem_range'_1.mp allocatedIndex).1
+  rcases List.mem_map.mp existing with
+    ⟨requirement, requirementMember, requirementIdEq⟩
+  have below := requirement_id_lt_nextRequirement state wellFormed
+    requirementMember
+  rw [requirementIdEq] at below
+  exact (Nat.not_lt_of_ge atLeast) below
+
 /-- In a canonical ledger, taking the first `cutoff` rows selects exactly the
 rows whose stable identity lies below that cutoff. -/
 theorem mem_take_requirements_iff (state : State)

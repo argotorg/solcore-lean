@@ -1040,6 +1040,26 @@ private theorem generalizationSideConditionState_requirementsWellFormed :
     generalizationSideConditionState.RequirementsWellFormed := by
   rfl
 
+/-- Batch allocation produces consecutive, distinct identities which remain
+fresh for the complete input ledger even when predicate payloads repeat. -/
+example :
+    let allocation := generalizationSideConditionState.addRequirementsWithIds
+      [solverRegressionNormalized, solverRegressionNormalized]
+    allocation.1 = [(⟨1⟩ : SourceInference.RequirementId), ⟨2⟩] ∧
+      allocation.1.Nodup ∧
+      ∀ id, id ∈ allocation.1 →
+        id ∉ generalizationSideConditionState.requirements.map
+          (fun requirement => requirement.id) := by
+  dsimp only
+  refine ⟨rfl, ?_, ?_⟩
+  · exact SourceInference.State.addRequirementsWithIds_ids_nodup
+      generalizationSideConditionState
+      [solverRegressionNormalized, solverRegressionNormalized]
+  · exact SourceInference.State.addRequirementsWithIds_ids_fresh
+      generalizationSideConditionState
+      [solverRegressionNormalized, solverRegressionNormalized]
+      generalizationSideConditionState_requirementsWellFormed
+
 private def ledgerExtensionRequirement : SourceInference.Requirement := {
   id := ⟨1⟩
   predicate := solverRegressionNormalized

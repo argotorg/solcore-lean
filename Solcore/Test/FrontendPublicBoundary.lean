@@ -726,6 +726,12 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.solveRequirements_ids_nodup
 example := @Solcore.Frontend.SourceInference.State.requirementIds_nodup
 example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementsWithIds_id_indices
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementsWithIds_ids_nodup
+example :=
+  @Solcore.Frontend.SourceInference.State.addRequirementsWithIds_ids_fresh
+example :=
   @Solcore.Frontend.SourceInference.State.requirements_length_eq_nextRequirement
 example :=
   @Solcore.Frontend.SourceInference.State.requirement_id_lt_nextRequirement
