@@ -11417,6 +11417,49 @@ theorem inferAssignedValueFuel_success_lexicalScope_eq
   inferAssignedValueFuel_preserves_lexicalScope fuel context target operator
     value state (assignment, inferredValue, final) success
 
+private theorem inferExprsFuel_preserves_lexicalScope
+    (fuel : Nat) (context : Context) (expressions : List Syntax.Expr)
+    (state : State) :
+    PreservesLexicalScope Prod.snd state
+      (inferExprsFuel fuel context expressions state) :=
+  inferFuel_preserves_lexicalScope_internal.2.2.2.2.2.2.2.2.2.1
+    fuel context expressions state
+
+/-- Successful source-ordered expression-list inference preserves the
+caller's stable lexical scope.  This is the public scope boundary used by
+multi-scrutinee match inference. -/
+theorem inferExprsFuel_success_lexicalScope_eq
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    result.2.lexicalScope = state.lexicalScope :=
+  inferExprsFuel_preserves_lexicalScope fuel context expressions state result
+    success
+
+private theorem inferMatchCasesFuel_restores_outerScope
+    (fuel : Nat) (context : Context) (scrutineeType expectedReturn : Ty)
+    (outerScope : LexicalScope) (cases : List Syntax.MatchCase)
+    (state : State) :
+    RestoresOuterScope MatchCasesResult.state outerScope state
+      (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+        cases state) :=
+  inferFuel_preserves_lexicalScope_internal.2.2.2.2.2.2.2.2.2.2
+    fuel context scrutineeType expectedReturn outerScope cases state
+
+/-- Successful match-case traversal restores the explicit outer lexical
+scope after every arm when that scope is the traversal's entry scope. -/
+theorem inferMatchCasesFuel_success_lexicalScope_eq
+    {fuel : Nat} {context : Context}
+    {scrutineeType expectedReturn : Ty} {outerScope : LexicalScope}
+    {cases : List Syntax.MatchCase} {state : State}
+    {result : MatchCasesResult}
+    (scopeEq : state.lexicalScope = outerScope)
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    result.state.lexicalScope = outerScope :=
+  inferMatchCasesFuel_restores_outerScope fuel context scrutineeType
+    expectedReturn outerScope cases state result success scopeEq
+
 private theorem pair_except_nextLocal {ε α β : Type}
     {computation : Except ε (α × β)} {result : α × β}
     {initial : State} {nextLocal : β → Nat}
