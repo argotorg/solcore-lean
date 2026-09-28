@@ -315,7 +315,11 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_assignValue_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_assignValue_deep_sound
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_assignBitNot_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_assignBitNot_deep_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_returnUnit_sound
 example :=

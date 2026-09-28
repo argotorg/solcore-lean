@@ -4529,6 +4529,88 @@ theorem inferStatementFuel_success_assignValue_sound
       assignmentTyping
   · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
 
+/-- The deep value-assignment branch closes both delegated place inference and
+RHS expression inference in the statement's finalized typed source. -/
+theorem inferStatementFuel_success_assignValue_deep_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression value : Syntax.Expr}
+    {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .assignValue targetExpression operator value)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (ready : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes))
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (expressionSound :
+      ∀ {expressionFuel : Nat} {expression : Syntax.Expr}
+        {expected : Option TypeSystem.Ty}
+        {expressionInitial expressionFinal : Frontend.SourceInference.State}
+        {inferred : InferredExpression},
+        Detail.inferExprFuel expressionFuel inferenceContext expression
+            expected expressionInitial = .ok (inferred, expressionFinal) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target inferred.id (outer.apply inferred.type)) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    rw [allocationEq] at preserved
+    exact preserved
+  obtain ⟨assignment, inferredValue, assignmentState, assignmentSuccess,
+      resultEq, contains⟩ :=
+    inferStatementFuel_success_assignValue_facts statementEq allocationEq
+      success roots
+  have assignmentInvariant :
+      ActiveLocalContextInvariant assignmentState outer target :=
+    allocatedInvariant.inferAssignedValueFuel assignmentSuccess
+  subst result
+  have assignmentExtension : outer.SemanticallyExtends
+      assignmentState.inference.substitution := by
+    change outer.SemanticallyExtends assignmentState.inference.substitution
+      at outerExtension
+    exact outerExtension
+  have assignmentType := inferAssignedValueFuel_success_sound allocatedReady
+    signatureFormation functionsCanonical allocatedInvariant
+    assignmentExtension expressionSound assignmentSuccess
+  refine ⟨assignmentInvariant.recordNode _, ?_, ?_⟩
+  · exact assignValueStatementHasType_afterSubstitution contains
+      assignmentType
+  · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
+
 /-- A successful bit-not assignment is compositional modulo recursive place
 soundness.  The statement layer discharges the `Word` unification, transports
 the finalized place annotation, and preserves the active lexical context. -/
@@ -4591,6 +4673,97 @@ theorem inferStatementFuel_success_assignBitNot_sound
     exact outerExtension
   refine ⟨unifiedInvariant.recordNode _, ?_, ?_⟩
   · exact assignBitNotStatementHasType_afterSubstitution contains placeTyping
+      resolvedEq unifiedExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
+
+/-- The deep bit-not assignment branch reconstructs its place typing directly
+from executable place inference and the final `Word` unification. -/
+theorem inferStatementFuel_success_assignBitNot_deep_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
+    {operatorSpan : Syntax.SourceSpan} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .assignBitNot targetExpression operatorSpan)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (ready : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes))
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (expressionSound :
+      ∀ {expressionFuel : Nat} {expression : Syntax.Expr}
+        {expected : Option TypeSystem.Ty}
+        {expressionInitial expressionFinal : Frontend.SourceInference.State}
+        {inferred : InferredExpression},
+        Detail.inferExprFuel expressionFuel inferenceContext expression
+            expected expressionInitial = .ok (inferred, expressionFinal) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target inferred.id (outer.apply inferred.type)) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    rw [allocationEq] at preserved
+    exact preserved
+  obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, resolvedEq,
+      resultEq, contains⟩ :=
+    inferStatementFuel_success_assignBitNot_facts statementEq allocationEq
+      success roots
+  have placeInvariant : ActiveLocalContextInvariant placeState outer target :=
+    allocatedInvariant.inferPlaceFuel placeSuccess
+  have unifiedInvariant : ActiveLocalContextInvariant unified outer target :=
+    placeInvariant.unify unifySuccess
+  have placeProperties := Detail.inferPlaceFuel_inferenceProperties
+    allocatedReady signatureFormation functionsCanonical placeSuccess
+  have unifyProgress := Detail.unify_inferenceProgress
+    placeProperties.2.1.solved placeProperties.2.2
+    (TypeSystem.Ty.variablesBelow_constructor _ _) unifySuccess
+  subst result
+  have unifiedExtension : outer.SemanticallyExtends
+      unified.inference.substitution := by
+    change outer.SemanticallyExtends unified.inference.substitution
+      at outerExtension
+    exact outerExtension
+  have placeExtension : outer.SemanticallyExtends
+      placeState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans unifiedExtension
+      unifyProgress.substitution_extends
+  have placeType := inferPlaceFuel_success_sound allocatedReady
+    signatureFormation functionsCanonical allocatedInvariant placeExtension
+    expressionSound placeSuccess
+  refine ⟨unifiedInvariant.recordNode _, ?_, ?_⟩
+  · exact assignBitNotStatementHasType_afterSubstitution contains placeType
       resolvedEq unifiedExtension
   · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
 
