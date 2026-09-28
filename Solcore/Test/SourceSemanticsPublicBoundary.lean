@@ -557,6 +557,13 @@ example := @Solcore.SourceSemantics.LocalIdentityOwnership
 example := @Solcore.SourceSemantics.RequirementOwnership
 example := @Solcore.SourceSemantics.RequirementOwnership.primaryOccurrence_unique
 example := @Solcore.SourceSemantics.TemplateScopeCovered
+example := @Solcore.SourceSemantics.InitializedLetBinding.directChild
+example :=
+  @Solcore.SourceSemantics.LocalSchemeTemplateOwner.scopes_parent_of_scopes_child
+example := @Solcore.SourceSemantics.TemplateScopeCovered.root
+example := @Solcore.SourceSemantics.TemplateScopeCovered.child
+example :=
+  @Solcore.SourceSemantics.TemplateScopeCovered.localSchemeInitializer_of_newRoots
 example := @Solcore.SourceSemantics.LocalSchemeTemplateOwnership.owner_unique
 example := @Solcore.SourceSemantics.patternInstructionBinderIds_eq_carrier
 example := @Solcore.SourceSemantics.patternBinderIds_eq_carrier

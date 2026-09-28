@@ -905,14 +905,21 @@ private theorem ordinaryExpressionContained :
       (expressionNode 0 [ordinaryId]) := by
   simp [ContainsExpression, ordinarySource, expressionNode]
 
+private theorem ordinaryRootsHaveNoParent :
+    RootsHaveNoParent ordinarySource := by
+  intro root parent rootMem edge
+  rcases edge with ⟨node, contains, childMem⟩
+  have nodeEq : node = .expression (expressionNode 0 [ordinaryId]) := by
+    simpa [ordinarySource] using contains.1
+  subst node
+  simp [nodeChildIds, Node.references, expressionNode,
+    ExpressionForm.references] at childMem
+
 private theorem ordinaryRootScopeCovered :
     TemplateScopeCovered ordinarySource ordinaryContextWithAssumption
-      (.expression (expressionId 0)) := by
-  intro owner scope
-  have impossible : False := by
-    simpa [ContainsLocalSchemeTemplate, localSchemeTemplateOwners,
-      initializedLetBindings, ordinarySource] using scope.1
-  exact impossible.elim
+      (.expression (expressionId 0)) :=
+  TemplateScopeCovered.root ordinaryRootsHaveNoParent (by
+    simp [ordinarySource])
 
 /-- The occurrence-sensitive bridge retains the ordinary ledger branch when
 the active context is the declaration context itself. -/
@@ -930,22 +937,184 @@ private theorem scopedTemplateRequirementOwnership :
       templateContext, Context.withSolvedRequirements, Context.ofSignatures,
       scopedTemplateSource, expressionNode, letNode, templateRow]
 
+/-- The concrete initialized-let fixture has no incoming edge to its statement
+root. -/
+private theorem scopedTemplateRootsHaveNoParent :
+    RootsHaveNoParent scopedTemplateSource := by
+  intro root parent rootMem edge
+  have rootEq : root = .statement (statementId 1) := by
+    simpa [scopedTemplateSource] using rootMem
+  subst root
+  rcases edge with ⟨node, contains, childMem⟩
+  have nodeCases :
+      node = .expression (expressionNode 0 [templateId]) ∨
+        node = .statement (letNode 1 0 0) := by
+    simpa [scopedTemplateSource] using contains.1
+  rcases nodeCases with rfl | rfl <;>
+    simp [nodeChildIds, Node.references, expressionNode, letNode,
+      ExpressionForm.references, StatementForm.references] at childMem
+
+/-- The initializer occurrence in the fixture has the retained let statement
+as its only possible parent. -/
+private theorem scopedTemplateChildHasUniqueParent :
+    ChildHasUniqueParent scopedTemplateSource := by
+  have parentEq : ∀ {parent child},
+      DirectChild scopedTemplateSource parent child →
+      parent = .statement (statementId 1) := by
+    intro parent child edge
+    rcases edge with ⟨node, contains, childMem⟩
+    have nodeCases :
+        node = .expression (expressionNode 0 [templateId]) ∨
+          node = .statement (letNode 1 0 0) := by
+      simpa [scopedTemplateSource] using contains.1
+    rcases nodeCases with rfl | rfl
+    · simp [nodeChildIds, Node.references, expressionNode,
+        ExpressionForm.references] at childMem
+    · simpa [Node.id, letNode] using contains.2.symm
+  intro left right child leftEdge rightEdge
+  exact (parentEq leftEdge).trans (parentEq rightEdge).symm
+
+private theorem scopedTemplateInitializerEdge :
+    DirectChild scopedTemplateSource (.statement (statementId 1))
+      (.expression (expressionId 0)) := by
+  refine ⟨.statement (letNode 1 0 0), ?_, ?_⟩
+  · exact ⟨by simp [scopedTemplateSource], rfl⟩
+  · simp [nodeChildIds, Node.references, letNode, StatementForm.references]
+
+private theorem scopedTemplateParentCovered :
+    TemplateScopeCovered scopedTemplateSource templateContext
+      (.statement (statementId 1)) :=
+  TemplateScopeCovered.root scopedTemplateRootsHaveNoParent (by
+    simp [scopedTemplateSource])
+
 private theorem templateInitializerScopeCovered :
     TemplateScopeCovered scopedTemplateSource
       (localSchemeInitializerContext templateContext (templateBinder 0))
       (.expression (expressionId 0)) := by
-  intro owner scope
+  apply TemplateScopeCovered.localSchemeInitializer_of_newRoots
+    scopedTemplateParentCovered scopedTemplateChildHasUniqueParent
+    scopedTemplateInitializerEdge
+  intro owner contains initializerEq
   have ownerEq : owner = scopedTemplateOwner := by
     simpa [ContainsLocalSchemeTemplate, localSchemeTemplateOwners,
       initializedLetBindings, statementInitializedLetBindings,
       InitializedLetBinding.templateOwners, scopedTemplateSource,
       scopedTemplateOwner, letNode, templateBinder, templateRequirement] using
-      scope.1
+      contains
+  subst owner
+  simp [scopedTemplateOwner, templateBinder, templateRequirement]
+
+private def groupExpressionNode (index innerIndex : Nat) : ExpressionNode := {
+  id := expressionId index
+  span := testSpan
+  type := .variable templateVariable
+  form := .group (expressionId innerIndex)
+}
+
+/-- A two-level initializer fixture separates entry into a new template root
+from ordinary descent within that already covered initializer. -/
+private def nestedTemplateSource : TypedSource := {
+  owner := testOwner
+  inputs := []
+  roots := [.statement (statementId 2)]
+  nodes := [
+    .expression (expressionNode 0 []),
+    .expression (groupExpressionNode 1 0),
+    .statement (letNode 2 0 1)
+  ]
+}
+
+private def nestedTemplateOwner : LocalSchemeTemplateOwner := {
+  binder := templateBinder 0
+  initializer := .expression (expressionId 1)
+  requirement := templateRequirement
+}
+
+private theorem nestedTemplateParentCovered :
+    TemplateScopeCovered nestedTemplateSource
+      (localSchemeInitializerContext templateContext (templateBinder 0))
+      (.expression (expressionId 1)) := by
+  intro owner scopes
+  have ownerEq : owner = nestedTemplateOwner := by
+    simpa [ContainsLocalSchemeTemplate, localSchemeTemplateOwners,
+      initializedLetBindings, statementInitializedLetBindings,
+      InitializedLetBinding.templateOwners, nestedTemplateSource,
+      nestedTemplateOwner, letNode, templateBinder, templateRequirement] using
+      scopes.1
   subst owner
   simp [localSchemeInitializerContext, Context.withTypeVariables,
     Context.withAssumptions, templateContext, Context.withSolvedRequirements,
-    Context.ofSignatures, scopedTemplateOwner, templateBinder,
+    Context.ofSignatures, nestedTemplateOwner, templateBinder,
     templateRequirement]
+
+private theorem nestedTemplateEdgeClassification
+    {parent child : NodeId}
+    (edge : DirectChild nestedTemplateSource parent child) :
+    (parent = .expression (expressionId 1) ∧
+        child = .expression (expressionId 0)) ∨
+      (parent = .statement (statementId 2) ∧
+        child = .expression (expressionId 1)) := by
+  rcases edge with ⟨node, contains, childMem⟩
+  have nodeCases :
+      node = .expression (expressionNode 0 []) ∨
+        node = .expression (groupExpressionNode 1 0) ∨
+        node = .statement (letNode 2 0 1) := by
+    simpa [nestedTemplateSource] using contains.1
+  rcases nodeCases with rfl | rfl | rfl
+  · simp [nodeChildIds, Node.references, expressionNode,
+      ExpressionForm.references] at childMem
+  · exact Or.inl ⟨by
+      simpa [Node.id, groupExpressionNode] using contains.2.symm, by
+      simpa [nodeChildIds, Node.references, groupExpressionNode,
+        ExpressionForm.references] using childMem⟩
+  · exact Or.inr ⟨by
+      simpa [Node.id, letNode] using contains.2.symm, by
+      simpa [nodeChildIds, Node.references, letNode,
+        StatementForm.references] using childMem⟩
+
+private theorem nestedTemplateChildHasUniqueParent :
+    ChildHasUniqueParent nestedTemplateSource := by
+  intro left right child leftEdge rightEdge
+  rcases nestedTemplateEdgeClassification leftEdge with
+    ⟨leftParent, leftChild⟩ | ⟨leftParent, leftChild⟩
+  · rcases nestedTemplateEdgeClassification rightEdge with
+      ⟨rightParent, rightChild⟩ | ⟨rightParent, rightChild⟩
+    · exact leftParent.trans rightParent.symm
+    · exfalso
+      have childEq := leftChild.symm.trans rightChild
+      simp [expressionId] at childEq
+  · rcases nestedTemplateEdgeClassification rightEdge with
+      ⟨rightParent, rightChild⟩ | ⟨rightParent, rightChild⟩
+    · exfalso
+      have childEq := leftChild.symm.trans rightChild
+      simp [expressionId] at childEq
+    · exact leftParent.trans rightParent.symm
+
+private theorem nestedTemplateInnerEdge :
+    DirectChild nestedTemplateSource (.expression (expressionId 1))
+      (.expression (expressionId 0)) := by
+  refine ⟨.expression (groupExpressionNode 1 0), ?_, ?_⟩
+  · exact ⟨by simp [nestedTemplateSource], rfl⟩
+  · simp [nodeChildIds, Node.references, groupExpressionNode,
+      ExpressionForm.references]
+
+/-- Ordinary descent inside an initializer inherits the parent's template
+coverage without adding another assumption. -/
+example : TemplateScopeCovered nestedTemplateSource
+    (localSchemeInitializerContext templateContext (templateBinder 0))
+    (.expression (expressionId 0)) := by
+  apply TemplateScopeCovered.child nestedTemplateParentCovered
+    nestedTemplateChildHasUniqueParent nestedTemplateInnerEdge
+    (fun _ member => member)
+  intro owner contains initializerEq
+  have ownerEq : owner = nestedTemplateOwner := by
+    simpa [ContainsLocalSchemeTemplate, localSchemeTemplateOwners,
+      initializedLetBindings, statementInitializedLetBindings,
+      InitializedLetBinding.templateOwners, nestedTemplateSource,
+      nestedTemplateOwner, letNode, templateBinder, templateRequirement] using
+      contains
+  subst owner
+  simp [nestedTemplateOwner, expressionId] at initializerEq
 
 /-- The same bridge accepts a template row only inside its covered
 initializer context, where the retained assumption evidence is active. -/

@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.WellFormed
 import Solcore.SourceSemantics.Ownership
 import Solcore.SourceSemantics.Substitution
+import Solcore.SourceSemantics.Binders
 import Solcore.Frontend.SourceInference.TypedIRProperties
 
 /-!
@@ -48,6 +49,98 @@ theorem ContainsStatement.of_nodes_prefix
 /-- One direct, category-preserving occurrence edge. -/
 def DirectChild (source : TypedSource) (parent child : NodeId) : Prop :=
   ∃ node, ContainsNode source parent node ∧ child ∈ nodeChildIds node
+
+private theorem initializedLetBinding_initializer_mem_forItemChildIds
+    {item : ForItemForm} {binding : InitializedLetBinding}
+    (member : binding ∈ forItemInitializedLetBindings item) :
+    binding.initializer ∈ forItemChildIds item := by
+  cases item with
+  | letDecl binder initializer =>
+      cases initializer with
+      | none => simp [forItemInitializedLetBindings] at member
+      | some initializer =>
+          have bindingEq : binding = {
+              binder := binder
+              initializer := .expression initializer
+            } := by
+            simpa [forItemInitializedLetBindings] using member
+          subst binding
+          simp [forItemChildIds, ForItemForm.references]
+  | expression _ => simp [forItemInitializedLetBindings] at member
+  | assignValue _ _ _ => simp [forItemInitializedLetBindings] at member
+  | assignBitNot _ => simp [forItemInitializedLetBindings] at member
+
+private theorem initializedLetBinding_initializer_mem_forItemsChildIds
+    {items : List ForItemForm} {binding : InitializedLetBinding}
+    (member : binding ∈ items.flatMap forItemInitializedLetBindings) :
+    binding.initializer ∈ items.flatMap forItemChildIds := by
+  rcases List.mem_flatMap.mp member with ⟨item, itemMem, bindingMem⟩
+  exact List.mem_flatMap.mpr ⟨item, itemMem,
+    initializedLetBinding_initializer_mem_forItemChildIds bindingMem⟩
+
+private theorem initializedLetBinding_initializer_mem_statementChildIds
+    {form : StatementForm} {binding : InitializedLetBinding}
+    (member : binding ∈ statementInitializedLetBindings form) :
+    binding.initializer ∈ statementChildIds form := by
+  cases form with
+  | letDecl binder initializer =>
+      cases initializer with
+      | none => simp [statementInitializedLetBindings] at member
+      | some initializer =>
+          have bindingEq : binding = {
+              binder := binder
+              initializer := .expression initializer
+            } := by
+            simpa [statementInitializedLetBindings] using member
+          subst binding
+          simp [statementChildIds, StatementForm.references]
+  | forLoop initializer condition post body =>
+      simp only [statementInitializedLetBindings] at member
+      rcases List.mem_append.mp member with initializerMem | postMem
+      · have childMem :=
+          initializedLetBinding_initializer_mem_forItemsChildIds initializerMem
+        have childMem' : binding.initializer ∈
+            initializer.flatMap ForItemForm.references := by
+          simpa [forItemChildIds] using childMem
+        simp only [statementChildIds, StatementForm.references,
+          List.mem_append, List.mem_cons, List.not_mem_nil, or_false]
+        exact Or.inl (Or.inl (Or.inl childMem'))
+      · have childMem :=
+          initializedLetBinding_initializer_mem_forItemsChildIds postMem
+        have childMem' : binding.initializer ∈
+            post.flatMap ForItemForm.references := by
+          simpa [forItemChildIds] using childMem
+        simp only [statementChildIds, StatementForm.references,
+          List.mem_append, List.mem_cons, List.not_mem_nil, or_false]
+        exact Or.inl (Or.inr childMem')
+  | returnStmt _ => simp [statementInitializedLetBindings] at member
+  | expression _ _ => simp [statementInitializedLetBindings] at member
+  | assignValue _ _ _ => simp [statementInitializedLetBindings] at member
+  | assignBitNot _ => simp [statementInitializedLetBindings] at member
+  | ifThen _ _ _ => simp [statementInitializedLetBindings] at member
+  | block _ => simp [statementInitializedLetBindings] at member
+  | matchWith _ => simp [statementInitializedLetBindings] at member
+  | whileLoop _ _ => simp [statementInitializedLetBindings] at member
+  | breakStmt => simp [statementInitializedLetBindings] at member
+  | continueStmt => simp [statementInitializedLetBindings] at member
+
+namespace InitializedLetBinding
+
+/-- Every retained initialized binding contributes its initializer as a
+direct child of the statement occurrence which owns the binding. -/
+theorem directChild
+    {source : TypedSource} {binding : InitializedLetBinding}
+    (member : binding ∈ initializedLetBindings source) :
+    ∃ parent, DirectChild source parent binding.initializer := by
+  unfold initializedLetBindings at member
+  rcases List.mem_flatMap.mp member with ⟨node, nodeMem, bindingMem⟩
+  cases node with
+  | expression _ => simp at bindingMem
+  | statement node =>
+      refine ⟨.statement node.id, .statement node, ⟨nodeMem, rfl⟩, ?_⟩
+      exact initializedLetBinding_initializer_mem_statementChildIds bindingMem
+
+end InitializedLetBinding
 
 /-- A nonempty path through direct occurrence edges. -/
 inductive Descends (source : TypedSource) : NodeId → NodeId → Prop where
@@ -252,6 +345,109 @@ theorem start_node
       exact ⟨node, contains⟩
 
 end Descends
+
+namespace LocalSchemeTemplateOwner
+
+/-- If a template scope contains a child without starting at that child, its
+scope also contains the child's unique parent. -/
+theorem scopes_parent_of_scopes_child
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    {parent child : NodeId}
+    (uniqueParent : ChildHasUniqueParent source)
+    (edge : DirectChild source parent child)
+    (scopes : owner.Scopes source child)
+    (notRoot : owner.initializer ≠ child) :
+    owner.Scopes source parent := by
+  rcases scopes with ⟨contains, childInScope⟩
+  refine ⟨contains, ?_⟩
+  rcases childInScope with childEq | path
+  · exact False.elim (notRoot childEq.symm)
+  · obtain ⟨lastParent, finalEdge, pathPrefix⟩ := path.final_edge
+    have lastParentEq : lastParent = parent :=
+      uniqueParent finalEdge edge
+    subst lastParent
+    rcases pathPrefix with initializerEq | pathPrefix
+    · exact Or.inl initializerEq.symm
+    · exact Or.inr pathPrefix
+
+end LocalSchemeTemplateOwner
+
+namespace TemplateScopeCovered
+
+/-- Declaration roots are outside every qualified initializer scope because a
+retained initializer always has an owning statement parent. -/
+theorem root
+    {source : TypedSource} {context : Context} {root : NodeId}
+    (rootsHaveNoParent : RootsHaveNoParent source)
+    (member : root ∈ source.roots) :
+    TemplateScopeCovered source context root := by
+  intro owner scopes
+  have impossible : False := by
+    rcases scopes with ⟨contains, rootInScope⟩
+    rcases rootInScope with rootEq | path
+    · obtain ⟨parent, edge⟩ :=
+        InitializedLetBinding.directChild (owner.binding_mem contains)
+      exact rootsHaveNoParent member (by simpa [rootEq] using edge)
+    · obtain ⟨_, finalEdge, _⟩ := path.final_edge
+      exact rootsHaveNoParent member finalEdge
+  exact impossible.elim
+
+/-- Coverage propagates over a direct child edge.  A template rooted at the
+child must be supplied explicitly; every enclosing template is inherited from
+the uniquely determined parent and transported by assumption weakening. -/
+theorem child
+    {source : TypedSource} {parent child : NodeId}
+    {parentContext childContext : Context}
+    (parentCovered : TemplateScopeCovered source parentContext parent)
+    (uniqueParent : ChildHasUniqueParent source)
+    (edge : DirectChild source parent child)
+    (assumptions_mono :
+      parentContext.assumptions ⊆ childContext.assumptions)
+    (newRootCovered : ∀ owner : LocalSchemeTemplateOwner,
+      ContainsLocalSchemeTemplate source owner →
+      owner.initializer = child →
+      owner.requirement.predicate ∈ childContext.assumptions) :
+    TemplateScopeCovered source childContext child := by
+  intro owner scopes
+  by_cases isNewRoot : owner.initializer = child
+  · exact newRootCovered owner scopes.1 isNewRoot
+  · exact assumptions_mono (parentCovered owner
+      (owner.scopes_parent_of_scopes_child uniqueParent edge scopes isNewRoot))
+
+/-- Enter a generalized initializer when the caller identifies every template
+rooted at that child with one of the selected binder's qualified predicates.
+The source-wide initializer-uniqueness automation is intentionally separate. -/
+theorem localSchemeInitializer_of_newRoots
+    {source : TypedSource} {context : Context} {parent : NodeId}
+    {initializer : ExpressionId} {binder : TypedBinder}
+    (parentCovered : TemplateScopeCovered source context parent)
+    (uniqueParent : ChildHasUniqueParent source)
+    (edge : DirectChild source parent (.expression initializer))
+    (newRoots : ∀ owner : LocalSchemeTemplateOwner,
+      ContainsLocalSchemeTemplate source owner →
+      owner.initializer = .expression initializer →
+      owner.requirement ∈ binder.schemeRequirements) :
+    TemplateScopeCovered source
+      (localSchemeInitializerContext context binder)
+      (.expression initializer) := by
+  apply child parentCovered uniqueParent edge
+  · intro predicate member
+    have appended := List.mem_append_left
+      (binder.schemeRequirements.map fun requirement =>
+        requirement.predicate) member
+    simpa [localSchemeInitializerContext, Context.withTypeVariables,
+      Context.withAssumptions] using appended
+  · intro owner contains initializerEq
+    have requirementMem := newRoots owner contains initializerEq
+    have mapped : owner.requirement.predicate ∈
+        binder.schemeRequirements.map fun requirement =>
+          requirement.predicate :=
+      List.mem_map.mpr ⟨owner.requirement, requirementMem, rfl⟩
+    have appended := List.mem_append_right context.assumptions mapped
+    simpa [localSchemeInitializerContext, Context.withTypeVariables,
+      Context.withAssumptions] using appended
+
+end TemplateScopeCovered
 
 namespace Reachable
 
