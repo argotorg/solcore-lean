@@ -740,6 +740,25 @@ theorem congr_localBinders
   ⟨invariant.aligned.congr_localBinders localBinders_eq,
     invariant.formation.congr_localBinders localBinders_eq⟩
 
+/-- Expression inference may allocate transient lambda or match binders, but
+restores the caller's active lexical scope before returning.  Consequently the
+combined executable/declarative local-context invariant is unchanged. -/
+theorem inferExprFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {state final : Frontend.SourceInference.State}
+    {inferred : InferredExpression}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (success : Detail.inferExprFuel fuel inferenceContext expression expected
+      state = .ok (inferred, final)) :
+    ActiveLocalContextInvariant final substitution context := by
+  apply invariant.congr_localBinders
+  have scopeEq := Detail.inferExprFuel_success_lexicalScope_eq success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
 /-- Replacing the compatibility-only name environment does not affect the
 stable lexical invariant. -/
 theorem withLocals
