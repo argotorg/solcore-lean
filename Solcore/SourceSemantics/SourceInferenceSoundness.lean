@@ -3969,6 +3969,338 @@ def inferMatchScrutineesFuel
       })
       pure ({ id := tupleId, type }, state)
 
+/-- Pointwise deep soundness for expression inference lifts through the
+source-ordered expression-list traversal.  The semantic source is fixed by
+the caller, so it may be the enclosing expression or statement's final common
+source rather than the intermediate state returned by the list traversal. -/
+theorem inferExprsFuel_success_expressionsHaveTypes
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {expressions : List Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {inferred : List InferredExpression}
+    (expressionSound :
+      ∀ {childFuel : Nat} {expression : Syntax.Expr}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext expression none
+            childInitial = .ok (child, childFinal) →
+          ExpressionHasType source target child.id
+            (outer.apply child.type))
+    (success : Detail.inferExprsFuel fuel inferenceContext expressions state =
+      .ok (inferred, final)) :
+    ExpressionsHaveTypes source target (inferred.map (·.id))
+      (inferred.map fun expression => outer.apply expression.type) := by
+  induction fuel generalizing expressions state inferred final with
+  | zero =>
+      simp [Detail.inferExprsFuel] at success
+  | succ fuel induction =>
+      cases expressions with
+      | nil =>
+          simp only [Detail.inferExprsFuel, Except.ok.injEq,
+            Prod.mk.injEq] at success
+          rcases success with ⟨rfl, rfl⟩
+          exact .nil target
+      | cons expression rest =>
+          unfold Detail.inferExprsFuel at success
+          cases headSuccess : Detail.inferExprFuel fuel inferenceContext
+              expression none state with
+          | error error =>
+              simp [headSuccess, bind, Except.bind] at success
+          | ok headPair =>
+              rcases headPair with ⟨head, headState⟩
+              simp only [headSuccess, bind, Except.bind] at success
+              cases tailSuccess : Detail.inferExprsFuel fuel inferenceContext
+                  rest headState with
+              | error error =>
+                  simp [tailSuccess] at success
+              | ok tailPair =>
+                  rcases tailPair with ⟨tail, tailState⟩
+                  simp only [tailSuccess, pure, Pure.pure, Except.pure]
+                    at success
+                  injection success with resultEq
+                  cases resultEq
+                  exact .cons (expressionSound headSuccess)
+                    (induction tailSuccess)
+
+/-- A retained synthetic tuple is typed by the pointwise typings of its
+children.  The tuple owns no requirements or output coercions. -/
+private theorem syntheticTupleExpressionHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {span : Syntax.SourceSpan} {tupleId : ExpressionId}
+    {elements : List InferredExpression}
+    (contains : ContainsExpression source tupleId {
+      id := tupleId
+      span
+      type := TypeSystem.Ty.productMany (elements.map (·.type))
+      form := .tuple (elements.map (·.id))
+    })
+    (binders : TypeParameterBindersWellFormed target)
+    (elementsType : ExpressionsHaveTypes
+      (source.applySubstitution outer) target (elements.map (·.id))
+      (elements.map fun expression => outer.apply expression.type)) :
+    ExpressionHasType (source.applySubstitution outer) target tupleId
+      (outer.apply (TypeSystem.Ty.productMany
+        (elements.map (·.type)))) := by
+  rw [FlexibleSubstitution.apply_productMany]
+  simp only [List.map_map, Function.comp_def]
+  have appliedContains : ContainsExpression
+      (source.applySubstitution outer) tupleId {
+        id := tupleId
+        span
+        type := TypeSystem.Ty.productMany
+          (elements.map fun expression => outer.apply expression.type)
+        form := .tuple (elements.map (·.id))
+      } := by
+    simpa [ExpressionNode.applySubstitution,
+      ExpressionForm.applySubstitution,
+      FlexibleSubstitution.apply_productMany, List.map_map,
+      Function.comp_def] using
+        (FlexibleSubstitution.ContainsExpression.applySubstitution outer
+          contains)
+  apply ExpressionHasType.ofOrdinary
+    (rawType := TypeSystem.Ty.productMany
+      (elements.map fun expression => outer.apply expression.type))
+    (owned := []) appliedContains
+  · exact .tuple elementsType
+  · exact elementsType.product_type_admissible binders
+  · exact elementsType.product_type_admissible binders
+  · intro requirement member
+    simp at member
+  · exact .nil _
+  · simp [coercionRequirementIds]
+
+/-- Deep soundness of the common match-scrutinee traversal in an eventual
+common typed source.  Singleton matches delegate directly to expression
+soundness.  Every other list is represented by an uncoerced synthetic tuple;
+the explicit node-prefix premise retains that tuple through the later match
+case and fallback traversals. -/
+theorem inferMatchScrutineesFuel_success_expressionHasType_in
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {inferred : InferredExpression}
+    {source : TypedSource}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (success : inferMatchScrutineesFuel fuel inferenceContext span sources
+      state = .ok (inferred, final))
+    (nodesPrefix : final.nodes <+: source.nodes)
+    (binders : TypeParameterBindersWellFormed target)
+    (expressionSound :
+      ∀ {childFuel : Nat} {expression : Syntax.Expr}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext expression none
+            childInitial = .ok (child, childFinal) →
+          ExpressionHasType (source.applySubstitution outer)
+            target child.id (outer.apply child.type)) :
+    ExpressionHasType (source.applySubstitution outer)
+      target inferred.id (outer.apply inferred.type) := by
+  cases sources with
+  | nil =>
+      unfold inferMatchScrutineesFuel at success
+      cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext []
+          state with
+      | error error =>
+          simp [elementsSuccess, bind, Except.bind] at success
+      | ok elementsPair =>
+          rcases elementsPair with ⟨elements, elementsState⟩
+          simp only [elementsSuccess, bind, Except.bind] at success
+          rcases allocation : elementsState.allocateExpressionId with
+            ⟨tupleId, allocated⟩
+          simp only [allocation, pure, Pure.pure, Except.pure] at success
+          injection success with resultEq
+          cases resultEq
+          have elementsType :=
+            inferExprsFuel_success_expressionsHaveTypes expressionSound
+              elementsSuccess
+          have containsHere := recordNode_containsExpression allocated ({
+            id := tupleId
+            span
+            type := TypeSystem.Ty.productMany (elements.map (·.type))
+            form := .tuple (elements.map (·.id))
+          } : ExpressionNode)
+          have contains : ContainsExpression source tupleId {
+              id := tupleId
+              span
+              type := TypeSystem.Ty.productMany (elements.map (·.type))
+              form := .tuple (elements.map (·.id))
+            } := by
+            apply ContainsExpression.of_nodes_prefix
+              (contains := containsHere)
+            simpa [Frontend.SourceInference.State.toTypedSource] using
+              nodesPrefix
+          exact syntheticTupleExpressionHasType_afterSubstitution contains
+            binders elementsType
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          apply expressionSound
+          simpa [inferMatchScrutineesFuel] using success
+      | cons second tail =>
+          unfold inferMatchScrutineesFuel at success
+          cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext
+              (first :: second :: tail) state with
+          | error error =>
+              simp [elementsSuccess, bind, Except.bind] at success
+          | ok elementsPair =>
+              rcases elementsPair with ⟨elements, elementsState⟩
+              simp only [elementsSuccess, bind, Except.bind] at success
+              rcases allocation : elementsState.allocateExpressionId with
+                ⟨tupleId, allocated⟩
+              simp only [allocation, pure, Pure.pure, Except.pure] at success
+              injection success with resultEq
+              cases resultEq
+              have elementsType :=
+                inferExprsFuel_success_expressionsHaveTypes expressionSound
+                  elementsSuccess
+              have containsHere := recordNode_containsExpression allocated ({
+                id := tupleId
+                span
+                type := TypeSystem.Ty.productMany (elements.map (·.type))
+                form := .tuple (elements.map (·.id))
+              } : ExpressionNode)
+              have contains : ContainsExpression source tupleId {
+                  id := tupleId
+                  span
+                  type := TypeSystem.Ty.productMany (elements.map (·.type))
+                  form := .tuple (elements.map (·.id))
+                } := by
+                apply ContainsExpression.of_nodes_prefix
+                  (contains := containsHere)
+                simpa [Frontend.SourceInference.State.toTypedSource] using
+                  nodesPrefix
+              exact syntheticTupleExpressionHasType_afterSubstitution contains
+                binders elementsType
+
+/-- The common match-scrutinee step makes monotone inference progress,
+preserves readiness, and returns a type bounded by the final allocator.  The
+synthetic-tuple branch composes list inference with occurrence allocation and
+node recording. -/
+theorem inferMatchScrutineesFuel_inferenceProperties
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {inferred : InferredExpression}
+    (ready : state.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (success : inferMatchScrutineesFuel fuel inferenceContext span sources
+      state = .ok (inferred, final)) :
+    state.InferenceProgress final ∧ final.InferenceReady ∧
+      inferred.type.VariablesBelow final.inference.next := by
+  have finishTuple
+      (elements : List InferredExpression)
+      (elementsState : Frontend.SourceInference.State)
+      (elementsProgress : state.InferenceProgress elementsState)
+      (elementsReady : elementsState.InferenceReady)
+      (elementsBelow : ∀ element ∈ elements,
+        element.type.VariablesBelow elementsState.inference.next)
+      (residualSuccess : (pure ({
+          id := elementsState.allocateExpressionId.fst
+          type := TypeSystem.Ty.productMany (elements.map (·.type))
+        }, elementsState.allocateExpressionId.snd.recordNode (.expression {
+          id := elementsState.allocateExpressionId.fst
+          span
+          type := TypeSystem.Ty.productMany (elements.map (·.type))
+          form := .tuple (elements.map (·.id))
+        })) : Except Frontend.SourceInference.Error
+          (InferredExpression × Frontend.SourceInference.State)) =
+            .ok (inferred, final)) :
+      state.InferenceProgress final ∧ final.InferenceReady ∧
+        inferred.type.VariablesBelow final.inference.next := by
+    have resultEq : ({
+        id := elementsState.allocateExpressionId.fst
+        type := TypeSystem.Ty.productMany (elements.map (·.type))
+      }, elementsState.allocateExpressionId.snd.recordNode (.expression {
+        id := elementsState.allocateExpressionId.fst
+        span
+        type := TypeSystem.Ty.productMany (elements.map (·.type))
+        form := .tuple (elements.map (·.id))
+      })) = (inferred, final) := by
+      simpa only [pure, Pure.pure, Except.pure, Except.ok.injEq] using
+        residualSuccess
+    have inferredEq := congrArg Prod.fst resultEq
+    have finalEq := congrArg Prod.snd resultEq
+    simp only at inferredEq finalEq
+    subst inferred
+    subst final
+    have tupleTypeBelow :
+        (TypeSystem.Ty.productMany
+          (elements.map (·.type))).VariablesBelow
+            elementsState.inference.next :=
+      TypeSystem.Ty.variablesBelow_productMany (by
+        intro type member
+        rcases List.mem_map.mp member with ⟨element, elementMember, rfl⟩
+        exact elementsBelow element elementMember)
+    have allocationProgress :=
+      Frontend.SourceInference.State.InferenceProgress.allocateExpressionId
+        elementsState elementsReady.solved
+    have allocationReady :=
+      Frontend.SourceInference.State.InferenceReady.allocateExpressionId
+        elementsReady
+    have recordProgress :=
+      Frontend.SourceInference.State.InferenceProgress.recordNode
+        elementsState.allocateExpressionId.snd (.expression {
+          id := elementsState.allocateExpressionId.fst
+          span
+          type := TypeSystem.Ty.productMany (elements.map (·.type))
+          form := .tuple (elements.map (·.id))
+        }) allocationReady.solved
+    have recordReady :=
+      Frontend.SourceInference.State.InferenceReady.recordNode
+        (.expression {
+          id := elementsState.allocateExpressionId.fst
+          span
+          type := TypeSystem.Ty.productMany (elements.map (·.type))
+          form := .tuple (elements.map (·.id))
+        }) allocationReady
+    have suffixProgress := allocationProgress.trans recordProgress
+    exact ⟨elementsProgress.trans suffixProgress, recordReady,
+      tupleTypeBelow.weaken suffixProgress.next_le⟩
+  cases sources with
+  | nil =>
+      unfold inferMatchScrutineesFuel at success
+      cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext []
+          state with
+      | error error =>
+          simp [elementsSuccess, bind, Except.bind] at success
+      | ok elementsPair =>
+          rcases elementsPair with ⟨elements, elementsState⟩
+          simp only [elementsSuccess, bind, Except.bind] at success
+          have elementsProperties :=
+            Detail.inferExprsFuel_inferenceProperties ready
+              signatureFormation functionsCanonical elementsSuccess
+          exact finishTuple elements elementsState elementsProperties.1
+            elementsProperties.2.1 elementsProperties.2.2 success
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          exact Detail.inferExprFuel_inferenceProperties (expected := none)
+            ready signatureFormation functionsCanonical (by simp)
+            (by simpa [inferMatchScrutineesFuel] using success)
+      | cons second tail =>
+          unfold inferMatchScrutineesFuel at success
+          cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext
+              (first :: second :: tail) state with
+          | error error =>
+              simp [elementsSuccess, bind, Except.bind] at success
+          | ok elementsPair =>
+              rcases elementsPair with ⟨elements, elementsState⟩
+              simp only [elementsSuccess, bind, Except.bind] at success
+              have elementsProperties :=
+                Detail.inferExprsFuel_inferenceProperties ready
+                  signatureFormation functionsCanonical elementsSuccess
+              exact finishTuple elements elementsState elementsProperties.1
+                elementsProperties.2.1 elementsProperties.2.2 success
+
 namespace ActiveLocalContextInvariant
 
 /-- The common match-scrutinee step preserves the caller's active lexical
@@ -7320,6 +7652,109 @@ theorem cons
     rw [headSawReturnEq, tailSawReturnEq]
 
 end BlockResultMatchesFactsAfterSubstitution
+
+/-- Explicit match-case inference is a generic source-ordered traversal over
+soundness for one arm.  Restoring the saved lexical scope after every body
+reestablishes the common outer invariant for the remaining arms; the supplied
+arm callback reconstructs declarative case typing in one finalized source.
+The returned facts also agree exactly with the executable all-return fold. -/
+theorem inferMatchCasesFuel_success_matchCasesHaveType
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : Frontend.SourceInference.State}
+    {result : Detail.MatchCasesResult}
+    {source : TypedSource} {control : ControlContext}
+    {outer : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (initialInvariant :
+      ActiveLocalContextInvariant state outer semanticContext)
+    (scopeEq : state.lexicalScope = outerScope)
+    (caseSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {arm : Syntax.MatchCase} {pattern : TypedMatchPattern}
+        {patternState : Frontend.SourceInference.State}
+        {bodyResult : Detail.BlockResult},
+        ActiveLocalContextInvariant input outer semanticContext →
+        Detail.inferMatchPatternFuel childFuel inferenceContext
+            arm.value.pattern scrutineeType input =
+          .ok (pattern, patternState) →
+        Detail.inferStatementsFuel childFuel inferenceContext
+            arm.value.body.value expectedReturn patternState = .ok bodyResult →
+        ∃ facts,
+          MatchCaseHasType source control semanticContext
+            (outer.apply scrutineeType)
+            (({
+              span := arm.span
+              pattern
+              body := bodyResult.statements
+            } : TypedMatchCase).applySubstitution outer) facts ∧
+          BlockResultMatchesFactsAfterSubstitution outer bodyResult facts)
+    (success : Detail.inferMatchCasesFuel fuel inferenceContext scrutineeType
+      expectedReturn outerScope cases state = .ok result) :
+    ∃ caseFacts,
+      MatchCasesHaveType source control semanticContext
+        (outer.apply scrutineeType)
+        (result.cases.map (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+      allBodiesSawReturn caseFacts = result.allReturn := by
+  induction fuel generalizing outerScope cases state result with
+  | zero =>
+      simp [Detail.inferMatchCasesFuel] at success
+  | succ fuel induction =>
+      cases cases with
+      | nil =>
+          unfold Detail.inferMatchCasesFuel at success
+          injection success with resultEq
+          subst result
+          exact ⟨[], .nil control semanticContext
+            (outer.apply scrutineeType), rfl⟩
+      | cons arm rest =>
+          unfold Detail.inferMatchCasesFuel at success
+          simp only [bind, Except.bind] at success
+          cases patternSuccess : Detail.inferMatchPatternFuel fuel
+              inferenceContext arm.value.pattern scrutineeType state with
+          | error error =>
+              simp [patternSuccess] at success
+          | ok patternPair =>
+              rcases patternPair with ⟨pattern, patternState⟩
+              simp only [patternSuccess] at success
+              cases bodySuccess : Detail.inferStatementsFuel fuel
+                  inferenceContext arm.value.body.value expectedReturn
+                  patternState with
+              | error error =>
+                  simp [bodySuccess] at success
+              | ok bodyResult =>
+                  simp only [bodySuccess] at success
+                  cases tailSuccess : Detail.inferMatchCasesFuel fuel
+                      inferenceContext scrutineeType expectedReturn outerScope
+                      rest
+                      (bodyResult.state.restoreLexicalScope outerScope) with
+                  | error error =>
+                      simp [tailSuccess] at success
+                  | ok tail =>
+                      simp only [tailSuccess] at success
+                      injection success with resultEq
+                      subst result
+                      obtain ⟨headFacts, headTyping, headAgreement⟩ :=
+                        caseSound initialInvariant patternSuccess bodySuccess
+                      have tailInvariant : ActiveLocalContextInvariant
+                          (bodyResult.state.restoreLexicalScope outerScope)
+                          outer semanticContext := by
+                        rw [← scopeEq]
+                        exact initialInvariant.restoreLexicalScope
+                      have tailScopeEq :
+                          (bodyResult.state.restoreLexicalScope outerScope
+                            ).lexicalScope = outerScope := by
+                        simp
+                      obtain ⟨tailFacts, tailTyping, tailAgreement⟩ :=
+                        induction tailInvariant tailScopeEq tailSuccess
+                      refine ⟨headFacts :: tailFacts, ?_, ?_⟩
+                      · simpa only [List.map_cons] using
+                          (MatchCasesHaveType.cons headTyping tailTyping)
+                      · change (headFacts.sawReturn &&
+                            allBodiesSawReturn tailFacts) =
+                          (bodyResult.sawReturn && tail.allReturn)
+                        rw [headAgreement.sawReturn_eq, tailAgreement]
 
 /-- Statement-list inference is a generic sequencing layer over soundness for
 one statement.  The caller chooses the relation connecting executable states

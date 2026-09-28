@@ -285,6 +285,12 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchScrutineesFuel
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_success_expressionsHaveTypes
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchScrutineesFuel_success_expressionHasType_in
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchScrutineesFuel_inferenceProperties
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferMatchScrutineesFuel
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.inferMatchCasesFuel
@@ -390,6 +396,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.singleton
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.cons
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchCasesFuel_success_matchCasesHaveType
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_statementsHaveType
 example :=
