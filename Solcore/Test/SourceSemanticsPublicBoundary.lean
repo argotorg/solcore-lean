@@ -169,6 +169,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_facts
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_builtinBoolean_containsExpression
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.builtinBooleanExpressionHasType_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceGraph_success_occurrenceGraphWellFormed
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.validateSourceLocalIdentities_success_localIdentityOwnership

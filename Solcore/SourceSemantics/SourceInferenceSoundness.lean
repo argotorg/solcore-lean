@@ -1377,6 +1377,84 @@ theorem inferExprFuel_success_localIdentifier_facts
   · simpa [predicates, instantiateLocalSchemePredicates, List.map_map,
       Function.comp_def] using correspondence
 
+/-- A successful builtin-boolean identifier branch materializes the exact
+reference node retained by source semantics.  The form owns no primary
+requirements, so every retained requirement belongs to the fitted output
+coercion path. -/
+theorem inferExprFuel_success_builtinBoolean_containsExpression
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = none)
+    (booleanName :
+      (name.value == "true" || name.value == "false") = true)
+    (success : Detail.inferExprFuel (fuel + 1) context expression expected
+      initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ coercions,
+      ContainsExpression (result.2.toTypedSource roots) result.1.id {
+        id := result.1.id
+        span := expression.span
+        type := result.1.type
+        form := .reference name.value
+          (.builtinBoolean (name.value == "true"))
+        requirements := Detail.coercionRequirements coercions
+        coercions
+      } := by
+  have recorded :
+      Detail.recordExpressionWithExpected context expression id .bool
+        (.reference name.value (.builtinBoolean (name.value == "true"))) []
+        expected allocated = .ok result := by
+    unfold Detail.inferExprFuel at success
+    simp only [allocationEq, expressionEq, lookupEq, booleanName, if_true]
+      at success
+    exact success
+  obtain ⟨coercions, contains⟩ :=
+    recordExpressionWithExpected_success_containsExpression recorded roots
+  exact ⟨coercions, by simpa using contains⟩
+
+/-- A retained builtin-boolean reference with a valid finalized output path
+is a declaratively typed expression.  This is the requirement-free leaf used
+by the whole-expression soundness induction. -/
+theorem builtinBooleanExpressionHasType_afterSubstitution
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {expression : Syntax.Expr} {name : Syntax.Identifier}
+    {result : InferredExpression} {coercions : List CoercionStep}
+    (contains : ContainsExpression source result.id {
+      id := result.id
+      span := expression.span
+      type := result.type
+      form := .reference name.value
+        (.builtinBoolean (name.value == "true"))
+      requirements := Detail.coercionRequirements coercions
+      coercions
+    })
+    (binders : TypeParameterBindersWellFormed target)
+    (finalAdmissible : TypeAdmissible target (outer.apply result.type))
+    (path : CoercionPathValid target .bool (outer.apply result.type)
+      (coercions.map (CoercionStep.applySubstitution outer))) :
+    ExpressionHasType (source.applySubstitution outer) target result.id
+      (outer.apply result.type) := by
+  apply ExpressionHasType.ofOrdinary
+    (rawType := .bool) (owned := [])
+    (FlexibleSubstitution.ContainsExpression.applySubstitution outer contains)
+  · exact .reference (.builtinBoolean (name.value == "true"))
+  · exact TypeAdmissible.bool binders
+  · exact finalAdmissible
+  · intro requirement member
+    simp at member
+  · exact path
+  · change Detail.coercionRequirements coercions =
+      coercionRequirementIds
+        (coercions.map (CoercionStep.applySubstitution outer))
+    rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
+    rfl
+
 /-- Successful executable graph validation establishes the complete initial
 declarative occurrence-graph well-formedness layer. -/
 theorem validateSourceGraph_success_occurrenceGraphWellFormed
