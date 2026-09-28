@@ -2278,6 +2278,118 @@ structure BlockResultMatchesFactsAfterSubstitution
   type_eq : facts.type = substitution.apply result.type
   sawReturn_eq : facts.sawReturn = result.sawReturn
 
+/-- An `if` without an `else` is declaratively typed from its finalized
+condition and recursively reconstructed then-body.  The explicit condition
+equality records the expected-type fact supplied by expression inference. -/
+theorem ifWithoutElseStatementHasType_afterSubstitution
+    {source : TypedSource} {target thenFinal : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {inferredCondition : InferredExpression}
+    {thenResult : Detail.BlockResult} {thenFacts : BodyFacts}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .ifThen inferredCondition.id thenResult.statements none
+    })
+    (conditionType : ExpressionHasType (source.applySubstitution outer) target
+      inferredCondition.id (outer.apply inferredCondition.type))
+    (conditionEq : outer.apply inferredCondition.type = .bool)
+    (thenType : StatementsHaveType (source.applySubstitution outer) control
+      target thenResult.statements thenFinal thenFacts) :
+    StatementHasType (source.applySubstitution outer) control target id target {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := thenFacts.control.branches (.ordinary .unit)
+    } := by
+  have conditionBool : ExpressionHasType (source.applySubstitution outer) target
+      inferredCondition.id .bool := by
+    rw [← conditionEq]
+    exact conditionType
+  exact .ifWithoutElse
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl conditionBool thenType (by simp [StatementNode.applySubstitution])
+
+/-- An `if` with an `else` is declaratively typed from both finalized branch
+derivations.  Their executable agreements align the branch-return test, while
+the final substitution's exact extension of the else state identifies the
+stored resolved return type with the declaration return type. -/
+theorem ifWithElseStatementHasType_afterSubstitution
+    {source : TypedSource} {target thenFinal elseFinal : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {loopDepth : Nat}
+    {statement : Syntax.Statement} {id : StatementId}
+    {expectedReturn : TypeSystem.Ty}
+    {inferredCondition : InferredExpression}
+    {thenResult elseResult : Detail.BlockResult}
+    {thenFacts elseFacts : BodyFacts}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := if thenResult.sawReturn && elseResult.sawReturn then
+        elseResult.state.resolve expectedReturn
+      else
+        .unit
+      form := .ifThen inferredCondition.id thenResult.statements
+        (some elseResult.statements)
+    })
+    (conditionType : ExpressionHasType (source.applySubstitution outer) target
+      inferredCondition.id (outer.apply inferredCondition.type))
+    (conditionEq : outer.apply inferredCondition.type = .bool)
+    (thenType : StatementsHaveType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target thenResult.statements thenFinal thenFacts)
+    (elseType : StatementsHaveType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target elseResult.statements elseFinal elseFacts)
+    (thenAgreement : BlockResultMatchesFactsAfterSubstitution outer thenResult
+      thenFacts)
+    (elseAgreement : BlockResultMatchesFactsAfterSubstitution outer elseResult
+      elseFacts)
+    (extension : outer.SemanticallyExtends
+      elseResult.state.inference.substitution) :
+    StatementHasType (source.applySubstitution outer) {
+      returnType := outer.apply expectedReturn
+      loopDepth
+    } target id target {
+      type := if thenFacts.sawReturn && elseFacts.sawReturn then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := thenFacts.sawReturn && elseFacts.sawReturn
+      sawReturn := thenFacts.sawReturn && elseFacts.sawReturn
+      control := thenFacts.control.branches elseFacts.control
+    } := by
+  have conditionBool : ExpressionHasType (source.applySubstitution outer) target
+      inferredCondition.id .bool := by
+    rw [← conditionEq]
+    exact conditionType
+  have resolvedFinal :
+      outer.apply (elseResult.state.resolve expectedReturn) =
+        outer.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  have typeEq :
+      outer.apply
+          (if thenResult.sawReturn && elseResult.sawReturn then
+            elseResult.state.resolve expectedReturn
+          else
+            .unit) =
+        if thenFacts.sawReturn && elseFacts.sawReturn then
+          outer.apply expectedReturn
+        else
+          .unit := by
+    rw [thenAgreement.sawReturn_eq, elseAgreement.sawReturn_eq]
+    cases thenResult.sawReturn <;> cases elseResult.sawReturn <;>
+      simp [resolvedFinal]
+  exact .ifWithElse
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl conditionBool thenType elseType (by
+      simpa [StatementNode.applySubstitution] using typeEq)
+
 /-- A retained block is typed by the recursively reconstructed statement
 sequence.  The sequence agreement supplies the final type annotation on the
 substituted block node, while lexical effects remain scoped to the body. -/
@@ -2392,6 +2504,70 @@ theorem continueStmt
       control := .continuing
     } := by
   constructor <;> rfl
+
+/-- The canonical executable result of an `if` without an `else` always agrees
+with its unit, non-value, non-returning declarative projections. -/
+theorem ifWithoutElse
+    (substitution : TypeSystem.Substitution) (thenFacts : BodyFacts)
+    (id : StatementId) (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      state
+    } {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := thenFacts.control.branches (.ordinary .unit)
+    } := by
+  constructor <;> rfl
+
+/-- Both branch agreements align the executable return conjunction with the
+declarative one.  Exact semantic extension of the final else state then closes
+the only nontrivial type projection. -/
+theorem ifWithElse
+    {substitution : TypeSystem.Substitution}
+    {expectedReturn : TypeSystem.Ty}
+    {thenResult elseResult : Detail.BlockResult}
+    {thenFacts elseFacts : BodyFacts}
+    (thenAgreement : BlockResultMatchesFactsAfterSubstitution substitution
+      thenResult thenFacts)
+    (elseAgreement : BlockResultMatchesFactsAfterSubstitution substitution
+      elseResult elseFacts)
+    (extension : substitution.SemanticallyExtends
+      elseResult.state.inference.substitution)
+    (id : StatementId) (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := if thenResult.sawReturn && elseResult.sawReturn then
+        elseResult.state.resolve expectedReturn
+      else
+        .unit
+      hasValue := thenResult.sawReturn && elseResult.sawReturn
+      sawReturn := thenResult.sawReturn && elseResult.sawReturn
+      state
+    } {
+      type := if thenFacts.sawReturn && elseFacts.sawReturn then
+        substitution.apply expectedReturn
+      else
+        .unit
+      hasValue := thenFacts.sawReturn && elseFacts.sawReturn
+      sawReturn := thenFacts.sawReturn && elseFacts.sawReturn
+      control := thenFacts.control.branches elseFacts.control
+    } := by
+  have resolvedFinal :
+      substitution.apply (elseResult.state.resolve expectedReturn) =
+        substitution.apply expectedReturn := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension expectedReturn
+  constructor
+  · rw [thenAgreement.sawReturn_eq, elseAgreement.sawReturn_eq]
+    cases thenResult.sawReturn <;> cases elseResult.sawReturn <;>
+      simp [resolvedFinal]
+  · rw [thenAgreement.sawReturn_eq, elseAgreement.sawReturn_eq]
+  · rw [thenAgreement.sawReturn_eq, elseAgreement.sawReturn_eq]
 
 /-- A scoped block statement inherits the finalized type and return flag of
 its recursively inferred body; erasing the body's ordinary value affects only

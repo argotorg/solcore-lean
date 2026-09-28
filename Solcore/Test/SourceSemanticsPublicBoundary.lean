@@ -225,6 +225,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.continueStatementHasType_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ifWithoutElseStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ifWithElseStatementHasType_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.blockStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution
@@ -236,6 +240,10 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.breakStmt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.continueStmt
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.ifWithoutElse
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.ifWithElse
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.block
 example :=
