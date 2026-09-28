@@ -2790,6 +2790,956 @@ theorem inferMatchCasesFuel_requirements_subset
   exact inferFuel_preserves_requirements_internal.2.2.2.2.2.2.2.2.2.2 fuel
     context scrutineeType expectedReturn outerScope cases state result success
 
+private theorem addRequirementsWithIds_integerPatterns_eq
+    (state : State) (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.integerPatterns =
+      state.integerPatterns := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate predicates induction =>
+      simp only [State.addRequirementsWithIds]
+      exact (induction (state.addRequirementWithId predicate).2).trans rfl
+
+private theorem commitCoercionPlan_integerPatterns_eq
+    (state : State) (plan : List PlannedCoercionStep) :
+    (commitCoercionPlan state plan).2.integerPatterns =
+      state.integerPatterns := by
+  induction plan generalizing state with
+  | nil => rfl
+  | cons step plan induction =>
+      simp only [commitCoercionPlan]
+      exact (induction
+        ((state.addRequirementWithId step.predicate).2
+          |>.addRequirementsWithIds step.methodPredicates).2).trans
+        (addRequirementsWithIds_integerPatterns_eq
+          (state.addRequirementWithId step.predicate).2
+          step.methodPredicates |>.trans rfl)
+
+private theorem withExpected_integerPatterns_eq
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    result.state.integerPatterns = state.integerPatterns := by
+  cases expected with
+  | none =>
+      simp only [withExpected] at success
+      injection success with resultEq
+      subst result
+      rfl
+  | some expected =>
+      cases unification : state.inference.unify actual.type expected with
+      | ok inference =>
+          simp only [withExpected, unification] at success
+          injection success with resultEq
+          subst result
+          rfl
+      | error error =>
+          cases error with
+          | occursCheck metavariable type =>
+              simp [withExpected, unification] at success
+          | exhausted =>
+              simp [withExpected, unification] at success
+          | mismatch left right =>
+              simp only [withExpected, unification] at success
+              cases planResult : coercionPlan? context state
+                  (state.resolve actual.type) (state.resolve expected) with
+              | error error =>
+                  simp [planResult, bind, Except.bind] at success
+              | ok plan? =>
+                  cases plan? with
+                  | none =>
+                      simp [planResult, bind, Except.bind] at success
+                  | some plan =>
+                      simp only [planResult, bind, Except.bind] at success
+                      change Except.ok _ = Except.ok result at success
+                      injection success with resultEq
+                      subst result
+                      exact commitCoercionPlan_integerPatterns_eq state plan
+
+private theorem candidateWithExpected_integerPatterns_eq
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : candidateWithExpected context state actual expected =
+      .ok (some result)) :
+    result.state.integerPatterns = state.integerPatterns := by
+  unfold candidateWithExpected at success
+  cases fittedResult : withExpected context state actual expected with
+  | error error =>
+      cases error <;> simp [fittedResult] at success
+      all_goals cases ‹Unification.Error› <;> simp_all
+  | ok fitted =>
+      simp only [fittedResult] at success
+      injection success with resultEq
+      have fittedEq : fitted = result := Option.some.inj resultEq
+      subst result
+      exact withExpected_integerPatterns_eq fittedResult
+
+private theorem fitArguments_integerPatterns_eq
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    result.state.integerPatterns = state.integerPatterns := by
+  induction arguments generalizing parameters state result with
+  | nil =>
+      cases parameters <;> simp [fitArguments] at success
+      subst result
+      rfl
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil => simp [fitArguments] at success
+      | cons parameter parameters =>
+          simp only [fitArguments] at success
+          cases fittedResult :
+              candidateWithExpected context state argument (some parameter) with
+          | error error =>
+              simp [fittedResult, bind, Except.bind] at success
+          | ok fitted? =>
+              cases fitted? with
+              | none =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  change Except.ok (none : Option ArgumentFitResult) =
+                    Except.ok (some result) at success
+                  simp at success
+              | some fitted =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  cases tailResult : fitArguments context fitted.state arguments
+                      parameters with
+                  | error error => simp [tailResult] at success
+                  | ok tail? =>
+                      cases tail? with
+                      | none =>
+                          simp only [tailResult] at success
+                          change Except.ok (none : Option ArgumentFitResult) =
+                            Except.ok (some result) at success
+                          simp at success
+                      | some tail =>
+                          simp only [tailResult] at success
+                          change Except.ok (some {
+                            state := tail.state
+                            cost := fitted.coercions.length + tail.cost
+                            coercions := {
+                              expression := argument.id
+                              coercions := fitted.coercions
+                            } :: tail.coercions
+                          }) = Except.ok (some result) at success
+                          injection success with resultEq
+                          have resultEq : _ = result := Option.some.inj resultEq
+                          subst result
+                          exact (induction (result := tail) tailResult).trans
+                            (candidateWithExpected_integerPatterns_eq
+                              fittedResult)
+
+private theorem tryFunctionCandidate_integerPatterns_eq
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    result.state.integerPatterns = state.integerPatterns := by
+  unfold tryFunctionCandidate at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try have fittedArgumentsEq :=
+    fitArguments_integerPatterns_eq (by assumption)
+  all_goals try have fittedResultEq :=
+    candidateWithExpected_integerPatterns_eq (by assumption)
+  all_goals
+    exact (addRequirementsWithIds_integerPatterns_eq _ _).trans
+      (fittedResultEq.trans fittedArgumentsEq)
+
+private theorem collectCandidateAttempts_success_integerPatterns_eq
+    {attempt : ProgramFunctionSignature →
+      Except Error (Option CandidateAttemptResult)}
+    {state : State}
+    (attemptEq : ∀ signature result,
+      attempt signature = .ok (some result) →
+        result.state.integerPatterns = state.integerPatterns) :
+    ∀ candidates success,
+      success ∈ (collectCandidateAttempts attempt candidates).successes →
+        success.attempt.state.integerPatterns = state.integerPatterns := by
+  intro candidates
+  induction candidates with
+  | nil => simp [collectCandidateAttempts]
+  | cons signature candidates induction =>
+      intro selected member
+      simp only [collectCandidateAttempts] at member
+      cases attemptResult : attempt signature with
+      | error error =>
+          simp only [attemptResult] at member
+          exact induction selected member
+      | ok result? =>
+          cases result? with
+          | none =>
+              simp only [attemptResult] at member
+              exact induction selected member
+          | some result =>
+              simp only [attemptResult, List.mem_cons] at member
+              cases member with
+              | inl selectedEq =>
+                  subst selected
+                  exact attemptEq signature result attemptResult
+              | inr member => exact induction selected member
+
+private theorem selectFunctionCandidateFrom_integerPatterns_eq
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    result.state.integerPatterns = state.integerPatterns := by
+  unfold selectFunctionCandidateFrom at success
+  let attempt := tryFunctionCandidate context arguments integerLiteralOrigins
+    call expected state
+  let search := collectCandidateAttempts attempt candidates
+  change selectCandidateSearch name candidates search = .ok result at success
+  unfold selectCandidateSearch at success
+  cases selected : bestCandidateSuccesses search.successes with
+  | nil =>
+      simp only [selected] at success
+      repeat' first | split at success
+      all_goals contradiction
+  | cons candidate rest =>
+      cases rest with
+      | cons second tail => simp [selected] at success
+      | nil =>
+          simp only [selected] at success
+          split at success
+          · contradiction
+          · injection success with resultEq
+            subst result
+            have member : candidate ∈ search.successes :=
+              bestCandidateSuccesses_requirements_subset search.successes
+                (by simp [selected])
+            exact collectCandidateAttempts_success_integerPatterns_eq
+              (state := state)
+              (fun signature attemptResult attemptSuccess =>
+                tryFunctionCandidate_integerPatterns_eq attemptSuccess)
+              candidates candidate member
+
+private theorem inferUnaryOperator_integerPatterns_eq
+    {context : Context} {operator : Syntax.UnaryOp} {operandType : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferUnaryOperator context operator operandType expected
+      integerLiterals state = .ok result) :
+    result.state.integerPatterns = state.integerPatterns := by
+  unfold inferUnaryOperator at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try simp_all
+  all_goals try
+    have pureEq := pureState_eq (by assumption)
+    subst_vars
+  all_goals try have unifiedEq :=
+    (unify_integerPatternMetadata_eq (by assumption)).1
+  all_goals try have requirementsEq :=
+    addRequirementsWithIds_integerPatterns_eq _ _
+  all_goals grind [unify_integerPatternMetadata_eq,
+    addRequirementsWithIds_integerPatterns_eq]
+
+private theorem inferBinaryOperator_integerPatterns_eq
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    result.state.integerPatterns = state.integerPatterns := by
+  unfold inferBinaryOperator at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try simp_all
+  all_goals try
+    have pureEq := pureState_eq (by assumption)
+    subst_vars
+  all_goals try have unifiedEq :=
+    (unify_integerPatternMetadata_eq (by assumption)).1
+  all_goals try have requirementsEq :=
+    addRequirementsWithIds_integerPatterns_eq _ _
+  all_goals grind [unify_integerPatternMetadata_eq,
+    addRequirementsWithIds_integerPatterns_eq]
+
+private theorem attachExpressionCoercions_integerPatterns_eq
+    (state : State) (entries : List ExpressionCoercions) :
+    (attachExpressionCoercions state entries).integerPatterns =
+      state.integerPatterns := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil => rfl
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      exact (induction
+        (state.modifyExpressionNode entry.expression fun node => {
+          node with
+          type := entry.coercions.foldl (fun _ step => step.target) node.type
+          requirements :=
+            node.requirements ++ coercionRequirements entry.coercions
+          coercions := node.coercions ++ entry.coercions
+        })).trans rfl
+
+private theorem recordExpression_integerPatterns_eq
+    (source : Syntax.Expr) (expression : InferredExpression)
+    (form : ExpressionForm) (requirements : List RequirementId)
+    (coercions : List CoercionStep) (state : State)
+    {localSchemeInstantiationStart : Option Nat} :
+    (recordExpression source expression form requirements coercions state
+      localSchemeInstantiationStart).2.integerPatterns =
+      state.integerPatterns := by
+  rfl
+
+@[simp] private theorem allocateExpressionId_integerPatterns_eq (state : State) :
+    state.allocateExpressionId.2.integerPatterns = state.integerPatterns := by
+  rfl
+
+private theorem recordExpressionWithExpected_integerPatterns_eq
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result) :
+    result.2.integerPatterns = state.integerPatterns := by
+  unfold recordExpressionWithExpected at success
+  cases fittedResult : withExpected context state { id, type } expected with
+  | error error => simp [fittedResult, bind, Except.bind] at success
+  | ok fitted =>
+      simp only [fittedResult, bind, Except.bind] at success
+      change Except.ok (recordExpression source fitted.expression form
+        (requirements ++ coercionRequirements fitted.coercions)
+        fitted.coercions fitted.state localSchemeInstantiationStart) =
+          Except.ok result at success
+      injection success with resultEq
+      subst result
+      exact (recordExpression_integerPatterns_eq source fitted.expression form
+        (requirements ++ coercionRequirements fitted.coercions)
+        fitted.coercions fitted.state).trans
+          (withExpected_integerPatterns_eq fittedResult)
+
+private theorem recordSelectedCallResult_integerPatterns_eq
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (state : State) :
+    (recordSelectedCallResult source callee name arguments attempt result
+      trailingCoercions state).2.integerPatterns = state.integerPatterns := by
+  unfold recordSelectedCallResult
+  rw [recordExpression_integerPatterns_eq,
+    recordExpression_integerPatterns_eq]
+  exact (attachExpressionCoercions_integerPatterns_eq state
+    attempt.argumentCoercions)
+
+private theorem recordSelectedCall_integerPatterns_eq
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
+    (recordSelectedCall source callee name arguments attempt).2.integerPatterns =
+      attempt.state.integerPatterns := by
+  exact recordSelectedCallResult_integerPatterns_eq source callee name
+    arguments attempt attempt.result [] attempt.state
+
+private theorem recordIndirectCall_integerPatterns_eq
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult) :
+    (recordIndirectCall source callee arguments result).2.integerPatterns =
+      result.state.integerPatterns := by
+  unfold recordIndirectCall
+  exact recordExpression_integerPatterns_eq _ _ _ _ _ _
+
+private theorem applyFunctionType_integerPatterns_eq
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Option Ty}
+    {state : State} {result : IndirectApplicationResult}
+    (success : applyFunctionType context call calleeType arguments expected
+      state = .ok result) :
+    result.state.integerPatterns = state.integerPatterns := by
+  unfold applyFunctionType at success
+  cases partsResult : functionParts? (state.resolve calleeType) with
+  | some parts =>
+      rcases parts with ⟨parameter, returnType⟩
+      simp only [partsResult] at success
+      cases argumentResult : withExpected context state
+          { id := call, type := Ty.productMany (arguments.map (fun x => x.type)) }
+          (some parameter) with
+      | error error => simp [argumentResult, bind, Except.bind] at success
+      | ok fittedArgument =>
+          simp only [argumentResult, bind, Except.bind] at success
+          cases resultResult : withExpected context fittedArgument.state
+              { id := call, type := returnType } expected with
+          | error error => simp [resultResult] at success
+          | ok fittedResult =>
+              simp only [resultResult] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := fittedArgument.coercions
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              exact (withExpected_integerPatterns_eq resultResult).trans
+                (withExpected_integerPatterns_eq argumentResult)
+  | none =>
+      simp only [partsResult] at success
+      generalize freshResultEq : state.fresh = freshResult at success
+      rcases freshResult with ⟨resultType, freshState⟩
+      cases unifyResult : unify freshState calleeType
+          (.function (Ty.productMany (arguments.map fun x => x.type))
+            resultType) with
+      | error error => simp [unifyResult, bind, Except.bind] at success
+      | ok unifiedState =>
+          simp only [unifyResult, bind, Except.bind] at success
+          cases resultResult : withExpected context unifiedState
+              { id := call, type := resultType } expected with
+          | error error => simp [resultResult] at success
+          | ok fittedResult =>
+              simp only [resultResult] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := []
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              subst result
+              have freshEq : freshState.integerPatterns =
+                  state.integerPatterns := by
+                have projected := congrArg
+                  (fun result : Ty × State => result.2.integerPatterns)
+                  freshResultEq
+                simpa [State.fresh] using projected.symm
+              exact (withExpected_integerPatterns_eq resultResult).trans
+                ((unify_integerPatternMetadata_eq unifyResult).1.trans freshEq)
+
+private theorem bindLambdaParameters_integerPatterns_eq
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {state : State}
+    {result : List TypedBinder × List Ty × State}
+    (success : bindLambdaParameters context parameters index seen state =
+      .ok result) :
+    result.2.2.integerPatterns = state.integerPatterns := by
+  induction parameters generalizing index seen state result with
+  | nil =>
+      simp only [bindLambdaParameters] at success
+      injection success with resultEq
+      subst result
+      rfl
+  | cons parameter rest induction =>
+      cases parameterValue : parameter.value with
+      | error =>
+          simp [bindLambdaParameters, parameterValue, bind, Except.bind]
+            at success
+      | inferred name =>
+          simp only [bindLambdaParameters, parameterValue, bind, Except.bind]
+            at success
+          repeat' first | split at success
+          all_goals try simp_all only [exceptPure_eq_ok]
+          all_goals try simp_all
+          all_goals
+            subst result
+            subst_vars
+            have tailEq := induction _ _ _ (by assumption)
+            simpa [State.fresh, State.allocateBinder] using tailEq
+      | typed marker name sourceType =>
+          simp only [bindLambdaParameters, parameterValue] at success
+          cases typeResult : resolveSourceType context sourceType with
+          | error error =>
+              simp [typeResult, bind, Except.bind] at success
+          | ok type =>
+              simp only [typeResult, bind, Except.bind] at success
+              repeat' first | split at success
+              all_goals try simp_all only [exceptPure_eq_ok]
+              all_goals try simp_all
+              all_goals
+                subst result
+                subst_vars
+                have tailEq := induction _ _ _ (by assumption)
+                simpa [State.allocateBinder] using tailEq
+
+private theorem unifyBuiltinFunctionArgumentsEqual_integerPatterns_eq
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {state next : State}
+    (success : unifyBuiltinFunctionArgumentsEqual arguments parameters state =
+      .ok next) :
+    next.integerPatterns = state.integerPatterns := by
+  induction arguments generalizing parameters state next with
+  | nil =>
+      simp only [unifyBuiltinFunctionArgumentsEqual] at success
+      injection success with nextEq
+      subst next
+      rfl
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          injection success with nextEq
+          subst next
+          rfl
+      | cons parameter parameters =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          cases unifyResult : unify state argument.type parameter with
+          | error error =>
+              simp [unifyResult, bind, Except.bind] at success
+          | ok unified =>
+              simp only [unifyResult, bind, Except.bind] at success
+              exact (induction success).trans
+                (unify_integerPatternMetadata_eq unifyResult).1
+
+private theorem recordBuiltinFunctionCall_integerPatterns_eq
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    result.2.integerPatterns = state.integerPatterns := by
+  unfold recordBuiltinFunctionCall at success
+  simp_all [bind, Except.bind]
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals try simp_all
+  all_goals try
+    have pureEq := pureState_eq (by assumption)
+    subst_vars
+  all_goals try have argumentsEq :=
+    unifyBuiltinFunctionArgumentsEqual_integerPatterns_eq (by assumption)
+  all_goals try have unifiedEq :=
+    (unify_integerPatternMetadata_eq (by assumption)).1
+  all_goals try have recordedEq :=
+    recordExpression_integerPatterns_eq _ _ _ _ _ _
+  all_goals try
+    rw [recordExpression_integerPatterns_eq,
+      recordExpression_integerPatterns_eq,
+      allocateExpressionId_integerPatterns_eq]
+  all_goals first
+    | exact unifiedEq.trans argumentsEq
+    | exact argumentsEq
+
+@[simp] private theorem stateFresh_integerPatterns_eq (state : State) :
+    state.fresh.2.integerPatterns = state.integerPatterns := by
+  rfl
+
+@[simp] private theorem withLocals_integerPatterns_eq
+    (state : State) (locals : TypeSystem.Environment) :
+    (state.withLocals locals).integerPatterns = state.integerPatterns := by
+  rfl
+
+@[simp] private theorem restoreLexicalScope_integerPatterns_eq
+    (state : State) (scope : LexicalScope) :
+    (state.restoreLexicalScope scope).integerPatterns =
+      state.integerPatterns := by
+  rfl
+
+@[simp] private theorem allocateBinder_integerPatterns_eq
+    (state : State) (name : String) (scheme : Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement) :
+    (state.allocateBinder name scheme span comptime
+      schemeRequirements).2.integerPatterns = state.integerPatterns := by
+  rfl
+
+@[simp] private theorem allocateHiddenLocal_integerPatterns_eq
+    (state : State) :
+    state.allocateHiddenLocal.2.integerPatterns = state.integerPatterns := by
+  rfl
+
+@[simp] private theorem allocateStatementId_integerPatterns_eq
+    (state : State) :
+    state.allocateStatementId.2.integerPatterns = state.integerPatterns := by
+  rfl
+
+@[simp] private theorem recordNode_integerPatterns_eq
+    (state : State) (node : Node) :
+    (state.recordNode node).integerPatterns = state.integerPatterns := by
+  rfl
+
+@[simp] private theorem addRequirementWithId_integerPatterns_eq
+    (state : State) (predicate : ProgramPredicate) :
+    (state.addRequirementWithId predicate).2.integerPatterns =
+      state.integerPatterns := by
+  rfl
+
+private theorem integerPatterns_subset_of_eq {before after : State}
+    (equal : after.integerPatterns = before.integerPatterns) :
+    before.integerPatterns ⊆ after.integerPatterns := by
+  rw [equal]
+  exact fun _ member => member
+
+private theorem pair_success_integerPatterns_subset {alpha : Type}
+    {operation : alpha × State} {value : alpha} {next initial : State}
+    (operationEq : operation.2.integerPatterns = initial.integerPatterns)
+    (success : operation = (value, next)) :
+    initial.integerPatterns ⊆ next.integerPatterns := by
+  rw [success] at operationEq
+  exact integerPatterns_subset_of_eq operationEq
+
+private theorem anchored_pair_except_integerPatterns_subset
+    {epsilon alpha beta : Type}
+    {anchor : alpha × State}
+    {computation : alpha → State → Except epsilon (beta × State)}
+    {initial state : State} {result : beta × State}
+    (_anchorInvariant : ∀ value next,
+      (Except.ok anchor : Except epsilon (alpha × State)) =
+          Except.ok (value, next) →
+        initial.integerPatterns ⊆ next.integerPatterns)
+    (invariant : ∀ value state result next,
+      computation value state = .ok (result, next) →
+        state.integerPatterns ⊆ next.integerPatterns)
+    (success : computation anchor.1 state = .ok result) :
+    state.integerPatterns ⊆ result.2.integerPatterns := by
+  rcases anchor with ⟨value, anchorState⟩
+  rcases result with ⟨result, next⟩
+  exact invariant value state result next success
+
+private theorem syntheticTuple_result_integerPatterns_subset
+    {elements : List InferredExpression} {span : Syntax.SourceSpan}
+    {state : State} {result : InferredExpression × State}
+    (success : (pure ({
+        id := state.allocateExpressionId.fst
+        type := Ty.productMany (elements.map (·.type))
+      }, state.allocateExpressionId.snd.recordNode (.expression {
+        id := state.allocateExpressionId.fst
+        span
+        type := Ty.productMany (elements.map (·.type))
+        form := .tuple (elements.map (·.id))
+      })) : Except Error (InferredExpression × State)) = .ok result) :
+    state.integerPatterns ⊆ result.2.integerPatterns := by
+  have resultEq : ({
+      id := state.allocateExpressionId.fst
+      type := Ty.productMany (elements.map (·.type))
+    }, state.allocateExpressionId.snd.recordNode (.expression {
+      id := state.allocateExpressionId.fst
+      span
+      type := Ty.productMany (elements.map (·.type))
+      form := .tuple (elements.map (·.id))
+    })) = result := by
+    simpa only [exceptPure_eq_ok] using success
+  rw [← resultEq]
+  exact fun _ member => member
+
+private theorem syntheticTuple_pair_integerPatterns_subset
+    {elements : List InferredExpression} {span : Syntax.SourceSpan}
+    {state : State} {result : InferredExpression × State}
+    (success : ({
+        id := state.allocateExpressionId.fst
+        type := Ty.productMany (elements.map (·.type))
+      }, state.allocateExpressionId.snd.recordNode (.expression {
+        id := state.allocateExpressionId.fst
+        span
+        type := Ty.productMany (elements.map (·.type))
+        form := .tuple (elements.map (·.id))
+      })) = result) :
+    state.integerPatterns ⊆ result.2.integerPatterns := by
+  rw [← success]
+  exact fun _ member => member
+
+private theorem pure_pair_result_integerPatterns_subset {epsilon alpha : Type}
+    {value : alpha} {next initial : State} {result : alpha × State}
+    (nextSubset : initial.integerPatterns ⊆ next.integerPatterns)
+    (success : (pure (value, next) : Except epsilon (alpha × State)) =
+      .ok result) :
+    initial.integerPatterns ⊆ result.2.integerPatterns := by
+  have resultEq : (value, next) = result := by
+    simpa only [exceptPure_eq_ok] using success
+  rw [← resultEq]
+  exact nextSubset
+
+private theorem restored_pair_result_integerPatterns_subset {alpha : Type}
+    {value : alpha} {state initial : State} {scope : LexicalScope}
+    {result : alpha × State}
+    (subset : initial.integerPatterns ⊆ state.integerPatterns)
+    (success : (value, state.restoreLexicalScope scope) = result) :
+    initial.integerPatterns ⊆ result.2.integerPatterns := by
+  rw [← success]
+  exact subset
+
+set_option maxHeartbeats 2000000 in
+private theorem inferFuel_preserves_integerPatterns_internal :
+    (∀ fuel context expression expected state,
+      PreservesIntegerPatterns Prod.snd state
+        (inferExprFuel fuel context expression expected state)) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      PreservesIntegerPatterns Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state)) ∧
+    (∀ fuel context sources expected state,
+      PreservesIntegerPatterns Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state)) ∧
+    (∀ fuel context statements expectedReturn state,
+      PreservesIntegerPatterns BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state)) ∧
+    (∀ fuel context statement expectedReturn state,
+      PreservesIntegerPatterns StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state)) ∧
+    (∀ fuel context items state,
+      PreservesIntegerPatterns InferredForItems.state state
+        (inferForItemsFuel fuel context items state)) ∧
+    (∀ fuel context item state,
+      PreservesIntegerPatterns Prod.snd state
+        (inferForItemFuel fuel context item state)) ∧
+    (∀ fuel context target state,
+      PreservesIntegerPatterns Prod.snd state
+        (inferPlaceFuel fuel context target state)) ∧
+    (∀ fuel context target operator value state,
+      PreservesIntegerPatterns (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state)) ∧
+    (∀ fuel context expressions state,
+      PreservesIntegerPatterns Prod.snd state
+        (inferExprsFuel fuel context expressions state)) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      PreservesIntegerPatterns MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state)) := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := fun fuel context expression expected state =>
+      PreservesIntegerPatterns Prod.snd state
+        (inferExprFuel fuel context expression expected state))
+    (motive2 := fun fuel context source id instantiation arguments expected
+        state =>
+      PreservesIntegerPatterns Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state))
+    (motive3 := fun fuel context sources expected state =>
+      PreservesIntegerPatterns Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state))
+    (motive4 := fun fuel context statements expectedReturn state =>
+      PreservesIntegerPatterns BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state))
+    (motive5 := fun fuel context statement expectedReturn state =>
+      PreservesIntegerPatterns StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state))
+    (motive6 := fun fuel context items state =>
+      PreservesIntegerPatterns InferredForItems.state state
+        (inferForItemsFuel fuel context items state))
+    (motive7 := fun fuel context item state =>
+      PreservesIntegerPatterns Prod.snd state
+        (inferForItemFuel fuel context item state))
+    (motive8 := fun fuel context target state =>
+      PreservesIntegerPatterns Prod.snd state
+        (inferPlaceFuel fuel context target state))
+    (motive9 := fun fuel context target operator value state =>
+      PreservesIntegerPatterns (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state))
+    (motive10 := fun fuel context expressions state =>
+      PreservesIntegerPatterns Prod.snd state
+        (inferExprsFuel fuel context expressions state))
+    (motive11 := fun fuel context scrutineeType expectedReturn outerScope
+        cases state =>
+      PreservesIntegerPatterns MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state))
+  case case44 =>
+    intros context statement expectedReturn state fuel id stateAfterId
+      statementIdEq scrutinees arms statementEq sources notSingleton
+      casesInduction bodyInduction expressionsInduction
+    unfold PreservesIntegerPatterns at *
+    intro result success
+    have statementIdSubset := pair_success_integerPatterns_subset
+      (operation := state.allocateStatementId) (by rfl) statementIdEq
+    unfold inferStatementFuel at success
+    simp only [statementIdEq, statementEq, bind, Except.bind] at success
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try exact (notSingleton _ (by assumption)).elim
+    all_goals try have expressionsSubset :=
+      expressionsInduction _ (by assumption)
+    all_goals try have casesSubset :=
+      casesInduction _ _ _ (by assumption)
+    all_goals try have bodySubset :=
+      bodyInduction _ _ _ (by assumption)
+    all_goals try have tupleSubset :=
+      syntheticTuple_result_integerPatterns_subset (by assumption)
+    all_goals try have tupleSubset :=
+      syntheticTuple_pair_integerPatterns_subset (by assumption)
+    all_goals try have defaultSubset :=
+      pure_pair_result_integerPatterns_subset casesSubset (by assumption)
+    all_goals simp_all only [exceptPure_eq_ok]
+    all_goals try have restoredSubset :=
+      restored_pair_result_integerPatterns_subset bodySubset (by assumption)
+    all_goals try simp_all [State.recordNode, State.allocateHiddenLocal]
+    all_goals
+      have initialSubset :
+          state.integerPatterns ⊆ stateAfterId.integerPatterns :=
+        pair_success_integerPatterns_subset
+          (operation := state.allocateStatementId) (value := id)
+          (next := stateAfterId) (initial := state) (by rfl) statementIdEq
+    all_goals intro origin member
+    all_goals try solve_by_elim (maxDepth := 30)
+  case case70 =>
+    intros fuel context target operator value state placeInduction valueInduction
+    unfold PreservesIntegerPatterns at *
+    intro result success
+    unfold inferAssignedValueFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try simp_all only [exceptPure_eq_ok]
+    all_goals try rcases v with ⟨place, placeState⟩
+    all_goals try rcases v_2 with ⟨inferred, resultState⟩
+    all_goals have placeSubset := pair_except_property placeInduction rfl
+    all_goals try have valueSubset :=
+      valueInduction place v_1 inferred resultState (by assumption)
+    all_goals try
+      have valueSubset := anchored_pair_except_integerPatterns_subset
+        placeInduction
+        valueInduction (by assumption)
+    all_goals try have valueSubset :=
+      pair_except_property (valueInduction _ _) (by assumption)
+    all_goals try
+      have unifiedSubset := integerPatterns_subset_of_eq
+        ((unify_integerPatternMetadata_eq (by assumption)).1)
+    all_goals simp_all
+    all_goals intro origin member
+    all_goals grind
+  case case67 =>
+    unfold PreservesIntegerPatterns at *
+    intros
+    simp_all only [inferPlaceFuel]
+  all_goals
+    intros
+    unfold PreservesIntegerPatterns at *
+    intro result success
+    first
+      | unfold inferExprFuel at success
+      | unfold inferConstructorApplicationFuel at success
+      | unfold inferConstructorArgumentsFuel at success
+      | unfold inferStatementsFuel at success
+      | unfold inferStatementFuel at success
+      | unfold inferForItemsFuel at success
+      | unfold inferForItemFuel at success
+      | unfold inferPlaceFuel at success
+      | unfold inferAssignedValueFuel at success
+      | unfold inferExprsFuel at success
+      | unfold inferMatchCasesFuel at success
+    try simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try simp_all only [exceptPure_eq_ok]
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals first
+      | specialize ih1 _ _ (by assumption)
+      | specialize ih1 _ _ _ (by assumption)
+      | specialize ih1 _ _ _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih2 _ _ (by assumption)
+      | specialize ih2 _ _ _ (by assumption)
+      | specialize ih2 _ _ _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih3 _ _ (by assumption)
+      | specialize ih3 _ _ _ (by assumption)
+      | specialize ih3 _ _ _ _ (by assumption)
+      | skip
+    all_goals first
+      | have ih1Subset := pair_eq_property ih1
+      | have ih1Subset := pair_except_property ih1 (by assumption)
+      | have ih1Subset := pair_except_property (ih1 _ _) (by assumption)
+      | skip
+    all_goals first
+      | have ih2Subset := pair_eq_property ih2
+      | have ih2Subset := pair_except_property ih2 (by assumption)
+      | have ih2Subset := pair_except_property (ih2 _ _) (by assumption)
+      | skip
+    all_goals first
+      | have ih3Subset := pair_eq_property ih3
+      | have ih3Subset := pair_except_property ih3 (by assumption)
+      | have ih3Subset := pair_except_property (ih3 _ _) (by assumption)
+      | skip
+    all_goals try
+      have unifiedSubset := integerPatterns_subset_of_eq
+        ((unify_integerPatternMetadata_eq (by assumption)).1)
+    all_goals try
+      have recordSubset := integerPatterns_subset_of_eq
+        (recordExpressionWithExpected_integerPatterns_eq (by assumption))
+    all_goals try
+      have lambdaSubset := integerPatterns_subset_of_eq
+        (bindLambdaParameters_integerPatterns_eq (by assumption))
+    all_goals try have patternSubset :=
+      inferMatchPatternFuel_integerPatterns_subset (by assumption)
+    all_goals try
+      have unarySubset := integerPatterns_subset_of_eq
+        (inferUnaryOperator_integerPatterns_eq (by assumption))
+    all_goals try
+      have binarySubset := integerPatterns_subset_of_eq
+        (inferBinaryOperator_integerPatterns_eq (by assumption))
+    all_goals try
+      have selectionSubset := integerPatterns_subset_of_eq
+        (selectFunctionCandidateFrom_integerPatterns_eq (by assumption))
+    all_goals try
+      have expectedSubset := integerPatterns_subset_of_eq
+        (withExpected_integerPatterns_eq (by assumption))
+    all_goals try
+      have applicationSubset := integerPatterns_subset_of_eq
+        (applyFunctionType_integerPatterns_eq (by assumption))
+    all_goals try
+      have builtinSubset := integerPatterns_subset_of_eq
+        (recordBuiltinFunctionCall_integerPatterns_eq (by assumption))
+    all_goals try simp_all
+    all_goals intro origin member
+    all_goals grind
+      [inferMatchPatternFuel_integerPatterns_subset,
+        unify_integerPatternMetadata_eq,
+        stateFresh_integerPatterns_eq,
+        withLocals_integerPatterns_eq,
+        restoreLexicalScope_integerPatterns_eq,
+        allocateBinder_integerPatterns_eq,
+        allocateHiddenLocal_integerPatterns_eq,
+        allocateExpressionId_integerPatterns_eq,
+        allocateStatementId_integerPatterns_eq,
+        recordNode_integerPatterns_eq,
+        addRequirementWithId_integerPatterns_eq,
+        freshTypes_integerPatterns_eq,
+        freshDataConstructorInstantiation_integerPatterns_eq,
+        addRequirementsWithIds_integerPatterns_eq,
+        recordExpression_integerPatterns_eq,
+        recordExpressionWithExpected_integerPatterns_eq,
+        recordSelectedCallResult_integerPatterns_eq,
+        recordSelectedCall_integerPatterns_eq,
+        recordIndirectCall_integerPatterns_eq,
+        bindLambdaParameters_integerPatterns_eq,
+        inferUnaryOperator_integerPatterns_eq,
+        inferBinaryOperator_integerPatterns_eq,
+        selectFunctionCandidateFrom_integerPatterns_eq,
+        withExpected_integerPatterns_eq,
+        applyFunctionType_integerPatterns_eq,
+        recordBuiltinFunctionCall_integerPatterns_eq]
+
+/-- Whole-block inference retains every numeric-pattern origin already present
+in its input state. -/
+theorem inferStatementsFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {statements : List Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : BlockResult}
+    (success : inferStatementsFuel fuel context statements expectedReturn state =
+      .ok result) :
+    state.integerPatterns ⊆ result.state.integerPatterns := by
+  exact inferFuel_preserves_integerPatterns_internal.2.2.2.1 fuel context
+    statements expectedReturn state result success
+
+/-- Match-arm inference retains the input origin ledger while carrying every
+origin introduced by an earlier arm through later bodies and cases. -/
+theorem inferMatchCasesFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {scrutineeType expectedReturn : Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : State} {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    state.integerPatterns ⊆ result.state.integerPatterns := by
+  exact inferFuel_preserves_integerPatterns_internal.2.2.2.2.2.2.2.2.2.2 fuel
+    context scrutineeType expectedReturn outerScope cases state result success
+
 theorem solveRequirements_preserves_ids
     (context : Context) (state : State) (requirements : List Requirement)
     (solved : List SolvedRequirement)
