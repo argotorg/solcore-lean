@@ -337,6 +337,103 @@ def mergeBodyControls : List BodyFacts → Option BodyFacts → Option ControlSu
       | none => some body.control
       | some tail => some (body.control.branches tail)
 
+/-- A source extension preserves the declaration owner and only appends nodes
+to the occurrence table.  Roots and inputs are intentionally irrelevant to
+the mutually recursive typing judgments below: every recursive edge is
+validated by exact node-table membership. -/
+structure TypingSourceExtends (before after : TypedSource) : Prop where
+  owner_eq : after.owner = before.owner
+  nodes_prefix : before.nodes <+: after.nodes
+
+namespace TypingSourceExtends
+
+theorem refl (source : TypedSource) : TypingSourceExtends source source :=
+  ⟨rfl, List.prefix_rfl⟩
+
+theorem trans
+    {first middle last : TypedSource}
+    (left : TypingSourceExtends first middle)
+    (right : TypingSourceExtends middle last) :
+    TypingSourceExtends first last :=
+  ⟨right.owner_eq.trans left.owner_eq,
+    List.IsPrefix.trans left.nodes_prefix right.nodes_prefix⟩
+
+/-- Flexible substitution changes node payloads pointwise, so it preserves
+the same append-only source-table relation. -/
+theorem applySubstitution
+    {before after : TypedSource}
+    (substitution : TypeSystem.Substitution)
+    (extension : TypingSourceExtends before after) :
+    TypingSourceExtends (before.applySubstitution substitution)
+      (after.applySubstitution substitution) := by
+  refine ⟨extension.owner_eq, ?_⟩
+  exact extension.nodes_prefix.map (Node.applySubstitution substitution)
+
+theorem containsExpression
+    {before after : TypedSource} {id : ExpressionId} {node : ExpressionNode}
+    (extension : TypingSourceExtends before after)
+    (contains : ContainsExpression before id node) :
+    ContainsExpression after id node :=
+  ⟨extension.nodes_prefix.subset contains.1, contains.2⟩
+
+theorem containsStatement
+    {before after : TypedSource} {id : StatementId} {node : StatementNode}
+    (extension : TypingSourceExtends before after)
+    (contains : ContainsStatement before id node) :
+    ContainsStatement after id node :=
+  ⟨extension.nodes_prefix.subset contains.1, contains.2⟩
+
+private theorem binderExtends
+    {before after : TypedSource} {context final : Context}
+    {binder : TypedBinder}
+    (extension : TypingSourceExtends before after)
+    (typing : BinderExtends before.owner context binder final) :
+    BinderExtends after.owner context binder final := by
+  rw [extension.owner_eq]
+  exact typing
+
+private theorem bindersExtend
+    {before after : TypedSource} {context final : Context}
+    {binders : List TypedBinder}
+    (extension : TypingSourceExtends before after)
+    (typing : BindersExtend before.owner context binders final) :
+    BindersExtend after.owner context binders final := by
+  rw [extension.owner_eq]
+  exact typing
+
+private theorem monoBindersExtend
+    {before after : TypedSource} {context final : Context}
+    {binders : List TypedBinder} {types : List TypeSystem.Ty}
+    (extension : TypingSourceExtends before after)
+    (typing : MonoBindersExtend before.owner context binders types final) :
+    MonoBindersExtend after.owner context binders types final := by
+  rw [extension.owner_eq]
+  exact typing
+
+private theorem directDeclarationCallee
+    {before after : TypedSource} {context : Context}
+    {id : ExpressionId} {instantiation : DeclarationInstantiation}
+    (extension : TypingSourceExtends before after)
+    (typing : DirectDeclarationCalleeValid context before id instantiation) :
+    DirectDeclarationCalleeValid context after id instantiation := by
+  cases typing with
+  | intro contains formEq valid typeEq requirementsEq coercionsEq =>
+      exact .intro (extension.containsExpression contains) formEq valid typeEq
+        requirementsEq coercionsEq
+
+private theorem directBuiltinCallee
+    {before after : TypedSource} {id : ExpressionId}
+    {function : BuiltinFunctionId}
+    (extension : TypingSourceExtends before after)
+    (typing : DirectBuiltinCalleeValid before id function) :
+    DirectBuiltinCalleeValid after id function := by
+  cases typing with
+  | intro contains formEq typeEq requirementsEq coercionsEq =>
+      exact .intro (extension.containsExpression contains) formEq typeEq
+        requirementsEq coercionsEq
+
+end TypingSourceExtends
+
 mutual
 
   /-- A source expression occurrence has its retained post-coercion type. -/
@@ -1002,6 +1099,333 @@ mutual
           (matchCase :: cases) (facts :: caseFacts)
 
 end
+
+/-! ## Source-table weakening
+
+All thirteen mutually recursive static judgments are monotone in their source
+table.  The proof follows the same complete mutual recursion used by the
+substitution development: source-independent premises are retained verbatim,
+node occurrences are transported through the table prefix, and binder
+extensions are transported through owner equality. -/
+
+section SourceWeakening
+
+set_option maxRecDepth 10000
+
+local macro "weaken_source_static" "(" recursor:term "," before:term ","
+    after:term "," sourceExtension:term "," typing:term ")" : term =>
+  `($recursor (source := $before)
+    (motive_1 := fun context id type _ =>
+      ExpressionHasType $after context id type)
+    (motive_2 := fun context form rawType plan _ =>
+      ExpressionFormHasRawType $after context form rawType plan)
+    (motive_3 := fun context expressions types _ =>
+      ExpressionsHaveTypes $after context expressions types)
+    (motive_4 := fun context initial projections final _ =>
+      SourceProjectionsHaveType $after context initial projections final)
+    (motive_5 := fun context place type _ =>
+      SourcePlaceHasType $after context place type)
+    (motive_6 := fun context assignment operator value _ =>
+      SourceAssignmentHasType $after context assignment operator value)
+    (motive_7 := fun context assignment _ =>
+      SourceBitNotAssignmentValid $after context assignment)
+    (motive_8 := fun control context id final facts _ =>
+      StatementHasType $after control context id final facts)
+    (motive_9 := fun control context statements final facts _ =>
+      StatementsHaveType $after control context statements final facts)
+    (motive_10 := fun control context item final _ =>
+      ForItemHasType $after control context item final)
+    (motive_11 := fun control context items final _ =>
+      ForItemsHaveType $after control context items final)
+    (motive_12 := fun control context scrutineeType matchCase facts _ =>
+      MatchCaseHasType $after control context scrutineeType matchCase facts)
+    (motive_13 := fun control context scrutineeType cases facts _ =>
+      MatchCasesHaveType $after control context scrutineeType cases facts)
+    (fun contains formType rawTypeEq rawWellFormed typeWellFormed requirements
+        formInduction =>
+      .intro (($sourceExtension).containsExpression contains) formInduction
+        rawTypeEq rawWellFormed typeWellFormed requirements)
+    (fun valid => .literal valid)
+    (fun valid => .integerLiteral valid)
+    (fun valid => .reference valid)
+    (fun innerType innerInduction => .group innerInduction)
+    (fun elementsType elementsInduction => .tuple elementsInduction)
+    (fun operandTypeProof operatorType operandInduction =>
+      .unary operandInduction operatorType)
+    (fun leftType rightType operatorType leftInduction rightInduction =>
+      .binary leftInduction rightInduction operatorType)
+    (fun conditionType thenType elseType conditionInduction thenInduction
+        elseInduction =>
+      .conditional conditionInduction thenInduction elseInduction)
+    (fun namesUnique parametersExtend bodyType bodyCompletes bodyInduction =>
+      .lambda namesUnique
+        (TypingSourceExtends.monoBindersExtend $sourceExtension parametersExtend)
+        bodyInduction bodyCompletes)
+    (fun calleeValid application argumentsType argumentsInduction =>
+      .directCall
+        (TypingSourceExtends.directDeclarationCallee $sourceExtension calleeValid)
+        application argumentsInduction)
+    (fun calleeValid argumentsType argumentsInduction =>
+      .builtinCall
+        (TypingSourceExtends.directBuiltinCallee $sourceExtension calleeValid)
+        argumentsInduction)
+    (fun calleeType argumentsType application calleeInduction
+        argumentsInduction =>
+      .indirectCall calleeInduction argumentsInduction application)
+    (fun valid argumentsType argumentsInduction =>
+      .constructor valid argumentsInduction)
+    (fun baseTypeProof memberTypeProof baseInduction =>
+      .member baseInduction memberTypeProof)
+    (fun innerWellFormed => .proxy innerWellFormed)
+    (fun baseType keyTypeProof baseInduction keyInduction =>
+      .index baseInduction keyInduction)
+    (fun _ => .nil _)
+    (fun head tail headInduction tailInduction =>
+      .cons headInduction tailInduction)
+    (fun type => .nil _)
+    (fun keyTypeProof restType keyInduction restInduction =>
+      .index keyInduction restInduction)
+    (fun selected restType restInduction => .member selected restInduction)
+    (fun rootTypeProof projectionsType storedTypeEq projectionsInduction =>
+      .intro rootTypeProof projectionsInduction storedTypeEq)
+    (fun targetType valueType requirementsEq targetInduction valueInduction =>
+      .equal targetInduction valueInduction requirementsEq)
+    (fun operatorKind targetType valueType requirementsEq targetInduction
+        valueInduction =>
+      .wordCompound operatorKind targetInduction valueInduction requirementsEq)
+    (fun targetType requirementsEq targetInduction =>
+      .intro targetInduction requirementsEq)
+    (fun contains formEq monomorphic generalizes binderExtension typeEq =>
+      .letUninitialized (($sourceExtension).containsStatement contains) formEq
+        monomorphic generalizes
+        (TypingSourceExtends.binderExtends $sourceExtension binderExtension) typeEq)
+    (fun contains formEq initializerType monomorphic generalizes binderExtension
+        typeEq initializerInduction =>
+      .letInitialized (($sourceExtension).containsStatement contains) formEq
+        initializerInduction monomorphic generalizes
+        (TypingSourceExtends.binderExtends $sourceExtension binderExtension) typeEq)
+    (fun contains formEq polymorphic requirementsWellFormed generalizes
+        initializerType binderExtension typeEq initializerInduction =>
+      .letInitializedGeneralized
+        (($sourceExtension).containsStatement contains) formEq polymorphic
+        requirementsWellFormed generalizes initializerInduction
+        (TypingSourceExtends.binderExtends $sourceExtension binderExtension) typeEq)
+    (fun contains formEq returnTypeEq typeEq =>
+      .returnUnit (($sourceExtension).containsStatement contains) formEq
+        returnTypeEq typeEq)
+    (fun contains formEq valueType typeEq valueInduction =>
+      .returnValue (($sourceExtension).containsStatement contains) formEq
+        valueInduction typeEq)
+    (fun contains formEq expressionType typeEq expressionInduction =>
+      .expressionValue (($sourceExtension).containsStatement contains) formEq
+        expressionInduction typeEq)
+    (fun contains formEq expressionType typeEq expressionInduction =>
+      .expressionDiscard (($sourceExtension).containsStatement contains) formEq
+        expressionInduction typeEq)
+    (fun contains formEq assignmentType typeEq assignmentInduction =>
+      .assignValue (($sourceExtension).containsStatement contains) formEq
+        assignmentInduction typeEq)
+    (fun contains formEq assignmentType typeEq assignmentInduction =>
+      .assignBitNot (($sourceExtension).containsStatement contains) formEq
+        assignmentInduction typeEq)
+    (fun contains formEq conditionType thenType typeEq conditionInduction
+        thenInduction =>
+      .ifWithoutElse (($sourceExtension).containsStatement contains) formEq
+        conditionInduction thenInduction typeEq)
+    (fun contains formEq conditionType thenType elseType typeEq
+        conditionInduction thenInduction elseInduction =>
+      .ifWithElse (($sourceExtension).containsStatement contains) formEq
+        conditionInduction thenInduction elseInduction typeEq)
+    (fun contains formEq bodyType typeEq bodyInduction =>
+      .block (($sourceExtension).containsStatement contains) formEq bodyInduction
+        typeEq)
+    (fun contains formEq defaultEq scrutineeTypeProof casesType requirementsEq
+        exhaustive merged typeEq scrutineeInduction casesInduction =>
+      .matchWithoutDefault (($sourceExtension).containsStatement contains)
+        formEq defaultEq scrutineeInduction casesInduction requirementsEq
+        exhaustive merged typeEq)
+    (fun contains formEq defaultEq scrutineeTypeProof casesType defaultType
+        requirementsEq merged typeEq scrutineeInduction casesInduction
+        defaultInduction =>
+      .matchWithDefault (($sourceExtension).containsStatement contains) formEq
+        defaultEq scrutineeInduction casesInduction defaultInduction
+        requirementsEq merged typeEq)
+    (fun contains formEq initializerType conditionType bodyType postType typeEq
+        initializerInduction conditionInduction bodyInduction postInduction =>
+      .forLoop (($sourceExtension).containsStatement contains) formEq
+        initializerInduction conditionInduction bodyInduction postInduction
+        typeEq)
+    (fun contains formEq conditionType bodyType typeEq conditionInduction
+        bodyInduction =>
+      .whileLoop (($sourceExtension).containsStatement contains) formEq
+        conditionInduction bodyInduction typeEq)
+    (fun contains formEq allowed typeEq =>
+      .breakStmt (($sourceExtension).containsStatement contains) formEq allowed
+        typeEq)
+    (fun contains formEq allowed typeEq =>
+      .continueStmt (($sourceExtension).containsStatement contains) formEq
+        allowed typeEq)
+    (fun control context => .nil _ _)
+    (fun head headInduction => .singleton headInduction)
+    (fun head tail headInduction tailInduction =>
+      .cons headInduction tailInduction)
+    (fun monomorphic generalizes binderExtension =>
+      .letUninitialized monomorphic generalizes
+        (TypingSourceExtends.binderExtends $sourceExtension binderExtension))
+    (fun initializerType monomorphic generalizes binderExtension
+        initializerInduction =>
+      .letInitialized initializerInduction monomorphic generalizes
+        (TypingSourceExtends.binderExtends $sourceExtension binderExtension))
+    (fun polymorphic requirementsWellFormed generalizes initializerType
+        binderExtension initializerInduction =>
+      .letInitializedGeneralized polymorphic requirementsWellFormed generalizes
+        initializerInduction
+        (TypingSourceExtends.binderExtends $sourceExtension binderExtension))
+    (fun expressionType expressionInduction =>
+      .expression expressionInduction)
+    (fun assignmentType assignmentInduction => .assignValue assignmentInduction)
+    (fun assignmentType assignmentInduction =>
+      .assignBitNot assignmentInduction)
+    (fun control context => .nil _ _)
+    (fun head tail headInduction tailInduction =>
+      .cons headInduction tailInduction)
+    (fun patternType bindersExtend bodyType bodyInduction =>
+      .intro patternType
+        (TypingSourceExtends.bindersExtend $sourceExtension bindersExtend)
+        bodyInduction)
+    (fun control context scrutineeType => .nil _ _ _)
+    (fun head tail headInduction tailInduction =>
+      .cons headInduction tailInduction)
+    $typing)
+
+theorem ExpressionHasType.weakenSource
+    {before after : TypedSource} {context : Context}
+    {id : ExpressionId} {type : TypeSystem.Ty}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : ExpressionHasType before context id type) :
+    ExpressionHasType after context id type :=
+  weaken_source_static(ExpressionHasType.rec, before, after, sourceExtension,
+    typing)
+
+theorem ExpressionFormHasRawType.weakenSource
+    {before after : TypedSource} {context : Context}
+    {form : ExpressionForm} {rawType : TypeSystem.Ty}
+    {plan : ExpressionRequirementPlan}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : ExpressionFormHasRawType before context form rawType plan) :
+    ExpressionFormHasRawType after context form rawType plan :=
+  weaken_source_static(ExpressionFormHasRawType.rec, before, after,
+    sourceExtension, typing)
+
+theorem ExpressionsHaveTypes.weakenSource
+    {before after : TypedSource} {context : Context}
+    {expressions : List ExpressionId} {types : List TypeSystem.Ty}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : ExpressionsHaveTypes before context expressions types) :
+    ExpressionsHaveTypes after context expressions types :=
+  weaken_source_static(ExpressionsHaveTypes.rec, before, after, sourceExtension,
+    typing)
+
+theorem SourceProjectionsHaveType.weakenSource
+    {before after : TypedSource} {context : Context}
+    {initial final : TypeSystem.Ty} {projections : List PlaceProjection}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : SourceProjectionsHaveType before context initial projections
+      final) :
+    SourceProjectionsHaveType after context initial projections final :=
+  weaken_source_static(SourceProjectionsHaveType.rec, before, after,
+    sourceExtension, typing)
+
+theorem SourcePlaceHasType.weakenSource
+    {before after : TypedSource} {context : Context}
+    {place : PlaceResolution} {type : TypeSystem.Ty}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : SourcePlaceHasType before context place type) :
+    SourcePlaceHasType after context place type :=
+  weaken_source_static(SourcePlaceHasType.rec, before, after, sourceExtension,
+    typing)
+
+theorem SourceAssignmentHasType.weakenSource
+    {before after : TypedSource} {context : Context}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
+    {value : ExpressionId}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : SourceAssignmentHasType before context assignment operator
+      value) :
+    SourceAssignmentHasType after context assignment operator value :=
+  weaken_source_static(SourceAssignmentHasType.rec, before, after,
+    sourceExtension, typing)
+
+theorem SourceBitNotAssignmentValid.weakenSource
+    {before after : TypedSource} {context : Context}
+    {assignment : AssignmentResolution}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : SourceBitNotAssignmentValid before context assignment) :
+    SourceBitNotAssignmentValid after context assignment :=
+  weaken_source_static(SourceBitNotAssignmentValid.rec, before, after,
+    sourceExtension, typing)
+
+theorem StatementHasType.weakenSource
+    {before after : TypedSource} {control : ControlContext}
+    {context final : Context} {id : StatementId} {facts : StatementFacts}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : StatementHasType before control context id final facts) :
+    StatementHasType after control context id final facts :=
+  weaken_source_static(StatementHasType.rec, before, after, sourceExtension,
+    typing)
+
+theorem StatementsHaveType.weakenSource
+    {before after : TypedSource} {control : ControlContext}
+    {context final : Context} {statements : List StatementId}
+    {facts : BodyFacts}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : StatementsHaveType before control context statements final
+      facts) :
+    StatementsHaveType after control context statements final facts :=
+  weaken_source_static(StatementsHaveType.rec, before, after, sourceExtension,
+    typing)
+
+theorem ForItemHasType.weakenSource
+    {before after : TypedSource} {control : ControlContext}
+    {context final : Context} {item : ForItemForm}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : ForItemHasType before control context item final) :
+    ForItemHasType after control context item final :=
+  weaken_source_static(ForItemHasType.rec, before, after, sourceExtension,
+    typing)
+
+theorem ForItemsHaveType.weakenSource
+    {before after : TypedSource} {control : ControlContext}
+    {context final : Context} {items : List ForItemForm}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : ForItemsHaveType before control context items final) :
+    ForItemsHaveType after control context items final :=
+  weaken_source_static(ForItemsHaveType.rec, before, after, sourceExtension,
+    typing)
+
+theorem MatchCaseHasType.weakenSource
+    {before after : TypedSource} {control : ControlContext}
+    {context : Context} {scrutineeType : TypeSystem.Ty}
+    {matchCase : TypedMatchCase} {facts : BodyFacts}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : MatchCaseHasType before control context scrutineeType matchCase
+      facts) :
+    MatchCaseHasType after control context scrutineeType matchCase facts :=
+  weaken_source_static(MatchCaseHasType.rec, before, after, sourceExtension,
+    typing)
+
+theorem MatchCasesHaveType.weakenSource
+    {before after : TypedSource} {control : ControlContext}
+    {context : Context} {scrutineeType : TypeSystem.Ty}
+    {cases : List TypedMatchCase} {facts : List BodyFacts}
+    (sourceExtension : TypingSourceExtends before after)
+    (typing : MatchCasesHaveType before control context scrutineeType cases
+      facts) :
+    MatchCasesHaveType after control context scrutineeType cases facts :=
+  weaken_source_static(MatchCasesHaveType.rec, before, after, sourceExtension,
+    typing)
+
+end SourceWeakening
 
 namespace SourceProjectionsHaveType
 
