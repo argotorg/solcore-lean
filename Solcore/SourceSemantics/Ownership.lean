@@ -576,6 +576,23 @@ theorem ContainsStatement.primaryRequirementOccursAt
     statementPrimaryRequirementOccurrences, List.mem_map]
   exact ⟨requirement, member, by simp [contains.2]⟩
 
+/-- A requirement retained by one explicit match-case pattern is owned by the
+enclosing match statement occurrence.  This is the exact ownership edge used
+when finalization turns integer-pattern metadata into solved literal evidence. -/
+theorem ContainsStatement.matchCasePatternRequirementOccursAt
+    {source : TypedSource} {id : StatementId} {node : StatementNode}
+    {resolution : MatchResolution} {matchCase : TypedMatchCase}
+    {requirement : RequirementId}
+    (contains : ContainsStatement source id node)
+    (form_eq : node.form = .matchWith resolution)
+    (case_mem : matchCase ∈ resolution.cases)
+    (requirement_mem : requirement ∈ matchCase.pattern.requirements) :
+    PrimaryRequirementOccursAt source (.statement id) requirement := by
+  apply contains.primaryRequirementOccursAt
+  rw [form_eq]
+  simp only [statementPrimaryRequirementIds]
+  exact List.mem_flatMap.mpr ⟨matchCase, case_mem, requirement_mem⟩
+
 /-- Every primary evidence owner in node-table order. -/
 def primaryRequirementIds (source : TypedSource) : List RequirementId :=
   source.nodes.flatMap fun node =>

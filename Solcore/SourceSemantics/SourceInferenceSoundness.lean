@@ -14020,6 +14020,55 @@ theorem integerPatternValidAt
       TypedTraitResolution.applySubstitution] using evidence
   exact integerLiteralValid_of_evidence decoded closedSupported closedEvidence
 
+/-- A successful direct flat integer-pattern inference supplies exactly the
+origin metadata needed by `integerPatternValidAt`.  The two subset premises
+transport its local origin and requirement row to the state consumed by
+whole-declaration finalization. -/
+theorem integerPatternValidAt_of_flatLiteral
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {active : SourceSemantics.Context} {occurrence : NodeId}
+    {fuel : Nat} {pattern : Syntax.Pattern}
+    {literal : Syntax.CoreLiteral} {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    {expected : TypeSystem.Ty} {seen : List String}
+    {initial : Frontend.SourceInference.State}
+    {inferred : Detail.InferredPattern}
+    (patternValue : pattern.value = .literal literal)
+    (success : Detail.inferMatchPatternFlatFuel fuel inferenceContext pattern
+      expected seen initial = .ok inferred)
+    (resolutionEq : inferred.resolution =
+      .integerLiteral source resolution)
+    (integerPatterns_subset :
+      inferred.state.integerPatterns ⊆ state.integerPatterns)
+    (requirements_subset :
+      inferred.state.requirements ⊆ state.requirements)
+    (signatures_eq : active.signatures =
+      (finalizedRequirementContext inferenceContext result).signatures)
+    (requirements_eq : active.solvedRequirements =
+      (finalizedRequirementContext inferenceContext result).solvedRequirements)
+    (assumptions_mono :
+      (finalizedRequirementContext inferenceContext result).assumptions ⊆
+        active.assumptions)
+    (covered : TemplateScopeCovered result.typedSource active occurrence)
+    (occurs : PrimaryRequirementOccursAt result.typedSource occurrence
+      resolution.requirement) :
+    IntegerLiteralValid active source
+      (resolution.applySubstitution result.substitution) := by
+  obtain ⟨origin, decoded, resolutionTarget, resolutionRequirement, _,
+      originMember, requirementMember, _⟩ :=
+    Detail.inferMatchPatternFlatFuel_integerLiteral_metadata_of_resolution
+      patternValue success resolutionEq
+  exact resources.integerPatternValidAt decoded resolutionTarget
+    resolutionRequirement (integerPatterns_subset originMember)
+    (requirements_subset requirementMember) signatures_eq requirements_eq
+    assumptions_mono covered occurs
+
 end FinalInferenceResources
 
 /-- Every successfully checked function body owns each solved requirement at

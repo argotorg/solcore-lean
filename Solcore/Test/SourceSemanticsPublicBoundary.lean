@@ -27,6 +27,8 @@ example := @Solcore.SourceSemantics.ContainsExpression
 example := @Solcore.SourceSemantics.ContainsStatement
 example := @Solcore.SourceSemantics.ContainsExpression.primaryRequirementOccursAt
 example := @Solcore.SourceSemantics.ContainsStatement.primaryRequirementOccursAt
+example :=
+  @Solcore.SourceSemantics.ContainsStatement.matchCasePatternRequirementOccursAt
 example := @Solcore.SourceSemantics.ContainsNode.of_nodes_prefix
 example := @Solcore.SourceSemantics.ContainsExpression.of_nodes_prefix
 example := @Solcore.SourceSemantics.ContainsStatement.of_nodes_prefix
@@ -617,6 +619,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.requirementProvesAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt_of_flatLiteral
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed
 example :=
