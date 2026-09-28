@@ -111,6 +111,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.localSchemes_perm
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.localFresh_of_not_mem_localBinders
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.mem_local_freeVariables_iff
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned.congr_localBinders

@@ -302,6 +302,30 @@ theorem localSchemes_perm
     TypeSystem.Environment.apply, List.map_map, Function.comp_def,
     FlexibleSubstitution.applyTypedBinder_scheme] using projected
 
+/-- Freshness in the stable executable binder stack transfers to both paired
+declarative local scopes. -/
+theorem localFresh_of_not_mem_localBinders
+    {state : Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    {id : Resolved.LocalId}
+    (aligned : LocalEnvironmentAligned state substitution context)
+    (fresh : id ∉ state.localBinders.map fun binder => binder.id) :
+    LocalFresh context id := by
+  constructor
+  · intro member
+    have sourceMember :=
+      (aligned.locals_perm.map Prod.fst).mem_iff.mpr member
+    apply fresh
+    simpa [closedBinderLocals, List.map_map, Function.comp_def,
+      TypedBinder.applySubstitution] using sourceMember
+  · intro member
+    have sourceMember :=
+      (aligned.requirements_perm.map Prod.fst).mem_iff.mpr member
+    apply fresh
+    simpa [closedBinderRequirements, List.map_map, Function.comp_def,
+      TypedBinder.applySubstitution] using sourceMember
+
 /-- The executable environment and aligned semantic local scope block
 exactly the same flexible variables during local-value generalization. -/
 theorem mem_local_freeVariables_iff
