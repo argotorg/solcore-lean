@@ -12859,4 +12859,29 @@ theorem inferForItemFuel_state_header
   congrArg (fun header : State.Header => header.inputs)
     (inferForItemFuel_state_header success)
 
+/-- Successful explicit match-case traversal preserves declaration identity
+and the original input-binder metadata. -/
+theorem inferMatchCasesFuel_state_header
+    {fuel : Nat} {context : Context}
+    {scrutineeType expectedReturn : Ty} {outerScope : LexicalScope}
+    {cases : List Syntax.MatchCase} {state : State}
+    {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    result.state.header = state.header := by
+  exact inferStatementsFuel_preserves_header_internal.2.2.2.2.2.2.2.2.2.2
+    fuel context scrutineeType expectedReturn outerScope cases state result
+      success
+
+@[simp] theorem inferMatchCasesFuel_preserves_owner
+    {fuel : Nat} {context : Context}
+    {scrutineeType expectedReturn : Ty} {outerScope : LexicalScope}
+    {cases : List Syntax.MatchCase} {state : State}
+    {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    result.state.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (inferMatchCasesFuel_state_header success)
+
 end Solcore.Frontend.SourceInference.Detail

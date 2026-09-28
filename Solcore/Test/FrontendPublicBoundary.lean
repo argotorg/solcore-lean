@@ -749,6 +749,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_preserves_localBindersBelowNextLocal
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_preserves_owner
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_nextLocal_le
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_nextLocal_le
