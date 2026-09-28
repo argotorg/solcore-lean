@@ -275,6 +275,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_block_facts
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_forLoop_facts
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_whileLoop_facts
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.returnUnitStatementHasType_afterSubstitution
@@ -290,6 +292,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ifWithElseStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.blockStatementHasType_afterSubstitution
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.forLoopStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.whileLoopStatementHasType_afterSubstitution
 example :=
@@ -310,6 +314,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.ifWithElse
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.block
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.forLoop
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.StatementResultMatchesFactsAfterSubstitution.whileLoop
 example :=
@@ -334,6 +340,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithoutElse_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_ifWithElse_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_forLoop_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_whileLoop_sound
 example :=

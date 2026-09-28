@@ -3666,6 +3666,97 @@ theorem inferStatementFuel_success_block_facts
           (bodyResult.state.restoreLexicalScope allocated.lexicalScope)
           _ roots⟩
 
+/-- A successful `for` exposes initializer items, its Boolean condition, the
+recursive loop body, restored post-item input scope, and the exact canonical
+unit statement recorded after restoring the enclosing scope. -/
+theorem inferStatementFuel_success_forLoop_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {headerSpan : Syntax.SourceSpan}
+    {initializer post : List Syntax.ForItem} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .forLoop headerSpan initializer condition post body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (roots : List NodeId := []) :
+    ∃ initializerResult inferredCondition conditionState bodyResult
+        postResult,
+      Detail.inferForItemsFuel fuel context initializer allocated =
+        .ok initializerResult ∧
+      Detail.inferExprFuel fuel context condition (some .bool)
+        initializerResult.state = .ok (inferredCondition, conditionState) ∧
+      Detail.inferStatementsFuel fuel
+        { context with loopDepth := context.loopDepth + 1 }
+        body.value expectedReturn conditionState = .ok bodyResult ∧
+      Detail.inferForItemsFuel fuel
+        { context with loopDepth := context.loopDepth + 1 } post
+        (bodyResult.state.restoreLexicalScope
+          initializerResult.state.lexicalScope) = .ok postResult ∧
+      result = {
+        id
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        state :=
+          (postResult.state.restoreLexicalScope
+            allocated.lexicalScope).recordNode (.statement {
+              id
+              span := statement.span
+              type := .unit
+              form := .forLoop initializerResult.items inferredCondition.id
+                postResult.items bodyResult.statements
+            })
+      } ∧
+      ContainsStatement (result.state.toTypedSource roots) result.id {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .forLoop initializerResult.items inferredCondition.id
+          postResult.items bodyResult.statements
+      } := by
+  unfold Detail.inferStatementFuel at success
+  simp only [allocationEq, statementEq, bind, Except.bind] at success
+  cases initializerSuccess : Detail.inferForItemsFuel fuel context initializer
+      allocated with
+  | error error =>
+      simp [initializerSuccess] at success
+  | ok initializerResult =>
+      simp only [initializerSuccess] at success
+      cases conditionSuccess : Detail.inferExprFuel fuel context condition
+          (some .bool) initializerResult.state with
+      | error error =>
+          simp [conditionSuccess] at success
+      | ok conditionPair =>
+          rcases conditionPair with ⟨inferredCondition, conditionState⟩
+          simp only [conditionSuccess] at success
+          cases bodySuccess : Detail.inferStatementsFuel fuel
+              { context with loopDepth := context.loopDepth + 1 }
+              body.value expectedReturn conditionState with
+          | error error =>
+              simp [bodySuccess] at success
+          | ok bodyResult =>
+              simp only [bodySuccess] at success
+              cases postSuccess : Detail.inferForItemsFuel fuel
+                  { context with loopDepth := context.loopDepth + 1 } post
+                  (bodyResult.state.restoreLexicalScope
+                    initializerResult.state.lexicalScope) with
+              | error error =>
+                  simp [postSuccess] at success
+              | ok postResult =>
+                  simp only [postSuccess, pure, Pure.pure, Except.pure]
+                    at success
+                  injection success with resultEq
+                  rw [← resultEq]
+                  exact ⟨initializerResult, inferredCondition, conditionState,
+                    bodyResult, postResult, rfl, conditionSuccess, bodySuccess,
+                    postSuccess, rfl,
+                    recordNode_containsStatement
+                      (postResult.state.restoreLexicalScope
+                        allocated.lexicalScope) _ roots⟩
+
 /-- A successful `while` branch exposes the expected-`Bool` condition, the
 body checked at one greater loop depth, lexical-scope restoration, and the
 canonical unit statement recorded afterwards. -/
@@ -4219,6 +4310,48 @@ theorem blockStatementHasType_afterSubstitution
     rfl bodyType (by
       simpa [StatementNode.applySubstitution] using agreement.type_eq.symm)
 
+/-- A retained `for` statement is typed from its finalized initializer and
+post-item sequences, Boolean condition, and recursively reconstructed body.
+The executable statement restores the enclosing lexical scope after these
+loop-local judgments have been checked. -/
+theorem forLoopStatementHasType_afterSubstitution
+    {source : TypedSource}
+    {target loopContext postContext bodyFinal : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {statement : Syntax.Statement} {id : StatementId}
+    {initializerResult postResult : Detail.InferredForItems}
+    {inferredCondition : InferredExpression}
+    {bodyResult : Detail.BlockResult} {bodyFacts : BodyFacts}
+    (contains : ContainsStatement source id {
+      id
+      span := statement.span
+      type := .unit
+      form := .forLoop initializerResult.items inferredCondition.id
+        postResult.items bodyResult.statements
+    })
+    (initializerType : ForItemsHaveType (source.applySubstitution outer)
+      control target
+      (initializerResult.items.map (ForItemForm.applySubstitution outer))
+      loopContext)
+    (conditionType : ExpressionHasType (source.applySubstitution outer)
+      loopContext inferredCondition.id .bool)
+    (bodyType : StatementsHaveType (source.applySubstitution outer)
+      control.enterLoop loopContext bodyResult.statements bodyFinal bodyFacts)
+    (postType : ForItemsHaveType (source.applySubstitution outer)
+      control.enterLoop loopContext
+      (postResult.items.map (ForItemForm.applySubstitution outer))
+      postContext) :
+    StatementHasType (source.applySubstitution outer) control target id target {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .loop bodyFacts.control
+    } := by
+  exact .forLoop
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    rfl initializerType conditionType bodyType postType
+    (by simp [StatementNode.applySubstitution])
+
 /-- A retained `while` statement is typed from its finalized Boolean
 condition and recursively reconstructed body at one greater loop depth.
 Lexical effects of the body remain scoped to the loop. -/
@@ -4449,6 +4582,25 @@ theorem block
 /-- A loop statement always has the executable unit/non-returning summary;
 the declarative body control is retained only inside the loop summary. -/
 theorem whileLoop
+    (substitution : TypeSystem.Substitution) (bodyFacts : BodyFacts)
+    (id : StatementId) (state : Frontend.SourceInference.State) :
+    StatementResultMatchesFactsAfterSubstitution substitution {
+      id
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      state
+    } {
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .loop bodyFacts.control
+    } := by
+  constructor <;> rfl
+
+/-- The canonical executable `for` result has the same unit/non-returning
+projection as `while`; initializer and post typing affect only its premises. -/
+theorem forLoop
     (substitution : TypeSystem.Substitution) (bodyFacts : BodyFacts)
     (id : StatementId) (state : Frontend.SourceInference.State) :
     StatementResultMatchesFactsAfterSubstitution substitution {
@@ -5312,6 +5464,129 @@ theorem inferStatementFuel_success_ifWithElse_sound
       elseAgreement elseExtension
   · exact StatementResultMatchesFactsAfterSubstitution.ifWithElse
       thenAgreement elseAgreement elseExtension id _
+
+/-- A successful `for` statement is compositional modulo recursive typing of
+its initializer, condition, body, and post-item sequence in one finalized
+typed source.  Executable scope restoration keeps all loop-local binders from
+escaping the enclosing statement. -/
+theorem inferStatementFuel_success_forLoop_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {headerSpan : Syntax.SourceSpan}
+    {initializer post : List Syntax.ForItem} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .forLoop headerSpan initializer condition post body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (roots : List NodeId := [])
+    (initializerSound :
+      ∀ {initializerResult : Detail.InferredForItems},
+        Detail.inferForItemsFuel fuel inferenceContext initializer allocated =
+            .ok initializerResult →
+          ∃ loopContext,
+            ActiveLocalContextInvariant initializerResult.state outer
+                loopContext ∧
+              ForItemsHaveType
+                ((result.state.toTypedSource roots).applySubstitution outer) {
+                  returnType := outer.apply expectedReturn
+                  loopDepth := inferenceContext.loopDepth
+                } target
+                (initializerResult.items.map
+                  (ForItemForm.applySubstitution outer)) loopContext)
+    (conditionSound :
+      ∀ {loopContext : SourceSemantics.Context}
+        {initializerState conditionState : Frontend.SourceInference.State}
+        {inferredCondition : InferredExpression},
+        ActiveLocalContextInvariant initializerState outer loopContext →
+          Detail.inferExprFuel fuel inferenceContext condition (some .bool)
+              initializerState = .ok (inferredCondition, conditionState) →
+            ExpressionHasType
+              ((result.state.toTypedSource roots).applySubstitution outer)
+              loopContext inferredCondition.id .bool)
+    (bodySound :
+      ∀ {loopContext : SourceSemantics.Context}
+        {conditionState : Frontend.SourceInference.State}
+        {bodyResult : Detail.BlockResult},
+        ActiveLocalContextInvariant conditionState outer loopContext →
+          Detail.inferStatementsFuel fuel {
+              inferenceContext with
+              loopDepth := inferenceContext.loopDepth + 1
+            } body.value expectedReturn conditionState = .ok bodyResult →
+            ∃ bodyFinal bodyFacts,
+              ActiveLocalContextInvariant bodyResult.state outer bodyFinal ∧
+                StatementsHaveType
+                  ((result.state.toTypedSource roots).applySubstitution outer)
+                  ({
+                    returnType := outer.apply expectedReturn
+                    loopDepth := inferenceContext.loopDepth
+                  } : ControlContext).enterLoop loopContext
+                  bodyResult.statements bodyFinal bodyFacts)
+    (postSound :
+      ∀ {loopContext : SourceSemantics.Context}
+        {postInput : Frontend.SourceInference.State}
+        {postResult : Detail.InferredForItems},
+        ActiveLocalContextInvariant postInput outer loopContext →
+          Detail.inferForItemsFuel fuel {
+              inferenceContext with
+              loopDepth := inferenceContext.loopDepth + 1
+            } post postInput = .ok postResult →
+            ∃ postContext,
+              ActiveLocalContextInvariant postResult.state outer postContext ∧
+                ForItemsHaveType
+                  ((result.state.toTypedSource roots).applySubstitution outer)
+                  ({
+                    returnType := outer.apply expectedReturn
+                    loopDepth := inferenceContext.loopDepth
+                  } : ControlContext).enterLoop loopContext
+                  (postResult.items.map (ForItemForm.applySubstitution outer))
+                  postContext) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨initializerResult, inferredCondition, conditionState, bodyResult,
+      postResult, initializerSuccess, conditionSuccess, bodySuccess,
+      postSuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_forLoop_facts statementEq allocationEq success
+      roots
+  obtain ⟨loopContext, initializerInvariant, initializerTyping⟩ :=
+    initializerSound initializerSuccess
+  have conditionInvariant :
+      ActiveLocalContextInvariant conditionState outer loopContext :=
+    initializerInvariant.inferExprFuel conditionSuccess
+  have conditionTyping :=
+    conditionSound initializerInvariant conditionSuccess
+  obtain ⟨bodyFinal, bodyFacts, _bodyInvariant, bodyTyping⟩ :=
+    bodySound conditionInvariant bodySuccess
+  have postInputInvariant : ActiveLocalContextInvariant
+      (bodyResult.state.restoreLexicalScope
+        initializerResult.state.lexicalScope) outer loopContext :=
+    initializerInvariant.restoreLexicalScope
+  obtain ⟨postContext, _postInvariant, postTyping⟩ :=
+    postSound postInputInvariant postSuccess
+  subst result
+  refine ⟨{
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .loop bodyFacts.control
+    }, allocatedInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact forLoopStatementHasType_afterSubstitution contains
+      initializerTyping conditionTyping bodyTyping postTyping
+  · exact StatementResultMatchesFactsAfterSubstitution.forLoop outer
+      bodyFacts id _
 
 /-- A successful `while` statement is compositional modulo condition and body
 soundness in the common final typed source.  Executable and declarative loop
