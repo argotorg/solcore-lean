@@ -941,6 +941,33 @@ example {environment : ProgramEnvironment}
     Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_scopedRequirementLedgerWellFormed_bodyContext
       validated member success
 
+/-- The deep-typing entry bridge returns one lexical context carrying both
+the declarative input extension and its finalized executable alignment. -/
+example {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature} {fuel : Nat}
+    {checked : SourceInference.CheckedFunction}
+    (parameterTypes : Solcore.SourceSemantics.TypesWellFormed
+      (Solcore.SourceSemantics.checkedBodyContext signatures signature checked)
+      signature.parameterTypes)
+    (success : SourceInference.checkFunctionBody environment signatures
+      signature fuel = .ok checked) :
+    ∃ lexicalContext,
+      Solcore.SourceSemantics.MonoBindersExtend signature.id
+          (Solcore.SourceSemantics.checkedBodyContext signatures signature
+            checked)
+          checked.typedBody.inputs signature.parameterTypes lexicalContext ∧
+        Solcore.SourceSemantics.SourceInferenceSoundness.LocalEnvironmentAligned
+          (SourceInference.State.initial signature.id
+            ((signature.parameterNames.zip signature.parameterTypes).map
+              fun parameter =>
+                (parameter.1, TypeSystem.Scheme.mono parameter.2))
+            signature.parameterComptime)
+          checked.substitution lexicalContext := by
+  exact
+    Solcore.SourceSemantics.SourceInferenceSoundness.checkFunctionBody_success_initialLocalEnvironmentAligned
+      parameterTypes success
+
 private def solverRegressionRequirement : SourceInference.Requirement := {
   id := ⟨0⟩
   predicate := solverRegressionSource

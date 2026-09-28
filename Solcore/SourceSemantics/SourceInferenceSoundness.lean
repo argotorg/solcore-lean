@@ -343,6 +343,52 @@ theorem mem_local_freeVariables_iff
 
 end LocalEnvironmentAligned
 
+/-- A successful body check installs the finalized input binders into one
+declarative lexical context and simultaneously aligns that context with the
+checker's initial stable-binder state under the final inference substitution.
+This is the common starting point for deep body-typing reconstruction. -/
+theorem checkFunctionBody_success_initialLocalEnvironmentAligned
+    {environment : ProgramEnvironment}
+    {signatures : ProgramSignatures}
+    {signature : ProgramFunctionSignature}
+    {fuel : Nat}
+    {checked : CheckedFunction}
+    (parameterTypes : TypesWellFormed
+      (checkedBodyContext signatures signature checked)
+      signature.parameterTypes)
+    (success : checkFunctionBody environment signatures signature fuel =
+      .ok checked) :
+    ∃ lexicalContext,
+      MonoBindersExtend signature.id
+          (checkedBodyContext signatures signature checked)
+          checked.typedBody.inputs signature.parameterTypes lexicalContext ∧
+        LocalEnvironmentAligned
+          (Frontend.SourceInference.State.initial signature.id
+            ((signature.parameterNames.zip signature.parameterTypes).map
+              fun parameter =>
+                (parameter.1, TypeSystem.Scheme.mono parameter.2))
+            signature.parameterComptime)
+          checked.substitution lexicalContext := by
+  obtain ⟨lexicalContext, extension⟩ :=
+    checkFunctionBody_success_inputs_extend
+      (context := checkedBodyContext signatures signature checked)
+      rfl rfl parameterTypes success
+  refine ⟨lexicalContext, extension, ?_⟩
+  apply LocalEnvironmentAligned.ofInitialMonoBindersExtend
+    signature.id
+    ((signature.parameterNames.zip signature.parameterTypes).map
+      fun parameter =>
+        (parameter.1, TypeSystem.Scheme.mono parameter.2))
+    signature.parameterComptime checked.substitution
+    (context := checkedBodyContext signatures signature checked)
+    (final := lexicalContext) (types := signature.parameterTypes)
+    rfl rfl
+  have inputsEq :=
+    Frontend.SourceInference.checkFunctionBody_success_typedBody_inputs success
+  rw [inputsEq] at extension
+  simpa only [Frontend.SourceInference.State.initial_inputs_eq_localBinders]
+    using extension
+
 /-- Agreement of the executable and declarative generalization barriers on
 the inferred type's candidate variables is enough to recover exact qualified
 rank-one generalization.  Variables outside `type.freeVariables` are
