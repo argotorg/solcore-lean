@@ -10757,6 +10757,208 @@ theorem inferMatchCasesFuel_success_matchCasesHaveType
                           (bodyResult.sawReturn && tail.allReturn)
                         rw [headAgreement.sawReturn_eq, tailAgreement]
 
+/-- Successful explicit match-case traversal is semantically sound once
+recursive statement-list soundness is available for each arm body.  Pattern
+soundness, binder installation, state transport, and source-ordered arm
+assembly are discharged here rather than delegated through an arm callback. -/
+theorem inferMatchCasesFuel_success_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : Frontend.SourceInference.State}
+    {result : Detail.MatchCasesResult}
+    {source : TypedSource} {control : ControlContext}
+    {outer : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (branches : MatchPatternBranchSoundnessCallbacks source
+      inferenceContext semanticContext outer)
+    (ready : state.InferenceReady)
+    (scrutineeBelow :
+      scrutineeType.VariablesBelow state.inference.next)
+    (returnBelow : expectedReturn.VariablesBelow state.inference.next)
+    (below : state.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = state.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (scrutineeAdmissible :
+      TypeAdmissible semanticContext (outer.apply scrutineeType))
+    (initialInvariant :
+      ActiveLocalContextInvariant state outer semanticContext)
+    (scopeEq : state.lexicalScope = outerScope)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (bodySound :
+      ∀ {childFuel : Nat} {statements : List Syntax.Statement}
+        {childInitial : Frontend.SourceInference.State}
+        {childResult : Detail.BlockResult}
+        {childContext : SourceSemantics.Context},
+        ActiveLocalContextInvariant childInitial outer childContext →
+        Detail.inferStatementsFuel childFuel inferenceContext statements
+            expectedReturn childInitial = .ok childResult →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant childResult.state outer finalContext ∧
+            StatementsHaveType source control childContext
+              childResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer childResult facts)
+    (success : Detail.inferMatchCasesFuel fuel inferenceContext scrutineeType
+      expectedReturn outerScope cases state = .ok result) :
+    ∃ caseFacts,
+      MatchCasesHaveType source control semanticContext
+        (outer.apply scrutineeType)
+        (result.cases.map (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+      allBodiesSawReturn caseFacts = result.allReturn := by
+  induction fuel generalizing outerScope cases state result with
+  | zero =>
+      simp [Detail.inferMatchCasesFuel] at success
+  | succ fuel induction =>
+      cases cases with
+      | nil =>
+          unfold Detail.inferMatchCasesFuel at success
+          injection success with resultEq
+          subst result
+          exact ⟨[], .nil control semanticContext
+            (outer.apply scrutineeType), rfl⟩
+      | cons arm rest =>
+          unfold Detail.inferMatchCasesFuel at success
+          simp only [bind, Except.bind] at success
+          cases patternSuccess : Detail.inferMatchPatternFuel fuel
+              inferenceContext arm.value.pattern scrutineeType state with
+          | error error =>
+              simp [patternSuccess] at success
+          | ok patternPair =>
+              rcases patternPair with ⟨pattern, patternState⟩
+              simp only [patternSuccess] at success
+              cases bodySuccess : Detail.inferStatementsFuel fuel
+                  inferenceContext arm.value.body.value expectedReturn
+                  patternState with
+              | error error =>
+                  simp [bodySuccess] at success
+              | ok bodyResult =>
+                  simp only [bodySuccess] at success
+                  let tailInput :=
+                    bodyResult.state.restoreLexicalScope outerScope
+                  cases tailSuccess : Detail.inferMatchCasesFuel fuel
+                      inferenceContext scrutineeType expectedReturn outerScope
+                      rest tailInput with
+                  | error error =>
+                      simp [tailInput, tailSuccess] at success
+                  | ok tail =>
+                      simp only [tailInput, tailSuccess, pure, Pure.pure,
+                        Except.pure] at success
+                      injection success with resultEq
+                      subst result
+                      have patternProperties :=
+                        Detail.inferMatchPatternFuel_inferenceProperties ready
+                          scrutineeBelow validated patternSuccess
+                      have returnAtPattern :=
+                        returnBelow.weaken patternProperties.1.next_le
+                      have bodyProperties :=
+                        Detail.inferStatementsFuel_inferenceProperties
+                          patternProperties.2.1 validated functionsCanonical
+                          returnAtPattern bodySuccess
+                      have throughBody :=
+                        patternProperties.1.trans bodyProperties.1
+                      have restoredProperties :
+                          state.InferenceProgress tailInput ∧
+                            tailInput.InferenceReady := by
+                        unfold tailInput
+                        rw [← scopeEq]
+                        exact Frontend.SourceInference.State.restoreLexicalScope_inferenceProperties
+                          ready throughBody
+                      have tailScrutineeBelow :=
+                        scrutineeBelow.weaken restoredProperties.1.next_le
+                      have tailReturnBelow :=
+                        returnBelow.weaken restoredProperties.1.next_le
+                      have tailProperties :=
+                        Detail.inferMatchCasesFuel_inferenceProperties
+                          (outerScope := outerScope) (state := tailInput)
+                          (result := tail)
+                          restoredProperties.2 validated functionsCanonical
+                          tailScrutineeBelow tailReturnBelow (by
+                            simp [tailInput]) tailSuccess
+                      change outer.SemanticallyExtends
+                        tail.state.inference.substitution at outerExtension
+                      have outerTailInput : outer.SemanticallyExtends
+                          tailInput.inference.substitution :=
+                        TypeSystem.Substitution.SemanticallyExtends.trans
+                          outerExtension
+                          tailProperties.1.substitution_extends
+                      have outerBody : outer.SemanticallyExtends
+                          bodyResult.state.inference.substitution := by
+                        simpa [tailInput,
+                          Frontend.SourceInference.State.restoreLexicalScope]
+                          using outerTailInput
+                      have outerPattern : outer.SemanticallyExtends
+                          patternState.inference.substitution :=
+                        TypeSystem.Substitution.SemanticallyExtends.trans
+                          outerBody bodyProperties.1.substitution_extends
+                      obtain ⟨headCertificate⟩ :=
+                        inferMatchCaseFuel_success_sound validated catalog
+                          semanticSignaturesEq branches ready scrutineeBelow
+                          below owner_eq semanticOwner scrutineeAdmissible
+                          initialInvariant outerPattern bodySound
+                          patternSuccess bodySuccess
+                      obtain ⟨headFacts, headTyping, headAgreement⟩ :=
+                        headCertificate.toMatchCaseHasType
+                          (arm := arm)
+                      have tailInvariant : ActiveLocalContextInvariant
+                          tailInput outer semanticContext := by
+                        unfold tailInput
+                        rw [← scopeEq]
+                        exact initialInvariant.restoreLexicalScope
+                      have patternNextLocal :
+                          state.nextLocal ≤ patternState.nextLocal :=
+                        Detail.inferMatchPatternFuel_nextLocal_le patternSuccess
+                      have bodyNextLocal :
+                          patternState.nextLocal ≤
+                            bodyResult.state.nextLocal :=
+                        Detail.inferStatementsFuel_nextLocal_le bodySuccess
+                      have tailNextLocal :
+                          state.nextLocal ≤ tailInput.nextLocal := by
+                        simpa [tailInput] using
+                          Nat.le_trans patternNextLocal bodyNextLocal
+                      have tailBelow : tailInput.LocalBindersBelowNextLocal := by
+                        apply Frontend.SourceInference.State.LocalBindersBelowNextLocal.transport
+                          (before := state) (after := tailInput)
+                        · change outerScope.binders = state.localBinders
+                          simpa [Frontend.SourceInference.State.lexicalScope]
+                            using congrArg LexicalScope.binders scopeEq.symm
+                        · exact tailNextLocal
+                        · exact below
+                      have patternOwner : patternState.owner = state.owner :=
+                        Detail.inferMatchPatternFuel_preserves_owner
+                          patternSuccess
+                      have bodyOwner :
+                          bodyResult.state.owner = patternState.owner :=
+                        Detail.inferStatementsFuel_preserves_owner bodySuccess
+                      have tailOwner : source.owner = tailInput.owner := by
+                        simpa [tailInput,
+                          Frontend.SourceInference.State.restoreLexicalScope]
+                          using owner_eq.trans
+                            (patternOwner.symm.trans bodyOwner.symm)
+                      have tailScopeEq : tailInput.lexicalScope = outerScope := by
+                        simp [tailInput]
+                      obtain ⟨tailFacts, tailTyping, tailAgreement⟩ :=
+                        induction restoredProperties.2 tailScrutineeBelow
+                          tailReturnBelow tailBelow tailOwner tailInvariant
+                          tailScopeEq outerExtension tailSuccess
+                      refine ⟨headFacts :: tailFacts, ?_, ?_⟩
+                      · simpa only [List.map_cons] using
+                          (MatchCasesHaveType.cons headTyping tailTyping)
+                      · change (headFacts.sawReturn &&
+                            allBodiesSawReturn tailFacts) =
+                          (bodyResult.sawReturn && tail.allReturn)
+                        rw [headAgreement.sawReturn_eq, tailAgreement]
+
 /-- Statement-list inference is a generic sequencing layer over soundness for
 one statement.  The caller chooses the relation connecting executable states
 to lexical semantic contexts and supplies one-statement soundness in the final
