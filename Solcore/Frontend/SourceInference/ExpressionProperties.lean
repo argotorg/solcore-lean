@@ -10340,6 +10340,20 @@ private theorem inferStatementsFuel_inferenceProperties_internal
   inferFuel_inferenceProperties_internal.2.2.2.1 fuel context statements
     expectedReturn state
 
+private theorem inferForItemsFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (items : List Syntax.ForItem)
+    (state : State) :
+    InferForItemsFuelInferenceProperties fuel context items state :=
+  inferFuel_inferenceProperties_internal.2.2.2.2.2.1
+    fuel context items state
+
+private theorem inferForItemFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (item : Syntax.ForItem)
+    (state : State) :
+    InferForItemFuelInferenceProperties fuel context item state :=
+  inferFuel_inferenceProperties_internal.2.2.2.2.2.2.1
+    fuel context item state
+
 private theorem inferPlaceFuel_inferenceProperties_internal
     (fuel : Nat) (context : Context) (target : Syntax.Expr) (state : State) :
     InferPlaceFuelInferenceProperties fuel context target state :=
@@ -10353,6 +10367,22 @@ private theorem inferAssignedValueFuel_inferenceProperties_internal
       value state :=
   inferFuel_inferenceProperties_internal.2.2.2.2.2.2.2.2.1
     fuel context target operator value state
+
+private theorem inferExprsFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (expressions : List Syntax.Expr)
+    (state : State) :
+    InferExprsFuelInferenceProperties fuel context expressions state :=
+  inferFuel_inferenceProperties_internal.2.2.2.2.2.2.2.2.2.1
+    fuel context expressions state
+
+private theorem inferMatchCasesFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (scrutineeType expectedReturn : Ty)
+    (outerScope : LexicalScope) (cases : List Syntax.MatchCase)
+    (state : State) :
+    InferMatchCasesFuelInferenceProperties fuel context scrutineeType
+      expectedReturn outerScope cases state :=
+  inferFuel_inferenceProperties_internal.2.2.2.2.2.2.2.2.2.2
+    fuel context scrutineeType expectedReturn outerScope cases state
 
 /-- Successful expression inference makes monotone inference progress, leaves
 the resulting state ready for further inference, and returns a type whose
@@ -10400,6 +10430,39 @@ theorem inferStatementsFuel_inferenceProperties
     statements expectedReturn state ready validated canonical returnBelow
     result success
 
+/-- Successful `for`-item sequence inference makes monotone progress and
+leaves the resulting state ready for the condition or loop body. -/
+theorem inferForItemsFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    state.InferenceProgress result.state ∧ result.state.InferenceReady := by
+  exact inferForItemsFuel_inferenceProperties_internal fuel context items state
+    ready validated canonical result success
+
+/-- Successful inference of one restricted `for` item makes monotone progress
+and preserves inference readiness. -/
+theorem inferForItemFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    state.InferenceProgress result.2 ∧ result.2.InferenceReady := by
+  exact inferForItemFuel_inferenceProperties_internal fuel context item state
+    ready validated canonical result success
+
 /-- Successful place inference makes monotone inference progress, preserves
 readiness, and returns a place type bounded by the resulting allocator. -/
 theorem inferPlaceFuel_inferenceProperties
@@ -10438,6 +10501,51 @@ theorem inferAssignedValueFuel_inferenceProperties
       result.2.1.type.VariablesBelow result.2.2.inference.next := by
   exact inferAssignedValueFuel_inferenceProperties_internal fuel context target
     operator value state ready validated canonical result success
+
+/-- Successful inference of a source-ordered expression list makes monotone
+progress, preserves readiness, and bounds every inferred element type. -/
+theorem inferExprsFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      ∀ expression ∈ result.1,
+        expression.type.VariablesBelow result.2.inference.next := by
+  exact inferExprsFuel_inferenceProperties_internal fuel context expressions
+    state ready validated canonical result success
+
+/-- Successful explicit match-case inference makes monotone progress, remains
+ready, and restores the supplied outer lexical scope. -/
+theorem inferMatchCasesFuel_inferenceProperties
+    {fuel : Nat} {context : Context}
+    {scrutineeType expectedReturn : Ty} {outerScope : LexicalScope}
+    {cases : List Syntax.MatchCase} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (scrutineeBelow : scrutineeType.VariablesBelow state.inference.next)
+    (returnBelow : expectedReturn.VariablesBelow state.inference.next)
+    (scopeEq : state.lexicalScope = outerScope)
+    {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.state.lexicalScope = outerScope := by
+  exact inferMatchCasesFuel_inferenceProperties_internal fuel context
+    scrutineeType expectedReturn outerScope cases state ready validated
+    canonical scrutineeBelow returnBelow scopeEq result success
 
 set_option maxHeartbeats 1000000 in
 private theorem inferFuel_preserves_lexicalScope_internal :
