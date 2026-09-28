@@ -423,13 +423,11 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.matchPatternFlatStateCallbacks
 example :=
-  @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternRecursiveSoundnessCallbacks
-example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternBranchSoundnessCallbacks
 example :=
-  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternsFlatFuel_success_sound_of_callbacks
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternsFlatFuel_success_sound
 example :=
-  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFlatFuel_success_sound_of_callbacks
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFlatFuel_success_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFuel_success_sound_of_flat
 example :=
