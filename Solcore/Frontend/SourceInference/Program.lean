@@ -299,7 +299,7 @@ def validateSourceLocalSchemeNoCapture (source : TypedSource)
 
 /-- Validate every replacement retained by the final inference substitution
 in the declaration's rigid and nominal formation scope.  Flexible variables
-remain open because finalized source bodies admit residual inference types. -/
+remain open because finalized source bodies permit residual inference types. -/
 def validateFinalSubstitutionRangeFormation (context : Context)
     (substitution : Substitution) : Except Error Unit :=
   match validateInferenceSubstitutionRangeFormation context.signatures
