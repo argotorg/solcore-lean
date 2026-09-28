@@ -7304,6 +7304,220 @@ theorem inferStatementFuel_success_matchWithDefault_sound
   · exact StatementResultMatchesFactsAfterSubstitution.matchWithDefault
       caseReturnEq defaultAgreement defaultExtension id _
 
+/-- A successful match with a fallback arm is deeply sound from expression
+soundness, recursive statement-list soundness, and the irreducible integer
+pattern evidence boundary.  Explicit case typing and fallback typing are
+constructed directly rather than supplied as match-specific callbacks. -/
+private theorem inferStatementFuel_success_matchWithDefault_deep_of_cases
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = some defaultBody)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (casesSound :
+      ∀ {scrutinee : InferredExpression}
+        {hiddenState : Frontend.SourceInference.State}
+        {checked : Detail.MatchCasesResult},
+        hiddenState.InferenceReady →
+        scrutinee.type.VariablesBelow hiddenState.inference.next →
+        expectedReturn.VariablesBelow hiddenState.inference.next →
+        hiddenState.LocalBindersBelowNextLocal →
+        ((result.state.toTypedSource roots).applySubstitution outer).owner =
+          hiddenState.owner →
+        TypeAdmissible target (outer.apply scrutinee.type) →
+        ActiveLocalContextInvariant hiddenState outer target →
+        outer.SemanticallyExtends checked.state.inference.substitution →
+        Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
+            expectedReturn hiddenState.lexicalScope arms.value.cases
+            hiddenState = .ok checked →
+          ∃ caseFacts,
+            MatchCasesHaveType
+              ((result.state.toTypedSource roots).applySubstitution outer) {
+                returnType := outer.apply expectedReturn
+                loopDepth := inferenceContext.loopDepth
+              } target (outer.apply scrutinee.type)
+              (checked.cases.map
+                (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+            allBodiesSawReturn caseFacts = checked.allReturn)
+    (scrutineeSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState : Frontend.SourceInference.State},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type))
+    (bodySound :
+      ∀ {childFuel : Nat} {statements : List Syntax.Statement}
+        {childInitial : Frontend.SourceInference.State}
+        {childResult : Detail.BlockResult}
+        {childContext : SourceSemantics.Context},
+        ActiveLocalContextInvariant childInitial outer childContext →
+        Detail.inferStatementsFuel childFuel inferenceContext statements
+            expectedReturn childInitial = .ok childResult →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant childResult.state outer finalContext ∧
+            StatementsHaveType
+              ((result.state.toTypedSource roots).applySubstitution outer) {
+                returnType := outer.apply expectedReturn
+                loopDepth := inferenceContext.loopDepth
+              } childContext childResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer childResult facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have retained :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [allocatedEq] at retained
+    exact retained
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← allocatedEq]
+    exact returnBelow
+  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+    have retained :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+        initial below
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [allocatedEq] at retained
+    exact retained
+  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
+      defaultResult, scrutineeSuccess, hiddenAllocation, casesSuccess,
+      defaultSuccess, _guardPassed, resultEq, contains⟩ :=
+    inferStatementFuel_success_matchWithDefault_facts statementEq defaultEq
+      allocationEq success roots
+  have scrutineeProperties := inferMatchScrutineesFuel_inferenceProperties
+    allocatedReady signatureFormation functionsCanonical scrutineeSuccess
+  have scrutineeInvariant :
+      ActiveLocalContextInvariant scrutineeState outer target :=
+    allocatedInvariant.inferMatchScrutineesFuel scrutineeSuccess
+  have scrutineeLocalBelow :
+      scrutineeState.LocalBindersBelowNextLocal :=
+    inferMatchScrutineesFuel_preserves_localBindersBelowNextLocal
+      allocatedBelow scrutineeSuccess
+  have hiddenInvariant : ActiveLocalContextInvariant hiddenState outer target :=
+    scrutineeInvariant.allocateHiddenLocal hiddenAllocation
+  have hiddenReady : hiddenState.InferenceReady := by
+    have retained :=
+      Frontend.SourceInference.State.InferenceReady.allocateHiddenLocal
+        scrutineeProperties.2.1
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [hiddenEq] at retained
+    exact retained
+  have hiddenScrutineeBelow :
+      scrutinee.type.VariablesBelow hiddenState.inference.next := by
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [← hiddenEq]
+    exact scrutineeProperties.2.2
+  have hiddenReturnBelow :
+      expectedReturn.VariablesBelow hiddenState.inference.next := by
+    have atScrutinee :=
+      allocatedReturnBelow.weaken scrutineeProperties.1.next_le
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [← hiddenEq]
+    exact atScrutinee
+  have hiddenBelow : hiddenState.LocalBindersBelowNextLocal := by
+    have retained :=
+      Frontend.SourceInference.State.allocateHiddenLocal_preserves_localBindersBelowNextLocal
+        scrutineeState scrutineeLocalBelow
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [hiddenEq] at retained
+    exact retained
+  have checkedProperties := Detail.inferMatchCasesFuel_inferenceProperties
+    hiddenReady signatureFormation functionsCanonical hiddenScrutineeBelow
+      hiddenReturnBelow rfl casesSuccess
+  have checkedInvariant : ActiveLocalContextInvariant checked.state outer
+      target := hiddenInvariant.inferMatchCasesFuel casesSuccess
+  have checkedReturnBelow :=
+    hiddenReturnBelow.weaken checkedProperties.1.next_le
+  have defaultProperties := Detail.inferStatementsFuel_inferenceProperties
+    checkedProperties.2.1 signatureFormation functionsCanonical
+      checkedReturnBelow defaultSuccess
+  have scrutineeTyping := scrutineeSound scrutineeSuccess
+  subst result
+  have defaultExtension : outer.SemanticallyExtends
+      defaultResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      defaultResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  have checkedExtension : outer.SemanticallyExtends
+      checked.state.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans defaultExtension
+      defaultProperties.1.substitution_extends
+  have checkedOwner : checked.state.owner = hiddenState.owner :=
+    Detail.inferMatchCasesFuel_preserves_owner casesSuccess
+  have defaultOwner : defaultResult.state.owner = checked.state.owner :=
+    Detail.inferStatementsFuel_preserves_owner defaultSuccess
+  obtain ⟨caseFacts, casesTyping, caseReturnEq⟩ :=
+    casesSound hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow
+      (by
+        simpa [Frontend.SourceInference.State.toTypedSource,
+          Frontend.SourceInference.State.restoreLexicalScope,
+          Frontend.SourceInference.State.recordNode,
+          TypedSource.applySubstitution] using
+            defaultOwner.trans checkedOwner)
+      scrutineeTyping.type_admissible hiddenInvariant checkedExtension
+      casesSuccess
+  obtain ⟨defaultFinal, defaultFacts, _defaultInvariant, defaultTyping,
+      defaultAgreement⟩ := bodySound checkedInvariant defaultSuccess
+  obtain ⟨summary, merged⟩ :=
+    mergeBodyControls_withDefault_eq_some caseFacts defaultFacts
+  refine ⟨{
+      type := if allBodiesSawReturn caseFacts && defaultFacts.sawReturn then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      sawReturn := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      control := summary.eraseValue
+    }, hiddenInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact matchWithDefaultStatementHasType_afterSubstitution contains
+      scrutineeTyping casesTyping defaultTyping caseReturnEq defaultAgreement
+      merged defaultExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.matchWithDefault
+      caseReturnEq defaultAgreement defaultExtension id _
+
 /-- Uniform conditional obligations used by the restricted `for`-header
 dispatchers below.  Every callback is indexed by the active semantic context
 and its matching executable-local invariant, so a source-ordered item list can
@@ -11037,6 +11251,91 @@ theorem inferMatchCasesFuel_success_sound
                             allBodiesSawReturn tailFacts) =
                           (bodyResult.sawReturn && tail.allReturn)
                         rw [headAgreement.sawReturn_eq, tailAgreement]
+
+/-- The deep match-with-default statement theorem closes explicit arm typing
+with `inferMatchCasesFuel_success_sound`.  Its only pattern-specific semantic
+input is finalized integer-literal evidence; every recursive body uses the
+ordinary statement-list soundness contract. -/
+theorem inferStatementFuel_success_matchWithDefault_deep_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = some defaultBody)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (semanticOwner : target.currentDeclaration = some
+      ((result.state.toTypedSource roots).applySubstitution outer).owner)
+    (patternBranches : MatchPatternBranchSoundnessCallbacks
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      inferenceContext target outer)
+    (scrutineeSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState : Frontend.SourceInference.State},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type))
+    (bodySound :
+      ∀ {childFuel : Nat} {statements : List Syntax.Statement}
+        {childInitial : Frontend.SourceInference.State}
+        {childResult : Detail.BlockResult}
+        {childContext : SourceSemantics.Context},
+        ActiveLocalContextInvariant childInitial outer childContext →
+        Detail.inferStatementsFuel childFuel inferenceContext statements
+            expectedReturn childInitial = .ok childResult →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant childResult.state outer finalContext ∧
+            StatementsHaveType
+              ((result.state.toTypedSource roots).applySubstitution outer) {
+                returnType := outer.apply expectedReturn
+                loopDepth := inferenceContext.loopDepth
+              } childContext childResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer childResult facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  apply inferStatementFuel_success_matchWithDefault_deep_of_cases
+    statementEq defaultEq allocationEq success signatureFormation
+    functionsCanonical ready returnBelow below invariant outerExtension roots
+    ?_ scrutineeSound bodySound
+  intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
+    hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
+    hiddenInvariant checkedExtension casesSuccess
+  exact inferMatchCasesFuel_success_sound signatureFormation
+    functionsCanonical catalog signatures_eq patternBranches hiddenReady
+    hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
+    semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
+    bodySound casesSuccess
 
 /-- Statement-list inference is a generic sequencing layer over soundness for
 one statement.  The caller chooses the relation connecting executable states
