@@ -687,6 +687,12 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_owner
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_inputs
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_inputs

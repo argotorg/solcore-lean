@@ -12172,6 +12172,38 @@ private theorem inferStatementListFuel_preserves_header_internal
   inferStatementsFuel_preserves_header_internal.2.2.2.1 fuel context statements
     expectedReturn state
 
+/-- Successful expression inference preserves the declaration owner and the
+original input binders. -/
+theorem inferExprFuel_state_header
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    result.2.header = state.header := by
+  exact inferStatementsFuel_preserves_header_internal.1
+    fuel context expression expected state result success
+
+@[simp] theorem inferExprFuel_preserves_owner
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    result.2.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (inferExprFuel_state_header success)
+
+@[simp] theorem inferExprFuel_preserves_inputs
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    result.2.inputs = state.inputs :=
+  congrArg (fun header : State.Header => header.inputs)
+    (inferExprFuel_state_header success)
+
 /-- Successful statement-list inference preserves the declaration owner and
 the original input binders. -/
 theorem inferStatementsFuel_state_header
