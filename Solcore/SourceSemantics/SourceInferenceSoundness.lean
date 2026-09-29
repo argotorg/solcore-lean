@@ -18894,7 +18894,156 @@ theorem ofTypingSourceExtends
   intro id node _ contains
   exact extension.containsExpression contains
 
+/-- Attaching coercions to a disjoint row of expression identities preserves
+the exact payload of every selected expression node. -/
+theorem ofAttachExpressionCoercions_of_disjoint
+    {state : Frontend.SourceInference.State}
+    {entries : List Detail.ExpressionCoercions}
+    {ids : List ExpressionId} {roots : List NodeId}
+    (disjoint : ∀ id ∈ ids, id ∉ entries.map (·.expression)) :
+    ExpressionNodesPreservedAt ids (state.toTypedSource roots)
+      ((Detail.attachExpressionCoercions state entries).toTypedSource roots) := by
+  intro id node member contains
+  exact attachExpressionCoercions_containsExpression_of_not_mem state entries
+    id node roots (disjoint id member) contains
+
 end ExpressionNodesPreservedAt
+
+/-- Every requirement already owned by one expression occurrence remains
+primarily attached at that identity in an eventual evidence source.  Unlike
+`ExpressionNodesPreservedAt`, this relation deliberately permits the node's
+authoritative type and output-coercion suffix to advance. -/
+def ExpressionRequirementsRetainedAt
+    (before after : TypedSource) (id : ExpressionId) : Prop :=
+  ∀ {node requirement},
+    ContainsExpression before id node →
+    requirement ∈ node.requirements →
+    PrimaryRequirementOccursAt after (.expression id) requirement
+
+namespace ExpressionRequirementsRetainedAt
+
+/-- An exact source extension after final substitution retains every
+requirement owned by the selected pre-substitution expression occurrence. -/
+theorem ofTypingSourceExtends
+    {before after : TypedSource} {id : ExpressionId}
+    (substitution : TypeSystem.Substitution)
+    (extension : TypingSourceExtends
+      (before.applySubstitution substitution) after) :
+    ExpressionRequirementsRetainedAt before after id := by
+  intro node requirement contains member
+  have finalContains := extension.containsExpression
+    (FlexibleSubstitution.ContainsExpression.applySubstitution substitution
+      contains)
+  apply finalContains.primaryRequirementOccursAt
+  simpa [ExpressionNode.applySubstitution] using member
+
+/-- Retention from a common later node source also applies to any exact
+append-only prefix of that source. -/
+theorem monoBefore
+    {before middle after : TypedSource} {id : ExpressionId}
+    (extension : TypingSourceExtends before middle)
+    (retained : ExpressionRequirementsRetainedAt middle after id) :
+    ExpressionRequirementsRetainedAt before after id := by
+  intro node requirement contains member
+  exact retained (extension.containsExpression contains) member
+
+/-- Rewriting one selected argument root by appending delayed coercions keeps
+all of the requirements already owned by that root.  Exact preservation is
+required only after the rewrite; the pre-attachment and post-attachment root
+payloads are intentionally different. -/
+theorem ofAttachExpressionCoercions
+    {state : Frontend.SourceInference.State}
+    {entries : List Detail.ExpressionCoercions}
+    {entry : Detail.ExpressionCoercions} {roots : List NodeId}
+    {substitution : TypeSystem.Substitution}
+    {evidenceSource : TypedSource}
+    (unique : (entries.map (·.expression)).Nodup)
+    (member : entry ∈ entries)
+    (preserved : ExpressionNodesPreservedAt [entry.expression]
+      ((Detail.attachExpressionCoercions state entries
+        |>.toTypedSource roots).applySubstitution substitution)
+      evidenceSource) :
+    ExpressionRequirementsRetainedAt (state.toTypedSource roots)
+      evidenceSource entry.expression := by
+  intro node requirement contains requirementMember
+  have attachedContains := attachExpressionCoercions_containsExpression state
+    entries entry node roots unique member contains
+  have substitutedContains :=
+    FlexibleSubstitution.ContainsExpression.applySubstitution substitution
+      attachedContains
+  have closedAttachedContains : ContainsExpression
+      ((Detail.attachExpressionCoercions state entries
+        |>.toTypedSource roots).applySubstitution substitution)
+      entry.expression
+      (Detail.appendExpressionCoercions
+        (node.applySubstitution substitution)
+        (entry.coercions.map
+          (CoercionStep.applySubstitution substitution))) := by
+    simpa only [Detail.appendExpressionCoercions_applySubstitution] using
+      substitutedContains
+  have finalContains := preserved (by simp) closedAttachedContains
+  apply finalContains.primaryRequirementOccursAt
+  change requirement ∈
+    (node.applySubstitution substitution).requirements ++
+      Detail.coercionRequirements
+        (entry.coercions.map
+          (CoercionStep.applySubstitution substitution))
+  rw [Detail.coercionRequirements_applySubstitution]
+  exact List.mem_append_left _ requirementMember
+
+end ExpressionRequirementsRetainedAt
+
+/-- Delayed coercion attachment retains the pre-existing requirements of
+every source-ordered argument root.  Newly allocated coercion requirements
+are handled separately by
+`ArgumentTypingBasesValid.attachExpressionCoercions_primaryRequirementOccursAt`.
+-/
+theorem argumentRequirementsRetainedAt_attachExpressionCoercions
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId} {evidenceSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {arguments : List InferredExpression}
+    {parameters : List TypeSystem.Ty}
+    {entries : List Detail.ExpressionCoercions}
+    (coercions : ArgumentCoercionsValid context substitution arguments
+      parameters entries)
+    (argumentIdsUnique : (arguments.map (·.id)).Nodup)
+    (preserved : ExpressionNodesPreservedAt (arguments.map (·.id))
+      ((Detail.attachExpressionCoercions state entries
+        |>.toTypedSource roots).applySubstitution substitution)
+      evidenceSource) :
+    ∀ argument ∈ arguments,
+      ExpressionRequirementsRetainedAt (state.toTypedSource roots)
+        evidenceSource argument.id := by
+  intro argument argumentMember
+  have argumentIdMember : argument.id ∈ arguments.map (·.id) :=
+    List.mem_map.mpr ⟨argument, argumentMember, rfl⟩
+  have entryIdMember : argument.id ∈ entries.map (·.expression) := by
+    rw [coercions.expression_ids]
+    exact argumentIdMember
+  obtain ⟨entry, entryMember, entryIdEq⟩ := List.mem_map.mp entryIdMember
+  have entriesUnique : (entries.map (·.expression)).Nodup := by
+    rw [coercions.expression_ids]
+    exact argumentIdsUnique
+  have entryPreserved : ExpressionNodesPreservedAt [entry.expression]
+      ((Detail.attachExpressionCoercions state entries
+        |>.toTypedSource roots).applySubstitution substitution)
+      evidenceSource := by
+    intro id node idMember contains
+    have idEq : id = entry.expression := by simpa using idMember
+    subst id
+    apply preserved
+    · rw [entryIdEq]
+      exact argumentIdMember
+    · exact contains
+  have retained : ExpressionRequirementsRetainedAt (state.toTypedSource roots)
+      evidenceSource entry.expression :=
+    ExpressionRequirementsRetainedAt.ofAttachExpressionCoercions
+      entriesUnique entryMember entryPreserved
+  rw [entryIdEq] at retained
+  intro node requirement contains requirementMember
+  exact retained contains requirementMember
 
 namespace ExpressionTypingBase
 
@@ -20611,6 +20760,139 @@ and fitted output-coercion requirements at that occurrence, and normalizes the
 raw endpoint with the final inference substitution.  It deliberately defers
 admissibility of the stored result type until the surrounding traversal has
 closed its flexible variables. -/
+theorem recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+    {inferenceContext : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {id : ExpressionId}
+    {rawType : TypeSystem.Ty} {form : ExpressionForm}
+    {owned : List RequirementId} {expected : Option TypeSystem.Ty}
+    {state later : Frontend.SourceInference.State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.recordExpressionWithExpected inferenceContext source id
+      rawType form owned expected state localSchemeInstantiationStart =
+        .ok result)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (formType : ExpressionFormHasRawType semanticSource active
+      (form.applySubstitution later.inference.substitution)
+      (later.inference.substitution.apply rawType) (.ordinary owned))
+    (rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply rawType))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  obtain ⟨fitted, fittedSuccess, resultExpressionEq, resultStateEq⟩ :=
+    Detail.recordExpressionWithExpected_success_record success
+  have recordedContains : ContainsExpression
+      (result.2.toTypedSource roots) result.1.id {
+        id := result.1.id
+        span := source.span
+        type := result.1.type
+        form
+        requirements := owned ++
+          Detail.coercionRequirements fitted.coercions
+        coercions := fitted.coercions
+        localSchemeInstantiationStart
+      } := by
+    rw [resultExpressionEq, resultStateEq]
+    exact recordNode_containsExpression fitted.state _ roots
+  have fittedRequirementsSubset :
+      fitted.state.requirements ⊆ later.requirements := by
+    intro requirement member
+    apply requirementsSubset
+    rw [resultStateEq]
+    exact member
+  have fittedSubstitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        fitted.state.inference.substitution := by
+    simpa [resultStateEq, Frontend.SourceInference.State.recordNode] using
+      substitutionExtends
+  have occursOwned : ∀ requirement, requirement ∈ owned →
+      PrimaryRequirementOccursAt evidenceSource
+        (.expression result.1.id) requirement := by
+    intro requirement member
+    apply retained recordedContains
+    simp [member]
+  have occursCoercion : ∀ requirement,
+      requirement ∈ coercionRequirementIds fitted.coercions →
+        PrimaryRequirementOccursAt evidenceSource
+          (.expression result.1.id) requirement := by
+    intro requirement member
+    apply retained recordedContains
+    change requirement ∈
+      owned ++ Detail.coercionRequirements fitted.coercions
+    apply List.mem_append_right owned
+    simpa [Detail.coercionRequirements, coercionRequirementIds] using member
+  have ownedValid : RequirementIdsValid active owned :=
+    ledger.requirementIdsValidAt ownership activeSignaturesEq
+      activeRequirementsEq assumptionsMono covered occursOwned
+  have path :=
+    withExpected_success_coercionPathValid_afterFinalization_scoped
+      fittedSuccess traitSuccess profileSuccess fittedRequirementsSubset
+      catalog contextValid signaturesEq traitName solveSuccess solvedEq ledger
+      ownership activeSignaturesEq activeRequirementsEq assumptionsMono covered
+      occursCoercion
+  have rawEndpointEq :
+      later.inference.substitution.apply (fitted.state.resolve rawType) =
+        later.inference.substitution.apply rawType :=
+    TypeSystem.InferState.apply_resolve_eq_apply fittedSubstitutionExtends
+      rawType
+  have finalPath : CoercionPathValid active
+      (later.inference.substitution.apply rawType)
+      (later.inference.substitution.apply result.1.type)
+      (fitted.coercions.map
+        (CoercionStep.applySubstitution later.inference.substitution)) := by
+    rw [resultExpressionEq, ← rawEndpointEq]
+    exact path
+  have requirementsEq :
+      owned ++ Detail.coercionRequirements fitted.coercions =
+      owned ++ coercionRequirementIds
+        (fitted.coercions.map
+          (CoercionStep.applySubstitution later.inference.substitution)) := by
+    rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
+    rfl
+  refine ExpressionTypingBase.intro (plan := .ordinary owned)
+    recordedContains (by rfl) ?_ rawAdmissible ?_
+  · simpa [ExpressionNode.applySubstitution] using formType
+  · exact ExpressionRequirementPlan.Valid.ordinary ownedValid finalPath
+      requirementsEq
+
+/-- Exact source extension is the common compatibility case of the
+occurrence-based ordinary recorder bridge. -/
 theorem recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped
     {inferenceContext : Frontend.SourceInference.Context}
     {source : Syntax.Expr} {id : ExpressionId}
@@ -20667,96 +20949,15 @@ theorem recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped
       (.expression result.1.id)) :
     ExpressionTypingBase (result.2.toTypedSource roots) ledgerSource active
       later.inference.substitution result.1 := by
-  obtain ⟨fitted, fittedSuccess, resultExpressionEq, resultStateEq⟩ :=
-    Detail.recordExpressionWithExpected_success_record success
-  have recordedContains : ContainsExpression
-      (result.2.toTypedSource roots) result.1.id {
-        id := result.1.id
-        span := source.span
-        type := result.1.type
-        form
-        requirements := owned ++
-          Detail.coercionRequirements fitted.coercions
-        coercions := fitted.coercions
-        localSchemeInstantiationStart
-      } := by
-    rw [resultExpressionEq, resultStateEq]
-    exact recordNode_containsExpression fitted.state _ roots
-  have finalContains : ContainsExpression ledgerSource result.1.id
-      (({
-        id := result.1.id
-        span := source.span
-        type := result.1.type
-        form
-        requirements := owned ++
-          Detail.coercionRequirements fitted.coercions
-        coercions := fitted.coercions
-        localSchemeInstantiationStart
-      } : ExpressionNode).applySubstitution
-        later.inference.substitution) :=
-    sourceExtension.containsExpression
-      (FlexibleSubstitution.ContainsExpression.applySubstitution
-        later.inference.substitution recordedContains)
-  have fittedRequirementsSubset :
-      fitted.state.requirements ⊆ later.requirements := by
-    intro requirement member
-    apply requirementsSubset
-    rw [resultStateEq]
-    exact member
-  have fittedSubstitutionExtends :
-      later.inference.substitution.SemanticallyExtends
-        fitted.state.inference.substitution := by
-    simpa [resultStateEq, Frontend.SourceInference.State.recordNode] using
-      substitutionExtends
-  have occursOwned : ∀ requirement, requirement ∈ owned →
-      PrimaryRequirementOccursAt ledgerSource
-        (.expression result.1.id) requirement := by
-    intro requirement member
-    apply finalContains.primaryRequirementOccursAt
-    simp [ExpressionNode.applySubstitution, member]
-  have occursCoercion : ∀ requirement,
-      requirement ∈ coercionRequirementIds fitted.coercions →
-        PrimaryRequirementOccursAt ledgerSource
-          (.expression result.1.id) requirement := by
-    intro requirement member
-    apply finalContains.primaryRequirementOccursAt
-    change requirement ∈
-      owned ++ Detail.coercionRequirements fitted.coercions
-    apply List.mem_append_right owned
-    simpa [Detail.coercionRequirements, coercionRequirementIds] using member
-  have ownedValid : RequirementIdsValid active owned :=
-    ledger.requirementIdsValidAt ownership activeSignaturesEq
-      activeRequirementsEq assumptionsMono covered occursOwned
-  have path :=
-    withExpected_success_coercionPathValid_afterFinalization_scoped
-      fittedSuccess traitSuccess profileSuccess fittedRequirementsSubset
-      catalog contextValid signaturesEq traitName solveSuccess solvedEq ledger
-      ownership activeSignaturesEq activeRequirementsEq assumptionsMono covered
-      occursCoercion
-  have rawEndpointEq :
-      later.inference.substitution.apply (fitted.state.resolve rawType) =
-        later.inference.substitution.apply rawType :=
-    TypeSystem.InferState.apply_resolve_eq_apply fittedSubstitutionExtends
-      rawType
-  have finalPath : CoercionPathValid active
-      (later.inference.substitution.apply rawType)
-      (later.inference.substitution.apply result.1.type)
-      (fitted.coercions.map
-        (CoercionStep.applySubstitution later.inference.substitution)) := by
-    rw [resultExpressionEq, ← rawEndpointEq]
-    exact path
-  have requirementsEq :
-      owned ++ Detail.coercionRequirements fitted.coercions =
-      owned ++ coercionRequirementIds
-        (fitted.coercions.map
-          (CoercionStep.applySubstitution later.inference.substitution)) := by
-    rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
-    rfl
-  refine ExpressionTypingBase.intro (plan := .ordinary owned)
-    recordedContains (by rfl) ?_ rawAdmissible ?_
-  · simpa [ExpressionNode.applySubstitution] using formType
-  · exact ExpressionRequirementPlan.Valid.ordinary ownedValid finalPath
-      requirementsEq
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      (semanticSource := ledgerSource) (evidenceSource := ledgerSource)
+      success substitutionExtends requirementsSubset
+      (ExpressionRequirementsRetainedAt.ofTypingSourceExtends
+        later.inference.substitution sourceExtension)
+      formType rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
 
 /-- Final result admissibility closes the reusable ordinary-recording base
 into the public expression-typing judgment. -/

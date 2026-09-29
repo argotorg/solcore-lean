@@ -689,6 +689,18 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionNodesPreservedAt.ofTypingSourceExtends
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionNodesPreservedAt.ofAttachExpressionCoercions_of_disjoint
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionRequirementsRetainedAt
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionRequirementsRetainedAt.ofTypingSourceExtends
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionRequirementsRetainedAt.monoBefore
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionRequirementsRetainedAt.ofAttachExpressionCoercions
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.argumentRequirementsRetainedAt_attachExpressionCoercions
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase.expressionHasType
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.argumentFitTrace_argumentCoercionsValid_afterFinalization_scoped
@@ -722,6 +734,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_success_expressionTypingBase_scoped
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_success_expressionHasType_scoped
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped
 example :=
