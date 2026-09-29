@@ -19136,15 +19136,15 @@ theorem
     (ExpressionNodesPreservedAt.ofTypingSourceExtends sourceExtension)
     finalAdmissible
 
-/-- The common soundness envelope for an ordinary expression-recording step.
+/-- The reusable soundness base for an ordinary expression-recording step.
 
 A shape-specific proof supplies only raw-form typing and admissibility.  This
-theorem transports the exact recorded node into the eventual source, validates
-both its owned requirements and fitted output-coercion requirements at that
-occurrence, and normalizes the raw endpoint with the final inference
-substitution.  The occurrence-scoped ledger keeps the result applicable inside
-generalized local initializers. -/
-theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
+theorem retains the exact recorded node, validates both its owned requirements
+and fitted output-coercion requirements at that occurrence, and normalizes the
+raw endpoint with the final inference substitution.  It deliberately defers
+admissibility of the stored result type until the surrounding traversal has
+closed its flexible variables. -/
+theorem recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped
     {inferenceContext : Frontend.SourceInference.Context}
     {source : Syntax.Expr} {id : ExpressionId}
     {rawType : TypeSystem.Ty} {form : ExpressionForm}
@@ -19174,8 +19174,6 @@ theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
       (later.inference.substitution.apply rawType) (.ordinary owned))
     (rawAdmissible : TypeAdmissible active
       (later.inference.substitution.apply rawType))
-    (finalAdmissible : TypeAdmissible active
-      (later.inference.substitution.apply result.1.type))
     (traitSuccess :
       Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
         .ok (some trait))
@@ -19200,8 +19198,8 @@ theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
     (assumptionsMono : base.assumptions ⊆ active.assumptions)
     (covered : TemplateScopeCovered ledgerSource active
       (.expression result.1.id)) :
-    ExpressionHasType ledgerSource active result.1.id
-      (later.inference.substitution.apply result.1.type) := by
+    ExpressionTypingBase (result.2.toTypedSource roots) ledgerSource active
+      later.inference.substitution result.1 := by
   obtain ⟨fitted, fittedSuccess, resultExpressionEq, resultStateEq⟩ :=
     Detail.recordExpressionWithExpected_success_record success
   have recordedContains : ContainsExpression
@@ -19273,21 +19271,95 @@ theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
         later.inference.substitution.apply rawType :=
     TypeSystem.InferState.apply_resolve_eq_apply fittedSubstitutionExtends
       rawType
-  apply ExpressionHasType.ofOrdinary finalContains formType rawAdmissible
-    finalAdmissible ownedValid
-  · change CoercionPathValid active
+  have finalPath : CoercionPathValid active
       (later.inference.substitution.apply rawType)
       (later.inference.substitution.apply result.1.type)
       (fitted.coercions.map
-        (CoercionStep.applySubstitution later.inference.substitution))
+        (CoercionStep.applySubstitution later.inference.substitution)) := by
     rw [resultExpressionEq, ← rawEndpointEq]
     exact path
-  · change owned ++ Detail.coercionRequirements fitted.coercions =
+  have requirementsEq :
+      owned ++ Detail.coercionRequirements fitted.coercions =
       owned ++ coercionRequirementIds
         (fitted.coercions.map
-          (CoercionStep.applySubstitution later.inference.substitution))
+          (CoercionStep.applySubstitution later.inference.substitution)) := by
     rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
     rfl
+  refine ExpressionTypingBase.intro (plan := .ordinary owned)
+    recordedContains (by rfl) ?_ rawAdmissible ?_
+  · simpa [ExpressionNode.applySubstitution] using formType
+  · exact ExpressionRequirementPlan.Valid.ordinary ownedValid finalPath
+      requirementsEq
+
+/-- Final result admissibility closes the reusable ordinary-recording base
+into the public expression-typing judgment. -/
+theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {id : ExpressionId}
+    {rawType : TypeSystem.Ty} {form : ExpressionForm}
+    {owned : List RequirementId} {expected : Option TypeSystem.Ty}
+    {state later : Frontend.SourceInference.State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.recordExpressionWithExpected inferenceContext source id
+      rawType form owned expected state localSchemeInstantiationStart =
+        .ok result)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (sourceExtension : TypingSourceExtends
+      ((result.2.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (formType : ExpressionFormHasRawType ledgerSource active
+      (form.applySubstitution later.inference.substitution)
+      (later.inference.substitution.apply rawType) (.ordinary owned))
+    (rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply rawType))
+    (finalAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply result.1.type))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered ledgerSource active
+      (.expression result.1.id)) :
+    ExpressionHasType ledgerSource active result.1.id
+      (later.inference.substitution.apply result.1.type) := by
+  have typingBase :=
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped
+      success substitutionExtends requirementsSubset sourceExtension formType
+      rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+  exact typingBase.expressionHasType
+    (ExpressionNodesPreservedAt.ofTypingSourceExtends sourceExtension)
+    finalAdmissible
 
 /-- Deep soundness of one constructor-application traversal at fixed child
 fuel.  Payload expressions are typed first in the source returned by their
