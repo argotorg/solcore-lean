@@ -1,5 +1,5 @@
 import Solcore
-/-! End-to-end regressions for the phase-10 public source compiler boundary. -/
+/-! End-to-end regressions for the public source compiler boundary. -/
 set_option autoImplicit false
 namespace Tests.SourceCompiler
 open Solcore Solcore.Frontend Solcore.TypeSystem
@@ -153,6 +153,36 @@ private def workspace : Workspace.RawWorkspace := {
   ]
   externalLibraries := []
 }
+
+/-- A compact raw-workspace fixture for automatic entry discovery, exported
+ABI discovery, re-export aliases, and mixed-backend multi-root compilation. -/
+private def orchestrationWorkspace : Workspace.RawWorkspace := {
+  entry := "api.solc"
+  mainSources := [
+    {
+      path := "api.solc"
+      content := String.intercalate "\n" [
+        "import {twice as doubled, recursive} from provider;",
+        "function main() returns (Word) { return 17; }",
+        "function local(value: Word) returns (Word) { return value + 1; }",
+        "function hidden(value: Word) returns (Word) { return value; }",
+        "export {doubled, local, recursive};"
+      ]
+    },
+    {
+      path := "provider.solc"
+      content := String.intercalate "\n" [
+        "function twice(value: Word) returns (Word) { return value * 2; }",
+        "function recursive(value: Word) returns (Word) {",
+        "  return value == 0 ? 31 : recursive(value - 1);",
+        "}",
+        "function providerOnly(value: Word) returns (Word) { return value; }",
+        "export {twice, recursive, providerOnly};"
+      ]
+    }
+  ]
+  externalLibraries := []
+}
 private def compilerOptions : CompileOptions :=
   { specializationBudget := 32, stagingFuel := 128 }
 private def runtimeOptions : RunOptions :=
@@ -169,6 +199,16 @@ private def compileNamed (checked : CheckedProgram) (path name : String) :
   | .ok compiled => pure compiled
   | .error error => throw (IO.userError
       s!"`{path}.{name}` failed compilation: {reprStr error}")
+private def compileNamedWithBackend (checked : CheckedProgram)
+    (path name : String) (preference : BackendPreference) :
+    IO CompiledEntry := do
+  let selectedModule ← moduleId path
+  let options := { compilerOptions with backendPreference := preference }
+  match compileChecked checked (Seed.named selectedModule name) options with
+  | .ok compiled => pure compiled
+  | .error error => throw (IO.userError
+      (s!"`{path}.{name}` failed compilation for {reprStr preference}: " ++
+        reprStr error))
 private def expectCoreWord (label : String) (expected : Nat) :
     Except RunError ExecutionResult → IO Unit
   | .ok (.core (.done (.word actual) [])) =>
@@ -209,12 +249,15 @@ private structure PreparedSet where
   checked : CheckedProgram
   direct : CompiledEntry
   recursive : CompiledEntry
+  recursiveGraph : CompiledEntry
   typed : CompiledEntry
 
 private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let checked ← checkedWorkspace
   let direct ← compileNamed checked "main.solc" "direct"
   let recursive ← compileNamed checked "main.solc" "recurse"
+  let recursiveGraph ← compileNamedWithBackend checked "main.solc" "recurse"
+    .callGraph
   let typed ← compileNamed checked "main.solc" "visibleAlias"
   let polymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
   let nestedPolymorphicLocal ←
@@ -229,7 +272,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
-      recursive.backend = .callGraph ∧
+      recursive.backend = .typedSource ∧
+      recursiveGraph.backend = .callGraph ∧
       typed.backend = .typedSource ∧
       polymorphicLocal.backend = .typedSource ∧
       nestedPolymorphicLocal.backend = .typedSource ∧
@@ -252,7 +296,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       typed.inputTypes = [.product .word .word] ∧ typed.resultType = .word))
     "backend-independent source signature metadata changed"
   assertTrue (direct.specializationCount == 1 &&
-      recursive.specializationCount == 1 && typed.specializationCount == 1)
+      recursive.specializationCount == 1 &&
+      recursiveGraph.specializationCount == 1 && typed.specializationCount == 1)
     "a single-function fixture retained an unexpected specialization plan"
   assertTrue (polymorphicLocal.specializationCount == 3)
     "local polymorphism did not retain its root and two generic helper instances"
@@ -329,8 +374,10 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "direct Core execution did not retain its supplied store"
   | result => throw (IO.userError
       s!"direct Core execution changed its exact state: {reprStr result}")
-  expectGraphWord "recursive graph root" 31 <|
-    recursive.runCore [.word (word 3)] runtimeOptions
+  expectTypedWord "automatic recursive typed root" 31 <|
+    recursive.runTyped [.word (word 3)] runtimeOptions
+  expectGraphWord "explicit recursive graph root" 31 <|
+    recursiveGraph.runCore [.word (word 3)] runtimeOptions
   expectTypedWord "imported alias typed root" 12 <|
     typed.runTyped [.product (.word (word 7)) (.word (word 8))] runtimeOptions
   match polymorphicLocal.runTyped [.bool true] runtimeOptions with
@@ -369,7 +416,193 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     typedCoercion.runTyped [.bool false] runtimeOptions
   expectTypedGlobal "public method-discovered function result" <|
     functionFromCoercion.runTyped [.word (word 1)] runtimeOptions
-  pure { checked, direct, recursive, typed }
+  pure { checked, direct, recursive, recursiveGraph, typed }
+
+/-- An explicit preference selects exactly the requested runtime, while all
+three executable backends agree on the same closed source computation. -/
+private def testExplicitBackendAgreement (checked : CheckedProgram) : IO Unit := do
+  let core ← compileNamedWithBackend checked "main.solc" "direct" .core
+  let graph ← compileNamedWithBackend checked "main.solc" "direct" .callGraph
+  let typed ← compileNamedWithBackend checked "main.solc" "direct" .typedSource
+  assertTrue (decide (core.backend = .core ∧
+      graph.backend = .callGraph ∧ typed.backend = .typedSource))
+    "an explicit backend preference selected a different runtime"
+  expectCoreWord "explicit direct-Core agreement" 14 <|
+    core.runCore [.word (word 7)] runtimeOptions
+  expectGraphWord "explicit call-graph agreement" 14 <|
+    graph.runCore [.word (word 7)] runtimeOptions
+  expectTypedWord "explicit typed-source agreement" 14 <|
+    typed.runTyped [.word (word 7)] runtimeOptions
+
+private def abiRootNamed (compiled : CompiledStaticWordProgram)
+    (name : String) : IO CompiledStaticWordRoot :=
+  match compiled.roots.find? fun root => root.metadata.name.text == name with
+  | some root => pure root
+  | none => throw (IO.userError s!"missing compiled ABI root `{name}`")
+
+/-- Exercise raw entry discovery, ordered/duplicate multi-root artifacts,
+mixed automatic backend selection, exported ABI aliases, and selector lookup. -/
+private def testProgramOrchestration : IO Unit := do
+  let api ← moduleId "api.solc"
+  let provider ← moduleId "provider.solc"
+  let entry ← match compileEntry orchestrationWorkspace with
+    | .ok entry => pure entry
+    | .error error => throw (IO.userError
+        s!"automatic main compilation failed: {reprStr error}")
+  assertTrue (entry.backend == .core && entry.inputTypes.isEmpty &&
+      entry.resultType == .word && entry.key.declaration.moduleId == api)
+    "automatic main discovery lost its entry module, signature, or backend"
+  expectCoreWord "automatic workspace main" 17 <|
+    entry.runCore [] runtimeOptions
+
+  let checked ← match checkProgram orchestrationWorkspace with
+    | .ok checked => pure checked
+    | .error errors => throw (IO.userError
+        s!"orchestration fixture failed checking: {reprStr errors}")
+  let requested := [
+    Seed.named provider "twice",
+    Seed.named provider "recursive",
+    Seed.named provider "twice"
+  ]
+  let many ← match compileManyChecked checked requested compilerOptions with
+    | .ok compiled => pure compiled
+    | .error error => throw (IO.userError
+        s!"checked multi-root compilation failed: {reprStr error}")
+  match many.entries with
+  | [first, second, third] =>
+      assertTrue (decide (many.count = 3 ∧
+          many.backends = [.core, .typedSource, .core] ∧
+          many.usesMixedBackends = true ∧
+          first.key = third.key ∧ first.key ≠ second.key))
+        "multi-root order, duplicates, or mixed backend selection changed"
+  | entries => throw (IO.userError
+      s!"multi-root compilation returned {entries.length} entries")
+  match compileManyChecked checked
+      [Seed.named provider "twice", Seed.named provider "missing"]
+      compilerOptions with
+  | .error failure =>
+      assertTrue (decide (failure.index = 1 ∧
+          failure.seed = Seed.named provider "missing"))
+        "multi-root failure lost its exact request position or seed"
+  | .ok _ => throw (IO.userError "missing second root compiled successfully")
+
+  let rawMany ← match compileMany orchestrationWorkspace requested with
+    | .ok compiled => pure compiled
+    | .error error => throw (IO.userError
+        s!"raw multi-root compilation failed: {reprStr error}")
+  assertTrue (rawMany.backends == [.core, .typedSource, .core] &&
+      rawMany.usesMixedBackends)
+    "raw compile-many did not preserve mixed per-root selection"
+
+  let abi ← match compileStaticWord orchestrationWorkspace with
+    | .ok compiled => pure compiled
+    | .error error => throw (IO.userError
+        s!"Static Word root compilation failed: {reprStr error}")
+  assertTrue (abi.count == 3 && abi.usesMixedBackends)
+    "Static Word discovery lost an exported root or mixed backend"
+  let doubled ← abiRootNamed abi "doubled"
+  let localRoot ← abiRootNamed abi "local"
+  let recursive ← abiRootNamed abi "recursive"
+  assertTrue (decide (
+      doubled.entry.key.declaration.moduleId = provider ∧
+      localRoot.entry.key.declaration.moduleId = api ∧
+      recursive.entry.key.declaration.moduleId = provider ∧
+      doubled.entry.backend = .core ∧ localRoot.entry.backend = .core ∧
+      recursive.entry.backend = .typedSource ∧
+      (abi.roots.find? fun root =>
+        root.metadata.name.text == "hidden").isNone ∧
+      (abi.roots.find? fun root =>
+        root.metadata.name.text == "providerOnly").isNone))
+    "ABI export/alias/module filtering or backend selection changed"
+  match abi.rootForSelector? doubled.metadata.selector with
+  | some selected =>
+      assertTrue (selected.metadata.name.text == "doubled")
+        "selector lookup returned a different ABI root"
+  | none => throw (IO.userError "selector lookup lost an admitted ABI root")
+  expectCoreWord "exported ABI alias" 14 <|
+    doubled.entry.runCore [.word (word 7)] runtimeOptions
+  expectCoreWord "exported local ABI root" 8 <|
+    localRoot.entry.runCore [.word (word 7)] runtimeOptions
+  expectTypedWord "exported recursive ABI root" 31 <|
+    recursive.entry.runTyped [.word (word 3)] runtimeOptions
+
+  let missingMain : Workspace.RawWorkspace := {
+    entry := "missing.solc"
+    mainSources := [{
+      path := "missing.solc"
+      content := "function helper() returns (Word) { return 0; }"
+    }]
+    externalLibraries := []
+  }
+  let missingModule ← moduleId "missing.solc"
+  match compileEntry missingMain with
+  | .error (.seed (.unknownName actual "main")) =>
+      assertTrue (actual == missingModule)
+        "automatic entry failure lost its canonical module"
+  | .error error => throw (IO.userError
+      s!"missing main changed diagnostic: {reprStr error}")
+  | .ok _ => throw (IO.userError "workspace without main compiled as an entry")
+
+  let invalidAbi : Workspace.RawWorkspace := {
+    entry := "bad.solc"
+    mainSources := [{
+      path := "bad.solc"
+      content := String.intercalate "\n" [
+        "function bad(value: Bool) returns (Word) { return value ? 1 : 0; }",
+        "export {bad};"
+      ]
+    }]
+    externalLibraries := []
+  }
+  match compileStaticWord invalidAbi with
+  | .error (.discovery (.unsupportedParameters _ "bad" [.bool] [false])) =>
+      pure ()
+  | .error error => throw (IO.userError
+      s!"unsupported ABI signature changed diagnostic: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "unsupported Bool ABI parameter was silently accepted")
+
+  let duplicateAbi : Workspace.RawWorkspace := {
+    entry := "duplicate.solc"
+    mainSources := [{
+      path := "duplicate.solc"
+      content := String.intercalate "\n" [
+        "function same(value: Word) returns (Word) { return value; }",
+        "function same(value: Word) returns (Word) { return value + 1; }",
+        "export {same};"
+      ]
+    }]
+    externalLibraries := []
+  }
+  match compileStaticWord duplicateAbi with
+  | .error (.discovery
+      (.duplicateSignature "same" "same" "same(uint256)")) => pure ()
+  | .error error => throw (IO.userError
+      s!"duplicate ABI signature changed diagnostic: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "duplicate ABI signatures were silently accepted")
+
+  let collisionAbi : Workspace.RawWorkspace := {
+    entry := "collision.solc"
+    mainSources := [{
+      path := "collision.solc"
+      content := String.intercalate "\n" [
+        "function f116643(value: Word) returns (Word) { return value; }",
+        "function f38491(value: Word) returns (Word) { return value; }",
+        "export {f38491, f116643};"
+      ]
+    }]
+    externalLibraries := []
+  }
+  match compileStaticWord collisionAbi with
+  | .error (.discovery (.selectorCollision
+      "f116643" "f38491" "f116643(uint256)" "f38491(uint256)" selector)) =>
+      assertTrue (selector.toUInt32.toNat == 0x77dbd42e)
+        "ABI collision diagnostic lost its canonical selector"
+  | .error error => throw (IO.userError
+      s!"ABI selector collision changed diagnostic: {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "colliding ABI selectors were silently accepted")
 
 private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
   let pair : SourceTypedRuntime.Value :=
@@ -408,7 +641,7 @@ private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
   | .error (.invocationKindMismatch .core .typedValues) => pure ()
   | result => throw (IO.userError
       s!"a typed invocation crossed the direct Core backend: {reprStr result}")
-  match prepared.recursive.runTyped [] runtimeOptions with
+  match prepared.recursiveGraph.runTyped [] runtimeOptions with
   | .error (.invocationKindMismatch .callGraph .typedValues) => pure ()
   | result => throw (IO.userError
       s!"a typed invocation crossed the graph backend: {reprStr result}")
@@ -456,17 +689,26 @@ private def testOneShotLimits : IO Unit := do
 
 private def testAllBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
   let blocked ← moduleId "blocked.solc"
+  let main ← moduleId "main.solc"
+  let coreOptions := {
+    compilerOptions with backendPreference := .core
+  }
+  match compileChecked checked (Seed.named main "recurse") coreOptions with
+  | .error (.backendRejected (.core _)) => pure ()
+  | .error error => throw (IO.userError
+      s!"forced Core rejection changed category: {reprStr error}")
+  | .ok compiled => throw (IO.userError
+      s!"forced Core silently fell through to {reprStr compiled.backend}")
   match compileChecked checked (Seed.named blocked "blocked") compilerOptions with
-  | .error (.noBackend failures) =>
-      match failures.direct with
+  | .error (.noBackend [
+      .core directError,
+      .typedSource typedSourceError
+    ]) =>
+      match directError with
       | .sourceCore _ => pure ()
       | error => throw (IO.userError
           s!"direct rejection lost its source-Core category: {reprStr error}")
-      match failures.callGraph with
-      | .unsupportedType _ => pure ()
-      | error => throw (IO.userError
-          s!"graph rejection lost its unsupported-type category: {reprStr error}")
-      match failures.typedSource with
+      match typedSourceError with
       | .executableCoercionMethod _ _ _
           (.missingTraitMethod _ "coerce") => pure ()
       | error => throw (IO.userError
@@ -475,12 +717,24 @@ private def testAllBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
       s!"all-backend rejection changed category: {reprStr error}")
   | .ok compiled => throw (IO.userError
       s!"an unsupported root selected {reprStr compiled.backend}")
+  let graphOptions := {
+    compilerOptions with backendPreference := .callGraph
+  }
+  match compileChecked checked (Seed.named blocked "blocked") graphOptions with
+  | .error (.backendRejected (.callGraph (.unsupportedType _))) => pure ()
+  | .error error => throw (IO.userError
+      s!"explicit graph rejection changed category: {reprStr error}")
+  | .ok compiled => throw (IO.userError
+      s!"an unsupported explicit graph root selected {reprStr compiled.backend}")
 
 private def typedRejection (checked : CheckedProgram) (name : String) :
     IO SourceTypedRuntime.RuntimeError := do
   let blocked ← moduleId "blocked.solc"
-  match compileChecked checked (Seed.named blocked name) compilerOptions with
-  | .error (.noBackend failures) => pure failures.typedSource
+  let typedOptions := {
+    compilerOptions with backendPreference := .typedSource
+  }
+  match compileChecked checked (Seed.named blocked name) typedOptions with
+  | .error (.backendRejected (.typedSource error)) => pure error
   | .error error => throw (IO.userError
       s!"`{name}` changed rejection stage: {reprStr error}")
   | .ok compiled => throw (IO.userError
@@ -612,16 +866,18 @@ private def testCheckingFailurePrecedence : IO Unit := do
   | .ok compiled => throw (IO.userError
       s!"malformed source selected {reprStr compiled.backend}")
 
-/-- Exercise compile-once reuse, three-way selection, exact results, staged
-typed execution, and the phase-10 public-boundary hardening matrix. -/
+/-- Exercise compile-once reuse, exact backend selection, whole-program root
+discovery, exact results, staged execution, and public-boundary hardening. -/
 def testSourceCompiler : IO Unit := do
   let prepared ← testCheckedReuseAndPrecedence
+  testExplicitBackendAgreement prepared.checked
+  testProgramOrchestration
   testTypedBoundary prepared
   testOneShotLimits
   testAllBackendDiagnostics prepared.checked
   testTypedCapabilityBoundary prepared.checked
   testPublicCompilationErrors prepared.checked
   testCheckingFailurePrecedence
-  IO.println "phase-10 public source compiler hardening GREEN"
+  IO.println "public source compiler integration GREEN"
 
 end Tests.SourceCompiler

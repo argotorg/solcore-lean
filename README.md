@@ -21,7 +21,7 @@ is the independent, proof-facing specification of resolved source programs.
 | [`Solcore.Syntax`](Solcore/Syntax.lean) | Source-preserving AST, lexer, parser, diagnostics, declarative grammars, and parser correctness properties. |
 | [`Solcore.Resolved`](Solcore/Resolved.lean) | Small already-resolved local-expression semantics with scope, typing, evaluation, renaming, lowering, and Core correspondence. It is not the whole-program name resolver. |
 | [`Solcore.TypeSystem`](Solcore/TypeSystem.lean) | Source types, substitutions, first-order unification, rank-1 schemes, inference state, and their basic properties. |
-| [`Solcore.Frontend.Current`](Solcore/Frontend/Current.lean) | Preferred executable whole-program entry: loading, resolution, inference, staging, specialization, linking, backend selection, and execution. |
+| [`Solcore.Frontend.Current`](Solcore/Frontend/Current.lean) | Preferred executable whole-program entry: loading, resolution, inference, staging, specialization, linking, reusable compilation, root discovery, backend selection, and execution. |
 | [`Solcore.Frontend`](Solcore/Frontend.lean) | Compatibility facade containing `Frontend.Current` and the older focused adapters under `Frontend.Fragments`. |
 | [`Solcore.SourceSemantics`](Solcore/SourceSemantics.lean) | Algorithm-independent static, staging, dynamic, fault, substitution, and preservation judgments for resolved typed source. |
 | [`Solcore.Core`](Solcore/Core.lean) | Typed Semantic Core syntax, stores, evaluator and machines, primitives, checker, runners, safety, and correspondence theorems. |
@@ -61,6 +61,24 @@ values execute arithmetic, comparisons, complement, and bitwise operations.
 Public result typing uses the complete prepared plan, including first-class
 globals discovered only inside a selected operator or coercion method.
 
+The public source compiler now owns the initial orchestration policy. Automatic
+selection tries direct Semantic Core first and the typed-source runtime second;
+the finite `callGraph` runtime is retained only as an explicitly requested
+compatibility and differential-testing backend. A backend preference can force
+any exact backend, and automatic exhaustion and explicit-backend rejection use
+one backend-tagged diagnostic carrier. Raw-workspace helpers can select the
+conventional `main` entry automatically, while ordered compile-many preserves
+the requested root order and permits different roots to select different
+backends.
+
+Initial Static Word ABI discovery is also executable. Every function explicitly
+exported by the workspace entry module is treated as an intended endpoint and
+must resolve to an executable, top-level, ground `Word -> Word` function;
+unsupported exported functions are rejected rather than silently omitted.
+These roots are source functions, not yet contract public members;
+contract-member visibility and ABI integration remain a separate language
+boundary.
+
 ## Priority implementation
 
 - Generalize evidence passing beyond ground, self-resolved public roots to
@@ -75,9 +93,11 @@ globals discovered only inside a selected operator or coercion method.
   that access path. The current upstream source syntax has no general value
   member projection; the latent typed-IR member form is therefore not exposed
   as invented source syntax.
-- Complete public compiler orchestration: automatic entry and ABI-root
-  discovery, multi-root and mixed-backend compilation, backend override, and
-  serialization of source values, closures, heaps, and results.
+- Add stable serialization for source values, closures, heaps, backend-tagged
+  results, and the reusable compiler boundary.
+- Integrate ABI discovery with true contract public-member declarations and
+  visibility. The current Static Word scan deliberately covers only executable
+  top-level functions explicitly exported by the entry module.
 
 ## Proof and specification work
 
@@ -89,6 +109,9 @@ globals discovered only inside a selected operator or coercion method.
 - Complete general progress and determinism results, exhaustive fault
   classification, divergence/fuel correspondence, backend-uniform deep
   preservation, plan-validator completeness, and aggregate work bounds.
+- Lift the existing single-root provenance and preservation certificates
+  through automatic-entry, compile-many, and exported Static Word aggregate
+  artifacts.
 
 ## Optional scope extensions
 

@@ -6,15 +6,20 @@ import Solcore.Frontend.SourceRuntimeDeepProperties
 import Solcore.Core.Safety
 import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceRuntimeEntryDeepProperties
+import Solcore.Frontend.ProgramInterfaces
+import Solcore.Abi.StaticWord
 
 /-!
 The restricted public source compiler boundary.
 
-Compilation checks a raw workspace, resolves one explicit ground root,
-discovers its finite specialization plan, and selects the first executable
-backend in this fixed order: direct Core, the structural runtime call graph,
-then the source-typed runtime.  The resulting artifact can be run repeatedly
-without repeating checking or specialization.
+Single-root compilation resolves a ground root and discovers its finite
+specialization plan.  The whole-program facade can also discover conventional
+`main` and exported Static Word ABI roots, or compile an ordered explicit root
+set after checking the workspace once.  Automatic selection prefers direct
+Core and otherwise uses the source-typed runtime.  Clients may instead request
+an exact backend; the structural runtime call graph remains available through
+that explicit preference for compatibility testing and comparison.  Resulting
+artifacts can be run repeatedly without repeating checking or specialization.
 
 Core stores/values and source-typed heaps/values are intentionally separate
 invocation carriers.  This boundary does not guess a conversion between them.
@@ -29,10 +34,39 @@ open TypeSystem
 abbrev SeedTarget := SourceProgramExecution.SeedTarget
 abbrev Seed := SourceProgramExecution.Seed
 
+/-- The exact runtime selected for a compiled root. -/
+inductive Backend where
+  | core
+  | callGraph
+  | typedSource
+  deriving Repr, BEq, DecidableEq
+
+/-- Backend policy for one compilation.  Automatic selection deliberately
+keeps the legacy Core path first but otherwise chooses the broader typed-source
+runtime.  The finite call graph is retained as an explicit comparison target. -/
+inductive BackendPreference where
+  | automatic
+  | core
+  | callGraph
+  | typedSource
+  deriving Repr, BEq, DecidableEq
+
+namespace BackendPreference
+
+/-- The exact backend requested by a non-automatic preference. -/
+def requested? : BackendPreference → Option Backend
+  | .automatic => none
+  | .core => some .core
+  | .callGraph => some .callGraph
+  | .typedSource => some .typedSource
+
+end BackendPreference
+
 /-- Bounds used after whole-program checking has already succeeded. -/
 structure CompileOptions where
   specializationBudget : Nat := 1024
   stagingFuel : Nat := 1024
+  backendPreference : BackendPreference := .automatic
   deriving Repr, DecidableEq
 
 /-- Raw-workspace compilation adds an independent checking bound. -/
@@ -64,19 +98,23 @@ def named (moduleId : Workspace.ModuleId) (name : String)
 
 end Seed
 
-/-- The exact runtime selected for a compiled root. -/
-inductive Backend where
-  | core
-  | callGraph
-  | typedSource
-  deriving Repr, BEq, DecidableEq
-
-/-- All three rejection reasons when no runtime can execute a canonical plan. -/
-structure BackendFailures where
-  direct : SourceCoreDirectLinking.Error
-  callGraph : SourceRuntimeLinking.Error
-  typedSource : SourceTypedRuntime.RuntimeError
+/-- One backend's exact rejection reason.  Both automatic exhaustion and an
+explicit preference use this common carrier, so clients need only one
+diagnostic traversal. -/
+inductive BackendRejection where
+  | core (error : SourceCoreDirectLinking.Error)
+  | callGraph (error : SourceRuntimeLinking.Error)
+  | typedSource (error : SourceTypedRuntime.RuntimeError)
   deriving Repr
+
+namespace BackendRejection
+
+def backend : BackendRejection → Backend
+  | .core _ => .core
+  | .callGraph _ => .callGraph
+  | .typedSource _ => .typedSource
+
+end BackendRejection
 
 /-- Stage-preserving compilation failures. -/
 inductive CompileError where
@@ -93,7 +131,8 @@ inductive CompileError where
   | publicCoreResultProjection (error : SourceCoreElaboration.Error)
   | publicCoreResultMismatch (expected actual : Core.Ty)
   | publicGraphResultMismatch (expected actual : Ty)
-  | noBackend (failures : BackendFailures)
+  | noBackend (rejections : List BackendRejection)
+  | backendRejected (rejection : BackendRejection)
   deriving Repr
 
 /-- Backend-specific payload retained behind the compiled artifact's private
@@ -103,6 +142,11 @@ private inductive Executable where
   | callGraph (entry : SourceRuntimeLinking.LinkedEntry)
   | typedSource
   deriving Repr
+
+private def Executable.backend : Executable → Backend
+  | .core _ => .core
+  | .callGraph _ => .callGraph
+  | .typedSource => .typedSource
 
 private def Executable.HasPublicResultProjection
     (root : SourceSpecialization.SpecializedFunction) : Executable → Prop
@@ -455,7 +499,7 @@ private theorem exactRoot_specializations
     next roots rootsEqual => cases accepted
   next keys seedKeysEqual => cases accepted
 
-private def selectBackend (program : CheckedProgram)
+private def selectCoreBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat) :
     Except CompileError Executable :=
   let complete : SourceSpecializationWorklist.Outcome := .complete plan
@@ -465,56 +509,199 @@ private def selectBackend (program : CheckedProgram)
       match linked.entries with
       | [entry] => .ok (.core entry)
       | entries => .error (.backendEntryCountMismatch .core entries.length)
-  | .error directError =>
-      match SourceRuntimeLinking.link program complete with
-      | .ok linked =>
-          match linked.entries with
-          | [entry] => .ok (.callGraph entry)
-          | entries => .error
-              (.backendEntryCountMismatch .callGraph entries.length)
-      | .error callGraphError =>
-          match SourceTypedRuntime.validateExecutablePlanEvidence program plan with
-          | .ok _ => .ok .typedSource
-          | .error typedSourceError => .error (.noBackend {
-              direct := directError
-              callGraph := callGraphError
-              typedSource := typedSourceError
-            })
+  | .error error => .error (.backendRejected (.core error))
+
+private def selectCallGraphBackend (program : CheckedProgram)
+    (plan : SourceSpecializationWorklist.Plan) :
+    Except CompileError Executable :=
+  let complete : SourceSpecializationWorklist.Outcome := .complete plan
+  match SourceRuntimeLinking.link program complete with
+  | .ok linked =>
+      match linked.entries with
+      | [entry] => .ok (.callGraph entry)
+      | entries => .error
+          (.backendEntryCountMismatch .callGraph entries.length)
+  | .error error => .error (.backendRejected (.callGraph error))
+
+private def selectTypedSourceBackend (program : CheckedProgram)
+    (plan : SourceSpecializationWorklist.Plan) :
+    Except CompileError Executable :=
+  match SourceTypedRuntime.validateExecutablePlanEvidence program plan with
+  | .ok _ => .ok .typedSource
+  | .error error => .error (.backendRejected (.typedSource error))
+
+private def selectBackend (program : CheckedProgram)
+    (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat)
+    (preference : BackendPreference) : Except CompileError Executable :=
+  match preference with
+  | .core => selectCoreBackend program plan stagingFuel
+  | .callGraph => selectCallGraphBackend program plan
+  | .typedSource => selectTypedSourceBackend program plan
+  | .automatic =>
+      match selectCoreBackend program plan stagingFuel with
+      | .ok executable => .ok executable
+      | .error (.backendRejected (.core directError)) =>
+          match selectTypedSourceBackend program plan with
+          | .ok executable => .ok executable
+          | .error (.backendRejected (.typedSource typedSourceError)) =>
+              .error (.noBackend [
+                .core directError,
+                .typedSource typedSourceError
+              ])
+          | .error error => .error error
+      | .error error => .error error
+
+private theorem selectCoreBackend_success_backend
+    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (stagingFuel : Nat) (executable : Executable)
+    (selected : selectCoreBackend program plan stagingFuel = .ok executable) :
+    executable.backend = .core := by
+  unfold selectCoreBackend at selected
+  cases linkedResult : SourceCoreDirectLinking.linkWithStagingFuel program
+      (.complete plan) stagingFuel with
+  | error error => simp [linkedResult] at selected
+  | ok linked =>
+      cases entries : linked.entries with
+      | nil => simp [linkedResult, entries] at selected
+      | cons entry rest =>
+          cases rest with
+          | nil =>
+              simp [linkedResult, entries] at selected
+              cases selected
+              rfl
+          | cons another tail =>
+              simp [linkedResult, entries] at selected
+
+private theorem selectCallGraphBackend_success_backend
+    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (executable : Executable)
+    (selected : selectCallGraphBackend program plan = .ok executable) :
+    executable.backend = .callGraph := by
+  unfold selectCallGraphBackend at selected
+  cases linkedResult : SourceRuntimeLinking.link program (.complete plan) with
+  | error error => simp [linkedResult] at selected
+  | ok linked =>
+      cases entries : linked.entries with
+      | nil => simp [linkedResult, entries] at selected
+      | cons entry rest =>
+          cases rest with
+          | nil =>
+              simp [linkedResult, entries] at selected
+              cases selected
+              rfl
+          | cons another tail =>
+              simp [linkedResult, entries] at selected
+
+private theorem selectTypedSourceBackend_success_backend
+    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (executable : Executable)
+    (selected : selectTypedSourceBackend program plan = .ok executable) :
+    executable.backend = .typedSource := by
+  cases validated : SourceTypedRuntime.validateExecutablePlanEvidence program
+      plan with
+  | error error =>
+      simp [selectTypedSourceBackend, validated] at selected
+  | ok value =>
+      cases value
+      have executableEq : executable = .typedSource := by
+        simpa [selectTypedSourceBackend, validated] using selected.symm
+      subst executable
+      rfl
+
+private theorem selectTypedSourceBackend_success_validation
+    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (executable : Executable)
+    (selected : selectTypedSourceBackend program plan = .ok executable) :
+    SourceTypedRuntime.validateExecutablePlanEvidence program plan = .ok () := by
+  cases validated : SourceTypedRuntime.validateExecutablePlanEvidence program
+      plan with
+  | error error =>
+      simp [selectTypedSourceBackend, validated] at selected
+  | ok value =>
+      cases value
+      rfl
+
+/-- An explicit backend preference cannot silently fall through to another
+runtime. -/
+private theorem selectBackend_backend_of_preference
+    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (stagingFuel : Nat) (preference : BackendPreference)
+    (backend : Backend) (executable : Executable)
+    (requested : preference.requested? = some backend)
+    (selected : selectBackend program plan stagingFuel preference =
+      .ok executable) :
+    executable.backend = backend := by
+  cases preference with
+  | automatic => simp [BackendPreference.requested?] at requested
+  | core =>
+      have backendEq : backend = .core := by
+        simpa [BackendPreference.requested?] using requested.symm
+      subst backend
+      exact selectCoreBackend_success_backend program plan stagingFuel
+        executable (by simpa [selectBackend] using selected)
+  | callGraph =>
+      have backendEq : backend = .callGraph := by
+        simpa [BackendPreference.requested?] using requested.symm
+      subst backend
+      exact selectCallGraphBackend_success_backend program plan executable
+        (by simpa [selectBackend] using selected)
+  | typedSource =>
+      have backendEq : backend = .typedSource := by
+        simpa [BackendPreference.requested?] using requested.symm
+      subst backend
+      exact selectTypedSourceBackend_success_backend program plan executable
+        (by simpa [selectBackend] using selected)
+
+private theorem selectBackend_automatic_typed_source
+    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (stagingFuel : Nat)
+    (selected : selectBackend program plan stagingFuel .automatic =
+      .ok .typedSource) :
+    selectTypedSourceBackend program plan = .ok .typedSource := by
+  cases direct : SourceCoreDirectLinking.linkWithStagingFuel program
+      (.complete plan) stagingFuel with
+  | error error =>
+      cases validated : SourceTypedRuntime.validateExecutablePlanEvidence
+          program plan with
+      | ok value =>
+          cases value
+          simp [selectTypedSourceBackend, validated]
+      | error typedError =>
+          simp [selectBackend, selectCoreBackend, direct,
+            selectTypedSourceBackend, validated] at selected
+  | ok linked =>
+      cases entries : linked.entries with
+      | nil =>
+          simp [selectBackend, selectCoreBackend, direct, entries] at selected
+      | cons entry rest =>
+          cases rest with
+          | nil =>
+              simp [selectBackend, selectCoreBackend, direct, entries] at selected
+          | cons another tail =>
+              simp [selectBackend, selectCoreBackend, direct, entries] at selected
 
 private theorem selectBackend_typed_plan
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
-    (stagingFuel : Nat)
-    (selected : selectBackend program plan stagingFuel = .ok .typedSource) :
+    (stagingFuel : Nat) (preference : BackendPreference)
+    (selected : selectBackend program plan stagingFuel preference =
+      .ok .typedSource) :
     SourceTypedRuntime.validateExecutablePlanEvidence program plan = .ok () := by
-  cases direct : SourceCoreDirectLinking.linkWithStagingFuel program
-      (.complete plan) stagingFuel with
-  | ok linked =>
-      cases entries : linked.entries with
-      | nil => simp [selectBackend, direct, entries] at selected
-      | cons entry rest =>
-          cases rest with
-          | nil => simp [selectBackend, direct, entries] at selected
-          | cons another tail =>
-              simp [selectBackend, direct, entries] at selected
-  | error directError =>
-      cases graph : SourceRuntimeLinking.link program (.complete plan) with
-      | ok linked =>
-          cases entries : linked.entries with
-          | nil => simp [selectBackend, direct, graph, entries] at selected
-          | cons entry rest =>
-              cases rest with
-              | nil =>
-                  simp [selectBackend, direct, graph, entries] at selected
-              | cons another tail =>
-                  simp [selectBackend, direct, graph, entries] at selected
-      | error graphError =>
-          cases validated : SourceTypedRuntime.validateExecutablePlanEvidence
-              program plan with
-          | ok value =>
-              cases value
-              rfl
-          | error error =>
-              simp [selectBackend, direct, graph, validated] at selected
+  cases preference with
+  | core =>
+      have impossible := selectCoreBackend_success_backend program plan
+        stagingFuel .typedSource (by simpa [selectBackend] using selected)
+      cases impossible
+  | callGraph =>
+      have impossible := selectCallGraphBackend_success_backend program plan
+        .typedSource (by simpa [selectBackend] using selected)
+      cases impossible
+  | typedSource =>
+      exact selectTypedSourceBackend_success_validation program plan
+        .typedSource (by simpa [selectBackend] using selected)
+  | automatic =>
+      exact selectTypedSourceBackend_success_validation program plan
+        .typedSource
+        (selectBackend_automatic_typed_source program plan stagingFuel selected)
 
 /-- Guard the public result signature against an inconsistent linker payload.
 The graph entry separately certifies projection from its source type to its
@@ -582,6 +769,7 @@ def compileChecked (program : CheckedProgram) (seed : Seed)
     |>.mapError CompileError.invalidPlan
   let root ← exactRoot plan
   let executable ← selectBackend program plan options.stagingFuel
+    options.backendPreference
   validatePublicResultType root executable
   pure ⟨program, plan, root, executable⟩
 
@@ -626,7 +814,7 @@ theorem compileChecked_program
                   | ok root =>
                       rw [selected] at compiledOk
                       cases backend : selectBackend program plan
-                          options.stagingFuel with
+                          options.stagingFuel options.backendPreference with
                       | error error =>
                           rw [backend] at compiledOk
                           cases compiledOk
@@ -642,6 +830,70 @@ theorem compileChecked_program
                               rw [publicResult] at compiledOk
                               cases compiledOk
                               rfl
+
+/-- An exact backend preference is authoritative: successful compilation never
+falls through to a different runtime.  Automatic selection has no requested
+backend and therefore cannot satisfy the premise. -/
+theorem compileChecked_backend_of_preference
+    (program : CheckedProgram) (seed : Seed) (options : CompileOptions)
+    (compiled : CompiledEntry) (backend : Backend)
+    (requested : options.backendPreference.requested? = some backend)
+    (compiledOk : compileChecked program seed options = .ok compiled) :
+    compiled.backend = backend := by
+  unfold compileChecked at compiledOk
+  cases seedResult : SourceProgramExecution.resolveSeed program seed with
+  | error error =>
+      rw [seedResult] at compiledOk
+      cases compiledOk
+  | ok request =>
+      rw [seedResult] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      cases worklist : SourceSpecializationWorklist.run program [request]
+          options.specializationBudget with
+      | error error =>
+          rw [worklist] at compiledOk
+          cases compiledOk
+      | ok outcome =>
+          rw [worklist] at compiledOk
+          cases outcome with
+          | budgetExhausted plan next pending =>
+              cases compiledOk
+          | complete plan =>
+              simp only [pure, Pure.pure, Except.pure] at compiledOk
+              cases valid : SourceCoreDirectLinking.validatePlan program plan with
+              | error error =>
+                  rw [valid] at compiledOk
+                  cases compiledOk
+              | ok checked =>
+                  rw [valid] at compiledOk
+                  cases selected : exactRoot plan with
+                  | error error =>
+                      rw [selected] at compiledOk
+                      cases compiledOk
+                  | ok root =>
+                      rw [selected] at compiledOk
+                      cases backendSelection : selectBackend program plan
+                          options.stagingFuel options.backendPreference with
+                      | error error =>
+                          rw [backendSelection] at compiledOk
+                          cases compiledOk
+                      | ok executable =>
+                          have exactBackend :=
+                            selectBackend_backend_of_preference program plan
+                              options.stagingFuel options.backendPreference
+                              backend executable requested backendSelection
+                          rw [backendSelection] at compiledOk
+                          simp at compiledOk
+                          cases publicResult : validatePublicResultType root
+                              executable with
+                          | error error =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                          | ok checkedResult =>
+                              rw [publicResult] at compiledOk
+                              cases compiledOk
+                              simpa [CompiledEntry.backend,
+                                Executable.backend] using exactBackend
 
 /-- Every artifact returned by the public checked compilation path retains its
 root as the unique specialization selected by the canonical seed key. -/
@@ -683,7 +935,7 @@ theorem compileChecked_hasCanonicalRoot
                   | ok root =>
                       rw [selected] at compiledOk
                       cases backend : selectBackend program plan
-                          options.stagingFuel with
+                          options.stagingFuel options.backendPreference with
                       | error error =>
                           rw [backend] at compiledOk
                           cases compiledOk
@@ -741,7 +993,7 @@ theorem compileChecked_hasValidatedTypedPlan
                   | ok root =>
                       rw [selected] at compiledOk
                       cases backendSelected : selectBackend program plan
-                          options.stagingFuel with
+                          options.stagingFuel options.backendPreference with
                       | error error =>
                           rw [backendSelected] at compiledOk
                           cases compiledOk
@@ -763,10 +1015,11 @@ theorem compileChecked_hasValidatedTypedPlan
                                   simp [CompiledEntry.backend] at typedBackend
                               | typedSource =>
                                   exact selectBackend_typed_plan program plan
-                                    options.stagingFuel backendSelected
+                                    options.stagingFuel options.backendPreference
+                                    backendSelected
 
 /-- The public result type is certified against the backend selected by every
-successful checked compilation, including fallback to the finite graph. -/
+successful checked compilation, including every explicit backend preference. -/
 theorem compileChecked_hasPublicResultProjection
     (program : CheckedProgram) (seed : Seed) (options : CompileOptions)
     (compiled : CompiledEntry)
@@ -805,7 +1058,7 @@ theorem compileChecked_hasPublicResultProjection
                   | ok root =>
                       rw [selected] at compiledOk
                       cases backend : selectBackend program plan
-                          options.stagingFuel with
+                          options.stagingFuel options.backendPreference with
                       | error error =>
                           rw [backend] at compiledOk
                           cases compiledOk
@@ -876,7 +1129,7 @@ theorem compileChecked_key_of_resolved (program : CheckedProgram) (seed : Seed)
                     simpa [rootSeeds] using seeds
                   rw [selected] at compiledOk
                   cases executable : selectBackend program plan
-                      options.stagingFuel with
+                      options.stagingFuel options.backendPreference with
                   | error error =>
                       rw [executable] at compiledOk
                       cases compiledOk
@@ -899,6 +1152,27 @@ def compile (raw : Workspace.RawWorkspace) (seed : Seed)
   let program ← (checkProgram raw options.checkingFuel).mapError
     CompileError.checking
   compileChecked program seed options.toCompileOptions
+
+/-- Raw-workspace compilation preserves the same exact-backend preference as
+the checked-program entry point. -/
+theorem compile_backend_of_preference
+    (raw : Workspace.RawWorkspace) (seed : Seed) (options : CheckingOptions)
+    (compiled : CompiledEntry) (backend : Backend)
+    (requested : options.backendPreference.requested? = some backend)
+    (compiledOk : compile raw seed options = .ok compiled) :
+    compiled.backend = backend := by
+  unfold compile at compiledOk
+  cases checked : checkProgram raw options.checkingFuel with
+  | error errors =>
+      rw [checked] at compiledOk
+      cases compiledOk
+  | ok program =>
+      rw [checked] at compiledOk
+      simp only [Except.mapError, bind, Except.bind] at compiledOk
+      apply compileChecked_backend_of_preference program seed
+        options.toCompileOptions compiled backend
+      · simpa using requested
+      · exact compiledOk
 
 /-- Raw compilation records an actual successful source-checker run.  The
 checked-program entry point deliberately has no corresponding unconditional
@@ -938,6 +1212,346 @@ theorem compile_hasValidatedTypedPlan
       simp only [Except.mapError, bind, Except.bind] at compiledOk
       exact compileChecked_hasValidatedTypedPlan program seed
         options.toCompileOptions compiled compiledOk typedBackend
+
+/-!
+## Whole-program orchestration
+
+The single-root compiler above remains the primitive operation.  The public
+program boundary below checks a workspace once and then compiles each requested
+root independently.  Independent root plans are intentional: they preserve
+per-root backend selection, so one artifact may contain both direct-Core and
+typed-source entries without forcing all roots onto the least common backend.
+-/
+
+/-- The exact root whose compilation failed in an ordered multi-root request. -/
+structure RootCompileError where
+  index : Nat
+  seed : Seed
+  error : CompileError
+  deriving Repr
+
+/-- A sealed ordered collection of independently compiled public roots. -/
+structure CompiledProgram where private mk ::
+  private compiledEntries : List CompiledEntry
+
+namespace CompiledProgram
+
+/-- Compiled entries in caller-supplied order, including repeated roots. -/
+def entries (compiled : CompiledProgram) : List CompiledEntry :=
+  compiled.compiledEntries
+
+/-- Number of requested roots retained by the artifact. -/
+def count (compiled : CompiledProgram) : Nat :=
+  compiled.compiledEntries.length
+
+/-- Selected backend of every root, in the same stable order. -/
+def backends (compiled : CompiledProgram) : List Backend :=
+  compiled.compiledEntries.map CompiledEntry.backend
+
+/-- Whether successful automatic selection used more than one backend. -/
+def usesMixedBackends (compiled : CompiledProgram) : Bool :=
+  decide (compiled.backends.eraseDups.length > 1)
+
+/-- Lookup by the zero-based request position. -/
+def entry? (compiled : CompiledProgram) (index : Nat) : Option CompiledEntry :=
+  compiled.compiledEntries[index]?
+
+end CompiledProgram
+
+private def compileRootsFrom (program : CheckedProgram)
+    (options : CompileOptions) :
+    Nat → List Seed → Except RootCompileError (List CompiledEntry)
+  | _, [] => .ok []
+  | index, seed :: rest => do
+      let compiled ← (compileChecked program seed options).mapError fun error =>
+        { index, seed, error }
+      let compiledRest ← compileRootsFrom program options (index + 1) rest
+      pure (compiled :: compiledRest)
+
+/-- Compile any ordered root set from one already checked catalog.  Budgets
+apply independently to each root; order and duplicates are preserved. -/
+def compileManyChecked (program : CheckedProgram) (seeds : List Seed)
+    (options : CompileOptions := {}) :
+    Except RootCompileError CompiledProgram := do
+  let entries ← compileRootsFrom program options 0 seeds
+  pure ⟨entries⟩
+
+/-- Raw-workspace multi-root failures keep checking separate from the exact
+root position that failed after checking. -/
+inductive ProgramCompileError where
+  | checking (errors : List ProgramCheckError)
+  | root (error : RootCompileError)
+  deriving Repr
+
+/-- Check one raw workspace once and compile an ordered root set. -/
+def compileMany (raw : Workspace.RawWorkspace) (seeds : List Seed)
+    (options : CheckingOptions := {}) :
+    Except ProgramCompileError CompiledProgram := do
+  let program ← (checkProgram raw options.checkingFuel).mapError
+    ProgramCompileError.checking
+  (compileManyChecked program seeds options.toCompileOptions).mapError
+    ProgramCompileError.root
+
+private def checkWorkspaceAtEntry (raw : Workspace.RawWorkspace) (fuel : Nat) :
+    Except (List ProgramCheckError) (CheckedProgram × Workspace.ModuleId) := do
+  let loaded ← (loadProgram raw).mapError fun errors =>
+    errors.map ProgramCheckError.loading
+  let program ← checkLoadedProgram loaded fuel
+  pure (program, loaded.workspace.entry.toModuleId)
+
+/-- Compile the conventional ground `main` in a known entry module. -/
+def compileEntryChecked (program : CheckedProgram)
+    (entryModule : Workspace.ModuleId) (options : CompileOptions := {}) :
+    Except CompileError CompiledEntry :=
+  compileChecked program (Seed.named entryModule "main") options
+
+/-- Validate and check a raw workspace once, derive its canonical entry module,
+and compile that module's conventional ground `main`. -/
+def compileEntry (raw : Workspace.RawWorkspace)
+    (options : CheckingOptions := {}) : Except CompileError CompiledEntry := do
+  let (program, entryModule) ←
+    (checkWorkspaceAtEntry raw options.checkingFuel).mapError
+      CompileError.checking
+  compileEntryChecked program entryModule options.toCompileOptions
+
+/-!
+## Exported Static Word ABI profile
+
+This initial source-compiler ABI profile discovers explicitly exported
+top-level functions from the workspace entry module.  It is deliberately not a
+claim that contract `public` members are executable: nested contract members do
+not yet participate in the checked-function and specialization catalogs.
+-/
+
+/-- One exported top-level root admitted by the `uint256 -> uint256` profile. -/
+structure StaticWordRoot where
+  metadata : Abi.V1.MethodMetadata
+  seed : Seed
+
+/-- Exact discovery failures for the exported Static Word source profile. -/
+inductive StaticWordRootError where
+  | interfaces (errors : List ProgramInterfaceError)
+  | unknownEntryModule (moduleId : Workspace.ModuleId)
+  | invalidMethodName (name : String)
+  | missingSignature (declaration : Resolved.DeclarationId)
+  | duplicateSignatures
+      (declaration : Resolved.DeclarationId) (count : Nat)
+  | genericFunction
+      (declaration : Resolved.DeclarationId) (name : String) (arity : Nat)
+  | unsupportedParameters
+      (declaration : Resolved.DeclarationId) (name : String)
+      (types : List Ty) (comptime : List Bool)
+  | unsupportedResults
+      (declaration : Resolved.DeclarationId) (name : String)
+      (types : List Ty) (comptime : Bool)
+  | duplicateSignature
+      (firstName secondName : String) (signature : String)
+  | selectorCollision
+      (firstName secondName : String)
+      (firstSignature secondSignature : String)
+      (selector : Abi.V1.Selector)
+  | noRoots (moduleId : Workspace.ModuleId)
+  deriving Repr
+
+private def staticWordRootOfEntity (program : CheckedProgram)
+    (entity : ProgramPublicEntity) : Except StaticWordRootError StaticWordRoot := do
+  let methodName ← match Abi.V1.validateMethodName? entity.publicName with
+    | some name => pure name
+    | none => throw (.invalidMethodName entity.publicName)
+  let candidates := program.signatures.functions.filter fun signature =>
+    decide (signature.id = entity.declaration.id)
+  let signature ← match candidates with
+    | [signature] => pure signature
+    | [] => throw (.missingSignature entity.declaration.id)
+    | signatures =>
+        throw (.duplicateSignatures entity.declaration.id signatures.length)
+  unless signature.scheme.parameters.isEmpty do
+    throw (.genericFunction signature.id entity.publicName
+      signature.scheme.parameters.length)
+  match signature.parameters with
+  | [parameter] =>
+      unless parameter.type == .word && !parameter.comptime do
+        throw (.unsupportedParameters signature.id entity.publicName
+          signature.parameterTypes signature.parameterComptime)
+  | _ =>
+      throw (.unsupportedParameters signature.id entity.publicName
+        signature.parameterTypes signature.parameterComptime)
+  unless signature.returnTypes == [.word] && !signature.returnComptime do
+    throw (.unsupportedResults signature.id entity.publicName
+      signature.returnTypes signature.returnComptime)
+  pure {
+    metadata := Abi.V1.MethodMetadata.staticWord methodName
+    seed := Seed.declaration signature.id
+  }
+
+private def staticWordRootsOfEntities (program : CheckedProgram) :
+    List ProgramPublicEntity → Except StaticWordRootError (List StaticWordRoot)
+  | [] => .ok []
+  | entity :: rest =>
+      if entity.declaration.kind == .function then do
+        let root ← staticWordRootOfEntity program entity
+        let roots ← staticWordRootsOfEntities program rest
+        pure (root :: roots)
+      else
+        staticWordRootsOfEntities program rest
+
+private structure IndexedStaticWordRoot where
+  root : StaticWordRoot
+  signature : String
+  selector : Abi.V1.Selector
+
+private def indexStaticWordRoot (root : StaticWordRoot) :
+    IndexedStaticWordRoot := {
+  root
+  signature := root.metadata.canonicalSignatureText
+  selector := root.metadata.selector
+}
+
+private def IndexedStaticWordRoot.signatureLE
+    (left right : IndexedStaticWordRoot) : Bool :=
+  (compare left.signature right.signature).isLE
+
+private def canonicalStaticWordRoots
+    (roots : List StaticWordRoot) : List IndexedStaticWordRoot :=
+  (roots.map indexStaticWordRoot).mergeSort IndexedStaticWordRoot.signatureLE
+
+private def firstDuplicateStaticWordSignature? :
+    List IndexedStaticWordRoot →
+      Option (IndexedStaticWordRoot × IndexedStaticWordRoot)
+  | [] => none
+  | first :: rest =>
+      match rest.find? fun later => later.signature == first.signature with
+      | some later => some (first, later)
+      | none => firstDuplicateStaticWordSignature? rest
+
+private def firstStaticWordSelectorCollision? :
+    List IndexedStaticWordRoot →
+      Option (IndexedStaticWordRoot × IndexedStaticWordRoot)
+  | [] => none
+  | first :: rest =>
+      match rest.find? fun later => later.selector == first.selector with
+      | some later => some (first, later)
+      | none => firstStaticWordSelectorCollision? rest
+
+private def validateStaticWordConflicts (roots : List StaticWordRoot) :
+    Except StaticWordRootError Unit :=
+  let indexed := canonicalStaticWordRoots roots
+  match firstDuplicateStaticWordSignature? indexed with
+  | some conflict =>
+      .error (.duplicateSignature
+        conflict.1.root.metadata.name.text
+        conflict.2.root.metadata.name.text conflict.1.signature)
+  | none =>
+      match firstStaticWordSelectorCollision? indexed with
+      | some conflict =>
+          .error (.selectorCollision
+            conflict.1.root.metadata.name.text
+            conflict.2.root.metadata.name.text
+            conflict.1.signature conflict.2.signature conflict.1.selector)
+      | none => .ok ()
+
+/-- Discover the complete exported Static Word root set of one checked entry
+module.  Unsupported exported functions are diagnosed rather than skipped. -/
+def discoverStaticWordRoots (program : CheckedProgram)
+    (entryModule : Workspace.ModuleId) :
+    Except StaticWordRootError (List StaticWordRoot) := do
+  let interfaces ← (buildProgramInterfaces program.environment).mapError
+    StaticWordRootError.interfaces
+  let interface ← match interfaces.interface? entryModule with
+    | some interface => pure interface
+    | none => throw (.unknownEntryModule entryModule)
+  let roots ← staticWordRootsOfEntities program interface.entities
+  if roots.isEmpty then
+    throw (.noRoots entryModule)
+  validateStaticWordConflicts roots
+  pure roots
+
+/-- One ABI name/selector paired with its reusable compiled source root. -/
+structure CompiledStaticWordRoot where
+  metadata : Abi.V1.MethodMetadata
+  entry : CompiledEntry
+
+/-- Sealed ordered ABI artifact for the exported Static Word source profile. -/
+structure CompiledStaticWordProgram where private mk ::
+  private compiledRoots : List CompiledStaticWordRoot
+
+namespace CompiledStaticWordProgram
+
+/-- ABI roots in deterministic public-interface order. -/
+def roots (compiled : CompiledStaticWordProgram) :
+    List CompiledStaticWordRoot :=
+  compiled.compiledRoots
+
+/-- Number of ABI methods retained by the artifact. -/
+def count (compiled : CompiledStaticWordProgram) : Nat :=
+  compiled.compiledRoots.length
+
+/-- Find the unique root for a four-byte selector.  Discovery rejects selector
+collisions, so a successful result is unambiguous. -/
+def rootForSelector? (compiled : CompiledStaticWordProgram)
+    (selector : Abi.V1.Selector) : Option CompiledStaticWordRoot :=
+  compiled.compiledRoots.find? fun root =>
+    root.metadata.selector == selector
+
+/-- Selected backends in deterministic ABI order. -/
+def backends (compiled : CompiledStaticWordProgram) : List Backend :=
+  compiled.compiledRoots.map fun root => root.entry.backend
+
+/-- Whether ABI root compilation selected more than one runtime. -/
+def usesMixedBackends (compiled : CompiledStaticWordProgram) : Bool :=
+  decide (compiled.backends.eraseDups.length > 1)
+
+end CompiledStaticWordProgram
+
+/-- An ABI-root compilation failure retains both source identity and the exact
+public export spelling used to derive its signature and selector. -/
+structure StaticWordRootCompileError where
+  index : Nat
+  publicName : String
+  seed : Seed
+  error : CompileError
+  deriving Repr
+
+/-- Static Word compilation failures preserve discovery separately from the
+exact exported root whose specialization or backend selection failed. -/
+inductive StaticWordCompileError where
+  | checking (errors : List ProgramCheckError)
+  | discovery (error : StaticWordRootError)
+  | root (error : StaticWordRootCompileError)
+  deriving Repr
+
+private def compileStaticWordRootsFrom (program : CheckedProgram)
+    (options : CompileOptions) : Nat → List StaticWordRoot →
+      Except StaticWordRootCompileError (List CompiledStaticWordRoot)
+  | _, [] => .ok []
+  | index, root :: rest => do
+      let entry ← (compileChecked program root.seed options).mapError fun error =>
+        { index, publicName := root.metadata.name.text,
+          seed := root.seed, error }
+      let compiledRest ←
+        compileStaticWordRootsFrom program options (index + 1) rest
+      pure ({ metadata := root.metadata, entry } :: compiledRest)
+
+/-- Discover and compile all exported Static Word roots from an already checked
+program and explicit entry module. -/
+def compileStaticWordChecked (program : CheckedProgram)
+    (entryModule : Workspace.ModuleId) (options : CompileOptions := {}) :
+    Except StaticWordCompileError CompiledStaticWordProgram := do
+  let roots ← (discoverStaticWordRoots program entryModule).mapError
+    StaticWordCompileError.discovery
+  let compiled ← (compileStaticWordRootsFrom program options 0 roots).mapError
+    StaticWordCompileError.root
+  pure ⟨compiled⟩
+
+/-- Check a raw workspace once, derive its canonical entry module, then
+discover and compile its exported Static Word ABI roots. -/
+def compileStaticWord (raw : Workspace.RawWorkspace)
+    (options : CheckingOptions := {}) :
+    Except StaticWordCompileError CompiledStaticWordProgram := do
+  let (program, entryModule) ←
+    (checkWorkspaceAtEntry raw options.checkingFuel).mapError
+      StaticWordCompileError.checking
+  compileStaticWordChecked program entryModule options.toCompileOptions
 
 /-- Combined failure carrier for the one-shot convenience boundary. -/
 inductive Error where
