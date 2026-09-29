@@ -21029,6 +21029,353 @@ theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
     (ExpressionNodesPreservedAt.ofTypingSourceExtends sourceExtension)
     finalAdmissible
 
+/-- The builtin-Boolean identifier branch produces an ordinary reusable
+typing base without requiring exact preservation of its recorded node in the
+requirement ledger source.  The raw Boolean reference is source-independent;
+only its fitted output path consults the occurrence-scoped ledger. -/
+theorem inferExprFuel_success_builtinBooleanIdentifier_expressionTypingBase_scoped_of_retained
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = none)
+    (isBoolean :
+      (name.value == "true" || name.value == "false") = true)
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok result)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (activeBinders : TypeParameterBindersWellFormed active)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  have recorded : Detail.recordExpressionWithExpected inferenceContext
+      expression id .bool
+      (.reference name.value (.builtinBoolean (name.value == "true"))) []
+      expected allocated = .ok result :=
+    Detail.inferExprFuel_success_builtinBooleanIdentifier_record expressionEq
+      allocationEq lookupEq isBoolean success
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.reference name.value
+        (.builtinBoolean (name.value == "true"))).applySubstitution
+          later.inference.substitution)
+      (later.inference.substitution.apply .bool) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution,
+      ReferenceResolution.applySubstitution] using
+      (ExpressionFormHasRawType.reference (source := semanticSource)
+        (ReferenceUseValid.builtinBoolean (context := active)
+          (name.value == "true")))
+  have rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply .bool) := by
+    simpa using TypeAdmissible.bool activeBinders
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recorded substitutionExtends requirementsSubset retained formType
+      rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
+/-- A resolved proxy type is closed by the frontend's source-type formation
+certificate, transported through the final substitution, and recorded through
+the occurrence-retained ordinary bridge.  No recursive expression typing is
+needed for this branch. -/
+theorem inferExprFuel_success_proxy_expressionTypingBase_scoped_of_retained
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {marker : Syntax.SourceSpan}
+    {sourceType : Syntax.TypeExpr} {expected : Option TypeSystem.Ty}
+    {initial allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (expressionEq : expression.value = .proxy marker sourceType)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok result)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (parametersEq : sourceContext.typeParameters =
+      inferenceContext.typeParameters)
+    (ownerEq : sourceContext.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  obtain ⟨inner, resolution, recorded⟩ :=
+    Detail.inferExprFuel_success_proxy_facts expressionEq allocationEq success
+  have sourceInnerWellFormed : TypeWellFormed sourceContext inner :=
+    resolveSourceType_success_typeWellFormed canonical signaturesEq
+      parametersEq ownerEq resolution
+  have innerAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply inner) :=
+    FlexibleSubstitution.TypeAdmissible.applySubstitution contextValid.closes
+      (TypeAdmissible.ofWellFormed sourceInnerWellFormed)
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.proxy inner).applySubstitution
+        later.inference.substitution)
+      (later.inference.substitution.apply (.proxy inner)) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution] using
+      ExpressionFormHasRawType.proxy innerAdmissible
+  have rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply (.proxy inner)) := by
+    simpa using TypeAdmissible.proxy innerAdmissible
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recorded substitutionExtends requirementsSubset retained formType
+      rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
+/-- Group inference composes one recursively typed child with the ordinary
+recorder bridge.  Child typing lives in the eventual semantic source, while
+the parent's owned and fitted requirements may be validated in a separate
+evidence source which merely retains their occurrence identity. -/
+theorem inferExprFuel_success_group_expressionTypingBase_scoped_of_retained
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression inner : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (expressionEq : expression.value = .group inner)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok result)
+    (expressionSound :
+      ∀ {childFuel : Nat} {childExpression : Syntax.Expr}
+        {childExpected : Option TypeSystem.Ty}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext childExpression
+            childExpected childInitial = .ok (child, childFinal) →
+          ExpressionHasType semanticSource active child.id
+            (later.inference.substitution.apply child.type))
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  obtain ⟨innerResult, innerState, innerSuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_group_facts expressionEq allocationEq success
+  have innerType : ExpressionHasType semanticSource active innerResult.id
+      (later.inference.substitution.apply innerResult.type) :=
+    expressionSound innerSuccess
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.group innerResult.id).applySubstitution
+        later.inference.substitution)
+      (later.inference.substitution.apply innerResult.type) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution] using
+      ExpressionFormHasRawType.group innerType
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recorded substitutionExtends requirementsSubset retained formType
+      innerType.type_admissible traitSuccess profileSuccess catalog
+      contextValid signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
+/-- Tuple inference lifts recursive child soundness through the source-ordered
+element traversal, then records the product as an ordinary expression.  The
+element typings are interpreted in the eventual semantic source; the tuple's
+requirement evidence is occurrence-retained independently. -/
+theorem inferExprFuel_success_tuple_expressionTypingBase_scoped_of_retained
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr}
+    {elements : Syntax.DelimitedList Syntax.Expr}
+    {expected : Option TypeSystem.Ty}
+    {initial allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (expressionEq : expression.value = .tuple elements)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok result)
+    (expressionSound :
+      ∀ {childFuel : Nat} {childExpression : Syntax.Expr}
+        {childExpected : Option TypeSystem.Ty}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext childExpression
+            childExpected childInitial = .ok (child, childFinal) →
+          ExpressionHasType semanticSource active child.id
+            (later.inference.substitution.apply child.type))
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (activeBinders : TypeParameterBindersWellFormed active)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  obtain ⟨inferredElements, elementsState, elementsSuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_tuple_facts expressionEq allocationEq success
+  have elementsType : ExpressionsHaveTypes semanticSource active
+      (inferredElements.map (·.id))
+      (inferredElements.map fun element =>
+        later.inference.substitution.apply element.type) :=
+    inferExprsFuel_success_expressionsHaveTypes
+      (fun childSuccess => expressionSound childSuccess) elementsSuccess
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.tuple (inferredElements.map (·.id))).applySubstitution
+        later.inference.substitution)
+      (later.inference.substitution.apply
+        (TypeSystem.Ty.productMany (inferredElements.map (·.type))))
+      (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution,
+      FlexibleSubstitution.apply_productMany, List.map_map,
+      Function.comp_def] using ExpressionFormHasRawType.tuple elementsType
+  have rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply
+        (TypeSystem.Ty.productMany (inferredElements.map (·.type)))) := by
+    simpa [FlexibleSubstitution.apply_productMany, List.map_map,
+      Function.comp_def] using
+        elementsType.product_type_admissible activeBinders
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recorded substitutionExtends requirementsSubset retained formType
+      rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
 /-- A nonlocal identifier with one visible declaration candidate yields a
 reusable expression-typing base after canonical instantiation, requirement
 allocation, final substitution, and occurrence-scoped requirement solving. -/
