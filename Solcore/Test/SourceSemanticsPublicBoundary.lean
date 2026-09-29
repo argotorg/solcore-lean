@@ -399,9 +399,13 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithoutDefault_deep_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithoutDefault_deep_sound_at
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithDefault_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithDefault_deep_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithDefault_deep_sound_at
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ForItemInferenceSoundnessCallbacks
 example :=

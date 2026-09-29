@@ -13042,6 +13042,99 @@ theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
     bodySound casesSuccess
 
+/-- Occurrence-aware deep soundness for a default-free match statement.
+Finalized integer-pattern evidence is fixed at the enclosing statement
+occurrence; the private statement proof supplies checked-to-result provenance,
+which is composed here with the caller's result-to-evidence transport. -/
+theorem inferStatementFuel_success_matchWithoutDefault_deep_sound_at
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (semanticOwner : target.currentDeclaration = some
+      ((result.state.toTypedSource roots).applySubstitution outer).owner)
+    (evidence : IntegerPatternEvidenceAt
+      ((result.state.toTypedSource roots).applySubstitution outer) target outer
+      evidenceState (.statement result.id))
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (casesPresent : arms.value.cases ≠ [])
+    (scrutineeSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState : Frontend.SourceInference.State},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type))
+    (bodySound :
+      ∀ {childFuel : Nat} {statements : List Syntax.Statement}
+        {childInitial : Frontend.SourceInference.State}
+        {childResult : Detail.BlockResult}
+        {childContext : SourceSemantics.Context},
+        ActiveLocalContextInvariant childInitial outer childContext →
+        Detail.inferStatementsFuel childFuel inferenceContext statements
+            expectedReturn childInitial = .ok childResult →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant childResult.state outer finalContext ∧
+            StatementsHaveType
+              ((result.state.toTypedSource roots).applySubstitution outer) {
+                returnType := outer.apply expectedReturn
+                loopDepth := inferenceContext.loopDepth
+              } childContext childResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer childResult facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  apply inferStatementFuel_success_matchWithoutDefault_deep_of_cases
+    statementEq defaultEq allocationEq success signatureFormation
+    functionsCanonical catalog signatures_eq ready returnBelow below invariant
+    outerExtension roots ?_ casesPresent scrutineeSound
+  intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
+    hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
+    hiddenInvariant checkedExtension checkedIntegerPatternsSubset
+    checkedRequirementsSubset checkedRequirementsOccur casesSuccess
+  exact inferMatchCasesFuel_success_sound_at signatureFormation
+    functionsCanonical catalog signatures_eq evidence hiddenReady
+    hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
+    semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
+    (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
+    (List.Subset.trans checkedRequirementsSubset requirementsSubset)
+    checkedRequirementsOccur bodySound casesSuccess
+
 /-- The deep match-with-default statement theorem closes explicit arm typing
 with `inferMatchCasesFuel_success_sound`.  Its only pattern-specific semantic
 input is finalized integer-literal evidence; every recursive body uses the
@@ -13127,6 +13220,98 @@ theorem inferStatementFuel_success_matchWithDefault_deep_sound
     hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
     bodySound casesSuccess
+
+/-- Occurrence-aware deep soundness for a match statement with a fallback
+arm.  Explicit-case pattern evidence is owned by the enclosing statement;
+fallback typing remains the ordinary recursive statement-list obligation. -/
+theorem inferStatementFuel_success_matchWithDefault_deep_sound_at
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = some defaultBody)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (semanticOwner : target.currentDeclaration = some
+      ((result.state.toTypedSource roots).applySubstitution outer).owner)
+    (evidence : IntegerPatternEvidenceAt
+      ((result.state.toTypedSource roots).applySubstitution outer) target outer
+      evidenceState (.statement result.id))
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (scrutineeSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState : Frontend.SourceInference.State},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type))
+    (bodySound :
+      ∀ {childFuel : Nat} {statements : List Syntax.Statement}
+        {childInitial : Frontend.SourceInference.State}
+        {childResult : Detail.BlockResult}
+        {childContext : SourceSemantics.Context},
+        ActiveLocalContextInvariant childInitial outer childContext →
+        Detail.inferStatementsFuel childFuel inferenceContext statements
+            expectedReturn childInitial = .ok childResult →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant childResult.state outer finalContext ∧
+            StatementsHaveType
+              ((result.state.toTypedSource roots).applySubstitution outer) {
+                returnType := outer.apply expectedReturn
+                loopDepth := inferenceContext.loopDepth
+              } childContext childResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer childResult facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  apply inferStatementFuel_success_matchWithDefault_deep_of_cases
+    statementEq defaultEq allocationEq success signatureFormation
+    functionsCanonical ready returnBelow below invariant outerExtension roots
+    ?_ scrutineeSound bodySound
+  intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
+    hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
+    hiddenInvariant checkedExtension checkedIntegerPatternsSubset
+    checkedRequirementsSubset checkedRequirementsOccur casesSuccess
+  exact inferMatchCasesFuel_success_sound_at signatureFormation
+    functionsCanonical catalog signatures_eq evidence hiddenReady
+    hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
+    semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
+    (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
+    (List.Subset.trans checkedRequirementsSubset requirementsSubset)
+    checkedRequirementsOccur bodySound casesSuccess
 
 /-- Successful statement inference is sound in the finalized typed source.
 The constructor dispatcher handles every statement form, while explicit match
