@@ -168,13 +168,13 @@ def HasValidatedTypedPlan (compiled : CompiledEntry) : Prop :=
   SourceTypedRuntime.validateExecutablePlanEvidence compiled.program
     compiled.plan = .ok ()
 
-/-- A source-typed runtime value has this artifact's public source result
-type according to the runtime's shallow tag reconstruction. The underlying
-plan stays sealed, so callers can use this proposition without reconstructing
-a specialization table. This does not validate a closure body or heap. -/
+/-- A source-typed runtime value has this artifact's public source result type
+in the complete executable plan deterministically prepared from the sealed
+specialization plan.  This includes first-class globals discovered through
+selected methods.  It does not validate a closure body or heap. -/
 def TypedValueHasResultType (compiled : CompiledEntry)
     (value : SourceTypedRuntime.Value) : Prop :=
-  value.type? compiled.plan = some compiled.resultType
+  value.HasPreparedType compiled.program compiled.plan compiled.resultType
 
 /-- The selected backend's result projection agrees with the public source
 result type.  Compilation checks this separately from runtime result typing:
@@ -356,8 +356,8 @@ def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult â
   | .typedSource (.done value _) =>
       match compiled.executable with
       | .typedSource =>
-          value.type? compiled.plan =
-            some compiled.root.function.inferredBodyType
+          value.HasPreparedType compiled.program compiled.plan
+            compiled.root.function.inferredBodyType
       | .core _ | .callGraph _ => False
   | .typedSource (.outOfFuel _) | .typedSource (.fault _ _) => True
 

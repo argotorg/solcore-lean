@@ -52,20 +52,25 @@ The typed-source backend now executes the closed specialization slice end to
 end: constrained generic calls and first-class function values carry checked
 trait evidence, selected unary/binary operator and `Coerce.coerce` bodies run
 with their complete helper frontier, and closures share mutable locals,
-mappings, and proxy values through one runtime heap.
+mappings, and proxy values through one runtime heap. Ground constrained roots
+resolve their own evidence before entry. `comptime<T>` is recursively erased
+to `T` at the runtime representation boundary, while direct and first-class
+calls still enforce marked parameter/result staging. Closed staged functions
+can combine closures, mutation, and mappings, and arbitrary-precision Integer
+values execute arithmetic, comparisons, complement, and bitwise operations.
+Public result typing uses the complete prepared plan, including first-class
+globals discovered only inside a selected operator or coercion method.
 
 ## Priority implementation
 
-- Broaden the closed specialization profile to the remaining unrestricted
-  trait-resolution and higher-order/effectful staging cases, including runtime
-  `comptime` values and types.
+- Generalize evidence passing beyond ground, self-resolved public roots to
+  open or caller-supplied dictionaries and unrestricted trait resolution.
+- Make staging analysis context-sensitive for locally polymorphic call sites
+  whose concrete specializations differ in compile-time availability.
 - Retain stronger provenance for manually assembled specialized plans. In
   particular, a generic operator specialized to a builtin operand type should
   remain distinguishable from an operator that inference originally selected
   as builtin even if an untrusted client strips its requirement ledger.
-- Preserve the appended executable-plan provenance when a first-class global
-  function discovered only inside a selected operator/coercion method escapes
-  as the public result.
 - Add contract-storage field execution when the target source language defines
   that access path. The current upstream source syntax has no general value
   member projection; the latent typed-IR member form is therefore not exposed

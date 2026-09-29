@@ -48,6 +48,16 @@ private def workspace : Workspace.RawWorkspace := {
         "    return scratch[0];",
         "  }",
         "}",
+        "type WordFunction = function(Word) returns (Word);",
+        "function returnedIdentity(value: Word) returns (Word) { return value; }",
+        "impl Coerce<Word, WordFunction> {",
+        "  function coerce(value: Word) returns (WordFunction) {",
+        "    return returnedIdentity;",
+        "  }",
+        "}",
+        "function functionFromCoercion(value: Word) returns (WordFunction) {",
+        "  return value;",
+        "}",
         "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
         "function localProof(flag: Bool) returns (Word, Bool) {",
         "  let f = lam(value) { return keepAs(1, value); };",
@@ -106,14 +116,38 @@ private def workspace : Workspace.RawWorkspace := {
         "function blockedHelper(value: Word) returns (Box) { return accept(value); }",
         "function blocked(value: Word) returns (Box) { return blockedHelper(value); }",
         "trait Marker<T> {}",
-        "function constrained(value: Word) returns (Word) where Word: Marker { return value; }",
+        "impl Marker<Word> {}",
+        "function constrained(value: Word) returns (Word) where Word: Marker {",
+        "  let table: mapping(Word => Word);",
+        "  table[0] = value;",
+        "  return table[0];",
+        "}",
         "function staged(comptime value: Word) returns (Word) { return value; }",
         "type StagedWord = comptime<Word>;",
         "type PairWithStage = (Word, StagedWord);",
+        "type DeepStage = (StagedWord, (Word, StagedWord));",
         "function stagedType(value: StagedWord) returns (Word) { return 1; }",
         "function integerResult() returns (integer) { return 1; }",
         "function nestedStaged(value: PairWithStage) returns (Word) { return 1; }",
-        "function dependent(flag: Bool) returns (Word) { return wordFromInteger(flag ? 1 : 2); }"
+        "function dependent(flag: Bool) returns (Word) { return wordFromInteger(flag ? 1 : 2); }",
+        "function nestedComptime(value: DeepStage) returns (DeepStage) { return value; }",
+        "function integerBitAnd() returns (integer) { return 5 & 3; }",
+        "function integerBitXor() returns (integer) { return 5 ^ 3; }",
+        "function integerBitOr() returns (integer) { return 5 | 3; }",
+        "function integerBitNot() returns (integer) { return ~5; }",
+        "function markedEffects(comptime seed: Word) returns (comptime<Word>) {",
+        "  let total: Word = seed;",
+        "  let table: mapping(Word => Word);",
+        "  let bump = lam(comptime delta: Word) -> Word {",
+        "    total += delta;",
+        "    table[0] = total;",
+        "    return table[0];",
+        "  };",
+        "  return bump(3);",
+        "}",
+        "function markedEffectsEntry() returns (Word) {",
+        "  return markedEffects(9);",
+        "}"
       ]
     }
   ]
@@ -150,6 +184,26 @@ private def expectTypedWord (label : String) (expected : Nat) :
   | .ok (.typedSource (.done (.word actual) _)) =>
       assertTrue (actual == word expected) s!"{label} returned the wrong Word"
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
+private def expectTypedInteger (label : String) (expected : Int) :
+    Except RunError ExecutionResult → IO Unit
+  | .ok (.typedSource (.done (.integer actual) _)) =>
+      assertTrue (actual == expected) s!"{label} returned the wrong integer"
+  | result => throw (IO.userError s!"{label} returned {reprStr result}")
+private def expectTypedGlobal (label : String) :
+    Except RunError ExecutionResult → IO Unit
+  | .ok (.typedSource (.done (.global _ _) _)) => pure ()
+  | result => throw (IO.userError s!"{label} returned {reprStr result}")
+private def expectTypedDeepStage (label : String)
+    (expectedLeft expectedMiddle expectedRight : Nat) :
+    Except RunError ExecutionResult → IO Unit
+  | .ok (.typedSource (.done
+      (.product (.word actualLeft)
+        (.product (.word actualMiddle) (.word actualRight))) _)) =>
+      assertTrue (actualLeft == word expectedLeft &&
+          actualMiddle == word expectedMiddle &&
+          actualRight == word expectedRight)
+        s!"{label} returned the wrong nested staged product"
+  | result => throw (IO.userError s!"{label} returned {reprStr result}")
 
 private structure PreparedSet where
   checked : CheckedProgram
@@ -170,6 +224,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let localProof ← compileNamed checked "main.solc" "localProof"
   let typedEvidence ← compileNamed checked "main.solc" "typedEvidence"
   let typedCoercion ← compileNamed checked "main.solc" "typedCoercion"
+  let functionFromCoercion ←
+    compileNamed checked "main.solc" "functionFromCoercion"
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
@@ -180,7 +236,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       recursiveContextPolymorphicLocal.backend = .typedSource ∧
       localProof.backend = .typedSource ∧
       typedEvidence.backend = .typedSource ∧
-      typedCoercion.backend = .typedSource))
+      typedCoercion.backend = .typedSource ∧
+      functionFromCoercion.backend = .typedSource))
     "automatic backend precedence changed"
   assertTrue (decide (
       direct.key.declaration.moduleId = main ∧
@@ -310,6 +367,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     typedCoercion.runTyped [.bool true] runtimeOptions
   expectTypedWord "public stateful coercion (false)" 8 <|
     typedCoercion.runTyped [.bool false] runtimeOptions
+  expectTypedGlobal "public method-discovered function result" <|
+    functionFromCoercion.runTyped [.word (word 1)] runtimeOptions
   pure { checked, direct, recursive, typed }
 
 private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
@@ -427,38 +486,93 @@ private def typedRejection (checked : CheckedProgram) (name : String) :
   | .ok compiled => throw (IO.userError
       s!"`{name}` bypassed staging through {reprStr compiled.backend}")
 
-private def testTypedCapabilityGate (checked : CheckedProgram) : IO Unit := do
-  match ← typedRejection checked "constrained" with
-  | .unresolvedAssumptions _ (_ :: _) => pure ()
-  | error => throw (IO.userError
-      s!"where assumptions crossed the typed boundary: {reprStr error}")
-  match ← typedRejection checked "staged" with
-  | .comptimeContract _ (_ :: _) _ => pure ()
-  | error => throw (IO.userError
-      s!"marked input crossed the typed boundary: {reprStr error}")
-  match ← typedRejection checked "stagedType" with
-  | .stagedBinderType _ type =>
-      assertTrue (decide (type = Ty.comptime .word))
-        "structural comptime input changed its retained type"
-  | error => throw (IO.userError
-      s!"structural comptime input crossed the typed boundary: {reprStr error}")
-  match ← typedRejection checked "integerResult" with
-  | .stagedResultType _ type =>
-      assertTrue (decide (type = Ty.integer))
-        "integer result changed its retained type"
-  | error => throw (IO.userError
-      s!"integer result crossed the typed boundary: {reprStr error}")
-  match ← typedRejection checked "nestedStaged" with
-  | .stagedBinderType _ type =>
-      assertTrue (decide (
-          type = Ty.product .word (.comptime .word)))
-        "nested comptime input changed its retained type"
-  | error => throw (IO.userError
-      s!"nested comptime input crossed the typed boundary: {reprStr error}")
+private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := do
+  let constrained ← compileNamed checked "blocked.solc" "constrained"
+  let staged ← compileNamed checked "blocked.solc" "staged"
+  let stagedType ← compileNamed checked "blocked.solc" "stagedType"
+  let integerResult ← compileNamed checked "blocked.solc" "integerResult"
+  let nestedStaged ← compileNamed checked "blocked.solc" "nestedStaged"
+  let nestedComptime ←
+    compileNamed checked "blocked.solc" "nestedComptime"
+  let integerBitAnd ← compileNamed checked "blocked.solc" "integerBitAnd"
+  let integerBitXor ← compileNamed checked "blocked.solc" "integerBitXor"
+  let integerBitOr ← compileNamed checked "blocked.solc" "integerBitOr"
+  let integerBitNot ← compileNamed checked "blocked.solc" "integerBitNot"
+  let markedEffects ←
+    compileNamed checked "blocked.solc" "markedEffects"
+  let markedEffectsEntry ←
+    compileNamed checked "blocked.solc" "markedEffectsEntry"
+  assertTrue (decide (
+      constrained.backend = .typedSource ∧
+      staged.backend = .typedSource ∧
+      stagedType.backend = .typedSource ∧
+      integerResult.backend = .typedSource ∧
+      nestedStaged.backend = .typedSource ∧
+      nestedComptime.backend = .typedSource ∧
+      integerBitAnd.backend = .typedSource ∧
+      integerBitXor.backend = .typedSource ∧
+      integerBitOr.backend = .typedSource ∧
+      integerBitNot.backend = .typedSource ∧
+      markedEffects.backend = .typedSource ∧
+      markedEffectsEntry.backend = .typedSource))
+    "staged capability cases did not select the typed-source backend"
+  assertTrue (decide (
+      constrained.inputTypes = [.word] ∧ constrained.resultType = .word ∧
+      staged.inputTypes = [.word] ∧ staged.resultType = .word ∧
+      stagedType.inputTypes = [.comptime .word] ∧
+      stagedType.resultType = .word ∧
+      integerResult.inputTypes = [] ∧
+      integerResult.resultType = .integer ∧
+      nestedStaged.inputTypes = [.product .word (.comptime .word)] ∧
+      nestedStaged.resultType = .word ∧
+      nestedComptime.inputTypes = [
+        .product (.comptime .word)
+          (.product .word (.comptime .word))] ∧
+      nestedComptime.resultType =
+        .product (.comptime .word)
+          (.product .word (.comptime .word)) ∧
+      integerBitAnd.inputTypes = [] ∧ integerBitAnd.resultType = .integer ∧
+      integerBitXor.inputTypes = [] ∧ integerBitXor.resultType = .integer ∧
+      integerBitOr.inputTypes = [] ∧ integerBitOr.resultType = .integer ∧
+      integerBitNot.inputTypes = [] ∧ integerBitNot.resultType = .integer ∧
+      markedEffects.inputTypes = [.word] ∧
+      markedEffects.resultType = .word ∧
+      markedEffectsEntry.inputTypes = [] ∧
+      markedEffectsEntry.resultType = .word))
+    "staged capability cases lost their source signature metadata"
+  expectTypedWord "ground constrained public root" 19 <|
+    constrained.runTyped [.word (word 19)] runtimeOptions
+  expectTypedWord "marked public input" 23 <|
+    staged.runTyped [.word (word 23)] runtimeOptions
+  expectTypedWord "structural comptime input" 1 <|
+    stagedType.runTyped [.word (word 29)] runtimeOptions
+  expectTypedInteger "integer result" 1 <|
+    integerResult.runTyped [] runtimeOptions
+  expectTypedWord "nested comptime input" 1 <|
+    nestedStaged.runTyped
+      [.product (.word (word 2)) (.word (word 3))] runtimeOptions
   match ← typedRejection checked "dependent" with
-  | .stagedExpressionType _ _ => pure ()
+  | .stagedExpressionType _ type =>
+      assertTrue (decide (type = Ty.integer))
+        "runtime-dependent staged expression lost its Integer type"
   | error => throw (IO.userError
-      s!"runtime-dependent staged expression crossed the boundary: {reprStr error}")
+      s!"runtime-dependent staged expression changed rejection: {reprStr error}")
+  expectTypedDeepStage "recursively erased comptime product" 4 5 6 <|
+    nestedComptime.runTyped [
+      .product (.word (word 4))
+        (.product (.word (word 5)) (.word (word 6)))] runtimeOptions
+  expectTypedInteger "integer bitwise and" 1 <|
+    integerBitAnd.runTyped [] runtimeOptions
+  expectTypedInteger "integer bitwise xor" 6 <|
+    integerBitXor.runTyped [] runtimeOptions
+  expectTypedInteger "integer bitwise or" 7 <|
+    integerBitOr.runTyped [] runtimeOptions
+  expectTypedInteger "integer bitwise not" (-6) <|
+    integerBitNot.runTyped [] runtimeOptions
+  expectTypedWord "marked closure/mutation/mapping" 12 <|
+    markedEffects.runTyped [.word (word 9)] runtimeOptions
+  expectTypedWord "effectful staged call" 12 <|
+    markedEffectsEntry.runTyped [] runtimeOptions
 
 private def testPublicCompilationErrors (checked : CheckedProgram) : IO Unit := do
   let main ← moduleId "main.solc"
@@ -498,14 +612,14 @@ private def testCheckingFailurePrecedence : IO Unit := do
   | .ok compiled => throw (IO.userError
       s!"malformed source selected {reprStr compiled.backend}")
 
-/-- Exercise compile-once reuse, three-way selection, exact results, stage-
-preserving rejection, and the phase-10 public-boundary hardening matrix. -/
+/-- Exercise compile-once reuse, three-way selection, exact results, staged
+typed execution, and the phase-10 public-boundary hardening matrix. -/
 def testSourceCompiler : IO Unit := do
   let prepared ← testCheckedReuseAndPrecedence
   testTypedBoundary prepared
   testOneShotLimits
   testAllBackendDiagnostics prepared.checked
-  testTypedCapabilityGate prepared.checked
+  testTypedCapabilityBoundary prepared.checked
   testPublicCompilationErrors prepared.checked
   testCheckingFailurePrecedence
   IO.println "phase-10 public source compiler hardening GREEN"

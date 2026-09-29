@@ -27,6 +27,28 @@ open SourceInference TypeSystem
 abbrev Key := SourceSpecialization.SpecializationKey
 abbrev Plan := SourceSpecializationWorklist.Plan
 
+/-- Erase staging wrappers while preserving the complete runtime type shape.
+`comptime<T>` changes when a value is available, not its runtime
+representation.  Erasure is recursive because staging wrappers may occur
+inside products, functions, mappings, proxies, and nominal arguments. -/
+@[simp] def runtimeType : Ty → Ty
+  | .variable id => .variable id
+  | .parameter id => .parameter id
+  | .constructor id => .constructor id
+  | .application function argument =>
+      .application (runtimeType function) (runtimeType argument)
+  | .function parameter result =>
+      .function (runtimeType parameter) (runtimeType result)
+  | .product left right => .product (runtimeType left) (runtimeType right)
+  | .mapping key value => .mapping (runtimeType key) (runtimeType value)
+  | .proxy inner => .proxy (runtimeType inner)
+  | .comptime inner => runtimeType inner
+  | .error => .error
+
+@[simp] theorem runtimeType_idempotent (type : Ty) :
+    runtimeType (runtimeType type) = runtimeType type := by
+  induction type <;> simp_all [runtimeType]
+
 structure Location where
   index : Nat
   deriving Repr, BEq, DecidableEq
@@ -173,22 +195,24 @@ mutual
     | .integer _ => some .integer
     | .product left right => do
         pure (.product (← left.type? plan) (← right.type? plan))
-    | .proxy inner => some (.proxy inner)
+    | .proxy inner => some (.proxy (runtimeType inner))
     | .constructed instantiation arguments => do
         let actual ← valueTypes? plan arguments
-        if actual = instantiation.payloadTypes then
-          some instantiation.resultType
+        if actual = instantiation.payloadTypes.map runtimeType then
+          some (runtimeType instantiation.resultType)
         else
           none
-    | .mapping keyType valueType _ => some (.mapping keyType valueType)
+    | .mapping keyType valueType _ =>
+        some (.mapping (runtimeType keyType) (runtimeType valueType))
     | .closure parameters resultType _ _ _ _ _ =>
-        some (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType)
+        some (runtimeType
+          (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType))
     | .instantiated substitution _ principal =>
-        substitution.apply <$> principal.type? plan
+        (runtimeType ∘ substitution.apply) <$> principal.type? plan
     | .global key _ => do
         let specialized ← findSpecialization? plan key
-        pure specialized.function.type
-    | .builtin function => some function.type
+        pure (runtimeType specialized.function.type)
+    | .builtin function => some (runtimeType function.type)
 
 end
 
@@ -199,7 +223,8 @@ value.  This deliberately follows `Value.type?`: it does not validate mapping
 entries, closure bodies or captures, constructor catalog authenticity, or the
 heap reachable through captured locations.  Uninitialized cells are valid. -/
 def HasShallowType (cell : Cell) (plan : Plan) : Prop :=
-  ∀ value, cell.value = some value → value.type? plan = some cell.type
+  ∀ value, cell.value = some value →
+    value.type? plan = some (runtimeType cell.type)
 
 end Cell
 
@@ -294,7 +319,7 @@ binding in the evaluator. -/
 theorem HasShallowTypes.allocateValue
     {plan : Plan} {state : RuntimeState}
     (typing : state.HasShallowTypes plan) (type : Ty) (value : Value)
-    (typed : value.type? plan = some type) :
+    (typed : value.type? plan = some (runtimeType type)) :
     (state.allocate type (some value)).2.HasShallowTypes plan := by
   intro selected member
   simp only [RuntimeState.allocate] at member
@@ -424,13 +449,15 @@ inductive RuntimeError where
   | missingRuntimeAssumptionEvidence
       (caller : Key) (id : ExpressionId) (requirement : RequirementId)
       (predicate : ProgramPredicate)
-  | comptimeContract
-      (key : Key) (parameterComptime : List Bool) (returnComptime : Bool)
-  | markedBinder (id : Resolved.LocalId)
-  | stagedBinderType (id : Resolved.LocalId) (type : Ty)
-  | stagedResultType (key : Key) (type : Ty)
   | stagedExpressionType (id : ExpressionId) (type : Ty)
-  | stagedLambdaResult (id : ExpressionId) (type : Ty)
+  | missingExpressionStage
+      (caller : Key) (use : ExpressionId) (expression : ExpressionId)
+  | comptimeArgumentStageMismatch
+      (caller : Key) (use : ExpressionId) (index : Nat)
+      (argument : ExpressionId) (actual : SourceStageAnalysis.Stage)
+  | comptimeResultStageMismatch
+      (caller : Key) (use : ExpressionId) (callee : Key)
+      (actual : SourceStageAnalysis.Stage)
   | unsupportedStagedInput (expected : Ty)
   | inputValidationFuelExhausted (expected : Ty) (fuel : Nat)
   | missingExpression (id : ExpressionId)
@@ -681,6 +708,20 @@ private def exactInstantiationKey (plan : Plan)
   | [specialized] => .ok specialized.key
   | candidates => .error (.duplicateInstantiationTargets
       instantiation.declaration instantiation.type candidates.length)
+
+private def predicateIsClosed (predicate : ProgramPredicate) : Bool :=
+  predicate.subject.freeVariables.isEmpty &&
+    predicate.arguments.all fun argument => argument.freeVariables.isEmpty
+
+/-- Contextual local polymorphism deliberately retains open call metadata in
+the caller and records one closed edge per reachable context.  Closed calls,
+on the other hand, must still identify one exact canonical target. -/
+private def instantiationIsClosed
+    (instantiation : DeclarationInstantiation) : Bool :=
+  instantiation.type.freeVariables.isEmpty &&
+    (instantiation.parameterSubstitution.all fun entry =>
+      entry.2.freeVariables.isEmpty) &&
+    instantiation.predicates.all predicateIsClosed
 
 private def exactCallKey (plan : Plan) (caller : Key) (id : ExpressionId)
     (callee : Key) :
@@ -1899,7 +1940,8 @@ private def validateUnaryOperatorRequirementLayout
     let operand ← exactExpression specialized.function.typedBody operandId
     let expectedInput := match operator with
       | .logicalNot => Ty.bool
-      | .bitNot => Ty.word
+      | .bitNot =>
+          if operand.type = Ty.integer then Ty.integer else Ty.word
     let expectedResult := runtimeUnaryResultType operator expectedInput
     unless operand.type = expectedInput do
       throw (.runtimeUnaryInputTypesMismatch specialized.key node.id
@@ -1933,7 +1975,13 @@ private def validateBinaryOperatorRequirementLayout
       | _ => throw (.unsupportedRuntimeBinary specialized.key node.id operator)
     let left ← exactExpression specialized.function.typedBody leftId
     let right ← exactExpression specialized.function.typedBody rightId
-    let expectedInput := SourceInference.Detail.binaryBuiltinType operator
+    let builtinInput := SourceInference.Detail.binaryBuiltinType operator
+    let expectedInput :=
+      if builtinInput = Ty.word && left.type = Ty.integer &&
+          right.type = Ty.integer then
+        Ty.integer
+      else
+        builtinInput
     let expectedInputs := [expectedInput, expectedInput]
     let actualInputs := [left.type, right.type]
     unless actualInputs = expectedInputs do
@@ -2039,61 +2087,105 @@ private def validateExecutableMetadata
         validateExpressionMetadata specialized expression
     | .statement statement => validateStatementMetadata function statement.form
 
-private def typeContainsStaged : Ty → Bool
+/-- Source types whose outermost value is available only during staged
+evaluation.  This intentionally inspects the source annotation rather than
+its erased runtime representation. -/
+private def sourceTypeIsComptimeOnly : Ty → Bool
   | .constructor (.builtin .integer)
   | .comptime _ => true
-  | .application function argument
-  | .function function argument
-  | .product function argument
-  | .mapping function argument =>
-      typeContainsStaged function || typeContainsStaged argument
-  | .proxy inner => typeContainsStaged inner
-  | .variable _ | .parameter _ | .constructor _ | .error => false
+  | _ => false
 
-private def validateRuntimeBinder (binder : TypedBinder) :
+private def requireComptimeArgumentStage
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (index : Nat) (argument : ExpressionId) :
+    Except RuntimeError Unit :=
+  match caller.stageAnalysis.expressionStage? argument with
+  | none => throw (.missingExpressionStage caller.key node.id argument)
+  | some .comptime => pure ()
+  | some actual =>
+      throw (.comptimeArgumentStageMismatch caller.key node.id index argument
+        actual)
+
+private def validateStagedArguments
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (forceComptime : Bool) :
+    Nat → List TypedBinder → List ExpressionId → Except RuntimeError Unit
+  | _, [], [] => pure ()
+  | index, parameter :: parameters, argument :: arguments => do
+      if forceComptime || parameter.comptime ||
+          sourceTypeIsComptimeOnly parameter.scheme.body then
+        requireComptimeArgumentStage caller node index argument
+      validateStagedArguments caller node forceComptime (index + 1)
+        parameters arguments
+  | _, parameters, arguments =>
+      throw (.argumentArityMismatch parameters.length arguments.length)
+
+private def validateStagedCallableContract
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (arguments : List ExpressionId)
+    (parameters : List TypedBinder) (stagedResult : Bool)
+    (calleeOwner : Key) :
     Except RuntimeError Unit := do
-  if binder.comptime then throw (.markedBinder binder.id)
-  if typeContainsStaged binder.scheme.body then
-    throw (.stagedBinderType binder.id binder.scheme.body)
+  let effectfulStaging := caller.function.returnComptime ||
+    sourceTypeIsComptimeOnly caller.function.inferredBodyType
+  unless effectfulStaging do
+    validateStagedArguments caller node stagedResult
+      0 parameters arguments
+    if stagedResult then
+      match caller.stageAnalysis.expressionStage? node.id with
+      | none => throw (.missingExpressionStage caller.key node.id node.id)
+      | some .comptime => pure ()
+      | some actual =>
+          throw (.comptimeResultStageMismatch caller.key node.id calleeOwner
+            actual)
 
-private def validateForItemBinder : ForItemForm → Except RuntimeError Unit
-  | .letDecl binder _ => validateRuntimeBinder binder
-  | .expression _ | .assignValue _ _ _ | .assignBitNot _ => pure ()
+private def validateStagedCallBoundary
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (arguments : List ExpressionId)
+    (callee : SourceSpecialization.SpecializedFunction) :
+    Except RuntimeError Unit :=
+  validateStagedCallableContract caller node arguments
+    callee.function.typedBody.inputs
+    (callee.function.returnComptime ||
+      sourceTypeIsComptimeOnly callee.function.inferredBodyType)
+    callee.key
 
-private def validatePatternInstructionBinder :
-    MatchPatternInstruction → Except RuntimeError Unit
-  | .binder binder => validateRuntimeBinder binder
-  | .wildcard | .integerLiteral _ _ | .constructor _ _ | .tuple _ => pure ()
+/-- Recover the staging contract of a first-class callable from its
+authenticated runtime representation.  Closure results encode staging in
+their source type; global results additionally retain the declaration's
+separate `returnComptime` marker through their specialization key. -/
+private def validateIndirectStagedCallBoundary (plan : Plan)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (arguments : List ExpressionId) :
+    Value → Except RuntimeError Unit
+  | .global key _ => do
+      let callee ← exactSpecialization plan key
+      validateStagedCallBoundary caller node arguments callee
+  | .closure parameters resultType _ _ owner _ _ =>
+      validateStagedCallableContract caller node arguments parameters
+        (sourceTypeIsComptimeOnly resultType) owner
+  | .instantiated substitution _
+      (.closure parameters resultType _ _ owner _ _) =>
+      validateStagedCallableContract caller node arguments
+        (parameters.map (TypedBinder.applySubstitution substitution))
+        (sourceTypeIsComptimeOnly (substitution.apply resultType)) owner
+  | _ => pure ()
 
-private def validatePatternBinders (pattern : TypedMatchPattern) :
+private def validateSpecializationStaging
+    (specialized : SourceSpecialization.SpecializedFunction) :
     Except RuntimeError Unit := do
-  match pattern.resolution with
-  | .binder binder => validateRuntimeBinder binder
-  | .constructor _ instructions | .tuple instructions =>
-      for instruction in instructions do
-        validatePatternInstructionBinder instruction
-  | .wildcard | .integerLiteral _ _ => pure ()
-
-private def validateRuntimeBinders (function : CheckedFunction) :
-    Except RuntimeError Unit := do
-  for node in function.typedBody.nodes do
-    match node with
-    | .expression expression => do
-        if typeContainsStaged expression.type then
-          throw (.stagedExpressionType expression.id expression.type)
-        match expression.form with
-        | .lambda parameters resultType _ => do
-            for parameter in parameters do validateRuntimeBinder parameter
-            if typeContainsStaged resultType then
-              throw (.stagedLambdaResult expression.id resultType)
-        | _ => pure ()
-    | .statement { form := .letDecl binder _, .. } =>
-        validateRuntimeBinder binder
-    | .statement { form := .forLoop initializer _ post _, .. } =>
-        for item in initializer ++ post do validateForItemBinder item
-    | .statement { form := .matchWith resolution, .. } =>
-        for arm in resolution.cases do validatePatternBinders arm.pattern
-    | _ => pure ()
+  let function := specialized.function
+  let effectfulStaging := function.returnComptime ||
+    sourceTypeIsComptimeOnly function.inferredBodyType
+  unless effectfulStaging do
+    for sourceNode in function.typedBody.nodes do
+      match sourceNode with
+      | .expression expression =>
+          if sourceTypeIsComptimeOnly expression.type then
+            match specialized.stageAnalysis.expressionStage? expression.id with
+            | some .comptime => pure ()
+            | _ => throw (.stagedExpressionType expression.id expression.type)
+      | .statement _ => pure ()
 
 private def validateSpecializationMetadataWith
     (allowAssumptions : Bool)
@@ -2105,19 +2197,7 @@ private def validateSpecializationMetadataWith
       specialized.function.typedBody.owner)
   unless allowAssumptions || specialized.assumptions.isEmpty do
     throw (.unresolvedAssumptions specialized.key specialized.assumptions)
-  let parameterComptime :=
-    specialized.function.typedBody.inputs.map (·.comptime)
-  if parameterComptime.any fun marked => marked then
-    throw (.comptimeContract specialized.key parameterComptime
-      specialized.function.returnComptime)
-  if specialized.function.returnComptime then
-    throw (.comptimeContract specialized.key parameterComptime true)
-  if typeContainsStaged specialized.function.inferredBodyType then
-    throw (.stagedResultType specialized.key
-      specialized.function.inferredBodyType)
-  for binder in specialized.function.typedBody.inputs do
-    validateRuntimeBinder binder
-  validateRuntimeBinders specialized.function
+  validateSpecializationStaging specialized
   validateExecutableMetadata specialized
   let declaredResult ← match resultType? specialized.function with
     | some result => pure result
@@ -2156,6 +2236,7 @@ private def extendCoercionMethodPlan (program : CheckedProgram)
     (available : RuntimeEvidenceEnvironment) (node : ExpressionNode)
     (step : CoercionStep) : Except RuntimeError Plan := do
   let method ← checkedCoercionMethod program specialized node available step
+  validateStagedCallBoundary specialized node [node.id] method.specialized
   discard <| coercionMethodRuntimeEvidence program specialized node step method
   let outerEdge : SourceSpecializationWorklist.CallEdge := {
     caller := specialized.key
@@ -2198,6 +2279,12 @@ private def extendOperatorMethodPlan (program : CheckedProgram)
           checkedBinaryOperatorMethod program specialized ownedNode available
             operator
       | _ => throw (.unsupportedRequirements requirements)
+    let arguments ← match ownedNode.form with
+      | .unary _ operand => pure [operand]
+      | .binary left _ right => pure [left, right]
+      | _ => throw (.unsupportedRequirements requirements)
+    validateStagedCallBoundary specialized ownedNode arguments
+      selection.method.specialized
     discard <| operatorMethodRuntimeEvidence program specialized ownedNode
       selection
     let outerEdge : SourceSpecializationWorklist.CallEdge := {
@@ -2241,7 +2328,24 @@ private def validateSpecializationEvidenceAndExtend
                 specialized available node step
         | _ => pure ()
         match node.form with
-        | .call _ _ (.declaration instantiation) =>
+        | .call _ arguments (.declaration instantiation) => do
+            if instantiationIsClosed instantiation then
+              let target ← exactInstantiationKey extended instantiation
+              let calleeKey ← exactCallKey extended specialized.key node.id
+                target
+              let callee ← exactSpecialization extended calleeKey
+              validateStagedCallBoundary specialized node arguments callee
+            else
+              let callEdges := extended.callEdges.filter fun edge =>
+                decide (edge.caller = specialized.key) &&
+                  decide (edge.occurrence = node.id) &&
+                  decide
+                    (edge.callee.declaration = instantiation.declaration)
+              if callEdges.isEmpty then
+                throw (.missingCallEdge specialized.key node.id)
+              for edge in callEdges do
+                let callee ← exactSpecialization extended edge.callee
+                validateStagedCallBoundary specialized node arguments callee
             validateExecutableDirectCallImplementationEvidence
               program.signatures specialized node instantiation
         | .reference _ (.declaration instantiation) =>
@@ -2273,8 +2377,10 @@ private def prepareExecutablePlanEvidenceAux (program : CheckedProgram)
       match plan.specializations[next]? with
       | none => pure plan
       | some specialized => do
-          validateSpecializationMetadataWith
-            (allowsEvidenceInvocation plan specialized.key) specialized
+          /- Every assumption is resolved below before the prepared plan can
+          escape.  In particular this admits a ground constrained seed, whose
+          authenticated evidence is supplied by the safe root boundary. -/
+          validateSpecializationMetadataWith true specialized
           let extended ← validateSpecializationEvidenceAndExtend program
             helperBudget plan specialized
           prepareExecutablePlanEvidenceAux program helperBudget remaining
@@ -2307,12 +2413,12 @@ def validateExecutablePlanEvidence (program : CheckedProgram)
 
 private def applyCoercion (plan : Plan) (step : CoercionStep)
     (value : Value) : Except RuntimeError Value := do
-  if value.type? plan != some step.source then
+  if value.type? plan != some (runtimeType step.source) then
     throw (.typeMismatch step.source (value.type? plan))
-  if step.source = step.target then
+  if runtimeType step.source = runtimeType step.target then
     pure value
   else
-    match value, step.source, step.target with
+    match value, runtimeType step.source, runtimeType step.target with
     | .integer integer, .constructor (.builtin .integer),
         .constructor (.builtin .word) =>
         pure (.word (Core.Word.ofIntModulo integer))
@@ -2334,7 +2440,8 @@ private def finishExpression (plan : Plan) (node : ExpressionNode)
       match applyCoercions plan node.coercions value with
       | .error error => .fault error state
       | .ok coerced =>
-          if coerced.type? plan = some node.type then .done coerced state
+          if coerced.type? plan = some (runtimeType node.type) then
+            .done coerced state
           else .fault (.typeMismatch node.type (coerced.type? plan)) state
   | .outOfFuel state => .outOfFuel state
   | .fault error state => .fault error state
@@ -2363,7 +2470,26 @@ private def applyUnary (plan : Plan) (operator : Syntax.UnaryOp)
   match operator, value with
   | .logicalNot, .bool operand => pure (.bool (!operand))
   | .bitNot, .word operand => pure (.word operand.bitNot)
+  | .bitNot, .integer operand => pure (.integer (~~~operand))
   | _, actual => throw (.invalidUnaryOperand operator (actual.type? plan))
+
+private def integerBitAnd : Int → Int → Int
+  | .ofNat left, .ofNat right => .ofNat (left &&& right)
+  | .ofNat left, .negSucc right => .ofNat (left ^^^ (left &&& right))
+  | .negSucc left, .ofNat right => .ofNat (right ^^^ (right &&& left))
+  | .negSucc left, .negSucc right => .negSucc (left ||| right)
+
+private def integerBitOr : Int → Int → Int
+  | .ofNat left, .ofNat right => .ofNat (left ||| right)
+  | .ofNat left, .negSucc right => .negSucc (right ^^^ (right &&& left))
+  | .negSucc left, .ofNat right => .negSucc (left ^^^ (left &&& right))
+  | .negSucc left, .negSucc right => .negSucc (left &&& right)
+
+private def integerBitXor : Int → Int → Int
+  | .ofNat left, .ofNat right => .ofNat (left ^^^ right)
+  | .ofNat left, .negSucc right => .negSucc (left ^^^ right)
+  | .negSucc left, .ofNat right => .negSucc (left ^^^ right)
+  | .negSucc left, .negSucc right => .ofNat (left ^^^ right)
 
 private def applyBinary (plan : Plan) (operator : Syntax.BinaryOp)
     (left right : Value) : Except RuntimeError Value :=
@@ -2387,6 +2513,12 @@ private def applyBinary (plan : Plan) (operator : Syntax.BinaryOp)
       if right = 0 then pure (.integer 0) else pure (.integer (left % right))
   | .add, .integer left, .integer right => pure (.integer (left + right))
   | .subtract, .integer left, .integer right => pure (.integer (left - right))
+  | .bitAnd, .integer left, .integer right =>
+      pure (.integer (integerBitAnd left right))
+  | .bitXor, .integer left, .integer right =>
+      pure (.integer (integerBitXor left right))
+  | .bitOr, .integer left, .integer right =>
+      pure (.integer (integerBitOr left right))
   | .less, .integer left, .integer right => pure (.bool (decide (left < right)))
   | .greater, .integer left, .integer right => pure (.bool (decide (left > right)))
   | .lessEqual, .integer left, .integer right => pure (.bool (decide (left ≤ right)))
@@ -2573,7 +2705,7 @@ def bindValues (plan : Plan) : Environment → RuntimeState →
       Except RuntimeError (Environment × RuntimeState)
   | environment, state, [] => pure (environment, state)
   | environment, state, (binder, value) :: rest => do
-      if value.type? plan != some binder.scheme.body then
+      if value.type? plan != some (runtimeType binder.scheme.body) then
         throw (.typeMismatch binder.scheme.body (value.type? plan))
       let (location, state) := state.allocate binder.scheme.body (some value)
       bindValues plan ((binder.id, location) :: environment) state rest
@@ -2595,7 +2727,8 @@ theorem bindValues_ok_preserves_shallow_types
       exact typing
   | cons binding rest inductionHypothesis =>
       obtain ⟨binder, value⟩ := binding
-      by_cases typed : value.type? plan = some binder.scheme.body
+      by_cases typed : value.type? plan =
+          some (runtimeType binder.scheme.body)
       · simp [bindValues, typed, bne] at bound
         exact inductionHypothesis _ _
           (typing.allocateValue binder.scheme.body value typed) bound
@@ -2686,7 +2819,7 @@ private def readResolvedValue (plan : Plan) :
   | some current, .index key :: rest =>
       match current with
       | .mapping keyType valueType entries => do
-          if key.type? plan != some keyType then
+          if key.type? plan != some (runtimeType keyType) then
             throw (.typeMismatch keyType (key.type? plan))
           let selected ← match mappingLookup? key entries with
             | some value => pure value
@@ -2738,13 +2871,13 @@ def updateResolvedValue (plan : Plan) (expected : Ty)
     Option Value → List RuntimeProjection → Except RuntimeError Value
   | current, [] => do
       let updated ← modify current
-      if updated.type? plan = some expected then pure updated
+      if updated.type? plan = some (runtimeType expected) then pure updated
       else throw (.typeMismatch expected (updated.type? plan))
   | none, _ :: _ => throw .invalidPlaceProjection
   | some current, .index key :: rest =>
       match current with
       | .mapping keyType valueType entries => do
-          if key.type? plan != some keyType then
+          if key.type? plan != some (runtimeType keyType) then
             throw (.typeMismatch keyType (key.type? plan))
           let selected ← match mappingLookup? key entries with
             | some value => pure value
@@ -2790,7 +2923,7 @@ def writeResolvedPlace (plan : Plan) (state : RuntimeState)
             place.projections with
         | .error error => .fault error state
         | .ok updated =>
-            if updated.type? plan != some place.rootType then
+            if updated.type? plan != some (runtimeType place.rootType) then
               .fault (.typeMismatch place.rootType (updated.type? plan)) state
             else
               match state.write? place.location (some updated) with
@@ -2832,7 +2965,8 @@ private theorem writeResolvedPlace_done_preserves_shallow_types
         | error error => simp [updateResult] at done
         | ok next =>
             simp only [updateResult] at done
-            by_cases nextType : next.type? plan = some place.rootType
+            by_cases nextType : next.type? plan =
+                some (runtimeType place.rootType)
             · simp [nextType] at done
               cases written : state.write? place.location (some next) with
               | none => simp [written] at done
@@ -2849,7 +2983,7 @@ private theorem writeResolvedPlace_done_preserves_shallow_types
 private def finishFunctionFlow (plan : Plan) (expected : Ty) :
     FlowOutcome → RunResult
   | .returned value state =>
-      if value.type? plan = some expected then .done value state
+      if value.type? plan = some (runtimeType expected) then .done value state
       else .fault (.resultTypeMismatch expected (value.type? plan)) state
   | .fallthrough _ state =>
       if expected = Ty.unit then .done .unit state
@@ -2864,7 +2998,7 @@ private theorem finishFunctionFlow_done_type
     (value : Value) (finalState : RuntimeState)
     (done : finishFunctionFlow plan expected flow =
       .done value finalState) :
-    value.type? plan = some expected := by
+    value.type? plan = some (runtimeType expected) := by
   cases flow with
   | returned returnedValue returnedState =>
       simp only [finishFunctionFlow] at done
@@ -2878,7 +3012,7 @@ private theorem finishFunctionFlow_done_type
       split at done
       · next isUnit =>
         cases done
-        simp [Value.type?, isUnit]
+        simp [Value.type?, runtimeType, Ty.unit, isUnit]
       · contradiction
   | breaking environment returnedState =>
       simp only [finishFunctionFlow] at done
@@ -2902,7 +3036,7 @@ private def modifyLeafForAssignment (plan : Plan) (expected : Ty)
     (operator : Syntax.ValueAssignOp) (right : Value) :
     Option Value → Except RuntimeError Value
   | current =>
-      if right.type? plan != some expected then
+      if right.type? plan != some (runtimeType expected) then
         throw (.typeMismatch expected (right.type? plan))
       else
         match operator, current with
@@ -2921,6 +3055,7 @@ private def modifyLeafForAssignment (plan : Plan) (expected : Ty)
 private def modifyLeafBitNot (plan : Plan) :
     Option Value → Except RuntimeError Value
   | some (.word value) => pure (.word value.bitNot)
+  | some (.integer value) => pure (.integer (~~~value))
   | some actual => throw (.invalidUnaryOperand .bitNot (actual.type? plan))
   | none => throw (.invalidUnaryOperand .bitNot none)
 
@@ -2933,7 +3068,7 @@ private def instantiateDirectLambdaLet? (plan : Plan) (owner : Key)
     (value : Value) : Except RuntimeError (Option Value) := do
   let some binder := directLambdaLetBinder? source id
     | pure none
-  if value.type? plan != some binder.scheme.body then
+  if value.type? plan != some (runtimeType binder.scheme.body) then
     throw (.localSchemeInstanceMismatch owner node.id binder.id
       binder.scheme.body (Option.getD (value.type? plan) Ty.error))
   let caller ← exactSpecialization plan owner
@@ -3019,7 +3154,8 @@ mutual
                             selection.method.specialized.key methodEvidence
                             [value] state with
                         | .done result finalState =>
-                            if result.type? plan = some node.rawType then
+                            if result.type? plan =
+                                some (runtimeType node.rawType) then
                               .done result finalState
                             else
                               .fault (.runtimeUnaryResultTypeMismatch caller.key
@@ -3061,7 +3197,8 @@ mutual
                             selection.method.specialized.key methodEvidence
                             [left, right] state with
                         | .done result finalState =>
-                            if result.type? plan = some node.rawType then
+                            if result.type? plan =
+                                some (runtimeType node.rawType) then
                               .done result finalState
                             else
                               .fault (.runtimeBinaryResultTypeMismatch caller.key
@@ -3084,10 +3221,11 @@ mutual
     | fuel + 1 =>
       match steps with
       | [] =>
-          if value.type? plan = some target then .done value state
+          if value.type? plan = some (runtimeType target) then
+            .done value state
           else .fault (.typeMismatch target (value.type? plan)) state
       | step :: rest =>
-          if value.type? plan != some step.source then
+          if value.type? plan != some (runtimeType step.source) then
             .fault (.typeMismatch step.source (value.type? plan)) state
           else
             match exactSpecialization plan owner with
@@ -3104,7 +3242,8 @@ mutual
                         match invokeDirectSpecialization fuel program plan
                             methodKey methodEvidence [value] state with
                         | .done coerced nextState =>
-                            if coerced.type? plan != some step.target then
+                            if coerced.type? plan !=
+                                some (runtimeType step.target) then
                               .fault (.typeMismatch step.target
                                 (coerced.type? plan)) nextState
                             else
@@ -3287,41 +3426,58 @@ mutual
           | .call callee arguments (.indirect metadata) =>
               match descend state callee with
               | .done functionValue argumentState =>
-                  match evaluateList descend argumentState arguments with
-                  | .done values finalState =>
-                      let packed := packValues values
-                      if packed.type? plan !=
-                          some metadata.argumentTypeBeforeCoercion then
-                        .fault (.typeMismatch metadata.argumentTypeBeforeCoercion
-                          (packed.type? plan)) finalState
-                      else
-                        let coerced := if metadata.argumentCoercions.isEmpty then
-                          .done packed finalState
-                        else
-                          executeCoercionPath fuel program plan owner evidence node
-                            metadata.argumentTypeAfterCoercion
-                            metadata.argumentCoercions packed finalState
-                        match coerced with
-                        | .done argumentBundle coercedState =>
-                            match unpackValues metadata.argumentCount
-                                argumentBundle with
-                            | some appliedArguments =>
-                                applyCallable fuel program plan functionValue
-                                  appliedArguments coercedState
-                            | none => .fault
-                                (.argumentArityMismatch metadata.argumentCount 0)
-                                coercedState
-                        | .outOfFuel coercedState => .outOfFuel coercedState
-                        | .fault error coercedState => .fault error coercedState
-                  | .outOfFuel finalState => .outOfFuel finalState
-                  | .fault error finalState => .fault error finalState
+                  match exactSpecialization plan owner with
+                  | .error error => .fault error argumentState
+                  | .ok caller =>
+                      match validateIndirectStagedCallBoundary plan caller node
+                          arguments functionValue with
+                      | .error error => .fault error argumentState
+                      | .ok () =>
+                          match evaluateList descend argumentState arguments with
+                          | .done values finalState =>
+                              let packed := packValues values
+                              if packed.type? plan !=
+                                  some (runtimeType
+                                    metadata.argumentTypeBeforeCoercion) then
+                                .fault
+                                  (.typeMismatch
+                                    metadata.argumentTypeBeforeCoercion
+                                    (packed.type? plan)) finalState
+                              else
+                                let coerced :=
+                                  if metadata.argumentCoercions.isEmpty then
+                                    .done packed finalState
+                                  else
+                                    executeCoercionPath fuel program plan owner
+                                      evidence node
+                                      metadata.argumentTypeAfterCoercion
+                                      metadata.argumentCoercions packed finalState
+                                match coerced with
+                                | .done argumentBundle coercedState =>
+                                    match unpackValues metadata.argumentCount
+                                        argumentBundle with
+                                    | some appliedArguments =>
+                                        applyCallable fuel program plan
+                                          functionValue appliedArguments
+                                          coercedState
+                                    | none => .fault
+                                        (.argumentArityMismatch
+                                          metadata.argumentCount 0)
+                                        coercedState
+                                | .outOfFuel coercedState =>
+                                    .outOfFuel coercedState
+                                | .fault error coercedState =>
+                                    .fault error coercedState
+                          | .outOfFuel finalState => .outOfFuel finalState
+                          | .fault error finalState => .fault error finalState
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
           | .constructor instantiation arguments =>
               match evaluateList descend state arguments with
               | .done values finalState =>
                   let candidate := Value.constructed instantiation values
-                  if candidate.type? plan = some instantiation.resultType then
+                  if candidate.type? plan =
+                      some (runtimeType instantiation.resultType) then
                     .done candidate finalState
                   else
                     .fault (.typeMismatch instantiation.resultType
@@ -3349,7 +3505,7 @@ mutual
                   | .done key finalState =>
                       match baseValue with
                       | .mapping keyType valueType entries =>
-                          if key.type? plan != some keyType then
+                          if key.type? plan != some (runtimeType keyType) then
                             .fault (.typeMismatch keyType (key.type? plan))
                               finalState
                           else
@@ -3463,7 +3619,7 @@ mutual
       | .ok specialized =>
           let function := specialized.function
           match validateSpecializationMetadataWith
-              (allowsEvidenceInvocation plan key) specialized with
+              true specialized with
           | .error error => .fault error state
           | .ok () =>
               match validateAuthenticatedRuntimeEvidence program.signatures key
@@ -3510,7 +3666,8 @@ mutual
             | some expression =>
                 match descend state expression with
                 | .done value finalState =>
-                    if value.type? plan != some binder.scheme.body then
+                    if value.type? plan !=
+                        some (runtimeType binder.scheme.body) then
                       .fault (.typeMismatch binder.scheme.body (value.type? plan))
                         finalState
                     else
@@ -3706,7 +3863,8 @@ mutual
             | some expression =>
                 match descend state expression with
                 | .done value finalState =>
-                    if value.type? plan != some binder.scheme.body then
+                    if value.type? plan !=
+                        some (runtimeType binder.scheme.body) then
                       .fault (.typeMismatch binder.scheme.body
                         (value.type? plan)) finalState
                     else
@@ -3907,7 +4065,7 @@ mutual
       Nat → ProgramSignatures → Plan → Ty → Value → TypeValidation
     | 0, _, _, _, _ => .outOfFuel
     | fuel + 1, signatures, plan, expected, actual =>
-        match expected, actual with
+        match runtimeType expected, actual with
         | .constructor (.builtin .unit), .unit => .valid
         | .constructor (.builtin .bool), .bool _ => .valid
         | .constructor (.builtin .word), .word _ => .valid
@@ -3917,28 +4075,27 @@ mutual
               (Value.validateTypeFuel fuel signatures plan leftType left)
               (Value.validateTypeFuel fuel signatures plan rightType right)
         | .proxy inner, .proxy actualInner =>
-            if inner = actualInner then .valid else .invalid
+            if inner = runtimeType actualInner then .valid else .invalid
         | .mapping keyType valueType, .mapping actualKey actualValue entries =>
-            if decide (keyType = actualKey) &&
-                decide (valueType = actualValue) then
+            if decide (keyType = runtimeType actualKey) &&
+                decide (valueType = runtimeType actualValue) then
               mappingEntriesValidateFuel fuel signatures plan keyType valueType
                 entries
             else
               .invalid
         | _, .constructed instantiation arguments =>
-            if decide (expected = instantiation.resultType) &&
+            if decide (runtimeType expected =
+                runtimeType instantiation.resultType) &&
                 validConstructorInstantiation signatures instantiation then
-              if instantiation.payloadTypes.any typeContainsStaged then
-                .unsupportedStaged
-              else
-                valuesValidateFuel fuel signatures plan
-                  instantiation.payloadTypes arguments
+              valuesValidateFuel fuel signatures plan
+                instantiation.payloadTypes arguments
             else
               .invalid
         | .function _ _, .global key evidence =>
             match exactSpecialization plan key with
             | .ok specialized =>
-                if specialized.function.type = expected then
+                if runtimeType specialized.function.type =
+                    runtimeType expected then
                   match validateAuthenticatedRuntimeEvidence signatures key
                       specialized.assumptions evidence with
                   | .ok () => .valid
@@ -3946,9 +4103,10 @@ mutual
                 else .invalid
             | .error _ => .invalid
         | .function _ _, .builtin function =>
-            if function.type = expected then .valid else .invalid
-        | .comptime inner, value =>
-            Value.validateTypeFuel fuel signatures plan inner value
+            if runtimeType function.type = runtimeType expected then
+              .valid
+            else
+              .invalid
         | _, _ => .invalid
 
 end
@@ -3983,31 +4141,32 @@ def Value.HasDeepTypeFuel :
     Nat → ProgramSignatures → Plan → RuntimeState → Ty → Value → Prop
   | 0, _, _, _, _, _ => True
   | fuel + 1, signatures, plan, state, expected, value =>
-      value.type? plan = some expected ∧
+      value.type? plan = some (runtimeType expected) ∧
         match value with
         | .product left right =>
-            match expected with
+            match runtimeType expected with
             | .product leftType rightType =>
                 left.HasDeepTypeFuel fuel signatures plan state leftType ∧
                   right.HasDeepTypeFuel fuel signatures plan state rightType
             | _ => False
         | .mapping actualKey actualValue entries =>
-            match expected with
+            match runtimeType expected with
             | .mapping keyType valueType =>
-                actualKey = keyType ∧ actualValue = valueType ∧
+                runtimeType actualKey = keyType ∧
+                  runtimeType actualValue = valueType ∧
                   ∀ entry, entry ∈ entries →
                     entry.1.HasDeepTypeFuel fuel signatures plan state keyType ∧
                       entry.2.HasDeepTypeFuel fuel signatures plan state valueType
             | _ => False
         | .constructed instantiation arguments =>
-            instantiation.resultType = expected ∧
+            runtimeType instantiation.resultType = runtimeType expected ∧
               validConstructorInstantiation signatures instantiation = true ∧
               instantiation.payloadTypes.length = arguments.length ∧
               ∀ pair, pair ∈ List.zip instantiation.payloadTypes arguments →
                 pair.2.HasDeepTypeFuel fuel signatures plan state pair.1
         | .closure parameters resultType _ _ _ captured _ =>
-            expected = .function
-              (Ty.productMany (parameters.map (·.scheme.body))) resultType ∧
+            runtimeType expected = runtimeType (.function
+              (Ty.productMany (parameters.map (·.scheme.body))) resultType) ∧
               ∀ binding, binding ∈ captured →
                 ∃ cell, state.read? binding.2 = some cell ∧
                   ∀ capturedValue, cell.value = some capturedValue →
@@ -4019,10 +4178,31 @@ def Value.HasDeepTypeFuel :
             | none => False
         | .global key evidence =>
             ∃ specialized, exactSpecialization plan key = .ok specialized ∧
-              specialized.function.type = expected ∧
+              runtimeType specialized.function.type = runtimeType expected ∧
               validateAuthenticatedRuntimeEvidence signatures key
                 specialized.assumptions evidence = .ok ()
         | _ => True
+
+/-- Deep structural typing depends only on the runtime representation of the
+expected source type. -/
+@[simp] theorem Value.hasDeepTypeFuel_runtimeType
+    (fuel : Nat) (signatures : ProgramSignatures) (plan : Plan)
+    (state : RuntimeState) (expected : Ty) (value : Value) :
+    value.HasDeepTypeFuel fuel signatures plan state (runtimeType expected) ↔
+      value.HasDeepTypeFuel fuel signatures plan state expected := by
+  cases fuel with
+  | zero => simp [Value.HasDeepTypeFuel]
+  | succ fuel => simp [Value.HasDeepTypeFuel]
+
+@[simp] theorem Value.hasDeepTypeFuel_comptime
+    (fuel : Nat) (signatures : ProgramSignatures) (plan : Plan)
+    (state : RuntimeState) (expected : Ty) (value : Value) :
+    value.HasDeepTypeFuel fuel signatures plan state (.comptime expected) ↔
+      value.HasDeepTypeFuel fuel signatures plan state expected := by
+  exact (Value.hasDeepTypeFuel_runtimeType fuel signatures plan state
+    (.comptime expected) value).symm.trans
+      (Value.hasDeepTypeFuel_runtimeType fuel signatures plan state
+        expected value)
 
 /-- All finite structural-heap observations of one value; this still does not
 certify closure code or the runtime evaluator. -/
@@ -4046,7 +4226,7 @@ theorem Value.HasDeepType.instantiated
   | zero => trivial
   | succ fuel =>
       change (Value.instantiated substitution requirements principal).type? plan =
-          some (substitution.apply principalType) ∧
+          some (runtimeType (substitution.apply principalType)) ∧
         (match principal.type? plan with
         | some innerType => principal.HasDeepTypeFuel fuel signatures plan
             state innerType
@@ -4279,11 +4459,11 @@ theorem evaluate_lambda_hasPlanCode
     unfold exactExpression
     rw [found]
     simp [shape, noCoercions, finishExpression, nodeType,
-      applyCoercions]
+      applyCoercions, runtimeType]
     change (if Value.type? plan
         (.closure parameters resultType body source owner environment evidence) =
-        some (Ty.function
-          (Ty.productMany (parameters.map (·.scheme.body))) resultType) then
+        some (runtimeType (Ty.function
+          (Ty.productMany (parameters.map (·.scheme.body))) resultType)) then
         ExpressionResult.done
           (.closure parameters resultType body source owner environment evidence)
           state
@@ -4295,7 +4475,7 @@ theorem evaluate_lambda_hasPlanCode
             (.closure parameters resultType body source owner environment
               evidence)))
           state) = _
-    simp [Value.type?]
+    simp [Value.type?, runtimeType]
   · intro depth
     cases depth with
     | zero => trivial
@@ -4375,7 +4555,8 @@ theorem runTrusted_done_has_inferredBodyType
       decide (candidate.key = entry)) = [specialized])
     (done : runTrusted program plan entry arguments fuel initial =
       .done value finalState) :
-    value.type? plan = some specialized.function.inferredBodyType := by
+    value.type? plan =
+      some (runtimeType specialized.function.inferredBodyType) := by
   unfold runTrusted at done
   cases fuel with
   | zero =>
@@ -4395,13 +4576,22 @@ theorem runTrusted_done_has_inferredBodyType
             · cases done
             · exact finishFunctionFlow_done_type _ _ _ _ _ done
 
-/-- Recheck the public result against the caller-supplied plan.  Prepared plans
-only append authenticated method/helper specializations, but this explicit
-boundary keeps the observable result theorem stated over the original plan. -/
+/-- A value has the expected runtime representation in the exact executable
+plan deterministically prepared from a caller-supplied specialization plan.
+This retains provenance for first-class globals discovered only through a
+selected operator or coercion method. -/
+def Value.HasPreparedType (program : CheckedProgram) (plan : Plan)
+    (value : Value) (expected : Ty) : Prop :=
+  ∃ executablePlan,
+    prepareExecutablePlanEvidence program plan = .ok executablePlan ∧
+      value.type? executablePlan = some (runtimeType expected)
+
+/-- Recheck the public result against the complete executable plan, including
+authenticated method/helper specializations appended during preparation. -/
 private def finishPreparedRun (plan : Plan) (expected : Ty) :
     RunResult → RunResult
   | .done value finalState =>
-      if value.type? plan = some expected then
+      if value.type? plan = some (runtimeType expected) then
         .done value finalState
       else
         .fault (.resultTypeMismatch expected (value.type? plan)) finalState
@@ -4412,7 +4602,7 @@ private theorem finishPreparedRun_done_type
     (plan : Plan) (expected : Ty) (result : RunResult)
     (value : Value) (finalState : RuntimeState)
     (done : finishPreparedRun plan expected result = .done value finalState) :
-    value.type? plan = some expected := by
+    value.type? plan = some (runtimeType expected) := by
   cases result with
   | done actual actualState =>
       simp only [finishPreparedRun] at done
@@ -4440,12 +4630,17 @@ def runWithValidationFuel (program : CheckedProgram) (plan : Plan)
           arguments with
       | some error => .fault error state
       | none =>
-          match prepareExecutablePlanEvidence program plan with
+          match resolveRuntimeEvidenceEnvironment program specialized.key
+              specialized.assumptions with
           | .error error => .fault error state
-          | .ok executablePlan =>
-              finishPreparedRun plan specialized.function.inferredBodyType <|
-                runTrusted program executablePlan entry arguments executionFuel
-                  state
+          | .ok rootEvidence =>
+              match prepareExecutablePlanEvidence program plan with
+              | .error error => .fault error state
+              | .ok executablePlan =>
+                  finishPreparedRun executablePlan
+                    specialized.function.inferredBodyType <|
+                    invokeDirectSpecialization executionFuel program
+                      executablePlan entry rootEvidence arguments state
 
 /-- Successful safe-boundary execution has the same inferred-result guarantee
 as the trusted evaluator reached after input validation. -/
@@ -4458,7 +4653,8 @@ theorem runWithValidationFuel_done_has_inferredBodyType
       decide (candidate.key = entry)) = [specialized])
     (done : runWithValidationFuel program plan entry arguments
       validationFuel executionFuel initial = .done value finalState) :
-    value.type? plan = some specialized.function.inferredBodyType := by
+    value.HasPreparedType program plan
+      specialized.function.inferredBodyType := by
   unfold runWithValidationFuel exactSpecialization at done
   rw [exact] at done
   simp only at done
@@ -4466,8 +4662,12 @@ theorem runWithValidationFuel_done_has_inferredBodyType
   · cases done
   · split at done
     · cases done
-    · exact finishPreparedRun_done_type plan
-        specialized.function.inferredBodyType _ value finalState done
+    · split at done
+      · cases done
+      · next executablePlan prepared =>
+          exact ⟨executablePlan, prepared,
+            finishPreparedRun_done_type executablePlan
+              specialized.function.inferredBodyType _ value finalState done⟩
 
 /-- Compatibility boundary using the same structural fuel for validation and
 execution.  New compiler clients can use `runWithValidationFuel` to keep the
@@ -4535,7 +4735,7 @@ open SourceInference TypeSystem
 
 theorem Cell.hasShallowType_some
     (plan : Plan) (type : Ty) (value : Value)
-    (typed : value.type? plan = some type) :
+    (typed : value.type? plan = some (runtimeType type)) :
     ({ type, value := some value } : Cell).HasShallowType plan := by
   intro selected equal
   cases equal
@@ -4562,7 +4762,7 @@ theorem RuntimeState.HasShallowTypes.read_value
     {location : Location} {cell : Cell} {value : Value}
     (found : state.read? location = some cell)
     (initialized : cell.value = some value) :
-    value.type? plan = some cell.type :=
+    value.type? plan = some (runtimeType cell.type) :=
   (typing.read found) value initialized
 
 theorem RuntimeState.HasShallowTypes.allocate
@@ -4588,7 +4788,7 @@ theorem RuntimeState.HasShallowTypes.allocate_none
 theorem RuntimeState.HasShallowTypes.allocate_some
     {plan : Plan} {state : RuntimeState} (typing : state.HasShallowTypes plan)
     (type : Ty) (value : Value)
-    (typed : value.type? plan = some type) :
+    (typed : value.type? plan = some (runtimeType type)) :
     (state.allocate type (some value)).2.HasShallowTypes plan :=
   typing.allocate type (some value)
     (Cell.hasShallowType_some plan type value typed)
@@ -4607,7 +4807,7 @@ theorem RuntimeState.HasShallowTypes.write?_some
     {plan : Plan} {state updated : RuntimeState} (typing : state.HasShallowTypes plan)
     {location : Location} {previous : Cell} {value : Value}
     (found : state.read? location = some previous)
-    (typed : value.type? plan = some previous.type)
+    (typed : value.type? plan = some (runtimeType previous.type))
     (written : state.write? location (some value) = some updated) :
     updated.HasShallowTypes plan := by
   apply typing.write? found _ written
@@ -4620,7 +4820,7 @@ theorem Value.HasDeepTypeFuel.shallow
     {fuel : Nat} {signatures : ProgramSignatures} {plan : Plan}
     {state : RuntimeState} {expected : Ty} {value : Value}
     (typed : value.HasDeepTypeFuel (fuel + 1) signatures plan state expected) :
-    value.type? plan = some expected :=
+    value.type? plan = some (runtimeType expected) :=
   typed.1
 
 /-- Deep heap typing refines the existing shallow heap invariant. -/
@@ -4678,7 +4878,8 @@ theorem Value.HasDeepTypeFuel.mapping_entry
     (member : entry ∈ entries) :
     entry.1.HasDeepTypeFuel fuel signatures plan state keyType ∧
       entry.2.HasDeepTypeFuel fuel signatures plan state valueType :=
-  typed.2.2.2 entry member
+  by
+    simpa using typed.2.2.2 entry member
 
 theorem Value.HasDeepTypeFuel.closure_captured
     {fuel : Nat} {signatures : ProgramSignatures} {plan : Plan}
@@ -4708,22 +4909,35 @@ theorem Value.HasDeepTypeFuel.down
       trivial
   | succ fuel inductionHypothesis =>
       intro expected value typed
+      simp only [Value.HasDeepTypeFuel] at typed ⊢
       cases value with
       | product left right =>
-          cases expected <;> try exact False.elim typed.2
+          generalize runtimeType expected = runtimeExpected at typed ⊢
+          cases runtimeExpected <;> try exact False.elim typed.2
           case product leftType rightType =>
             exact ⟨typed.1,
-              inductionHypothesis leftType left typed.2.1,
-              inductionHypothesis rightType right typed.2.2⟩
+              inductionHypothesis leftType left (by
+                change left.HasDeepTypeFuel (fuel + 1) signatures plan state
+                  leftType
+                exact typed.2.1),
+              inductionHypothesis rightType right (by
+                change right.HasDeepTypeFuel (fuel + 1) signatures plan state
+                  rightType
+                exact typed.2.2)⟩
       | mapping actualKey actualValue entries =>
-          cases expected <;> try exact False.elim typed.2
+          generalize runtimeType expected = runtimeExpected at typed ⊢
+          cases runtimeExpected <;> try exact False.elim typed.2
           case mapping keyType valueType =>
             exact ⟨typed.1, typed.2.1, typed.2.2.1,
               fun entry member =>
-                ⟨inductionHypothesis keyType entry.1
-                    (typed.2.2.2 entry member).1,
-                  inductionHypothesis valueType entry.2
-                    (typed.2.2.2 entry member).2⟩⟩
+                ⟨inductionHypothesis keyType entry.1 (by
+                    change entry.1.HasDeepTypeFuel (fuel + 1) signatures plan
+                      state keyType
+                    exact (typed.2.2.2 entry member).1),
+                  inductionHypothesis valueType entry.2 (by
+                    change entry.2.HasDeepTypeFuel (fuel + 1) signatures plan
+                      state valueType
+                    exact (typed.2.2.2 entry member).2)⟩⟩
       | constructed instantiation arguments =>
           exact ⟨typed.1, typed.2.1, typed.2.2.1, typed.2.2.2.1,
             fun pair member =>
@@ -4802,22 +5016,35 @@ theorem Value.HasDeepTypeFuel.transport_world
       trivial
   | succ fuel inductionHypothesis =>
       intro expected value typed
+      simp only [Value.HasDeepTypeFuel] at typed ⊢
       cases value with
       | product left right =>
-          cases expected <;> try exact False.elim typed.2
+          generalize runtimeType expected = runtimeExpected at typed ⊢
+          cases runtimeExpected <;> try exact False.elim typed.2
           case product leftType rightType =>
             exact ⟨typed.1,
-              inductionHypothesis leftType left typed.2.1,
-              inductionHypothesis rightType right typed.2.2⟩
+              inductionHypothesis leftType left (by
+                change left.HasDeepTypeFuel fuel signatures plan oldWorld
+                  leftType
+                exact typed.2.1),
+              inductionHypothesis rightType right (by
+                change right.HasDeepTypeFuel fuel signatures plan oldWorld
+                  rightType
+                exact typed.2.2)⟩
       | mapping actualKey actualValue entries =>
-          cases expected <;> try exact False.elim typed.2
+          generalize runtimeType expected = runtimeExpected at typed ⊢
+          cases runtimeExpected <;> try exact False.elim typed.2
           case mapping keyType valueType =>
             exact ⟨typed.1, typed.2.1, typed.2.2.1,
               fun entry member =>
-                ⟨inductionHypothesis keyType entry.1
-                    (typed.2.2.2 entry member).1,
-                  inductionHypothesis valueType entry.2
-                    (typed.2.2.2 entry member).2⟩⟩
+                ⟨inductionHypothesis keyType entry.1 (by
+                    change entry.1.HasDeepTypeFuel fuel signatures plan
+                      oldWorld keyType
+                    exact (typed.2.2.2 entry member).1),
+                  inductionHypothesis valueType entry.2 (by
+                    change entry.2.HasDeepTypeFuel fuel signatures plan
+                      oldWorld valueType
+                    exact (typed.2.2.2 entry member).2)⟩⟩
       | constructed instantiation arguments =>
           exact ⟨typed.1, typed.2.1, typed.2.2.1, typed.2.2.2.1,
             fun pair member =>
@@ -4905,22 +5132,41 @@ theorem Value.HasDeepTypeFuel.transport_typed_world
       | builtin _ => exact typed
   | succ fuel inductionHypothesis =>
       intro expected value newTyping typed
+      simp only [Value.HasDeepTypeFuel] at typed ⊢
       cases value with
       | product left right =>
-          cases expected <;> try exact False.elim typed.2
+          generalize runtimeType expected = runtimeExpected at typed ⊢
+          cases runtimeExpected <;> try exact False.elim typed.2
           case product leftType rightType =>
             exact ⟨typed.1,
-              inductionHypothesis leftType left newTyping.down typed.2.1,
-              inductionHypothesis rightType right newTyping.down typed.2.2⟩
+              inductionHypothesis leftType left newTyping.down
+                (by
+                  change left.HasDeepTypeFuel (fuel + 1) signatures plan
+                    oldWorld leftType
+                  exact typed.2.1),
+              inductionHypothesis rightType right newTyping.down
+                (by
+                  change right.HasDeepTypeFuel (fuel + 1) signatures plan
+                    oldWorld rightType
+                  exact typed.2.2)⟩
       | mapping actualKey actualValue entries =>
-          cases expected <;> try exact False.elim typed.2
+          generalize runtimeType expected = runtimeExpected at typed ⊢
+          cases runtimeExpected <;> try exact False.elim typed.2
           case mapping keyType valueType =>
             exact ⟨typed.1, typed.2.1, typed.2.2.1,
               fun entry member =>
-                ⟨inductionHypothesis keyType entry.1 newTyping.down
-                    (typed.2.2.2 entry member).1,
-                  inductionHypothesis valueType entry.2 newTyping.down
-                    (typed.2.2.2 entry member).2⟩⟩
+                ⟨inductionHypothesis keyType entry.1
+                    newTyping.down
+                    (by
+                      change entry.1.HasDeepTypeFuel (fuel + 1) signatures plan
+                        oldWorld keyType
+                      exact (typed.2.2.2 entry member).1),
+                  inductionHypothesis valueType entry.2
+                    newTyping.down
+                    (by
+                      change entry.2.HasDeepTypeFuel (fuel + 1) signatures plan
+                        oldWorld valueType
+                      exact (typed.2.2.2 entry member).2)⟩⟩
       | constructed instantiation arguments =>
           exact ⟨typed.1, typed.2.1, typed.2.2.1, typed.2.2.2.1,
             fun pair member =>
@@ -5045,7 +5291,8 @@ theorem bindValues_ok_preserves_deep_types
       obtain ⟨binder, value⟩ := binding
       have valueDeep : value.HasDeepType signatures plan state binder.scheme.body :=
         inputs (binder, value) (List.Mem.head rest)
-      have valueType : value.type? plan = some binder.scheme.body :=
+      have valueType : value.type? plan =
+          some (runtimeType binder.scheme.body) :=
         (valueDeep 1).shallow
       simp [bindValues, valueType, bne] at bound
       let nextState := (state.allocate binder.scheme.body (some value)).2
@@ -5211,7 +5458,7 @@ def ResolvedPlace.UpdatePreservesDeepAndCode
     cell.type = place.rootType →
     updateResolvedValue plan place.valueType modify
       (initialRootValue cell) place.projections = .ok updated →
-    updated.type? plan = some place.rootType →
+    updated.type? plan = some (runtimeType place.rootType) →
     state.write? place.location (some updated) = some finalState →
     updated.HasDeepType signatures plan finalState place.rootType ∧
       updated.HasPlanCode plan
@@ -5223,7 +5470,7 @@ theorem updateResolvedValue_index_present_eq
     (modify : Option Value → Except RuntimeError Value)
     (key selected child : Value) (entries : List (Value × Value))
     (rest : List RuntimeProjection)
-    (keyTyped : key.type? plan = some keyType)
+    (keyTyped : key.type? plan = some (runtimeType keyType))
     (found : mappingLookup? key entries = some selected)
     (recursive : updateResolvedValue plan expected modify (some selected)
       rest = .ok child) :
@@ -5241,7 +5488,7 @@ theorem updateResolvedValue_index_default_eq
     (modify : Option Value → Except RuntimeError Value)
     (key selected child : Value) (entries : List (Value × Value))
     (rest : List RuntimeProjection)
-    (keyTyped : key.type? plan = some keyType)
+    (keyTyped : key.type? plan = some (runtimeType keyType))
     (missing : mappingLookup? key entries = none)
     (defaulted : defaultValue? (valueType.size + 1) valueType = some selected)
     (recursive : updateResolvedValue plan expected modify (some selected)
@@ -5286,7 +5533,7 @@ theorem updateResolvedValue_index_present_preserves
     (modify : Option Value → Except RuntimeError Value)
     (key selected child updated : Value)
     (entries : List (Value × Value)) (rest : List RuntimeProjection)
-    (keyTyped : key.type? plan = some keyType)
+    (keyTyped : key.type? plan = some (runtimeType keyType))
     (found : mappingLookup? key entries = some selected)
     (recursive : updateResolvedValue plan expected modify (some selected)
       rest = .ok child)
@@ -5316,7 +5563,7 @@ theorem updateResolvedValue_index_default_preserves
     (modify : Option Value → Except RuntimeError Value)
     (key selected child updated : Value)
     (entries : List (Value × Value)) (rest : List RuntimeProjection)
-    (keyTyped : key.type? plan = some keyType)
+    (keyTyped : key.type? plan = some (runtimeType keyType))
     (missing : mappingLookup? key entries = none)
     (defaulted : defaultValue? (valueType.size + 1) valueType = some selected)
     (recursive : updateResolvedValue plan expected modify (some selected)
@@ -5365,7 +5612,8 @@ theorem Value.mappingInsert_hasDeepType
       rcases mappingInsert_member key replacement entries entry member with
         fresh | retained
       · subst entry
-        exact ⟨keyDeep fuel, replacementDeep fuel⟩
+        exact ⟨by simpa using keyDeep fuel,
+          by simpa using replacementDeep fuel⟩
       · exact (old (fuel + 1)).2.2.2 entry retained
 
 theorem Value.mappingInsert_hasPlanCode
@@ -5420,7 +5668,7 @@ theorem updateResolvedValue_index_present_preserves_from_parts
     (modify : Option Value → Except RuntimeError Value)
     (key selected child updated : Value)
     (entries : List (Value × Value)) (rest : List RuntimeProjection)
-    (keyTyped : key.type? plan = some keyType)
+    (keyTyped : key.type? plan = some (runtimeType keyType))
     (found : mappingLookup? key entries = some selected)
     (recursive : updateResolvedValue plan expected modify (some selected)
       rest = .ok child)
@@ -5452,7 +5700,7 @@ theorem updateResolvedValue_index_default_preserves_from_parts
     (modify : Option Value → Except RuntimeError Value)
     (key selected child updated : Value)
     (entries : List (Value × Value)) (rest : List RuntimeProjection)
-    (keyTyped : key.type? plan = some keyType)
+    (keyTyped : key.type? plan = some (runtimeType keyType))
     (missing : mappingLookup? key entries = none)
     (defaulted : defaultValue? (valueType.size + 1) valueType = some selected)
     (recursive : updateResolvedValue plan expected modify (some selected)
@@ -5595,8 +5843,8 @@ private theorem valueTypes?_of_zip
     ∀ (types : List Ty) (arguments : List Value),
       types.length = arguments.length →
       (∀ pair, pair ∈ List.zip types arguments →
-        pair.2.type? plan = some pair.1) →
-      valueTypes? plan arguments = some types := by
+        pair.2.type? plan = some (runtimeType pair.1)) →
+      valueTypes? plan arguments = some (types.map runtimeType) := by
   intro types
   induction types with
   | nil =>
@@ -5609,13 +5857,13 @@ private theorem valueTypes?_of_zip
       cases arguments with
       | nil => cases lengths
       | cons firstValue restValues =>
-          have headTyped : firstValue.type? plan = some first :=
+          have headTyped : firstValue.type? plan = some (runtimeType first) :=
             typed (first, firstValue) (by simp [List.zip, List.zipWith])
           have tailLengths : restTypes.length = restValues.length := by
             simpa using lengths
           have tailTyped : ∀ pair,
               pair ∈ List.zip restTypes restValues →
-                pair.2.type? plan = some pair.1 := by
+                pair.2.type? plan = some (runtimeType pair.1) := by
             intro pair member
             exact typed pair (by
               simp only [List.zip, List.zipWith, List.mem_cons]
@@ -5642,20 +5890,20 @@ theorem Value.constructed_replace_hasDeepType
     (old 1).2.2.2.1
   have oldShallow : ∀ pair,
       pair ∈ List.zip instantiation.payloadTypes arguments →
-        pair.2.type? plan = some pair.1 := by
+        pair.2.type? plan = some (runtimeType pair.1) := by
     intro pair member
     exact ((old 2).2.2.2.2 pair member).shallow
   obtain ⟨newLength, newShallow⟩ :=
     replaceValueAt_preserves_zip
-      (fun type value => value.type? plan = some type) index
+      (fun type value => value.type? plan = some (runtimeType type)) index
       instantiation.payloadTypes arguments replaced fieldType replacement
       oldLength oldShallow slot (replacementDeep 1).shallow written
   have newTypes : valueTypes? plan replaced =
-      some instantiation.payloadTypes :=
+      some (instantiation.payloadTypes.map runtimeType) :=
     valueTypes?_of_zip plan instantiation.payloadTypes replaced newLength
       newShallow
   have outer : (Value.constructed instantiation replaced).type? plan =
-      some instantiation.resultType := by
+      some (runtimeType instantiation.resultType) := by
     simp [Value.type?, newTypes]
   intro fuel
   cases fuel with
@@ -5742,7 +5990,7 @@ theorem writeResolvedPlace_done_components
       cell.type = place.rootType ∧
       updateResolvedValue plan place.valueType modify
         (initialRootValue cell) place.projections = .ok updated ∧
-      updated.type? plan = some place.rootType ∧
+      updated.type? plan = some (runtimeType place.rootType) ∧
       state.write? place.location (some updated) = some finalState := by
   unfold writeResolvedPlace at done
   cases found : state.read? place.location with
@@ -5761,7 +6009,8 @@ theorem writeResolvedPlace_done_components
             cases done
         | ok next =>
             rw [updateResult] at done
-            by_cases nextType : next.type? plan = some place.rootType
+            by_cases nextType : next.type? plan =
+                some (runtimeType place.rootType)
             · simp [nextType] at done
               cases written : state.write? place.location (some next) with
               | none => simp [written] at done
@@ -5810,8 +6059,8 @@ theorem ResolvedPlace.updatePreservesDeepAndCode_root
       state.read? place.location = some cell →
       cell.type = place.rootType →
       modify (initialRootValue cell) = .ok candidate →
-      candidate.type? plan = some place.valueType →
-      candidate.type? plan = some place.rootType →
+      candidate.type? plan = some (runtimeType place.valueType) →
+      candidate.type? plan = some (runtimeType place.rootType) →
       state.write? place.location (some candidate) = some finalState →
       candidate.HasDeepType signatures plan finalState place.rootType ∧
         candidate.HasPlanCode plan) :
@@ -5825,9 +6074,11 @@ theorem ResolvedPlace.updatePreservesDeepAndCode_root
       change Except.error error = Except.ok candidate at updatedByPath
       cases updatedByPath
   | ok modifiedValue =>
-      by_cases valueType : modifiedValue.type? plan = some place.valueType
+      by_cases valueType : modifiedValue.type? plan =
+          some (runtimeType place.valueType)
       · rw [modified] at updatedByPath
-        change (if modifiedValue.type? plan = some place.valueType then
+        change (if modifiedValue.type? plan =
+            some (runtimeType place.valueType) then
             Except.ok modifiedValue else
             Except.error (RuntimeError.typeMismatch place.valueType
               (modifiedValue.type? plan))) = .ok candidate at updatedByPath
@@ -5836,7 +6087,8 @@ theorem ResolvedPlace.updatePreservesDeepAndCode_root
         exact modifyPreserves cell candidate finalState found sameType
           modified valueType rootType written
       · rw [modified] at updatedByPath
-        change (if modifiedValue.type? plan = some place.valueType then
+        change (if modifiedValue.type? plan =
+            some (runtimeType place.valueType) then
             Except.ok modifiedValue else
             Except.error (RuntimeError.typeMismatch place.valueType
               (modifiedValue.type? plan))) = .ok candidate at updatedByPath
@@ -5857,8 +6109,8 @@ theorem writeResolvedPlace_done_preserves_root_deep_and_code
       state.read? place.location = some cell →
       cell.type = place.rootType →
       modify (initialRootValue cell) = .ok candidate →
-      candidate.type? plan = some place.valueType →
-      candidate.type? plan = some place.rootType →
+      candidate.type? plan = some (runtimeType place.valueType) →
+      candidate.type? plan = some (runtimeType place.rootType) →
       state.write? place.location (some candidate) = some nextState →
       candidate.HasDeepType signatures plan nextState place.rootType ∧
         candidate.HasPlanCode plan)
@@ -5892,7 +6144,8 @@ theorem bindValues_ok_preserves_plan_codes
       obtain ⟨binder, value⟩ := binding
       have valueCode : value.HasPlanCode plan :=
         inputs (binder, value) (List.Mem.head rest)
-      by_cases typed : value.type? plan = some binder.scheme.body
+      by_cases typed : value.type? plan =
+          some (runtimeType binder.scheme.body)
       · simp [bindValues, typed, bne] at bound
         have restInputs : ∀ pair, pair ∈ rest →
             pair.2.HasPlanCode plan := by
@@ -5911,7 +6164,7 @@ theorem unit_hasType (signatures : ProgramSignatures) (plan : Plan)
   unfold Value.hasType Value.hasTypeFuel
   simp only [Ty.unit, Nat.add_one]
   rw [Value.validateTypeFuel.eq_2]
-  rfl
+  all_goals rfl
 
 theorem bool_hasType (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) (value : Bool) :
@@ -5919,7 +6172,7 @@ theorem bool_hasType (signatures : ProgramSignatures) (plan : Plan)
   unfold Value.hasType Value.hasTypeFuel
   simp only [Ty.bool, Nat.add_one]
   rw [Value.validateTypeFuel.eq_3]
-  rfl
+  all_goals rfl
 
 theorem word_hasType (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) (value : Core.Word) :
@@ -5927,7 +6180,7 @@ theorem word_hasType (signatures : ProgramSignatures) (plan : Plan)
   unfold Value.hasType Value.hasTypeFuel
   simp only [Ty.word, Nat.add_one]
   rw [Value.validateTypeFuel.eq_4]
-  rfl
+  all_goals rfl
 
 theorem proxy_hasType (signatures : ProgramSignatures) (plan : Plan)
     (fuel : Nat) (inner : Ty) :
@@ -5936,9 +6189,9 @@ theorem proxy_hasType (signatures : ProgramSignatures) (plan : Plan)
   unfold Value.hasType Value.hasTypeFuel
   rw [Nat.add_one, Value.validateTypeFuel.eq_7]
   split
-  · change true = true
-    rfl
+  · rfl
   · contradiction
+  all_goals cases inner <;> rfl
 
 theorem zero_fuel_validateType (signatures : ProgramSignatures) (plan : Plan)
     (expected : Ty) (value : Value) :
@@ -5966,7 +6219,8 @@ theorem run_done_has_inferredBodyType
       decide (candidate.key = entry)) = [specialized])
     (done : run program plan entry arguments fuel initial =
       .done value finalState) :
-    value.type? plan = some specialized.function.inferredBodyType := by
+    value.HasPreparedType program plan
+      specialized.function.inferredBodyType := by
   exact runWithValidationFuel_done_has_inferredBodyType program plan entry
     arguments fuel fuel initial finalState value specialized exact done
 
@@ -5989,7 +6243,8 @@ theorem run?_some_has_inferredBodyType
       decide (candidate.key = entry)) = [specialized])
     (success : run? program plan entry arguments fuel initial =
       some (value, finalState)) :
-    value.type? plan = some specialized.function.inferredBodyType := by
+    value.HasPreparedType program plan
+      specialized.function.inferredBodyType := by
   apply run_done_has_inferredBodyType program plan entry arguments fuel
     initial finalState value specialized exact
   exact (run?_some_iff program plan entry arguments fuel initial finalState

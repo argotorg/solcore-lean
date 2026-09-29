@@ -208,13 +208,16 @@ private def expectShallowHeap (label : String)
         match cell.value with
         | none => pure ()
         | some value =>
-            assertTrue (decide (value.type? plan = some cell.type))
+            assertTrue (decide (
+                value.type? plan = some (runtimeType cell.type)))
               s!"{label} left an initialized cell with a mismatched type"
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
 
 private def source : String := String.intercalate "\n" [
   "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
   "enum StagedBox { Open(integer) }",
+  "type StagedWord = comptime<Word>;",
+  "type DeepStage = (StagedWord, (Word, StagedWord));",
   "function sumTree(tree: Tree<Word>) returns (Word) {",
   "  match (tree) {",
   "    case .Leaf(value) { return value; }",
@@ -237,6 +240,60 @@ private def source : String := String.intercalate "\n" [
   "}",
   "function acceptStagedBox(value: StagedBox) returns (Word) {",
   "  return 17;",
+  "}",
+  "function nestedComptime(value: DeepStage) returns (DeepStage) {",
+  "  return value;",
+  "}",
+  "function integerBitAnd() returns (integer) { return 5 & 3; }",
+  "function integerBitXor() returns (integer) { return 5 ^ 3; }",
+  "function integerBitOr() returns (integer) { return 5 | 3; }",
+  "function integerBitNot() returns (integer) { return ~5; }",
+  "function integerBitAndNegative() returns (integer) {",
+  "  return integerSub(0, 5) & 3;",
+  "}",
+  "function integerBitOrNegative() returns (integer) {",
+  "  return 2 | integerSub(0, 5);",
+  "}",
+  "function integerBitXorNegative() returns (integer) {",
+  "  return integerSub(0, 5) ^ 2;",
+  "}",
+  "function markedEffects(comptime seed: Word) returns (comptime<Word>) {",
+  "  let total: Word = seed;",
+  "  let table: mapping(Word => Word);",
+  "  let bump = lam(comptime delta: Word) -> Word {",
+  "    total += delta;",
+  "    table[0] = total;",
+  "    return table[0];",
+  "  };",
+  "  return bump(3);",
+  "}",
+  "function markedClosureClosed() returns (Word) {",
+  "  let f = lam(comptime value: Word) -> Word { return value; };",
+  "  return f(21);",
+  "}",
+  "function markedClosureRuntime(value: Word) returns (Word) {",
+  "  let f = lam(comptime item: Word) -> Word { return item; };",
+  "  return f(value);",
+  "}",
+  "function markedGlobal(comptime value: Word) returns (Word) { return value; }",
+  "function markedGlobalClosed() returns (Word) {",
+  "  let f = markedGlobal;",
+  "  return f(22);",
+  "}",
+  "function markedGlobalRuntime(value: Word) returns (Word) {",
+  "  let f = markedGlobal;",
+  "  return f(value);",
+  "}",
+  "function markedResult(comptime value: Word) returns (comptime<Word>) {",
+  "  return value;",
+  "}",
+  "function markedResultIndirectBlocked() returns (Word) {",
+  "  let f = markedResult;",
+  "  return f(23);",
+  "}",
+  "function markedResultIndirectStaged() returns (comptime<Word>) {",
+  "  let f = markedResult;",
+  "  return f(24);",
   "}",
   "function tupleMatch() returns (Word) {",
   "  let tree: Tree<Word> = .Leaf(7);",
@@ -314,6 +371,11 @@ private def source : String := String.intercalate "\n" [
   "trait Eq<T> {}",
   "impl Eq<Word> where Word: Proof {}",
   "impl Eq<Bool> {}",
+  "function constrainedRoot(value: Word) returns (Word) where Word: Eq {",
+  "  let table: mapping(Word => Word);",
+  "  table[0] = value;",
+  "  return table[0];",
+  "}",
   "trait Mark<T> {}",
   "impl Mark<Word> {}",
   "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
@@ -379,6 +441,17 @@ private def source : String := String.intercalate "\n" [
   "      where Word: Eq, Word: Mark {",
   "    return (value, value);",
   "  }",
+  "}",
+  "type WordFunction = function(Word) returns (Word);",
+  "function returnedIdentity(value: Word) returns (Word) { return value; }",
+  "impl Coerce<Word, WordFunction> {",
+  "  function coerce(value: Word) returns (WordFunction)",
+  "      where Word: Eq, Word: Mark {",
+  "    return returnedIdentity;",
+  "  }",
+  "}",
+  "function functionFromCoercion(value: Word) returns (WordFunction) {",
+  "  return value;",
   "}",
   "function acceptWord(value: Word) returns (Word) { return value; }",
   "function acceptWordPair(value: (Word, Word)) returns ((Word, Word)) {",
@@ -647,15 +720,77 @@ private def testNominalInputValidation (program : CheckedProgram) : IO Unit := d
     payloadTypes := stagedConstructor.payloadTypes
     resultType := stagedResultType
   }
-  match runPrepared stagedPrepared
-      [.constructed stagedInstantiation [.integer 13]] with
-  | .fault (.unsupportedStagedInput expected) { heap := [] } =>
-      assertTrue (decide (expected = stagedResultType))
-        "staged constructor input lost its authoritative nominal type"
-  | .fault error state => throw (IO.userError
-      s!"staged constructor input mutated state before rejection: {reprStr error}, {reprStr state}")
+  let stagedResult := runPrepared stagedPrepared
+    [.constructed stagedInstantiation [.integer 13]]
+  expectWord "validated staged nominal input" 17 stagedResult
+  expectShallowHeap "validated staged nominal input" stagedPrepared.plan
+    stagedResult
+
+private def testStagedRuntimeTypesAndEffects
+    (program : CheckedProgram) : IO Unit := do
+  let nested ← prepareNamed program "nestedComptime"
+  let nestedResult := runPrepared nested [
+    .product (.word (word 4))
+      (.product (.word (word 5)) (.word (word 6)))]
+  match nestedResult with
+  | .done (.product (.word left)
+      (.product (.word middle) (.word right))) _ =>
+      assertTrue (left == word 4 && middle == word 5 && right == word 6)
+        "recursively erased comptime product changed its payload"
   | result => throw (IO.userError
-      s!"staged constructor input was not rejected: {reprStr result}")
+      s!"recursively erased comptime product returned {reprStr result}")
+  expectShallowHeap "recursively erased comptime product" nested.plan
+    nestedResult
+
+  for (name, expected) in [
+      ("integerBitAnd", 1), ("integerBitXor", 6),
+      ("integerBitOr", 7), ("integerBitNot", -6),
+      ("integerBitAndNegative", 3), ("integerBitOrNegative", -5),
+      ("integerBitXorNegative", -7)] do
+    let prepared ← prepareNamed program name
+    match runPrepared prepared with
+    | .done (.integer actual) state =>
+        assertTrue (actual == expected)
+          s!"{name} returned the wrong integer"
+        assertTrue state.heap.isEmpty
+          s!"{name} unexpectedly allocated a cell"
+    | result => throw (IO.userError s!"{name} returned {reprStr result}")
+
+  let effects ← prepareNamed program "markedEffects"
+  let effectsResult := runPrepared effects [.word (word 9)]
+  expectWord "marked closure/mutation/mapping" 12 effectsResult
+  expectShallowHeap "marked closure/mutation/mapping" effects.plan
+    effectsResult
+
+  let closureClosed ← prepareNamed program "markedClosureClosed"
+  expectWord "closed marked closure call" 21 (runPrepared closureClosed)
+  let closureRuntime ← prepareNamed program "markedClosureRuntime"
+  match runPrepared closureRuntime [.word (word 21)] with
+  | .fault (.comptimeArgumentStageMismatch _ _ 0 _ .runtime) _ => pure ()
+  | result => throw (IO.userError
+      s!"runtime marked closure argument returned {reprStr result}")
+
+  let globalClosed ← prepareNamed program "markedGlobalClosed"
+  expectWord "closed marked global call" 22 (runPrepared globalClosed)
+  let globalRuntime ← prepareNamed program "markedGlobalRuntime"
+  match runPrepared globalRuntime [.word (word 22)] with
+  | .fault (.comptimeArgumentStageMismatch _ _ 0 _ .runtime) _ => pure ()
+  | result => throw (IO.userError
+      s!"runtime marked global argument returned {reprStr result}")
+
+  let blockedResult ← prepareNamed program "markedResultIndirectBlocked"
+  match runPrepared blockedResult with
+  | .fault (.comptimeResultStageMismatch _ _ _ .deferred) _ => pure ()
+  | result => throw (IO.userError
+      s!"ordinary indirect staged result returned {reprStr result}")
+  let stagedResult ← prepareNamed program "markedResultIndirectStaged"
+  expectWord "staged indirect marked result" 24 (runPrepared stagedResult)
+
+  let functionResult ← prepareNamed program "functionFromCoercion"
+  match runPrepared functionResult [.word (word 1)] with
+  | .done (.global _ _) _ => pure ()
+  | result => throw (IO.userError
+      s!"method-discovered first-class global returned {reprStr result}")
 
 private def expectPreExecutionFault (label : String)
     (accept : RuntimeError → Bool) : RunResult → IO Unit
@@ -1284,6 +1419,13 @@ closure case verifies that deferred code captures the dictionary at creation
 rather than borrowing it from its eventual invoker. -/
 private def testRuntimeEvidenceForwarding
     (program : CheckedProgram) : IO Unit := do
+  let constrainedRoot ← prepareNamed program "constrainedRoot"
+  let rootSpecialized ← entrySpecialization constrainedRoot
+  assertTrue (rootSpecialized.assumptions.length == 1)
+    "ground constrained root lost its retained predicate"
+  expectWord "ground constrained root evidence" 59
+    (runPrepared constrainedRoot [.word (word 59)])
+
   let nested ← prepareNamed program "nestedConstrained"
   let nestedRoot ← entrySpecialization nested
   let relay ← specializationNamedInPlan program nested "relay"
@@ -1624,6 +1766,7 @@ private def testAll : IO Unit := do
   testRuntimeEvidenceForwarding program
   testQualifiedLocalRequirementValidation program
   testNominalInputValidation program
+  testStagedRuntimeTypesAndEffects program
   testTamperedExecutableMetadata program
   testIndirectArgumentCountMetadata program
   testIndirectEndpointMetadata program
