@@ -2212,6 +2212,95 @@ theorem attachExpressionCoercions_containsExpression
           exact List.mem_map.mpr ⟨entry, member, equal⟩
         · exact contains
 
+/-- Recording a selected direct call materializes the exact call payload after
+the delayed argument-coercion rewrites and synthetic callee allocation. -/
+theorem recordSelectedCallResult_success_containsExpression
+    {source callee : Syntax.Expr} {name : String}
+    {arguments : List InferredExpression}
+    {attempt : Detail.CandidateAttemptResult}
+    {result : InferredExpression}
+    {trailingCoercions : List CoercionStep}
+    {state : Frontend.SourceInference.State}
+    {recorded : InferredExpression × Frontend.SourceInference.State}
+    (success : Detail.recordSelectedCallResult source callee name arguments
+      attempt result trailingCoercions state = recorded)
+    (roots : List NodeId := []) :
+    ContainsExpression (recorded.2.toTypedSource roots) result.id {
+      id := result.id
+      span := source.span
+      type := result.type
+      form := .call
+        ((Detail.attachExpressionCoercions state attempt.argumentCoercions
+          ).allocateExpressionId.1)
+        (arguments.map (·.id))
+        (.declaration attempt.instantiation)
+      requirements :=
+        Detail.coercionRequirements attempt.callCoercions ++
+          attempt.signatureRequirements ++
+          Detail.coercionRequirements trailingCoercions
+      coercions := attempt.callCoercions ++ trailingCoercions
+    } := by
+  let attachedState := Detail.attachExpressionCoercions state
+    attempt.argumentCoercions
+  let allocation := attachedState.allocateExpressionId
+  let callNode : ExpressionNode := {
+    id := result.id
+    span := source.span
+    type := result.type
+    form := .call allocation.1 (arguments.map (·.id))
+      (.declaration attempt.instantiation)
+    requirements :=
+      Detail.coercionRequirements attempt.callCoercions ++
+        attempt.signatureRequirements ++
+        Detail.coercionRequirements trailingCoercions
+    coercions := attempt.callCoercions ++ trailingCoercions
+  }
+  have nodes := Detail.recordSelectedCallResult_success_nodes success
+  have contains : ContainsExpression (recorded.2.toTypedSource roots)
+      result.id callNode := by
+    refine ⟨?_, rfl⟩
+    change .expression callNode ∈ recorded.2.nodes
+    rw [nodes.2]
+    simp [attachedState, allocation, callNode]
+  simpa only [attachedState, allocation, callNode] using contains
+
+/-- Every requirement stored on a successfully recorded selected call occurs
+primarily at that exact call identity in any later append-only semantic
+source.  Flexible substitution changes types and evidence, but not stable
+requirement identities or their owning occurrence. -/
+theorem recordSelectedCallResult_success_primaryRequirementOccursAt
+    {source callee : Syntax.Expr} {name : String}
+    {arguments : List InferredExpression}
+    {attempt : Detail.CandidateAttemptResult}
+    {result : InferredExpression}
+    {trailingCoercions : List CoercionStep}
+    {state : Frontend.SourceInference.State}
+    {recorded : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {substitution : TypeSystem.Substitution}
+    {semanticSource : TypedSource}
+    {requirement : RequirementId}
+    (success : Detail.recordSelectedCallResult source callee name arguments
+      attempt result trailingCoercions state = recorded)
+    (sourceExtension : TypingSourceExtends
+      ((recorded.2.toTypedSource roots).applySubstitution substitution)
+      semanticSource)
+    (member : requirement ∈
+      Detail.coercionRequirements attempt.callCoercions ++
+        attempt.signatureRequirements ++
+        Detail.coercionRequirements trailingCoercions) :
+    PrimaryRequirementOccursAt semanticSource (.expression result.id)
+      requirement := by
+  have rawContains :=
+    recordSelectedCallResult_success_containsExpression success roots
+  have substitutedContains :=
+    FlexibleSubstitution.ContainsExpression.applySubstitution substitution
+      rawContains
+  have finalContains := sourceExtension.containsExpression
+    substitutedContains
+  apply finalContains.primaryRequirementOccursAt
+  simpa using member
+
 /-- Recording a selected direct call extends the coercion-attached typed
 source by the synthetic callee and call nodes appended by the executable
 recorder. -/
@@ -18185,13 +18274,10 @@ theorem recordSelectedCallResult_success_expressionHasType
         Detail.coercionRequirements trailingCoercions
     coercions := attempt.callCoercions ++ trailingCoercions
   }
-  have nodes := Detail.recordSelectedCallResult_success_nodes success
   have rawContains : ContainsExpression (recorded.2.toTypedSource roots)
       result.id callNode := by
-    refine ⟨?_, rfl⟩
-    change .expression callNode ∈ recorded.2.nodes
-    rw [nodes.2]
-    simp [attachedState, allocation, callNode]
+    simpa only [attachedState, allocation, callNode] using
+      recordSelectedCallResult_success_containsExpression success roots
   have finalContains : ContainsExpression ledgerSource result.id
       (callNode.applySubstitution later.inference.substitution) :=
     sourceExtension.containsExpression
@@ -18358,11 +18444,6 @@ theorem tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHas
           (.expression entry.expression) requirement)
     (callCovered : TemplateScopeCovered ledgerSource active
       (.expression result.id))
-    (callOccurs : ∀ requirement,
-      requirement ∈ Detail.coercionRequirements attempt.callCoercions ++
-          attempt.signatureRequirements →
-        PrimaryRequirementOccursAt ledgerSource
-          (.expression result.id) requirement)
     (trailingPath : CoercionPathValid active
       (later.inference.substitution.apply attempt.result.type)
       (later.inference.substitution.apply result.type)
@@ -18408,7 +18489,12 @@ theorem tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHas
         PrimaryRequirementOccursAt ledgerSource
           (.expression attempt.result.id) requirement := by
     intro requirement member
-    simpa only [← resultIdEq] using callOccurs requirement member
+    have occurs :=
+      recordSelectedCallResult_success_primaryRequirementOccursAt
+        recordSuccess sourceExtension
+        (List.mem_append_left
+          (Detail.coercionRequirements trailingCoercions) member)
+    simpa only [← resultIdEq] using occurs
   have instantiationPredicatesEq :
       attempt.instantiation.predicates = instantiated.predicates := by
     rw [Detail.tryFunctionCandidate_some_instantiation candidateSuccess]

@@ -679,6 +679,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_containsExpression
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_primaryRequirementOccursAt
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_attachedTypingSourceExtends
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_directDeclarationCalleeValid
