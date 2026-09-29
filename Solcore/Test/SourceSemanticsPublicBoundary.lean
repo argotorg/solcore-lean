@@ -98,6 +98,8 @@ example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_evi
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_entails
 example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_retainedEvidenceValid
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferenceTypeFormationValidated_typeAdmissible_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.closedBinderLocals
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.closedBinderRequirements

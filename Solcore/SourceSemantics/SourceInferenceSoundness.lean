@@ -52,6 +52,36 @@ private theorem list_eq_singleton_of_length_eq_one
       | nil => exact ⟨item, rfl⟩
       | cons second tail => simp at length_eq
 
+/-- A frontend-formed open inference type remains admissible after the
+enclosing flexible substitution closes its source context.  Allocator bounds
+alone only constrain metavariable identities; the formation certificate is
+the additional invariant which rules out recovery types, malformed nominal
+applications, and out-of-scope rigid parameters. -/
+theorem inferenceTypeFormationValidated_typeAdmissible_afterSubstitution
+    {signatures : ProgramSignatures}
+    {owner : Resolved.DeclarationId}
+    {parameters : List TypeSystem.TypeParameterId}
+    {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    {substitution : TypeSystem.Substitution}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {source target : SourceSemantics.Context}
+    (validated : Frontend.InferenceTypeFormationValidated signatures owner
+      parameters flexibleVariables type)
+    (binders : TypeParameterBindersWellFormed source)
+    (signatures_eq : source.signatures = signatures)
+    (parameters_eq : source.typeParameters = parameters)
+    (owner_eq : source.currentDeclaration = some owner)
+    (residual : source.residualTypeVariables = true)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid substitution
+      closedVariables source target) :
+    TypeAdmissible target (substitution.apply type) := by
+  apply FlexibleSubstitution.TypeAdmissible.applySubstitution
+    contextValid.closes
+  exact
+    Solcore.SourceSemantics.InferenceTypeFormationValidated.typeAdmissible
+      validated binders signatures_eq parameters_eq owner_eq residual
+
 private theorem list_perm_reverse {value : Type} (values : List value) :
     values.Perm values.reverse := by
   induction values with
