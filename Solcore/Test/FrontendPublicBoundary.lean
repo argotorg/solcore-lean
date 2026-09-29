@@ -499,6 +499,18 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_builtinFunctionIdentifier_record
 example :=
+  @Solcore.Frontend.SourceInference.Detail.LambdaPrefixFacts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.LambdaPrefixFacts.noExpectedPartsAnnotated
+example :=
+  @Solcore.Frontend.SourceInference.Detail.LambdaPrefixFacts.noExpectedPartsFresh
+example :=
+  @Solcore.Frontend.SourceInference.Detail.LambdaPrefixFacts.expectedPartsAnnotated
+example :=
+  @Solcore.Frontend.SourceInference.Detail.LambdaPrefixFacts.expectedPartsInferred
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_lambda_facts
+example :=
   @Solcore.Frontend.SourceInference.Detail.qualifiedFunctionsNamed_success_subset_catalog
 example :=
   @Solcore.Frontend.SourceInference.Detail.PlannedCoercionPath.isValid

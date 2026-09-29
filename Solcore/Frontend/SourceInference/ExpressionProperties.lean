@@ -301,6 +301,246 @@ theorem inferExprFuel_success_builtinFunctionIdentifier_record
     builtinEq, Bool.false_eq_true, if_false, bind, Except.bind] at success
   simpa only using success
 
+/-- The executable prefix of lambda inference has four exact successful
+shapes.  An explicit return annotation always supplies the result type;
+otherwise the result comes either from a recognized expected function type or
+from one fresh inference variable.  Keeping these alternatives separate lets
+semantic consumers recover both the state transition and the provenance of
+the selected result type without unfolding the expression traversal. -/
+inductive LambdaPrefixFacts
+    (context : Context) (expected : Option Ty)
+    (returnAnnotation : Option Syntax.TypeExpr)
+    (parameterTypes : List Ty) (parameterState : State) :
+    Ty → State → Prop where
+  | noExpectedPartsAnnotated
+      {sourceType : Syntax.TypeExpr} {resultType : Ty}
+      (parts_eq :
+        expected.bind (fun type =>
+          functionParts? (parameterState.resolve type)) = none)
+      (annotation_eq : returnAnnotation = some sourceType)
+      (resolution : resolveSourceType context sourceType = .ok resultType) :
+      LambdaPrefixFacts context expected returnAnnotation parameterTypes
+        parameterState resultType parameterState
+  | noExpectedPartsFresh
+      {resultType : Ty} {resultState : State}
+      (parts_eq :
+        expected.bind (fun type =>
+          functionParts? (parameterState.resolve type)) = none)
+      (annotation_eq : returnAnnotation = none)
+      (fresh_eq : parameterState.fresh = (resultType, resultState)) :
+      LambdaPrefixFacts context expected returnAnnotation parameterTypes
+        parameterState resultType resultState
+  | expectedPartsAnnotated
+      {expectedParameter expectedResult resultType : Ty}
+      {fittedState : State} {sourceType : Syntax.TypeExpr}
+      (parts_eq :
+        expected.bind (fun type =>
+          functionParts? (parameterState.resolve type)) =
+            some (expectedParameter, expectedResult))
+      (parameter_unify : unify parameterState
+        (Ty.productMany parameterTypes) expectedParameter = .ok fittedState)
+      (annotation_eq : returnAnnotation = some sourceType)
+      (resolution : resolveSourceType context sourceType = .ok resultType) :
+      LambdaPrefixFacts context expected returnAnnotation parameterTypes
+        parameterState resultType fittedState
+  | expectedPartsInferred
+      {expectedParameter resultType : Ty} {fittedState : State}
+      (parts_eq :
+        expected.bind (fun type =>
+          functionParts? (parameterState.resolve type)) =
+            some (expectedParameter, resultType))
+      (parameter_unify : unify parameterState
+        (Ty.productMany parameterTypes) expectedParameter = .ok fittedState)
+      (annotation_eq : returnAnnotation = none) :
+      LambdaPrefixFacts context expected returnAnnotation parameterTypes
+        parameterState resultType fittedState
+
+/-- Invert successful lambda inference into its complete executable trace.
+The prefix certificate records exactly the four ways parameter fitting and
+result-type selection can succeed; the remaining fields expose body
+inference, result unification, lexical restoration, and the final ordinary
+expression-recording step. -/
+theorem inferExprFuel_success_lambda_facts
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {keyword : Syntax.SourceSpan}
+    {parameters : Syntax.DelimitedList Syntax.LambdaParameter}
+    {returnAnnotation : Option Syntax.TypeExpr} {body : Syntax.Block}
+    {result : InferredExpression × State}
+    (expressionEq : expression.value =
+      .lambda keyword parameters returnAnnotation body)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ boundParameters parameterTypes parameterState resultType resultState
+        bodyResult unifiedState restoredState,
+      bindLambdaParameters context parameters.elements 0 [] allocated =
+          .ok (boundParameters, parameterTypes, parameterState) ∧
+        LambdaPrefixFacts context expected returnAnnotation parameterTypes
+          parameterState resultType resultState ∧
+        inferStatementsFuel fuel { context with loopDepth := 0 } body.value
+            resultType resultState = .ok bodyResult ∧
+        unify bodyResult.state bodyResult.type resultType = .ok unifiedState ∧
+        restoredState =
+          unifiedState.restoreLexicalScope allocated.lexicalScope ∧
+        recordExpressionWithExpected context expression id
+          (.function
+            (restoredState.resolve (Ty.productMany parameterTypes))
+            (restoredState.resolve resultType))
+          (.lambda boundParameters (restoredState.resolve resultType)
+            bodyResult.statements)
+          [] expected restoredState = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases parameterResult : bindLambdaParameters context parameters.elements 0 []
+      allocated with
+  | error error =>
+      simp [parameterResult, bind, Except.bind] at success
+  | ok parameterTriple =>
+      rcases parameterTriple with
+        ⟨boundParameters, parameterTypes, parameterState⟩
+      simp only [parameterResult, bind, Except.bind] at success
+      let parameterType := Ty.productMany parameterTypes
+      cases partsEq : expected.bind (fun type =>
+          functionParts? (parameterState.resolve type)) with
+      | none =>
+          simp only [parameterType, partsEq, bind, Except.bind, pure,
+            Pure.pure, Except.pure] at success
+          cases returnAnnotation with
+          | some sourceType =>
+              cases annotationResult : resolveSourceType context sourceType with
+              | error error =>
+                  simp [annotationResult, bind, Except.bind] at success
+              | ok resultType =>
+                  simp only [annotationResult, bind, Except.bind, pure,
+                    Pure.pure, Except.pure, Prod.eta] at success
+                  cases bodySuccess : inferStatementsFuel fuel
+                      { context with loopDepth := 0 } body.value resultType
+                      parameterState with
+                  | error error =>
+                      simp [bodySuccess, bind, Except.bind] at success
+                  | ok bodyResult =>
+                      simp only [bodySuccess, bind, Except.bind] at success
+                      cases unifySuccess : unify bodyResult.state
+                          bodyResult.type resultType with
+                      | error error =>
+                          simp [unifySuccess, bind, Except.bind] at success
+                      | ok unifiedState =>
+                          simp only [unifySuccess, bind, Except.bind] at success
+                          let restoredState := unifiedState.restoreLexicalScope
+                            allocated.lexicalScope
+                          refine ⟨boundParameters, parameterTypes,
+                            parameterState, resultType, parameterState,
+                            bodyResult, unifiedState, restoredState,
+                            rfl, ?_, bodySuccess, unifySuccess,
+                            rfl, ?_⟩
+                          · exact .noExpectedPartsAnnotated partsEq rfl
+                              annotationResult
+                          · simpa only [parameterType, restoredState] using
+                              success
+          | none =>
+              simp only [partsEq, bind, Except.bind, pure, Pure.pure,
+                Except.pure, Prod.eta] at success
+              generalize freshEq : parameterState.fresh = freshResult at success
+              rcases freshResult with ⟨resultType, resultState⟩
+              cases bodySuccess : inferStatementsFuel fuel
+                  { context with loopDepth := 0 } body.value resultType
+                  resultState with
+              | error error =>
+                  simp [bodySuccess, bind, Except.bind] at success
+              | ok bodyResult =>
+                  simp only [bodySuccess, bind, Except.bind] at success
+                  cases unifySuccess : unify bodyResult.state bodyResult.type
+                      resultType with
+                  | error error =>
+                      simp [unifySuccess, bind, Except.bind] at success
+                  | ok unifiedState =>
+                      simp only [unifySuccess, bind, Except.bind] at success
+                      let restoredState := unifiedState.restoreLexicalScope
+                        allocated.lexicalScope
+                      refine ⟨boundParameters, parameterTypes,
+                        parameterState, resultType, resultState, bodyResult,
+                        unifiedState, restoredState, rfl, ?_,
+                        bodySuccess, unifySuccess, rfl, ?_⟩
+                      · exact .noExpectedPartsFresh partsEq rfl freshEq
+                      · simpa only [parameterType, restoredState] using
+                          success
+      | some parts =>
+          rcases parts with ⟨expectedParameter, expectedResult⟩
+          simp only [parameterType, partsEq] at success
+          cases parameterUnify : unify parameterState parameterType
+              expectedParameter with
+          | error error =>
+              simp [parameterType, parameterUnify, bind, Except.bind] at success
+          | ok fittedState =>
+              simp only [parameterType, parameterUnify, bind, Except.bind]
+                at success
+              cases returnAnnotation with
+              | some sourceType =>
+                  cases annotationResult : resolveSourceType context sourceType with
+                  | error error =>
+                      simp [annotationResult, bind, Except.bind] at success
+                  | ok resultType =>
+                      simp only [annotationResult, bind, Except.bind, pure,
+                        Pure.pure, Except.pure, Prod.eta] at success
+                      cases bodySuccess : inferStatementsFuel fuel
+                          { context with loopDepth := 0 } body.value resultType
+                          fittedState with
+                      | error error =>
+                          simp [bodySuccess, bind, Except.bind] at success
+                      | ok bodyResult =>
+                          simp only [bodySuccess, bind, Except.bind] at success
+                          cases unifySuccess : unify bodyResult.state
+                              bodyResult.type resultType with
+                          | error error =>
+                              simp [unifySuccess, bind, Except.bind] at success
+                          | ok unifiedState =>
+                              simp only [unifySuccess, bind, Except.bind]
+                                at success
+                              let restoredState :=
+                                unifiedState.restoreLexicalScope
+                                  allocated.lexicalScope
+                              refine ⟨boundParameters, parameterTypes,
+                                parameterState, resultType, fittedState,
+                                bodyResult, unifiedState, restoredState,
+                                rfl, ?_, bodySuccess, unifySuccess,
+                                rfl, ?_⟩
+                              · exact .expectedPartsAnnotated partsEq
+                                  (by simpa only [parameterType] using
+                                    parameterUnify)
+                                  rfl annotationResult
+                              · simpa only [parameterType, restoredState] using
+                                  success
+              | none =>
+                  simp only [partsEq, bind, Except.bind, pure, Pure.pure,
+                    Except.pure, Prod.eta] at success
+                  cases bodySuccess : inferStatementsFuel fuel
+                      { context with loopDepth := 0 } body.value expectedResult
+                      fittedState with
+                  | error error =>
+                      simp [bodySuccess, bind, Except.bind] at success
+                  | ok bodyResult =>
+                      simp only [bodySuccess, bind, Except.bind] at success
+                      cases unifySuccess : unify bodyResult.state
+                          bodyResult.type expectedResult with
+                      | error error =>
+                          simp [unifySuccess, bind, Except.bind] at success
+                      | ok unifiedState =>
+                          simp only [unifySuccess, bind, Except.bind] at success
+                          let restoredState := unifiedState.restoreLexicalScope
+                            allocated.lexicalScope
+                          refine ⟨boundParameters, parameterTypes,
+                            parameterState, expectedResult, fittedState,
+                            bodyResult, unifiedState, restoredState,
+                            rfl, ?_, bodySuccess, unifySuccess,
+                            rfl, ?_⟩
+                          · exact .expectedPartsInferred partsEq
+                              (by simpa only [parameterType] using
+                                parameterUnify)
+                              rfl
+                          · simpa only [parameterType, restoredState] using
+                              success
+
 namespace PlannedCoercionStep
 
 /-- A planned coercion edge retains the canonical `Coerce<source, target>`
