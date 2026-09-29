@@ -34,6 +34,20 @@ private def workspace : Workspace.RawWorkspace := {
         "function globalIdentity<T>(value: T) returns (T) { return value; }",
         "trait Eq<T> {}",
         "impl Eq<Word> {}",
+        "trait Coerce<From, To> {",
+        "  function coerce(value: From) returns (To);",
+        "}",
+        "function coercionSeed(value: Bool) returns (Word) {",
+        "  return value ? 40 : 6;",
+        "}",
+        "impl Coerce<Bool, Word> {",
+        "  function coerce(value: Bool) returns (Word) {",
+        "    let scratch: mapping(Word => Word);",
+        "    scratch[0] = coercionSeed(value);",
+        "    scratch[0] += 2;",
+        "    return scratch[0];",
+        "  }",
+        "}",
         "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
         "function localProof(flag: Bool) returns (Word, Bool) {",
         "  let f = lam(value) { return keepAs(1, value); };",
@@ -44,6 +58,11 @@ private def workspace : Workspace.RawWorkspace := {
         "function typedEvidence(value: Word) returns (Word) {",
         "  let table: mapping(Word => Word);",
         "  table[0] = relay(value);",
+        "  return table[0];",
+        "}",
+        "function typedCoercion(value: Bool) returns (Word) {",
+        "  let table: mapping(Word => Word);",
+        "  table[0] = value;",
         "  return table[0];",
         "}",
         "function polymorphicLocal(flag: Bool) returns (Word, Bool) {",
@@ -150,6 +169,7 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     compileNamed checked "main.solc" "recursiveContextPolymorphicLocal"
   let localProof ← compileNamed checked "main.solc" "localProof"
   let typedEvidence ← compileNamed checked "main.solc" "typedEvidence"
+  let typedCoercion ← compileNamed checked "main.solc" "typedCoercion"
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
@@ -159,7 +179,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       nestedPolymorphicLocal.backend = .typedSource ∧
       recursiveContextPolymorphicLocal.backend = .typedSource ∧
       localProof.backend = .typedSource ∧
-      typedEvidence.backend = .typedSource))
+      typedEvidence.backend = .typedSource ∧
+      typedCoercion.backend = .typedSource))
     "automatic backend precedence changed"
   assertTrue (decide (
       direct.key.declaration.moduleId = main ∧
@@ -285,6 +306,10 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       s!"runtime local proof calls returned {reprStr result}")
   expectTypedWord "public typed evidence forwarding" 73 <|
     typedEvidence.runTyped [.word (word 73)] runtimeOptions
+  expectTypedWord "public stateful coercion (true)" 42 <|
+    typedCoercion.runTyped [.bool true] runtimeOptions
+  expectTypedWord "public stateful coercion (false)" 8 <|
+    typedCoercion.runTyped [.bool false] runtimeOptions
   pure { checked, direct, recursive, typed }
 
 private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
@@ -383,7 +408,8 @@ private def testAllBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
       | error => throw (IO.userError
           s!"graph rejection lost its unsupported-type category: {reprStr error}")
       match failures.typedSource with
-      | .unsupportedExpressionCoercions _ => pure ()
+      | .executableCoercionMethod _ _ _
+          (.missingTraitMethod _ "coerce") => pure ()
       | error => throw (IO.userError
           s!"typed rejection lost its evidence diagnostic: {reprStr error}")
   | .error error => throw (IO.userError

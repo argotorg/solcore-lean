@@ -165,7 +165,8 @@ def HasCheckedSourceWitness (compiled : CompiledEntry) : Prop :=
 preflight. Successful compilation guarantees this when that backend is
 selected; it is not asserted for Core or graph artifacts. -/
 def HasValidatedTypedPlan (compiled : CompiledEntry) : Prop :=
-  SourceTypedRuntime.validateExecutablePlan compiled.plan = .ok ()
+  SourceTypedRuntime.validateExecutablePlanEvidence compiled.program
+    compiled.plan = .ok ()
 
 /-- A source-typed runtime value has this artifact's public source result
 type according to the runtime's shallow tag reconstruction. The underlying
@@ -472,7 +473,7 @@ private def selectBackend (program : CheckedProgram)
           | entries => .error
               (.backendEntryCountMismatch .callGraph entries.length)
       | .error callGraphError =>
-          match SourceTypedRuntime.validateExecutablePlan plan with
+          match SourceTypedRuntime.validateExecutablePlanEvidence program plan with
           | .ok _ => .ok .typedSource
           | .error typedSourceError => .error (.noBackend {
               direct := directError
@@ -484,7 +485,7 @@ private theorem selectBackend_typed_plan
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
     (stagingFuel : Nat)
     (selected : selectBackend program plan stagingFuel = .ok .typedSource) :
-    SourceTypedRuntime.validateExecutablePlan plan = .ok () := by
+    SourceTypedRuntime.validateExecutablePlanEvidence program plan = .ok () := by
   cases direct : SourceCoreDirectLinking.linkWithStagingFuel program
       (.complete plan) stagingFuel with
   | ok linked =>
@@ -507,7 +508,8 @@ private theorem selectBackend_typed_plan
               | cons another tail =>
                   simp [selectBackend, direct, graph, entries] at selected
       | error graphError =>
-          cases validated : SourceTypedRuntime.validateExecutablePlan plan with
+          cases validated : SourceTypedRuntime.validateExecutablePlanEvidence
+              program plan with
           | ok value =>
               cases value
               rfl
