@@ -498,7 +498,30 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.withExpected_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_some_withExpected
+example :=
+  @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_some_apply_eq
+example :=
   @Solcore.Frontend.SourceInference.Detail.candidateWithExpected_some_inferenceProperties
+example := @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace
+example := @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.nil
+example := @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.cons
+example :=
+  @Solcore.Frontend.SourceInference.Detail.fitArguments_some_trace
+example :=
+  @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.argument_parameter_length
+example :=
+  @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.coercions_length
+example :=
+  @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.coercion_expression_ids
+example :=
+  @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.cons_exists
+example :=
+  @Solcore.Frontend.SourceInference.Detail.fitArguments_some_length_eq
+example :=
+  @Solcore.Frontend.SourceInference.Detail.fitArguments_some_coercions_length
+example :=
+  @Solcore.Frontend.SourceInference.Detail.fitArguments_some_coercion_expression_ids
 example :=
   @Solcore.Frontend.SourceInference.Detail.functionParts?_success_variablesBelow
 example :=

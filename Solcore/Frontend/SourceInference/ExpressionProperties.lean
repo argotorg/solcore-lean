@@ -1278,18 +1278,16 @@ private theorem recordExpressionWithExpected_some_apply_eq
       apply withExpected_some_apply_eq fittedResult
       simpa only [recordExpression, State.recordNode] using extension
 
-/-- Retaining an expected-type candidate does not weaken the semantic
-equality established by the underlying successful fit. -/
-private theorem candidateWithExpected_some_apply_eq
+/-- A retained expected-type candidate is exactly a successful underlying
+`withExpected` result; the wrapper only turns type mismatches into rejection. -/
+theorem candidateWithExpected_some_withExpected
     {context : Context} {state : State} {actual : InferredExpression}
-    {expected : Ty} {result : ExpectationResult} {outer : Substitution}
-    (success : candidateWithExpected context state actual (some expected) =
-      .ok (some result))
-    (extension : outer.SemanticallyExtends
-      result.state.inference.substitution) :
-    outer.apply result.expression.type = outer.apply expected := by
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : candidateWithExpected context state actual expected =
+      .ok (some result)) :
+    withExpected context state actual expected = .ok result := by
   unfold candidateWithExpected at success
-  cases fittedResult : withExpected context state actual (some expected) with
+  cases fittedResult : withExpected context state actual expected with
   | error error =>
       cases error <;> simp [fittedResult] at success
       all_goals cases ‹Unification.Error› <;> simp_all [fittedResult]
@@ -1298,7 +1296,20 @@ private theorem candidateWithExpected_some_apply_eq
       injection success with resultEq
       have fittedEq : fitted = result := Option.some.inj resultEq
       subst result
-      exact withExpected_some_apply_eq fittedResult extension
+      rfl
+
+/-- Retaining an expected-type candidate does not weaken the semantic
+equality established by the underlying successful fit. -/
+theorem candidateWithExpected_some_apply_eq
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Ty} {result : ExpectationResult} {outer : Substitution}
+    (success : candidateWithExpected context state actual (some expected) =
+      .ok (some result))
+    (extension : outer.SemanticallyExtends
+      result.state.inference.substitution) :
+    outer.apply result.expression.type = outer.apply expected := by
+  exact withExpected_some_apply_eq
+    (candidateWithExpected_some_withExpected success) extension
 
 /-- A successfully resolved source annotation contains no flexible
 metavariables, so it lies below every inference allocator bound. -/
@@ -2772,6 +2783,182 @@ theorem candidateWithExpected_some_inferenceProperties
       subst result
       exact withExpected_inferenceProperties ready actualBelow expectedBelow
         fittedResult
+
+/-- Exact source-ordered evidence for a successful argument-fitting pass.
+
+Unlike membership-only summaries of the delayed coercion ledger, this trace
+retains every successful `candidateWithExpected` equation together with the
+intermediate state from which the remaining arguments were fitted.  Its
+indices also record the exact result assembled by `fitArguments`. -/
+inductive ArgumentFitTrace (context : Context) :
+    State → List InferredExpression → List Ty → ArgumentFitResult → Prop where
+  | nil (state : State) :
+      ArgumentFitTrace context state [] [] {
+        state
+        cost := 0
+        coercions := []
+      }
+  | cons
+      {state : State}
+      {argument : InferredExpression}
+      {arguments : List InferredExpression}
+      {parameter : Ty}
+      {parameters : List Ty}
+      {fitted : ExpectationResult}
+      {tail : ArgumentFitResult}
+      (head : candidateWithExpected context state argument (some parameter) =
+        .ok (some fitted))
+      (rest : ArgumentFitTrace context fitted.state arguments parameters tail) :
+      ArgumentFitTrace context state (argument :: arguments)
+        (parameter :: parameters) {
+          state := tail.state
+          cost := fitted.coercions.length + tail.cost
+          coercions := {
+            expression := argument.id
+            coercions := fitted.coercions
+          } :: tail.coercions
+        }
+
+/-- Every successful `fitArguments` execution has an exact ordered trace of
+the fitting equations and intermediate states which produced its result. -/
+theorem fitArguments_some_trace
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    ArgumentFitTrace context state arguments parameters result := by
+  induction arguments generalizing parameters state result with
+  | nil =>
+      cases parameters <;> simp [fitArguments] at success
+      subst result
+      exact .nil state
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil => simp [fitArguments] at success
+      | cons parameter parameters =>
+          simp only [fitArguments] at success
+          cases fittedResult :
+              candidateWithExpected context state argument (some parameter) with
+          | error error =>
+              simp [fittedResult, bind, Except.bind] at success
+          | ok fitted? =>
+              cases fitted? with
+              | none => simp [fittedResult, bind, Except.bind] at success
+              | some fitted =>
+                  simp only [fittedResult, bind, Except.bind] at success
+                  cases tailResult : fitArguments context fitted.state arguments
+                      parameters with
+                  | error error =>
+                      simp [tailResult, bind, Except.bind] at success
+                  | ok tail? =>
+                      cases tail? with
+                      | none =>
+                          simp [tailResult, bind, Except.bind] at success
+                      | some tail =>
+                          simp only [tailResult, bind, Except.bind,
+                            except_pure_eq_ok] at success
+                          have resultEq : _ = result := Option.some.inj success
+                          subst result
+                          exact .cons fittedResult (induction tailResult)
+
+namespace ArgumentFitTrace
+
+/-- A successful trace consumes arguments and parameters in lockstep. -/
+theorem argument_parameter_length
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (trace : ArgumentFitTrace context state arguments parameters result) :
+    arguments.length = parameters.length := by
+  induction trace with
+  | nil => rfl
+  | cons _ _ induction => simp [induction]
+
+/-- The delayed coercion ledger has exactly one source-ordered entry for each
+fitted argument. -/
+theorem coercions_length
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (trace : ArgumentFitTrace context state arguments parameters result) :
+    result.coercions.length = arguments.length := by
+  induction trace with
+  | nil => rfl
+  | cons _ _ induction => simp [induction]
+
+/-- Projecting expression identities from the delayed coercion ledger recovers
+the input argument identities exactly, including their order and multiplicity. -/
+theorem coercion_expression_ids
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (trace : ArgumentFitTrace context state arguments parameters result) :
+    result.coercions.map (fun entry => entry.expression) =
+      arguments.map (fun argument => argument.id) := by
+  induction trace with
+  | nil => rfl
+  | cons _ _ induction => simp [induction]
+
+/-- Inverting a nonempty trace exposes the exact head fitting equation, its
+coercion entry, and the ordered trace for the remaining arguments. -/
+theorem cons_exists
+    {context : Context} {state : State}
+    {argument : InferredExpression} {arguments : List InferredExpression}
+    {parameter : Ty} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (trace : ArgumentFitTrace context state (argument :: arguments)
+      (parameter :: parameters) result) :
+    ∃ fitted tail,
+      candidateWithExpected context state argument (some parameter) =
+        .ok (some fitted) ∧
+      ArgumentFitTrace context fitted.state arguments parameters tail ∧
+      result = {
+        state := tail.state
+        cost := fitted.coercions.length + tail.cost
+        coercions := {
+          expression := argument.id
+          coercions := fitted.coercions
+        } :: tail.coercions
+      } := by
+  cases trace with
+  | cons head rest => exact ⟨_, _, head, rest, rfl⟩
+
+end ArgumentFitTrace
+
+/-- Successful argument fitting consumes equally many arguments and
+parameters. -/
+theorem fitArguments_some_length_eq
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    arguments.length = parameters.length :=
+  (fitArguments_some_trace success).argument_parameter_length
+
+/-- Successful argument fitting emits exactly one delayed-coercion entry per
+input argument. -/
+theorem fitArguments_some_coercions_length
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    result.coercions.length = arguments.length :=
+  (fitArguments_some_trace success).coercions_length
+
+/-- Successful argument fitting preserves the complete ordered row of argument
+identities in its delayed coercion ledger. -/
+theorem fitArguments_some_coercion_expression_ids
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (success : fitArguments context state arguments parameters =
+      .ok (some result)) :
+    result.coercions.map (fun entry => entry.expression) =
+      arguments.map (fun argument => argument.id) :=
+  (fitArguments_some_trace success).coercion_expression_ids
 
 /-- Successfully recognizing a function type transfers its allocator bound to
 both the bundled parameter type and result type. -/
