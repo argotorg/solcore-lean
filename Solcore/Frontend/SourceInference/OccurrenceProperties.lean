@@ -2261,6 +2261,20 @@ private def PreservesNextOccurrence {alpha : Type}
   ∀ result, computation = .ok result →
     initial.nextOccurrence ≤ (stateOf result).nextOccurrence
 
+private def StrictlyAdvancesNextOccurrence {alpha : Type}
+    (stateOf : alpha → State) (initial : State)
+    (computation : Except Error alpha) : Prop :=
+  ∀ result, computation = .ok result →
+    initial.nextOccurrence < (stateOf result).nextOccurrence
+
+private theorem StrictlyAdvancesNextOccurrence.preserves
+    {alpha : Type} {stateOf : alpha → State} {initial : State}
+    {computation : Except Error alpha}
+    (strict : StrictlyAdvancesNextOccurrence stateOf initial computation) :
+    PreservesNextOccurrence stateOf initial computation := by
+  intro result success
+  exact Nat.le_of_lt (strict result success)
+
 private theorem pair_except_nextOccurrence {epsilon alpha beta : Type}
     {computation : Except epsilon (alpha × beta)} {result : alpha × beta}
     {initial : State} {nextOccurrence : beta → Nat}
@@ -2291,7 +2305,7 @@ private theorem triple_eq_nextOccurrence {alpha beta : Type}
 set_option maxHeartbeats 800000 in
 private theorem inference_preserves_nextOccurrence :
     (∀ fuel context expression expected state,
-      PreservesNextOccurrence Prod.snd state
+      StrictlyAdvancesNextOccurrence Prod.snd state
         (inferExprFuel fuel context expression expected state)) ∧
     (∀ fuel context source id instantiation arguments expected state,
       PreservesNextOccurrence Prod.snd state
@@ -2327,7 +2341,7 @@ private theorem inference_preserves_nextOccurrence :
           cases state)) := by
   apply inferExprFuel.mutual_induct
     (motive1 := fun fuel context expression expected state =>
-      PreservesNextOccurrence Prod.snd state
+      StrictlyAdvancesNextOccurrence Prod.snd state
         (inferExprFuel fuel context expression expected state))
     (motive2 := fun fuel context source id instantiation arguments expected
         state =>
@@ -2366,7 +2380,7 @@ private theorem inference_preserves_nextOccurrence :
   case case15 =>
     intros context expression expected state fuel calleeId stateAfterId
       allocationEq keyword parameters returnType body expressionEq bodyInduction
-    unfold PreservesNextOccurrence at *
+    simp only [PreservesNextOccurrence, StrictlyAdvancesNextOccurrence] at *
     intro result success
     unfold inferExprFuel at success
     simp_all [bind, Except.bind]
@@ -2394,13 +2408,15 @@ private theorem inference_preserves_nextOccurrence :
       unify_success_nextOccurrence,
       bindLambdaParameters_occurrenceState_eq]
   case case67 =>
-    unfold PreservesNextOccurrence at *
+    simp only [PreservesNextOccurrence, StrictlyAdvancesNextOccurrence] at *
     intros
     simp_all only [inferPlaceFuel]
   case case70 =>
     intros fuel context target operator value state placeInduction
       valueInduction
-    unfold PreservesNextOccurrence at *
+    have valueInductionWeak := fun target state =>
+      (valueInduction target state).preserves
+    simp only [PreservesNextOccurrence, StrictlyAdvancesNextOccurrence] at *
     intro result success
     unfold inferAssignedValueFuel at success
     simp_all [bind, Except.bind]
@@ -2409,14 +2425,14 @@ private theorem inference_preserves_nextOccurrence :
     all_goals try have placeNext :=
       pair_except_nextOccurrence placeInduction (by assumption)
     all_goals try have valueNext :=
-      pair_except_nextOccurrence (valueInduction _ _) (by assumption)
+      pair_except_nextOccurrence (valueInductionWeak _ _) (by assumption)
     all_goals try have unifiedNext :=
       unify_occurrenceState_eq (by assumption)
     all_goals simp_all [Prod.eta]
     all_goals grind [unify_success_nextOccurrence]
   all_goals
     intros
-    unfold PreservesNextOccurrence at *
+    simp only [PreservesNextOccurrence, StrictlyAdvancesNextOccurrence] at *
     intro result success
     first
       | unfold inferExprFuel at success
@@ -2499,6 +2515,16 @@ private theorem inference_preserves_nextOccurrence :
       unify_success_nextOccurrence,
       freshDataConstructorInstantiation_nextOccurrence]
 
+private theorem inferExprFuel_nextOccurrence_lt
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    state.nextOccurrence < result.2.nextOccurrence :=
+  inference_preserves_nextOccurrence.1 fuel context expression expected state
+    result success
+
 /-- Every successful expression traversal monotonically advances its input
 occurrence cutoff. -/
 theorem inferExprFuel_nextOccurrence_le
@@ -2508,8 +2534,7 @@ theorem inferExprFuel_nextOccurrence_le
     (success : inferExprFuel fuel context expression expected state =
       .ok result) :
     state.nextOccurrence ≤ result.2.nextOccurrence :=
-  inference_preserves_nextOccurrence.1 fuel context expression expected state
-    result success
+  Nat.le_of_lt (inferExprFuel_nextOccurrence_lt success)
 
 /-- Constructor-application inference monotonically advances occurrences. -/
 theorem inferConstructorApplicationFuel_nextOccurrence_le
@@ -2635,6 +2660,63 @@ theorem inferExprsFuel_success_ids_fresh
           all_goals intro current member
           all_goals simp_all only [List.mem_cons]
           all_goals grind
+
+/-- Successful expression-list inference gives every returned root a distinct
+source identity. -/
+theorem inferExprsFuel_success_ids_nodup
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    (result.1.map (fun expression => expression.id)).Nodup := by
+  induction expressions generalizing fuel state result with
+  | nil =>
+      cases fuel with
+      | zero => simp [inferExprsFuel] at success
+      | succ fuel =>
+          simp only [inferExprsFuel] at success
+          injection success with resultEq
+          subst result
+          exact List.nodup_nil
+  | cons source sources induction =>
+      cases fuel with
+      | zero => simp [inferExprsFuel] at success
+      | succ fuel =>
+          unfold inferExprsFuel at success
+          cases headResult : inferExprFuel fuel context source none state with
+          | error error =>
+              simp only [headResult, bind, Except.bind] at success
+              cases success
+          | ok head =>
+              rcases head with ⟨head, headState⟩
+              simp only [headResult, bind, Except.bind] at success
+              cases tailResult :
+                  inferExprsFuel fuel context sources headState with
+              | error error =>
+                  simp only [tailResult, bind, Except.bind] at success
+                  cases success
+              | ok tail =>
+                  rcases tail with ⟨tail, finalState⟩
+                  simp only [tailResult, bind, Except.bind] at success
+                  injection success with resultEq
+                  subst result
+                  simp only [List.map_cons, List.nodup_cons]
+                  constructor
+                  · intro headMember
+                    rcases List.mem_map.mp headMember with
+                      ⟨tailExpression, tailMember, tailIdEq⟩
+                    have tailFresh :=
+                      inferExprsFuel_success_ids_fresh tailResult
+                        tailExpression tailMember
+                    have headBeforeTail :
+                        head.id.occurrence.index <
+                          tailExpression.id.occurrence.index := by
+                      rw [inferExprFuel_success_id_index headResult]
+                      exact Nat.lt_of_lt_of_le
+                        (inferExprFuel_nextOccurrence_lt headResult) tailFresh
+                    have indexEq := congrArg
+                      (fun id : ExpressionId => id.occurrence.index) tailIdEq
+                    exact (Nat.ne_of_lt headBeforeTail) indexEq.symm
+                  · exact induction tailResult
 
 /-- Match-case inference monotonically advances occurrences. -/
 theorem inferMatchCasesFuel_nextOccurrence_le

@@ -384,6 +384,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_success_ids_fresh
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_success_ids_nodup
+example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix_of_fresh
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix
