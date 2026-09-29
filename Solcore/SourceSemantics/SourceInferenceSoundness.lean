@@ -17026,6 +17026,201 @@ theorem argumentFitTrace_argumentCoercionsValid_afterFinalization_scoped
           exact occurs tailEntry (by simp [entryMember]) requirement
             requirementMember
 
+/-- A retained canonical function candidate forwards a semantically valid,
+source-ordered argument-coercion row for its exact freshly instantiated
+parameter spine.  Result fitting and signature-requirement allocation happen
+after argument fitting, so their inference and requirement progress must be
+transported explicitly before the final scoped coercion proof is applied. -/
+theorem tryFunctionCandidate_some_argumentCoercionsValid_afterFinalization_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state later : Frontend.SourceInference.State}
+    {signature : ProgramFunctionSignature}
+    {result : Detail.CandidateAttemptResult}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base semanticContext : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (canonical : signature.scheme.body = .function
+      (TypeSystem.Ty.productMany signature.parameterTypes)
+      (TypeSystem.Ty.productMany signature.returnTypes))
+    (success : Detail.tryFunctionCandidate inferenceContext arguments
+      integerLiteralOrigins call expected state signature = .ok (some result))
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (schemeBodyBelow : signature.scheme.body.VariablesBelow
+      state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.state.inference.substitution)
+    (requirementsSubset : result.state.requirements ⊆ later.requirements)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (binders : TypeParameterBindersWellFormed sourceContext)
+    (residual : sourceContext.residualTypeVariables = true)
+    (signatureMember : signature ∈ sourceContext.signatures.functions)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext
+        semanticContext)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : semanticContext.signatures = base.signatures)
+    (activeRequirementsEq :
+      semanticContext.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ semanticContext.assumptions)
+    (covered : ∀ entry ∈ result.argumentCoercions,
+      TemplateScopeCovered ledgerSource semanticContext
+        (.expression entry.expression))
+    (occurs : ∀ entry ∈ result.argumentCoercions, ∀ requirement,
+      requirement ∈ coercionRequirementIds entry.coercions →
+        PrimaryRequirementOccursAt ledgerSource
+          (.expression entry.expression) requirement) :
+    ArgumentCoercionsValid semanticContext later.inference.substitution
+      arguments
+      (signature.parameterTypes.map
+        (signature.scheme.instantiate state.inference.next
+          |>.parameterSubstitution.apply))
+      result.argumentCoercions := by
+  let instantiated := signature.scheme.instantiate state.inference.next
+  let advancedState : Frontend.SourceInference.State := {
+    state with inference := {
+      state.inference with next := instantiated.next
+    }
+  }
+  obtain ⟨fittedArguments, fittedResult, trace, fittedResultSuccess,
+    coercionsEq, resultInferenceEq, fittedRequirementsSubset⟩ :=
+    Detail.tryFunctionCandidate_some_argumentFitWitness canonical success
+  have instantiatedNextLe :
+      state.inference.next ≤ instantiated.next := by
+    simpa only [instantiated] using
+      ConstrainedDeclarationScheme.instantiate_next_le signature.scheme
+        state.inference.next
+  have advanceProgress : state.InferenceProgress advancedState := by
+    refine Frontend.SourceInference.State.InferenceProgress.of_substitution_eq
+      ready.solved ?_ ?_
+    · simpa only [advancedState] using instantiatedNextLe
+    · rfl
+  have advancedReady : advancedState.InferenceReady :=
+    Frontend.SourceInference.State.InferenceReady.of_progress_of_binderEnvironment_eq
+      ready advanceProgress rfl
+  have argumentsAtAdvanced : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow advancedState.inference.next := by
+    intro argument member
+    exact (argumentsBelow argument member).weaken advanceProgress.next_le
+  have instantiatedBodyBelow :
+      instantiated.body.VariablesBelow instantiated.next := by
+    simpa only [instantiated] using
+      ConstrainedDeclarationScheme.instantiate_body_variablesBelow
+        signature.scheme state.inference.next schemeBodyBelow
+  have partsResult : Detail.functionParts? instantiated.body =
+      some
+        (instantiated.parameterSubstitution.apply
+            (TypeSystem.Ty.productMany signature.parameterTypes),
+          instantiated.parameterSubstitution.apply
+            (TypeSystem.Ty.productMany signature.returnTypes)) := by
+    rw [ConstrainedDeclarationScheme.instantiate_body, canonical]
+    rfl
+  have partsBelow := Detail.functionParts?_success_variablesBelow
+    instantiatedBodyBelow partsResult
+  have parametersResult := Detail.parameterTypesForArity?_apply_productMany
+    instantiated.parameterSubstitution signature.parameterTypes
+  have parametersBelowAtInstantiation :=
+    Detail.parameterTypesForArity?_success_variablesBelow partsBelow.1
+      parametersResult
+  have parametersBelow : ∀ parameter ∈
+      signature.parameterTypes.map instantiated.parameterSubstitution.apply,
+      parameter.VariablesBelow advancedState.inference.next := by
+    simpa only [advancedState] using parametersBelowAtInstantiation
+  have traceProperties := trace.inferenceProperties advancedReady
+    argumentsAtAdvanced parametersBelow
+  have resultTypeAtAdvanced :
+      (instantiated.parameterSubstitution.apply
+        (TypeSystem.Ty.productMany signature.returnTypes)).VariablesBelow
+          advancedState.inference.next := by
+    simpa only [advancedState] using partsBelow.2
+  have resultTypeAtArguments :
+      (instantiated.parameterSubstitution.apply
+        (TypeSystem.Ty.productMany signature.returnTypes)).VariablesBelow
+          fittedArguments.state.inference.next :=
+    resultTypeAtAdvanced.weaken traceProperties.1.next_le
+  have expectedAtArguments : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow
+        fittedArguments.state.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken
+      (Nat.le_trans advanceProgress.next_le traceProperties.1.next_le)
+  have fittedResultProperties :=
+    Detail.candidateWithExpected_some_inferenceProperties
+      traceProperties.2 resultTypeAtArguments expectedAtArguments
+        fittedResultSuccess
+  have laterExtendsFittedResult :
+      later.inference.substitution.SemanticallyExtends
+        fittedResult.state.inference.substitution := by
+    rw [← resultInferenceEq]
+    exact substitutionExtends
+  have laterExtendsFittedArguments :
+      later.inference.substitution.SemanticallyExtends
+        fittedArguments.state.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans
+      laterExtendsFittedResult
+      fittedResultProperties.1.substitution_extends
+  have fittedRequirementsAtLater :
+      fittedArguments.state.requirements ⊆ later.requirements :=
+    List.Subset.trans fittedRequirementsSubset requirementsSubset
+  have parametersAdmissible : ∀ parameter ∈
+      signature.parameterTypes.map instantiated.parameterSubstitution.apply,
+      TypeAdmissible semanticContext
+        (later.inference.substitution.apply parameter) := by
+    intro parameter member
+    apply FlexibleSubstitution.TypeAdmissible.applySubstitution
+      contextValid.closes
+    exact instantiatedFunctionParameterTypesAdmissible catalog binders
+      residual signatureMember state.inference.next parameter member
+  have fittedCovered : ∀ entry ∈ fittedArguments.coercions,
+      TemplateScopeCovered ledgerSource semanticContext
+        (.expression entry.expression) := by
+    intro entry member
+    apply covered entry
+    rw [coercionsEq]
+    exact member
+  have fittedOccurs : ∀ entry ∈ fittedArguments.coercions,
+      ∀ requirement,
+        requirement ∈ coercionRequirementIds entry.coercions →
+          PrimaryRequirementOccursAt ledgerSource
+            (.expression entry.expression) requirement := by
+    intro entry member requirement requirementMember
+    apply occurs entry
+    · rw [coercionsEq]
+      exact member
+    · exact requirementMember
+  rw [coercionsEq]
+  exact argumentFitTrace_argumentCoercionsValid_afterFinalization_scoped
+    trace advancedReady argumentsAtAdvanced parametersBelow
+    laterExtendsFittedArguments fittedRequirementsAtLater
+    parametersAdmissible traitSuccess profileSuccess catalog contextValid
+    signaturesEq traitName solveSuccess solvedEq ledger ownership
+    activeSignaturesEq activeRequirementsEq assumptionsMono fittedCovered
+    fittedOccurs
+
 /-- The common soundness envelope for an ordinary expression-recording step.
 
 A shape-specific proof supplies only raw-form typing and admissibility.  This
