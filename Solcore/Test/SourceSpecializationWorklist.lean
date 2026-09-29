@@ -279,6 +279,22 @@ private def setIndirectMetadata (nodes : List Node) (target : ExpressionId)
         node
   | .statement _ => node
 
+private def setCallResolution (nodes : List Node) (target : ExpressionId)
+    (resolution : CallResolution) : List Node :=
+  nodes.map fun node => match node with
+  | .expression expression =>
+      if expression.id == target then
+        match expression.form with
+        | .call callee arguments _ =>
+            .expression {
+              expression with
+              form := .call callee arguments resolution
+            }
+        | _ => node
+      else
+        node
+  | .statement _ => node
+
 private def setDirectInstantiationMarkers (nodes : List Node)
     (call callee : ExpressionId) (parameterComptime : List Bool)
     (returnComptime : Bool) : List Node :=
@@ -1405,6 +1421,119 @@ private def testQualifiedLocalSchemeCalls
   | result => throw (IO.userError
       s!"detached qualified call requirement was accepted: {reprStr result}")
 
+private def testQualifiedLocalSchemeReferences
+    (program : CheckedProgram) : IO Unit := do
+  let keep ← signatureNamed program "keep"
+  let qualifiedLocal ← signatureNamed program "qualifiedLocal"
+  let function ← functionFor program qualifiedLocal
+  let binder ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "f" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError "qualifiedLocal lost its f binder")
+  let template ← match binder.schemeRequirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"qualifiedLocal retained {requirements.length} scheme requirements")
+  let (call, callee, arguments, instantiation) ← match
+      function.typedBody.nodes.findSome? fun
+        | .expression node@{
+            form := .call callee arguments (.declaration instantiation), .. } =>
+            if instantiation.declaration == keep.id then
+              some (node, callee, arguments, instantiation)
+            else
+              none
+        | _ => none with
+    | some selected => pure selected
+    | none => throw (IO.userError "qualifiedLocal lost its keep call")
+  let reference ← match function.typedBody.lookupExpression? callee with
+    | some node@{ form := .reference _ (.declaration reference), .. } =>
+        if reference == instantiation then pure node
+        else throw (IO.userError
+          "qualifiedLocal call and reference instantiations diverged")
+    | _ => throw (IO.userError
+        "qualifiedLocal keep call lost its declaration-reference child")
+  let argumentTypes ← arguments.mapM fun argument =>
+    match function.typedBody.lookupExpression? argument with
+    | some node => pure node.type
+    | none => throw (IO.userError
+        "qualifiedLocal keep call lost an argument node")
+  let parameterType ← match reference.type with
+    | .function parameter _ => pure parameter
+    | type => throw (IO.userError
+        s!"qualifiedLocal keep reference is not a function: {reprStr type}")
+  let metadata : IndirectCallResolution := {
+    argumentCount := arguments.length
+    argumentTypeBeforeCoercion := Ty.productMany argumentTypes
+    argumentTypeAfterCoercion := parameterType
+    argumentCoercions := []
+  }
+  let indirectNodes := setCallResolution function.typedBody.nodes call.id
+    (.indirect metadata)
+  let indirectNodes := setExpressionRequirements indirectNodes call.id []
+  let indirectNodes := setExpressionRequirements indirectNodes callee
+    [template.templateRequirement]
+  let indirectFunction : CheckedFunction := {
+    function with
+    typedBody := { function.typedBody with nodes := indirectNodes }
+  }
+  let indirectProgram := replaceFunction program indirectFunction
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := qualifiedLocal.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := keep.id
+    arguments := [.word]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := keep.id
+    arguments := [.bool]
+  }
+  let expectedEdges : List SourceSpecializationWorklist.ReferenceEdge := [{
+    caller := entryKey
+    occurrence := callee
+    callee := wordKey
+  }, {
+    caller := entryKey
+    occurrence := callee
+    callee := boolKey
+  }]
+  match ← runOrThrow "qualified local scheme references" indirectProgram
+      [monomorphicRequest qualifiedLocal] 3 with
+  | .complete plan =>
+      assertTrue (decide (
+          plan.seedKeys = [entryKey] ∧
+          plan.specializations.map (·.key) = [entryKey, wordKey, boolKey] ∧
+          plan.callEdges = [] ∧
+          plan.referenceEdges = expectedEdges ∧
+          plan.referenceEdges.eraseDups.length = 2))
+        "qualified local scheme reference lost its concrete keys or edges"
+      match SourceCoreDirectLinking.validatePlan indirectProgram plan with
+      | .ok () => pure ()
+      | .error error => throw (IO.userError
+          s!"qualified local reference plan failed replay validation: {reprStr error}")
+  | outcome => throw (IO.userError
+      s!"qualified local scheme references expected complete, found {reprStr outcome}")
+
+  let detachedFunction : CheckedFunction := {
+    indirectFunction with
+    typedBody := {
+      indirectFunction.typedBody with
+      nodes := setExpressionRequirements indirectFunction.typedBody.nodes
+        callee []
+    }
+  }
+  match SourceSpecializationWorklist.run
+      (replaceFunction indirectProgram detachedFunction)
+      [monomorphicRequest qualifiedLocal] 3 with
+  | .error (.localSchemeRequirementIdMultiplicity _ actualRequirement 0) =>
+      assertTrue (actualRequirement == template.templateRequirement)
+        "detached qualified reference lost its template identity"
+  | result => throw (IO.userError
+      s!"detached qualified reference requirement was accepted: {reprStr result}")
+
 private def testFunctionValueReference (program : CheckedProgram) : IO Unit := do
   let identity ← signatureNamed program "identity"
   let asValue ← signatureNamed program "asValue"
@@ -1741,6 +1870,7 @@ def testSourceSpecializationWorklist : IO Unit := do
   testAssumptionPreservation program
   testContextualLocalProofCalls program
   testQualifiedLocalSchemeCalls program
+  testQualifiedLocalSchemeReferences program
   testFunctionValueReference program
   testIndirectCallBoundary program
   testIndirectArgumentCounts program

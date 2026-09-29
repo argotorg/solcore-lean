@@ -705,7 +705,7 @@ private def firstDuplicateRequirement :
       if rest.contains requirement then some requirement
       else firstDuplicateRequirement rest
 
-private def validateQualifiedLocalDirectCall
+private def validateQualifiedLocalDeclarationUse
     (localInstance : LocalLambdaInstance) (expression : ExpressionNode)
     (instantiation : DeclarationInstantiation) : Except Error Unit := do
   if expression.requirements.length != instantiation.predicates.length then
@@ -745,21 +745,24 @@ private def validateLocalSchemeTemplateUses
     (·.templateRequirement)
   let all := bindings.flatMap fun binding =>
     binding.binder.schemeRequirements.map (·.templateRequirement)
-  let calls := nodes.filterMap fun
-    | .expression node@{ form := .call _ _ (.declaration _), .. } => some node
-    | _ => none
+  let declarationUses := nodes.filterMap fun
+    | .expression node =>
+        match declarationInstantiation? node with
+        | some _ => some node
+        | none => none
+    | .statement _ => none
   for requirement in own do
-    let count := calls.foldl (fun count call =>
-      count + (call.requirements.filter fun candidate =>
+    let count := declarationUses.foldl (fun count declarationUse =>
+      count + (declarationUse.requirements.filter fun candidate =>
         candidate == requirement).length) 0
     if count != 1 then
       throw (.localSchemeRequirementIdMultiplicity
         localInstance.binding.initializer requirement count)
-  for call in calls do
-    match call.requirements.find? fun requirement =>
+  for declarationUse in declarationUses do
+    match declarationUse.requirements.find? fun requirement =>
         all.contains requirement && !own.contains requirement with
     | some requirement =>
-        throw (.foreignLocalSchemeRequirement call.id requirement)
+        throw (.foreignLocalSchemeRequirement declarationUse.id requirement)
     | none => pure ()
 
 private def validateReachableOpenDeclarations (source : TypedSource)
@@ -788,14 +791,14 @@ private def validateReachableOpenDeclarations (source : TypedSource)
                   else if !instantiation.predicates.isEmpty then
                     match expression.form with
                     | .call _ _ (.declaration _) =>
-                        validateQualifiedLocalDirectCall localInstance expression
-                          instantiation
+                        validateQualifiedLocalDeclarationUse localInstance
+                          expression instantiation
                     | .reference _ (.declaration _) =>
                         if directCallees.contains expression.id then
                           pure ()
                         else
-                          throw (.unsupportedLocalPolymorphicRequirements
-                            expression.id instantiation.predicates)
+                          validateQualifiedLocalDeclarationUse localInstance
+                            expression instantiation
                     | _ => pure ()
                   else
                     pure ()
