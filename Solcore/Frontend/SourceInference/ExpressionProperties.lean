@@ -5680,6 +5680,112 @@ theorem tryFunctionCandidate_some_argumentFitWitness
                         (State.addRequirementsWithIds_requirements_subset
                           fittedResult.state _)
 
+/-- A successful canonical candidate exposes the exact result-fitting and
+signature-requirement allocation which assembled its retained result.  The
+allocated predicate row is the instantiated declaration predicate row; the
+returned requirement IDs, call coercions, final marked state, and resolved
+result expression are preserved without rewriting or reordering. -/
+theorem tryFunctionCandidate_some_resultFitAllocationWitness
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (canonical : signature.scheme.body = .function
+      (Ty.productMany signature.parameterTypes)
+      (Ty.productMany signature.returnTypes))
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    let instantiated := signature.scheme.instantiate state.inference.next
+    let advancedState : State := {
+      state with inference := {
+        state.inference with next := instantiated.next
+      }
+    }
+    ∃ fittedArguments fittedResult,
+      ArgumentFitTrace context advancedState arguments
+        (signature.parameterTypes.map
+          instantiated.parameterSubstitution.apply) fittedArguments ∧
+      candidateWithExpected context fittedArguments.state {
+        id := call
+        type := instantiated.parameterSubstitution.apply
+          (Ty.productMany signature.returnTypes)
+      } expected = .ok (some fittedResult) ∧
+      let allocation := fittedResult.state.addRequirementsWithIds
+        instantiated.predicates
+      let finalState := allocation.2.markDirectCallRequirements allocation.1
+      result.instantiation =
+          DeclarationInstantiation.ofInstantiated signature instantiated ∧
+        result.result = {
+          fittedResult.expression with
+          type := finalState.resolve fittedResult.expression.type
+        } ∧
+        result.argumentCoercions = fittedArguments.coercions ∧
+        result.callCoercions = fittedResult.coercions ∧
+        result.signatureRequirements = allocation.1 ∧
+        result.state = finalState := by
+  let instantiated := signature.scheme.instantiate state.inference.next
+  let advancedState : State := {
+    state with inference := {
+      state.inference with next := instantiated.next
+    }
+  }
+  obtain ⟨fittedArguments, fittedResult, trace, fittedResultSuccess,
+    _, _, _⟩ :=
+      tryFunctionCandidate_some_argumentFitWitness canonical success
+  refine ⟨fittedArguments, fittedResult, trace, fittedResultSuccess, ?_⟩
+  have partsResult : functionParts? instantiated.body =
+      some
+        (instantiated.parameterSubstitution.apply
+            (Ty.productMany signature.parameterTypes),
+          instantiated.parameterSubstitution.apply
+            (Ty.productMany signature.returnTypes)) := by
+    rw [ConstrainedDeclarationScheme.instantiate_body, canonical]
+    rfl
+  have parametersResult := parameterTypesForArity?_apply_productMany
+    instantiated.parameterSubstitution signature.parameterTypes
+  have argumentsResult := trace.fitArguments_eq
+  have expandedFittedResult :
+      candidateWithExpected context fittedArguments.state {
+        id := call
+        type := (signature.scheme.instantiate
+          state.inference.next).parameterSubstitution.apply
+            (Ty.productMany signature.returnTypes)
+      } expected = .ok (some fittedResult) := by
+    simpa only [instantiated] using fittedResultSuccess
+  unfold tryFunctionCandidate at success
+  dsimp only at success
+  rw [show functionParts?
+      (signature.scheme.instantiate state.inference.next).body = _ by
+        simpa only [instantiated] using partsResult] at success
+  simp only at success
+  rw [show parameterTypesForArity? signature.parameterTypes.length
+      ((signature.scheme.instantiate state.inference.next).parameterSubstitution.apply
+        (Ty.productMany signature.parameterTypes)) =
+        some (signature.parameterTypes.map
+          (signature.scheme.instantiate
+            state.inference.next).parameterSubstitution.apply) by
+      simpa only [instantiated] using parametersResult] at success
+  simp only at success
+  have expandedArgumentsResult :
+      fitArguments context {
+        state with inference := {
+          state.inference with
+          next := (signature.scheme.instantiate state.inference.next).next
+        }
+      } arguments
+        (signature.parameterTypes.map
+          (signature.scheme.instantiate
+            state.inference.next).parameterSubstitution.apply) =
+        .ok (some fittedArguments) := by
+    simpa only [instantiated, advancedState] using argumentsResult
+  rw [expandedArgumentsResult] at success
+  simp only [bind, Except.bind] at success
+  rw [expandedFittedResult] at success
+  simp_all
+  repeat' first | split at success
+  all_goals try cases success
+  all_goals simp_all
+
 /-- Projection of the complete fitting witness used by consumers which need
 only the canonical argument trace and its forwarded coercion ledger. -/
 theorem tryFunctionCandidate_some_argumentFitTrace

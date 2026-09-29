@@ -779,6 +779,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_argumentFitWitness
 example :=
+  @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_resultFitAllocationWitness
+example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_argumentFitTrace
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_argumentCoercion_expression_ids
