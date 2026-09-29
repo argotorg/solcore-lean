@@ -463,9 +463,13 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFuel_success_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFuel_success_sound_at
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchCaseFuel_success_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchCaseFuel_success_sound_at
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchCaseInferenceCertificate.toMatchCaseHasType
 example :=

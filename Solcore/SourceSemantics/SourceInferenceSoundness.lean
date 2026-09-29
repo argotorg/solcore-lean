@@ -12060,6 +12060,72 @@ theorem inferMatchPatternFuel_success_sound
     semanticOwner (by simp) semanticAdmissible semanticAdmissible invariant
     resultExtension flatSuccess
 
+/-- Successful public pattern inference is sound from finalized evidence at a
+fixed source occurrence.  Inverting the wrapper identifies its retained state
+and requirement row with the underlying flat result, so the three root
+provenance premises pass unchanged to flat-pattern soundness. -/
+theorem inferMatchPatternFuel_success_sound_at
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {fuel : Nat} {patternSource : Syntax.Pattern}
+    {expected : TypeSystem.Ty}
+    {initial patternState : Frontend.SourceInference.State}
+    {pattern : TypedMatchPattern}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initial.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (semanticAdmissible :
+      TypeAdmissible semanticContext (outer.apply expected))
+    (invariant : ActiveLocalContextInvariant initial outer semanticContext)
+    (outerExtension : outer.SemanticallyExtends
+      patternState.inference.substitution)
+    (integerPatternsSubset :
+      patternState.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      patternState.requirements ⊆ evidenceState.requirements)
+    (requirementsOccur : ∀ requirement,
+      requirement ∈ pattern.requirements →
+        PrimaryRequirementOccursAt source occurrence requirement)
+    (success : Detail.inferMatchPatternFuel fuel inferenceContext patternSource
+      expected initial = .ok (pattern, patternState)) :
+    Nonempty (MatchPatternInferenceCertificate source semanticContext outer
+      expected pattern patternState) := by
+  have wrapperSuccess := success
+  unfold Detail.inferMatchPatternFuel at wrapperSuccess
+  cases flatSuccess : Detail.inferMatchPatternFlatFuel fuel inferenceContext
+      patternSource expected [] initial with
+  | error error =>
+      simp [flatSuccess, bind, Except.bind] at wrapperSuccess
+  | ok flatResult =>
+      simp only [flatSuccess, bind, Except.bind, pure, Pure.pure,
+        Except.pure] at wrapperSuccess
+      injection wrapperSuccess with resultEq
+      cases resultEq
+      apply inferMatchPatternFuel_success_sound_of_flat
+        (outerExtension := outerExtension) (success := success)
+      intro result resultExtension resultSuccess
+      have okEq : Except.ok flatResult = Except.ok result :=
+        flatSuccess.symm.trans resultSuccess
+      injection okEq with flatResultEq
+      subst result
+      exact inferMatchPatternFlatFuel_success_sound_at validated catalog
+        semanticSignaturesEq rfl evidence ready expectedBelow below owner_eq
+        semanticOwner (by simp) semanticAdmissible semanticAdmissible invariant
+        resultExtension integerPatternsSubset requirementsSubset
+        requirementsOccur flatSuccess
+
 /-- The semantic certificate for one successfully inferred explicit match
 arm.  Pattern inference supplies the substituted pattern typing and the exact
 binder extension; statement inference starts from the corresponding active
@@ -12140,6 +12206,81 @@ theorem inferMatchCaseFuel_success_sound
     validated catalog semanticSignaturesEq branches ready scrutineeBelow below
     owner_eq semanticOwner scrutineeAdmissible invariant
     patternOuterExtension patternSuccess
+  obtain ⟨finalContext, facts, _bodyInvariant, bodyTyping, bodyMatches⟩ :=
+    bodySound patternCertificate.pattern_invariant bodySuccess
+  exact ⟨{
+    binders := patternCertificate.binders
+    rootArity := patternCertificate.rootArity
+    armContext := patternCertificate.armContext
+    finalContext
+    facts
+    pattern_type := patternCertificate.pattern_type
+    binders_extend := patternCertificate.binders_extend
+    pattern_invariant := patternCertificate.pattern_invariant
+    body_type := bodyTyping
+    body_matches := bodyMatches
+  }⟩
+
+/-- Occurrence-aware soundness for one explicit match arm.  The pattern
+certificate is obtained from finalized evidence owned by the enclosing match
+occurrence; body typing and certificate assembly are otherwise identical to
+the callback-based theorem. -/
+theorem inferMatchCaseFuel_success_sound_at
+    {source : TypedSource} {control : ControlContext}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {fuel : Nat} {arm : Syntax.MatchCase}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {input patternState : Frontend.SourceInference.State}
+    {pattern : TypedMatchPattern} {bodyResult : Detail.BlockResult}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (ready : input.InferenceReady)
+    (scrutineeBelow :
+      scrutineeType.VariablesBelow input.inference.next)
+    (below : input.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = input.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (scrutineeAdmissible :
+      TypeAdmissible semanticContext (outer.apply scrutineeType))
+    (invariant : ActiveLocalContextInvariant input outer semanticContext)
+    (patternOuterExtension : outer.SemanticallyExtends
+      patternState.inference.substitution)
+    (integerPatternsSubset :
+      patternState.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      patternState.requirements ⊆ evidenceState.requirements)
+    (requirementsOccur : ∀ requirement,
+      requirement ∈ pattern.requirements →
+        PrimaryRequirementOccursAt source occurrence requirement)
+    (bodySound :
+      ∀ {armContext : SourceSemantics.Context},
+        ActiveLocalContextInvariant patternState outer armContext →
+        Detail.inferStatementsFuel fuel inferenceContext arm.value.body.value
+            expectedReturn patternState = .ok bodyResult →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant bodyResult.state outer finalContext ∧
+            StatementsHaveType source control armContext
+              bodyResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer bodyResult facts)
+    (patternSuccess : Detail.inferMatchPatternFuel fuel inferenceContext
+      arm.value.pattern scrutineeType input = .ok (pattern, patternState))
+    (bodySuccess : Detail.inferStatementsFuel fuel inferenceContext
+      arm.value.body.value expectedReturn patternState = .ok bodyResult) :
+    Nonempty (MatchCaseInferenceCertificate source control semanticContext
+      outer scrutineeType pattern patternState bodyResult) := by
+  obtain ⟨patternCertificate⟩ := inferMatchPatternFuel_success_sound_at
+    validated catalog semanticSignaturesEq evidence ready scrutineeBelow below
+    owner_eq semanticOwner scrutineeAdmissible invariant
+    patternOuterExtension integerPatternsSubset requirementsSubset
+    requirementsOccur patternSuccess
   obtain ⟨finalContext, facts, _bodyInvariant, bodyTyping, bodyMatches⟩ :=
     bodySound patternCertificate.pattern_invariant bodySuccess
   exact ⟨{
