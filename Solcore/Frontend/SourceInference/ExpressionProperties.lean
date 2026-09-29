@@ -6734,6 +6734,109 @@ private theorem recordSelectedCallResult_withExpected_apply_eq
   change outer.apply fitted.expression.type = outer.apply expected
   exact withExpected_some_apply_eq fittedSuccess fittedExtension
 
+/-- A successful indirect application exposes the exact executable path used
+to fit its bundled argument and result.  A known function shape performs two
+expectation fits; an unknown shape allocates one result metavariable, unifies
+the callee with the synthesized function type, and then fits that result. -/
+theorem applyFunctionType_success_facts
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression} {expected : Option Ty}
+    {state : State} {result : IndirectApplicationResult}
+    (success : applyFunctionType context call calleeType arguments expected
+      state = .ok result) :
+    (∃ parameterType resultType fittedArgument fittedResult,
+      functionParts? (state.resolve calleeType) =
+          some (parameterType, resultType) ∧
+        withExpected context state {
+          id := call
+          type := Ty.productMany (arguments.map (·.type))
+        } (some parameterType) = .ok fittedArgument ∧
+        withExpected context fittedArgument.state {
+          id := call
+          type := resultType
+        } expected = .ok fittedResult ∧
+        result = {
+          result := fittedResult.expression
+          argumentCoercions := fittedArgument.coercions
+          callCoercions := fittedResult.coercions
+          state := fittedResult.state
+        }) ∨
+      (∃ resultType freshState unifiedState fittedResult,
+        functionParts? (state.resolve calleeType) = none ∧
+          state.fresh = (resultType, freshState) ∧
+          unify freshState calleeType
+            (.function (Ty.productMany (arguments.map (·.type))) resultType) =
+              .ok unifiedState ∧
+          withExpected context unifiedState {
+            id := call
+            type := resultType
+          } expected = .ok fittedResult ∧
+          result = {
+            result := fittedResult.expression
+            argumentCoercions := []
+            callCoercions := fittedResult.coercions
+            state := fittedResult.state
+          }) := by
+  unfold applyFunctionType at success
+  cases partsResult : functionParts? (state.resolve calleeType) with
+  | some parts =>
+      rcases parts with ⟨parameterType, resultType⟩
+      simp only [partsResult] at success
+      cases argumentResult : withExpected context state {
+          id := call
+          type := Ty.productMany (arguments.map (·.type))
+        } (some parameterType) with
+      | error error =>
+          simp [argumentResult, bind, Except.bind] at success
+      | ok fittedArgument =>
+          simp only [argumentResult, bind, Except.bind] at success
+          cases resultResult : withExpected context fittedArgument.state {
+              id := call
+              type := resultType
+            } expected with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := fittedArgument.coercions
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              exact .inl ⟨parameterType, resultType, fittedArgument,
+                fittedResult, rfl, argumentResult, resultResult,
+                resultEq.symm⟩
+  | none =>
+      simp only [partsResult] at success
+      generalize freshResultEq : state.fresh = freshResult at success
+      rcases freshResult with ⟨resultType, freshState⟩
+      cases unifyResult : unify freshState calleeType
+          (.function (Ty.productMany (arguments.map (·.type))) resultType) with
+      | error error =>
+          simp [unifyResult, bind, Except.bind] at success
+      | ok unifiedState =>
+          simp only [unifyResult, bind, Except.bind] at success
+          cases resultResult : withExpected context unifiedState {
+              id := call
+              type := resultType
+            } expected with
+          | error error =>
+              simp [resultResult, bind, Except.bind] at success
+          | ok fittedResult =>
+              simp only [resultResult, bind, Except.bind] at success
+              change Except.ok {
+                result := fittedResult.expression
+                argumentCoercions := []
+                callCoercions := fittedResult.coercions
+                state := fittedResult.state
+              } = Except.ok result at success
+              injection success with resultEq
+              exact .inr ⟨resultType, freshState, unifiedState, fittedResult,
+                rfl, rfl, unifyResult, resultResult,
+                resultEq.symm⟩
+
 /-- Applying an indirectly obtained function type makes semantic inference
 progress, preserves readiness, and returns an allocator-bounded result type. -/
 theorem applyFunctionType_inferenceProperties
