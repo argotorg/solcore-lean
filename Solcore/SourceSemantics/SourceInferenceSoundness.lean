@@ -19329,6 +19329,102 @@ theorem argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
     argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes_of_subset
       bases coercions (fun _ member => member) entryIdsUnique preserved
 
+/-- Recording a compiler-provided builtin call retains a reusable typing base
+for its exact synthetic call node.  The builtin's monomorphic parameter and
+result types are closed, so final substitution only has to transport the
+already inferred argument row into that fixed signature. -/
+theorem recordBuiltinFunctionCall_success_expressionTypingBase
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {recorded : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {semanticSource : TypedSource}
+    {active : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    (success : Detail.recordBuiltinFunctionCall source callee name function
+      arguments call expected state = .ok recorded)
+    (substitutionExtends : substitution.SemanticallyExtends
+      recorded.2.inference.substitution)
+    (sourceExtension : TypingSourceExtends
+      ((recorded.2.toTypedSource roots).applySubstitution substitution)
+      semanticSource)
+    (argumentsType : ExpressionsHaveTypes semanticSource active
+      (arguments.map (·.id))
+      (arguments.map fun argument => substitution.apply argument.type))
+    (binders : TypeParameterBindersWellFormed active) :
+    ExpressionTypingBase (recorded.2.toTypedSource roots) semanticSource
+      active substitution recorded.1 := by
+  obtain ⟨calleeId, nodesEq⟩ :=
+    Detail.recordBuiltinFunctionCall_success_nodes success
+  let calleeNode : ExpressionNode := {
+    id := calleeId
+    span := callee.span
+    type := function.type
+    form := .reference name (.builtinFunction function)
+  }
+  let callNode : ExpressionNode := {
+    id := recorded.1.id
+    span := source.span
+    type := recorded.1.type
+    form := .call calleeId (arguments.map (·.id))
+      (.builtinFunction function)
+  }
+  have rawCalleeContains : ContainsExpression
+      (recorded.2.toTypedSource roots) calleeId calleeNode := by
+    refine ⟨?_, rfl⟩
+    change .expression calleeNode ∈ recorded.2.nodes
+    rw [nodesEq]
+    simp [calleeNode]
+  have rawCallContains : ContainsExpression
+      (recorded.2.toTypedSource roots) recorded.1.id callNode := by
+    refine ⟨?_, rfl⟩
+    change .expression callNode ∈ recorded.2.nodes
+    rw [nodesEq]
+    simp [callNode]
+  have finalCalleeContains : ContainsExpression semanticSource calleeId
+      (calleeNode.applySubstitution substitution) :=
+    sourceExtension.containsExpression
+      (FlexibleSubstitution.ContainsExpression.applySubstitution substitution
+        rawCalleeContains)
+  have calleeValid : DirectBuiltinCalleeValid semanticSource calleeId
+      function := by
+    refine .intro (name := name) finalCalleeContains ?_ ?_ ?_ ?_
+    · rfl
+    · cases function <;> rfl
+    · rfl
+    · rfl
+  have argumentTypesEq :=
+    Detail.recordBuiltinFunctionCall_success_argumentTypes_apply_eq success
+      substitutionExtends
+  have finalArgumentsType : ExpressionsHaveTypes semanticSource active
+      (arguments.map (·.id)) function.parameterTypes := by
+    rw [← argumentTypesEq]
+    exact argumentsType
+  have formType : ExpressionFormHasRawType semanticSource active
+      (callNode.applySubstitution substitution).form function.returnType
+      (.ordinary []) := by
+    simpa [callNode, ExpressionNode.applySubstitution,
+      ExpressionForm.applySubstitution, CallResolution.applySubstitution] using
+        (ExpressionFormHasRawType.builtinCall calleeValid finalArgumentsType)
+  have rawAdmissible : TypeAdmissible active function.returnType :=
+    TypeAdmissible.builtinFunctionResult binders function
+  have resultTypeEq :=
+    Detail.recordBuiltinFunctionCall_success_returnType_eq success
+  have finalTypeEq : substitution.apply recorded.1.type =
+      function.returnType := by
+    rw [resultTypeEq]
+    cases function <;> rfl
+  refine .intro rawCallContains rfl formType rawAdmissible ?_
+  apply ExpressionRequirementPlan.Valid.ordinary
+  · simp [RequirementIdsValid]
+  · change CoercionPathValid active function.returnType
+      (substitution.apply recorded.1.type) []
+    rw [finalTypeEq]
+    exact .nil _
+  · rfl
+
 /-- Recording a selected declaration call retains a reusable typing base for
 the exact call node emitted after delayed argument coercions are attached.
 The base does not require the recorded result type to be admissible yet; that
@@ -22122,6 +22218,82 @@ theorem expressionsHaveTypes_of_argumentTypingBases
         (resources.expressionHasType_of_typingBase head binders signatures_eq
           parameters_eq owner_eq residual contextValid)
         induction
+
+/-- Source-ordered argument inference followed by builtin-call recording
+produces the builtin call's reusable typing base in the source consumed by
+whole-body finalization.  Finalization closes every argument base in the
+common emitted source; the recorder bridge then uses the fixed builtin
+signature to type the synthetic callee and call nodes. -/
+theorem inferExprsFuel_recordBuiltinFunctionCall_success_expressionTypingBase
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {fuel : Nat}
+    {argumentSources : List Syntax.Expr}
+    {argumentInitial argumentState : Frontend.SourceInference.State}
+    {arguments : List InferredExpression}
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {call : ExpressionId}
+    {expected : Option TypeSystem.Ty} {inferred : InferredExpression}
+    {sourceContext active : SourceSemantics.Context}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (argumentsSuccess : Detail.inferExprsFuel fuel inferenceContext
+      argumentSources argumentInitial = .ok (arguments, argumentState))
+    (recordSuccess : Detail.recordBuiltinFunctionCall source callee name
+      function arguments call expected argumentState = .ok (inferred, state))
+    (nodesBelow : argumentInitial.NodesBelowNextOccurrence)
+    (expressionBase :
+      ∀ {childFuel : Nat} {expression : Syntax.Expr}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext expression none
+            childInitial = .ok (child, childFinal) →
+          ExpressionTypingBase (childFinal.toTypedSource roots)
+            result.typedSource active result.substitution child)
+    (ready : state.InferenceReady)
+    (binders : TypeParameterBindersWellFormed sourceContext)
+    (activeBinders : TypeParameterBindersWellFormed active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (parametersEq : sourceContext.typeParameters =
+      inferenceContext.typeParameters)
+    (ownerEq : sourceContext.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (residual : sourceContext.residualTypeVariables = true)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      result.substitution closedVariables sourceContext active) :
+    ExpressionTypingBase (state.toTypedSource roots) result.typedSource active
+      result.substitution inferred := by
+  have argumentBases := inferExprsFuel_success_argumentTypingBasesValid roots
+    expressionBase nodesBelow argumentsSuccess
+  obtain ⟨calleeId, nodesEq⟩ :=
+    Detail.recordBuiltinFunctionCall_success_nodes recordSuccess
+  have nodesPrefix : argumentState.nodes <+: state.nodes := by
+    rw [nodesEq]
+    exact List.prefix_append _ _
+  have finalArgumentBases : ArgumentTypingBasesValid
+      (state.toTypedSource roots) result.typedSource active
+      result.substitution arguments :=
+    argumentBases.weakenNodeSource nodesPrefix
+  have argumentsType : ExpressionsHaveTypes result.typedSource active
+      (arguments.map (·.id))
+      (arguments.map fun argument => result.substitution.apply argument.type) :=
+    resources.expressionsHaveTypes_of_argumentTypingBases finalArgumentBases
+      binders signaturesEq parametersEq ownerEq residual contextValid
+  have substitutionExtends : result.substitution.SemanticallyExtends
+      state.inference.substitution := by
+    rw [resources.substitution_eq]
+    exact (resources.progress_of_ready ready).substitution_extends
+  have sourceExtension : TypingSourceExtends
+      ((state.toTypedSource roots).applySubstitution result.substitution)
+      result.typedSource := by
+    rw [resources.source_eq]
+    exact .refl _
+  exact recordBuiltinFunctionCall_success_expressionTypingBase recordSuccess
+    substitutionExtends sourceExtension argumentsType activeBinders
 
 /-- Any requirement retained by the pre-finalization state proves its closed
 predicate at the exact covered source occurrence which owns its identity. -/

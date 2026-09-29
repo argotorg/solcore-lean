@@ -697,6 +697,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordBuiltinFunctionCall_success_expressionTypingBase
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_containsExpression
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_argumentDirectChild
@@ -788,6 +790,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionHasType_of_typingBase
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionsHaveTypes_of_argumentTypingBases
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.inferExprsFuel_recordBuiltinFunctionCall_success_expressionTypingBase
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.requirementProvesAt
 example :=
