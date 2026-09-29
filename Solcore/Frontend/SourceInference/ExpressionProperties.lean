@@ -10870,6 +10870,23 @@ private theorem inferExprFuel_inferenceProperties_internal
     InferExprFuelInferenceProperties fuel context expression expected state :=
   inferFuel_inferenceProperties_internal.1 fuel context expression expected state
 
+private theorem inferConstructorApplicationFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (source : Syntax.Expr)
+    (id : ExpressionId) (instantiation : DataConstructorInstantiation)
+    (arguments : List Syntax.Expr) (expected : Option Ty) (state : State) :
+    InferConstructorApplicationFuelInferenceProperties fuel context source id
+      instantiation arguments expected state :=
+  inferFuel_inferenceProperties_internal.2.1 fuel context source id
+    instantiation arguments expected state
+
+private theorem inferConstructorArgumentsFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (sources : List Syntax.Expr)
+    (expectedTypes : List Ty) (state : State) :
+    InferConstructorArgumentsFuelInferenceProperties fuel context sources
+      expectedTypes state :=
+  inferFuel_inferenceProperties_internal.2.2.1 fuel context sources
+    expectedTypes state
+
 private theorem inferStatementsFuel_inferenceProperties_internal
     (fuel : Nat) (context : Context) (statements : List Syntax.Statement)
     (expectedReturn : Ty) (state : State) :
@@ -10944,6 +10961,60 @@ theorem inferExprFuel_inferenceProperties
       result.1.type.VariablesBelow result.2.inference.next := by
   exact inferExprFuel_inferenceProperties_internal fuel context expression
     expected state ready validated canonical expectedBelow result success
+
+/-- Successful constructor-application inference makes monotone inference
+progress, leaves the resulting state ready, and returns a type whose variables
+are allocated by that state. -/
+theorem inferConstructorApplicationFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (payloadBelow : ∀ payload ∈ instantiation.payloadTypes,
+      payload.VariablesBelow state.inference.next)
+    (resultBelow : instantiation.resultType.VariablesBelow
+      state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      result.1.type.VariablesBelow result.2.inference.next := by
+  exact inferConstructorApplicationFuel_inferenceProperties_internal fuel
+    context source id instantiation arguments expected state ready validated
+    canonical payloadBelow resultBelow expectedBelow result success
+
+/-- Successful constructor-argument inference makes monotone inference
+progress, leaves the resulting state ready, and bounds every inferred argument
+type by the resulting allocator. -/
+theorem inferConstructorArgumentsFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {expectedTypes : List Ty} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (expectedBelow : ∀ expectedType ∈ expectedTypes,
+      expectedType.VariablesBelow state.inference.next)
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expectedTypes
+      state = .ok result) :
+    state.InferenceProgress result.2 ∧
+      result.2.InferenceReady ∧
+      ∀ expression ∈ result.1,
+        expression.type.VariablesBelow result.2.inference.next := by
+  exact inferConstructorArgumentsFuel_inferenceProperties_internal fuel context
+    sources expectedTypes state ready validated canonical expectedBelow result
+    success
 
 /-- Successful statement-list inference makes monotone inference progress,
 leaves the resulting state ready for further inference, and returns a block
@@ -12963,6 +13034,73 @@ theorem inferExprFuel_state_header
     result.2.inputs = state.inputs :=
   congrArg (fun header : State.Header => header.inputs)
     (inferExprFuel_state_header success)
+
+/-- Successful constructor-application inference preserves the declaration
+owner and original input binders. -/
+theorem inferConstructorApplicationFuel_state_header
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result) :
+    result.2.header = state.header := by
+  exact inferStatementsFuel_preserves_header_internal.2.1 fuel context source id
+    instantiation arguments expected state result success
+
+@[simp] theorem inferConstructorApplicationFuel_preserves_owner
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result) :
+    result.2.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (inferConstructorApplicationFuel_state_header success)
+
+@[simp] theorem inferConstructorApplicationFuel_preserves_inputs
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result) :
+    result.2.inputs = state.inputs :=
+  congrArg (fun header : State.Header => header.inputs)
+    (inferConstructorApplicationFuel_state_header success)
+
+/-- Successful constructor-argument inference preserves the declaration owner
+and original input binders. -/
+theorem inferConstructorArgumentsFuel_state_header
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {expectedTypes : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expectedTypes
+      state = .ok result) :
+    result.2.header = state.header := by
+  exact inferStatementsFuel_preserves_header_internal.2.2.1 fuel context sources
+    expectedTypes state result success
+
+@[simp] theorem inferConstructorArgumentsFuel_preserves_owner
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {expectedTypes : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expectedTypes
+      state = .ok result) :
+    result.2.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (inferConstructorArgumentsFuel_state_header success)
+
+@[simp] theorem inferConstructorArgumentsFuel_preserves_inputs
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {expectedTypes : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expectedTypes
+      state = .ok result) :
+    result.2.inputs = state.inputs :=
+  congrArg (fun header : State.Header => header.inputs)
+    (inferConstructorArgumentsFuel_state_header success)
 
 /-- Successful statement-list inference preserves the declaration owner and
 the original input binders. -/

@@ -749,6 +749,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorApplicationFuel_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorArgumentsFuel_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_lexicalScope_eq
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferPlaceFuel_success_lexicalScope_eq
@@ -816,6 +820,18 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_owner
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_inputs
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorApplicationFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorApplicationFuel_preserves_owner
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorApplicationFuel_preserves_inputs
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorArgumentsFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorArgumentsFuel_preserves_owner
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorArgumentsFuel_preserves_inputs
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
 example :=
