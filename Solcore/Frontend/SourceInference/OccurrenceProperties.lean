@@ -2515,7 +2515,9 @@ private theorem inference_preserves_nextOccurrence :
       unify_success_nextOccurrence,
       freshDataConstructorInstantiation_nextOccurrence]
 
-private theorem inferExprFuel_nextOccurrence_lt
+/-- Every successful expression traversal strictly advances the occurrence
+allocator beyond its input cutoff. -/
+theorem inferExprFuel_nextOccurrence_lt
     {fuel : Nat} {context : Context} {expression : Syntax.Expr}
     {expected : Option Ty} {state : State}
     {result : InferredExpression × State}

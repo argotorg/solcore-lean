@@ -362,6 +362,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.State.markDirectCallRequirements_preserves_localBindersBelowNextLocal
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_nextOccurrence_lt
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_nextOccurrence_le
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferConstructorApplicationFuel_nextOccurrence_le
