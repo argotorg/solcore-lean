@@ -592,6 +592,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.binaryOperatorTrait_hasTypeAfterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.binaryOperatorInferenceCase_hasType_afterFinalization_scoped
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.freshDataConstructorInstantiation_admissible
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_instantiationAdmissible
