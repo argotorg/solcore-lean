@@ -632,6 +632,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.withExpected_success_coercionPathValid_afterFinalization_scoped
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferConstructorApplicationFuel_success_expressionHasType_scoped
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_template_evidence
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_ordinary_sound
 example := @Solcore.SourceSemantics.SourceInferenceSoundness.solveRequirements_scoped_entries_sound

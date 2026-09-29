@@ -16887,6 +16887,290 @@ theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
     rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
     rfl
 
+/-- Deep soundness of one constructor-application traversal at fixed child
+fuel.  Payload expressions are typed first in the source returned by their
+source-ordered traversal, then weakened through the final constructor record
+and into the caller's eventual scoped-ledger source. -/
+theorem inferConstructorApplicationFuel_success_expressionHasType_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {id : ExpressionId}
+    {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial resultState later : Frontend.SourceInference.State}
+    {result : InferredExpression}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.inferConstructorApplicationFuel fuel inferenceContext
+      source id instantiation arguments expected initial =
+        .ok (result, resultState))
+    (ready : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (payloadBelow : ∀ payload ∈ instantiation.payloadTypes,
+      payload.VariablesBelow initial.inference.next)
+    (resultBelow : instantiation.resultType.VariablesBelow
+      initial.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow initial.inference.next)
+    (nodesBelow : initial.NodesBelowNextOccurrence)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        resultState.inference.substitution)
+    (requirementsSubset : resultState.requirements ⊆ later.requirements)
+    (sourceExtension : TypingSourceExtends
+      ((resultState.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (binders : TypeParameterBindersWellFormed active)
+    (instantiationValid :
+      SourceSemantics.DataConstructorInstantiation.Admissible active
+        (instantiation.applySubstitution later.inference.substitution))
+    (finalAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply result.type))
+    (expressionSound :
+      ∀ {expression : Syntax.Expr} {expectedType : TypeSystem.Ty}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        childInitial.InferenceReady →
+        expectedType.VariablesBelow childInitial.inference.next →
+        childInitial.NodesBelowNextOccurrence →
+        later.inference.substitution.SemanticallyExtends
+          childFinal.inference.substitution →
+        Detail.inferExprFuel fuel inferenceContext expression
+            (some (childInitial.resolve expectedType)) childInitial =
+              .ok (child, childFinal) →
+          ExpressionHasType
+            ((childFinal.toTypedSource roots).applySubstitution
+              later.inference.substitution)
+            active child.id (later.inference.substitution.apply child.type))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered ledgerSource active
+      (.expression result.id)) :
+    ExpressionHasType ledgerSource active result.id
+      (later.inference.substitution.apply result.type) := by
+  have wholeSuccess := success
+  have finish
+      {argumentInitial argumentsState : Frontend.SourceInference.State}
+      {inferredArguments : List InferredExpression}
+      (argumentInitialReady : argumentInitial.InferenceReady)
+      (payloadAtArgumentInitial : ∀ payload ∈ instantiation.payloadTypes,
+        payload.VariablesBelow argumentInitial.inference.next)
+      (resultAtArgumentInitial : instantiation.resultType.VariablesBelow
+        argumentInitial.inference.next)
+      (expectedAtArgumentInitial : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow argumentInitial.inference.next)
+      (nodesAtArgumentInitial :
+        argumentInitial.NodesBelowNextOccurrence)
+      (argumentInitialOwner : argumentInitial.owner = initial.owner)
+      (argumentsSuccess : Detail.inferConstructorArgumentsFuel fuel
+        inferenceContext arguments instantiation.payloadTypes argumentInitial =
+          .ok (inferredArguments, argumentsState))
+      (recordSuccess : Detail.recordExpressionWithExpected inferenceContext
+        source id (argumentsState.resolve instantiation.resultType)
+        (.constructor instantiation (inferredArguments.map (·.id))) [] expected
+        argumentsState none = .ok (result, resultState)) :
+      ExpressionHasType ledgerSource active result.id
+        (later.inference.substitution.apply result.type) := by
+    have argumentsProperties :=
+      Detail.inferConstructorArgumentsFuel_inferenceProperties
+        argumentInitialReady signatureFormation functionsCanonical
+        payloadAtArgumentInitial argumentsSuccess
+    have resultAtArguments : instantiation.resultType.VariablesBelow
+        argumentsState.inference.next :=
+      resultAtArgumentInitial.weaken argumentsProperties.1.next_le
+    have resolvedResultBelow :
+        (argumentsState.resolve instantiation.resultType).VariablesBelow
+          argumentsState.inference.next :=
+      argumentsProperties.2.1.solved.variablesBelow_apply resultAtArguments
+    have expectedAtArguments : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow argumentsState.inference.next := by
+      intro expectedType member
+      exact (expectedAtArgumentInitial expectedType member).weaken
+        argumentsProperties.1.next_le
+    have recordProperties :=
+      Detail.recordExpressionWithExpected_inferenceProperties
+        argumentsProperties.2.1 resolvedResultBelow expectedAtArguments
+        recordSuccess
+    have outerArguments : later.inference.substitution.SemanticallyExtends
+        argumentsState.inference.substitution :=
+      TypeSystem.Substitution.SemanticallyExtends.trans substitutionExtends
+        recordProperties.1.substitution_extends
+    have argumentsTypeLocal :=
+      inferConstructorArgumentsFuel_success_expressionsHaveTypes_local
+        (roots := roots) signatureFormation functionsCanonical
+        argumentInitialReady payloadAtArgumentInitial nodesAtArgumentInitial
+        outerArguments expressionSound argumentsSuccess
+    obtain ⟨fitted, fittedSuccess, _, resultStateEq⟩ :=
+      Detail.recordExpressionWithExpected_success_record recordSuccess
+    have argumentsNodesPrefix : argumentsState.nodes <+: resultState.nodes := by
+      have fittedPrefix : argumentsState.nodes <+: fitted.state.nodes := by
+        rw [(Detail.withExpected_occurrenceState_eq fittedSuccess).1]
+        exact List.prefix_rfl
+      have resultStateEq' : resultState =
+          fitted.state.recordNode (.expression {
+            id := fitted.expression.id
+            span := source.span
+            type := fitted.expression.type
+            form := .constructor instantiation
+              (inferredArguments.map (·.id))
+            requirements := [] ++
+              Detail.coercionRequirements fitted.coercions
+            coercions := fitted.coercions
+          }) := by
+        simpa using resultStateEq
+      rw [resultStateEq']
+      exact fittedPrefix.trans
+        (Frontend.SourceInference.State.recordNode_nodesPrefix fitted.state _)
+    have resultOwner : resultState.owner = initial.owner :=
+      Detail.inferConstructorApplicationFuel_preserves_owner wholeSuccess
+    have argumentsOwner : argumentsState.owner = argumentInitial.owner :=
+      Detail.inferConstructorArgumentsFuel_preserves_owner argumentsSuccess
+    have argumentsToResult : TypingSourceExtends
+        (argumentsState.toTypedSource roots)
+        (resultState.toTypedSource roots) := by
+      constructor
+      · exact resultOwner.trans
+          (argumentInitialOwner.symm.trans argumentsOwner.symm)
+      · exact argumentsNodesPrefix
+    have argumentsToLedger : TypingSourceExtends
+        ((argumentsState.toTypedSource roots).applySubstitution
+          later.inference.substitution) ledgerSource :=
+      (argumentsToResult.applySubstitution
+        later.inference.substitution).trans sourceExtension
+    have argumentsType :=
+      argumentsTypeLocal.weakenSource argumentsToLedger
+    have rawTypeEq :
+        later.inference.substitution.apply
+            (argumentsState.resolve instantiation.resultType) =
+          later.inference.substitution.apply instantiation.resultType := by
+      simpa [Frontend.SourceInference.State.resolve,
+        TypeSystem.InferState.resolve] using
+          outerArguments instantiation.resultType
+    have rawAdmissible : TypeAdmissible active
+        (later.inference.substitution.apply
+          (argumentsState.resolve instantiation.resultType)) := by
+      rw [rawTypeEq]
+      simpa [DataConstructorInstantiation.applySubstitution] using
+        (SourceSemantics.DataConstructorInstantiation.Admissible.result_type_admissible
+          binders instantiationValid)
+    have formType : ExpressionFormHasRawType ledgerSource active
+        ((.constructor instantiation
+            (inferredArguments.map (·.id)) : ExpressionForm).applySubstitution
+          later.inference.substitution)
+        (later.inference.substitution.apply
+          (argumentsState.resolve instantiation.resultType))
+        (.ordinary []) := by
+      rw [rawTypeEq]
+      simpa [ExpressionForm.applySubstitution,
+        DataConstructorInstantiation.applySubstitution] using
+          (ExpressionFormHasRawType.constructor instantiationValid
+            argumentsType)
+    exact recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
+      recordSuccess substitutionExtends requirementsSubset sourceExtension
+      formType rawAdmissible finalAdmissible traitSuccess profileSuccess
+      catalog contextValid signaturesEq traitName solveSuccess solvedEq ledger
+      ownership activeSignaturesEq activeRequirementsEq assumptionsMono covered
+  unfold Detail.inferConstructorApplicationFuel at success
+  by_cases arity : arguments.length = instantiation.payloadTypes.length
+  · simp only [arity] at success
+    cases expected with
+    | none =>
+        simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at success
+        cases argumentsResult : Detail.inferConstructorArgumentsFuel fuel
+            inferenceContext arguments instantiation.payloadTypes initial with
+        | error error =>
+            simp [argumentsResult] at success
+        | ok argumentsPair =>
+            rcases argumentsPair with ⟨inferredArguments, argumentsState⟩
+            simp only [argumentsResult] at success
+            exact finish ready payloadBelow resultBelow expectedBelow nodesBelow
+              rfl argumentsResult success
+    | some expectedType =>
+        cases unifyResult : Detail.unify initial instantiation.resultType
+            expectedType with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at success
+        | ok argumentInitial =>
+            simp only [unifyResult, bind, Except.bind] at success
+            have expectedTypeBelow : expectedType.VariablesBelow
+                initial.inference.next :=
+              expectedBelow expectedType (by simp)
+            have unifyProgress := Detail.unify_inferenceProgress ready.solved
+              resultBelow expectedTypeBelow unifyResult
+            have argumentInitialReady :=
+              Detail.unify_preserves_inferenceReady ready resultBelow
+                expectedTypeBelow unifyResult
+            have payloadAtArgumentInitial : ∀ payload ∈
+                instantiation.payloadTypes,
+                payload.VariablesBelow argumentInitial.inference.next := by
+              intro payload member
+              exact (payloadBelow payload member).weaken unifyProgress.next_le
+            have resultAtArgumentInitial :
+                instantiation.resultType.VariablesBelow
+                  argumentInitial.inference.next :=
+              resultBelow.weaken unifyProgress.next_le
+            have expectedAtArgumentInitial : ∀ candidate ∈
+                (some expectedType : Option TypeSystem.Ty),
+                candidate.VariablesBelow argumentInitial.inference.next := by
+              intro candidate member
+              simp only [Option.mem_def] at member
+              injection member with candidateEq
+              subst candidate
+              exact expectedTypeBelow.weaken unifyProgress.next_le
+            have nodesAtArgumentInitial :
+                argumentInitial.NodesBelowNextOccurrence :=
+              (Detail.unify_occurrenceBoundExtends unifyResult
+                ).nodesBelowNextOccurrence nodesBelow
+            have argumentInitialOwner :
+                argumentInitial.owner = initial.owner :=
+              congrArg (fun header : Frontend.SourceInference.State.Header =>
+                header.owner) (Detail.unify_state_header unifyResult)
+            cases argumentsResult : Detail.inferConstructorArgumentsFuel fuel
+                inferenceContext arguments instantiation.payloadTypes
+                argumentInitial with
+            | error error =>
+                simp [argumentsResult] at success
+            | ok argumentsPair =>
+                rcases argumentsPair with
+                  ⟨inferredArguments, argumentsState⟩
+                simp only [argumentsResult] at success
+                exact finish argumentInitialReady payloadAtArgumentInitial
+                  resultAtArgumentInitial expectedAtArgumentInitial
+                  nodesAtArgumentInitial argumentInitialOwner argumentsResult
+                  success
+  · simp [arity, bind, Except.bind] at success
+
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
 predicate. -/
