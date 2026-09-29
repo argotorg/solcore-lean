@@ -16859,6 +16859,173 @@ theorem withExpected_success_coercionPathValid_afterFinalization_scoped
       signaturesEq traitName solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered occurs
 
+/-- Pointwise semantic validity of the delayed coercions produced while a
+function candidate fits its source-ordered argument spine.  The operational
+arguments, parameters, and attachment ledger remain unclosed in the indices;
+each constructor records the path after the enclosing final substitution has
+been applied.  Target admissibility is retained alongside the path because it
+is the additional premise needed to rebuild expression typing after
+`attachExpressionCoercions` advances the argument node's authoritative type. -/
+inductive ArgumentCoercionsValid
+    (context : SourceSemantics.Context)
+    (substitution : TypeSystem.Substitution) :
+    List InferredExpression → List TypeSystem.Ty →
+      List Detail.ExpressionCoercions → Prop where
+  | nil : ArgumentCoercionsValid context substitution [] [] []
+  | cons
+      {argument : InferredExpression}
+      {arguments : List InferredExpression}
+      {parameter : TypeSystem.Ty}
+      {parameters : List TypeSystem.Ty}
+      {coercions : List CoercionStep}
+      {entries : List Detail.ExpressionCoercions}
+      (targetAdmissible :
+        TypeAdmissible context (substitution.apply parameter))
+      (path : CoercionPathValid context
+        (substitution.apply argument.type)
+        (substitution.apply parameter)
+        (coercions.map (CoercionStep.applySubstitution substitution)))
+      (tail : ArgumentCoercionsValid context substitution arguments parameters
+        entries) :
+      ArgumentCoercionsValid context substitution
+        (argument :: arguments) (parameter :: parameters)
+        ({ expression := argument.id, coercions } :: entries)
+
+/-- An exact frontend argument-fitting trace becomes a source-ordered row of
+semantically valid coercion paths once the enclosing inference traversal and
+requirement solver have finished.  Tail progress transports the final
+substitution back to every intermediate fitted state; tail requirement
+monotonicity similarly makes every head path visible to the final scoped
+ledger. -/
+theorem argumentFitTrace_argumentCoercionsValid_afterFinalization_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {initial later : Frontend.SourceInference.State}
+    {arguments : List InferredExpression}
+    {parameters : List TypeSystem.Ty}
+    {result : Detail.ArgumentFitResult}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base semanticContext : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (trace : Detail.ArgumentFitTrace inferenceContext initial arguments
+      parameters result)
+    (ready : initial.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow initial.inference.next)
+    (parametersBelow : ∀ parameter ∈ parameters,
+      parameter.VariablesBelow initial.inference.next)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.state.inference.substitution)
+    (requirementsSubset : result.state.requirements ⊆ later.requirements)
+    (parametersAdmissible : ∀ parameter ∈ parameters,
+      TypeAdmissible semanticContext
+        (later.inference.substitution.apply parameter))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext
+        semanticContext)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : semanticContext.signatures = base.signatures)
+    (activeRequirementsEq :
+      semanticContext.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ semanticContext.assumptions)
+    (covered : ∀ entry ∈ result.coercions,
+      TemplateScopeCovered ledgerSource semanticContext
+        (.expression entry.expression))
+    (occurs : ∀ entry ∈ result.coercions, ∀ requirement,
+      requirement ∈ coercionRequirementIds entry.coercions →
+        PrimaryRequirementOccursAt ledgerSource
+          (.expression entry.expression) requirement) :
+    ArgumentCoercionsValid semanticContext later.inference.substitution
+      arguments parameters result.coercions := by
+  induction trace with
+  | nil => exact .nil
+  | @cons state argument arguments parameter parameters fitted tail
+      head rest induction =>
+      have argumentBelow :
+          argument.type.VariablesBelow state.inference.next :=
+        argumentsBelow argument (by simp)
+      have parameterBelow :
+          parameter.VariablesBelow state.inference.next :=
+        parametersBelow parameter (by simp)
+      have fittedProperties :=
+        Detail.candidateWithExpected_some_inferenceProperties ready
+          argumentBelow (by
+            intro expectedType member
+            simp only [Option.mem_def] at member
+            have expectedTypeEq : expectedType = parameter :=
+              Option.some.inj member.symm
+            simpa only [expectedTypeEq] using parameterBelow) head
+      have tailArgumentsBelow : ∀ tailArgument ∈ arguments,
+          tailArgument.type.VariablesBelow fitted.state.inference.next := by
+        intro tailArgument member
+        exact (argumentsBelow tailArgument (by simp [member])).weaken
+          fittedProperties.1.next_le
+      have tailParametersBelow : ∀ tailParameter ∈ parameters,
+          tailParameter.VariablesBelow fitted.state.inference.next := by
+        intro tailParameter member
+        exact (parametersBelow tailParameter (by simp [member])).weaken
+          fittedProperties.1.next_le
+      have tailProperties := rest.inferenceProperties
+        fittedProperties.2.1 tailArgumentsBelow tailParametersBelow
+      have outerFitted : later.inference.substitution.SemanticallyExtends
+          fitted.state.inference.substitution :=
+        TypeSystem.Substitution.SemanticallyExtends.trans substitutionExtends
+          tailProperties.1.substitution_extends
+      have fittedRequirementsSubset :
+          fitted.state.requirements ⊆ later.requirements :=
+        List.Subset.trans rest.requirements_subset requirementsSubset
+      let entry : Detail.ExpressionCoercions := {
+        expression := argument.id
+        coercions := fitted.coercions
+      }
+      have entryMember : entry ∈ entry :: tail.coercions := by simp
+      have path :=
+        withExpected_success_coercionPathValid_afterFinalization_scoped
+          (Detail.candidateWithExpected_some_withExpected head)
+          traitSuccess profileSuccess fittedRequirementsSubset catalog
+          contextValid signaturesEq traitName solveSuccess solvedEq ledger
+          ownership activeSignaturesEq activeRequirementsEq assumptionsMono
+          (covered entry entryMember)
+          (fun requirement member => occurs entry entryMember requirement member)
+      have rawEndpointEq :
+          later.inference.substitution.apply
+              (fitted.state.resolve argument.type) =
+            later.inference.substitution.apply argument.type :=
+        TypeSystem.InferState.apply_resolve_eq_apply outerFitted argument.type
+      have targetEndpointEq :
+          later.inference.substitution.apply fitted.expression.type =
+            later.inference.substitution.apply parameter :=
+        Detail.candidateWithExpected_some_apply_eq head outerFitted
+      refine .cons (parametersAdmissible parameter (by simp)) ?_ ?_
+      · simpa only [rawEndpointEq, targetEndpointEq] using path
+      · apply induction fittedProperties.2.1 tailArgumentsBelow
+          tailParametersBelow substitutionExtends requirementsSubset
+        · intro tailParameter member
+          exact parametersAdmissible tailParameter (by simp [member])
+        · intro tailEntry member
+          exact covered tailEntry (by simp [member])
+        · intro tailEntry entryMember requirement requirementMember
+          exact occurs tailEntry (by simp [entryMember]) requirement
+            requirementMember
+
 /-- The common soundness envelope for an ordinary expression-recording step.
 
 A shape-specific proof supplies only raw-form typing and admissibility.  This

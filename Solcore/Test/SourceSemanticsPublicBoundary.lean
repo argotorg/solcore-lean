@@ -639,6 +639,14 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.withExpected_success_coercionPathValid_afterFinalization_scoped
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentCoercionsValid
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentCoercionsValid.nil
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentCoercionsValid.cons
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.argumentFitTrace_argumentCoercionsValid_afterFinalization_scoped
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferConstructorApplicationFuel_success_expressionHasType_scoped
