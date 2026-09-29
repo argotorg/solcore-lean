@@ -82,6 +82,120 @@ theorem inferenceTypeFormationValidated_typeAdmissible_afterSubstitution
     Solcore.SourceSemantics.InferenceTypeFormationValidated.typeAdmissible
       validated binders signatures_eq parameters_eq owner_eq residual
 
+/-- Every lambda-parameter type produced by executable binding is admissible
+after the enclosing flexible substitution closes the declaration context.
+Inferred parameters contribute one fresh residual variable; annotated
+parameters reuse the closed formation guaranteed by source-type resolution. -/
+theorem bindLambdaParameters_success_typesAdmissible_afterSubstitution
+    {inferenceContext : Frontend.SourceInference.Context}
+    {sourceParameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String}
+    {state : Frontend.SourceInference.State}
+    {result : List TypedBinder × List TypeSystem.Ty ×
+      Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {sourceContext target : SourceSemantics.Context}
+    (success : Detail.bindLambdaParameters inferenceContext sourceParameters
+      index seen state = .ok result)
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (binders : TypeParameterBindersWellFormed sourceContext)
+    (signatures_eq : sourceContext.signatures =
+      inferenceContext.signatures)
+    (parameters_eq : sourceContext.typeParameters =
+      inferenceContext.typeParameters)
+    (owner_eq : sourceContext.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (residual : sourceContext.residualTypeVariables = true)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid substitution
+      closedVariables sourceContext target) :
+    ∀ type ∈ result.2.1,
+      TypeAdmissible target (substitution.apply type) := by
+  induction sourceParameters generalizing index seen state result with
+  | nil =>
+      simp only [Detail.bindLambdaParameters] at success
+      injection success with resultEq
+      subst result
+      simp
+  | cons parameter rest induction =>
+      cases parameterValue : parameter.value with
+      | error =>
+          simp [Detail.bindLambdaParameters, parameterValue, bind,
+            Except.bind, pure, Pure.pure, Except.pure] at success
+      | inferred name =>
+          by_cases duplicate : name.value ∈ seen
+          · simp [Detail.bindLambdaParameters, parameterValue, duplicate,
+              bind, Except.bind, pure, Pure.pure, Except.pure] at success
+          · let type := state.fresh.1
+            let freshState := state.fresh.2
+            let binderState :=
+              (freshState.allocateBinder name.value (.mono type)
+                (some parameter.span) false []).2
+            cases tailResult : Detail.bindLambdaParameters inferenceContext rest
+                (index + 1) (name.value :: seen) binderState with
+            | error error =>
+                simp [Detail.bindLambdaParameters, parameterValue, duplicate,
+                  type, freshState, binderState, tailResult, bind,
+                  Except.bind, pure, Pure.pure, Except.pure] at success
+            | ok tail =>
+                rcases tail with ⟨tailBinders, tailTypes, finalState⟩
+                have resultEq :
+                    ((freshState.allocateBinder name.value (.mono type)
+                        (some parameter.span) false []).1 :: tailBinders,
+                      type :: tailTypes, finalState) = result := by
+                  simpa [Detail.bindLambdaParameters, parameterValue,
+                    duplicate, type, freshState, binderState, tailResult,
+                    bind, Except.bind, pure, Pure.pure, Except.pure] using
+                    success
+                subst result
+                intro candidate member
+                rcases List.mem_cons.mp member with rfl | member
+                · apply FlexibleSubstitution.TypeAdmissible.applySubstitution
+                    contextValid.closes
+                  exact TypeAdmissible.variableOfResidual binders residual _
+                · exact induction tailResult candidate member
+      | typed marker name sourceType =>
+          cases typeResult : Detail.resolveSourceType inferenceContext
+              sourceType with
+          | error error =>
+              simp [Detail.bindLambdaParameters, parameterValue, typeResult,
+                bind, Except.bind] at success
+          | ok resolvedType =>
+              by_cases duplicate : name.value ∈ seen
+              · simp [Detail.bindLambdaParameters, parameterValue,
+                  typeResult, duplicate, bind, Except.bind, pure, Pure.pure,
+                  Except.pure] at success
+              · let binderState :=
+                  (state.allocateBinder name.value (.mono resolvedType)
+                    (some parameter.span) marker.isSome []).2
+                cases tailResult : Detail.bindLambdaParameters inferenceContext
+                    rest (index + 1) (name.value :: seen) binderState with
+                | error error =>
+                    simp [Detail.bindLambdaParameters, parameterValue,
+                      typeResult, duplicate, binderState, tailResult, bind,
+                      Except.bind, pure, Pure.pure, Except.pure] at success
+                | ok tail =>
+                    rcases tail with ⟨tailBinders, tailTypes, finalState⟩
+                    have resultEq :
+                        ((state.allocateBinder name.value (.mono resolvedType)
+                            (some parameter.span) marker.isSome []).1 ::
+                            tailBinders,
+                          resolvedType :: tailTypes, finalState) = result := by
+                      simpa [Detail.bindLambdaParameters, parameterValue,
+                        typeResult, duplicate, binderState, tailResult, bind,
+                        Except.bind, pure, Pure.pure, Except.pure] using success
+                    subst result
+                    intro candidate member
+                    rcases List.mem_cons.mp member with rfl | member
+                    · apply
+                        FlexibleSubstitution.TypeAdmissible.applySubstitution
+                          contextValid.closes
+                      exact TypeAdmissible.ofWellFormed
+                        (resolveSourceType_success_typeWellFormed canonical
+                          signatures_eq parameters_eq owner_eq typeResult)
+                    · exact induction tailResult candidate member
+
 private theorem list_perm_reverse {value : Type} (values : List value) :
     values.Perm values.reverse := by
   induction values with
@@ -1109,6 +1223,343 @@ theorem allocateBinder_of_localBindersBelowNextLocal
       schemeRequirements allocated schemeWellFormed requirementsWellFormed⟩
 
 end ActiveLocalContextInvariant
+
+/-- Successful lambda-parameter binding installs the finalized monomorphic
+binder row in source order.  The same induction retains executable/declarative
+scope alignment, the stable-local allocator bound, and the duplicate-name
+facts enforced by the frontend's `seen` accumulator. -/
+theorem bindLambdaParameters_success_monoBindersExtend_afterSubstitution
+    {inferenceContext : Frontend.SourceInference.Context}
+    {sourceParameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String}
+    {state : Frontend.SourceInference.State}
+    {result : List TypedBinder × List TypeSystem.Ty ×
+      Frontend.SourceInference.State}
+    {substitution : TypeSystem.Substitution}
+    {context : SourceSemantics.Context}
+    (success : Detail.bindLambdaParameters inferenceContext sourceParameters
+      index seen state = .ok result)
+    (invariant : ActiveLocalContextInvariant state substitution context)
+    (below : state.LocalBindersBelowNextLocal)
+    (typesAdmissible : ∀ type ∈ result.2.1,
+      TypeAdmissible context (substitution.apply type)) :
+    ∃ finalContext,
+      (result.1.map fun binder => binder.name).Nodup ∧
+      (∀ name, name ∈ result.1.map (fun binder => binder.name) →
+        name ∉ seen) ∧
+      MonoBindersExtend state.owner context
+        (result.1.map (TypedBinder.applySubstitution substitution))
+        (result.2.1.map substitution.apply) finalContext ∧
+      ActiveLocalContextInvariant result.2.2 substitution finalContext ∧
+      result.2.2.LocalBindersBelowNextLocal := by
+  induction sourceParameters generalizing index seen state result context with
+  | nil =>
+      simp only [Detail.bindLambdaParameters] at success
+      injection success with resultEq
+      subst result
+      exact ⟨context, by simp, by simp, .nil context, invariant, below⟩
+  | cons parameter rest induction =>
+      cases parameterValue : parameter.value with
+      | error =>
+          simp [Detail.bindLambdaParameters, parameterValue, bind,
+            Except.bind, pure, Pure.pure, Except.pure] at success
+      | inferred name =>
+          by_cases duplicate : name.value ∈ seen
+          · simp [Detail.bindLambdaParameters, parameterValue, duplicate,
+              bind, Except.bind, pure, Pure.pure, Except.pure] at success
+          · let type := state.fresh.1
+            let freshState := state.fresh.2
+            let binder :=
+              (freshState.allocateBinder name.value (.mono type)
+                (some parameter.span) false []).1
+            let binderState :=
+              (freshState.allocateBinder name.value (.mono type)
+                (some parameter.span) false []).2
+            have allocated : freshState.allocateBinder name.value (.mono type)
+                (some parameter.span) false [] = (binder, binderState) := by
+              exact (Prod.eta _).symm
+            cases tailResult : Detail.bindLambdaParameters inferenceContext rest
+                (index + 1) (name.value :: seen) binderState with
+            | error error =>
+                simp [Detail.bindLambdaParameters, parameterValue, duplicate,
+                  type, freshState, binderState, tailResult, bind,
+                  Except.bind, pure, Pure.pure, Except.pure] at success
+            | ok tail =>
+                rcases tail with ⟨tailBinders, tailTypes, finalState⟩
+                have resultEq :
+                    (binder :: tailBinders, type :: tailTypes, finalState) =
+                      result := by
+                  simpa [Detail.bindLambdaParameters, parameterValue,
+                    duplicate, type, freshState, binder, binderState,
+                    tailResult, bind, Except.bind, pure, Pure.pure,
+                    Except.pure] using success
+                subst result
+                have freshInvariant : ActiveLocalContextInvariant freshState
+                    substitution context := by
+                  apply invariant.congr_localBinders
+                  rfl
+                have freshBelow :
+                    freshState.LocalBindersBelowNextLocal := by
+                  exact Frontend.SourceInference.State.fresh_preserves_localBindersBelowNextLocal
+                    state below
+                have binderEq :
+                    (freshState.allocateBinder name.value (.mono type)
+                      (some parameter.span) false []).1 = binder :=
+                  congrArg Prod.fst allocated
+                have closedSchemeEq :
+                    (binder.applySubstitution substitution).scheme =
+                      .mono (substitution.apply type) := by
+                  rw [← binderEq]
+                  simp [Frontend.SourceInference.State.allocateBinder,
+                    TypedBinder.applySubstitution, TypeSystem.Scheme.apply,
+                    TypeSystem.Scheme.mono, TypeSystem.Substitution.without]
+                have closedRequirementsEq :
+                    (binder.applySubstitution substitution
+                      ).schemeRequirements = [] := by
+                  rw [← binderEq]
+                  simp [Frontend.SourceInference.State.allocateBinder,
+                    TypedBinder.applySubstitution]
+                have headAdmissible : TypeAdmissible context
+                    (substitution.apply type) :=
+                  typesAdmissible type (by simp)
+                have schemeWellFormed : SchemeWellFormed context
+                    (binder.applySubstitution substitution).scheme := by
+                  rw [closedSchemeEq]
+                  exact SchemeWellFormed.monoAdmissible headAdmissible
+                have requirementsWellFormed :
+                    LocalSchemeRequirementsWellFormed context
+                      (binder.applySubstitution substitution) :=
+                  LocalSchemeRequirementsWellFormed.empty context _
+                    closedRequirementsEq
+                let middleContext := context.withLocal binder.id
+                  (binder.applySubstitution substitution).scheme
+                  (binder.applySubstitution substitution).schemeRequirements
+                have middleInvariant : ActiveLocalContextInvariant binderState
+                    substitution middleContext := by
+                  exact freshInvariant.allocateBinder_of_localBindersBelowNextLocal
+                    name.value
+                      (.mono type) (some parameter.span) false [] allocated
+                      freshBelow schemeWellFormed requirementsWellFormed
+                have headExtension : BinderExtends state.owner context
+                    (binder.applySubstitution substitution) middleContext := by
+                  exact freshInvariant.aligned.binderExtends_of_allocateBinder
+                    freshBelow allocated schemeWellFormed (by
+                      rw [closedSchemeEq]
+                      simp [SchemeQuantifiersFresh,
+                        TypeSystem.Scheme.mono]) (by
+                      intro _
+                      exact closedRequirementsEq)
+                have binderBelow :
+                    binderState.LocalBindersBelowNextLocal := by
+                  have preserved := Frontend.SourceInference.State.allocateBinder_preserves_localBindersBelowNextLocal
+                      freshState name.value (.mono type)
+                      (some parameter.span) false [] freshBelow
+                  have finalEq :
+                      (freshState.allocateBinder name.value (.mono type)
+                        (some parameter.span) false []).2 = binderState :=
+                    congrArg Prod.snd allocated
+                  rwa [finalEq] at preserved
+                have tailAdmissible : ∀ candidate ∈ tailTypes,
+                    TypeAdmissible middleContext
+                      (substitution.apply candidate) := by
+                  intro candidate member
+                  apply StructuralSubstitution.TypeAdmissible.transportContext
+                      (source := context) (target := middleContext)
+                    rfl rfl rfl rfl rfl
+                  exact typesAdmissible candidate (by simp [member])
+                obtain ⟨finalContext, tailNamesNodup, tailNamesFresh,
+                    tailExtension, finalInvariant, finalBelow⟩ :=
+                  induction tailResult middleInvariant binderBelow
+                    tailAdmissible
+                have binderNameEq : binder.name = name.value := by
+                  rw [← binderEq]
+                  rfl
+                have headNameFresh : name.value ∉
+                    tailBinders.map (fun candidate => candidate.name) := by
+                  intro member
+                  exact (tailNamesFresh name.value member) (by simp)
+                have namesNodup :
+                    ((binder :: tailBinders).map
+                      (fun candidate => candidate.name)).Nodup := by
+                  rw [List.map_cons, binderNameEq]
+                  exact List.nodup_cons.mpr
+                    ⟨headNameFresh, tailNamesNodup⟩
+                have namesFresh : ∀ candidate,
+                    candidate ∈
+                        (binder :: tailBinders).map
+                          (fun retained => retained.name) →
+                      candidate ∉ seen := by
+                  intro candidate member
+                  simp only [List.map_cons, List.mem_cons] at member
+                  rcases member with headEq | tailMember
+                  · rw [headEq, binderNameEq]
+                    exact duplicate
+                  · intro seenMember
+                    exact (tailNamesFresh candidate tailMember)
+                      (by simp [seenMember])
+                have tailExtension' : MonoBindersExtend state.owner
+                    middleContext
+                    (tailBinders.map
+                      (TypedBinder.applySubstitution substitution))
+                    (tailTypes.map substitution.apply) finalContext := by
+                  simpa [binderState, freshState,
+                    Frontend.SourceInference.State.fresh,
+                    Frontend.SourceInference.State.allocateBinder] using
+                    tailExtension
+                refine ⟨finalContext, namesNodup, namesFresh, ?_,
+                  finalInvariant, finalBelow⟩
+                exact .cons closedSchemeEq headExtension tailExtension'
+      | typed marker name sourceType =>
+          cases typeResult : Detail.resolveSourceType inferenceContext
+              sourceType with
+          | error error =>
+              simp [Detail.bindLambdaParameters, parameterValue, typeResult,
+                bind, Except.bind] at success
+          | ok resolvedType =>
+              by_cases duplicate : name.value ∈ seen
+              · simp [Detail.bindLambdaParameters, parameterValue,
+                  typeResult, duplicate, bind, Except.bind, pure, Pure.pure,
+                  Except.pure] at success
+              · let binder :=
+                  (state.allocateBinder name.value (.mono resolvedType)
+                    (some parameter.span) marker.isSome []).1
+                let binderState :=
+                  (state.allocateBinder name.value (.mono resolvedType)
+                    (some parameter.span) marker.isSome []).2
+                have allocated : state.allocateBinder name.value
+                    (.mono resolvedType) (some parameter.span) marker.isSome
+                    [] = (binder, binderState) := by
+                  exact (Prod.eta _).symm
+                cases tailResult : Detail.bindLambdaParameters inferenceContext
+                    rest (index + 1) (name.value :: seen) binderState with
+                | error error =>
+                    simp [Detail.bindLambdaParameters, parameterValue,
+                      typeResult, duplicate, binderState, tailResult,
+                      bind, Except.bind, pure, Pure.pure, Except.pure]
+                      at success
+                | ok tail =>
+                    rcases tail with ⟨tailBinders, tailTypes, finalState⟩
+                    have resultEq :
+                        (binder :: tailBinders, resolvedType :: tailTypes,
+                          finalState) = result := by
+                      simpa [Detail.bindLambdaParameters, parameterValue,
+                        typeResult, duplicate, binder, binderState, tailResult,
+                        bind, Except.bind, pure, Pure.pure, Except.pure] using
+                        success
+                    subst result
+                    have binderEq :
+                        (state.allocateBinder name.value (.mono resolvedType)
+                          (some parameter.span) marker.isSome []).1 = binder :=
+                      congrArg Prod.fst allocated
+                    have closedSchemeEq :
+                        (binder.applySubstitution substitution).scheme =
+                          .mono (substitution.apply resolvedType) := by
+                      rw [← binderEq]
+                      simp [Frontend.SourceInference.State.allocateBinder,
+                        TypedBinder.applySubstitution, TypeSystem.Scheme.apply,
+                        TypeSystem.Scheme.mono,
+                        TypeSystem.Substitution.without]
+                    have closedRequirementsEq :
+                        (binder.applySubstitution substitution
+                          ).schemeRequirements = [] := by
+                      rw [← binderEq]
+                      simp [Frontend.SourceInference.State.allocateBinder,
+                        TypedBinder.applySubstitution]
+                    have headAdmissible : TypeAdmissible context
+                        (substitution.apply resolvedType) :=
+                      typesAdmissible resolvedType (by simp)
+                    have schemeWellFormed : SchemeWellFormed context
+                        (binder.applySubstitution substitution).scheme := by
+                      rw [closedSchemeEq]
+                      exact SchemeWellFormed.monoAdmissible headAdmissible
+                    have requirementsWellFormed :
+                        LocalSchemeRequirementsWellFormed context
+                          (binder.applySubstitution substitution) :=
+                      LocalSchemeRequirementsWellFormed.empty context _
+                        closedRequirementsEq
+                    let middleContext := context.withLocal binder.id
+                      (binder.applySubstitution substitution).scheme
+                      (binder.applySubstitution substitution
+                        ).schemeRequirements
+                    have middleInvariant :
+                        ActiveLocalContextInvariant binderState substitution
+                          middleContext := by
+                      exact invariant.allocateBinder_of_localBindersBelowNextLocal
+                        name.value
+                          (.mono resolvedType) (some parameter.span)
+                          marker.isSome [] allocated below schemeWellFormed
+                          requirementsWellFormed
+                    have headExtension : BinderExtends state.owner context
+                        (binder.applySubstitution substitution)
+                        middleContext := by
+                      exact invariant.aligned.binderExtends_of_allocateBinder
+                        below allocated schemeWellFormed (by
+                          rw [closedSchemeEq]
+                          simp [SchemeQuantifiersFresh,
+                            TypeSystem.Scheme.mono]) (by
+                          intro _
+                          exact closedRequirementsEq)
+                    have binderBelow :
+                        binderState.LocalBindersBelowNextLocal := by
+                      have preserved := Frontend.SourceInference.State.allocateBinder_preserves_localBindersBelowNextLocal
+                          state name.value (.mono resolvedType)
+                          (some parameter.span) marker.isSome [] below
+                      have finalEq :
+                          (state.allocateBinder name.value
+                            (.mono resolvedType) (some parameter.span)
+                            marker.isSome []).2 = binderState :=
+                        congrArg Prod.snd allocated
+                      rwa [finalEq] at preserved
+                    have tailAdmissible : ∀ candidate ∈ tailTypes,
+                        TypeAdmissible middleContext
+                          (substitution.apply candidate) := by
+                      intro candidate member
+                      apply
+                        StructuralSubstitution.TypeAdmissible.transportContext
+                            (source := context) (target := middleContext)
+                          rfl rfl rfl rfl rfl
+                      exact typesAdmissible candidate (by simp [member])
+                    obtain ⟨finalContext, tailNamesNodup, tailNamesFresh,
+                        tailExtension, finalInvariant, finalBelow⟩ :=
+                      induction tailResult middleInvariant binderBelow
+                        tailAdmissible
+                    have binderNameEq : binder.name = name.value := by
+                      rw [← binderEq]
+                      rfl
+                    have headNameFresh : name.value ∉
+                        tailBinders.map (fun candidate => candidate.name) := by
+                      intro member
+                      exact (tailNamesFresh name.value member) (by simp)
+                    have namesNodup :
+                        ((binder :: tailBinders).map
+                          (fun candidate => candidate.name)).Nodup := by
+                      rw [List.map_cons, binderNameEq]
+                      exact List.nodup_cons.mpr
+                        ⟨headNameFresh, tailNamesNodup⟩
+                    have namesFresh : ∀ candidate,
+                        candidate ∈
+                            (binder :: tailBinders).map
+                              (fun retained => retained.name) →
+                          candidate ∉ seen := by
+                      intro candidate member
+                      simp only [List.map_cons, List.mem_cons] at member
+                      rcases member with headEq | tailMember
+                      · rw [headEq, binderNameEq]
+                        exact duplicate
+                      · intro seenMember
+                        exact (tailNamesFresh candidate tailMember)
+                          (by simp [seenMember])
+                    have tailExtension' : MonoBindersExtend state.owner
+                        middleContext
+                        (tailBinders.map
+                          (TypedBinder.applySubstitution substitution))
+                        (tailTypes.map substitution.apply) finalContext := by
+                      simpa [binderState,
+                        Frontend.SourceInference.State.allocateBinder] using
+                        tailExtension
+                    refine ⟨finalContext, namesNodup, namesFresh, ?_,
+                      finalInvariant, finalBelow⟩
+                    exact .cons closedSchemeEq headExtension tailExtension'
 
 /-- A successful local-identifier place exposes the selected monomorphic
 binder and the exact unprojected place returned by executable inference. -/

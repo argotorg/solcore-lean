@@ -100,6 +100,8 @@ example := @Solcore.SourceSemantics.TraitResolutionSoundness.resolve_success_ret
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferenceTypeFormationValidated_typeAdmissible_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.bindLambdaParameters_success_typesAdmissible_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.closedBinderLocals
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.closedBinderRequirements
@@ -181,6 +183,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.restoreLexicalScope_recordNode
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.allocateBinder_of_localBindersBelowNextLocal
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.bindLambdaParameters_success_monoBindersExtend_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferPlaceFuel_success_identifier_facts
 example :=
