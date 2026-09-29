@@ -18013,6 +18013,164 @@ theorem argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
     argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes_of_subset
       bases coercions (fun _ member => member) entryIdsUnique preserved
 
+/-- Recording a selected declaration call turns the finalized candidate facts
+into typing for the exact call node emitted after delayed argument coercions
+are attached.  The argument bases deliberately refer to the pre-attachment
+node table; the recorder's append-only suffix and the caller's eventual source
+extension provide the identity-scoped preservation needed to recover them. -/
+theorem recordSelectedCallResult_success_expressionHasType
+    {source callee : Syntax.Expr} {name : String}
+    {arguments : List InferredExpression}
+    {attempt : Detail.CandidateAttemptResult}
+    {result : InferredExpression}
+    {trailingCoercions : List CoercionStep}
+    {recordState later : Frontend.SourceInference.State}
+    {recorded : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {sourceContext active : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {parameterTypes : List TypeSystem.Ty}
+    {rawResult : TypeSystem.Ty}
+    {predicates : List ProgramPredicate}
+    (success : Detail.recordSelectedCallResult source callee name arguments
+      attempt result trailingCoercions recordState = recorded)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        recordState.inference.substitution)
+    (sourceExtension : TypingSourceExtends
+      ((recorded.2.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (bases : ArgumentTypingBasesValid (recordState.toTypedSource roots)
+      ledgerSource active later.inference.substitution arguments)
+    (argumentCoercions : ArgumentCoercionsValid active
+      later.inference.substitution arguments parameterTypes
+      attempt.argumentCoercions)
+    (argumentIdsUnique : (arguments.map (·.id)).Nodup)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (application : DeclarationApplicationValid sourceContext
+      attempt.instantiation parameterTypes rawResult predicates)
+    (rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply rawResult))
+    (finalAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply result.type))
+    (callRequirements : DirectCallRequirementsValid active
+      (later.inference.substitution.apply rawResult)
+      (later.inference.substitution.apply attempt.result.type)
+      (predicates.map
+        (TypedTraitResolution.applySubstitution
+          later.inference.substitution))
+      (Detail.coercionRequirements attempt.callCoercions ++
+        attempt.signatureRequirements)
+      (attempt.callCoercions.map
+        (CoercionStep.applySubstitution later.inference.substitution)))
+    (trailingPath : CoercionPathValid active
+      (later.inference.substitution.apply attempt.result.type)
+      (later.inference.substitution.apply result.type)
+      (trailingCoercions.map
+        (CoercionStep.applySubstitution later.inference.substitution))) :
+    ExpressionHasType ledgerSource active result.id
+      (later.inference.substitution.apply result.type) := by
+  let attachedState := Detail.attachExpressionCoercions recordState
+    attempt.argumentCoercions
+  let allocation := attachedState.allocateExpressionId
+  let callNode : ExpressionNode := {
+    id := result.id
+    span := source.span
+    type := result.type
+    form := .call allocation.1 (arguments.map (·.id))
+      (.declaration attempt.instantiation)
+    requirements :=
+      Detail.coercionRequirements attempt.callCoercions ++
+        attempt.signatureRequirements ++
+        Detail.coercionRequirements trailingCoercions
+    coercions := attempt.callCoercions ++ trailingCoercions
+  }
+  have nodes := Detail.recordSelectedCallResult_success_nodes success
+  have rawContains : ContainsExpression (recorded.2.toTypedSource roots)
+      result.id callNode := by
+    refine ⟨?_, rfl⟩
+    change .expression callNode ∈ recorded.2.nodes
+    rw [nodes.2]
+    simp [attachedState, allocation, callNode]
+  have finalContains : ContainsExpression ledgerSource result.id
+      (callNode.applySubstitution later.inference.substitution) :=
+    sourceExtension.containsExpression
+      (FlexibleSubstitution.ContainsExpression.applySubstitution
+        later.inference.substitution rawContains)
+  have attachedToRecorded : TypingSourceExtends
+      (attachedState.toTypedSource roots)
+      (recorded.2.toTypedSource roots) := by
+    simpa only [attachedState] using
+      recordSelectedCallResult_success_attachedTypingSourceExtends success roots
+  have attachedToLedger : TypingSourceExtends
+      ((attachedState.toTypedSource roots).applySubstitution
+        later.inference.substitution)
+      ledgerSource :=
+    (attachedToRecorded.applySubstitution later.inference.substitution).trans
+      sourceExtension
+  have argumentsType : ExpressionsHaveTypes ledgerSource active
+      (arguments.map (·.id))
+      (parameterTypes.map later.inference.substitution.apply) :=
+    argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
+      bases argumentCoercions argumentIdsUnique
+        (ExpressionNodesPreservedAt.ofTypingSourceExtends attachedToLedger)
+  have instantiationValid :
+      SourceSemantics.DeclarationInstantiation.Admissible sourceContext
+        attempt.instantiation := by
+    cases application with
+    | intro _ valid _ _ _ _ _ => exact valid
+  have calleeValid : DirectDeclarationCalleeValid active ledgerSource
+      allocation.1
+      (attempt.instantiation.applySubstitution
+        later.inference.substitution) := by
+    simpa only [attachedState, allocation] using
+      recordSelectedCallResult_success_directDeclarationCalleeValid success
+        substitutionExtends sourceExtension catalog contextValid
+        instantiationValid
+  have mappedApplication : DeclarationApplicationValid active
+      (attempt.instantiation.applySubstitution
+        later.inference.substitution)
+      (parameterTypes.map later.inference.substitution.apply)
+      (later.inference.substitution.apply rawResult)
+      (predicates.map
+        (TypedTraitResolution.applySubstitution
+          later.inference.substitution)) :=
+    FlexibleSubstitution.DeclarationApplicationValid.applySubstitution
+      catalog contextValid application
+  have formType : ExpressionFormHasRawType ledgerSource active
+      (callNode.applySubstitution later.inference.substitution).form
+      (later.inference.substitution.apply rawResult)
+      (.directCall
+        (predicates.map
+          (TypedTraitResolution.applySubstitution
+            later.inference.substitution))) := by
+    simpa [callNode, ExpressionNode.applySubstitution,
+      ExpressionForm.applySubstitution, CallResolution.applySubstitution] using
+        (ExpressionFormHasRawType.directCall calleeValid mappedApplication
+          argumentsType)
+  have typing := ExpressionHasType.ofAppendedOutput finalContains formType
+    rawAdmissible (by
+      simpa [callNode, ExpressionNode.applySubstitution] using finalAdmissible)
+    (.directCall callRequirements) trailingPath (by
+      change
+        Detail.coercionRequirements attempt.callCoercions ++
+            attempt.signatureRequirements ++
+            Detail.coercionRequirements trailingCoercions =
+          (Detail.coercionRequirements attempt.callCoercions ++
+            attempt.signatureRequirements) ++
+            coercionRequirementIds
+              (trailingCoercions.map
+                (CoercionStep.applySubstitution
+                  later.inference.substitution))
+      rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
+      simp only [Detail.coercionRequirements, coercionRequirementIds,
+        List.append_assoc]) (by
+      simp [callNode, ExpressionNode.applySubstitution, List.map_append])
+  simpa [callNode, ExpressionNode.applySubstitution] using typing
+
 /-- The common soundness envelope for an ordinary expression-recording step.
 
 A shape-specific proof supplies only raw-form typing and admissibility.  This
