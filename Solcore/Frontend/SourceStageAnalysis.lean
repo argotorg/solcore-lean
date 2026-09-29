@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceInference.Types
+import Solcore.SourceSemantics.Staging.Classification
 
 /-!
 Scope-aware source staging analysis.
@@ -34,6 +35,13 @@ def join (stages : List Stage) : Stage :=
     .comptime
   else
     .deferred
+
+/-- Interpret the executable classifier's three-point result in the
+independent declarative staging language. -/
+def toSemantic : Stage → SourceSemantics.Staging.Stage
+  | .comptime => .comptime
+  | .runtime => .runtime
+  | .deferred => .deferred
 
 end Stage
 
@@ -102,10 +110,24 @@ private abbrev Environment := List BinderStage
 /-- Types whose values exist only at staged evaluation time in the current
 source language.  `comptime<T>` is structural; the arbitrary-precision
 `Integer` builtin is staged even without an explicit marker. -/
-private def typeIsComptimeOnly : Ty → Bool
+def typeIsComptimeOnly : Ty → Bool
   | .constructor (.builtin .integer)
   | .comptime _ => true
   | _ => false
+
+/-- The local, executable classification rule for a direct declaration call.
+Keeping it named makes the analyzer's call-site contract independently
+checkable and connects it to the declarative rule below. -/
+def directCallStage (node : ExpressionNode)
+    (instantiation : DeclarationInstantiation)
+    (argumentStages : List Stage) : Stage :=
+  let resultIsComptimeOnly :=
+    node.coercions.isEmpty && typeIsComptimeOnly node.type
+  if (instantiation.returnComptime || resultIsComptimeOnly) &&
+      argumentStages.all fun argument => argument == .comptime then
+    .comptime
+  else
+    .deferred
 
 private structure Traversal where
   active : List OccurrenceId := []
@@ -324,14 +346,7 @@ mutual
                 analyzeExpressionListWith recurse arguments state
               let stage := match resolution with
                 | .declaration instantiation =>
-                    let resultIsComptimeOnly :=
-                      node.coercions.isEmpty && typeIsComptimeOnly node.type
-                    if (instantiation.returnComptime || resultIsComptimeOnly) &&
-                        argumentStages.all fun argument =>
-                          argument == .comptime then
-                      Stage.comptime
-                    else
-                      Stage.deferred
+                    directCallStage node instantiation argumentStages
                 | .indirect _
                 | .builtinFunction _ => Stage.deferred
               pure (stage, state)
@@ -686,3 +701,167 @@ theorem join_append (left right : List Stage) :
     deferred_beq_runtime, comptime_beq_comptime, deferred_beq_comptime]
 
 end Solcore.Frontend.SourceStageAnalysis.Stage
+
+namespace Solcore.Frontend.SourceStageAnalysis
+
+open SourceInference TypeSystem
+
+namespace SemanticStaging
+
+abbrev Stage := SourceSemantics.Staging.Stage
+abbrev AllComptime := SourceSemantics.Staging.AllComptime
+abbrev DirectResultComptime := SourceSemantics.Staging.DirectResultComptime
+abbrev DirectCallGetsStage := SourceSemantics.Staging.DirectCallGetsStage
+
+end SemanticStaging
+
+/-- The executable predicate for stage-only source types is exact with
+respect to the independent declarative classification. -/
+theorem typeIsComptimeOnly_eq_true_iff (type : Ty) :
+    typeIsComptimeOnly type = true ↔
+      SourceSemantics.Staging.ComptimeOnlyType type := by
+  constructor
+  · intro accepted
+    cases type with
+    | constructor constructor =>
+        cases constructor with
+        | builtin builtin =>
+            cases builtin with
+            | unit => simp [typeIsComptimeOnly] at accepted
+            | bool => simp [typeIsComptimeOnly] at accepted
+            | word => simp [typeIsComptimeOnly] at accepted
+            | integer => exact .integer
+        | declaration declaration =>
+            simp [typeIsComptimeOnly] at accepted
+    | comptime inner => exact .marked inner
+    | «variable» metavariable => simp [typeIsComptimeOnly] at accepted
+    | parameter parameter => simp [typeIsComptimeOnly] at accepted
+    | application function argument => simp [typeIsComptimeOnly] at accepted
+    | function parameter result => simp [typeIsComptimeOnly] at accepted
+    | product left right => simp [typeIsComptimeOnly] at accepted
+    | mapping key value => simp [typeIsComptimeOnly] at accepted
+    | proxy inner => simp [typeIsComptimeOnly] at accepted
+    | error => simp [typeIsComptimeOnly] at accepted
+  · intro semantic
+    cases semantic <;> rfl
+
+@[simp] theorem Stage.toSemantic_eq_comptime_iff (stage : Stage) :
+    stage.toSemantic = .comptime ↔ stage = .comptime := by
+  cases stage <;> simp [Stage.toSemantic]
+
+/-- Pointwise compile-time arguments in the executable list are exactly the
+declarative `AllComptime` premise after stage-carrier conversion. -/
+theorem stages_all_comptime_eq_true_iff (stages : List Stage) :
+    stages.all (fun stage => stage == .comptime) = true ↔
+      SourceSemantics.Staging.AllComptime (stages.map Stage.toSemantic) := by
+  rw [Stage.all_comptime_true_iff]
+  constructor
+  · intro all semantic member
+    obtain ⟨stage, sourceMember, equal⟩ := List.mem_map.mp member
+    subst semantic
+    rw [all stage sourceMember]
+    rfl
+  · intro all stage member
+    have converted := all stage.toSemantic
+      (List.mem_map.mpr ⟨stage, member, rfl⟩)
+    cases stage <;> simp [Stage.toSemantic] at converted ⊢
+
+/-- The executable direct-result test is equivalent to the premise used by
+the declarative direct-call staging rule. -/
+theorem directResultComptime_eq_true_iff
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    (instantiation.returnComptime ||
+      (node.coercions.isEmpty && typeIsComptimeOnly node.type)) = true ↔
+      SourceSemantics.Staging.DirectResultComptime node instantiation := by
+  simp only [Bool.or_eq_true, Bool.and_eq_true]
+  rw [typeIsComptimeOnly_eq_true_iff]
+  simp [SourceSemantics.Staging.DirectResultComptime]
+
+/-- The Boolean condition used by `directCallStage` is exactly the conjunction
+of the two premises in declarative `DirectCallGetsStage.comptime`. -/
+theorem directCallExecutable_eq_true_iff
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation)
+    (argumentStages : List Stage) :
+    ((instantiation.returnComptime ||
+        (node.coercions.isEmpty && typeIsComptimeOnly node.type)) &&
+      argumentStages.all fun argument => argument == .comptime) = true ↔
+      SourceSemantics.Staging.DirectResultComptime node instantiation ∧
+        SourceSemantics.Staging.AllComptime
+          (argumentStages.map Stage.toSemantic) := by
+  simp only [Bool.and_eq_true]
+  rw [directResultComptime_eq_true_iff,
+    stages_all_comptime_eq_true_iff]
+
+/-- Each direct-call result computed by the executable classifier satisfies
+the corresponding independent declarative call-site rule. -/
+theorem directCallStage_sound
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation)
+    (argumentStages : List Stage) :
+    SourceSemantics.Staging.DirectCallGetsStage node instantiation
+      (argumentStages.map Stage.toSemantic)
+      (directCallStage node instantiation argumentStages).toSemantic := by
+  by_cases executable :
+      ((instantiation.returnComptime ||
+          (node.coercions.isEmpty && typeIsComptimeOnly node.type)) &&
+        argumentStages.all fun argument => argument == .comptime) = true
+  · simp [directCallStage, executable, Stage.toSemantic]
+    obtain ⟨resultComptime, argumentsComptime⟩ :=
+      (directCallExecutable_eq_true_iff node instantiation argumentStages).mp
+        executable
+    exact .comptime resultComptime argumentsComptime
+  · have rejected :
+        ((instantiation.returnComptime ||
+            (node.coercions.isEmpty && typeIsComptimeOnly node.type)) &&
+          argumentStages.all fun argument => argument == .comptime) = false :=
+        Bool.eq_false_iff.mpr executable
+    simp [directCallStage, rejected, Stage.toSemantic]
+    apply SourceSemantics.Staging.DirectCallGetsStage.deferred
+    intro accepted
+    exact executable
+      ((directCallExecutable_eq_true_iff node instantiation argumentStages).mpr
+        accepted)
+
+/-- Public certificate extracted from one successful whole-function analysis.
+
+The certificate deliberately stops short of `Staging.FunctionHasStages`: that
+judgment also reconstructs the complete lexical `StageScope`, assignment
+facts, and occurrence-graph derivations.  It nevertheless records the exact
+analyzed carrier and guarantees that every direct-call classifier used by the
+analysis implements the independent declarative call-site rule. -/
+structure FunctionAnalysisCertificate (function : CheckedFunction)
+    (analysis : Analysis) : Prop where
+  analyzed : analyzeFunction function = .ok analysis
+  sourceOwner : function.typedBody.owner = function.declaration
+  directCalls : ∀ node,
+    .expression node ∈ function.typedBody.nodes →
+    ∀ callee arguments instantiation,
+      node.form = .call callee arguments (.declaration instantiation) →
+      ∀ argumentStages,
+        SourceSemantics.Staging.DirectCallGetsStage node instantiation
+          (argumentStages.map Stage.toSemantic)
+          (directCallStage node instantiation argumentStages).toSemantic
+
+/-- Successful executable analysis always exposes the public local-soundness
+certificate. -/
+theorem analyzeFunction_success_certificate
+    (function : CheckedFunction) (analysis : Analysis)
+    (success : analyzeFunction function = .ok analysis) :
+    FunctionAnalysisCertificate function analysis := by
+  have sourceOwner :
+      function.typedBody.owner = function.declaration := by
+    by_cases same : function.typedBody.owner = function.declaration
+    · exact same
+    · simp [analyzeFunction, same] at success
+      change Except.error
+        (Error.sourceOwnerMismatch function.declaration function.typedBody.owner) =
+          Except.ok analysis at success
+      cases success
+  refine {
+    analyzed := success
+    sourceOwner := sourceOwner
+    directCalls := ?_
+  }
+  intro node member callee arguments instantiation form argumentStages
+  exact directCallStage_sound node instantiation argumentStages
+
+end Solcore.Frontend.SourceStageAnalysis
