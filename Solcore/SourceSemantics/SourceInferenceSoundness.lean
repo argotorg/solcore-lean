@@ -965,6 +965,299 @@ theorem allocateBinder
 
 end ActiveLocalFormation
 
+/-- Provenance needed to discharge capture-freedom for every currently active
+stable binder.  Monomorphic binders need no whole-source certificate;
+polymorphic binders must come from an initialized let retained by the final
+source passed to whole-body validation. -/
+structure ActiveBinderCaptureOrigins
+    (state : Frontend.SourceInference.State)
+    (wholeSource : TypedSource) : Prop where
+  origin : ∀ binder, binder ∈ state.localBinders →
+    binder.scheme.quantified = [] ∨
+      binder ∈ wholeSource.initializedLetBinders
+
+namespace ActiveBinderCaptureOrigins
+
+/-- A lexical scope consisting entirely of monomorphic binders needs no
+initialized-let provenance. -/
+theorem of_monomorphic
+    {state : Frontend.SourceInference.State} {wholeSource : TypedSource}
+    (monomorphic : ∀ binder, binder ∈ state.localBinders →
+      binder.scheme.quantified = []) :
+    ActiveBinderCaptureOrigins state wholeSource :=
+  ⟨fun binder member => .inl (monomorphic binder member)⟩
+
+/-- Replacing unrelated state fields leaves active binder provenance intact. -/
+theorem congr_localBinders
+    {state final : Frontend.SourceInference.State}
+    {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (localBinders_eq : final.localBinders = state.localBinders) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  constructor
+  intro binder member
+  apply origins.origin binder
+  rwa [localBinders_eq] at member
+
+/-- Enlarging the whole-source initialized-let inventory preserves every
+active binder's capture origin. -/
+theorem monoWholeSource
+    {state : Frontend.SourceInference.State}
+    {before after : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state before)
+    (subset : before.initializedLetBinders ⊆ after.initializedLetBinders) :
+    ActiveBinderCaptureOrigins state after := by
+  constructor
+  intro binder member
+  rcases origins.origin binder member with monomorphic | initialized
+  · exact .inl monomorphic
+  · exact .inr (subset initialized)
+
+/-- Append-only growth of the whole typed source preserves binder provenance. -/
+theorem weakenWholeSource
+    {state : Frontend.SourceInference.State}
+    {before after : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state before)
+    (extension : TypingSourceExtends before after) :
+    ActiveBinderCaptureOrigins state after :=
+  origins.monoWholeSource extension.initializedLetBinders_subset
+
+/-- Eliminate the invariant for one known active binder. -/
+theorem origin_of_mem
+    {state : Frontend.SourceInference.State} {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    {binder : TypedBinder} (member : binder ∈ state.localBinders) :
+    binder.scheme.quantified = [] ∨
+      binder ∈ wholeSource.initializedLetBinders :=
+  origins.origin binder member
+
+/-- A successful lexical lookup exposes the selected binder's capture origin. -/
+theorem origin_of_lookupBinder?
+    {state : Frontend.SourceInference.State} {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    {name : String} {binder : TypedBinder}
+    (found : state.lookupBinder? name = some binder) :
+    binder.scheme.quantified = [] ∨
+      binder ∈ wholeSource.initializedLetBinders :=
+  origins.origin_of_mem
+    (Frontend.SourceInference.State.lookupBinder?_eq_some_facts found).1
+
+/-- Lookup provenance and whole-source validation close the binder-local
+no-capture obligation used by canonical local-scheme instantiation. -/
+theorem noCapture_of_lookupBinder?
+    {state : Frontend.SourceInference.State} {wholeSource : TypedSource}
+    {substitution : TypeSystem.Substitution}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    {name : String} {binder : TypedBinder}
+    (found : state.lookupBinder? name = some binder)
+    (initializedNoCapture : ∀ candidate,
+      candidate ∈ wholeSource.initializedLetBinders →
+        Detail.LocalBinderInstantiationNoCapture substitution candidate) :
+    Detail.LocalBinderInstantiationNoCapture substitution binder := by
+  rcases origins.origin_of_lookupBinder? found with
+    monomorphic | initialized
+  · exact Detail.LocalBinderInstantiationNoCapture.of_quantified_eq_nil
+      monomorphic
+  · exact initializedNoCapture binder initialized
+
+/-- Expression inference restores the caller's active binder stack. -/
+theorem inferExprFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {state final : Frontend.SourceInference.State}
+    {inferred : InferredExpression} {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (success : Detail.inferExprFuel fuel inferenceContext expression expected
+      state = .ok (inferred, final)) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  apply origins.congr_localBinders
+  have scopeEq := Detail.inferExprFuel_success_lexicalScope_eq success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
+/-- Source-ordered expression-list inference restores the caller's active
+binder stack. -/
+theorem inferExprsFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {expressions : List Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {inferred : List InferredExpression} {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (success : Detail.inferExprsFuel fuel inferenceContext expressions state =
+      .ok (inferred, final)) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  apply origins.congr_localBinders
+  have scopeEq := Detail.inferExprsFuel_success_lexicalScope_eq success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
+/-- Place inference restores the caller's active binder stack. -/
+theorem inferPlaceFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression : Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {place : PlaceResolution} {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (success : Detail.inferPlaceFuel fuel inferenceContext targetExpression
+      state = .ok (place, final)) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  apply origins.congr_localBinders
+  have scopeEq := Detail.inferPlaceFuel_success_lexicalScope_eq success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
+/-- Assignment inference restores the caller's active binder stack. -/
+theorem inferAssignedValueFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression value : Syntax.Expr} {operator : Syntax.ValueAssignOp}
+    {state final : Frontend.SourceInference.State}
+    {assignment : AssignmentResolution} {inferredValue : InferredExpression}
+    {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (success : Detail.inferAssignedValueFuel fuel inferenceContext
+      targetExpression operator value state =
+        .ok (assignment, inferredValue, final)) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  apply origins.congr_localBinders
+  have scopeEq :=
+    Detail.inferAssignedValueFuel_success_lexicalScope_eq success
+  simpa [Frontend.SourceInference.State.lexicalScope] using
+    congrArg (fun scope : LexicalScope => scope.binders) scopeEq
+
+/-- Updating the compatibility-only environment preserves capture origins. -/
+theorem withLocals
+    {state : Frontend.SourceInference.State} {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (locals : TypeSystem.Environment) :
+    ActiveBinderCaptureOrigins (state.withLocals locals) wholeSource := by
+  apply origins.congr_localBinders
+  rfl
+
+/-- Reserving an expression occurrence preserves capture origins. -/
+theorem allocateExpressionId
+    {state final : Frontend.SourceInference.State}
+    {wholeSource : TypedSource} {id : ExpressionId}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (allocated : state.allocateExpressionId = (id, final)) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  apply origins.congr_localBinders
+  have finalEq : state.allocateExpressionId.2 = final :=
+    congrArg Prod.snd allocated
+  rw [← finalEq]
+  rfl
+
+/-- Reserving a statement occurrence preserves capture origins. -/
+theorem allocateStatementId
+    {state final : Frontend.SourceInference.State}
+    {wholeSource : TypedSource} {id : StatementId}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (allocated : state.allocateStatementId = (id, final)) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  apply origins.congr_localBinders
+  have finalEq : state.allocateStatementId.2 = final :=
+    congrArg Prod.snd allocated
+  rw [← finalEq]
+  rfl
+
+/-- Reserving a hidden local changes no source-visible binder. -/
+theorem allocateHiddenLocal
+    {state final : Frontend.SourceInference.State}
+    {wholeSource : TypedSource} {id : Resolved.LocalId}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (allocated : state.allocateHiddenLocal = (id, final)) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  apply origins.congr_localBinders
+  have finalEq : state.allocateHiddenLocal.2 = final :=
+    congrArg Prod.snd allocated
+  rw [← finalEq]
+  rfl
+
+/-- Recording a node leaves the active binder stack unchanged. -/
+theorem recordNode
+    {state : Frontend.SourceInference.State} {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (node : Node) :
+    ActiveBinderCaptureOrigins (state.recordNode node) wholeSource := by
+  apply origins.congr_localBinders
+  rfl
+
+/-- Unification changes only inference data and preserves capture origins. -/
+theorem unify
+    {state final : Frontend.SourceInference.State}
+    {wholeSource : TypedSource} {left right : TypeSystem.Ty}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (success : Detail.unify state left right = .ok final) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  apply origins.congr_localBinders
+  unfold Detail.unify at success
+  cases inferenceResult : Detail.liftUnification
+      (state.inference.unify left right) with
+  | error error =>
+      simp [inferenceResult, bind, Except.bind] at success
+  | ok inference =>
+      simp only [inferenceResult, bind, Except.bind] at success
+      change Except.ok { state with inference } = Except.ok final at success
+      injection success with finalEq
+      subst final
+      rfl
+
+/-- Restoring an enclosing lexical scope restores its capture origins. -/
+theorem restoreLexicalScope
+    {outer inner : Frontend.SourceInference.State}
+    {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins outer wholeSource) :
+    ActiveBinderCaptureOrigins
+      (inner.restoreLexicalScope outer.lexicalScope) wholeSource := by
+  apply origins.congr_localBinders
+  rfl
+
+/-- Recording after lexical restoration preserves the outer scope's origins. -/
+theorem restoreLexicalScope_recordNode
+    {outer inner : Frontend.SourceInference.State}
+    {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins outer wholeSource)
+    (node : Node) :
+    ActiveBinderCaptureOrigins
+      ((inner.restoreLexicalScope outer.lexicalScope).recordNode node)
+      wholeSource :=
+  origins.restoreLexicalScope.recordNode node
+
+/-- Entering one visible binder preserves the invariant when that binder is
+monomorphic or is known to originate from an initialized let in the chosen
+whole source. -/
+theorem allocateBinder
+    {state final : Frontend.SourceInference.State}
+    {wholeSource : TypedSource}
+    {name : String} {scheme : TypeSystem.Scheme}
+    {span : Option Syntax.SourceSpan} {comptime : Bool}
+    {schemeRequirements : List LocalSchemeRequirement}
+    {binder : TypedBinder}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (allocated : state.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, final))
+    (origin : binder.scheme.quantified = [] ∨
+      binder ∈ wholeSource.initializedLetBinders) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  have binderEq :
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).1 = binder :=
+    congrArg Prod.fst allocated
+  have finalEq :
+      (state.allocateBinder name scheme span comptime
+        schemeRequirements).2 = final :=
+    congrArg Prod.snd allocated
+  have finalBinders : final.localBinders = binder :: state.localBinders := by
+    rw [← finalEq, ← binderEq]
+    rfl
+  constructor
+  intro candidate member
+  rw [finalBinders] at member
+  rcases List.mem_cons.mp member with rfl | retained
+  · exact origin
+  · exact origins.origin candidate retained
+
+end ActiveBinderCaptureOrigins
+
 /-- The complete lexical invariant threaded by recursive statement typing:
 stable executable binders are aligned with the declarative local context, and
 every active closed scheme and qualified-requirement template is formed in
@@ -24459,6 +24752,23 @@ def ofFinalize
     exact patternProperties.1.trans literalProperties.1
   · rw [solvedEq]
     exact witness.requirementsSolved
+
+/-- Active-binder provenance selects either the trivial monomorphic proof or
+the initialized-let certificate supplied by this finalization. -/
+theorem noCapture_of_lookupBinder?
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state activeState : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    (origins : ActiveBinderCaptureOrigins activeState
+      (state.toTypedSource roots))
+    {name : String} {binder : TypedBinder}
+    (found : activeState.lookupBinder? name = some binder) :
+    Detail.LocalBinderInstantiationNoCapture result.substitution binder :=
+  origins.noCapture_of_lookupBinder? found resources.local_no_capture
 
 /-- Finalization closes an integer-literal origin retained by any earlier
 inference subcomputation, provided that origin remains in the state finalized

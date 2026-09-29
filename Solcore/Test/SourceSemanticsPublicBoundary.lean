@@ -154,6 +154,28 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalFormation.allocateBinder
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.of_monomorphic
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.congr_localBinders
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.monoWholeSource
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.weakenWholeSource
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.origin_of_lookupBinder?
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.noCapture_of_lookupBinder?
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.inferExprFuel
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.inferExprsFuel
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.restoreLexicalScope
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveBinderCaptureOrigins.allocateBinder
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ActiveLocalContextInvariant.congr_localBinders
@@ -819,6 +841,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.ofFinalize
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.noCapture_of_lookupBinder?
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerLiteralTargetSupported_of_subset
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionTypeFormationValidated
@@ -1322,6 +1346,7 @@ example := @Solcore.SourceSemantics.TypingSourceExtends.trans
 example := @Solcore.SourceSemantics.TypingSourceExtends.applySubstitution
 example := @Solcore.SourceSemantics.TypingSourceExtends.containsExpression
 example := @Solcore.SourceSemantics.TypingSourceExtends.containsStatement
+example := @Solcore.SourceSemantics.ContainsStatement.initializedLetBinder_mem
 example :=
   @Solcore.SourceSemantics.TypingSourceExtends.initializedLetBinders_subset
 example :=

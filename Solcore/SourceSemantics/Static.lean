@@ -337,6 +337,21 @@ def mergeBodyControls : List BodyFacts → Option BodyFacts → Option ControlSu
       | none => some body.control
       | some tail => some (body.control.branches tail)
 
+namespace ContainsStatement
+
+/-- Every initialized-let binder retained directly by a contained statement
+belongs to the whole typed source's initialized-binder inventory. -/
+theorem initializedLetBinder_mem
+    {source : TypedSource} {id : StatementId} {node : StatementNode}
+    {binder : TypedBinder}
+    (contains : ContainsStatement source id node)
+    (member : binder ∈ node.form.initializedLetBinders) :
+    binder ∈ source.initializedLetBinders := by
+  unfold TypedSource.initializedLetBinders
+  exact List.mem_flatMap.mpr ⟨.statement node, contains.1, member⟩
+
+end ContainsStatement
+
 /-- A source extension preserves the declaration owner and only appends nodes
 to the occurrence table.  Roots and inputs are intentionally irrelevant to
 the mutually recursive typing judgments below: every recursive edge is
