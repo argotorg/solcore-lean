@@ -50,19 +50,22 @@ Leaf files, `*Properties` modules, parser grammar/trace units, and
 
 The typed-source backend now executes the closed specialization slice end to
 end: constrained generic calls and first-class function values carry checked
-trait evidence, selected `Coerce.coerce` bodies run with their complete helper
-frontier, and closures share mutable locals, mappings, and proxy values through
-one runtime heap.
+trait evidence, selected unary/binary operator and `Coerce.coerce` bodies run
+with their complete helper frontier, and closures share mutable locals,
+mappings, and proxy values through one runtime heap.
 
 ## Priority implementation
 
-- Execute trait-selected unary and binary operator methods in the typed-source
-  backend. The checker and declarative semantics already retain this evidence;
-  the runtime currently executes primitive operators and selected coercion
-  methods only.
 - Broaden the closed specialization profile to the remaining unrestricted
   trait-resolution and higher-order/effectful staging cases, including runtime
   `comptime` values and types.
+- Retain stronger provenance for manually assembled specialized plans. In
+  particular, a generic operator specialized to a builtin operand type should
+  remain distinguishable from an operator that inference originally selected
+  as builtin even if an untrusted client strips its requirement ledger.
+- Preserve the appended executable-plan provenance when a first-class global
+  function discovered only inside a selected operator/coercion method escapes
+  as the public result.
 - Add contract-storage field execution when the target source language defines
   that access path. The current upstream source syntax has no general value
   member projection; the latent typed-IR member form is therefore not exposed

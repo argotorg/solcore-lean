@@ -1492,7 +1492,7 @@ private def testAssignmentRootsAreDeferred
       some SourceStageAnalysis.Stage.deferred)
     "a closure-captured assignment root retained a non-deferred stage"
 
-private def testCoercionMethodPreflight : IO Unit := do
+private def testOperatorMethodNestedInCoercion : IO Unit := do
   let program ← checkedProgram (String.intercalate "\n" [
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
@@ -1514,21 +1514,27 @@ private def testCoercionMethodPreflight : IO Unit := do
     "    return box + box;",
     "  }",
     "}",
-    "function unsupportedMethodCoercion(value: Bool) returns (RuntimeBox) {",
+    "function operatorMethodCoercion(value: Bool) returns (RuntimeBox) {",
     "  return value;",
     "}"
   ])
-  let prepared ← prepareNamed program "unsupportedMethodCoercion"
+  let prepared ← prepareNamed program "operatorMethodCoercion"
   let initialState : RuntimeState := {
     heap := [{ type := .word, value := none }]
   }
-  expectPreExecutionFaultPreservingSentinel
-    "unsupported coercion-method metadata"
-    (fun error => match error with
-      | .unsupportedRequirements requirements => !requirements.isEmpty
-      | _ => false)
-    (SourceTypedRuntime.runWithValidationFuel prepared.program prepared.plan
-      prepared.key [.bool true] 4096 4096 initialState)
+  match SourceTypedRuntime.runWithValidationFuel prepared.program prepared.plan
+      prepared.key [.bool true] 4096 4096 initialState with
+  | .done (.constructed _ []) finalState =>
+      match finalState.heap with
+      | { type := type, value := none } :: _ =>
+          assertTrue (type == Ty.word)
+            "nested operator execution changed the sentinel cell type"
+          assertTrue (finalState.heap.length > initialState.heap.length)
+            "nested operator execution did not share the coercion-method heap"
+      | _ => throw (IO.userError
+          "nested operator execution changed the sentinel cell")
+  | result => throw (IO.userError
+      s!"operator method nested in coercion returned {reprStr result}")
 
 private def testRuntimeCoercions (program : CheckedProgram) : IO Unit := do
   let chain ← prepareNamed program "coercionChain"
@@ -1622,7 +1628,7 @@ private def testAll : IO Unit := do
   testIndirectArgumentCountMetadata program
   testIndirectEndpointMetadata program
   testAssignmentRootsAreDeferred program
-  testCoercionMethodPreflight
+  testOperatorMethodNestedInCoercion
   testRuntimeCoercions program
   IO.println "phase-7 typed-source runtime GREEN"
 

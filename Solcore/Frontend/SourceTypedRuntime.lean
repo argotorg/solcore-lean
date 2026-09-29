@@ -523,6 +523,41 @@ inductive RuntimeError where
   | invalidUnaryOperand (operator : Syntax.UnaryOp) (actual : Option Ty)
   | invalidBinaryOperands
       (operator : Syntax.BinaryOp) (left right : Option Ty)
+  | unsupportedRuntimeUnary
+      (caller : Key) (id : ExpressionId) (operator : Syntax.UnaryOp)
+  | unsupportedRuntimeBinary
+      (caller : Key) (id : ExpressionId) (operator : Syntax.BinaryOp)
+  | unaryRequirementCountMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : Nat)
+  | binaryRequirementCountMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : Nat)
+  | duplicateUnaryRequirement
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+  | duplicateBinaryRequirement
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+  | runtimeUnaryTraitNameMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : String)
+  | runtimeBinaryTraitNameMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : String)
+  | executableUnaryMethod
+      (caller : Key) (id : ExpressionId)
+      (error : ExecutableImplMethods.Error)
+  | executableBinaryMethod
+      (caller : Key) (id : ExpressionId)
+      (error : ExecutableImplMethods.Error)
+  | runtimeUnaryInputTypesMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : List Ty)
+  | runtimeBinaryInputTypesMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : List Ty)
+  | runtimeUnaryResultTypeMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : Ty)
+  | runtimeBinaryResultTypeMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : Ty)
+  | operatorMethodWorklist
+      (caller : Key) (id : ExpressionId)
+      (error : SourceSpecializationWorklist.Error)
+  | operatorMethodSpecializationBudgetExhausted
+      (caller : Key) (id : ExpressionId) (next : Key) (pending : Nat)
   | invalidAssignmentOperands
       (operator : Syntax.ValueAssignOp) (left right : Option Ty)
   | invalidMember (name : String) (index : Nat) (actual : Option Ty)
@@ -1138,6 +1173,195 @@ private def exactRuntimeRequirementEvidenceList (program : CheckedProgram)
       throw (.coercionMethodRequirementCountMismatch caller.key node.id
         { index := 0 } predicates.length requirements.length)
 
+private structure RuntimeOperatorProfile where
+  traitName : String
+  methodName : String
+
+private def runtimeUnaryProfile? :
+    Syntax.UnaryOp → Option RuntimeOperatorProfile
+  | operator =>
+      match SourceInference.Detail.unaryOperatorDispatch operator with
+      | .traitMethod traitName methodName => some { traitName, methodName }
+      | .function _ => none
+
+private def runtimeBinaryProfile? :
+    Syntax.BinaryOp → Option RuntimeOperatorProfile
+  | operator =>
+      match SourceInference.Detail.binaryOperatorDispatch operator with
+      | .traitMethod traitName methodName => some { traitName, methodName }
+      | .function _ => none
+
+private def runtimeUnaryResultType (operator : Syntax.UnaryOp)
+    (operandType : Ty) : Ty :=
+  if operator == .logicalNot then .bool else operandType
+
+private def runtimeBinaryResultType (operator : Syntax.BinaryOp)
+    (operandType : Ty) : Ty :=
+  if SourceInference.Detail.binaryResultIsBool operator then .bool
+  else operandType
+
+private def runtimeOperatorMethodPredicates
+    (trait : ProgramTraitSignature)
+    (goal : ProgramPredicate) (expectedName : String)
+    (wrap : ExecutableImplMethods.Error → RuntimeError) :
+    Except RuntimeError (List ProgramPredicate) := do
+  let goalArity := goal.arguments.length + 1
+  unless goalArity = 1 do
+    throw (wrap (.evidenceGoalArityMismatch goal.trait 1 goalArity))
+  unless trait.parameters.length = 1 do
+    throw (wrap (.traitArityMismatch trait.id 1 trait.parameters.length))
+  let method ← match trait.methods.filter fun method =>
+      method.name == expectedName with
+    | [] => throw (wrap (.missingTraitMethod trait.id expectedName))
+    | [method] => pure method
+    | methods => throw (wrap (.multipleTraitMethods trait.id methods.length))
+  let substitution : ParameterSubstitution :=
+    trait.parameters.zip [goal.subject]
+  pure (method.wherePredicates.map
+    (ProgramPredicate.applyParameters substitution))
+
+private structure CheckedRuntimeOperatorMethod where
+  primaryRequirement : RequirementId
+  method : ExecutableImplMethods.CheckedMethod
+
+private def checkedUnaryOperatorMethod (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
+    (operator : Syntax.UnaryOp) :
+    Except RuntimeError CheckedRuntimeOperatorMethod := do
+  let profile ← match runtimeUnaryProfile? operator with
+    | some profile => pure profile
+    | none => throw (.unsupportedRuntimeUnary caller.key node.id operator)
+  let requirements ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  let primaryRequirement ← match requirements with
+    | requirement :: _ => pure requirement
+    | [] => throw (.unaryRequirementCountMismatch caller.key node.id 1 0)
+  match firstDuplicateRequirement requirements with
+  | some requirement =>
+      throw (.duplicateUnaryRequirement caller.key node.id requirement)
+  | none => pure ()
+  let solved ← exactCallSolvedRequirement caller node.id primaryRequirement
+  let predicate := solved.predicate
+  let primary ← exactRuntimeRequirementEvidence program caller node available
+    primaryRequirement predicate
+  let traitId ← match predicate.trait with
+    | .declaration id => pure id
+    | .builtin id => throw (.executableUnaryMethod caller.key node.id
+        (.builtinTraitNotExecutable id))
+  let trait ← match program.signatures.trait? traitId with
+    | some trait => pure trait
+    | none => throw (.executableUnaryMethod caller.key node.id
+        (.missingTrait traitId))
+  unless trait.name = profile.traitName do
+    throw (.runtimeUnaryTraitNameMismatch caller.key node.id
+      profile.traitName trait.name)
+  let methodPredicates ← runtimeOperatorMethodPredicates trait
+    predicate profile.methodName
+    (RuntimeError.executableUnaryMethod caller.key node.id)
+  let expectedCount := methodPredicates.length + 1
+  unless requirements.length = expectedCount do
+    throw (.unaryRequirementCountMismatch caller.key node.id expectedCount
+      requirements.length)
+  let methodEvidence ← exactRuntimeRequirementEvidenceList program caller node
+    available (requirements.drop 1) methodPredicates
+  let method ←
+    (ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary
+      methodEvidence 1 profile.methodName).mapError fun error =>
+        .executableUnaryMethod caller.key node.id error
+  let expectedInputs := [predicate.subject]
+  let actualInputs := method.specialized.function.typedBody.inputs.map
+    fun binder => binder.scheme.body
+  unless actualInputs = expectedInputs do
+    throw (.runtimeUnaryInputTypesMismatch caller.key node.id expectedInputs
+      actualInputs)
+  let operandId ← match node.form with
+    | .unary _ operand => pure operand
+    | _ => throw (.unsupportedRuntimeUnary caller.key node.id operator)
+  let operand ← exactExpression caller.function.typedBody operandId
+  unless operand.type = predicate.subject do
+    throw (.runtimeUnaryInputTypesMismatch caller.key node.id expectedInputs
+      [operand.type])
+  let expectedResult := runtimeUnaryResultType operator predicate.subject
+  unless method.specialized.function.inferredBodyType = expectedResult do
+    throw (.runtimeUnaryResultTypeMismatch caller.key node.id expectedResult
+      method.specialized.function.inferredBodyType)
+  unless node.rawType = expectedResult do
+    throw (.runtimeUnaryResultTypeMismatch caller.key node.id expectedResult
+      node.rawType)
+  pure { primaryRequirement, method }
+
+private def checkedBinaryOperatorMethod (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
+    (operator : Syntax.BinaryOp) :
+    Except RuntimeError CheckedRuntimeOperatorMethod := do
+  let profile ← match runtimeBinaryProfile? operator with
+    | some profile => pure profile
+    | none => throw (.unsupportedRuntimeBinary caller.key node.id operator)
+  let requirements ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  let primaryRequirement ← match requirements with
+    | requirement :: _ => pure requirement
+    | [] => throw (.binaryRequirementCountMismatch caller.key node.id 1 0)
+  match firstDuplicateRequirement requirements with
+  | some requirement =>
+      throw (.duplicateBinaryRequirement caller.key node.id requirement)
+  | none => pure ()
+  let solved ← exactCallSolvedRequirement caller node.id primaryRequirement
+  let predicate := solved.predicate
+  let primary ← exactRuntimeRequirementEvidence program caller node available
+    primaryRequirement predicate
+  let traitId ← match predicate.trait with
+    | .declaration id => pure id
+    | .builtin id => throw (.executableBinaryMethod caller.key node.id
+        (.builtinTraitNotExecutable id))
+  let trait ← match program.signatures.trait? traitId with
+    | some trait => pure trait
+    | none => throw (.executableBinaryMethod caller.key node.id
+        (.missingTrait traitId))
+  unless trait.name = profile.traitName do
+    throw (.runtimeBinaryTraitNameMismatch caller.key node.id
+      profile.traitName trait.name)
+  let methodPredicates ← runtimeOperatorMethodPredicates trait
+    predicate profile.methodName
+    (RuntimeError.executableBinaryMethod caller.key node.id)
+  let expectedCount := methodPredicates.length + 1
+  unless requirements.length = expectedCount do
+    throw (.binaryRequirementCountMismatch caller.key node.id expectedCount
+      requirements.length)
+  let methodEvidence ← exactRuntimeRequirementEvidenceList program caller node
+    available (requirements.drop 1) methodPredicates
+  let method ←
+    (ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary
+      methodEvidence 1 profile.methodName).mapError fun error =>
+        .executableBinaryMethod caller.key node.id error
+  let expectedInputs := [predicate.subject, predicate.subject]
+  let actualInputs := method.specialized.function.typedBody.inputs.map
+    fun binder => binder.scheme.body
+  unless actualInputs = expectedInputs do
+    throw (.runtimeBinaryInputTypesMismatch caller.key node.id expectedInputs
+      actualInputs)
+  let (leftId, rightId) ← match node.form with
+    | .binary left _ right => pure (left, right)
+    | _ => throw (.unsupportedRuntimeBinary caller.key node.id operator)
+  let left ← exactExpression caller.function.typedBody leftId
+  let right ← exactExpression caller.function.typedBody rightId
+  let operandTypes := [left.type, right.type]
+  unless operandTypes = expectedInputs do
+    throw (.runtimeBinaryInputTypesMismatch caller.key node.id expectedInputs
+      operandTypes)
+  let expectedResult := runtimeBinaryResultType operator predicate.subject
+  unless method.specialized.function.inferredBodyType = expectedResult do
+    throw (.runtimeBinaryResultTypeMismatch caller.key node.id expectedResult
+      method.specialized.function.inferredBodyType)
+  unless node.rawType = expectedResult do
+    throw (.runtimeBinaryResultTypeMismatch caller.key node.id expectedResult
+      node.rawType)
+  pure { primaryRequirement, method }
+
 /-- Authenticate one retained `Coerce<From, To>` edge and recover the exact
 checked implementation method selected by its evidence. -/
 private def checkedCoercionMethod (program : CheckedProgram)
@@ -1187,7 +1411,7 @@ private def checkedCoercionMethod (program : CheckedProgram)
     methodEvidence 2 "coerce").mapError fun error =>
       .executableCoercionMethod caller.key node.id step.requirement error
 
-private def resolveClosedCoercionEvidence (program : CheckedProgram)
+private def resolveClosedMethodEvidence (program : CheckedProgram)
     (caller : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) (requirement : RequirementId) :
     List ProgramPredicate →
@@ -1207,7 +1431,7 @@ private def resolveClosedCoercionEvidence (program : CheckedProgram)
           if goal != predicate then
             throw (.callRequirementEvidenceGoalMismatch caller.key node.id
               requirement predicate goal)
-          pure (evidence :: (← resolveClosedCoercionEvidence program caller
+          pure (evidence :: (← resolveClosedMethodEvidence program caller
             node requirement predicates))
 
 /-- The synthetic checked method lists trait-header, implementation-head, and
@@ -1218,8 +1442,21 @@ private def coercionMethodRuntimeEvidence (program : CheckedProgram)
     (node : ExpressionNode) (step : CoercionStep)
     (method : ExecutableImplMethods.CheckedMethod) :
     Except RuntimeError RuntimeEvidenceEnvironment := do
-  let traitEvidence ← resolveClosedCoercionEvidence program caller node
+  let traitEvidence ← resolveClosedMethodEvidence program caller node
     step.requirement method.traitPredicates
+  let environment := traitEvidence ++ method.implementationPremises ++
+    method.methodPremises
+  validateRuntimeEvidence method.specialized.key method.specialized.assumptions
+    environment
+  pure environment
+
+private def operatorMethodRuntimeEvidence (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (selection : CheckedRuntimeOperatorMethod) :
+    Except RuntimeError RuntimeEvidenceEnvironment := do
+  let method := selection.method
+  let traitEvidence ← resolveClosedMethodEvidence program caller node
+    selection.primaryRequirement method.traitPredicates
   let environment := traitEvidence ++ method.implementationPremises ++
     method.methodPremises
   validateRuntimeEvidence method.specialized.key method.specialized.assumptions
@@ -1648,6 +1885,77 @@ private def validateIndirectCallMetadata (source : TypedSource)
         coercionRequirementIds node.coercions do
     throw (.unsupportedRequirements node.requirements)
 
+private def validateUnaryOperatorRequirementLayout
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (operator : Syntax.UnaryOp) :
+    Except RuntimeError Unit := do
+  let requirements ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  if requirements.isEmpty then do
+    let operandId ← match node.form with
+      | .unary _ operand => pure operand
+      | _ => throw (.unsupportedRuntimeUnary specialized.key node.id operator)
+    let operand ← exactExpression specialized.function.typedBody operandId
+    let expectedInput := match operator with
+      | .logicalNot => Ty.bool
+      | .bitNot => Ty.word
+    let expectedResult := runtimeUnaryResultType operator expectedInput
+    unless operand.type = expectedInput do
+      throw (.runtimeUnaryInputTypesMismatch specialized.key node.id
+        [expectedInput] [operand.type])
+    unless node.rawType = expectedResult do
+      throw (.runtimeUnaryResultTypeMismatch specialized.key node.id
+        expectedResult node.rawType)
+  else
+    if (runtimeUnaryProfile? operator).isNone then
+      throw (.unsupportedRuntimeUnary specialized.key node.id operator)
+    match firstDuplicateRequirement requirements with
+    | some requirement =>
+        throw (.duplicateUnaryRequirement specialized.key node.id requirement)
+    | none => pure ()
+    for requirement in requirements do
+      let solved ← exactCallSolvedRequirement specialized node.id requirement
+      unless solved.evidence.goal = solved.predicate do
+        throw (.callRequirementEvidenceGoalMismatch specialized.key node.id
+          requirement solved.predicate solved.evidence.goal)
+
+private def validateBinaryOperatorRequirementLayout
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (operator : Syntax.BinaryOp) :
+    Except RuntimeError Unit := do
+  let requirements ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  if requirements.isEmpty then do
+    let (leftId, rightId) ← match node.form with
+      | .binary left _ right => pure (left, right)
+      | _ => throw (.unsupportedRuntimeBinary specialized.key node.id operator)
+    let left ← exactExpression specialized.function.typedBody leftId
+    let right ← exactExpression specialized.function.typedBody rightId
+    let expectedInput := SourceInference.Detail.binaryBuiltinType operator
+    let expectedInputs := [expectedInput, expectedInput]
+    let actualInputs := [left.type, right.type]
+    unless actualInputs = expectedInputs do
+      throw (.runtimeBinaryInputTypesMismatch specialized.key node.id
+        expectedInputs actualInputs)
+    let expectedResult := runtimeBinaryResultType operator expectedInput
+    unless node.rawType = expectedResult do
+      throw (.runtimeBinaryResultTypeMismatch specialized.key node.id
+        expectedResult node.rawType)
+  else
+    if (runtimeBinaryProfile? operator).isNone then
+      throw (.unsupportedRuntimeBinary specialized.key node.id operator)
+    match firstDuplicateRequirement requirements with
+    | some requirement =>
+        throw (.duplicateBinaryRequirement specialized.key node.id requirement)
+    | none => pure ()
+    for requirement in requirements do
+      let solved ← exactCallSolvedRequirement specialized node.id requirement
+      unless solved.evidence.goal = solved.predicate do
+        throw (.callRequirementEvidenceGoalMismatch specialized.key node.id
+          requirement solved.predicate solved.evidence.goal)
+
 private def validateExpressionMetadata
     (specialized : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) : Except RuntimeError Unit := do
@@ -1678,7 +1986,12 @@ private def validateExpressionMetadata
       let owned ← match ordinaryOwnedRequirements? node with
         | some requirements => pure requirements
         | none => throw (.unsupportedRequirements node.requirements)
-      let ownedNode := { node with requirements := owned, coercions := [] }
+      let ownedNode := {
+        node with
+        type := node.rawType
+        requirements := owned
+        coercions := []
+      }
       match directLambdaLetBinder? function.typedBody binderId with
       | some binder =>
           if binder.schemeRequirements.isEmpty then
@@ -1689,6 +2002,10 @@ private def validateExpressionMetadata
       | none =>
           unless owned.isEmpty do
             throw (.unsupportedRequirements owned)
+  | .unary operator _ =>
+      validateUnaryOperatorRequirementLayout specialized node operator
+  | .binary _ operator _ =>
+      validateBinaryOperatorRequirementLayout specialized node operator
   | _ =>
       match ordinaryOwnedRequirements? node with
       | some [] => pure ()
@@ -1825,9 +2142,9 @@ private def allowsEvidenceInvocation (plan : Plan) (key : Key) : Bool :=
     !plan.seedKeys.contains key
 
 /-- Preflight every reachable specialization before selecting this runtime as
-an executable backend.  The canonical worklist has already fixed the finite
-call graph; this pass rejects metadata which the typed runtime deliberately
-does not dispatch instead of postponing that rejection until a call happens. -/
+an executable backend.  The canonical worklist has already fixed the ordinary
+call graph; this pass validates the source metadata accepted by the typed
+runtime before signature-aware method closure is added. -/
 def validateExecutablePlan (plan : Plan) : Except RuntimeError Unit := do
   for specialized in plan.specializations do
     validateSpecializationMetadataWith
@@ -1856,6 +2173,49 @@ private def extendCoercionMethodPlan (program : CheckedProgram)
       throw (.coercionMethodSpecializationBudgetExhausted specialized.key
         node.id step.requirement next pending.length)
 
+private def extendOperatorMethodPlan (program : CheckedProgram)
+    (helperBudget : Nat) (plan : Plan)
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (available : RuntimeEvidenceEnvironment) (node : ExpressionNode) :
+    Except RuntimeError Plan := do
+  let requirements ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  if requirements.isEmpty then
+    pure plan
+  else
+    let ownedNode := {
+      node with
+      type := node.rawType
+      requirements
+      coercions := []
+    }
+    let selection ← match ownedNode.form with
+      | .unary operator _ =>
+          checkedUnaryOperatorMethod program specialized ownedNode available
+            operator
+      | .binary _ operator _ =>
+          checkedBinaryOperatorMethod program specialized ownedNode available
+            operator
+      | _ => throw (.unsupportedRequirements requirements)
+    discard <| operatorMethodRuntimeEvidence program specialized ownedNode
+      selection
+    let outerEdge : SourceSpecializationWorklist.CallEdge := {
+      caller := specialized.key
+      occurrence := node.id
+      callee := selection.method.specialized.key
+    }
+    let outcome ← match SourceSpecializationWorklist.extendCompletePlan program
+        plan selection.method.specialized outerEdge helperBudget with
+      | .ok outcome => pure outcome
+      | .error error => throw (.operatorMethodWorklist specialized.key node.id
+          error)
+    match outcome with
+    | .complete extended => pure extended
+    | .budgetExhausted _ next pending =>
+        throw (.operatorMethodSpecializationBudgetExhausted specialized.key
+          node.id next pending.length)
+
 private def validateSpecializationEvidenceAndExtend
     (program : CheckedProgram) (helperBudget : Nat) (plan : Plan)
     (specialized : SourceSpecialization.SpecializedFunction) :
@@ -1866,6 +2226,11 @@ private def validateSpecializationEvidenceAndExtend
   for sourceNode in specialized.function.typedBody.nodes do
     match sourceNode with
     | .expression node =>
+        match node.form with
+        | .unary _ _ | .binary _ _ _ =>
+            extended ← extendOperatorMethodPlan program helperBudget extended
+              specialized available node
+        | _ => pure ()
         for step in node.coercions do
           extended ← extendCoercionMethodPlan program helperBudget extended
             specialized available node step
@@ -1915,10 +2280,11 @@ private def prepareExecutablePlanEvidenceAux (program : CheckedProgram)
           prepareExecutablePlanEvidenceAux program helperBudget remaining
             (next + 1) extended
 
-/-- Close and authenticate every executable coercion method before execution.
-The outer budget bounds the number of specializations inspected, including
-detached methods appended during the pass.  The helper budget independently
-bounds ordinary call/reference closure discovered from each detached method. -/
+/-- Close and authenticate every executable operator and coercion method before
+execution.  The outer budget bounds the number of specializations inspected,
+including detached methods appended during the pass.  The helper budget
+independently bounds ordinary call/reference closure discovered from each
+detached method. -/
 def prepareExecutablePlanEvidenceWithBudget (program : CheckedProgram)
     (plan : Plan) (closureFuel helperBudget : Nat) :
     Except RuntimeError Plan :=
@@ -1933,7 +2299,8 @@ def prepareExecutablePlanEvidence (program : CheckedProgram)
 
 /-- Signature-aware safe-boundary validation.  In addition to authenticating
 all retained evidence, this closes and validates the full source frontier of
-every selected coercion method before execution can mutate the heap. -/
+every selected operator and coercion method before execution can mutate the
+heap. -/
 def validateExecutablePlanEvidence (program : CheckedProgram)
     (plan : Plan) : Except RuntimeError Unit := do
   discard <| prepareExecutablePlanEvidence program plan
@@ -2573,7 +2940,12 @@ private def instantiateDirectLambdaLet? (plan : Plan) (owner : Key)
   let owned ← match ordinaryOwnedRequirements? node with
     | some requirements => pure requirements
     | none => throw (.unsupportedRequirements node.requirements)
-  let node := { node with requirements := owned, coercions := [] }
+  let node := {
+    node with
+    type := node.rawType
+    requirements := owned
+    coercions := []
+  }
   let (substitution, requirements) ←
     localRequirementWitnesses caller available binder node
   match value with
@@ -2614,6 +2986,90 @@ private def rewriteLocalRequirements
 }
 
 mutual
+
+  private def executeUnaryOperatorMethod (fuel : Nat)
+      (program : CheckedProgram) (plan : Plan) (owner : Key)
+      (available : RuntimeEvidenceEnvironment) (node : ExpressionNode)
+      (operator : Syntax.UnaryOp) (value : Value) (state : RuntimeState) :
+      ExpressionResult :=
+    match fuel with
+    | 0 => .outOfFuel state
+    | fuel + 1 =>
+        match exactSpecialization plan owner with
+        | .error error => .fault error state
+        | .ok caller =>
+            match ordinaryOwnedRequirements? node with
+            | none => .fault (.unsupportedRequirements node.requirements) state
+            | some requirements =>
+                let ownedNode := {
+                  node with
+                  type := node.rawType
+                  requirements
+                  coercions := []
+                }
+                match checkedUnaryOperatorMethod program caller ownedNode
+                    available operator with
+                | .error error => .fault error state
+                | .ok selection =>
+                    match operatorMethodRuntimeEvidence program caller ownedNode
+                        selection with
+                    | .error error => .fault error state
+                    | .ok methodEvidence =>
+                        match invokeDirectSpecialization fuel program plan
+                            selection.method.specialized.key methodEvidence
+                            [value] state with
+                        | .done result finalState =>
+                            if result.type? plan = some node.rawType then
+                              .done result finalState
+                            else
+                              .fault (.runtimeUnaryResultTypeMismatch caller.key
+                                node.id node.rawType
+                                (Option.getD (result.type? plan) Ty.error))
+                                finalState
+                        | .outOfFuel finalState => .outOfFuel finalState
+                        | .fault error finalState => .fault error finalState
+
+  private def executeBinaryOperatorMethod (fuel : Nat)
+      (program : CheckedProgram) (plan : Plan) (owner : Key)
+      (available : RuntimeEvidenceEnvironment) (node : ExpressionNode)
+      (operator : Syntax.BinaryOp) (left right : Value)
+      (state : RuntimeState) : ExpressionResult :=
+    match fuel with
+    | 0 => .outOfFuel state
+    | fuel + 1 =>
+        match exactSpecialization plan owner with
+        | .error error => .fault error state
+        | .ok caller =>
+            match ordinaryOwnedRequirements? node with
+            | none => .fault (.unsupportedRequirements node.requirements) state
+            | some requirements =>
+                let ownedNode := {
+                  node with
+                  type := node.rawType
+                  requirements
+                  coercions := []
+                }
+                match checkedBinaryOperatorMethod program caller ownedNode
+                    available operator with
+                | .error error => .fault error state
+                | .ok selection =>
+                    match operatorMethodRuntimeEvidence program caller ownedNode
+                        selection with
+                    | .error error => .fault error state
+                    | .ok methodEvidence =>
+                        match invokeDirectSpecialization fuel program plan
+                            selection.method.specialized.key methodEvidence
+                            [left, right] state with
+                        | .done result finalState =>
+                            if result.type? plan = some node.rawType then
+                              .done result finalState
+                            else
+                              .fault (.runtimeBinaryResultTypeMismatch caller.key
+                                node.id node.rawType
+                                (Option.getD (result.type? plan) Ty.error))
+                                finalState
+                        | .outOfFuel finalState => .outOfFuel finalState
+                        | .fault error finalState => .fault error finalState
 
   /-- Execute an evidence-selected coercion method in the same heap as the
   enclosing expression.  Safe execution has already inserted the method and
@@ -2742,23 +3198,45 @@ mutual
           | .unary operator operand =>
               match descend state operand with
               | .done value finalState =>
-                  match applyUnary plan operator value with
-                  | .ok result => .done result finalState
-                  | .error error => .fault error finalState
+                  match ordinaryOwnedRequirements? node with
+                  | none =>
+                      .fault (.unsupportedRequirements node.requirements)
+                        finalState
+                  | some [] =>
+                      match applyUnary plan operator value with
+                      | .ok result => .done result finalState
+                      | .error error => .fault error finalState
+                  | some _ =>
+                      executeUnaryOperatorMethod fuel program plan owner
+                        evidence node operator value finalState
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
           | .binary left operator right =>
               match descend state left with
               | .done leftValue rightState =>
-                  match operator, leftValue with
-                  | .logicalAnd, .bool false => .done (.bool false) rightState
-                  | .logicalOr, .bool true => .done (.bool true) rightState
-                  | _, _ =>
+                  match ordinaryOwnedRequirements? node with
+                  | none =>
+                      .fault (.unsupportedRequirements node.requirements)
+                        rightState
+                  | some [] =>
+                      match operator, leftValue with
+                      | .logicalAnd, .bool false =>
+                          .done (.bool false) rightState
+                      | .logicalOr, .bool true => .done (.bool true) rightState
+                      | _, _ =>
+                          match descend rightState right with
+                          | .done rightValue finalState =>
+                              match applyBinary plan operator leftValue
+                                  rightValue with
+                              | .ok result => .done result finalState
+                              | .error error => .fault error finalState
+                          | .outOfFuel finalState => .outOfFuel finalState
+                          | .fault error finalState => .fault error finalState
+                  | some _ =>
                       match descend rightState right with
                       | .done rightValue finalState =>
-                          match applyBinary plan operator leftValue rightValue with
-                          | .ok result => .done result finalState
-                          | .error error => .fault error finalState
+                          executeBinaryOperatorMethod fuel program plan owner
+                            evidence node operator leftValue rightValue finalState
                       | .outOfFuel finalState => .outOfFuel finalState
                       | .fault error finalState => .fault error finalState
               | .outOfFuel finalState => .outOfFuel finalState
@@ -3949,7 +4427,7 @@ private theorem finishPreparedRun_done_type
 /-- Safe typed-source execution with independent bounds for recursive input
 validation and runtime execution.  Constructor inputs are checked against
 `ProgramSignatures`, not merely against self-described runtime metadata, and
-the complete coercion-method frontier is prepared before evaluation starts. -/
+the complete selected-method frontier is prepared before evaluation starts. -/
 def runWithValidationFuel (program : CheckedProgram) (plan : Plan)
     (entry : Key) (arguments : List Value) (validationFuel executionFuel : Nat)
     (state : RuntimeState := {}) : RunResult :=
