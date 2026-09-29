@@ -21,9 +21,9 @@ is the independent, proof-facing specification of resolved source programs.
 | [`Solcore.Syntax`](Solcore/Syntax.lean) | Source-preserving AST, lexer, parser, diagnostics, declarative grammars, and parser correctness properties. |
 | [`Solcore.Resolved`](Solcore/Resolved.lean) | Small already-resolved local-expression semantics with scope, typing, evaluation, renaming, lowering, and Core correspondence. It is not the whole-program name resolver. |
 | [`Solcore.TypeSystem`](Solcore/TypeSystem.lean) | Source types, substitutions, first-order unification, rank-1 schemes, inference state, and their basic properties. |
-| [`Solcore.Frontend.Current`](Solcore/Frontend/Current.lean) | Preferred executable whole-program entry: loading, resolution, inference, staging, specialization, linking, reusable compilation, root discovery, backend selection, and execution. |
+| [`Solcore.Frontend.Current`](Solcore/Frontend/Current.lean) | Preferred executable whole-program entry: loading, resolution, inference, staging, specialization, linking, reusable compilation, root discovery, backend selection, execution, and backend-native/deep result certificates. |
 | [`Solcore.Frontend`](Solcore/Frontend.lean) | Compatibility facade containing `Frontend.Current` and the older focused adapters under `Frontend.Fragments`. |
-| [`Solcore.SourceSemantics`](Solcore/SourceSemantics.lean) | Algorithm-independent static, staging, dynamic, fault, substitution, and preservation judgments for resolved typed source. |
+| [`Solcore.SourceSemantics`](Solcore/SourceSemantics.lean) | Algorithm-independent static, staging, dynamic, fault, and substitution judgments for resolved typed source, including constructive whole-language preservation for successful declarative executions. |
 | [`Solcore.Core`](Solcore/Core.lean) | Typed Semantic Core syntax, stores, evaluator and machines, primitives, checker, runners, safety, and correspondence theorems. |
 | [`Solcore.Core.Wire`](Solcore/Core/Wire.lean) | Canonical external Core representation, Core conversion, fixed host boundary, strict JSON codecs, and decode budgets. |
 | [`Solcore.ContractRuntime`](Solcore/ContractRuntime.lean) | Checked-Core execution over accounts and world state: host effects, storage, frames, transactions, calls, creation, commit/rollback, and observations. |
@@ -34,6 +34,21 @@ is the independent, proof-facing specification of resolved source programs.
 Umbrella files are the navigation and import boundaries for downstream code.
 Leaf files, `*Properties` modules, parser grammar/trace units, and
 `Frontend.Fragments` are focused implementation or proof units.
+
+The two preservation boundaries are intentionally distinct.
+[`WholeLanguagePreservation`](Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean)
+is the constructive, algorithm-independent mutual preservation proof for
+declarative resolved-source evaluation, and
+[`ProgramEvaluates.preserves`](Solcore/SourceSemantics/Dynamic/Program.lean)
+lifts it to the whole-program entry judgment.
+[`SourceTypedRuntimeDeepSafety`](Solcore/Frontend/SourceTypedRuntimeDeepSafety.lean)
+is the executable typed-source boundary certificate: a normal public run
+certifies deeply typed initial/final heaps, inputs/results, readable captures,
+heap type-layout extension, checked-plan substitution-image code provenance,
+and authenticated evidence. [`SourceCompiler`](Solcore/Frontend/SourceCompiler.lean)
+exposes both the complete pre/post certificate and its final-result projection.
+Correspondence between this executable pipeline and the independent
+declarative judgments remains future work.
 
 ## Contributor map
 
@@ -103,15 +118,14 @@ boundary.
 
 - Add declarative raw-source parsing, module/import, and name-resolution
   semantics before the existing resolved-source layer.
-- Prove end-to-end soundness, completeness, and correspondence from checking,
-  inference, staging, and specialization through every execution backend;
-  include unification, trait solving, and module resolution.
+- Prove end-to-end correspondence between executable checking, inference,
+  staging, specialization, and each runtime, and the independent declarative
+  `SourceSemantics` judgments; include unification, trait solving, and module
+  resolution.
 - Complete general progress and determinism results, exhaustive fault
-  classification, divergence/fuel correspondence, backend-uniform deep
-  preservation, plan-validator completeness, and aggregate work bounds.
-- Lift the existing single-root provenance and preservation certificates
-  through automatic-entry, compile-many, and exported Static Word aggregate
-  artifacts.
+  classification, divergence/fuel correspondence, plan-validator completeness,
+  aggregate work bounds, and—if useful—a single backend-independent
+  formulation combining the existing backend-native preservation results.
 
 ## Optional scope extensions
 
