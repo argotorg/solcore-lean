@@ -365,10 +365,13 @@ private def source : String := String.intercalate "\n" [
   "  function coerce(value: From) returns (To)",
   "      where From: Eq, From: Mark;",
   "}",
+  "function boolToWord(value: Bool) returns (Word) {",
+  "  return value ? 41 : 7;",
+  "}",
   "impl Coerce<Bool, Word> {",
   "  function coerce(value: Bool) returns (Word)",
   "      where Bool: Eq, Bool: Mark {",
-  "    return value ? 41 : 7;",
+  "    return boolToWord(value);",
   "  }",
   "}",
   "impl Coerce<Word, (Word, Word)> {",
@@ -1489,6 +1492,44 @@ private def testAssignmentRootsAreDeferred
       some SourceStageAnalysis.Stage.deferred)
     "a closure-captured assignment root retained a non-deferred stage"
 
+private def testCoercionMethodPreflight : IO Unit := do
+  let program ← checkedProgram (String.intercalate "\n" [
+    "trait Add<T> {",
+    "  function add(left: T, right: T) returns (T);",
+    "}",
+    "enum RuntimeBox { Only }",
+    "impl Add<RuntimeBox> {",
+    "  function add(left: RuntimeBox, right: RuntimeBox) returns (RuntimeBox) {",
+    "    return left;",
+    "  }",
+    "}",
+    "trait Coerce<From, To> {",
+    "  function coerce(value: From) returns (To);",
+    "}",
+    "impl Coerce<Bool, RuntimeBox> {",
+    "  function coerce(value: Bool) returns (RuntimeBox) {",
+    "    let touched: Word = 0;",
+    "    touched += 1;",
+    "    let box: RuntimeBox = .Only;",
+    "    return box + box;",
+    "  }",
+    "}",
+    "function unsupportedMethodCoercion(value: Bool) returns (RuntimeBox) {",
+    "  return value;",
+    "}"
+  ])
+  let prepared ← prepareNamed program "unsupportedMethodCoercion"
+  let initialState : RuntimeState := {
+    heap := [{ type := .word, value := none }]
+  }
+  expectPreExecutionFaultPreservingSentinel
+    "unsupported coercion-method metadata"
+    (fun error => match error with
+      | .unsupportedRequirements requirements => !requirements.isEmpty
+      | _ => false)
+    (SourceTypedRuntime.runWithValidationFuel prepared.program prepared.plan
+      prepared.key [.bool true] 4096 4096 initialState)
+
 private def testRuntimeCoercions (program : CheckedProgram) : IO Unit := do
   let chain ← prepareNamed program "coercionChain"
   match runPrepared chain [.bool true] 8192 with
@@ -1581,6 +1622,7 @@ private def testAll : IO Unit := do
   testIndirectArgumentCountMetadata program
   testIndirectEndpointMetadata program
   testAssignmentRootsAreDeferred program
+  testCoercionMethodPreflight
   testRuntimeCoercions program
   IO.println "phase-7 typed-source runtime GREEN"
 

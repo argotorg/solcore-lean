@@ -551,6 +551,13 @@ inductive RuntimeError where
   | executableCoercionMethod
       (caller : Key) (id : ExpressionId) (requirement : RequirementId)
       (error : ExecutableImplMethods.Error)
+  | coercionMethodWorklist
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (error : SourceSpecializationWorklist.Error)
+  | coercionMethodSpecializationBudgetExhausted
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (next : Key) (pending : Nat)
+  | executablePlanClosureFuelExhausted (nextSpecialization : Nat)
   | unsupportedCoercion (source target : Ty)
   | unsupportedRequirements (requirements : List RequirementId)
   | unsupportedExpressionCoercions (expression : ExpressionId)
@@ -1826,54 +1833,110 @@ def validateExecutablePlan (plan : Plan) : Except RuntimeError Unit := do
     validateSpecializationMetadataWith
       (allowsEvidenceInvocation plan specialized.key) specialized
 
-/-- Signature-aware safe-boundary validation.  The structural pass retains
-its existing diagnostics and ordering; the second pass authenticates every
-implementation witness used by a direct declaration call against the
-authoritative resolution catalog. -/
+private def extendCoercionMethodPlan (program : CheckedProgram)
+    (helperBudget : Nat) (plan : Plan)
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (available : RuntimeEvidenceEnvironment) (node : ExpressionNode)
+    (step : CoercionStep) : Except RuntimeError Plan := do
+  let method ← checkedCoercionMethod program specialized node available step
+  discard <| coercionMethodRuntimeEvidence program specialized node step method
+  let outerEdge : SourceSpecializationWorklist.CallEdge := {
+    caller := specialized.key
+    occurrence := node.id
+    callee := method.specialized.key
+  }
+  let outcome ← match SourceSpecializationWorklist.extendCompletePlan program
+      plan method.specialized outerEdge helperBudget with
+    | .ok outcome => pure outcome
+    | .error error => throw (.coercionMethodWorklist specialized.key node.id
+        step.requirement error)
+  match outcome with
+  | .complete extended => pure extended
+  | .budgetExhausted _ next pending =>
+      throw (.coercionMethodSpecializationBudgetExhausted specialized.key
+        node.id step.requirement next pending.length)
+
+private def validateSpecializationEvidenceAndExtend
+    (program : CheckedProgram) (helperBudget : Nat) (plan : Plan)
+    (specialized : SourceSpecialization.SpecializedFunction) :
+    Except RuntimeError Plan := do
+  let available ← resolveRuntimeEvidenceEnvironment program specialized.key
+    specialized.assumptions
+  let mut extended := plan
+  for sourceNode in specialized.function.typedBody.nodes do
+    match sourceNode with
+    | .expression node =>
+        for step in node.coercions do
+          extended ← extendCoercionMethodPlan program helperBudget extended
+            specialized available node step
+        match node.form with
+        | .call _ _ (.indirect metadata) =>
+            for step in metadata.argumentCoercions do
+              extended ← extendCoercionMethodPlan program helperBudget extended
+                specialized available node step
+        | _ => pure ()
+        match node.form with
+        | .call _ _ (.declaration instantiation) =>
+            validateExecutableDirectCallImplementationEvidence
+              program.signatures specialized node instantiation
+        | .reference _ (.declaration instantiation) =>
+            if directDeclarationCalleeUseCount
+                specialized.function.typedBody node.id == 0 then
+              validateExecutableDeclarationReferenceImplementationEvidence
+                program.signatures specialized node instantiation
+            else
+              pure ()
+        | .reference _ (.local binderId) =>
+            match directLambdaLetBinder?
+                specialized.function.typedBody binderId with
+            | some binder =>
+                unless binder.schemeRequirements.isEmpty do
+                  validateQualifiedLocalReferenceEvidence program.signatures
+                    specialized available node binder
+            | none => pure ()
+        | _ => pure ()
+    | .statement _ => pure ()
+  pure extended
+
+private def prepareExecutablePlanEvidenceAux (program : CheckedProgram)
+    (helperBudget : Nat) : Nat → Nat → Plan → Except RuntimeError Plan
+  | 0, next, plan =>
+      match plan.specializations[next]? with
+      | none => pure plan
+      | some _ => throw (.executablePlanClosureFuelExhausted next)
+  | remaining + 1, next, plan =>
+      match plan.specializations[next]? with
+      | none => pure plan
+      | some specialized => do
+          validateSpecializationMetadataWith
+            (allowsEvidenceInvocation plan specialized.key) specialized
+          let extended ← validateSpecializationEvidenceAndExtend program
+            helperBudget plan specialized
+          prepareExecutablePlanEvidenceAux program helperBudget remaining
+            (next + 1) extended
+
+/-- Close and authenticate every executable coercion method before execution.
+The outer budget bounds the number of specializations inspected, including
+detached methods appended during the pass.  The helper budget independently
+bounds ordinary call/reference closure discovered from each detached method. -/
+def prepareExecutablePlanEvidenceWithBudget (program : CheckedProgram)
+    (plan : Plan) (closureFuel helperBudget : Nat) :
+    Except RuntimeError Plan :=
+  prepareExecutablePlanEvidenceAux program helperBudget closureFuel 0 plan
+
+/-- Default checked execution plan preparation.  The bound mirrors the public
+compiler's default specialization budget while remaining explicit through the
+`WithBudget` entry for clients that need a different policy. -/
+def prepareExecutablePlanEvidence (program : CheckedProgram)
+    (plan : Plan) : Except RuntimeError Plan :=
+  prepareExecutablePlanEvidenceWithBudget program plan 1024 1024
+
+/-- Signature-aware safe-boundary validation.  In addition to authenticating
+all retained evidence, this closes and validates the full source frontier of
+every selected coercion method before execution can mutate the heap. -/
 def validateExecutablePlanEvidence (program : CheckedProgram)
     (plan : Plan) : Except RuntimeError Unit := do
-  validateExecutablePlan plan
-  for specialized in plan.specializations do
-    let available ← resolveRuntimeEvidenceEnvironment program specialized.key
-      specialized.assumptions
-    for sourceNode in specialized.function.typedBody.nodes do
-      match sourceNode with
-      | .expression node =>
-          for step in node.coercions do
-            let method ← checkedCoercionMethod program specialized node
-              available step
-            discard <| coercionMethodRuntimeEvidence program specialized node
-              step method
-          match node.form with
-          | .call _ _ (.indirect metadata) =>
-              for step in metadata.argumentCoercions do
-                let method ← checkedCoercionMethod program specialized node
-                  available step
-                discard <| coercionMethodRuntimeEvidence program specialized
-                  node step method
-          | _ => pure ()
-          match node.form with
-          | .call _ _ (.declaration instantiation) =>
-              validateExecutableDirectCallImplementationEvidence
-                program.signatures
-                specialized node instantiation
-          | .reference _ (.declaration instantiation) =>
-              if directDeclarationCalleeUseCount
-                  specialized.function.typedBody node.id == 0 then
-                validateExecutableDeclarationReferenceImplementationEvidence
-                  program.signatures specialized node instantiation
-              else
-                pure ()
-          | .reference _ (.local binderId) =>
-              match directLambdaLetBinder?
-                  specialized.function.typedBody binderId with
-              | some binder =>
-                  unless binder.schemeRequirements.isEmpty do
-                    validateQualifiedLocalReferenceEvidence program.signatures
-                      specialized available node binder
-              | none => pure ()
-          | _ => pure ()
-      | .statement _ => pure ()
+  discard <| prepareExecutablePlanEvidence program plan
 
 private def applyCoercion (plan : Plan) (step : CoercionStep)
     (value : Value) : Except RuntimeError Value := do
@@ -2553,10 +2616,9 @@ private def rewriteLocalRequirements
 mutual
 
   /-- Execute an evidence-selected coercion method in the same heap as the
-  enclosing expression.  The selected checked method is installed in a
-  temporary runtime plan so its ordinary source body, including allocations
-  and mutations, is interpreted by this evaluator rather than reinterpreted
-  as a builtin cast. -/
+  enclosing expression.  Safe execution has already inserted the method and
+  its complete call/reference frontier into the prepared plan, so closures and
+  function values produced by the method retain one coherent provenance. -/
   private def executeCoercionPath (fuel : Nat) (program : CheckedProgram)
       (plan : Plan) (owner : Key) (evidence : RuntimeEvidenceEnvironment)
       (node : ExpressionNode) (target : Ty) (steps : List CoercionStep)
@@ -2583,23 +2645,12 @@ mutual
                     | .error error => .fault error state
                     | .ok methodEvidence =>
                         let methodKey := method.specialized.key
-                        let methodPlan : Plan := {
-                          plan with
-                          specializations := method.specialized ::
-                            (plan.specializations.filter fun specialized =>
-                              specialized.key != methodKey)
-                          callEdges := {
-                            caller := owner
-                            occurrence := node.id
-                            callee := methodKey
-                          } :: plan.callEdges
-                        }
-                        match invokeDirectSpecialization fuel program methodPlan
+                        match invokeDirectSpecialization fuel program plan
                             methodKey methodEvidence [value] state with
                         | .done coerced nextState =>
-                            if coerced.type? methodPlan != some step.target then
+                            if coerced.type? plan != some step.target then
                               .fault (.typeMismatch step.target
-                                (coerced.type? methodPlan)) nextState
+                                (coerced.type? plan)) nextState
                             else
                               executeCoercionPath fuel program plan owner evidence
                                 node target rest coerced nextState
@@ -3866,9 +3917,39 @@ theorem runTrusted_done_has_inferredBodyType
             · cases done
             · exact finishFunctionFlow_done_type _ _ _ _ _ done
 
+/-- Recheck the public result against the caller-supplied plan.  Prepared plans
+only append authenticated method/helper specializations, but this explicit
+boundary keeps the observable result theorem stated over the original plan. -/
+private def finishPreparedRun (plan : Plan) (expected : Ty) :
+    RunResult → RunResult
+  | .done value finalState =>
+      if value.type? plan = some expected then
+        .done value finalState
+      else
+        .fault (.resultTypeMismatch expected (value.type? plan)) finalState
+  | .outOfFuel finalState => .outOfFuel finalState
+  | .fault error finalState => .fault error finalState
+
+private theorem finishPreparedRun_done_type
+    (plan : Plan) (expected : Ty) (result : RunResult)
+    (value : Value) (finalState : RuntimeState)
+    (done : finishPreparedRun plan expected result = .done value finalState) :
+    value.type? plan = some expected := by
+  cases result with
+  | done actual actualState =>
+      simp only [finishPreparedRun] at done
+      split at done
+      · next hasType =>
+        cases done
+        exact hasType
+      · contradiction
+  | outOfFuel state => cases done
+  | fault error state => cases done
+
 /-- Safe typed-source execution with independent bounds for recursive input
 validation and runtime execution.  Constructor inputs are checked against
-`ProgramSignatures`, not merely against self-described runtime metadata. -/
+`ProgramSignatures`, not merely against self-described runtime metadata, and
+the complete coercion-method frontier is prepared before evaluation starts. -/
 def runWithValidationFuel (program : CheckedProgram) (plan : Plan)
     (entry : Key) (arguments : List Value) (validationFuel executionFuel : Nat)
     (state : RuntimeState := {}) : RunResult :=
@@ -3881,9 +3962,12 @@ def runWithValidationFuel (program : CheckedProgram) (plan : Plan)
           arguments with
       | some error => .fault error state
       | none =>
-          match validateExecutablePlanEvidence program plan with
+          match prepareExecutablePlanEvidence program plan with
           | .error error => .fault error state
-          | .ok () => runTrusted program plan entry arguments executionFuel state
+          | .ok executablePlan =>
+              finishPreparedRun plan specialized.function.inferredBodyType <|
+                runTrusted program executablePlan entry arguments executionFuel
+                  state
 
 /-- Successful safe-boundary execution has the same inferred-result guarantee
 as the trusted evaluator reached after input validation. -/
@@ -3904,8 +3988,8 @@ theorem runWithValidationFuel_done_has_inferredBodyType
   · cases done
   · split at done
     · cases done
-    · exact runTrusted_done_has_inferredBodyType program plan entry arguments
-        executionFuel initial finalState value specialized exact done
+    · exact finishPreparedRun_done_type plan
+        specialized.function.inferredBodyType _ value finalState done
 
 /-- Compatibility boundary using the same structural fuel for validation and
 execution.  New compiler clients can use `runWithValidationFuel` to keep the
