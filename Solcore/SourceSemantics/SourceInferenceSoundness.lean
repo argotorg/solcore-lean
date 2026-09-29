@@ -7560,6 +7560,13 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
         TypeAdmissible target (outer.apply scrutinee.type) →
         ActiveLocalContextInvariant hiddenState outer target →
         outer.SemanticallyExtends checked.state.inference.substitution →
+        checked.state.integerPatterns ⊆ result.state.integerPatterns →
+        checked.state.requirements ⊆ result.state.requirements →
+        (∀ matchCase, matchCase ∈ checked.cases →
+          ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+            PrimaryRequirementOccursAt
+              ((result.state.toTypedSource roots).applySubstitution outer)
+              (.statement result.id) requirement) →
         Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
             expectedReturn hiddenState.lexicalScope arms.value.cases
             hiddenState = .ok checked →
@@ -7663,6 +7670,26 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
   have checkedInvariant : ActiveLocalContextInvariant checked.state outer
       target := hiddenInvariant.inferMatchCasesFuel casesSuccess
   have scrutineeTyping := scrutineeSound scrutineeSuccess
+  have checkedIntegerPatternsSubset :
+      checked.state.integerPatterns ⊆ result.state.integerPatterns := by
+    rw [resultEq]
+    intro origin member
+    exact member
+  have checkedRequirementsSubset :
+      checked.state.requirements ⊆ result.state.requirements := by
+    rw [resultEq]
+    exact Frontend.SourceInference.State.recordNode_requirements_subset
+      checked.state _
+  have checkedRequirementsOccur : ∀ matchCase,
+      matchCase ∈ checked.cases →
+      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+        PrimaryRequirementOccursAt
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          (.statement result.id) requirement := by
+    intro matchCase caseMember requirement requirementMember
+    rw [FlexibleSubstitution.primaryRequirementOccursAt_applySubstitution]
+    exact contains.matchCasePatternRequirementOccursAt rfl caseMember
+      requirementMember
   subst result
   have checkedExtension : outer.SemanticallyExtends
       checked.state.inference.substitution := by
@@ -7678,7 +7705,8 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
           Frontend.SourceInference.State.recordNode,
           TypedSource.applySubstitution] using checkedOwner)
       scrutineeTyping.type_admissible hiddenInvariant checkedExtension
-      casesSuccess
+      checkedIntegerPatternsSubset checkedRequirementsSubset
+      checkedRequirementsOccur casesSuccess
   have exhaustive :=
     matchExhaustiveWithoutDefault_of_guard catalog signatures_eq casesSuccess
       casesTyping scrutineeTyping.type_admissible checkedExtension guardPassed
@@ -7874,6 +7902,13 @@ private theorem inferStatementFuel_success_matchWithDefault_deep_of_cases
         TypeAdmissible target (outer.apply scrutinee.type) →
         ActiveLocalContextInvariant hiddenState outer target →
         outer.SemanticallyExtends checked.state.inference.substitution →
+        checked.state.integerPatterns ⊆ result.state.integerPatterns →
+        checked.state.requirements ⊆ result.state.requirements →
+        (∀ matchCase, matchCase ∈ checked.cases →
+          ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+            PrimaryRequirementOccursAt
+              ((result.state.toTypedSource roots).applySubstitution outer)
+              (.statement result.id) requirement) →
         Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
             expectedReturn hiddenState.lexicalScope arms.value.cases
             hiddenState = .ok checked →
@@ -8000,6 +8035,42 @@ private theorem inferStatementFuel_success_matchWithDefault_deep_of_cases
     checkedProperties.2.1 signatureFormation functionsCanonical
       checkedReturnBelow defaultSuccess
   have scrutineeTyping := scrutineeSound scrutineeSuccess
+  have checkedIntegerPatternsSubset :
+      checked.state.integerPatterns ⊆ result.state.integerPatterns := by
+    rw [resultEq]
+    have throughDefault : checked.state.integerPatterns ⊆
+        defaultResult.state.integerPatterns :=
+      Detail.inferStatementsFuel_integerPatterns_subset defaultSuccess
+    have throughRestore : defaultResult.state.integerPatterns ⊆
+        (defaultResult.state.restoreLexicalScope
+          hiddenState.lexicalScope).integerPatterns := by
+      intro origin member
+      exact member
+    apply List.Subset.trans throughDefault
+    apply List.Subset.trans throughRestore
+    intro origin member
+    exact member
+  have checkedRequirementsSubset :
+      checked.state.requirements ⊆ result.state.requirements := by
+    rw [resultEq]
+    exact List.Subset.trans
+      (Detail.inferStatementsFuel_requirements_subset defaultSuccess)
+      (List.Subset.trans
+        (Frontend.SourceInference.State.restoreLexicalScope_requirements_subset
+          defaultResult.state hiddenState.lexicalScope)
+        (Frontend.SourceInference.State.recordNode_requirements_subset
+          (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope)
+          _))
+  have checkedRequirementsOccur : ∀ matchCase,
+      matchCase ∈ checked.cases →
+      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+        PrimaryRequirementOccursAt
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          (.statement result.id) requirement := by
+    intro matchCase caseMember requirement requirementMember
+    rw [FlexibleSubstitution.primaryRequirementOccursAt_applySubstitution]
+    exact contains.matchCasePatternRequirementOccursAt rfl caseMember
+      requirementMember
   subst result
   have defaultExtension : outer.SemanticallyExtends
       defaultResult.state.inference.substitution := by
@@ -8023,7 +8094,8 @@ private theorem inferStatementFuel_success_matchWithDefault_deep_of_cases
           TypedSource.applySubstitution] using
             defaultOwner.trans checkedOwner)
       scrutineeTyping.type_admissible hiddenInvariant checkedExtension
-      casesSuccess
+      checkedIntegerPatternsSubset checkedRequirementsSubset
+      checkedRequirementsOccur casesSuccess
   obtain ⟨defaultFinal, defaultFacts, _defaultInvariant, defaultTyping,
       defaultAgreement⟩ := bodySound checkedInvariant defaultSuccess
   obtain ⟨summary, merged⟩ :=
@@ -9336,7 +9408,10 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                   below invariant outerExtension roots
                   (fun hiddenReady hiddenScrutineeBelow hiddenReturnBelow
                       hiddenBelow sourceOwner scrutineeAdmissible
-                      hiddenInvariant checkedExtension casesSuccess =>
+                      hiddenInvariant checkedExtension
+                      _checkedIntegerPatternsSubset
+                      _checkedRequirementsSubset _checkedRequirementsOccur
+                      casesSuccess =>
                     matchCasesSound hiddenReady hiddenScrutineeBelow
                       hiddenReturnBelow hiddenBelow sourceOwner
                       scrutineeAdmissible hiddenInvariant checkedExtension
@@ -9352,7 +9427,10 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                   outerExtension roots
                   (fun hiddenReady hiddenScrutineeBelow hiddenReturnBelow
                       hiddenBelow sourceOwner scrutineeAdmissible
-                      hiddenInvariant checkedExtension casesSuccess =>
+                      hiddenInvariant checkedExtension
+                      _checkedIntegerPatternsSubset
+                      _checkedRequirementsSubset _checkedRequirementsOccur
+                      casesSuccess =>
                     matchCasesSound hiddenReady hiddenScrutineeBelow
                       hiddenReturnBelow hiddenBelow sourceOwner
                       scrutineeAdmissible hiddenInvariant checkedExtension
@@ -12956,7 +13034,8 @@ theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
     outerExtension roots ?_ casesPresent scrutineeSound
   intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
-    hiddenInvariant checkedExtension casesSuccess
+    hiddenInvariant checkedExtension _checkedIntegerPatternsSubset
+    _checkedRequirementsSubset _checkedRequirementsOccur casesSuccess
   exact inferMatchCasesFuel_success_sound signatureFormation
     functionsCanonical catalog signatures_eq patternBranches hiddenReady
     hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
@@ -13041,7 +13120,8 @@ theorem inferStatementFuel_success_matchWithDefault_deep_sound
     ?_ scrutineeSound bodySound
   intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
-    hiddenInvariant checkedExtension casesSuccess
+    hiddenInvariant checkedExtension _checkedIntegerPatternsSubset
+    _checkedRequirementsSubset _checkedRequirementsOccur casesSuccess
   exact inferMatchCasesFuel_success_sound signatureFormation
     functionsCanonical catalog signatures_eq patternBranches hiddenReady
     hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
