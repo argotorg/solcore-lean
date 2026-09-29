@@ -18268,6 +18268,190 @@ theorem recordSelectedCallResult_success_expressionHasType
       simp [callNode, ExpressionNode.applySubstitution, List.map_append])
   simpa [callNode, ExpressionNode.applySubstitution] using typing
 
+/-- A successful canonical candidate supplies every declarative component of
+the recorded direct-call typing rule after whole-body finalization.  Argument
+bases originate at the candidate input state; candidate and post-candidate
+occurrence preservation transport them to the state on which delayed argument
+coercions are attached. -/
+theorem tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHasType_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {source callee : Syntax.Expr} {name : String}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state recordState later : Frontend.SourceInference.State}
+    {signature : ProgramFunctionSignature}
+    {attempt : Detail.CandidateAttemptResult}
+    {result : InferredExpression}
+    {trailingCoercions : List CoercionStep}
+    {recorded : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (canonical : signature.scheme.body = .function
+      (TypeSystem.Ty.productMany signature.parameterTypes)
+      (TypeSystem.Ty.productMany signature.returnTypes))
+    (candidateSuccess : Detail.tryFunctionCandidate inferenceContext arguments
+      integerLiteralOrigins call expected state signature = .ok (some attempt))
+    (recordSuccess : Detail.recordSelectedCallResult source callee name
+      arguments attempt result trailingCoercions recordState = recorded)
+    (recordNodesEq : recordState.nodes = attempt.state.nodes)
+    (resultIdEq : result.id = attempt.result.id)
+    (bases : ArgumentTypingBasesValid (state.toTypedSource roots)
+      ledgerSource active later.inference.substitution arguments)
+    (argumentIdsUnique : (arguments.map (·.id)).Nodup)
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (schemeBodyBelow : signature.scheme.body.VariablesBelow
+      state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (candidateSubstitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        attempt.state.inference.substitution)
+    (recordSubstitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        recordState.inference.substitution)
+    (candidateRequirementsSubset :
+      attempt.state.requirements ⊆ later.requirements)
+    (sourceExtension : TypingSourceExtends
+      ((recorded.2.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (binders : TypeParameterBindersWellFormed sourceContext)
+    (residual : sourceContext.residualTypeVariables = true)
+    (signatureMember : signature ∈ sourceContext.signatures.functions)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (finalAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply result.type))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (argumentCovered : ∀ entry ∈ attempt.argumentCoercions,
+      TemplateScopeCovered ledgerSource active
+        (.expression entry.expression))
+    (argumentOccurs : ∀ entry ∈ attempt.argumentCoercions, ∀ requirement,
+      requirement ∈ coercionRequirementIds entry.coercions →
+        PrimaryRequirementOccursAt ledgerSource
+          (.expression entry.expression) requirement)
+    (callCovered : TemplateScopeCovered ledgerSource active
+      (.expression result.id))
+    (callOccurs : ∀ requirement,
+      requirement ∈ Detail.coercionRequirements attempt.callCoercions ++
+          attempt.signatureRequirements →
+        PrimaryRequirementOccursAt ledgerSource
+          (.expression result.id) requirement)
+    (trailingPath : CoercionPathValid active
+      (later.inference.substitution.apply attempt.result.type)
+      (later.inference.substitution.apply result.type)
+      (trailingCoercions.map
+        (CoercionStep.applySubstitution later.inference.substitution))) :
+    ExpressionHasType ledgerSource active result.id
+      (later.inference.substitution.apply result.type) := by
+  let instantiated := signature.scheme.instantiate state.inference.next
+  have application : DeclarationApplicationValid sourceContext
+      attempt.instantiation
+      (signature.parameterTypes.map instantiated.parameterSubstitution.apply)
+      (instantiated.parameterSubstitution.apply
+        (TypeSystem.Ty.productMany signature.returnTypes))
+      instantiated.predicates := by
+    simpa only [instantiated] using
+      tryFunctionCandidate_declarationApplicationValid catalog binders residual
+        signatureMember candidateSuccess
+  have rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply
+        (instantiated.parameterSubstitution.apply
+          (TypeSystem.Ty.productMany signature.returnTypes))) :=
+    FlexibleSubstitution.TypeAdmissible.applySubstitution contextValid.closes
+      (DeclarationApplicationValid.result_type_admissible catalog binders
+        application)
+  have argumentCoercions : ArgumentCoercionsValid active
+      later.inference.substitution arguments
+      (signature.parameterTypes.map instantiated.parameterSubstitution.apply)
+      attempt.argumentCoercions := by
+    simpa only [instantiated] using
+      tryFunctionCandidate_some_argumentCoercionsValid_afterFinalization_scoped
+        canonical candidateSuccess ready argumentsBelow schemeBodyBelow
+        expectedBelow candidateSubstitutionExtends
+        candidateRequirementsSubset catalog binders residual signatureMember
+        contextValid signaturesEq traitSuccess profileSuccess traitName
+        solveSuccess solvedEq ledger ownership activeSignaturesEq
+        activeRequirementsEq assumptionsMono argumentCovered argumentOccurs
+  have selectedCovered : TemplateScopeCovered ledgerSource active
+      (.expression attempt.result.id) := by
+    simpa only [← resultIdEq] using callCovered
+  have selectedOccurs : ∀ requirement,
+      requirement ∈ Detail.coercionRequirements attempt.callCoercions ++
+          attempt.signatureRequirements →
+        PrimaryRequirementOccursAt ledgerSource
+          (.expression attempt.result.id) requirement := by
+    intro requirement member
+    simpa only [← resultIdEq] using callOccurs requirement member
+  have instantiationPredicatesEq :
+      attempt.instantiation.predicates = instantiated.predicates := by
+    rw [Detail.tryFunctionCandidate_some_instantiation candidateSuccess]
+    rfl
+  have callRequirements : DirectCallRequirementsValid active
+      (later.inference.substitution.apply
+        (instantiated.parameterSubstitution.apply
+          (TypeSystem.Ty.productMany signature.returnTypes)))
+      (later.inference.substitution.apply attempt.result.type)
+      (instantiated.predicates.map
+        (TypedTraitResolution.applySubstitution
+          later.inference.substitution))
+      (Detail.coercionRequirements attempt.callCoercions ++
+        attempt.signatureRequirements)
+      (attempt.callCoercions.map
+        (CoercionStep.applySubstitution
+          later.inference.substitution)) := by
+    rw [← instantiationPredicatesEq]
+    simpa only [instantiated] using
+      tryFunctionCandidate_some_directCallRequirementsValid_afterFinalization_scoped
+        canonical candidateSuccess ready argumentsBelow schemeBodyBelow
+        expectedBelow candidateSubstitutionExtends
+        candidateRequirementsSubset catalog contextValid signaturesEq
+        traitSuccess profileSuccess traitName solveSuccess solvedEq ledger
+        ownership activeSignaturesEq activeRequirementsEq assumptionsMono
+        selectedCovered selectedOccurs
+  have candidateNodesEq : attempt.state.nodes = state.nodes :=
+    (Detail.tryFunctionCandidate_some_occurrenceState_eq candidateSuccess).1
+  have nodesPrefix :
+      (state.toTypedSource roots).nodes <+:
+        (recordState.toTypedSource roots).nodes := by
+    change state.nodes <+: recordState.nodes
+    rw [recordNodesEq, candidateNodesEq]
+    exact List.prefix_rfl
+  have recordBases : ArgumentTypingBasesValid
+      (recordState.toTypedSource roots) ledgerSource active
+      later.inference.substitution arguments :=
+    bases.weakenNodeSource nodesPrefix
+  exact recordSelectedCallResult_success_expressionHasType recordSuccess
+    recordSubstitutionExtends sourceExtension recordBases argumentCoercions
+    argumentIdsUnique catalog contextValid application rawAdmissible
+    finalAdmissible callRequirements trailingPath
+
 /-- The common soundness envelope for an ordinary expression-recording step.
 
 A shape-specific proof supplies only raw-form typing and admissibility.  This
