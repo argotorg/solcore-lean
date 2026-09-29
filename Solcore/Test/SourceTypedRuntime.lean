@@ -96,7 +96,7 @@ private def prepareNamed (program : CheckedProgram) (name : String)
 
 private def runPrepared (prepared : Prepared)
     (arguments : List Value := []) (fuel : Nat := 4096) : RunResult :=
-  SourceTypedRuntime.run prepared.program.signatures prepared.plan prepared.key
+  SourceTypedRuntime.run prepared.program prepared.plan prepared.key
     arguments fuel
 
 private def rewriteEntryNodes (prepared : Prepared)
@@ -348,6 +348,42 @@ private def source : String := String.intercalate "\n" [
   "  let asWord: function(Word) returns(Word) = applyIdentity;",
   "  let asBool: function(Bool) returns(Bool) = applyIdentity;",
   "  return (asWord(47), asBool(flag));",
+  "}",
+  "impl Mark<Bool> {}",
+  "trait Coerce<From, To> {",
+  "  function coerce(value: From) returns (To)",
+  "      where From: Eq, From: Mark;",
+  "}",
+  "impl Coerce<Bool, Word> {",
+  "  function coerce(value: Bool) returns (Word)",
+  "      where Bool: Eq, Bool: Mark {",
+  "    return value ? 41 : 7;",
+  "  }",
+  "}",
+  "impl Coerce<Word, (Word, Word)> {",
+  "  function coerce(value: Word) returns ((Word, Word))",
+  "      where Word: Eq, Word: Mark {",
+  "    return (value, value);",
+  "  }",
+  "}",
+  "function acceptWord(value: Word) returns (Word) { return value; }",
+  "function acceptWordPair(value: (Word, Word)) returns ((Word, Word)) {",
+  "  return value;",
+  "}",
+  "function coercionChain(value: Bool) returns ((Word, Word)) {",
+  "  return acceptWordPair(value);",
+  "}",
+  "function coercionRelay<T>(value: T) returns (Word)",
+  "    where T: Coerce<Word>, T: Eq, T: Mark {",
+  "  return acceptWord(value);",
+  "}",
+  "function genericCoercion(value: Bool) returns (Word) {",
+  "  return coercionRelay(value);",
+  "}",
+  "function resultCoercion(value: Bool) returns (Word) { return value; }",
+  "function indirectCoercion(value: Bool) returns (Word) {",
+  "  let apply = lam(inner: Word) -> Word { return inner; };",
+  "  return apply(value);",
   "}",
   "function spin(value: Word) returns (Word) { return spin(value); }"
 ]
@@ -661,8 +697,8 @@ private def testTamperedExecutableMetadata
   }
   let withResultCoercion := rewriteEntryNodes proxy <| rewriteFirstExpression
     fun node => { node with coercions := [fakeCoercion] }
-  expectPreExecutionFault "unsupported result coercion"
-    (fun error => error matches .unsupportedExpressionCoercions _)
+  expectPreExecutionFault "invalid result coercion"
+    (fun error => error matches .invalidExpressionCoercionPath _ _ _)
     (runPrepared withResultCoercion)
 
   let capture ← prepareNamed program "sharedCapture"
@@ -670,8 +706,8 @@ private def testTamperedExecutableMetadata
     rewriteFirstIndirectCall fun metadata => {
       metadata with argumentCoercions := [fakeCoercion]
     }
-  expectPreExecutionFault "unsupported indirect argument coercion"
-    (fun error => error matches .unsupportedIndirectCoercions _)
+  expectPreExecutionFault "invalid indirect argument coercion"
+    (fun error => error matches .invalidIndirectArgumentCoercionPath _)
     (runPrepared withArgumentCoercion)
 
   let inconsistentResult := rewriteEntryFunction proxy fun function =>
@@ -912,6 +948,8 @@ private def testContextualCallRequirementValidation
   expectPreExecutionFault "missing direct-call requirement"
     (fun error => match error with
       | .callRequirementCountMismatch caller occurrence 1 0 =>
+          decide (caller = prepared.key ∧ occurrence = fixture.occurrence)
+      | .invalidDirectCallRequirementLayout caller occurrence [] =>
           decide (caller = prepared.key ∧ occurrence = fixture.occurrence)
       | _ => false)
     (runPrepared missingCallRequirement [.bool true])
@@ -1386,6 +1424,81 @@ private def testAssignmentRootsAreDeferred
       some SourceStageAnalysis.Stage.deferred)
     "a closure-captured assignment root retained a non-deferred stage"
 
+private def testRuntimeCoercions (program : CheckedProgram) : IO Unit := do
+  let chain ← prepareNamed program "coercionChain"
+  match runPrepared chain [.bool true] 8192 with
+  | .done (.product (.word left) (.word right)) _ =>
+      assertTrue (left == word 41 && right == word 41)
+        "typed runtime did not compose both selected coercion methods"
+  | result => throw (IO.userError
+      s!"typed multi-step coercion returned {reprStr result}")
+  match runPrepared chain [.bool false] 8192 with
+  | .done (.product (.word left) (.word right)) _ =>
+      assertTrue (left == word 7 && right == word 7)
+        "typed runtime changed the false coercion branch"
+  | result => throw (IO.userError
+      s!"typed multi-step coercion false branch returned {reprStr result}")
+  let generic ← prepareNamed program "genericCoercion"
+  expectWord "generic caller coercion evidence" 41
+    (runPrepared generic [.bool true] 8192)
+  let result ← prepareNamed program "resultCoercion"
+  expectWord "expression result coercion" 7
+    (runPrepared result [.bool false] 8192)
+  let indirect ← prepareNamed program "indirectCoercion"
+  expectWord "indirect argument coercion" 41
+    (runPrepared indirect [.bool true] 8192)
+
+  let specialized ← entrySpecialization chain
+  let coercedNode ← match specialized.function.typedBody.nodes.findSome? fun
+      | .expression node =>
+          if node.coercions.isEmpty then none else some node
+      | .statement _ => none with
+    | some node => pure node
+    | none => throw (IO.userError "coercionChain lost its coercion path")
+  let firstStep ← match coercedNode.coercions with
+    | step :: _ => pure step
+    | [] => throw (IO.userError "coercionChain retained an empty path")
+  let reversedMethodRequirements ← match firstStep.methodRequirements with
+    | [left, right] => pure [right, left]
+    | requirements => throw (IO.userError
+        s!"coercionChain retained {requirements.length} method requirements")
+  let reordered := rewriteEntryExpressionAt chain coercedNode.id fun node =>
+    let coercions := match node.coercions with
+      | step :: rest =>
+          { step with methodRequirements := reversedMethodRequirements } :: rest
+      | [] => []
+    { node with
+      coercions
+      requirements := coercions.flatMap (·.requirements)
+    }
+  expectPreExecutionFault "reordered coercion method evidence"
+    (fun error => match error with
+      | .callRequirementPredicateMismatch caller occurrence _ _ _ =>
+          decide (caller = chain.key ∧ occurrence = coercedNode.id)
+      | _ => false)
+    (runPrepared reordered [.bool true] 8192)
+
+  let duplicated := rewriteEntryExpressionAt chain coercedNode.id fun node =>
+    let coercions := match node.coercions with
+      | step :: rest =>
+          match step.methodRequirements with
+          | requirement :: requirements =>
+              { step with
+                methodRequirements := requirement :: requirement :: requirements
+              } :: rest
+          | [] => step :: rest
+      | [] => []
+    { node with
+      coercions
+      requirements := coercions.flatMap (·.requirements)
+    }
+  expectPreExecutionFault "duplicate coercion method evidence"
+    (fun error => match error with
+      | .duplicateCoercionRequirement caller occurrence _ =>
+          decide (caller = chain.key ∧ occurrence = coercedNode.id)
+      | _ => false)
+    (runPrepared duplicated [.bool true] 8192)
+
 private def testAll : IO Unit := do
   let program ← checkedProgram source
   testNominalConstructionAndRecursiveCalls program
@@ -1402,6 +1515,7 @@ private def testAll : IO Unit := do
   testTamperedExecutableMetadata program
   testIndirectArgumentCountMetadata program
   testAssignmentRootsAreDeferred program
+  testRuntimeCoercions program
   IO.println "phase-7 typed-source runtime GREEN"
 
 end Runtime

@@ -376,7 +376,7 @@ def run (compiled : CompiledEntry) (invocation : Invocation)
         arguments store))
   | .typedSource, .typedValues arguments state =>
       .ok (.typedSource (SourceTypedRuntime.runWithValidationFuel
-        compiled.program.signatures compiled.plan compiled.root.key arguments
+        compiled.program compiled.plan compiled.root.key arguments
         options.inputValidationFuel options.executionFuel state))
   | _, invocation =>
       .error (.invocationKindMismatch compiled.backend invocation.kind)
@@ -1153,13 +1153,13 @@ theorem CompiledEntry.run_typedSource_done_preserves_type
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
       have completed : SourceTypedRuntime.runWithValidationFuel
-          program.signatures plan root.key arguments
+          program plan root.key arguments
             options.inputValidationFuel options.executionFuel initial =
           .done value finalState := by
         simpa [CompiledEntry.run] using ran
       simp only [CompiledEntry.SuccessfulResultHasNativeType]
       exact SourceTypedRuntime.runWithValidationFuel_done_has_inferredBodyType
-        program.signatures plan root.key arguments options.inputValidationFuel
+        program plan root.key arguments options.inputValidationFuel
         options.executionFuel initial finalState value root precondition completed
 
 /-- On the typed backend, the common native-type conclusion is exactly the

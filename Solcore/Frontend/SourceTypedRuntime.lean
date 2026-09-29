@@ -1,4 +1,5 @@
 import Solcore.Core.Primitive
+import Solcore.Frontend.ExecutableImplMethods
 import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.Frontend.WordLiteral
 
@@ -408,6 +409,11 @@ inductive RuntimeError where
   | runtimeEvidenceGoalMismatch
       (key : Key) (index : Nat)
       (expected actual : ProgramPredicate)
+  | runtimeEvidenceResolutionNoSolution (key : Key)
+      (predicate : ProgramPredicate)
+  | runtimeEvidenceResolutionInconclusive (key : Key)
+      (reason : TraitResolution.InconclusiveReason
+        ProgramTraitId Ty ProgramImplId)
   | missingRuntimeAssumptionEvidence
       (caller : Key) (id : ExpressionId) (requirement : RequirementId)
       (predicate : ProgramPredicate)
@@ -430,6 +436,9 @@ inductive RuntimeError where
   | missingCallEdge (caller : Key) (id : ExpressionId)
   | callRequirementCountMismatch
       (caller : Key) (id : ExpressionId) (expected actual : Nat)
+  | invalidDirectCallRequirementLayout
+      (caller : Key) (id : ExpressionId)
+      (requirements : List RequirementId)
   | duplicateCallRequirement
       (caller : Key) (id : ExpressionId) (requirement : RequirementId)
   | missingSolvedRequirement
@@ -508,6 +517,23 @@ inductive RuntimeError where
       (operator : Syntax.ValueAssignOp) (left right : Option Ty)
   | invalidMember (name : String) (index : Nat) (actual : Option Ty)
   | invalidPlaceProjection
+  | invalidExpressionCoercionPath
+      (expression : ExpressionId) (source target : Ty)
+  | invalidIndirectArgumentCoercionPath (expression : ExpressionId)
+  | duplicateCoercionRequirement
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+  | coercionPredicateMismatch
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (source target : Ty) (actual : ProgramPredicate)
+  | coercionTraitMismatch
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (trait : ProgramTraitId)
+  | coercionMethodRequirementCountMismatch
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (expected actual : Nat)
+  | executableCoercionMethod
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (error : ExecutableImplMethods.Error)
   | unsupportedCoercion (source target : Ty)
   | unsupportedRequirements (requirements : List RequirementId)
   | unsupportedExpressionCoercions (expression : ExpressionId)
@@ -651,6 +677,78 @@ private def firstDuplicateRequirement :
   | requirement :: rest =>
       if rest.contains requirement then some requirement
       else firstDuplicateRequirement rest
+
+private def coercionRequirementIds (steps : List CoercionStep) :
+    List RequirementId :=
+  steps.flatMap (fun step => step.requirements)
+
+private def deduplicateRequirementLists
+    (candidates : List (List RequirementId)) : List (List RequirementId) :=
+  candidates.foldl (fun unique candidate =>
+    if unique.contains candidate then unique else unique ++ [candidate]) []
+
+/-- A direct call may carry a result path selected during overload resolution
+before its signature predicates and a contextual result path after them.  The
+IR deliberately concatenates both paths, so recover the unique middle ledger
+by considering every path split and checking the stored order exactly. -/
+private def directCallRequirementCandidates (node : ExpressionNode)
+    (predicateCount : Nat) : List (List RequirementId) :=
+  deduplicateRequirementLists <| (List.range (node.coercions.length + 1)).filterMap
+    fun split =>
+      let before := coercionRequirementIds (node.coercions.take split)
+      let after := coercionRequirementIds (node.coercions.drop split)
+      let middleAndAfter := node.requirements.drop before.length
+      let middle := middleAndAfter.take predicateCount
+      if node.requirements.take before.length = before &&
+          middle.length = predicateCount &&
+          middleAndAfter.drop predicateCount = after then
+        some middle
+      else
+        none
+
+private def requirementPredicatesMatch (function : CheckedFunction)
+    (requirements : List RequirementId)
+    (predicates : List ProgramPredicate) : Bool :=
+  requirements.length == predicates.length &&
+    (List.zip requirements predicates).all fun pair =>
+      match exactSolvedRequirement? function pair.1 with
+      | some solved => solved.predicate == pair.2 && solved.evidence.goal == pair.2
+      | none => false
+
+private def exactDirectCallRequirementIds
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    Except RuntimeError (List RequirementId) := do
+  if node.coercions.isEmpty &&
+      node.requirements.length != instantiation.predicates.length then
+    throw (.callRequirementCountMismatch caller.key node.id
+      instantiation.predicates.length node.requirements.length)
+  match firstDuplicateRequirement node.requirements with
+  | some requirement =>
+      throw (.duplicateCallRequirement caller.key node.id requirement)
+  | none => pure ()
+  let structuralCandidates := directCallRequirementCandidates node
+    instantiation.predicates.length
+  let candidates := structuralCandidates.filter fun requirements =>
+    requirementPredicatesMatch caller.function requirements
+      instantiation.predicates
+  match structuralCandidates with
+  | [requirements] => return requirements
+  | _ => pure ()
+  match candidates with
+  | [requirements] => pure requirements
+  | _ => throw (.invalidDirectCallRequirementLayout caller.key node.id
+      node.requirements)
+
+private def ordinaryOwnedRequirements? (node : ExpressionNode) :
+    Option (List RequirementId) :=
+  let coercions := coercionRequirementIds node.coercions
+  if node.requirements.length < coercions.length then
+    none
+  else
+    let owned := node.requirements.take
+      (node.requirements.length - coercions.length)
+    if node.requirements = owned ++ coercions then some owned else none
 
 private def directLambdaLetBinder? (source : TypedSource)
     (id : Resolved.LocalId) : Option TypedBinder :=
@@ -863,15 +961,9 @@ private def exactDirectCallRuntimeEvidence
     (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
     (instantiation : DeclarationInstantiation) :
     Except RuntimeError RuntimeEvidenceEnvironment := do
-  if node.requirements.length != instantiation.predicates.length then
-    throw (.callRequirementCountMismatch caller.key node.id
-      instantiation.predicates.length node.requirements.length)
-  match firstDuplicateRequirement node.requirements with
-  | some requirement =>
-      throw (.duplicateCallRequirement caller.key node.id requirement)
-  | none =>
-      materializeCallEvidence caller node.id available node.requirements
-        instantiation.predicates
+  let requirements ← exactDirectCallRequirementIds caller node instantiation
+  materializeCallEvidence caller node.id available requirements
+    instantiation.predicates
 
 private def validateSelectedCallImplementationEvidence
     (signatures : ProgramSignatures)
@@ -893,6 +985,153 @@ private def validateSelectedCallImplementationEvidence
         let .byImpl _ implementation _ := evidence
         .error (.callEvidenceNotSelected caller.key occurrence requirement
           goal implementation)
+
+/-- Recover one concrete requirement witness at runtime.  Assumption markers
+are discharged from the caller's closed dictionary; concrete witnesses are
+authenticated again against the authoritative whole-program resolver. -/
+private def exactRuntimeRequirementEvidence (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
+    (requirement : RequirementId) (expected : ProgramPredicate) :
+    Except RuntimeError TypedTraitResolution.Evidence := do
+  let solved ← exactCallSolvedRequirement caller node.id requirement
+  if solved.predicate != expected then
+    throw (.callRequirementPredicateMismatch caller.key node.id requirement
+      expected solved.predicate)
+  if solved.evidence.goal != expected then
+    throw (.callRequirementEvidenceGoalMismatch caller.key node.id requirement
+      expected solved.evidence.goal)
+  let evidence ← match solved.evidence with
+    | .implementation evidence => pure evidence
+    | .assumption predicate =>
+        match availableRuntimeEvidence? available predicate with
+        | some evidence => pure evidence
+        | none => throw (.missingRuntimeAssumptionEvidence caller.key node.id
+            requirement predicate)
+  validateSelectedCallImplementationEvidence program.signatures caller node.id
+    requirement expected evidence
+  pure evidence
+
+private def exactRuntimeRequirementEvidenceList (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment) :
+    List RequirementId → List ProgramPredicate →
+      Except RuntimeError (List TypedTraitResolution.Evidence)
+  | [], [] => pure []
+  | requirement :: requirements, predicate :: predicates => do
+      let evidence ← exactRuntimeRequirementEvidence program caller node
+        available requirement predicate
+      pure (evidence :: (← exactRuntimeRequirementEvidenceList program caller
+        node available requirements predicates))
+  | requirements, predicates =>
+      throw (.coercionMethodRequirementCountMismatch caller.key node.id
+        { index := 0 } predicates.length requirements.length)
+
+/-- Authenticate one retained `Coerce<From, To>` edge and recover the exact
+checked implementation method selected by its evidence. -/
+private def checkedCoercionMethod (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
+    (step : CoercionStep) :
+    Except RuntimeError ExecutableImplMethods.CheckedMethod := do
+  match firstDuplicateRequirement step.requirements with
+  | some requirement =>
+      throw (.duplicateCoercionRequirement caller.key node.id requirement)
+  | none => pure ()
+  let solved ← exactCallSolvedRequirement caller node.id step.requirement
+  let predicate := solved.predicate
+  unless predicate.subject = step.source && predicate.arguments = [step.target] do
+    throw (.coercionPredicateMismatch caller.key node.id step.requirement
+      step.source step.target predicate)
+  let traitId ← match predicate.trait with
+    | .declaration id => pure id
+    | trait => throw (.coercionTraitMismatch caller.key node.id
+        step.requirement trait)
+  let trait ← match program.signatures.trait? traitId with
+    | some trait => pure trait
+    | none => throw (.coercionTraitMismatch caller.key node.id
+        step.requirement predicate.trait)
+  unless trait.name = "Coerce" && trait.parameters.length = 2 do
+    throw (.coercionTraitMismatch caller.key node.id step.requirement
+      predicate.trait)
+  let traitMethod ← match trait.methods.filter fun method =>
+      method.name == "coerce" with
+    | [method] => pure method
+    | [] => throw (.executableCoercionMethod caller.key node.id
+        step.requirement (.missingTraitMethod trait.id "coerce"))
+    | methods => throw (.executableCoercionMethod caller.key node.id
+        step.requirement (.multipleTraitMethods trait.id methods.length))
+  let substitution : ParameterSubstitution :=
+    trait.parameters.zip [predicate.subject, step.target]
+  let methodPredicates := traitMethod.wherePredicates.map
+    (ProgramPredicate.applyParameters substitution)
+  if step.methodRequirements.length != methodPredicates.length then
+    throw (.coercionMethodRequirementCountMismatch caller.key node.id
+      step.requirement methodPredicates.length step.methodRequirements.length)
+  let primary ← exactRuntimeRequirementEvidence program caller node available
+    step.requirement predicate
+  let methodEvidence ← exactRuntimeRequirementEvidenceList program caller node
+    available step.methodRequirements methodPredicates
+  (ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary
+    methodEvidence 2 "coerce").mapError fun error =>
+      .executableCoercionMethod caller.key node.id step.requirement error
+
+private def resolveClosedCoercionEvidence (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (requirement : RequirementId) :
+    List ProgramPredicate →
+      Except RuntimeError (List TypedTraitResolution.Evidence)
+  | [] => pure []
+  | predicate :: predicates =>
+      match (TypedTraitResolution.resolve program.signatures.resolutionRules 32
+          predicate).outcome with
+      | .noSolution =>
+          throw (.callEvidenceResolutionNoSolution caller.key node.id
+            requirement predicate)
+      | .inconclusive reason =>
+          throw (.callEvidenceResolutionInconclusive caller.key node.id
+            requirement reason)
+      | .success evidence => do
+          let .byImpl goal _ _ := evidence
+          if goal != predicate then
+            throw (.callRequirementEvidenceGoalMismatch caller.key node.id
+              requirement predicate goal)
+          pure (evidence :: (← resolveClosedCoercionEvidence program caller
+            node requirement predicates))
+
+/-- The synthetic checked method lists trait-header, implementation-head, and
+method predicates in that order.  Reconstruct the same closed runtime
+dictionary rather than depending on incidental evidence-list order. -/
+private def coercionMethodRuntimeEvidence (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (step : CoercionStep)
+    (method : ExecutableImplMethods.CheckedMethod) :
+    Except RuntimeError RuntimeEvidenceEnvironment := do
+  let traitEvidence ← resolveClosedCoercionEvidence program caller node
+    step.requirement method.traitPredicates
+  let environment := traitEvidence ++ method.implementationPremises ++
+    method.methodPremises
+  validateRuntimeEvidence method.specialized.key method.specialized.assumptions
+    environment
+  pure environment
+
+private def resolveRuntimeEvidenceEnvironment (program : CheckedProgram)
+    (key : Key) : List ProgramPredicate →
+      Except RuntimeError RuntimeEvidenceEnvironment
+  | [] => pure []
+  | predicate :: predicates =>
+      match (TypedTraitResolution.resolve program.signatures.resolutionRules 32
+          predicate).outcome with
+      | .noSolution =>
+          throw (.runtimeEvidenceResolutionNoSolution key predicate)
+      | .inconclusive reason =>
+          throw (.runtimeEvidenceResolutionInconclusive key reason)
+      | .success evidence => do
+          let .byImpl goal _ _ := evidence
+          if goal != predicate then
+            throw (.runtimeEvidenceGoalMismatch key 0 predicate goal)
+          pure (evidence :: (← resolveRuntimeEvidenceEnvironment program key
+            predicates))
 
 private def directLambdaBodyRoots? (source : TypedSource)
     (binderId : Resolved.LocalId) : Option (List NodeId) :=
@@ -1021,15 +1260,9 @@ private def validateExecutableDirectCallRequirements
     (caller : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
     Except RuntimeError Unit := do
-  if node.requirements.length != instantiation.predicates.length then
-    throw (.callRequirementCountMismatch caller.key node.id
-      instantiation.predicates.length node.requirements.length)
-  match firstDuplicateRequirement node.requirements with
-  | some requirement =>
-      throw (.duplicateCallRequirement caller.key node.id requirement)
-  | none =>
-      validateExecutableCallRequirementEvidence caller node.id
-        node.requirements instantiation.predicates
+  let requirements ← exactDirectCallRequirementIds caller node instantiation
+  validateExecutableCallRequirementEvidence caller node.id requirements
+    instantiation.predicates
 
 private def validateExecutableCallImplementationEvidence
     (signatures : ProgramSignatures)
@@ -1056,8 +1289,9 @@ private def validateExecutableDirectCallImplementationEvidence
     (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
     Except RuntimeError Unit := do
   validateExecutableDirectCallRequirements caller node instantiation
+  let requirements ← exactDirectCallRequirementIds caller node instantiation
   validateExecutableCallImplementationEvidence signatures caller node.id
-    node.requirements instantiation.predicates
+    requirements instantiation.predicates
 
 private def nodeUseCount (source : TypedSource) (target : NodeId) : Nat :=
   let rootCount := (source.roots.filter fun root => root == target).length
@@ -1240,36 +1474,44 @@ private def validateExpressionMetadata
     (specialized : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) : Except RuntimeError Unit := do
   let function := specialized.function
-  unless node.coercions.isEmpty do
-    throw (.unsupportedExpressionCoercions node.id)
+  unless node.hasValidCoercionPath do
+    throw (.invalidExpressionCoercionPath node.id node.rawType node.type)
   match node.form with
   | .integerLiteral source resolution =>
-      unless node.requirements = [resolution.requirement] do
+      unless node.requirements =
+          [resolution.requirement] ++ coercionRequirementIds node.coercions do
         throw (.unsupportedRequirements node.requirements)
       validateLiteralResolution function source resolution
   | .call _ arguments (.indirect metadata) =>
       unless arguments.length = metadata.argumentCount do
         throw (.argumentArityMismatch metadata.argumentCount arguments.length)
-      unless metadata.argumentCoercions.isEmpty do
-        throw (.unsupportedIndirectCoercions node.id)
-      unless node.requirements.isEmpty do
+      unless metadata.hasValidArgumentCoercionPath do
+        throw (.invalidIndirectArgumentCoercionPath node.id)
+      unless node.requirements =
+          coercionRequirementIds metadata.argumentCoercions ++
+            coercionRequirementIds node.coercions do
         throw (.unsupportedRequirements node.requirements)
   | .call _ _ (.declaration instantiation) =>
       validateExecutableDirectCallRequirements specialized node instantiation
   | .reference _ (.local binderId) =>
+      let owned ← match ordinaryOwnedRequirements? node with
+        | some requirements => pure requirements
+        | none => throw (.unsupportedRequirements node.requirements)
+      let ownedNode := { node with requirements := owned, coercions := [] }
       match directLambdaLetBinder? function.typedBody binderId with
       | some binder =>
           if binder.schemeRequirements.isEmpty then
-            unless node.requirements.isEmpty do
-              throw (.unsupportedRequirements node.requirements)
+            unless owned.isEmpty do
+              throw (.unsupportedRequirements owned)
           else
-            discard <| validateQualifiedLocalReference specialized node binder
+            discard <| validateQualifiedLocalReference specialized ownedNode binder
       | none =>
-          unless node.requirements.isEmpty do
-            throw (.unsupportedRequirements node.requirements)
+          unless owned.isEmpty do
+            throw (.unsupportedRequirements owned)
   | _ =>
-      unless node.requirements.isEmpty do
-        throw (.unsupportedRequirements node.requirements)
+      match ordinaryOwnedRequirements? node with
+      | some [] => pure ()
+      | _ => throw (.unsupportedRequirements node.requirements)
 
 private def validateStatementMetadata (function : CheckedFunction) :
     StatementForm → Except RuntimeError Unit
@@ -1413,23 +1655,39 @@ def validateExecutablePlan (plan : Plan) : Except RuntimeError Unit := do
 its existing diagnostics and ordering; the second pass authenticates every
 implementation witness used by a direct declaration call against the
 authoritative resolution catalog. -/
-def validateExecutablePlanEvidence (signatures : ProgramSignatures)
+def validateExecutablePlanEvidence (program : CheckedProgram)
     (plan : Plan) : Except RuntimeError Unit := do
   validateExecutablePlan plan
   for specialized in plan.specializations do
+    let available ← resolveRuntimeEvidenceEnvironment program specialized.key
+      specialized.assumptions
     for sourceNode in specialized.function.typedBody.nodes do
       match sourceNode with
       | .expression node =>
+          for step in node.coercions do
+            let method ← checkedCoercionMethod program specialized node
+              available step
+            discard <| coercionMethodRuntimeEvidence program specialized node
+              step method
+          match node.form with
+          | .call _ _ (.indirect metadata) =>
+              for step in metadata.argumentCoercions do
+                let method ← checkedCoercionMethod program specialized node
+                  available step
+                discard <| coercionMethodRuntimeEvidence program specialized
+                  node step method
+          | _ => pure ()
           match node.form with
           | .call _ _ (.declaration instantiation) =>
-              validateExecutableDirectCallImplementationEvidence signatures
+              validateExecutableDirectCallImplementationEvidence
+                program.signatures
                 specialized node instantiation
           | .reference _ (.local binderId) =>
               match directLambdaLetBinder?
                   specialized.function.typedBody binderId with
               | some binder =>
                   unless binder.schemeRequirements.isEmpty do
-                    validateQualifiedLocalReferenceEvidence signatures
+                    validateQualifiedLocalReferenceEvidence program.signatures
                       specialized node binder
               | none => pure ()
           | _ => pure ()
@@ -2066,6 +2324,10 @@ private def instantiateDirectLambdaLet? (plan : Plan) (owner : Key)
     throw (.localSchemeInstanceMismatch owner node.id binder.id
       binder.scheme.body (Option.getD (value.type? plan) Ty.error))
   let caller ← exactSpecialization plan owner
+  let owned ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  let node := { node with requirements := owned, coercions := [] }
   let (substitution, requirements) ←
     localRequirementWitnesses caller binder node
   match value with
@@ -2107,7 +2369,62 @@ private def rewriteLocalRequirements
 
 mutual
 
-  private def evaluate (fuel : Nat) (plan : Plan) (owner : Key)
+  /-- Execute an evidence-selected coercion method in the same heap as the
+  enclosing expression.  The selected checked method is installed in a
+  temporary runtime plan so its ordinary source body, including allocations
+  and mutations, is interpreted by this evaluator rather than reinterpreted
+  as a builtin cast. -/
+  private def executeCoercionPath (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (owner : Key) (evidence : RuntimeEvidenceEnvironment)
+      (node : ExpressionNode) (target : Ty) (steps : List CoercionStep)
+      (value : Value) (state : RuntimeState) : ExpressionResult :=
+    match fuel with
+    | 0 => .outOfFuel state
+    | fuel + 1 =>
+      match steps with
+      | [] =>
+          if value.type? plan = some target then .done value state
+          else .fault (.typeMismatch target (value.type? plan)) state
+      | step :: rest =>
+          if value.type? plan != some step.source then
+            .fault (.typeMismatch step.source (value.type? plan)) state
+          else
+            match exactSpecialization plan owner with
+            | .error error => .fault error state
+            | .ok caller =>
+                match checkedCoercionMethod program caller node evidence step with
+                | .error error => .fault error state
+                | .ok method =>
+                    match coercionMethodRuntimeEvidence program caller node step
+                        method with
+                    | .error error => .fault error state
+                    | .ok methodEvidence =>
+                        let methodKey := method.specialized.key
+                        let methodPlan : Plan := {
+                          plan with
+                          specializations := method.specialized ::
+                            (plan.specializations.filter fun specialized =>
+                              specialized.key != methodKey)
+                          callEdges := {
+                            caller := owner
+                            occurrence := node.id
+                            callee := methodKey
+                          } :: plan.callEdges
+                        }
+                        match invokeDirectSpecialization fuel program methodPlan
+                            methodKey methodEvidence [value] state with
+                        | .done coerced nextState =>
+                            if coerced.type? methodPlan != some step.target then
+                              .fault (.typeMismatch step.target
+                                (coerced.type? methodPlan)) nextState
+                            else
+                              executeCoercionPath fuel program plan owner evidence
+                                node target rest coerced nextState
+                        | .outOfFuel finalState => .outOfFuel finalState
+                        | .fault error finalState => .fault error finalState
+
+  private def evaluate (fuel : Nat) (program : CheckedProgram) (plan : Plan)
+      (owner : Key)
       (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (id : ExpressionId) : ExpressionResult :=
@@ -2117,7 +2434,7 @@ mutual
       match exactExpression source id with
       | .error error => .fault error state
       | .ok node =>
-        let descend := evaluate fuel plan owner evidence source environment
+        let descend := evaluate fuel program plan owner evidence source environment
         let raw : ExpressionResult :=
           match node.form with
           | .literal literal =>
@@ -2230,23 +2547,47 @@ mutual
                                   | .error error => .fault error finalState
                                   | .ok calleeEvidence =>
                                       expressionOfRunResult
-                                        (invokeDirectSpecialization fuel plan key
-                                          calleeEvidence values finalState)
+                                        (invokeDirectSpecialization fuel program
+                                          plan key calleeEvidence values finalState)
                           | .error error => .fault error finalState
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
           | .call _ arguments (.builtinFunction function) =>
               match evaluateList descend state arguments with
               | .done values finalState =>
-                  applyCallable fuel plan (.builtin function) values finalState
+                  applyCallable fuel program plan (.builtin function) values
+                    finalState
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
-          | .call callee arguments (.indirect _) =>
+          | .call callee arguments (.indirect metadata) =>
               match descend state callee with
               | .done functionValue argumentState =>
                   match evaluateList descend argumentState arguments with
                   | .done values finalState =>
-                      applyCallable fuel plan functionValue values finalState
+                      let packed := packValues values
+                      if packed.type? plan !=
+                          some metadata.argumentTypeBeforeCoercion then
+                        .fault (.typeMismatch metadata.argumentTypeBeforeCoercion
+                          (packed.type? plan)) finalState
+                      else
+                        let coerced := if metadata.argumentCoercions.isEmpty then
+                          .done packed finalState
+                        else
+                          executeCoercionPath fuel program plan owner evidence node
+                            metadata.argumentTypeAfterCoercion
+                            metadata.argumentCoercions packed finalState
+                        match coerced with
+                        | .done argumentBundle coercedState =>
+                            match unpackValues metadata.argumentCount
+                                argumentBundle with
+                            | some appliedArguments =>
+                                applyCallable fuel program plan functionValue
+                                  appliedArguments coercedState
+                            | none => .fault
+                                (.argumentArityMismatch metadata.argumentCount 0)
+                                coercedState
+                        | .outOfFuel coercedState => .outOfFuel coercedState
+                        | .fault error coercedState => .fault error coercedState
                   | .outOfFuel finalState => .outOfFuel finalState
                   | .fault error finalState => .fault error finalState
               | .outOfFuel finalState => .outOfFuel finalState
@@ -2300,9 +2641,18 @@ mutual
                   | .fault error finalState => .fault error finalState
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
-        finishExpression plan node raw
+        match raw with
+        | .done value finalState =>
+            if node.coercions.isEmpty then
+              finishExpression plan node raw
+            else
+              executeCoercionPath fuel program plan owner evidence node
+                node.type node.coercions value finalState
+        | .outOfFuel finalState => .outOfFuel finalState
+        | .fault error finalState => .fault error finalState
 
-  private def applyCallable (fuel : Nat) (plan : Plan) (function : Value)
+  private def applyCallable (fuel : Nat) (program : CheckedProgram) (plan : Plan)
+      (function : Value)
       (arguments : List Value) (state : RuntimeState) : ExpressionResult :=
     match fuel with
     | 0 => .outOfFuel state
@@ -2313,7 +2663,8 @@ mutual
           | .ok value => .done value state
           | .error error => .fault error state
       | .global key =>
-          expressionOfRunResult (invokeSpecialization fuel plan key arguments state)
+          expressionOfRunResult
+            (invokeSpecialization fuel program plan key arguments state)
       | .closure parameters expected body source owner captured evidence =>
           if parameters.length != arguments.length then
             .fault (.argumentArityMismatch parameters.length arguments.length) state
@@ -2321,7 +2672,7 @@ mutual
             match bindValues plan captured state (List.zip parameters arguments) with
             | .error error => .fault error state
             | .ok (environment, bodyState) =>
-                let flow := executeFunctionSequence fuel plan owner evidence
+                let flow := executeFunctionSequence fuel program plan owner evidence
                   source environment bodyState body
                 expressionOfRunResult (finishFunctionFlow plan expected flow)
       | .instantiated substitution requirements
@@ -2337,12 +2688,13 @@ mutual
             match bindValues plan captured state (List.zip parameters arguments) with
             | .error error => .fault error state
             | .ok (environment, bodyState) =>
-                let flow := executeFunctionSequence fuel plan owner evidence
+                let flow := executeFunctionSequence fuel program plan owner evidence
                   source environment bodyState body
                 expressionOfRunResult (finishFunctionFlow plan expected flow)
       | actual => .fault (.expectedFunction (actual.type? plan)) state
 
-  private def invokeSpecialization (fuel : Nat) (plan : Plan) (key : Key)
+  private def invokeSpecialization (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (key : Key)
       (arguments : List Value) (state : RuntimeState) : RunResult :=
     match fuel with
     | 0 => .outOfFuel state
@@ -2367,14 +2719,15 @@ mutual
                     match statementIds function.typedBody.roots with
                     | .error error => .fault error bodyState
                     | .ok roots =>
-                        let flow := executeFunctionSequence fuel plan key []
+                        let flow := executeFunctionSequence fuel program plan key []
                           function.typedBody environment bodyState roots
                         finishFunctionFlow plan expected flow
 
   /-- Enter a specialization whose where-predicates were discharged by the
   immediately enclosing, validated direct declaration call.  This entry point
   is deliberately absent from `Value.global`, roots, and indirect calls. -/
-  private def invokeDirectSpecialization (fuel : Nat) (plan : Plan) (key : Key)
+  private def invokeDirectSpecialization (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (key : Key)
       (evidence : RuntimeEvidenceEnvironment)
       (arguments : List Value) (state : RuntimeState) : RunResult :=
     match fuel with
@@ -2405,12 +2758,13 @@ mutual
                         match statementIds function.typedBody.roots with
                         | .error error => .fault error bodyState
                         | .ok roots =>
-                            let flow := executeFunctionSequence fuel plan key
+                            let flow := executeFunctionSequence fuel program plan key
                               evidence function.typedBody environment bodyState
                               roots
                             finishFunctionFlow plan expected flow
 
-  private def executeStatement (fuel : Nat) (plan : Plan) (owner : Key)
+  private def executeStatement (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (owner : Key)
       (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (id : StatementId) : FlowOutcome :=
@@ -2420,7 +2774,7 @@ mutual
       match exactStatement source id with
       | .error error => .fault error state
       | .ok node =>
-        let descend := evaluate fuel plan owner evidence source environment
+        let descend := evaluate fuel program plan owner evidence source environment
         match node.form with
         | .letDecl binder initializer =>
             match initializer with
@@ -2484,20 +2838,21 @@ mutual
             match descend state condition with
             | .done (.bool true) branchState =>
                 restoreScope environment <| executeSequence
-                  (executeStatement fuel plan owner evidence source)
+                  (executeStatement fuel program plan owner evidence source)
                   environment branchState thenBody
             | .done (.bool false) branchState =>
                 match elseBody with
                 | none => .fallthrough environment branchState
                 | some body => restoreScope environment <| executeSequence
-                    (executeStatement fuel plan owner evidence source)
+                    (executeStatement fuel program plan owner evidence source)
                     environment branchState body
             | .done actual finalState =>
                 .fault (.expectedBool (actual.type? plan)) finalState
             | .outOfFuel finalState => .outOfFuel finalState
             | .fault error finalState => .fault error finalState
         | .block body => restoreScope environment <| executeSequence
-            (executeStatement fuel plan owner evidence source) environment state
+            (executeStatement fuel program plan owner evidence source)
+              environment state
               body
         | .matchWith resolution =>
             match descend state resolution.scrutinee with
@@ -2507,16 +2862,16 @@ mutual
                   scrutineeType (some scrutinee)
                 let matchEnvironment :=
                   (resolution.hiddenScrutinee, hidden) :: environment
-                restoreScope environment <| executeMatchCases fuel plan owner
+                restoreScope environment <| executeMatchCases fuel program plan owner
                   evidence source matchEnvironment hiddenState scrutinee
                   resolution.cases resolution.defaultBody
             | .outOfFuel finalState => .outOfFuel finalState
             | .fault error finalState => .fault error finalState
         | .forLoop initializer condition post body =>
-            match executeForItems fuel plan owner evidence source environment
+            match executeForItems fuel program plan owner evidence source environment
                 state initializer with
             | .fallthrough loopEnvironment loopState =>
-                restoreScope environment <| executeForIterations fuel plan owner
+                restoreScope environment <| executeForIterations fuel program plan owner
                   evidence source loopEnvironment loopState condition post body
             | .returned value finalState => .returned value finalState
             | .breaking _ finalState
@@ -2525,12 +2880,13 @@ mutual
             | .outOfFuel finalState => .outOfFuel finalState
             | .fault error finalState => .fault error finalState
         | .whileLoop condition body =>
-            restoreScope environment <| executeWhile fuel plan owner evidence
+            restoreScope environment <| executeWhile fuel program plan owner evidence
               source environment state condition body
         | .breakStmt => .breaking environment state
         | .continueStmt => .continuing environment state
 
-  private def executeWhile (fuel : Nat) (plan : Plan) (owner : Key)
+  private def executeWhile (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (owner : Key)
       (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (condition : ExpressionId)
@@ -2538,18 +2894,18 @@ mutual
     match fuel with
     | 0 => .outOfFuel state
     | fuel + 1 =>
-      match evaluate fuel plan owner evidence source environment state
+      match evaluate fuel program plan owner evidence source environment state
           condition with
       | .done (.bool false) finalState =>
           .fallthrough environment finalState
       | .done (.bool true) bodyState =>
           let outcome := restoreScope environment <| executeSequence
-            (executeStatement fuel plan owner evidence source)
+            (executeStatement fuel program plan owner evidence source)
             environment bodyState body
           match outcome with
           | .fallthrough nextEnvironment nextState
           | .continuing nextEnvironment nextState =>
-              executeWhile fuel plan owner evidence source nextEnvironment
+              executeWhile fuel program plan owner evidence source nextEnvironment
                 nextState condition body
           | .breaking _ finalState => .fallthrough environment finalState
           | .returned value finalState => .returned value finalState
@@ -2560,7 +2916,8 @@ mutual
       | .outOfFuel finalState => .outOfFuel finalState
       | .fault error finalState => .fault error finalState
 
-  private def executeForIterations (fuel : Nat) (plan : Plan) (owner : Key)
+  private def executeForIterations (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (owner : Key)
       (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (condition : ExpressionId)
@@ -2568,13 +2925,13 @@ mutual
     match fuel with
     | 0 => .outOfFuel state
     | fuel + 1 =>
-      match evaluate fuel plan owner evidence source environment state
+      match evaluate fuel program plan owner evidence source environment state
           condition with
       | .done (.bool false) finalState =>
           .fallthrough environment finalState
       | .done (.bool true) bodyState =>
           let outcome := restoreScope environment <| executeSequence
-            (executeStatement fuel plan owner evidence source)
+            (executeStatement fuel program plan owner evidence source)
             environment bodyState body
           match outcome with
           | .breaking _ finalState => .fallthrough environment finalState
@@ -2583,10 +2940,10 @@ mutual
           | .fault error finalState => .fault error finalState
           | .fallthrough postEnvironment postState
           | .continuing postEnvironment postState =>
-              match executeForItems fuel plan owner evidence source
+              match executeForItems fuel program plan owner evidence source
                   postEnvironment postState post with
               | .fallthrough _ nextState =>
-                  executeForIterations fuel plan owner evidence source
+                  executeForIterations fuel program plan owner evidence source
                     environment nextState condition post body
               | .returned value finalState => .returned value finalState
               | .breaking _ finalState
@@ -2599,7 +2956,8 @@ mutual
       | .outOfFuel finalState => .outOfFuel finalState
       | .fault error finalState => .fault error finalState
 
-  private def executeForItems (fuel : Nat) (plan : Plan) (owner : Key)
+  private def executeForItems (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (owner : Key)
       (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (items : List ForItemForm) : FlowOutcome :=
@@ -2609,9 +2967,9 @@ mutual
       match fuel with
       | 0 => .outOfFuel state
       | fuel + 1 =>
-        let descend := evaluate fuel plan owner evidence source environment
+        let descend := evaluate fuel program plan owner evidence source environment
         let next (nextEnvironment : Environment) (nextState : RuntimeState) :=
-          executeForItems fuel plan owner evidence source nextEnvironment
+          executeForItems fuel program plan owner evidence source nextEnvironment
             nextState rest
         match item with
         | .letDecl binder initializer =>
@@ -2665,7 +3023,8 @@ mutual
             | .outOfFuel finalState => .outOfFuel finalState
             | .fault error finalState => .fault error finalState
 
-  private def executeMatchCases (fuel : Nat) (plan : Plan) (owner : Key)
+  private def executeMatchCases (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (owner : Key)
       (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (scrutinee : Value)
@@ -2679,19 +3038,19 @@ mutual
           match defaultBody with
           | none => .fallthrough environment state
           | some body => restoreScope environment <| executeSequence
-              (executeStatement fuel plan owner evidence source) environment
+              (executeStatement fuel program plan owner evidence source) environment
                 state body
       | arm :: rest =>
           match matchPattern arm.pattern scrutinee with
           | .malformed => .fault .malformedPattern state
-          | .noMatch => executeMatchCases fuel plan owner evidence source
+          | .noMatch => executeMatchCases fuel program plan owner evidence source
               environment state scrutinee rest defaultBody
           | .matched bindings =>
               match bindValues plan environment state bindings with
               | .error error => .fault error state
               | .ok (armEnvironment, armState) =>
                   restoreScope environment <| executeSequence
-                    (executeStatement fuel plan owner evidence source)
+                    (executeStatement fuel program plan owner evidence source)
                     armEnvironment armState arm.body
 
   /-- Execute a function or closure body with the source language's implicit
@@ -2699,7 +3058,8 @@ mutual
   top-level statement yields the function result.  Earlier expression values,
   and expression values inside nested statement bodies, remain ordinary
   fallthrough effects. -/
-  private def executeFunctionSequence (fuel : Nat) (plan : Plan) (owner : Key)
+  private def executeFunctionSequence (fuel : Nat) (program : CheckedProgram)
+      (plan : Plan) (owner : Key)
       (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) : List StatementId → FlowOutcome
@@ -2715,18 +3075,18 @@ mutual
                 | .ok node =>
                     match node.form with
                     | .expression expression false =>
-                        match evaluate fuel plan owner evidence source environment
+                        match evaluate fuel program plan owner evidence source environment
                             state expression with
                         | .done value finalState => .returned value finalState
                         | .outOfFuel finalState => .outOfFuel finalState
                         | .fault error finalState => .fault error finalState
-                    | _ => executeStatement fuel plan owner evidence source
+                    | _ => executeStatement fuel program plan owner evidence source
                         environment state statement
             | _ =>
-                match executeStatement fuel plan owner evidence source
+                match executeStatement fuel program plan owner evidence source
                     environment state statement with
                 | .fallthrough nextEnvironment nextState =>
-                    executeFunctionSequence fuel plan owner evidence source
+                    executeFunctionSequence fuel program plan owner evidence source
                       nextEnvironment nextState rest
                 | .returned value finalState => .returned value finalState
                 | .breaking finalEnvironment finalState =>
@@ -3159,7 +3519,8 @@ end RuntimeState
 source and owner.  This is one concrete evaluator transition linking dynamic
 code values to the plan-provenance predicate. -/
 theorem evaluate_lambda_hasPlanCode
-    (fuel : Nat) (plan : Plan) (owner : Key) (source : TypedSource)
+    (fuel : Nat) (program : CheckedProgram) (plan : Plan) (owner : Key)
+    (source : TypedSource)
     (evidence : RuntimeEvidenceEnvironment)
     (environment : Environment) (state : RuntimeState)
     (id : ExpressionId) (node : ExpressionNode)
@@ -3174,7 +3535,7 @@ theorem evaluate_lambda_hasPlanCode
     (noCoercions : node.coercions = [])
     (nodeType : node.type = .function
       (Ty.productMany (parameters.map (·.scheme.body))) resultType) :
-    evaluate (fuel + 1) plan owner evidence source environment state id =
+    evaluate (fuel + 1) program plan owner evidence source environment state id =
       .done (.closure parameters resultType body source owner environment
         evidence) state ∧
     (Value.closure parameters resultType body source owner environment
@@ -3264,19 +3625,21 @@ private def validateInputs (signatures : ProgramSignatures) (plan : Plan)
 
 /-- Execute a plan whose inputs and embedded nominal metadata have already
 been trusted by the caller.  Public boundaries should normally use `run`. -/
-def runTrusted (plan : Plan) (entry : Key) (arguments : List Value)
+def runTrusted (program : CheckedProgram) (plan : Plan) (entry : Key)
+    (arguments : List Value)
     (fuel : Nat) (state : RuntimeState := {}) : RunResult :=
-  invokeSpecialization fuel plan entry arguments state
+  invokeSpecialization fuel program plan entry arguments state
 
 /-- A successful trusted run preserves the inferred result type carried by
 the unique specialization selected for its entry key. -/
 theorem runTrusted_done_has_inferredBodyType
-    (plan : Plan) (entry : Key) (arguments : List Value) (fuel : Nat)
+    (program : CheckedProgram) (plan : Plan) (entry : Key)
+    (arguments : List Value) (fuel : Nat)
     (initial finalState : RuntimeState) (value : Value)
     (specialized : SourceSpecialization.SpecializedFunction)
     (exact : plan.specializations.filter (fun candidate =>
       decide (candidate.key = entry)) = [specialized])
-    (done : runTrusted plan entry arguments fuel initial =
+    (done : runTrusted program plan entry arguments fuel initial =
       .done value finalState) :
     value.type? plan = some specialized.function.inferredBodyType := by
   unfold runTrusted at done
@@ -3301,7 +3664,7 @@ theorem runTrusted_done_has_inferredBodyType
 /-- Safe typed-source execution with independent bounds for recursive input
 validation and runtime execution.  Constructor inputs are checked against
 `ProgramSignatures`, not merely against self-described runtime metadata. -/
-def runWithValidationFuel (signatures : ProgramSignatures) (plan : Plan)
+def runWithValidationFuel (program : CheckedProgram) (plan : Plan)
     (entry : Key) (arguments : List Value) (validationFuel executionFuel : Nat)
     (state : RuntimeState := {}) : RunResult :=
   match exactSpecialization plan entry with
@@ -3309,23 +3672,24 @@ def runWithValidationFuel (signatures : ProgramSignatures) (plan : Plan)
   | .ok specialized =>
       let expected := specialized.function.typedBody.inputs.map
         (·.scheme.body)
-      match validateInputs signatures plan validationFuel expected arguments with
+      match validateInputs program.signatures plan validationFuel expected
+          arguments with
       | some error => .fault error state
       | none =>
-          match validateExecutablePlanEvidence signatures plan with
+          match validateExecutablePlanEvidence program plan with
           | .error error => .fault error state
-          | .ok () => runTrusted plan entry arguments executionFuel state
+          | .ok () => runTrusted program plan entry arguments executionFuel state
 
 /-- Successful safe-boundary execution has the same inferred-result guarantee
 as the trusted evaluator reached after input validation. -/
 theorem runWithValidationFuel_done_has_inferredBodyType
-    (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+    (program : CheckedProgram) (plan : Plan) (entry : Key)
     (arguments : List Value) (validationFuel executionFuel : Nat)
     (initial finalState : RuntimeState) (value : Value)
     (specialized : SourceSpecialization.SpecializedFunction)
     (exact : plan.specializations.filter (fun candidate =>
       decide (candidate.key = entry)) = [specialized])
-    (done : runWithValidationFuel signatures plan entry arguments
+    (done : runWithValidationFuel program plan entry arguments
       validationFuel executionFuel initial = .done value finalState) :
     value.type? plan = some specialized.function.inferredBodyType := by
   unfold runWithValidationFuel exactSpecialization at done
@@ -3335,22 +3699,22 @@ theorem runWithValidationFuel_done_has_inferredBodyType
   · cases done
   · split at done
     · cases done
-    · exact runTrusted_done_has_inferredBodyType plan entry arguments
+    · exact runTrusted_done_has_inferredBodyType program plan entry arguments
         executionFuel initial finalState value specialized exact done
 
 /-- Compatibility boundary using the same structural fuel for validation and
 execution.  New compiler clients can use `runWithValidationFuel` to keep the
 two resource policies independent. -/
-def run (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+def run (program : CheckedProgram) (plan : Plan) (entry : Key)
     (arguments : List Value) (fuel : Nat)
     (state : RuntimeState := {}) : RunResult :=
-  runWithValidationFuel signatures plan entry arguments fuel fuel state
+  runWithValidationFuel program plan entry arguments fuel fuel state
 
 /-- Convenience projection for clients which only need successful values. -/
-def run? (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+def run? (program : CheckedProgram) (plan : Plan) (entry : Key)
     (arguments : List Value) (fuel : Nat)
     (state : RuntimeState := {}) : Option (Value × RuntimeState) :=
-  match run signatures plan entry arguments fuel state with
+  match run program plan entry arguments fuel state with
   | .done value finalState => some (value, finalState)
   | .outOfFuel _
   | .fault _ _ => none
@@ -3359,7 +3723,7 @@ def run? (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
 allocating a parameter cell or entering the runtime evaluator.  The original
 state is therefore preserved exactly. -/
 theorem runWithValidationFuel_zero_of_nonempty
-    (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+    (program : CheckedProgram) (plan : Plan) (entry : Key)
     (specialized : SourceSpecialization.SpecializedFunction)
     (first : Ty) (expectedRest : List Ty) (value : Value)
     (argumentsRest : List Value) (executionFuel : Nat)
@@ -3368,7 +3732,7 @@ theorem runWithValidationFuel_zero_of_nonempty
       decide (candidate.key = entry)) = [specialized])
     (expected : specialized.function.typedBody.inputs.map
       (·.scheme.body) = first :: expectedRest) :
-    runWithValidationFuel signatures plan entry (value :: argumentsRest)
+    runWithValidationFuel program plan entry (value :: argumentsRest)
         0 executionFuel state =
       .fault (.inputValidationFuelExhausted first 0) state := by
   unfold runWithValidationFuel exactSpecialization
@@ -4814,54 +5178,54 @@ theorem zero_fuel_validateType (signatures : ProgramSignatures) (plan : Plan)
     value.validateTypeFuel 0 signatures plan expected = .outOfFuel := by
   rw [Value.validateTypeFuel.eq_1]
 
-theorem zero_fuel_runTrusted (plan : Plan) (entry : Key)
+theorem zero_fuel_runTrusted (program : CheckedProgram) (plan : Plan) (entry : Key)
     (arguments : List Value) (state : RuntimeState) :
-    runTrusted plan entry arguments 0 state = .outOfFuel state := by
+    runTrusted program plan entry arguments 0 state = .outOfFuel state := by
   rfl
 
-theorem run_eq_runWithValidationFuel (signatures : ProgramSignatures)
+theorem run_eq_runWithValidationFuel (program : CheckedProgram)
     (plan : Plan) (entry : Key) (arguments : List Value) (fuel : Nat)
     (state : RuntimeState) :
-    run signatures plan entry arguments fuel state =
-      runWithValidationFuel signatures plan entry arguments fuel fuel state := by
+    run program plan entry arguments fuel state =
+      runWithValidationFuel program plan entry arguments fuel fuel state := by
   rfl
 
 theorem run_done_has_inferredBodyType
-    (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+    (program : CheckedProgram) (plan : Plan) (entry : Key)
     (arguments : List Value) (fuel : Nat)
     (initial finalState : RuntimeState) (value : Value)
     (specialized : SourceSpecialization.SpecializedFunction)
     (exact : plan.specializations.filter (fun candidate =>
       decide (candidate.key = entry)) = [specialized])
-    (done : run signatures plan entry arguments fuel initial =
+    (done : run program plan entry arguments fuel initial =
       .done value finalState) :
     value.type? plan = some specialized.function.inferredBodyType := by
-  exact runWithValidationFuel_done_has_inferredBodyType signatures plan entry
+  exact runWithValidationFuel_done_has_inferredBodyType program plan entry
     arguments fuel fuel initial finalState value specialized exact done
 
-theorem run?_some_iff (signatures : ProgramSignatures) (plan : Plan)
+theorem run?_some_iff (program : CheckedProgram) (plan : Plan)
     (entry : Key) (arguments : List Value) (fuel : Nat)
     (initial finalState : RuntimeState) (value : Value) :
-    run? signatures plan entry arguments fuel initial =
+    run? program plan entry arguments fuel initial =
         some (value, finalState) ↔
-      run signatures plan entry arguments fuel initial =
+      run program plan entry arguments fuel initial =
         .done value finalState := by
   unfold run?
   split <;> simp_all
 
 theorem run?_some_has_inferredBodyType
-    (signatures : ProgramSignatures) (plan : Plan) (entry : Key)
+    (program : CheckedProgram) (plan : Plan) (entry : Key)
     (arguments : List Value) (fuel : Nat)
     (initial finalState : RuntimeState) (value : Value)
     (specialized : SourceSpecialization.SpecializedFunction)
     (exact : plan.specializations.filter (fun candidate =>
       decide (candidate.key = entry)) = [specialized])
-    (success : run? signatures plan entry arguments fuel initial =
+    (success : run? program plan entry arguments fuel initial =
       some (value, finalState)) :
     value.type? plan = some specialized.function.inferredBodyType := by
-  apply run_done_has_inferredBodyType signatures plan entry arguments fuel
+  apply run_done_has_inferredBodyType program plan entry arguments fuel
     initial finalState value specialized exact
-  exact (run?_some_iff signatures plan entry arguments fuel initial finalState
+  exact (run?_some_iff program plan entry arguments fuel initial finalState
     value).mp success
 
 end Solcore.Frontend.SourceTypedRuntime

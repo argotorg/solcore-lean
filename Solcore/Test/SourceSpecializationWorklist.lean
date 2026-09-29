@@ -704,7 +704,7 @@ private def testGroundInnerUnderPolymorphicOuter
       | .error error => throw (IO.userError
           s!"ground-inner plan failed replay validation: {reprStr error}")
       | .ok () =>
-          match SourceTypedRuntime.run program.signatures plan entryKey
+          match SourceTypedRuntime.run program plan entryKey
               [.bool true] 4096 with
           | .done (.product (.word left) (.word right)) _ =>
               let expected := Core.Word.ofNatModulo 1
