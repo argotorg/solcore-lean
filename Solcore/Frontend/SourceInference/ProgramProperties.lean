@@ -902,6 +902,27 @@ structure LocalBinderInstantiationNoCapture
         ∀ argument, argument ∈ requirement.predicate.arguments →
           substitution.RangeAvoidsVariablesOn binder.scheme.quantified argument
 
+namespace LocalBinderInstantiationNoCapture
+
+/-- A monomorphic binder cannot capture any scheme-local variable because it
+protects no quantified variables.  This covers function inputs, lambda
+parameters, and every other binder introduced with `Scheme.mono`, independently
+of the closing inference substitution. -/
+theorem of_quantified_eq_nil
+    {substitution : Substitution} {binder : TypedBinder}
+    (monomorphic : binder.scheme.quantified = []) :
+    LocalBinderInstantiationNoCapture substitution binder := by
+  constructor
+  · simp [monomorphic]
+  · simp [Substitution.RangeAvoidsVariablesOn, monomorphic]
+  · intro requirement member
+    constructor
+    · simp [Substitution.RangeAvoidsVariablesOn, monomorphic]
+    · intro argument argumentMember
+      simp [Substitution.RangeAvoidsVariablesOn, monomorphic]
+
+end LocalBinderInstantiationNoCapture
+
 /-- The finite executable range check is equivalent to the first-match
 relevance-restricted no-capture proposition. -/
 theorem substitutionRangeAvoidsVariablesOn_eq_true_iff

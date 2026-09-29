@@ -1286,6 +1286,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.LocalBinderInstantiationNoCapture
 example :=
+  @Solcore.Frontend.SourceInference.Detail.LocalBinderInstantiationNoCapture.of_quantified_eq_nil
+example :=
   @Solcore.Frontend.SourceInference.Detail.substitutionRangeAvoidsVariablesOn_eq_true_iff
 example :=
   @Solcore.Frontend.SourceInference.Detail.localBinderInstantiationNoCapture_eq_true_iff
