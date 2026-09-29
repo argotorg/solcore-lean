@@ -12993,6 +12993,35 @@ theorem inferStatementsFuel_state_header
   congrArg (fun header : State.Header => header.inputs)
     (inferStatementsFuel_state_header success)
 
+/-- Successful single-statement inference preserves the declaration owner and
+the original input binders. -/
+theorem inferStatementFuel_state_header
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    result.state.header = state.header := by
+  exact inferStatementsFuel_preserves_header_internal.2.2.2.2.1
+    fuel context statement expectedReturn state result success
+
+@[simp] theorem inferStatementFuel_preserves_owner
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    result.state.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (inferStatementFuel_state_header success)
+
+@[simp] theorem inferStatementFuel_preserves_inputs
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    result.state.inputs = state.inputs :=
+  congrArg (fun header : State.Header => header.inputs)
+    (inferStatementFuel_state_header success)
+
 /-- Successful `for`-item sequence inference preserves declaration identity
 and the original input-binder metadata. -/
 theorem inferForItemsFuel_state_header

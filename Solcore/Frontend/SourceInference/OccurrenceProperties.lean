@@ -2647,6 +2647,703 @@ theorem inferMatchCasesFuel_nextOccurrence_le
   inference_preserves_nextOccurrence.2.2.2.2.2.2.2.2.2.2 fuel context
     scrutineeType expectedReturn outerScope cases state result success
 
+private def PreservesOccurrenceBound {alpha : Type}
+    (stateOf : alpha → State) (initial : State)
+    (computation : Except Error alpha) : Prop :=
+  ∀ result, computation = .ok result →
+    initial.OccurrenceBoundExtends (stateOf result)
+
+private theorem pair_except_occurrenceBoundExtends {epsilon alpha : Type}
+    {computation : Except epsilon (alpha × State)}
+    {result : alpha × State} {initial : State}
+    (invariant : ∀ value state,
+      computation = .ok (value, state) →
+        initial.OccurrenceBoundExtends state)
+    (success : computation = .ok result) :
+    initial.OccurrenceBoundExtends result.2 := by
+  rcases result with ⟨value, state⟩
+  exact invariant value state success
+
+private theorem pair_eq_occurrenceBoundExtends {alpha : Type}
+    {result : alpha × State} {initial : State}
+    (invariant : ∀ value state, result = (value, state) →
+      initial.OccurrenceBoundExtends state) :
+    initial.OccurrenceBoundExtends result.2 := by
+  exact invariant result.1 result.2 (Prod.eta result)
+
+private theorem triple_eq_occurrenceBoundExtends {alpha beta : Type}
+    {result : alpha × beta × State} {initial : State}
+    (invariant : ∀ first second state,
+      result = (first, second, state) →
+        initial.OccurrenceBoundExtends state) :
+    initial.OccurrenceBoundExtends result.2.2 := by
+  rcases result with ⟨first, second, state⟩
+  exact invariant first second state rfl
+
+private theorem allocateExpressionId_success_occurrenceBoundExtends
+    {initial allocated : State} {id : ExpressionId}
+    (success : initial.allocateExpressionId = (id, allocated)) :
+    initial.OccurrenceBoundExtends allocated := by
+  have boundExtends :=
+    State.OccurrenceBoundExtends.allocateExpressionId initial
+  rw [success] at boundExtends
+  exact boundExtends
+
+private theorem allocateStatementId_success_occurrenceBoundExtends
+    {initial allocated : State} {id : StatementId}
+    (success : initial.allocateStatementId = (id, allocated)) :
+    initial.OccurrenceBoundExtends allocated := by
+  have boundExtends :=
+    State.OccurrenceBoundExtends.allocateStatementId initial
+  rw [success] at boundExtends
+  exact boundExtends
+
+private theorem fresh_success_occurrenceBoundExtends
+    {initial next : State} {type : Ty}
+    (success : initial.fresh = (type, next)) :
+    initial.OccurrenceBoundExtends next := by
+  have boundExtends := State.OccurrenceBoundExtends.fresh initial
+  rw [success] at boundExtends
+  exact boundExtends
+
+private theorem addRequirementWithId_success_occurrenceBoundExtends
+    {initial next : State} {predicate : ProgramPredicate}
+    {id : RequirementId}
+    (success : initial.addRequirementWithId predicate = (id, next)) :
+    initial.OccurrenceBoundExtends next := by
+  have boundExtends :=
+    State.OccurrenceBoundExtends.addRequirementWithId initial predicate
+  rw [success] at boundExtends
+  exact boundExtends
+
+private theorem addRequirementsWithIds_success_occurrenceBoundExtends
+    {initial next : State} {predicates : List ProgramPredicate}
+    {ids : List RequirementId}
+    (success : initial.addRequirementsWithIds predicates = (ids, next)) :
+    initial.OccurrenceBoundExtends next := by
+  have boundExtends :=
+    State.OccurrenceBoundExtends.addRequirementsWithIds initial predicates
+  rw [success] at boundExtends
+  exact boundExtends
+
+private theorem allocateBinder_success_occurrenceBoundExtends
+    {initial next : State} {name : String} {scheme : TypeSystem.Scheme}
+    {span : Option Syntax.SourceSpan} {comptime : Bool}
+    {schemeRequirements : List LocalSchemeRequirement} {binder : TypedBinder}
+    (success : initial.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, next)) :
+    initial.OccurrenceBoundExtends next := by
+  have boundExtends := State.OccurrenceBoundExtends.allocateBinder initial
+    name scheme span comptime schemeRequirements
+  rw [success] at boundExtends
+  exact boundExtends
+
+private theorem allocateHiddenLocal_success_occurrenceBoundExtends
+    {initial next : State} {binder : Resolved.LocalId}
+    (success : initial.allocateHiddenLocal = (binder, next)) :
+    initial.OccurrenceBoundExtends next := by
+  have boundExtends :=
+    State.OccurrenceBoundExtends.allocateHiddenLocal initial
+  rw [success] at boundExtends
+  exact boundExtends
+
+private theorem replaceInference_addRequirementsWithIds_occurrenceBoundExtends
+    (state : State) (inference : TypeSystem.InferState)
+    (predicates : List ProgramPredicate) :
+    state.OccurrenceBoundExtends
+      (({ state with inference }).addRequirementsWithIds predicates).2 := by
+  have replaced : state.OccurrenceBoundExtends { state with inference } :=
+    .of_nodes_eq_nextOccurrence_eq rfl rfl
+  exact replaced.trans
+    (State.OccurrenceBoundExtends.addRequirementsWithIds
+      { state with inference } predicates)
+
+private theorem replaceLocals_allocateBinder_occurrenceBoundExtends
+    (state : State) (locals : TypeSystem.Environment) (name : String)
+    (scheme : TypeSystem.Scheme) (span : Option Syntax.SourceSpan)
+    (comptime : Bool) (schemeRequirements : List LocalSchemeRequirement) :
+    state.OccurrenceBoundExtends
+      (({ state with locals }).allocateBinder name scheme span comptime
+        schemeRequirements).2 := by
+  have replaced : state.OccurrenceBoundExtends { state with locals } :=
+    .of_nodes_eq_nextOccurrence_eq rfl rfl
+  exact replaced.trans
+    (State.OccurrenceBoundExtends.allocateBinder { state with locals }
+      name scheme span comptime schemeRequirements)
+
+private theorem inferUnaryOperator_occurrenceBoundExtends
+    {context : Context} {operator : Syntax.UnaryOp} {operand : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferUnaryOperator context operator operand expected
+      integerLiterals state = .ok result) :
+    state.OccurrenceBoundExtends result.state := by
+  have exactState := inferUnaryOperator_occurrenceState_eq success
+  exact .of_nodes_eq_nextOccurrence_eq exactState.1 exactState.2
+
+private theorem inferBinaryOperator_occurrenceBoundExtends
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    state.OccurrenceBoundExtends result.state := by
+  have exactState := inferBinaryOperator_occurrenceState_eq success
+  exact .of_nodes_eq_nextOccurrence_eq exactState.1 exactState.2
+
+private theorem recordExpressionWithExpected_after_allocation_occurrenceBoundExtends
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {initial allocated state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result)
+    (beforeRecord : allocated.OccurrenceBoundExtends state) :
+    initial.OccurrenceBoundExtends result.2 := by
+  have allocatedBelow :
+      id.occurrence.index < allocated.nextOccurrence := by
+    have below := State.allocateExpressionId_index_lt_nextOccurrence initial
+    rw [allocation] at below
+    exact below
+  have idBelow : id.occurrence.index < state.nextOccurrence :=
+    Nat.lt_of_lt_of_le allocatedBelow beforeRecord.nextOccurrence_le
+  exact
+    (allocateExpressionId_success_occurrenceBoundExtends allocation).trans
+      (beforeRecord.trans
+        (recordExpressionWithExpected_occurrenceBoundExtends success idBelow))
+
+private theorem recordStatement_after_allocation_occurrenceBoundExtends
+    {initial allocated state : State} {id : StatementId}
+    (allocation : initial.allocateStatementId = (id, allocated))
+    (beforeRecord : allocated.OccurrenceBoundExtends state)
+    (node : StatementNode) (nodeId : node.id = id) :
+    initial.OccurrenceBoundExtends (state.recordNode (.statement node)) := by
+  have allocatedBelow :
+      id.occurrence.index < allocated.nextOccurrence := by
+    have below := State.allocateStatementId_index_lt_nextOccurrence initial
+    rw [allocation] at below
+    exact below
+  have nodeBelow : node.id.occurrence.index < state.nextOccurrence := by
+    rw [nodeId]
+    exact Nat.lt_of_lt_of_le allocatedBelow beforeRecord.nextOccurrence_le
+  exact
+    (allocateStatementId_success_occurrenceBoundExtends allocation).trans
+      (beforeRecord.trans
+        (State.OccurrenceBoundExtends.recordNode state (.statement node)
+          nodeBelow))
+
+private theorem recordExpressionNode_after_allocation_occurrenceBoundExtends
+    (state : State) (node : ExpressionNode)
+    (nodeId : node.id = state.allocateExpressionId.1) :
+    state.OccurrenceBoundExtends
+      (state.allocateExpressionId.2.recordNode (.expression node)) := by
+  have nodeBelow :
+      node.id.occurrence.index < state.allocateExpressionId.2.nextOccurrence := by
+    rw [nodeId]
+    exact State.allocateExpressionId_index_lt_nextOccurrence state
+  exact
+    (State.OccurrenceBoundExtends.allocateExpressionId state).trans
+      (State.OccurrenceBoundExtends.recordNode state.allocateExpressionId.2
+        (.expression node) nodeBelow)
+
+private theorem recordSelectedCall_after_allocation_occurrenceBoundExtends
+    {initial allocated : State} {call : ExpressionId}
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (allocation : initial.allocateExpressionId = (call, allocated))
+    (beforeRecord : allocated.OccurrenceBoundExtends attempt.state)
+    (resultId : attempt.result.id = call) :
+    initial.OccurrenceBoundExtends
+      (recordSelectedCall source callee name arguments attempt).2 := by
+  have callBelow : call.occurrence.index < allocated.nextOccurrence := by
+    have below := State.allocateExpressionId_index_lt_nextOccurrence initial
+    rw [allocation] at below
+    exact below
+  have resultBelow :
+      attempt.result.id.occurrence.index < attempt.state.nextOccurrence := by
+    rw [resultId]
+    exact Nat.lt_of_lt_of_le callBelow beforeRecord.nextOccurrence_le
+  exact
+    (allocateExpressionId_success_occurrenceBoundExtends allocation).trans
+      (beforeRecord.trans
+        (recordSelectedCall_occurrenceBoundExtends source callee name arguments
+          attempt resultBelow))
+
+private theorem recordSelectedCallResult_after_allocation_occurrenceBoundExtends
+    {initial allocated state : State} {call : ExpressionId}
+    (source callee : Syntax.Expr) (name : String)
+    (arguments : List InferredExpression) (attempt : CandidateAttemptResult)
+    (result : InferredExpression) (trailingCoercions : List CoercionStep)
+    (allocation : initial.allocateExpressionId = (call, allocated))
+    (beforeRecord : allocated.OccurrenceBoundExtends state)
+    (resultId : result.id = call) :
+    initial.OccurrenceBoundExtends
+      (recordSelectedCallResult source callee name arguments attempt result
+        trailingCoercions state).2 := by
+  have callBelow : call.occurrence.index < allocated.nextOccurrence := by
+    have below := State.allocateExpressionId_index_lt_nextOccurrence initial
+    rw [allocation] at below
+    exact below
+  have resultBelow : result.id.occurrence.index < state.nextOccurrence := by
+    rw [resultId]
+    exact Nat.lt_of_lt_of_le callBelow beforeRecord.nextOccurrence_le
+  exact
+    (allocateExpressionId_success_occurrenceBoundExtends allocation).trans
+      (beforeRecord.trans
+        (recordSelectedCallResult_occurrenceBoundExtends source callee name
+          arguments attempt result trailingCoercions state resultBelow))
+
+private theorem recordIndirectCall_after_allocation_occurrenceBoundExtends
+    {initial allocated : State} {call : ExpressionId}
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult)
+    (allocation : initial.allocateExpressionId = (call, allocated))
+    (beforeRecord : allocated.OccurrenceBoundExtends result.state)
+    (resultId : result.result.id = call) :
+    initial.OccurrenceBoundExtends
+      (recordIndirectCall source callee arguments result).2 := by
+  have callBelow : call.occurrence.index < allocated.nextOccurrence := by
+    have below := State.allocateExpressionId_index_lt_nextOccurrence initial
+    rw [allocation] at below
+    exact below
+  have resultBelow :
+      result.result.id.occurrence.index < result.state.nextOccurrence := by
+    rw [resultId]
+    exact Nat.lt_of_lt_of_le callBelow beforeRecord.nextOccurrence_le
+  exact
+    (allocateExpressionId_success_occurrenceBoundExtends allocation).trans
+      (beforeRecord.trans
+        (recordIndirectCall_occurrenceBoundExtends source callee arguments
+          result resultBelow))
+
+private theorem recordBuiltinFunctionCall_after_allocation_occurrenceBoundExtends
+    {initial allocated state : State} {call : ExpressionId}
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {expected : Option Ty} {result : InferredExpression × State}
+    (allocation : initial.allocateExpressionId = (call, allocated))
+    (beforeRecord : allocated.OccurrenceBoundExtends state)
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    initial.OccurrenceBoundExtends result.2 := by
+  have callBelow : call.occurrence.index < allocated.nextOccurrence := by
+    have below := State.allocateExpressionId_index_lt_nextOccurrence initial
+    rw [allocation] at below
+    exact below
+  have callBelowFinal : call.occurrence.index < state.nextOccurrence :=
+    Nat.lt_of_lt_of_le callBelow beforeRecord.nextOccurrence_le
+  exact
+    (allocateExpressionId_success_occurrenceBoundExtends allocation).trans
+      (beforeRecord.trans
+        (recordBuiltinFunctionCall_occurrenceBoundExtends success
+          callBelowFinal))
+
+attribute [local grind →]
+  State.OccurrenceBoundExtends.nextOccurrence_le
+  unify_occurrenceBoundExtends
+  withExpected_occurrenceBoundExtends
+  selectFunctionCandidateFrom_occurrenceBoundExtends
+  applyFunctionType_occurrenceBoundExtends
+  bindLambdaParameters_occurrenceBoundExtends
+  inferMatchPatternFuel_occurrenceBoundExtends
+  recordBuiltinFunctionCall_occurrenceBoundExtends
+  fresh_success_occurrenceBoundExtends
+  addRequirementWithId_success_occurrenceBoundExtends
+  addRequirementsWithIds_success_occurrenceBoundExtends
+  allocateBinder_success_occurrenceBoundExtends
+  allocateHiddenLocal_success_occurrenceBoundExtends
+  inferUnaryOperator_occurrenceBoundExtends
+  inferBinaryOperator_occurrenceBoundExtends
+
+set_option maxHeartbeats 2000000 in
+private theorem inference_occurrenceBoundExtends :
+    (∀ fuel context expression expected state,
+      PreservesOccurrenceBound Prod.snd state
+        (inferExprFuel fuel context expression expected state)) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      id.occurrence.index < state.nextOccurrence →
+        PreservesOccurrenceBound Prod.snd state
+          (inferConstructorApplicationFuel fuel context source id instantiation
+            arguments expected state)) ∧
+    (∀ fuel context sources expected state,
+      PreservesOccurrenceBound Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state)) ∧
+    (∀ fuel context statements expectedReturn state,
+      PreservesOccurrenceBound BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state)) ∧
+    (∀ fuel context statement expectedReturn state,
+      PreservesOccurrenceBound StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state)) ∧
+    (∀ fuel context items state,
+      PreservesOccurrenceBound InferredForItems.state state
+        (inferForItemsFuel fuel context items state)) ∧
+    (∀ fuel context item state,
+      PreservesOccurrenceBound Prod.snd state
+        (inferForItemFuel fuel context item state)) ∧
+    (∀ fuel context target state,
+      PreservesOccurrenceBound Prod.snd state
+        (inferPlaceFuel fuel context target state)) ∧
+    (∀ fuel context target operator value state,
+      PreservesOccurrenceBound (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state)) ∧
+    (∀ fuel context expressions state,
+      PreservesOccurrenceBound Prod.snd state
+        (inferExprsFuel fuel context expressions state)) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      PreservesOccurrenceBound MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state)) := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := fun fuel context expression expected state =>
+      PreservesOccurrenceBound Prod.snd state
+        (inferExprFuel fuel context expression expected state))
+    (motive2 := fun fuel context source id instantiation arguments expected
+        state =>
+      id.occurrence.index < state.nextOccurrence →
+        PreservesOccurrenceBound Prod.snd state
+          (inferConstructorApplicationFuel fuel context source id instantiation
+            arguments expected state))
+    (motive3 := fun fuel context sources expected state =>
+      PreservesOccurrenceBound Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state))
+    (motive4 := fun fuel context statements expectedReturn state =>
+      PreservesOccurrenceBound BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state))
+    (motive5 := fun fuel context statement expectedReturn state =>
+      PreservesOccurrenceBound StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state))
+    (motive6 := fun fuel context items state =>
+      PreservesOccurrenceBound InferredForItems.state state
+        (inferForItemsFuel fuel context items state))
+    (motive7 := fun fuel context item state =>
+      PreservesOccurrenceBound Prod.snd state
+        (inferForItemFuel fuel context item state))
+    (motive8 := fun fuel context target state =>
+      PreservesOccurrenceBound Prod.snd state
+        (inferPlaceFuel fuel context target state))
+    (motive9 := fun fuel context target operator value state =>
+      PreservesOccurrenceBound (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state))
+    (motive10 := fun fuel context expressions state =>
+      PreservesOccurrenceBound Prod.snd state
+        (inferExprsFuel fuel context expressions state))
+    (motive11 := fun fuel context scrutineeType expectedReturn outerScope
+        cases state =>
+      PreservesOccurrenceBound MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state))
+  case case15 =>
+    intros context expression expected state fuel calleeId stateAfterId
+      allocationEq keyword parameters returnType body expressionEq bodyInduction
+    unfold PreservesOccurrenceBound at *
+    intro result success
+    unfold inferExprFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals try have bodyExtends := bodyInduction _ _ _ (by assumption)
+    all_goals try have lambdaExtends :=
+      bindLambdaParameters_occurrenceBoundExtends (by assumption)
+    all_goals try have unifiedExtends :=
+      unify_occurrenceBoundExtends (by assumption)
+    all_goals try have unifiedExtends1 :=
+      unify_occurrenceBoundExtends heq_1
+    all_goals try have unifiedExtends2 :=
+      unify_occurrenceBoundExtends heq_2
+    all_goals try have unifiedExtends3 :=
+      unify_occurrenceBoundExtends heq_3
+    all_goals try have unifiedExtends4 :=
+      unify_occurrenceBoundExtends heq_4
+    all_goals try have unifiedExtends5 :=
+      unify_occurrenceBoundExtends heq_5
+    all_goals try have unifiedExtends6 :=
+      unify_occurrenceBoundExtends heq_6
+    all_goals try have unifiedExtends7 :=
+      unify_occurrenceBoundExtends heq_7
+    all_goals try have unifiedExtends8 :=
+      unify_occurrenceBoundExtends heq_8
+    all_goals try have freshExtends :=
+      fresh_success_occurrenceBoundExtends (by assumption)
+    all_goals try
+      have parameterExtends : v.2.2.OccurrenceBoundExtends v_1 :=
+        unify_occurrenceBoundExtends heq_2
+    all_goals try simp_all only [except_pure_eq_ok]
+    all_goals
+      apply recordExpressionWithExpected_after_allocation_occurrenceBoundExtends
+        (allocation := allocationEq) (success := success)
+    all_goals grind [State.OccurrenceBoundExtends.trans,
+      State.OccurrenceBoundExtends.of_nodes_eq_nextOccurrence_eq,
+      State.OccurrenceBoundExtends.fresh,
+      State.OccurrenceBoundExtends.restoreLexicalScope,
+      unify_occurrenceBoundExtends]
+  case case70 =>
+    intros fuel context target operator value state placeInduction
+      valueInduction
+    unfold PreservesOccurrenceBound at *
+    intro result success
+    unfold inferAssignedValueFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try subst_vars
+    all_goals try have placeExtends :=
+      pair_except_occurrenceBoundExtends placeInduction (by assumption)
+    all_goals try have valueExtends :=
+      pair_except_occurrenceBoundExtends (valueInduction _ _) (by assumption)
+    all_goals try have unifiedExtends :=
+      unify_occurrenceBoundExtends (by assumption)
+    all_goals simp_all [Prod.eta]
+    all_goals grind [State.OccurrenceBoundExtends.trans]
+  case case67 =>
+    unfold PreservesOccurrenceBound at *
+    intros
+    simp_all only [inferPlaceFuel]
+  all_goals
+    intros
+    unfold PreservesOccurrenceBound at *
+    intro result success
+    first
+      | unfold inferExprFuel at success
+      | unfold inferConstructorApplicationFuel at success
+      | unfold inferConstructorArgumentsFuel at success
+      | unfold inferStatementsFuel at success
+      | unfold inferStatementFuel at success
+      | unfold inferForItemsFuel at success
+      | unfold inferForItemFuel at success
+      | unfold inferPlaceFuel at success
+      | unfold inferAssignedValueFuel at success
+      | unfold inferExprsFuel at success
+      | unfold inferMatchCasesFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals try specialize ih1 (by
+      grind [State.allocateExpressionId_index_lt_nextOccurrence,
+        State.OccurrenceBoundExtends.trans])
+    all_goals try specialize ih2 (by
+      grind [State.allocateExpressionId_index_lt_nextOccurrence,
+        State.OccurrenceBoundExtends.trans])
+    all_goals try specialize ih3 (by
+      grind [State.allocateExpressionId_index_lt_nextOccurrence,
+        State.OccurrenceBoundExtends.trans])
+    all_goals first
+      | specialize ih1 _ _ _ _ (by assumption)
+      | specialize ih1 _ _ _ (by assumption)
+      | specialize ih1 _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih2 _ _ _ _ (by assumption)
+      | specialize ih2 _ _ _ (by assumption)
+      | specialize ih2 _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih3 _ _ _ _ (by assumption)
+      | specialize ih3 _ _ _ (by assumption)
+      | specialize ih3 _ _ (by assumption)
+      | skip
+    all_goals first
+      | have ih1Extends := pair_eq_occurrenceBoundExtends ih1
+      | have ih1Extends := triple_eq_occurrenceBoundExtends ih1
+      | skip
+    all_goals first
+      | have ih2Extends := pair_eq_occurrenceBoundExtends ih2
+      | have ih2Extends := triple_eq_occurrenceBoundExtends ih2
+      | skip
+    all_goals first
+      | have ih3Extends := pair_eq_occurrenceBoundExtends ih3
+      | have ih3Extends := triple_eq_occurrenceBoundExtends ih3
+      | skip
+    all_goals try have unifiedExtends :=
+      unify_occurrenceBoundExtends (by assumption)
+    all_goals try
+      have recordDirectExtends :=
+        recordExpressionWithExpected_occurrenceBoundExtends
+          (success := by assumption)
+          (idBelow := by
+            grind [State.OccurrenceBoundExtends.trans])
+    all_goals try
+      have recordExtends :=
+        recordExpressionWithExpected_after_allocation_occurrenceBoundExtends
+          (allocation := by assumption)
+          (success := by assumption)
+          (beforeRecord := by
+            first
+              | exact
+                  .of_nodes_eq_nextOccurrence_eq rfl rfl
+              | grind [State.OccurrenceBoundExtends.trans,
+                  State.OccurrenceBoundExtends.of_nodes_eq_nextOccurrence_eq,
+                  State.OccurrenceBoundExtends.fresh,
+                  State.OccurrenceBoundExtends.addRequirementWithId,
+                  State.OccurrenceBoundExtends.addRequirementsWithIds])
+    all_goals try have lambdaExtends :=
+      bindLambdaParameters_occurrenceBoundExtends (by assumption)
+    all_goals try have patternExtends :=
+      inferMatchPatternFuel_occurrenceBoundExtends (by assumption)
+    all_goals try have selectionExtends :=
+      selectFunctionCandidateFrom_occurrenceBoundExtends (by assumption)
+    all_goals try have selectionResultId :=
+      selectFunctionCandidateFrom_result_id (by assumption)
+    all_goals try have expectedExtends :=
+      withExpected_occurrenceBoundExtends (by assumption)
+    all_goals try have expectedExpressionId :=
+      withExpected_success_expression_id (by assumption)
+    all_goals try have applicationExtends :=
+      applyFunctionType_occurrenceBoundExtends (by assumption)
+    all_goals try have applicationResultId :=
+      applyFunctionType_result_id (by assumption)
+    all_goals try have unaryExtends :=
+      inferUnaryOperator_occurrenceBoundExtends (by assumption)
+    all_goals try have binaryExtends :=
+      inferBinaryOperator_occurrenceBoundExtends (by assumption)
+    all_goals try have selectedRecordExtends :=
+      recordSelectedCall_occurrenceBoundExtends _ _ _ _ _ (by
+        grind [State.allocateExpressionId_index_lt_nextOccurrence,
+          State.OccurrenceBoundExtends.trans])
+    all_goals try have selectedResultRecordExtends :=
+      recordSelectedCallResult_occurrenceBoundExtends _ _ _ _ _ _ _ _ (by
+        grind [State.allocateExpressionId_index_lt_nextOccurrence,
+          State.OccurrenceBoundExtends.trans])
+    all_goals try have indirectRecordExtends :=
+      recordIndirectCall_occurrenceBoundExtends _ _ _ _ (by
+        grind [State.allocateExpressionId_index_lt_nextOccurrence,
+          State.OccurrenceBoundExtends.trans])
+    all_goals try
+      have builtinExtends :=
+        recordBuiltinFunctionCall_occurrenceBoundExtends
+          (success := by assumption)
+          (callBelow := by
+            grind [State.allocateExpressionId_index_lt_nextOccurrence,
+              State.OccurrenceBoundExtends.trans])
+    all_goals try have constructorExtends :=
+      freshDataConstructorInstantiation_occurrenceBoundExtends _ _ _
+    all_goals try have expressionAllocationExtends :=
+      allocateExpressionId_success_occurrenceBoundExtends (by assumption)
+    all_goals try have statementAllocationExtends :=
+      allocateStatementId_success_occurrenceBoundExtends (by assumption)
+    all_goals try have freshExtends :=
+      fresh_success_occurrenceBoundExtends (by assumption)
+    all_goals try have requirementExtends :=
+      addRequirementWithId_success_occurrenceBoundExtends (by assumption)
+    all_goals try have requirementsExtends :=
+      addRequirementsWithIds_success_occurrenceBoundExtends (by assumption)
+    all_goals try have binderExtends :=
+      allocateBinder_success_occurrenceBoundExtends (by assumption)
+    all_goals try have hiddenLocalExtends :=
+      allocateHiddenLocal_success_occurrenceBoundExtends (by assumption)
+    all_goals try have exactState12 :
+        state_1.OccurrenceBoundExtends state_2 :=
+      .of_nodes_eq_nextOccurrence_eq rfl rfl
+    all_goals try have exactState23 :
+        state_2.OccurrenceBoundExtends state_3 :=
+      .of_nodes_eq_nextOccurrence_eq rfl rfl
+    all_goals try have exactState34 :
+        state_3.OccurrenceBoundExtends state_4 :=
+      .of_nodes_eq_nextOccurrence_eq rfl rfl
+    all_goals first
+      | apply recordSelectedCall_after_allocation_occurrenceBoundExtends
+          (allocation := by assumption) (resultId := by assumption)
+      | apply recordSelectedCallResult_after_allocation_occurrenceBoundExtends
+          (allocation := by assumption) (resultId := by assumption)
+      | apply recordIndirectCall_after_allocation_occurrenceBoundExtends
+          (allocation := by assumption) (resultId := by assumption)
+      | apply
+          recordBuiltinFunctionCall_after_allocation_occurrenceBoundExtends
+            (allocation := by assumption) (success := by assumption)
+      | apply
+          recordExpressionWithExpected_after_allocation_occurrenceBoundExtends
+            (allocation := by assumption) (success := by assumption)
+      | apply recordStatement_after_allocation_occurrenceBoundExtends
+          (allocation := by assumption) (node := _) (nodeId := rfl)
+      | skip
+    all_goals try simp_all only [except_pure_eq_ok]
+    all_goals try simp_all [Prod.eta]
+    all_goals try simp_all [State.addRequirementWithId,
+      State.addRequirementsWithIds, State.allocateBinder,
+      bind, Except.bind]
+    all_goals try exact
+      replaceInference_addRequirementsWithIds_occurrenceBoundExtends _ _ _
+    all_goals try exact
+      replaceLocals_allocateBinder_occurrenceBoundExtends _ _ _ _ _ _ _
+    all_goals try exact .refl _
+    all_goals grind [State.OccurrenceBoundExtends.trans,
+      State.OccurrenceBoundExtends.of_nodes_eq_nextOccurrence_eq,
+      State.OccurrenceBoundExtends.fresh,
+      State.OccurrenceBoundExtends.withLocals,
+      State.OccurrenceBoundExtends.restoreLexicalScope,
+      State.OccurrenceBoundExtends.allocateBinder,
+      State.OccurrenceBoundExtends.allocateHiddenLocal,
+      State.OccurrenceBoundExtends.allocateExpressionId,
+      State.OccurrenceBoundExtends.allocateStatementId,
+      State.OccurrenceBoundExtends.recordNode,
+      State.OccurrenceBoundExtends.addRequirementWithId,
+      State.OccurrenceBoundExtends.addRequirementsWithIds,
+      recordExpressionWithExpected_after_allocation_occurrenceBoundExtends,
+      recordStatement_after_allocation_occurrenceBoundExtends,
+      recordExpressionNode_after_allocation_occurrenceBoundExtends,
+      recordSelectedCall_after_allocation_occurrenceBoundExtends,
+      recordSelectedCallResult_after_allocation_occurrenceBoundExtends,
+      recordIndirectCall_after_allocation_occurrenceBoundExtends,
+      recordBuiltinFunctionCall_after_allocation_occurrenceBoundExtends,
+      recordExpression_occurrenceBoundExtends,
+      recordSelectedCallResult_occurrenceBoundExtends,
+      recordSelectedCall_occurrenceBoundExtends,
+      recordIndirectCall_occurrenceBoundExtends,
+      freshDataConstructorInstantiation_occurrenceBoundExtends,
+      inferUnaryOperator_occurrenceState_eq,
+      inferBinaryOperator_occurrenceState_eq,
+      State.allocateExpressionId_value,
+      State.allocateExpressionId_index_lt_nextOccurrence,
+      State.allocateStatementId_index_lt_nextOccurrence]
+
+/-- Every successful expression traversal preserves the occurrence-allocation
+bound from its input state. -/
+theorem inferExprFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result) :
+    state.OccurrenceBoundExtends result.2 :=
+  inference_occurrenceBoundExtends.1 fuel context expression expected state
+    result success
+
+/-- Statement-list inference preserves the occurrence-allocation bound. -/
+theorem inferStatementsFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context} {statements : List Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : BlockResult}
+    (success : inferStatementsFuel fuel context statements expectedReturn state =
+      .ok result) :
+    state.OccurrenceBoundExtends result.state :=
+  inference_occurrenceBoundExtends.2.2.2.1 fuel context statements
+    expectedReturn state result success
+
+/-- Single-statement inference preserves the occurrence-allocation bound. -/
+theorem inferStatementFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    state.OccurrenceBoundExtends result.state :=
+  inference_occurrenceBoundExtends.2.2.2.2.1 fuel context statement
+    expectedReturn state result success
+
 /-! ## Anchored node-prefix preservation
 
 Selected-call fitting is the only traversal step that may rewrite already

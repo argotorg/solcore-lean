@@ -381,6 +381,12 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_nextOccurrence_le
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_occurrenceBoundExtends
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_occurrenceBoundExtends
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_occurrenceBoundExtends
+example :=
   @Solcore.Frontend.SourceInference.State.initial_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_preserves_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_requirements_subset
@@ -792,6 +798,12 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_owner
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_inputs
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_state_header
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_preserves_owner
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_preserves_inputs
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_state_header
 example :=
