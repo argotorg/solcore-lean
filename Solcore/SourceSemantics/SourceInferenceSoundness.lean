@@ -9745,6 +9745,22 @@ structure IntegerPatternEvidenceAt
       IntegerLiteralValid context literal
         (resolution.applySubstitution substitution)
 
+/-- Finalized integer-pattern evidence on an extended source remains usable
+on any exact source prefix. -/
+theorem IntegerPatternEvidenceAt.restrictSource
+    {before after : TypedSource} {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {state : Frontend.SourceInference.State} {occurrence : NodeId}
+    (evidence : IntegerPatternEvidenceAt after context substitution state
+      occurrence)
+    (extension : TypingSourceExtends before after) :
+    IntegerPatternEvidenceAt before context substitution state occurrence := by
+  constructor
+  intro literal resolution origin decoded targetEq requirementEq originMember
+    requirementMember occurs
+  exact evidence.valid decoded targetEq requirementEq originMember
+    requirementMember (extension.primaryRequirementOccursAt occurs)
+
 /-- A successful direct flat integer-pattern branch can consume finalized
 occurrence-local evidence without asking its caller to reconstruct the
 literal's origin or canonical requirement row.  The two subset premises

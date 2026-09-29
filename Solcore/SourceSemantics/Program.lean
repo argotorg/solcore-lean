@@ -18,6 +18,20 @@ namespace Solcore.SourceSemantics
 open Frontend
 open Frontend.SourceInference
 
+/-- A primary requirement occurrence retained by a source prefix is also
+retained by every append-only typing-source extension. -/
+theorem TypingSourceExtends.primaryRequirementOccursAt
+    {before after : TypedSource} {occurrence : NodeId}
+    {requirement : RequirementId}
+    (extension : TypingSourceExtends before after)
+    (occurs : PrimaryRequirementOccursAt before occurrence requirement) :
+    PrimaryRequirementOccursAt after occurrence requirement := by
+  unfold PrimaryRequirementOccursAt primaryRequirementOccurrences at occurs ⊢
+  rcases List.mem_flatMap.mp occurs with
+    ⟨node, nodeMember, occurrenceMember⟩
+  exact List.mem_flatMap.mpr
+    ⟨node, extension.nodes_prefix.subset nodeMember, occurrenceMember⟩
+
 /-- A resolved body together with all retained metadata needed by static and
 dynamic source semantics. -/
 structure BodyDefinition where

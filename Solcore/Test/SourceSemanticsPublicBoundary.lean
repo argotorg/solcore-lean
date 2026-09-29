@@ -441,6 +441,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.IntegerPatternEvidenceAt
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.IntegerPatternEvidenceAt.restrictSource
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.IntegerPatternEvidenceAt.integerLiteralValid_of_flat
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternFlatInferenceCertificate
@@ -1144,6 +1146,8 @@ example := @Solcore.SourceSemantics.TypingSourceExtends.trans
 example := @Solcore.SourceSemantics.TypingSourceExtends.applySubstitution
 example := @Solcore.SourceSemantics.TypingSourceExtends.containsExpression
 example := @Solcore.SourceSemantics.TypingSourceExtends.containsStatement
+example :=
+  @Solcore.SourceSemantics.TypingSourceExtends.primaryRequirementOccursAt
 example := @Solcore.SourceSemantics.ExpressionHasType.weakenSource
 example := @Solcore.SourceSemantics.ExpressionFormHasRawType.weakenSource
 example := @Solcore.SourceSemantics.ExpressionsHaveTypes.weakenSource
