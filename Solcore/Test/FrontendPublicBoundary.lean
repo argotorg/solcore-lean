@@ -499,6 +499,14 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_builtinFunctionIdentifier_record
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_builtinBooleanIdentifier_record
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_group_facts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_tuple_facts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_proxy_facts
+example :=
   @Solcore.Frontend.SourceInference.Detail.LambdaPrefixFacts
 example :=
   @Solcore.Frontend.SourceInference.Detail.LambdaPrefixFacts.noExpectedPartsAnnotated

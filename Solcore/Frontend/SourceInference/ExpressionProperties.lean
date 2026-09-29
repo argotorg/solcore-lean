@@ -242,6 +242,28 @@ theorem inferExprFuel_success_localIdentifier_record
   simp only [allocationEq, expressionEq, lookupEq] at success
   simpa only using success
 
+/-- Invert a successful identifier recognized as one of the two builtin
+Boolean constants through the exact expression-recording operation. -/
+theorem inferExprFuel_success_builtinBooleanIdentifier_record
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {result : InferredExpression × State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = none)
+    (isBoolean :
+      (name.value == "true" || name.value == "false") = true)
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    recordExpressionWithExpected context expression id .bool
+      (.reference name.value (.builtinBoolean (name.value == "true"))) []
+      expected allocated = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, lookupEq, isBoolean, if_true]
+    at success
+  simpa only using success
+
 /-- Invert a successful nonlocal identifier with exactly one visible function
 candidate through canonical scheme instantiation, predicate allocation, and
 the precise declaration-reference recording operation. -/
@@ -300,6 +322,84 @@ theorem inferExprFuel_success_builtinFunctionIdentifier_record
   simp only [allocationEq, expressionEq, lookupEq, notBoolean, functionsEq,
     builtinEq, Bool.false_eq_true, if_false, bind, Except.bind] at success
   simpa only using success
+
+/-- Invert successful grouping into the exact recursive inference call and
+the final group-recording operation. -/
+theorem inferExprFuel_success_group_facts
+    {fuel : Nat} {context : Context} {expression inner : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .group inner)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ innerResult innerState,
+      inferExprFuel fuel context inner expected allocated =
+          .ok (innerResult, innerState) ∧
+        recordExpressionWithExpected context expression id innerResult.type
+          (.group innerResult.id) [] expected innerState = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases innerSuccess : inferExprFuel fuel context inner expected allocated with
+  | error error =>
+      simp [innerSuccess, bind, Except.bind] at success
+  | ok innerPair =>
+      rcases innerPair with ⟨innerResult, innerState⟩
+      simp only [innerSuccess, bind, Except.bind] at success
+      exact ⟨innerResult, innerState, rfl, success⟩
+
+/-- Invert successful tuple inference into the exact element traversal and
+the final tuple-recording operation. -/
+theorem inferExprFuel_success_tuple_facts
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {elements : Syntax.DelimitedList Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .tuple elements)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ inferredElements elementsState,
+      inferExprsFuel fuel context elements.elements allocated =
+          .ok (inferredElements, elementsState) ∧
+        recordExpressionWithExpected context expression id
+          (Ty.productMany (inferredElements.map (·.type)))
+          (.tuple (inferredElements.map (·.id))) [] expected elementsState =
+            .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases elementsSuccess : inferExprsFuel fuel context elements.elements
+      allocated with
+  | error error =>
+      simp [elementsSuccess, bind, Except.bind] at success
+  | ok elementsPair =>
+      rcases elementsPair with ⟨inferredElements, elementsState⟩
+      simp only [elementsSuccess, bind, Except.bind] at success
+      exact ⟨inferredElements, elementsState, rfl, success⟩
+
+/-- Invert successful proxy-type expression inference into source-type
+resolution and the exact proxy-recording operation. -/
+theorem inferExprFuel_success_proxy_facts
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {marker : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .proxy marker sourceType)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ inner,
+      resolveSourceType context sourceType = .ok inner ∧
+        recordExpressionWithExpected context expression id (.proxy inner)
+          (.proxy inner) [] expected allocated = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases resolution : resolveSourceType context sourceType with
+  | error error =>
+      simp [resolution, bind, Except.bind] at success
+  | ok inner =>
+      simp only [resolution, bind, Except.bind] at success
+      exact ⟨inner, rfl, success⟩
 
 /-- The executable prefix of lambda inference has four exact successful
 shapes.  An explicit return annotation always supplies the result type;
