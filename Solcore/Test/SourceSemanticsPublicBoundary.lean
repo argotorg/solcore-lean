@@ -669,6 +669,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase.ofRecordIndirectCall
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_inferExprFuel_applyFunctionType_recordIndirectCall_success_expressionTypingBase_scoped
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.nil
