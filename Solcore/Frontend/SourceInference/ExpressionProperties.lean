@@ -11085,6 +11085,52 @@ theorem inferMatchCasesFuel_inferenceProperties
     scrutineeType expectedReturn outerScope cases state ready validated
     canonical scrutineeBelow returnBelow scopeEq result success
 
+/-- Successful explicit match-case inference produces exactly one inferred
+case for each source case. -/
+theorem inferMatchCasesFuel_success_cases_length
+    {fuel : Nat} {context : Context}
+    {scrutineeType expectedReturn : Ty} {outerScope : LexicalScope}
+    {cases : List Syntax.MatchCase} {state : State}
+    {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    result.cases.length = cases.length := by
+  induction fuel generalizing cases state result with
+  | zero =>
+      simp [inferMatchCasesFuel] at success
+  | succ fuel induction =>
+      cases cases with
+      | nil =>
+          simp [inferMatchCasesFuel] at success
+          subst result
+          rfl
+      | cons arm rest =>
+          unfold inferMatchCasesFuel at success
+          simp only [bind, Except.bind] at success
+          cases patternResult : inferMatchPatternFuel fuel context
+              arm.value.pattern scrutineeType state with
+          | error error =>
+              simp [patternResult, bind, Except.bind] at success
+          | ok patternPair =>
+              rcases patternPair with ⟨pattern, patternState⟩
+              simp only [patternResult, bind, Except.bind] at success
+              cases bodyResult : inferStatementsFuel fuel context
+                  arm.value.body.value expectedReturn patternState with
+              | error error =>
+                  simp [bodyResult, bind, Except.bind] at success
+              | ok body =>
+                  simp only [bodyResult, bind, Except.bind] at success
+                  cases tailResult : inferMatchCasesFuel fuel context
+                      scrutineeType expectedReturn outerScope rest
+                      (body.state.restoreLexicalScope outerScope) with
+                  | error error =>
+                      simp [tailResult, bind, Except.bind] at success
+                  | ok tail =>
+                      simp only [tailResult, bind, Except.bind] at success
+                      injection success with resultEq
+                      subst result
+                      simp [induction tailResult]
+
 set_option maxHeartbeats 1000000 in
 private theorem inferFuel_preserves_lexicalScope_internal :
     (∀ fuel context expression expected state,

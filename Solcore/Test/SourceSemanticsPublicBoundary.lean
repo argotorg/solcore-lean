@@ -325,6 +325,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.mergeBodyControls_withDefault_eq_some
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.matchCasesHaveType_facts_ne_nil_of_cases_ne_nil
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.mergeBodyControls_withoutDefault_eq_some_of_ne_nil
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.matchWithDefaultStatementHasType_afterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.forLoopStatementHasType_afterSubstitution

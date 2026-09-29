@@ -777,6 +777,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_success_cases_length
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_state_header
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_owner

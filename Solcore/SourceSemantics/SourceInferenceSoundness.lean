@@ -5721,6 +5721,34 @@ theorem matchWithoutDefaultStatementHasType_afterSubstitution
     (by simp [MatchResolution.applySubstitution]) exhaustive merged
     (by simpa [StatementNode.applySubstitution] using typeEq)
 
+/-- Declarative typing preserves the common shape of the explicit case and
+body-fact rows, so a nonempty case row has a nonempty fact row. -/
+theorem matchCasesHaveType_facts_ne_nil_of_cases_ne_nil
+    {source : TypedSource} {control : ControlContext}
+    {context : SourceSemantics.Context} {scrutineeType : TypeSystem.Ty}
+    {cases : List TypedMatchCase} {facts : List BodyFacts}
+    (typing : MatchCasesHaveType source control context scrutineeType
+      cases facts)
+    (cases_ne : cases ≠ []) : facts ≠ [] := by
+  cases typing with
+  | nil => exact (cases_ne rfl).elim
+  | cons => simp
+
+/-- A nonempty explicit-case fact row always has a control merge even without
+a fallback arm.  The exceptional `none` result is exactly the empty/empty
+recovery shape. -/
+theorem mergeBodyControls_withoutDefault_eq_some_of_ne_nil
+    (caseFacts : List BodyFacts) (caseFacts_ne : caseFacts ≠ []) :
+    ∃ summary, mergeBodyControls caseFacts none = some summary := by
+  cases caseFacts with
+  | nil => exact (caseFacts_ne rfl).elim
+  | cons head tail =>
+      cases merged : mergeBodyControls tail none with
+      | none => exact ⟨head.control, by simp [mergeBodyControls, merged]⟩
+      | some summary =>
+          exact ⟨head.control.branches summary,
+            by simp [mergeBodyControls, merged]⟩
+
 /-- Adding a default body makes `mergeBodyControls` total independently of
 the number of explicit cases. -/
 theorem mergeBodyControls_withDefault_eq_some
@@ -7186,10 +7214,10 @@ theorem inferStatementFuel_success_matchWithoutDefault_sound
       allReturnEq checkedExtension id _
 
 /-- A successful default-free match is deeply sound once explicit-case typing
-is reconstructed and the two genuinely external boundaries are supplied:
-accepted exhaustiveness and a control merge for the nonempty arm collection.
-The latter is not implied by inference success on arbitrary recovery ASTs,
-which may contain no explicit arm and no fallback. -/
+is reconstructed, the recovery AST is known to contain an explicit arm, and
+accepted semantic exhaustiveness is supplied.  Nonemptiness is transported
+through inference and declarative case typing to construct the control merge
+internally. -/
 private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement}
@@ -7242,21 +7270,7 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
               (checked.cases.map
                 (TypedMatchCase.applySubstitution outer)) caseFacts ∧
             allBodiesSawReturn caseFacts = checked.allReturn)
-    (controlMergeSound :
-      ∀ {scrutinee : InferredExpression}
-        {hiddenState : Frontend.SourceInference.State}
-        {checked : Detail.MatchCasesResult} {caseFacts : List BodyFacts},
-        Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
-            expectedReturn hiddenState.lexicalScope arms.value.cases
-            hiddenState = .ok checked →
-        MatchCasesHaveType
-            ((result.state.toTypedSource roots).applySubstitution outer) {
-              returnType := outer.apply expectedReturn
-              loopDepth := inferenceContext.loopDepth
-            } target (outer.apply scrutinee.type)
-            (checked.cases.map
-              (TypedMatchCase.applySubstitution outer)) caseFacts →
-          ∃ summary, mergeBodyControls caseFacts none = some summary)
+    (casesPresent : arms.value.cases ≠ [])
     (scrutineeSound :
       ∀ {scrutinee : InferredExpression}
         {scrutineeState : Frontend.SourceInference.State},
@@ -7379,7 +7393,19 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
           TypedSource.applySubstitution] using checkedOwner)
       scrutineeTyping.type_admissible hiddenInvariant checkedExtension
       casesSuccess
-  obtain ⟨summary, merged⟩ := controlMergeSound casesSuccess casesTyping
+  have checkedCasesPresent : checked.cases ≠ [] := by
+    intro checkedCasesEq
+    have lengthEq := Detail.inferMatchCasesFuel_success_cases_length
+      casesSuccess
+    rw [checkedCasesEq] at lengthEq
+    apply casesPresent
+    simpa using lengthEq.symm
+  have caseFactsPresent : caseFacts ≠ [] :=
+    matchCasesHaveType_facts_ne_nil_of_cases_ne_nil casesTyping (by
+      simpa using checkedCasesPresent)
+  obtain ⟨summary, merged⟩ :=
+    mergeBodyControls_withoutDefault_eq_some_of_ne_nil caseFacts
+      caseFactsPresent
   refine ⟨{
       type := if allBodiesSawReturn caseFacts then
         outer.apply expectedReturn
@@ -8867,24 +8893,12 @@ structure StatementInferenceSoundnessCallbacks
       patternResult.resolution = .integerLiteral literalSource resolution →
       IntegerLiteralValid target literalSource
         (resolution.applySubstitution outer)
-  matchControlMergeWithoutDefault :
+  matchCasesPresentWithoutDefault :
     ∀ {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
-      {arms : Syntax.MatchArms} {scrutinee : InferredExpression}
-      {hiddenState : Frontend.SourceInference.State}
-      {checked : Detail.MatchCasesResult} {caseFacts : List BodyFacts},
+      {arms : Syntax.MatchArms},
       statement.value = .matchWith scrutinees arms →
       arms.value.defaultBody = none →
-      Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
-          expectedReturn hiddenState.lexicalScope arms.value.cases
-          hiddenState = .ok checked →
-      MatchCasesHaveType
-          ((result.state.toTypedSource roots).applySubstitution outer) {
-            returnType := outer.apply expectedReturn
-            loopDepth := inferenceContext.loopDepth
-          } target (outer.apply scrutinee.type)
-          (checked.cases.map (TypedMatchCase.applySubstitution outer))
-          caseFacts →
-        ∃ summary, mergeBodyControls caseFacts none = some summary
+      arms.value.cases ≠ []
   matchExhaustiveWithoutDefault :
     ∀ {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
       {arms : Syntax.MatchArms} {scrutinee : InferredExpression}
@@ -9065,9 +9079,7 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                       hiddenReturnBelow hiddenBelow sourceOwner
                       scrutineeAdmissible hiddenInvariant checkedExtension
                       casesSuccess)
-                  (fun casesSuccess casesTyping =>
-                    callbacks.matchControlMergeWithoutDefault rfl defaultEq
-                      casesSuccess casesTyping)
+                  (callbacks.matchCasesPresentWithoutDefault rfl defaultEq)
                   callbacks.matchScrutinee
                   (fun scrutineeSuccess casesSuccess guardPassed =>
                     callbacks.matchExhaustiveWithoutDefault rfl defaultEq
@@ -11481,10 +11493,11 @@ theorem inferMatchCasesFuel_success_sound
                           (bodyResult.sawReturn && tail.allReturn)
                         rw [headAgreement.sawReturn_eq, tailAgreement]
 
-/-- The deep default-free match theorem reconstructs every explicit arm from
-pattern soundness and ordinary recursive statement-list soundness.  Only the
-parser/recovery-sensitive nonempty control merge and semantic exhaustiveness
-certificate remain as match-specific boundaries. -/
+/-- The deep default-free match theorem reconstructs every explicit arm and
+its control merge from pattern soundness, ordinary recursive statement-list
+soundness, and the parser/recovery-sensitive fact that an arm is present.
+Only semantic exhaustiveness remains as a substantive match-specific proof
+boundary. -/
 theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement}
@@ -11519,21 +11532,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
     (patternBranches : MatchPatternBranchSoundnessCallbacks
       ((result.state.toTypedSource roots).applySubstitution outer)
       inferenceContext target outer)
-    (controlMergeSound :
-      ∀ {scrutinee : InferredExpression}
-        {hiddenState : Frontend.SourceInference.State}
-        {checked : Detail.MatchCasesResult} {caseFacts : List BodyFacts},
-        Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
-            expectedReturn hiddenState.lexicalScope arms.value.cases
-            hiddenState = .ok checked →
-        MatchCasesHaveType
-            ((result.state.toTypedSource roots).applySubstitution outer) {
-              returnType := outer.apply expectedReturn
-              loopDepth := inferenceContext.loopDepth
-            } target (outer.apply scrutinee.type)
-            (checked.cases.map
-              (TypedMatchCase.applySubstitution outer)) caseFacts →
-          ∃ summary, mergeBodyControls caseFacts none = some summary)
+    (casesPresent : arms.value.cases ≠ [])
     (scrutineeSound :
       ∀ {scrutinee : InferredExpression}
         {scrutineeState : Frontend.SourceInference.State},
@@ -11584,7 +11583,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
   apply inferStatementFuel_success_matchWithoutDefault_deep_of_cases
     statementEq defaultEq allocationEq success signatureFormation
     functionsCanonical ready returnBelow below invariant outerExtension roots
-    ?_ controlMergeSound scrutineeSound exhaustivenessSound
+    ?_ casesPresent scrutineeSound exhaustivenessSound
   intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
     hiddenInvariant checkedExtension casesSuccess
