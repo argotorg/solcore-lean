@@ -887,6 +887,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_inferenceProperties
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_inferenceProperties

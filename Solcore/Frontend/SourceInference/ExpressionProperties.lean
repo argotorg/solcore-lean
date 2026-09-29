@@ -11587,6 +11587,14 @@ private theorem inferStatementsFuel_inferenceProperties_internal
   inferFuel_inferenceProperties_internal.2.2.2.1 fuel context statements
     expectedReturn state
 
+private theorem inferStatementFuel_inferenceProperties_internal
+    (fuel : Nat) (context : Context) (statement : Syntax.Statement)
+    (expectedReturn : Ty) (state : State) :
+    InferStatementFuelInferenceProperties fuel context statement
+      expectedReturn state :=
+  inferFuel_inferenceProperties_internal.2.2.2.2.1 fuel context statement
+    expectedReturn state
+
 private theorem inferForItemsFuel_inferenceProperties_internal
     (fuel : Nat) (context : Context) (items : List Syntax.ForItem)
     (state : State) :
@@ -11730,6 +11738,28 @@ theorem inferStatementsFuel_inferenceProperties
   exact inferStatementsFuel_inferenceProperties_internal fuel context
     statements expectedReturn state ready validated canonical returnBelow
     result success
+
+/-- Successful inference of one statement makes monotone inference progress,
+leaves the resulting state ready for further inference, and returns a type
+whose variables are allocated by that state. -/
+theorem inferStatementFuel_inferenceProperties
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State}
+    (ready : state.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (returnBelow : expectedReturn.VariablesBelow state.inference.next)
+    {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    state.InferenceProgress result.state ∧
+      result.state.InferenceReady ∧
+      result.type.VariablesBelow result.state.inference.next := by
+  exact inferStatementFuel_inferenceProperties_internal fuel context statement
+    expectedReturn state ready validated canonical returnBelow result success
 
 /-- Successful `for`-item sequence inference makes monotone progress and
 leaves the resulting state ready for the condition or loop body. -/
