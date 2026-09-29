@@ -2212,6 +2212,35 @@ theorem attachExpressionCoercions_containsExpression
           exact List.mem_map.mpr ⟨entry, member, equal⟩
         · exact contains
 
+/-- Recording a selected direct call extends the coercion-attached typed
+source by the synthetic callee and call nodes appended by the executable
+recorder. -/
+theorem recordSelectedCallResult_success_attachedTypingSourceExtends
+    {source callee : Syntax.Expr} {name : String}
+    {arguments : List InferredExpression}
+    {attempt : Detail.CandidateAttemptResult}
+    {result : InferredExpression}
+    {trailingCoercions : List CoercionStep}
+    {state : Frontend.SourceInference.State}
+    {recorded : InferredExpression × Frontend.SourceInference.State}
+    (success : Detail.recordSelectedCallResult source callee name arguments
+      attempt result trailingCoercions state = recorded)
+    (roots : List NodeId := []) :
+    TypingSourceExtends
+      ((Detail.attachExpressionCoercions state attempt.argumentCoercions
+        ).toTypedSource roots)
+      (recorded.2.toTypedSource roots) := by
+  have nodesEq :=
+    (Detail.recordSelectedCallResult_success_nodes success).2
+  constructor
+  · subst recorded
+    rfl
+  · change
+      (Detail.attachExpressionCoercions state attempt.argumentCoercions).nodes
+        <+: recorded.2.nodes
+    rw [nodesEq]
+    exact List.prefix_append _ _
+
 /-- Recording an expression node immediately materializes declarative
 expression containment. -/
 theorem recordNode_containsExpression
