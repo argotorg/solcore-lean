@@ -16,6 +16,17 @@ open TypeSystem
 open SourceSemantics
 open SourceSemantics.StructuralSubstitution
 
+/-- The expression-child scope bridge is available from the public graph
+module without exposing its initialized-binding implementation details. -/
+example {source : TypedSource} {context : SourceSemantics.Context}
+    {parent child : ExpressionId}
+    (parentCovered :
+      TemplateScopeCovered source context (.expression parent))
+    (closed : OccurrenceGraphClosed source)
+    (edge : DirectChild source (.expression parent) (.expression child)) :
+    TemplateScopeCovered source context (.expression child) :=
+  TemplateScopeCovered.expressionChild parentCovered closed edge
+
 private def captureSource : TypeVarId := ⟨0⟩
 
 private def captureProtected : TypeVarId := ⟨1⟩
