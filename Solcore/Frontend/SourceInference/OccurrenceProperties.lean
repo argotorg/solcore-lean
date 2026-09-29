@@ -3406,5 +3406,1570 @@ theorem inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_preserves_
   exact Nat.le_trans cutoffLe
     (inferExprsFuel_success_ids_fresh argumentsSuccess argument member)
 
+/-! The mutual traversal proof is most conveniently phrased as a private
+transitive relation.  In addition to monotonic occurrence allocation, the
+relation remembers that every prefix anchored below an older cutoff remains
+byte-for-byte unchanged.  A selected call does not in general relate its
+immediate input state to its output in this sense: it may refine argument
+nodes already present in that input.  The overloaded-expression cases below
+therefore establish the relation directly from the enclosing traversal's
+input, using argument-root freshness. -/
+
+private structure AnchoredNodePrefixExtends (before after : State) : Prop where
+  nextOccurrence_le : before.nextOccurrence ≤ after.nextOccurrence
+  preserves_nodesPrefix :
+    ∀ {baseNodes : List Node} {cutoff : Nat},
+      baseNodes <+: before.nodes →
+      (∀ node ∈ baseNodes, node.occurrenceId.index < cutoff) →
+      cutoff ≤ before.nextOccurrence →
+      baseNodes <+: after.nodes
+
+namespace AnchoredNodePrefixExtends
+
+theorem refl (state : State) : AnchoredNodePrefixExtends state state :=
+  ⟨Nat.le_refl _, fun nodesPrefix _ _ => nodesPrefix⟩
+
+theorem trans {first second third : State}
+    (left : AnchoredNodePrefixExtends first second)
+    (right : AnchoredNodePrefixExtends second third) :
+    AnchoredNodePrefixExtends first third := by
+  constructor
+  · exact Nat.le_trans left.nextOccurrence_le right.nextOccurrence_le
+  · intro baseNodes cutoff nodesPrefix baseBelow cutoffLe
+    exact right.preserves_nodesPrefix
+      (left.preserves_nodesPrefix nodesPrefix baseBelow cutoffLe) baseBelow
+      (Nat.le_trans cutoffLe left.nextOccurrence_le)
+
+theorem of_nodesPrefix {before after : State}
+    (nodesPrefix : before.nodes <+: after.nodes)
+    (nextOccurrence_le : before.nextOccurrence ≤ after.nextOccurrence) :
+    AnchoredNodePrefixExtends before after := by
+  constructor
+  · exact nextOccurrence_le
+  · intro baseNodes cutoff basePrefix _ _
+    exact basePrefix.trans nodesPrefix
+
+theorem of_occurrenceState_eq {before after : State}
+    (nodesEq : after.nodes = before.nodes)
+    (nextOccurrenceEq : after.nextOccurrence = before.nextOccurrence) :
+    AnchoredNodePrefixExtends before after := by
+  apply of_nodesPrefix
+  · rw [nodesEq]
+    exact List.prefix_rfl
+  · rw [nextOccurrenceEq]
+    exact Nat.le_refl _
+
+end AnchoredNodePrefixExtends
+
+private def PreservesAnchoredNodePrefix {alpha : Type}
+    (stateOf : alpha → State) (initial : State)
+    (computation : Except Error alpha) : Prop :=
+  ∀ result, computation = .ok result →
+    AnchoredNodePrefixExtends initial (stateOf result)
+
+private theorem pair_eq_anchoredNodePrefixExtends {alpha : Type}
+    {result : alpha × State} {initial : State}
+    (invariant : ∀ value state, result = (value, state) →
+      AnchoredNodePrefixExtends initial state) :
+    AnchoredNodePrefixExtends initial result.2 := by
+  exact invariant result.1 result.2 (Prod.eta result)
+
+private theorem triple_eq_anchoredNodePrefixExtends {alpha beta : Type}
+    {result : alpha × beta × State} {initial : State}
+    (invariant : ∀ first second state,
+      result = (first, second, state) →
+        AnchoredNodePrefixExtends initial state) :
+    AnchoredNodePrefixExtends initial result.2.2 := by
+  rcases result with ⟨first, second, state⟩
+  exact invariant first second state rfl
+
+private theorem allocateExpressionId_success_anchoredNodePrefixExtends
+    {initial allocated : State} {id : ExpressionId}
+    (success : initial.allocateExpressionId = (id, allocated)) :
+    AnchoredNodePrefixExtends initial allocated := by
+  apply AnchoredNodePrefixExtends.of_nodesPrefix
+  · have nodesPrefix := allocateExpressionId_preserves_nodesPrefix initial
+      (List.prefix_rfl)
+    rw [success] at nodesPrefix
+    exact nodesPrefix
+  · exact (allocateExpressionId_success_occurrenceBoundExtends success).nextOccurrence_le
+
+private theorem allocateStatementId_success_anchoredNodePrefixExtends
+    {initial allocated : State} {id : StatementId}
+    (success : initial.allocateStatementId = (id, allocated)) :
+    AnchoredNodePrefixExtends initial allocated := by
+  apply AnchoredNodePrefixExtends.of_nodesPrefix
+  · have nodesPrefix := allocateStatementId_preserves_nodesPrefix initial
+      (List.prefix_rfl)
+    rw [success] at nodesPrefix
+    exact nodesPrefix
+  · exact (allocateStatementId_success_occurrenceBoundExtends success).nextOccurrence_le
+
+private theorem recordExpressionWithExpected_anchoredNodePrefixExtends
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result) :
+    AnchoredNodePrefixExtends state result.2 := by
+  apply AnchoredNodePrefixExtends.of_nodesPrefix
+  · exact recordExpressionWithExpected_preserves_nodesPrefix success
+      (List.prefix_rfl)
+  · rw [recordExpressionWithExpected_success_nextOccurrence success]
+    exact Nat.le_refl _
+
+private theorem recordBuiltinFunctionCall_anchoredNodePrefixExtends
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    AnchoredNodePrefixExtends state result.2 := by
+  apply AnchoredNodePrefixExtends.of_nodesPrefix
+  · exact recordBuiltinFunctionCall_preserves_nodesPrefix success
+      (List.prefix_rfl)
+  · rw [recordBuiltinFunctionCall_success_nextOccurrence success]
+    exact Nat.le_succ _
+
+private theorem recordIndirectCall_anchoredNodePrefixExtends
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult) :
+    AnchoredNodePrefixExtends result.state
+      (recordIndirectCall source callee arguments result).2 := by
+  apply AnchoredNodePrefixExtends.of_nodesPrefix
+  · exact recordIndirectCall_preserves_nodesPrefix source callee arguments result
+      (List.prefix_rfl)
+  · rw [recordIndirectCall_nextOccurrence]
+    exact Nat.le_refl _
+
+private theorem syntheticTuple_anchoredNodePrefixExtends
+    (state : State) (elements : List InferredExpression)
+    (span : Syntax.SourceSpan) :
+    AnchoredNodePrefixExtends state
+      (state.allocateExpressionId.2.recordNode (.expression {
+        id := state.allocateExpressionId.1
+        span
+        type := Ty.productMany (elements.map (·.type))
+        form := .tuple (elements.map (·.id))
+      })) := by
+  apply AnchoredNodePrefixExtends.of_nodesPrefix
+  · exact (allocateExpressionId_preserves_nodesPrefix state (List.prefix_rfl)).trans
+      (State.recordNode_nodesPrefix state.allocateExpressionId.2 _)
+  · simp only [State.recordNode_nextOccurrence,
+      State.allocateExpressionId_nextOccurrence]
+    exact Nat.le_succ _
+
+private theorem unify_anchoredNodePrefixExtends
+    {state next : State} {left right : Ty}
+    (success : unify state left right = .ok next) :
+    AnchoredNodePrefixExtends state next := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (unify_occurrenceState_eq success).1 (unify_occurrenceState_eq success).2
+
+private theorem withExpected_anchoredNodePrefixExtends
+    {context : Context} {state : State} {actual : InferredExpression}
+    {expected : Option Ty} {result : ExpectationResult}
+    (success : withExpected context state actual expected = .ok result) :
+    AnchoredNodePrefixExtends state result.state := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (withExpected_occurrenceState_eq success).1
+    (withExpected_occurrenceState_eq success).2
+
+private theorem selectFunctionCandidateFrom_anchoredNodePrefixExtends
+    {context : Context} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : CandidateAttemptResult}
+    (success : selectFunctionCandidateFrom context name candidates arguments
+      integerLiteralOrigins call expected state = .ok result) :
+    AnchoredNodePrefixExtends state result.state := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (selectFunctionCandidateFrom_occurrenceState_eq success).1
+    (selectFunctionCandidateFrom_occurrenceState_eq success).2
+
+private theorem applyFunctionType_anchoredNodePrefixExtends
+    {context : Context} {call : ExpressionId} {calleeType : Ty}
+    {arguments : List InferredExpression}
+    {expected : Option Ty} {state : State}
+    {result : IndirectApplicationResult}
+    (success : applyFunctionType context call calleeType arguments expected state =
+      .ok result) :
+    AnchoredNodePrefixExtends state result.state := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (applyFunctionType_occurrenceState_eq success).1
+    (applyFunctionType_occurrenceState_eq success).2
+
+private theorem bindLambdaParameters_anchoredNodePrefixExtends
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {state : State}
+    {result : List TypedBinder × List Ty × State}
+    (success : bindLambdaParameters context parameters index seen state =
+      .ok result) :
+    AnchoredNodePrefixExtends state result.2.2 := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (bindLambdaParameters_occurrenceState_eq success).1
+    (bindLambdaParameters_occurrenceState_eq success).2
+
+private theorem bindLambdaParameters_then_unify_anchoredNodePrefixExtends
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {initial : State}
+    {bound : List TypedBinder × List Ty × State} {expectedParameter : Ty}
+    {next : State}
+    (binding : bindLambdaParameters context parameters index seen initial =
+      .ok bound)
+    (unification : unify bound.2.2 (Ty.productMany bound.2.1)
+      expectedParameter = .ok next) :
+    AnchoredNodePrefixExtends initial next :=
+  (bindLambdaParameters_anchoredNodePrefixExtends binding).trans
+    (unify_anchoredNodePrefixExtends unification)
+
+private theorem bindLambdaParameters_then_unify_pair_anchoredNodePrefixExtends
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {initial : State}
+    {bound : List TypedBinder × List Ty × State} {expectedParameter : Ty}
+    {next : State} {resultType : Ty} {pair : Ty × State}
+    (binding : bindLambdaParameters context parameters index seen initial =
+      .ok bound)
+    (unification : unify bound.2.2 (Ty.productMany bound.2.1)
+      expectedParameter = .ok next)
+    (pairEq : (resultType, next) = pair) :
+    AnchoredNodePrefixExtends initial pair.2 := by
+  have prefixExtends :=
+    bindLambdaParameters_then_unify_anchoredNodePrefixExtends binding
+      unification
+  rw [← congrArg Prod.snd pairEq]
+  exact prefixExtends
+
+private theorem lambdaTraversal_anchoredNodePrefixExtends
+    {context : Context} {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String} {initial : State}
+    {bound : List TypedBinder × List Ty × State} {expectedParameter : Ty}
+    {parameterState : State} {resultType : Ty} {pair : Ty × State}
+    {bodyState finalState : State} {bodyType : Ty}
+    (binding : bindLambdaParameters context parameters index seen initial =
+      .ok bound)
+    (parameterUnification : unify bound.2.2 (Ty.productMany bound.2.1)
+      expectedParameter = .ok parameterState)
+    (pairEq : (resultType, parameterState) = pair)
+    (bodyExtends : AnchoredNodePrefixExtends pair.2 bodyState)
+    (finalUnification : unify bodyState bodyType pair.1 = .ok finalState)
+    (scope : LexicalScope) :
+    AnchoredNodePrefixExtends initial
+      (finalState.restoreLexicalScope scope) :=
+  (bindLambdaParameters_then_unify_pair_anchoredNodePrefixExtends binding
+    parameterUnification pairEq).trans
+    (bodyExtends.trans
+      ((unify_anchoredNodePrefixExtends finalUnification).trans
+        (AnchoredNodePrefixExtends.of_nodesPrefix
+          (restoreLexicalScope_preserves_nodesPrefix finalState scope
+            List.prefix_rfl)
+          (State.OccurrenceBoundExtends.restoreLexicalScope finalState
+            scope).nextOccurrence_le)))
+
+private theorem inferMatchPatternFuel_anchoredNodePrefixExtends
+    {fuel : Nat} {context : Context} {pattern : Syntax.Pattern}
+    {expected : Ty} {state : State} {result : TypedMatchPattern × State}
+    (success : inferMatchPatternFuel fuel context pattern expected state =
+      .ok result) :
+    AnchoredNodePrefixExtends state result.2 := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (inferMatchPatternFuel_occurrenceState_eq success).1
+    (inferMatchPatternFuel_occurrenceState_eq success).2
+
+private theorem inferUnaryOperator_anchoredNodePrefixExtends
+    {context : Context} {operator : Syntax.UnaryOp} {operand : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferUnaryOperator context operator operand expected
+      integerLiterals state = .ok result) :
+    AnchoredNodePrefixExtends state result.state := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (inferUnaryOperator_occurrenceState_eq success).1
+    (inferUnaryOperator_occurrenceState_eq success).2
+
+private theorem inferBinaryOperator_anchoredNodePrefixExtends
+    {context : Context} {operator : Syntax.BinaryOp} {left right : Ty}
+    {expected : Option Ty} {integerLiterals : List IntegerLiteralOrigin}
+    {state : State} {result : OperatorInferenceResult}
+    (success : inferBinaryOperator context operator left right expected
+      integerLiterals state = .ok result) :
+    AnchoredNodePrefixExtends state result.state := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (inferBinaryOperator_occurrenceState_eq success).1
+    (inferBinaryOperator_occurrenceState_eq success).2
+
+private theorem recordNode_anchoredNodePrefixExtends
+    (state : State) (node : Node) :
+    AnchoredNodePrefixExtends state (state.recordNode node) := by
+  exact AnchoredNodePrefixExtends.of_nodesPrefix
+    (State.recordNode_nodesPrefix state node) (by
+      rw [State.recordNode_nextOccurrence]
+      exact Nat.le_refl _)
+
+private theorem fresh_anchoredNodePrefixExtends (state : State) :
+    AnchoredNodePrefixExtends state state.fresh.2 := by
+  exact AnchoredNodePrefixExtends.of_nodesPrefix
+    (fresh_preserves_nodesPrefix state List.prefix_rfl)
+    (State.OccurrenceBoundExtends.fresh state).nextOccurrence_le
+
+private theorem withLocals_anchoredNodePrefixExtends
+    (state : State) (locals : TypeSystem.Environment) :
+    AnchoredNodePrefixExtends state (state.withLocals locals) := by
+  exact AnchoredNodePrefixExtends.of_nodesPrefix
+    (withLocals_preserves_nodesPrefix state locals List.prefix_rfl)
+    (State.OccurrenceBoundExtends.withLocals state locals).nextOccurrence_le
+
+private theorem restoreLexicalScope_anchoredNodePrefixExtends
+    (state : State) (scope : LexicalScope) :
+    AnchoredNodePrefixExtends state (state.restoreLexicalScope scope) := by
+  exact AnchoredNodePrefixExtends.of_nodesPrefix
+    (restoreLexicalScope_preserves_nodesPrefix state scope List.prefix_rfl)
+    (State.OccurrenceBoundExtends.restoreLexicalScope state scope).nextOccurrence_le
+
+private theorem addRequirementWithId_anchoredNodePrefixExtends
+    (state : State) (predicate : ProgramPredicate) :
+    AnchoredNodePrefixExtends state (state.addRequirementWithId predicate).2 := by
+  exact AnchoredNodePrefixExtends.of_nodesPrefix List.prefix_rfl
+    (State.OccurrenceBoundExtends.addRequirementWithId state predicate).nextOccurrence_le
+
+private theorem addRequirementsWithIds_anchoredNodePrefixExtends
+    (state : State) (predicates : List ProgramPredicate) :
+    AnchoredNodePrefixExtends state
+      (state.addRequirementsWithIds predicates).2 := by
+  exact AnchoredNodePrefixExtends.of_nodesPrefix (by
+    rw [State.addRequirementsWithIds_nodes]
+    exact List.prefix_rfl)
+    (State.OccurrenceBoundExtends.addRequirementsWithIds state predicates).nextOccurrence_le
+
+private theorem allocateBinder_anchoredNodePrefixExtends
+    (state : State) (name : String) (scheme : TypeSystem.Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (schemeRequirements : List LocalSchemeRequirement) :
+    AnchoredNodePrefixExtends state
+      (state.allocateBinder name scheme span comptime schemeRequirements).2 := by
+  exact AnchoredNodePrefixExtends.of_nodesPrefix
+    (allocateBinder_preserves_nodesPrefix state name scheme span comptime
+      schemeRequirements List.prefix_rfl)
+    (State.OccurrenceBoundExtends.allocateBinder state name scheme span comptime
+      schemeRequirements).nextOccurrence_le
+
+private theorem allocateHiddenLocal_anchoredNodePrefixExtends (state : State) :
+    AnchoredNodePrefixExtends state state.allocateHiddenLocal.2 := by
+  exact AnchoredNodePrefixExtends.of_nodesPrefix
+    (allocateHiddenLocal_preserves_nodesPrefix state List.prefix_rfl)
+    (State.OccurrenceBoundExtends.allocateHiddenLocal state).nextOccurrence_le
+
+private theorem freshDataConstructorInstantiation_anchoredNodePrefixExtends
+    (dataType : ProgramDataSignature)
+    (constructor : ProgramDataConstructorSignature) (state : State) :
+    AnchoredNodePrefixExtends state
+      (freshDataConstructorInstantiation dataType constructor state).2 := by
+  exact AnchoredNodePrefixExtends.of_occurrenceState_eq
+    (freshDataConstructorInstantiation_nodes dataType constructor state)
+    (freshDataConstructorInstantiation_nextOccurrence dataType constructor
+      state)
+
+private theorem replaceInference_anchoredNodePrefixExtends
+    (state : State) (inference : TypeSystem.InferState) :
+    AnchoredNodePrefixExtends state { state with inference } :=
+  .of_occurrenceState_eq rfl rfl
+
+private theorem replaceLocals_anchoredNodePrefixExtends
+    (state : State) (locals : TypeSystem.Environment) :
+    AnchoredNodePrefixExtends state { state with locals } :=
+  .of_occurrenceState_eq rfl rfl
+
+private theorem recordExpression_anchoredNodePrefixExtends
+    (source : Syntax.Expr) (expression : InferredExpression)
+    (form : ExpressionForm) (requirements : List RequirementId)
+    (coercions : List CoercionStep) (state : State) :
+    AnchoredNodePrefixExtends state
+      (recordExpression source expression form requirements coercions state).2 := by
+  apply AnchoredNodePrefixExtends.of_nodesPrefix
+  · exact recordExpression_preserves_nodesPrefix source expression form
+      requirements coercions state List.prefix_rfl
+  · simp only [recordExpression, State.recordNode_nextOccurrence]
+    exact Nat.le_refl _
+
+private theorem fresh_success_anchoredNodePrefixExtends
+    {initial next : State} {type : Ty}
+    (success : initial.fresh = (type, next)) :
+    AnchoredNodePrefixExtends initial next := by
+  have step := fresh_anchoredNodePrefixExtends initial
+  rw [success] at step
+  exact step
+
+private theorem addRequirementWithId_success_anchoredNodePrefixExtends
+    {initial next : State} {predicate : ProgramPredicate}
+    {id : RequirementId}
+    (success : initial.addRequirementWithId predicate = (id, next)) :
+    AnchoredNodePrefixExtends initial next := by
+  have step := addRequirementWithId_anchoredNodePrefixExtends initial predicate
+  rw [success] at step
+  exact step
+
+private theorem addRequirementsWithIds_success_anchoredNodePrefixExtends
+    {initial next : State} {predicates : List ProgramPredicate}
+    {ids : List RequirementId}
+    (success : initial.addRequirementsWithIds predicates = (ids, next)) :
+    AnchoredNodePrefixExtends initial next := by
+  have step :=
+    addRequirementsWithIds_anchoredNodePrefixExtends initial predicates
+  rw [success] at step
+  exact step
+
+private theorem allocateBinder_success_anchoredNodePrefixExtends
+    {initial next : State} {name : String} {scheme : TypeSystem.Scheme}
+    {span : Option Syntax.SourceSpan} {comptime : Bool}
+    {schemeRequirements : List LocalSchemeRequirement} {binder : TypedBinder}
+    (success : initial.allocateBinder name scheme span comptime
+      schemeRequirements = (binder, next)) :
+    AnchoredNodePrefixExtends initial next := by
+  have step := allocateBinder_anchoredNodePrefixExtends initial name scheme
+    span comptime schemeRequirements
+  rw [success] at step
+  exact step
+
+private theorem allocateHiddenLocal_success_anchoredNodePrefixExtends
+    {initial next : State} {binder : Resolved.LocalId}
+    (success : initial.allocateHiddenLocal = (binder, next)) :
+    AnchoredNodePrefixExtends initial next := by
+  have step := allocateHiddenLocal_anchoredNodePrefixExtends initial
+  rw [success] at step
+  exact step
+
+private theorem recordExpressionWithExpected_after_allocation_anchoredNodePrefixExtends
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {initial allocated state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result)
+    (beforeRecord : AnchoredNodePrefixExtends allocated state) :
+    AnchoredNodePrefixExtends initial result.2 :=
+  (allocateExpressionId_success_anchoredNodePrefixExtends allocation).trans
+    (beforeRecord.trans
+      (recordExpressionWithExpected_anchoredNodePrefixExtends success))
+
+private theorem recordStatement_after_allocation_anchoredNodePrefixExtends
+    {initial allocated state : State} {id : StatementId}
+    (allocation : initial.allocateStatementId = (id, allocated))
+    (beforeRecord : AnchoredNodePrefixExtends allocated state)
+    (node : StatementNode) :
+    AnchoredNodePrefixExtends initial (state.recordNode (.statement node)) :=
+  (allocateStatementId_success_anchoredNodePrefixExtends allocation).trans
+    (beforeRecord.trans (recordNode_anchoredNodePrefixExtends state _))
+
+private theorem recordExpressionNode_after_allocation_anchoredNodePrefixExtends
+    (state : State) (node : ExpressionNode) :
+    AnchoredNodePrefixExtends state
+      (state.allocateExpressionId.2.recordNode (.expression node)) :=
+  (AnchoredNodePrefixExtends.of_nodesPrefix
+    (allocateExpressionId_preserves_nodesPrefix state List.prefix_rfl)
+    (State.OccurrenceBoundExtends.allocateExpressionId state).nextOccurrence_le)
+    |>.trans (recordNode_anchoredNodePrefixExtends _ _)
+
+private theorem recordIndirectCall_after_allocation_anchoredNodePrefixExtends
+    {initial allocated : State} {call : ExpressionId}
+    (source : Syntax.Expr) (callee : InferredExpression)
+    (arguments : List InferredExpression) (result : IndirectApplicationResult)
+    (allocation : initial.allocateExpressionId = (call, allocated))
+    (beforeRecord : AnchoredNodePrefixExtends allocated result.state) :
+    AnchoredNodePrefixExtends initial
+      (recordIndirectCall source callee arguments result).2 :=
+  (allocateExpressionId_success_anchoredNodePrefixExtends allocation).trans
+    (beforeRecord.trans
+      (recordIndirectCall_anchoredNodePrefixExtends source callee arguments
+        result))
+
+private theorem recordBuiltinFunctionCall_after_allocation_anchoredNodePrefixExtends
+    {initial allocated state : State} {call : ExpressionId}
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {expected : Option Ty} {result : InferredExpression × State}
+    (allocation : initial.allocateExpressionId = (call, allocated))
+    (beforeRecord : AnchoredNodePrefixExtends allocated state)
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    AnchoredNodePrefixExtends initial result.2 :=
+  (allocateExpressionId_success_anchoredNodePrefixExtends allocation).trans
+    (beforeRecord.trans
+      (recordBuiltinFunctionCall_anchoredNodePrefixExtends success))
+
+attribute [local grind →]
+  AnchoredNodePrefixExtends.nextOccurrence_le
+
+set_option maxHeartbeats 3000000 in
+private theorem inference_anchoredNodePrefixExtends :
+    (∀ fuel context expression expected state,
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferExprFuel fuel context expression expected state)) ∧
+    (∀ fuel context source id instantiation arguments expected state,
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state)) ∧
+    (∀ fuel context sources expected state,
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state)) ∧
+    (∀ fuel context statements expectedReturn state,
+      PreservesAnchoredNodePrefix BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state)) ∧
+    (∀ fuel context statement expectedReturn state,
+      PreservesAnchoredNodePrefix StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state)) ∧
+    (∀ fuel context items state,
+      PreservesAnchoredNodePrefix InferredForItems.state state
+        (inferForItemsFuel fuel context items state)) ∧
+    (∀ fuel context item state,
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferForItemFuel fuel context item state)) ∧
+    (∀ fuel context target state,
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferPlaceFuel fuel context target state)) ∧
+    (∀ fuel context target operator value state,
+      PreservesAnchoredNodePrefix (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state)) ∧
+    (∀ fuel context expressions state,
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferExprsFuel fuel context expressions state)) ∧
+    (∀ fuel context scrutineeType expectedReturn outerScope cases state,
+      PreservesAnchoredNodePrefix MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state)) := by
+  apply inferExprFuel.mutual_induct
+    (motive1 := fun fuel context expression expected state =>
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferExprFuel fuel context expression expected state))
+    (motive2 := fun fuel context source id instantiation arguments expected
+        state =>
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferConstructorApplicationFuel fuel context source id instantiation
+          arguments expected state))
+    (motive3 := fun fuel context sources expected state =>
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferConstructorArgumentsFuel fuel context sources expected state))
+    (motive4 := fun fuel context statements expectedReturn state =>
+      PreservesAnchoredNodePrefix BlockResult.state state
+        (inferStatementsFuel fuel context statements expectedReturn state))
+    (motive5 := fun fuel context statement expectedReturn state =>
+      PreservesAnchoredNodePrefix StatementResult.state state
+        (inferStatementFuel fuel context statement expectedReturn state))
+    (motive6 := fun fuel context items state =>
+      PreservesAnchoredNodePrefix InferredForItems.state state
+        (inferForItemsFuel fuel context items state))
+    (motive7 := fun fuel context item state =>
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferForItemFuel fuel context item state))
+    (motive8 := fun fuel context target state =>
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferPlaceFuel fuel context target state))
+    (motive9 := fun fuel context target operator value state =>
+      PreservesAnchoredNodePrefix (fun result => result.2.2) state
+        (inferAssignedValueFuel fuel context target operator value state))
+    (motive10 := fun fuel context expressions state =>
+      PreservesAnchoredNodePrefix Prod.snd state
+        (inferExprsFuel fuel context expressions state))
+    (motive11 := fun fuel context scrutineeType expectedReturn outerScope
+        cases state =>
+      PreservesAnchoredNodePrefix MatchCasesResult.state state
+        (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
+          cases state))
+  case case12 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      operator operand expressionEq operandInduction
+    unfold PreservesAnchoredNodePrefix
+    intro result success
+    have overallSuccess := success
+    have allocationExtends :=
+      allocateExpressionId_success_anchoredNodePrefixExtends allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases operandResult : inferExprFuel fuel context operand none allocated with
+    | error error =>
+        simp [operandResult, bind, Except.bind] at success
+    | ok operandPair =>
+        rcases operandPair with ⟨inferredOperand, operandState⟩
+        simp only [operandResult, bind, Except.bind, Prod.eta] at success
+        have operandExtends := operandInduction
+          (inferredOperand, operandState) operandResult
+        have throughOperand := allocationExtends.trans operandExtends
+        let integerLiterals := relevantIntegerLiterals operandState
+          allocated.integerLiterals.length [inferredOperand]
+        have finishInferred (inferred : OperatorInferenceResult)
+            (inferenceSuccess : inferUnaryOperator context operator.value
+              inferredOperand.type expected integerLiterals operandState =
+                .ok inferred)
+            (recordSuccess : recordExpressionWithExpected context expression id
+              inferred.type (.unary operator.value inferredOperand.id)
+              inferred.requirements expected inferred.state = .ok result) :
+            AnchoredNodePrefixExtends initial result.2 :=
+          throughOperand.trans
+            ((inferUnaryOperator_anchoredNodePrefixExtends inferenceSuccess).trans
+              (recordExpressionWithExpected_anchoredNodePrefixExtends
+                recordSuccess))
+        cases dispatchEq : unaryOperatorDispatch operator.value with
+        | traitMethod traitName methodName =>
+            simp only [integerLiterals, dispatchEq] at success
+            cases inferredResult : inferUnaryOperator context operator.value
+                inferredOperand.type expected integerLiterals operandState with
+            | error error =>
+                simp [integerLiterals, inferredResult, bind, Except.bind]
+                  at success
+            | ok inferred =>
+                simp only [integerLiterals, inferredResult, bind,
+                  Except.bind] at success
+                exact finishInferred inferred inferredResult success
+        | function name =>
+            simp only [integerLiterals, dispatchEq] at success
+            cases functionsResult : functionsNamed context name with
+            | error error =>
+                simp [functionsResult, bind, Except.bind] at success
+            | ok candidates =>
+                simp only [functionsResult, bind, Except.bind] at success
+                cases candidates with
+                | nil =>
+                    cases inferredResult : inferUnaryOperator context
+                        operator.value inferredOperand.type expected
+                        integerLiterals operandState with
+                    | error error =>
+                        simp [integerLiterals, inferredResult, bind,
+                          Except.bind] at success
+                    | ok inferred =>
+                        simp only [integerLiterals, inferredResult, bind,
+                          Except.bind] at success
+                        exact finishInferred inferred inferredResult success
+                | cons candidate rest =>
+                    cases selectionResult : selectFunctionCandidateFrom context
+                        name (candidate :: rest) [inferredOperand]
+                        integerLiterals id expected operandState with
+                    | error error =>
+                        simp [integerLiterals, selectionResult, bind,
+                          Except.bind] at success
+                    | ok attempt =>
+                        simp only [integerLiterals, selectionResult, bind,
+                          Except.bind, pure, Pure.pure, Except.pure] at success
+                        let callee : Syntax.Expr := {
+                          span := operator.span
+                          value := .identifier {
+                            span := operator.span
+                            value := name
+                          }
+                        }
+                        change Except.ok (recordSelectedCall expression callee
+                          name [inferredOperand] attempt) = Except.ok result
+                            at success
+                        injection success with resultEq
+                        have overallNext :=
+                          (inferExprFuel_occurrenceBoundExtends
+                            overallSuccess).nextOccurrence_le
+                        rw [← resultEq] at overallNext
+                        rw [← resultEq]
+                        constructor
+                        · exact overallNext
+                        · intro baseNodes cutoff nodesPrefix baseBelow cutoffLe
+                          have operandPrefix :=
+                            throughOperand.preserves_nodesPrefix nodesPrefix
+                              baseBelow cutoffLe
+                          apply
+                            selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix_of_fresh
+                              selectionResult operandPrefix baseBelow
+                          intro argument member
+                          simp only [List.mem_singleton] at member
+                          subst argument
+                          rw [inferExprFuel_success_id_index operandResult]
+                          exact Nat.le_trans cutoffLe
+                            allocationExtends.nextOccurrence_le
+  case case13 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      left operator right expressionEq leftInduction rightInduction
+    unfold PreservesAnchoredNodePrefix
+    intro result success
+    have overallSuccess := success
+    have allocationExtends :=
+      allocateExpressionId_success_anchoredNodePrefixExtends allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases leftResult : inferExprFuel fuel context left none allocated with
+    | error error =>
+        simp [leftResult, bind, Except.bind] at success
+    | ok leftPair =>
+        rcases leftPair with ⟨inferredLeft, leftState⟩
+        simp only [leftResult, bind, Except.bind, Prod.eta] at success
+        have leftExtends := leftInduction (inferredLeft, leftState) leftResult
+        cases rightResult : inferExprFuel fuel context right none leftState with
+        | error error =>
+            simp [rightResult, bind, Except.bind] at success
+        | ok rightPair =>
+            rcases rightPair with ⟨inferredRight, rightState⟩
+            simp only [rightResult, bind, Except.bind, Prod.eta] at success
+            have rightExtends := rightInduction leftState
+              (inferredRight, rightState) rightResult
+            have throughArguments := allocationExtends.trans
+              (leftExtends.trans rightExtends)
+            let integerLiterals := relevantIntegerLiterals rightState
+              allocated.integerLiterals.length [inferredLeft, inferredRight]
+            have finishInferred (inferred : OperatorInferenceResult)
+                (inferenceSuccess : inferBinaryOperator context operator.value
+                  inferredLeft.type inferredRight.type expected integerLiterals
+                    rightState = .ok inferred)
+                (recordSuccess : recordExpressionWithExpected context expression
+                  id inferred.type
+                  (.binary inferredLeft.id operator.value inferredRight.id)
+                  inferred.requirements expected inferred.state = .ok result) :
+                AnchoredNodePrefixExtends initial result.2 :=
+              throughArguments.trans
+                ((inferBinaryOperator_anchoredNodePrefixExtends
+                  inferenceSuccess).trans
+                  (recordExpressionWithExpected_anchoredNodePrefixExtends
+                    recordSuccess))
+            cases dispatchEq : binaryOperatorDispatch operator.value with
+            | traitMethod traitName methodName =>
+                simp only [integerLiterals, dispatchEq] at success
+                cases inferredResult : inferBinaryOperator context
+                    operator.value inferredLeft.type inferredRight.type expected
+                    integerLiterals rightState with
+                | error error =>
+                    simp [integerLiterals, inferredResult, bind, Except.bind]
+                      at success
+                | ok inferred =>
+                    simp only [integerLiterals, inferredResult, bind,
+                      Except.bind] at success
+                    exact finishInferred inferred inferredResult success
+            | function name =>
+                simp only [integerLiterals, dispatchEq] at success
+                cases functionsResult : functionsNamed context name with
+                | error error =>
+                    simp [functionsResult, bind, Except.bind] at success
+                | ok candidates =>
+                    simp only [functionsResult, bind, Except.bind] at success
+                    cases candidates with
+                    | nil =>
+                        cases inferredResult : inferBinaryOperator context
+                            operator.value inferredLeft.type inferredRight.type
+                            expected integerLiterals rightState with
+                        | error error =>
+                            simp [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                        | ok inferred =>
+                            simp only [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                            exact finishInferred inferred inferredResult success
+                    | cons candidate rest =>
+                        cases selectionResult : selectFunctionCandidateFrom
+                            context name (candidate :: rest)
+                            [inferredLeft, inferredRight] integerLiterals id
+                            (some .bool) rightState with
+                        | error error =>
+                            simp [integerLiterals, selectionResult, bind,
+                              Except.bind] at success
+                        | ok attempt =>
+                            simp only [integerLiterals, selectionResult, bind,
+                              Except.bind] at success
+                            cases fittedResult : withExpected context
+                                attempt.state attempt.result expected with
+                            | error error =>
+                                simp [fittedResult, bind, Except.bind]
+                                  at success
+                            | ok fitted =>
+                                simp only [fittedResult, bind, Except.bind,
+                                  pure, Pure.pure, Except.pure] at success
+                                let callee : Syntax.Expr := {
+                                  span := operator.span
+                                  value := .identifier {
+                                    span := operator.span
+                                    value := name
+                                  }
+                                }
+                                change Except.ok
+                                  (recordSelectedCallResult expression callee
+                                    name [inferredLeft, inferredRight] attempt
+                                    fitted.expression fitted.coercions
+                                    fitted.state) = Except.ok result at success
+                                injection success with resultEq
+                                have overallNext :=
+                                  (inferExprFuel_occurrenceBoundExtends
+                                    overallSuccess).nextOccurrence_le
+                                rw [← resultEq] at overallNext
+                                rw [← resultEq]
+                                constructor
+                                · exact overallNext
+                                · intro baseNodes cutoff nodesPrefix baseBelow
+                                    cutoffLe
+                                  have argumentPrefix :=
+                                    throughArguments.preserves_nodesPrefix
+                                      nodesPrefix baseBelow cutoffLe
+                                  have attemptPrefix :
+                                      baseNodes <+: attempt.state.nodes := by
+                                    rw [(selectFunctionCandidateFrom_occurrenceState_eq
+                                      selectionResult).1]
+                                    exact argumentPrefix
+                                  have fittedPrefix :
+                                      baseNodes <+: fitted.state.nodes := by
+                                    rw [(withExpected_occurrenceState_eq
+                                      fittedResult).1]
+                                    exact attemptPrefix
+                                  apply
+                                    recordSelectedCallResult_preserves_nodesPrefix_of_fresh
+                                      expression callee name
+                                      [inferredLeft, inferredRight] attempt
+                                      fitted.expression fitted.coercions
+                                      fitted.state baseNodes cutoff fittedPrefix
+                                      baseBelow
+                                  apply
+                                    selectFunctionCandidateFrom_argumentCoercions_fresh
+                                      selectionResult
+                                  intro argument member
+                                  simp only [List.mem_cons,
+                                    List.mem_singleton] at member
+                                  rcases member with rfl | member
+                                  · rw [inferExprFuel_success_id_index
+                                      leftResult]
+                                    exact Nat.le_trans cutoffLe
+                                      allocationExtends.nextOccurrence_le
+                                  · rcases member with rfl | member
+                                    · rw [inferExprFuel_success_id_index
+                                        rightResult]
+                                      exact Nat.le_trans cutoffLe
+                                        (Nat.le_trans
+                                          allocationExtends.nextOccurrence_le
+                                          leftExtends.nextOccurrence_le)
+                                    · simp at member
+  case case15 =>
+    intros context expression expected state fuel calleeId stateAfterId
+      allocationEq keyword parameters returnType body expressionEq bodyInduction
+    unfold PreservesAnchoredNodePrefix at *
+    intro result success
+    unfold inferExprFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals try have bodyExtends := bodyInduction _ _ _ (by assumption)
+    all_goals try have lambdaExtends :=
+      bindLambdaParameters_anchoredNodePrefixExtends (by assumption)
+    all_goals try have unifiedExtends :=
+      unify_anchoredNodePrefixExtends (by assumption)
+    all_goals try have unifiedExtends1 :=
+      unify_anchoredNodePrefixExtends heq_1
+    all_goals try have unifiedExtends2 :=
+      unify_anchoredNodePrefixExtends heq_2
+    all_goals try have unifiedExtends3 :=
+      unify_anchoredNodePrefixExtends heq_3
+    all_goals try have unifiedExtends4 :=
+      unify_anchoredNodePrefixExtends heq_4
+    all_goals try have unifiedExtends5 :=
+      unify_anchoredNodePrefixExtends heq_5
+    all_goals try have unifiedExtends6 :=
+      unify_anchoredNodePrefixExtends heq_6
+    all_goals try have unifiedExtends7 :=
+      unify_anchoredNodePrefixExtends heq_7
+    all_goals try have unifiedExtends8 :=
+      unify_anchoredNodePrefixExtends heq_8
+    all_goals try have freshExtends :=
+      fresh_success_anchoredNodePrefixExtends (by assumption)
+    all_goals try simp_all only [except_pure_eq_ok]
+    all_goals
+      apply
+        recordExpressionWithExpected_after_allocation_anchoredNodePrefixExtends
+          (allocation := allocationEq) (success := success)
+    all_goals first
+      | exact lambdaTraversal_anchoredNodePrefixExtends
+          (binding := by assumption)
+          (parameterUnification := by assumption)
+          (pairEq := by assumption)
+          (bodyExtends := by assumption)
+          (finalUnification := by assumption)
+          (scope := _)
+      | grind [AnchoredNodePrefixExtends.trans,
+          AnchoredNodePrefixExtends.of_occurrenceState_eq,
+          fresh_anchoredNodePrefixExtends,
+          restoreLexicalScope_anchoredNodePrefixExtends,
+          unify_anchoredNodePrefixExtends]
+  case case16 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      callee sourceArguments expressionEq constructorInduction
+      argumentsInduction calleeInduction
+    unfold PreservesAnchoredNodePrefix
+    intro result success
+    have overallSuccess := success
+    have allocationExtends :=
+      allocateExpressionId_success_anchoredNodePrefixExtends allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases candidatesResult :
+        constructorCalleeCandidates context allocated callee with
+    | error error =>
+        simp [candidatesResult, bind, Except.bind] at success
+    | ok candidates =>
+        simp only [candidatesResult, bind, Except.bind] at success
+        cases candidates with
+        | cons candidate rest =>
+            cases rest with
+            | cons second tail => simp at success
+            | nil =>
+                rcases candidate with ⟨dataType, constructor⟩
+                let freshResult :=
+                  freshDataConstructorInstantiation dataType constructor
+                    allocated
+                have freshExtends :=
+                  freshDataConstructorInstantiation_anchoredNodePrefixExtends
+                    dataType constructor allocated
+                have constructorExtends := constructorInduction freshResult.1
+                  freshResult.2 result (by
+                    simpa only [freshResult] using success)
+                exact allocationExtends.trans
+                  (freshExtends.trans constructorExtends)
+        | nil =>
+            simp only [bind, Except.bind] at success
+            split at success
+            · cases success
+            · next _ missing _ =>
+              cases missing with
+              | some missing =>
+                  rcases missing with ⟨qualifiers, name⟩
+                  simp at success
+              | none =>
+                cases argumentsResult : inferExprsFuel fuel context
+                    sourceArguments.elements allocated with
+                | error error =>
+                    simp [argumentsResult, bind, Except.bind] at success
+                | ok argumentsPair =>
+                    rcases argumentsPair with ⟨arguments, argumentState⟩
+                    simp only [argumentsResult, bind, Except.bind,
+                      Prod.eta] at success
+                    have argumentsExtends := argumentsInduction
+                      (arguments, argumentState) argumentsResult
+                    have throughArguments := allocationExtends.trans
+                      argumentsExtends
+                    have finishSelected
+                        (name : String)
+                        (candidates : List ProgramFunctionSignature)
+                        (attempt : CandidateAttemptResult)
+                        (selectionSuccess :
+                          selectFunctionCandidateFrom context name candidates
+                            arguments
+                            (relevantIntegerLiterals argumentState
+                              allocated.integerLiterals.length arguments)
+                            id expected argumentState = .ok attempt)
+                        (resultEq :
+                          recordSelectedCall expression callee name arguments
+                            attempt = result) :
+                        AnchoredNodePrefixExtends initial result.2 := by
+                      have overallNext :=
+                        (inferExprFuel_occurrenceBoundExtends
+                          overallSuccess).nextOccurrence_le
+                      rw [← resultEq] at overallNext
+                      rw [← resultEq]
+                      constructor
+                      · exact overallNext
+                      · intro baseNodes cutoff nodesPrefix baseBelow cutoffLe
+                        have argumentPrefix :=
+                          throughArguments.preserves_nodesPrefix nodesPrefix
+                            baseBelow cutoffLe
+                        exact
+                          inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_preserves_nodesPrefix
+                            argumentsResult selectionSuccess argumentPrefix
+                            baseBelow
+                            (Nat.le_trans cutoffLe
+                              allocationExtends.nextOccurrence_le)
+                    have finishIndirect
+                        (calleeResult : InferredExpression)
+                        (calleeState : State)
+                        (calleeSuccess :
+                          inferExprFuel fuel context callee none argumentState =
+                            .ok (calleeResult, calleeState))
+                        (application : IndirectApplicationResult)
+                        (applicationSuccess :
+                          applyFunctionType context id calleeResult.type
+                            arguments expected calleeState = .ok application)
+                        (resultEq :
+                          recordIndirectCall expression calleeResult arguments
+                            application = result) :
+                        AnchoredNodePrefixExtends initial result.2 := by
+                      have calleeExtends := calleeInduction argumentState
+                        (calleeResult, calleeState) calleeSuccess
+                      have applicationExtends :=
+                        applyFunctionType_anchoredNodePrefixExtends
+                          applicationSuccess
+                      rw [← resultEq]
+                      exact throughArguments.trans
+                        (calleeExtends.trans
+                          (applicationExtends.trans
+                            (recordIndirectCall_anchoredNodePrefixExtends
+                              expression calleeResult arguments application)))
+                    cases qualifiedEq : calleeQualifiedIdentifier? callee with
+                    | some qualified =>
+                        rcases qualified with ⟨namespacePath, name⟩
+                        simp only [qualifiedEq] at success
+                        cases binderEq :
+                            argumentState.lookupBinder? namespacePath.head! with
+                        | some binder =>
+                            simp only [binderEq] at success
+                            cases calleeResult : inferExprFuel fuel context callee
+                                none argumentState with
+                            | error error =>
+                                simp [calleeResult, bind, Except.bind]
+                                  at success
+                            | ok calleePair =>
+                                rcases calleePair with
+                                  ⟨inferredCallee, calleeState⟩
+                                simp only [calleeResult, bind, Except.bind,
+                                  Prod.eta] at success
+                                cases applicationResult : applyFunctionType
+                                    context id inferredCallee.type arguments
+                                    expected calleeState with
+                                | error error =>
+                                    simp [applicationResult, bind, Except.bind]
+                                      at success
+                                | ok application =>
+                                    simp only [applicationResult, bind,
+                                      Except.bind, pure, Pure.pure, Except.pure]
+                                      at success
+                                    injection success with resultEq
+                                    exact finishIndirect inferredCallee
+                                      calleeState calleeResult application
+                                      applicationResult resultEq
+                        | none =>
+                            simp only [binderEq] at success
+                            cases functionsResult : qualifiedFunctionsNamed
+                                context namespacePath name with
+                            | error error =>
+                                simp [functionsResult, bind, Except.bind]
+                                  at success
+                            | ok candidatesOption =>
+                                simp only [functionsResult, bind, Except.bind]
+                                  at success
+                                cases candidatesOption with
+                                | some candidates =>
+                                    cases selectionResult :
+                                        selectFunctionCandidateFrom context
+                                          (String.intercalate "."
+                                            (namespacePath ++ [name]))
+                                          candidates arguments
+                                          (relevantIntegerLiterals argumentState
+                                            allocated.integerLiterals.length
+                                            arguments)
+                                          id expected argumentState with
+                                    | error error =>
+                                        simp [selectionResult, bind,
+                                          Except.bind] at success
+                                    | ok attempt =>
+                                        simp only [selectionResult, bind,
+                                          Except.bind, pure, Pure.pure,
+                                          Except.pure] at success
+                                        injection success with resultEq
+                                        exact finishSelected
+                                          (String.intercalate "."
+                                            (namespacePath ++ [name]))
+                                          candidates attempt selectionResult
+                                          resultEq
+                                | none =>
+                                    cases calleeResult : inferExprFuel fuel
+                                        context callee none argumentState with
+                                    | error error =>
+                                        simp [calleeResult, bind, Except.bind]
+                                          at success
+                                    | ok calleePair =>
+                                        rcases calleePair with
+                                          ⟨inferredCallee, calleeState⟩
+                                        simp only [calleeResult, bind,
+                                          Except.bind, Prod.eta] at success
+                                        cases applicationResult :
+                                            applyFunctionType context id
+                                              inferredCallee.type arguments
+                                              expected calleeState with
+                                        | error error =>
+                                            simp [applicationResult, bind,
+                                              Except.bind] at success
+                                        | ok application =>
+                                            simp only [applicationResult, bind,
+                                              Except.bind, pure, Pure.pure,
+                                              Except.pure] at success
+                                            injection success with resultEq
+                                            exact finishIndirect inferredCallee
+                                              calleeState calleeResult
+                                              application applicationResult
+                                              resultEq
+                    | none =>
+                        simp only [qualifiedEq] at success
+                        cases identifierEq : calleeIdentifier? callee with
+                        | none =>
+                            simp only [identifierEq] at success
+                            cases calleeResult : inferExprFuel fuel context callee
+                                none argumentState with
+                            | error error =>
+                                simp [calleeResult, bind, Except.bind]
+                                  at success
+                            | ok calleePair =>
+                                rcases calleePair with
+                                  ⟨inferredCallee, calleeState⟩
+                                simp only [calleeResult, bind, Except.bind,
+                                  Prod.eta] at success
+                                cases applicationResult : applyFunctionType
+                                    context id inferredCallee.type arguments
+                                    expected calleeState with
+                                | error error =>
+                                    simp [applicationResult, bind, Except.bind]
+                                      at success
+                                | ok application =>
+                                    simp only [applicationResult, bind,
+                                      Except.bind, pure, Pure.pure, Except.pure]
+                                      at success
+                                    injection success with resultEq
+                                    exact finishIndirect inferredCallee
+                                      calleeState calleeResult application
+                                      applicationResult resultEq
+                        | some name =>
+                            simp only [identifierEq] at success
+                            cases binderEq : argumentState.lookupBinder? name with
+                            | some binder =>
+                                simp only [binderEq] at success
+                                cases calleeResult : inferExprFuel fuel context
+                                    callee none argumentState with
+                                | error error =>
+                                    simp [calleeResult, bind, Except.bind]
+                                      at success
+                                | ok calleePair =>
+                                    rcases calleePair with
+                                      ⟨inferredCallee, calleeState⟩
+                                    simp only [calleeResult, bind, Except.bind,
+                                      Prod.eta] at success
+                                    cases applicationResult : applyFunctionType
+                                        context id inferredCallee.type arguments
+                                        expected calleeState with
+                                    | error error =>
+                                        simp [applicationResult, bind,
+                                          Except.bind] at success
+                                    | ok application =>
+                                        simp only [applicationResult, bind,
+                                          Except.bind, pure, Pure.pure,
+                                          Except.pure] at success
+                                        injection success with resultEq
+                                        exact finishIndirect inferredCallee
+                                          calleeState calleeResult application
+                                          applicationResult resultEq
+                            | none =>
+                                simp only [binderEq] at success
+                                cases functionsResult : functionsNamed context
+                                    name with
+                                | error error =>
+                                    simp [functionsResult, bind, Except.bind]
+                                      at success
+                                | ok candidates =>
+                                    simp only [functionsResult, bind,
+                                      Except.bind] at success
+                                    cases candidates with
+                                    | nil =>
+                                        cases builtinEq :
+                                            builtinFunctionNamed? name with
+                                        | none => simp [builtinEq] at success
+                                        | some function =>
+                                            simp only [builtinEq] at success
+                                            exact throughArguments.trans
+                                              (recordBuiltinFunctionCall_anchoredNodePrefixExtends
+                                                success)
+                                    | cons candidate rest =>
+                                        cases selectionResult :
+                                            selectFunctionCandidateFrom context
+                                              name (candidate :: rest) arguments
+                                              (relevantIntegerLiterals
+                                                argumentState
+                                                allocated.integerLiterals.length
+                                                arguments)
+                                              id expected argumentState with
+                                        | error error =>
+                                            simp [selectionResult, bind,
+                                              Except.bind] at success
+                                        | ok attempt =>
+                                            simp only [selectionResult, bind,
+                                              Except.bind, pure, Pure.pure,
+                                              Except.pure] at success
+                                            injection success with resultEq
+                                            exact finishSelected name
+                                              (candidate :: rest) attempt
+                                              selectionResult resultEq
+  case case20 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      base dot name expressionEq constructorInduction
+    unfold PreservesAnchoredNodePrefix
+    intro result success
+    have allocationExtends :=
+      allocateExpressionId_success_anchoredNodePrefixExtends allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases candidatesResult :
+        constructorCalleeCandidates context allocated expression with
+    | error error =>
+        simp [candidatesResult, bind, Except.bind] at success
+    | ok candidates =>
+        simp only [candidatesResult, bind, Except.bind] at success
+        cases candidates with
+        | nil =>
+            simp_all [bind, Except.bind]
+            repeat' first | split at success
+            all_goals contradiction
+        | cons candidate rest =>
+            cases rest with
+            | cons second tail => simp at success
+            | nil =>
+                rcases candidate with ⟨dataType, constructor⟩
+                let freshResult :=
+                  freshDataConstructorInstantiation dataType constructor
+                    allocated
+                have freshExtends :=
+                  freshDataConstructorInstantiation_anchoredNodePrefixExtends
+                    dataType constructor allocated
+                have constructorExtends := constructorInduction freshResult.1
+                  freshResult.2 result (by
+                    simpa only [freshResult] using success)
+                exact allocationExtends.trans
+                  (freshExtends.trans constructorExtends)
+  case case70 =>
+    intros fuel context target operator value state placeInduction
+      valueInduction
+    unfold PreservesAnchoredNodePrefix at *
+    intro result success
+    unfold inferAssignedValueFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try subst_vars
+    all_goals try have placeExtends :=
+      pair_eq_anchoredNodePrefixExtends placeInduction
+    all_goals try have valueExtends :=
+      valueInduction _ _ _ _ (by assumption)
+    all_goals try have unifiedExtends :=
+      unify_anchoredNodePrefixExtends (by assumption)
+    all_goals simp_all [Prod.eta]
+    all_goals grind [AnchoredNodePrefixExtends.trans]
+  case case67 =>
+    unfold PreservesAnchoredNodePrefix at *
+    intros
+    simp_all only [inferPlaceFuel]
+  all_goals
+    intros
+    unfold PreservesAnchoredNodePrefix at *
+    intro result success
+    first
+      | unfold inferExprFuel at success
+      | unfold inferConstructorApplicationFuel at success
+      | unfold inferConstructorArgumentsFuel at success
+      | unfold inferStatementsFuel at success
+      | unfold inferStatementFuel at success
+      | unfold inferForItemsFuel at success
+      | unfold inferForItemFuel at success
+      | unfold inferPlaceFuel at success
+      | unfold inferAssignedValueFuel at success
+      | unfold inferExprsFuel at success
+      | unfold inferMatchCasesFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals try rcases v with ⟨v0a, v0b⟩
+    all_goals try rcases v_1 with ⟨v1a, v1b⟩
+    all_goals try rcases v_2 with ⟨v2a, v2b⟩
+    all_goals try rcases v_3 with ⟨v3a, v3b⟩
+    all_goals try rcases v_4 with ⟨v4a, v4b⟩
+    all_goals try subst_vars
+    all_goals first
+      | specialize ih1 _ _ _ _ (by assumption)
+      | specialize ih1 _ _ _ (by assumption)
+      | specialize ih1 _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih2 _ _ _ _ (by assumption)
+      | specialize ih2 _ _ _ (by assumption)
+      | specialize ih2 _ _ (by assumption)
+      | skip
+    all_goals first
+      | specialize ih3 _ _ _ _ (by assumption)
+      | specialize ih3 _ _ _ (by assumption)
+      | specialize ih3 _ _ (by assumption)
+      | skip
+    all_goals first
+      | have ih1Extends := pair_eq_anchoredNodePrefixExtends ih1
+      | have ih1Extends := triple_eq_anchoredNodePrefixExtends ih1
+      | skip
+    all_goals first
+      | have ih2Extends := pair_eq_anchoredNodePrefixExtends ih2
+      | have ih2Extends := triple_eq_anchoredNodePrefixExtends ih2
+      | skip
+    all_goals first
+      | have ih3Extends := pair_eq_anchoredNodePrefixExtends ih3
+      | have ih3Extends := triple_eq_anchoredNodePrefixExtends ih3
+      | skip
+    all_goals try have unifiedExtends :=
+      unify_anchoredNodePrefixExtends (by assumption)
+    all_goals try have recordDirectExtends :=
+      recordExpressionWithExpected_anchoredNodePrefixExtends (by assumption)
+    all_goals try have lambdaExtends :=
+      bindLambdaParameters_anchoredNodePrefixExtends (by assumption)
+    all_goals try have patternExtends :=
+      inferMatchPatternFuel_anchoredNodePrefixExtends (by assumption)
+    all_goals try have selectionExtends :=
+      selectFunctionCandidateFrom_anchoredNodePrefixExtends (by assumption)
+    all_goals try have expectedExtends :=
+      withExpected_anchoredNodePrefixExtends (by assumption)
+    all_goals try have applicationExtends :=
+      applyFunctionType_anchoredNodePrefixExtends (by assumption)
+    all_goals try have unaryExtends :=
+      inferUnaryOperator_anchoredNodePrefixExtends (by assumption)
+    all_goals try have binaryExtends :=
+      inferBinaryOperator_anchoredNodePrefixExtends (by assumption)
+    all_goals try have constructorExtends :=
+      freshDataConstructorInstantiation_anchoredNodePrefixExtends _ _ _
+    all_goals try have directRecordExtends :=
+      recordExpression_anchoredNodePrefixExtends _ _ _ _ _ _
+    all_goals try have expressionAllocationExtends :=
+      allocateExpressionId_success_anchoredNodePrefixExtends (by assumption)
+    all_goals try have statementAllocationExtends :=
+      allocateStatementId_success_anchoredNodePrefixExtends (by assumption)
+    all_goals try have freshExtends :=
+      fresh_success_anchoredNodePrefixExtends (by assumption)
+    all_goals try have requirementExtends :=
+      addRequirementWithId_success_anchoredNodePrefixExtends (by assumption)
+    all_goals try have requirementsExtends :=
+      addRequirementsWithIds_success_anchoredNodePrefixExtends (by assumption)
+    all_goals try have binderExtends :=
+      allocateBinder_success_anchoredNodePrefixExtends (by assumption)
+    all_goals try have hiddenLocalExtends :=
+      allocateHiddenLocal_success_anchoredNodePrefixExtends (by assumption)
+    all_goals try have exactState12 :
+        AnchoredNodePrefixExtends state_1 state_2 :=
+      .of_occurrenceState_eq rfl rfl
+    all_goals try have exactState23 :
+        AnchoredNodePrefixExtends state_2 state_3 :=
+      .of_occurrenceState_eq rfl rfl
+    all_goals try have exactState34 :
+        AnchoredNodePrefixExtends state_3 state_4 :=
+      .of_occurrenceState_eq rfl rfl
+    all_goals first
+      | apply recordIndirectCall_after_allocation_anchoredNodePrefixExtends
+          (allocation := by assumption)
+      | apply
+          recordBuiltinFunctionCall_after_allocation_anchoredNodePrefixExtends
+            (allocation := by assumption) (success := by assumption)
+      | apply
+          recordExpressionWithExpected_after_allocation_anchoredNodePrefixExtends
+            (allocation := by assumption) (success := by assumption)
+      | apply recordStatement_after_allocation_anchoredNodePrefixExtends
+          (allocation := by assumption) (node := _)
+      | skip
+    all_goals try simp_all only [except_pure_eq_ok]
+    all_goals try simp_all [Prod.eta]
+    all_goals try simp_all [State.addRequirementWithId,
+      State.addRequirementsWithIds, State.allocateBinder,
+      bind, Except.bind]
+    all_goals try exact .refl _
+    all_goals grind [AnchoredNodePrefixExtends.trans,
+      AnchoredNodePrefixExtends.of_occurrenceState_eq,
+      fresh_anchoredNodePrefixExtends,
+      withLocals_anchoredNodePrefixExtends,
+      restoreLexicalScope_anchoredNodePrefixExtends,
+      addRequirementWithId_anchoredNodePrefixExtends,
+      addRequirementsWithIds_anchoredNodePrefixExtends,
+      allocateBinder_anchoredNodePrefixExtends,
+      allocateHiddenLocal_anchoredNodePrefixExtends,
+      recordNode_anchoredNodePrefixExtends,
+      replaceInference_anchoredNodePrefixExtends,
+      replaceLocals_anchoredNodePrefixExtends,
+      recordExpression_anchoredNodePrefixExtends,
+      recordExpressionWithExpected_after_allocation_anchoredNodePrefixExtends,
+      recordStatement_after_allocation_anchoredNodePrefixExtends,
+      recordExpressionNode_after_allocation_anchoredNodePrefixExtends,
+      recordIndirectCall_after_allocation_anchoredNodePrefixExtends,
+      recordBuiltinFunctionCall_after_allocation_anchoredNodePrefixExtends,
+      State.allocateExpressionId_value]
+
+/-- Successful expression inference retains every input node prefix anchored
+strictly below an input occurrence cutoff. -/
+theorem inferExprFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferExprFuel fuel context expression expected state =
+      .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.2.nodes :=
+  (inference_anchoredNodePrefixExtends.1 fuel context expression expected state
+    result success).preserves_nodesPrefix nodesPrefix baseBelow cutoffLe
+
+/-- Constructor-application inference retains an anchored input node prefix. -/
+theorem inferConstructorApplicationFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {source : Syntax.Expr}
+    {id : ExpressionId} {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferConstructorApplicationFuel fuel context source id
+      instantiation arguments expected state = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.2.nodes :=
+  (inference_anchoredNodePrefixExtends.2.1 fuel context source id instantiation
+    arguments expected state result success).preserves_nodesPrefix nodesPrefix
+      baseBelow cutoffLe
+
+/-- Constructor-argument inference retains an anchored input node prefix. -/
+theorem inferConstructorArgumentsFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {expected : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferConstructorArgumentsFuel fuel context sources expected state =
+      .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.2.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.1 fuel context sources expected state
+    result success).preserves_nodesPrefix nodesPrefix baseBelow cutoffLe
+
+/-- Statement-list inference retains an anchored input node prefix. -/
+theorem inferStatementsFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {statements : List Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : BlockResult}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferStatementsFuel fuel context statements expectedReturn state =
+      .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.state.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.2.1 fuel context statements
+    expectedReturn state result success).preserves_nodesPrefix nodesPrefix
+      baseBelow cutoffLe
+
+/-- Single-statement inference retains an anchored input node prefix. -/
+theorem inferStatementFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.state.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.2.2.1 fuel context statement
+    expectedReturn state result success).preserves_nodesPrefix nodesPrefix
+      baseBelow cutoffLe
+
+/-- For-item-list inference retains an anchored input node prefix. -/
+theorem inferForItemsFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferForItemsFuel fuel context items state = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.state.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.2.2.2.1 fuel context items state
+    result success).preserves_nodesPrefix nodesPrefix baseBelow cutoffLe
+
+/-- Single for-item inference retains an anchored input node prefix. -/
+theorem inferForItemFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferForItemFuel fuel context item state = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.2.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.2.2.2.2.1 fuel context item state
+    result success).preserves_nodesPrefix nodesPrefix baseBelow cutoffLe
+
+/-- Place inference retains an anchored input node prefix. -/
+theorem inferPlaceFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferPlaceFuel fuel context target state = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.2.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.2.2.2.2.2.1 fuel context target
+    state result success).preserves_nodesPrefix nodesPrefix baseBelow cutoffLe
+
+/-- Assigned-value inference retains an anchored input node prefix. -/
+theorem inferAssignedValueFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr}
+    {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.2.2.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.2.2.2.2.2.2.1 fuel context target
+    operator value state result success).preserves_nodesPrefix nodesPrefix
+      baseBelow cutoffLe
+
+/-- Expression-list inference retains an anchored input node prefix. -/
+theorem inferExprsFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {expressions : List Syntax.Expr}
+    {state : State} {result : List InferredExpression × State}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferExprsFuel fuel context expressions state = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.2.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.2.2.2.2.2.2.2.1 fuel context
+    expressions state result success).preserves_nodesPrefix nodesPrefix
+      baseBelow cutoffLe
+
+/-- Match-case inference retains an anchored input node prefix. -/
+theorem inferMatchCasesFuel_preserves_nodesPrefix
+    {fuel : Nat} {context : Context} {scrutineeType expectedReturn : Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : State} {result : MatchCasesResult}
+    {baseNodes : List Node} {cutoff : Nat}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result)
+    (nodesPrefix : baseNodes <+: state.nodes)
+    (baseBelow : ∀ node ∈ baseNodes,
+      node.occurrenceId.index < cutoff)
+    (cutoffLe : cutoff ≤ state.nextOccurrence) :
+    baseNodes <+: result.state.nodes :=
+  (inference_anchoredNodePrefixExtends.2.2.2.2.2.2.2.2.2.2 fuel context
+    scrutineeType expectedReturn outerScope cases state result
+    success).preserves_nodesPrefix nodesPrefix baseBelow cutoffLe
+
 
 end Solcore.Frontend.SourceInference.Detail

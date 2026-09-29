@@ -387,6 +387,28 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_occurrenceBoundExtends
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorApplicationFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferConstructorArgumentsFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferStatementFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemsFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferPlaceFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferAssignedValueFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprsFuel_preserves_nodesPrefix
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_preserves_nodesPrefix
+example :=
   @Solcore.Frontend.SourceInference.State.initial_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_preserves_requirementsWellFormed
 example := @Solcore.Frontend.SourceInference.State.fresh_requirements_subset
