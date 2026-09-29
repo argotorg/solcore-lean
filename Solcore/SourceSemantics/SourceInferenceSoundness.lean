@@ -21376,6 +21376,317 @@ theorem inferExprFuel_success_tuple_expressionTypingBase_scoped_of_retained
       signaturesEq traitName solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
 
+/-- The ordinary-recording tail of unary inference becomes a reusable typing
+base once its recursively inferred operand and the retained operator evidence
+have been validated.  This theorem is shared by both the builtin-function
+fallback (an empty visible overload set) and trait-method dispatch. -/
+theorem inferUnaryOperator_recordExpressionWithExpected_success_expressionTypingBase_scoped_of_retained
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {id : ExpressionId}
+    {operator : Syntax.UnaryOp} {operand : InferredExpression}
+    {expected : Option TypeSystem.Ty}
+    {integerLiterals : List IntegerLiteralOrigin}
+    {operandState later : Frontend.SourceInference.State}
+    {inferred : Detail.OperatorInferenceResult}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (operatorSuccess : Detail.inferUnaryOperator inferenceContext operator
+      operand.type expected integerLiterals operandState = .ok inferred)
+    (recordSuccess : Detail.recordExpressionWithExpected inferenceContext
+      expression id inferred.type (.unary operator operand.id)
+      inferred.requirements expected inferred.state = .ok result)
+    (operandType : ExpressionHasType semanticSource active operand.id
+      (later.inference.substitution.apply operand.type))
+    (operandReady : operandState.InferenceReady)
+    (operandBelow : operand.type.VariablesBelow
+      operandState.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow operandState.inference.next)
+    (integerLiteralsSubset : integerLiterals ⊆ later.integerLiterals)
+    (integerLiteralTargetsSupported : ∀ origin,
+      origin ∈ later.integerLiterals →
+        later.inference.substitution.apply
+            (.variable origin.metavariable) = .word ∨
+          later.inference.substitution.apply
+            (.variable origin.metavariable) = .integer)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (activeCatalog : SignatureCatalogWellFormed active.signatures)
+    (activeBinders : TypeParameterBindersWellFormed active)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (selectedTraitName : ∀ {selectedTrait : Resolved.DeclarationId}
+      {traitName : String},
+      Detail.operatorTrait? inferenceContext traitName =
+          .ok (some selectedTrait) →
+        (inferenceContext.signatures.trait? selectedTrait).map (·.name) =
+          some traitName)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  have operatorProperties := Detail.inferUnaryOperator_inferenceProperties
+    operandReady operandBelow expectedBelow operatorSuccess
+  have inferenceCase : UnaryOperatorInferenceCase inferenceContext
+      sourceContext operandState operator operand.type integerLiterals inferred :=
+    inferUnaryOperator_success_case operatorSuccess
+      operatorProperties.2.1.solved
+  have expectedBelowInferred : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow inferred.state.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken operatorProperties.1.next_le
+  have recordProperties :=
+    Detail.recordExpressionWithExpected_inferenceProperties
+      operatorProperties.2.1 operatorProperties.2.2 expectedBelowInferred
+      recordSuccess
+  have inferredSubstitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        inferred.state.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans substitutionExtends
+      recordProperties.1.substitution_extends
+  have inferredRequirementsSubset :
+      inferred.state.requirements ⊆ later.requirements :=
+    List.Subset.trans
+      (Detail.recordExpressionWithExpected_requirements_subset recordSuccess)
+      requirementsSubset
+  obtain ⟨coercions, recordedContains⟩ :=
+    recordExpressionWithExpected_success_containsExpression recordSuccess roots
+  have operatorRequirementsOccur : ∀ requirement,
+      requirement ∈ inferred.requirements →
+        PrimaryRequirementOccursAt evidenceSource
+          (.expression result.1.id) requirement := by
+    intro requirement member
+    apply retained recordedContains
+    simp [member]
+  have operatorType : UnaryOperatorHasType active operator
+      (later.inference.substitution.apply operand.type)
+      (later.inference.substitution.apply inferred.type)
+      inferred.requirements :=
+    unaryOperatorInferenceCase_hasType_afterFinalization_scoped inferenceCase
+      operatorProperties.1 inferredSubstitutionExtends
+      inferredRequirementsSubset integerLiteralsSubset
+      integerLiteralTargetsSupported catalog contextValid signaturesEq
+      selectedTraitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+      operatorRequirementsOccur
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.unary operator operand.id).applySubstitution
+        later.inference.substitution)
+      (later.inference.substitution.apply inferred.type)
+      (.ordinary inferred.requirements) := by
+    simpa [ExpressionForm.applySubstitution] using
+      (ExpressionFormHasRawType.unary operandType operatorType)
+  have rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply inferred.type) :=
+    operatorType.result_type_admissible activeCatalog activeBinders
+      operandType.type_admissible
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recordSuccess substitutionExtends requirementsSubset retained formType
+      rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
+/-- Declarative binary-operator typing always uses one common operand type. -/
+private theorem binaryOperatorHasType_operand_types_eq
+    {context : SourceSemantics.Context} {operator : Syntax.BinaryOp}
+    {left right result : TypeSystem.Ty}
+    {requirements : List RequirementId}
+    (typing : BinaryOperatorHasType context operator left right result
+      requirements) :
+    left = right := by
+  cases typing <;> rfl
+
+/-- The analogous ordinary-recording tail for a binary operator.  Successful
+operator inference proves that both final operand types coincide; that fact is
+used only here to fit the two recursive typings to the declarative binary
+form rule. -/
+theorem inferBinaryOperator_recordExpressionWithExpected_success_expressionTypingBase_scoped_of_retained
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {id : ExpressionId}
+    {operator : Syntax.BinaryOp}
+    {left right : InferredExpression}
+    {expected : Option TypeSystem.Ty}
+    {integerLiterals : List IntegerLiteralOrigin}
+    {operandState later : Frontend.SourceInference.State}
+    {inferred : Detail.OperatorInferenceResult}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (operatorSuccess : Detail.inferBinaryOperator inferenceContext operator
+      left.type right.type expected integerLiterals operandState = .ok inferred)
+    (recordSuccess : Detail.recordExpressionWithExpected inferenceContext
+      expression id inferred.type (.binary left.id operator right.id)
+      inferred.requirements expected inferred.state = .ok result)
+    (leftType : ExpressionHasType semanticSource active left.id
+      (later.inference.substitution.apply left.type))
+    (rightType : ExpressionHasType semanticSource active right.id
+      (later.inference.substitution.apply right.type))
+    (operandReady : operandState.InferenceReady)
+    (leftBelow : left.type.VariablesBelow operandState.inference.next)
+    (rightBelow : right.type.VariablesBelow operandState.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow operandState.inference.next)
+    (integerLiteralsSubset : integerLiterals ⊆ later.integerLiterals)
+    (integerLiteralTargetsSupported : ∀ origin,
+      origin ∈ later.integerLiterals →
+        later.inference.substitution.apply
+            (.variable origin.metavariable) = .word ∨
+          later.inference.substitution.apply
+            (.variable origin.metavariable) = .integer)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (activeCatalog : SignatureCatalogWellFormed active.signatures)
+    (activeBinders : TypeParameterBindersWellFormed active)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (selectedTraitName : ∀ {selectedTrait : Resolved.DeclarationId}
+      {traitName : String},
+      Detail.operatorTrait? inferenceContext traitName =
+          .ok (some selectedTrait) →
+        (inferenceContext.signatures.trait? selectedTrait).map (·.name) =
+          some traitName)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  have operatorProperties := Detail.inferBinaryOperator_inferenceProperties
+    operandReady leftBelow rightBelow expectedBelow operatorSuccess
+  have inferenceCase : BinaryOperatorInferenceCase inferenceContext
+      sourceContext operandState operator left.type right.type integerLiterals
+      inferred :=
+    inferBinaryOperator_success_case operatorSuccess
+  have expectedBelowInferred : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow inferred.state.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken operatorProperties.1.next_le
+  have recordProperties :=
+    Detail.recordExpressionWithExpected_inferenceProperties
+      operatorProperties.2.1 operatorProperties.2.2 expectedBelowInferred
+      recordSuccess
+  have inferredSubstitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        inferred.state.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans substitutionExtends
+      recordProperties.1.substitution_extends
+  have inferredRequirementsSubset :
+      inferred.state.requirements ⊆ later.requirements :=
+    List.Subset.trans
+      (Detail.recordExpressionWithExpected_requirements_subset recordSuccess)
+      requirementsSubset
+  obtain ⟨coercions, recordedContains⟩ :=
+    recordExpressionWithExpected_success_containsExpression recordSuccess roots
+  have operatorRequirementsOccur : ∀ requirement,
+      requirement ∈ inferred.requirements →
+        PrimaryRequirementOccursAt evidenceSource
+          (.expression result.1.id) requirement := by
+    intro requirement member
+    apply retained recordedContains
+    simp [member]
+  have operatorType : BinaryOperatorHasType active operator
+      (later.inference.substitution.apply left.type)
+      (later.inference.substitution.apply right.type)
+      (later.inference.substitution.apply inferred.type)
+      inferred.requirements :=
+    binaryOperatorInferenceCase_hasType_afterFinalization_scoped inferenceCase
+      operatorProperties.1 inferredSubstitutionExtends
+      inferredRequirementsSubset integerLiteralsSubset
+      integerLiteralTargetsSupported catalog contextValid signaturesEq
+      selectedTraitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+      operatorRequirementsOccur
+  have operandTypesEq :
+      later.inference.substitution.apply left.type =
+        later.inference.substitution.apply right.type :=
+    binaryOperatorHasType_operand_types_eq operatorType
+  have rightTypeAsLeft : ExpressionHasType semanticSource active right.id
+      (later.inference.substitution.apply left.type) := by
+    rw [operandTypesEq]
+    exact rightType
+  have operatorTypeAsLeft : BinaryOperatorHasType active operator
+      (later.inference.substitution.apply left.type)
+      (later.inference.substitution.apply left.type)
+      (later.inference.substitution.apply inferred.type)
+      inferred.requirements := by
+    rwa [← operandTypesEq] at operatorType
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.binary left.id operator right.id).applySubstitution
+        later.inference.substitution)
+      (later.inference.substitution.apply inferred.type)
+      (.ordinary inferred.requirements) := by
+    simpa [ExpressionForm.applySubstitution] using
+      (ExpressionFormHasRawType.binary leftType rightTypeAsLeft
+        operatorTypeAsLeft)
+  have rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply inferred.type) :=
+    operatorTypeAsLeft.result_type_admissible activeCatalog activeBinders
+      leftType.type_admissible
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recordSuccess substitutionExtends requirementsSubset retained formType
+      rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
 /-- A nonlocal identifier with one visible declaration candidate yields a
 reusable expression-typing base after canonical instantiation, requirement
 allocation, final substitution, and occurrence-scoped requirement solving. -/
