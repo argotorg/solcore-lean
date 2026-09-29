@@ -17305,6 +17305,298 @@ theorem tryFunctionCandidate_some_argumentCoercionsValid_afterFinalization_scope
     activeSignaturesEq activeRequirementsEq assumptionsMono fittedCovered
     fittedOccurs
 
+/-- A retained canonical function candidate's result-fitting path and freshly
+allocated signature requirements form the exact direct-call requirement plan
+after whole-body finalization.  The candidate's selected-result coercions are
+the first path segment; contextual coercions, if any, are appended later by
+`ExpressionRequirementPlan.Valid.appendOutput`. -/
+theorem tryFunctionCandidate_some_directCallRequirementsValid_afterFinalization_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state later : Frontend.SourceInference.State}
+    {signature : ProgramFunctionSignature}
+    {result : Detail.CandidateAttemptResult}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base semanticContext : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (canonical : signature.scheme.body = .function
+      (TypeSystem.Ty.productMany signature.parameterTypes)
+      (TypeSystem.Ty.productMany signature.returnTypes))
+    (success : Detail.tryFunctionCandidate inferenceContext arguments
+      integerLiteralOrigins call expected state signature = .ok (some result))
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (schemeBodyBelow : signature.scheme.body.VariablesBelow
+      state.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow state.inference.next)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.state.inference.substitution)
+    (requirementsSubset : result.state.requirements ⊆ later.requirements)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext
+        semanticContext)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : semanticContext.signatures = base.signatures)
+    (activeRequirementsEq :
+      semanticContext.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ semanticContext.assumptions)
+    (covered : TemplateScopeCovered ledgerSource semanticContext
+      (.expression result.result.id))
+    (occurs : ∀ requirement,
+      requirement ∈ Detail.coercionRequirements result.callCoercions ++
+          result.signatureRequirements →
+        PrimaryRequirementOccursAt ledgerSource
+          (.expression result.result.id) requirement) :
+    let instantiated := signature.scheme.instantiate state.inference.next
+    DirectCallRequirementsValid semanticContext
+      (later.inference.substitution.apply
+        (instantiated.parameterSubstitution.apply
+          (TypeSystem.Ty.productMany signature.returnTypes)))
+      (later.inference.substitution.apply result.result.type)
+      (result.instantiation.predicates.map
+        (TypedTraitResolution.applySubstitution
+          later.inference.substitution))
+      (Detail.coercionRequirements result.callCoercions ++
+        result.signatureRequirements)
+      (result.callCoercions.map
+        (CoercionStep.applySubstitution
+          later.inference.substitution)) := by
+  let instantiated := signature.scheme.instantiate state.inference.next
+  let advancedState : Frontend.SourceInference.State := {
+    state with inference := {
+      state.inference with next := instantiated.next
+    }
+  }
+  obtain ⟨fittedArguments, fittedResult, trace, fittedResultSuccess,
+    instantiationEq, resultExpressionEq, _, callCoercionsEq,
+    signatureRequirementsEq, resultStateEq⟩ :=
+    Detail.tryFunctionCandidate_some_resultFitAllocationWitness canonical
+      success
+  let allocation := fittedResult.state.addRequirementsWithIds
+    instantiated.predicates
+  let finalState := allocation.2.markDirectCallRequirements allocation.1
+  have normalizedResultExpressionEq : result.result = {
+      fittedResult.expression with
+      type := finalState.resolve fittedResult.expression.type
+    } := by
+    simpa only [allocation, finalState] using resultExpressionEq
+  have normalizedSignatureRequirementsEq :
+      result.signatureRequirements = allocation.1 := by
+    simpa only [allocation] using signatureRequirementsEq
+  have normalizedResultStateEq : result.state = finalState := by
+    simpa only [allocation, finalState] using resultStateEq
+  have instantiatedNextLe :
+      state.inference.next ≤ instantiated.next := by
+    simpa only [instantiated] using
+      ConstrainedDeclarationScheme.instantiate_next_le signature.scheme
+        state.inference.next
+  have advanceProgress : state.InferenceProgress advancedState := by
+    refine Frontend.SourceInference.State.InferenceProgress.of_substitution_eq
+      ready.solved ?_ ?_
+    · simpa only [advancedState] using instantiatedNextLe
+    · rfl
+  have advancedReady : advancedState.InferenceReady :=
+    Frontend.SourceInference.State.InferenceReady.of_progress_of_binderEnvironment_eq
+      ready advanceProgress rfl
+  have argumentsAtAdvanced : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow advancedState.inference.next := by
+    intro argument member
+    exact (argumentsBelow argument member).weaken advanceProgress.next_le
+  have instantiatedBodyBelow :
+      instantiated.body.VariablesBelow instantiated.next := by
+    simpa only [instantiated] using
+      ConstrainedDeclarationScheme.instantiate_body_variablesBelow
+        signature.scheme state.inference.next schemeBodyBelow
+  have partsResult : Detail.functionParts? instantiated.body =
+      some
+        (instantiated.parameterSubstitution.apply
+            (TypeSystem.Ty.productMany signature.parameterTypes),
+          instantiated.parameterSubstitution.apply
+            (TypeSystem.Ty.productMany signature.returnTypes)) := by
+    rw [ConstrainedDeclarationScheme.instantiate_body, canonical]
+    rfl
+  have partsBelow := Detail.functionParts?_success_variablesBelow
+    instantiatedBodyBelow partsResult
+  have parametersResult := Detail.parameterTypesForArity?_apply_productMany
+    instantiated.parameterSubstitution signature.parameterTypes
+  have parametersBelowAtInstantiation :=
+    Detail.parameterTypesForArity?_success_variablesBelow partsBelow.1
+      parametersResult
+  have parametersBelow : ∀ parameter ∈
+      signature.parameterTypes.map instantiated.parameterSubstitution.apply,
+      parameter.VariablesBelow advancedState.inference.next := by
+    simpa only [advancedState] using parametersBelowAtInstantiation
+  have traceProperties := trace.inferenceProperties advancedReady
+    argumentsAtAdvanced parametersBelow
+  have resultTypeAtAdvanced :
+      (instantiated.parameterSubstitution.apply
+        (TypeSystem.Ty.productMany signature.returnTypes)).VariablesBelow
+          advancedState.inference.next := by
+    simpa only [advancedState] using partsBelow.2
+  have resultTypeAtArguments :
+      (instantiated.parameterSubstitution.apply
+        (TypeSystem.Ty.productMany signature.returnTypes)).VariablesBelow
+          fittedArguments.state.inference.next :=
+    resultTypeAtAdvanced.weaken traceProperties.1.next_le
+  have expectedAtArguments : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow
+        fittedArguments.state.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken
+      (Nat.le_trans advanceProgress.next_le traceProperties.1.next_le)
+  have fittedResultProperties :=
+    Detail.candidateWithExpected_some_inferenceProperties
+      traceProperties.2 resultTypeAtArguments expectedAtArguments
+        fittedResultSuccess
+  have allocationProgress :
+      fittedResult.state.InferenceProgress allocation.2 := by
+    simpa only [allocation] using
+      (Frontend.SourceInference.State.InferenceProgress.addRequirementsWithIds
+        fittedResult.state instantiated.predicates
+        fittedResultProperties.2.1.solved)
+  have markProgress : allocation.2.InferenceProgress finalState := by
+    simpa only [finalState] using
+      (Frontend.SourceInference.State.InferenceProgress.markDirectCallRequirements
+        allocation.2 allocation.1 allocationProgress.solved)
+  have finalProgress :
+      fittedResult.state.InferenceProgress finalState :=
+    allocationProgress.trans markProgress
+  have laterExtendsFinal :
+      later.inference.substitution.SemanticallyExtends
+        finalState.inference.substitution := by
+    rw [← normalizedResultStateEq]
+    exact substitutionExtends
+  have laterExtendsFittedResult :
+      later.inference.substitution.SemanticallyExtends
+        fittedResult.state.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans laterExtendsFinal
+      finalProgress.substitution_extends
+  have allocationRequirementsAtFinal :
+      allocation.2.requirements ⊆ finalState.requirements := by
+    simpa only [finalState] using
+      Frontend.SourceInference.State.markDirectCallRequirements_requirements_subset
+        allocation.2 allocation.1
+  have finalRequirementsAtLater :
+      finalState.requirements ⊆ later.requirements := by
+    rw [← normalizedResultStateEq]
+    exact requirementsSubset
+  have allocationRequirementsAtLater :
+      allocation.2.requirements ⊆ later.requirements :=
+    List.Subset.trans allocationRequirementsAtFinal finalRequirementsAtLater
+  have fittedRequirementsAtAllocation :
+      fittedResult.state.requirements ⊆ allocation.2.requirements := by
+    simpa only [allocation] using
+      Frontend.SourceInference.State.addRequirementsWithIds_requirements_subset
+        fittedResult.state instantiated.predicates
+  have fittedRequirementsAtLater :
+      fittedResult.state.requirements ⊆ later.requirements :=
+    List.Subset.trans fittedRequirementsAtAllocation
+      allocationRequirementsAtLater
+  have selectedPath :=
+    withExpected_success_coercionPathValid_afterFinalization_scoped
+      (Detail.candidateWithExpected_some_withExpected fittedResultSuccess)
+      traitSuccess profileSuccess fittedRequirementsAtLater catalog
+      contextValid signaturesEq traitName solveSuccess solvedEq ledger
+      ownership activeSignaturesEq activeRequirementsEq assumptionsMono
+      covered (by
+        intro requirement member
+        apply occurs requirement
+        apply List.mem_append_left
+        rw [callCoercionsEq]
+        simpa [Detail.coercionRequirements, coercionRequirementIds] using
+          member)
+  have rawEndpointEq :
+      later.inference.substitution.apply
+          (fittedResult.state.resolve
+            (instantiated.parameterSubstitution.apply
+              (TypeSystem.Ty.productMany signature.returnTypes))) =
+        later.inference.substitution.apply
+          (instantiated.parameterSubstitution.apply
+            (TypeSystem.Ty.productMany signature.returnTypes)) :=
+    TypeSystem.InferState.apply_resolve_eq_apply laterExtendsFittedResult _
+  have resultTypeEq : result.result.type =
+      finalState.resolve fittedResult.expression.type := by
+    exact congrArg InferredExpression.type normalizedResultExpressionEq
+  have finalEndpointEq :
+      later.inference.substitution.apply result.result.type =
+        later.inference.substitution.apply fittedResult.expression.type := by
+    rw [resultTypeEq]
+    exact TypeSystem.InferState.apply_resolve_eq_apply laterExtendsFinal _
+  have selectedPathValid : CoercionPathValid semanticContext
+      (later.inference.substitution.apply
+        (instantiated.parameterSubstitution.apply
+          (TypeSystem.Ty.productMany signature.returnTypes)))
+      (later.inference.substitution.apply result.result.type)
+      (result.callCoercions.map
+        (CoercionStep.applySubstitution
+          later.inference.substitution)) := by
+    simpa only [instantiated, rawEndpointEq, finalEndpointEq,
+      callCoercionsEq] using
+      selectedPath
+  have allocationCorresponds : RequirementPredicatesCorrespond
+      allocation.2.requirements instantiated.predicates allocation.1 := by
+    simpa only [allocation] using
+      Frontend.SourceInference.State.addRequirementsWithIds_correspond
+        fittedResult.state instantiated.predicates
+  have laterCorresponds : RequirementPredicatesCorrespond
+      later.requirements instantiated.predicates allocation.1 :=
+    allocationCorresponds.mono allocationRequirementsAtLater
+  have allocatedSignatureValid : RequirementSequenceProves semanticContext
+      allocation.1 (instantiated.predicates.map (Detail.applyPredicate later)) :=
+    solveRequirements_correspondingSequenceProvesAt laterCorresponds
+      solveSuccess solvedEq ledger ownership activeSignaturesEq
+      activeRequirementsEq assumptionsMono covered (by
+        intro requirement member
+        apply occurs requirement
+        apply List.mem_append_right
+        rw [normalizedSignatureRequirementsEq]
+        exact member)
+  have predicateMapEq :
+      instantiated.predicates.map (Detail.applyPredicate later) =
+        instantiated.predicates.map
+          (TypedTraitResolution.applySubstitution
+            later.inference.substitution) := by
+    apply List.map_congr_left
+    intro predicate _
+    rfl
+  have signatureValid : RequirementSequenceProves semanticContext
+      result.signatureRequirements
+      (result.instantiation.predicates.map
+        (TypedTraitResolution.applySubstitution
+          later.inference.substitution)) := by
+    simpa only [instantiated, normalizedSignatureRequirementsEq,
+      instantiationEq,
+      Frontend.SourceInference.DeclarationInstantiation.ofInstantiated,
+      predicateMapEq] using allocatedSignatureValid
+  apply DirectCallRequirementsValid.intro selectedPathValid (.nil _)
+    signatureValid
+  · simp only [List.append_nil]
+  · rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
+    simp [Detail.coercionRequirements, coercionRequirementIds]
+
 /-- Internal form of post-attachment argument typing.  `attachedEntries` is
 kept fixed while recursion consumes the certified subrow, so every argument
 is recovered from the same fully refined node table. -/

@@ -665,6 +665,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_some_argumentCoercionsValid_afterFinalization_scoped
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_some_directCallRequirementsValid_afterFinalization_scoped
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
