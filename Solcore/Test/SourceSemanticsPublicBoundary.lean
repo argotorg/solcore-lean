@@ -1309,6 +1309,8 @@ example := @Solcore.SourceSemantics.TypingSourceExtends.applySubstitution
 example := @Solcore.SourceSemantics.TypingSourceExtends.containsExpression
 example := @Solcore.SourceSemantics.TypingSourceExtends.containsStatement
 example :=
+  @Solcore.SourceSemantics.TypingSourceExtends.initializedLetBinders_subset
+example :=
   @Solcore.SourceSemantics.TypingSourceExtends.primaryRequirementOccursAt
 example := @Solcore.SourceSemantics.ExpressionHasType.weakenSource
 example := @Solcore.SourceSemantics.ExpressionFormHasRawType.weakenSource

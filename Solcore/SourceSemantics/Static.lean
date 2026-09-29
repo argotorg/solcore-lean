@@ -383,6 +383,18 @@ theorem containsStatement
     ContainsStatement after id node :=
   ⟨extension.nodes_prefix.subset contains.1, contains.2⟩
 
+/-- Every initialized local-scheme binder retained by a source prefix remains
+present after append-only node-table growth. -/
+theorem initializedLetBinders_subset
+    {before after : TypedSource}
+    (extension : TypingSourceExtends before after) :
+    before.initializedLetBinders ⊆ after.initializedLetBinders := by
+  intro binder member
+  unfold TypedSource.initializedLetBinders at member ⊢
+  rcases List.mem_flatMap.mp member with ⟨node, nodeMember, binderMember⟩
+  exact List.mem_flatMap.mpr
+    ⟨node, extension.nodes_prefix.subset nodeMember, binderMember⟩
+
 private theorem binderExtends
     {before after : TypedSource} {context final : Context}
     {binder : TypedBinder}
