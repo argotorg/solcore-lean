@@ -2241,6 +2241,103 @@ theorem recordSelectedCallResult_success_attachedTypingSourceExtends
     rw [nodesEq]
     exact List.prefix_append _ _
 
+/-- The synthetic reference node emitted for a selected declaration call is
+declaratively valid after the enclosing inference substitution closes its
+resolved function type. -/
+theorem recordSelectedCallResult_success_directDeclarationCalleeValid
+    {source callee : Syntax.Expr} {name : String}
+    {arguments : List InferredExpression}
+    {attempt : Detail.CandidateAttemptResult}
+    {result : InferredExpression}
+    {trailingCoercions : List CoercionStep}
+    {recordState later : Frontend.SourceInference.State}
+    {recorded : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {sourceContext semanticContext : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.recordSelectedCallResult source callee name arguments
+      attempt result trailingCoercions recordState = recorded)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        recordState.inference.substitution)
+    (sourceExtension : TypingSourceExtends
+      ((recorded.2.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext
+        semanticContext)
+    (instantiationValid :
+      SourceSemantics.DeclarationInstantiation.Admissible sourceContext
+        attempt.instantiation) :
+    DirectDeclarationCalleeValid semanticContext ledgerSource
+      ((Detail.attachExpressionCoercions recordState
+        attempt.argumentCoercions).allocateExpressionId.1)
+      (attempt.instantiation.applySubstitution
+        later.inference.substitution) := by
+  let attachedState := Detail.attachExpressionCoercions recordState
+    attempt.argumentCoercions
+  let allocation := attachedState.allocateExpressionId
+  let calleeNode : ExpressionNode := {
+    id := allocation.1
+    span := callee.span
+    type := allocation.2.resolve attempt.instantiation.type
+    form := .reference name (.declaration attempt.instantiation)
+  }
+  have nodes := Detail.recordSelectedCallResult_success_nodes success
+  have rawContains : ContainsExpression (recorded.2.toTypedSource roots)
+      allocation.1 calleeNode := by
+    refine ⟨?_, rfl⟩
+    change .expression calleeNode ∈ recorded.2.nodes
+    rw [nodes.2]
+    simp [attachedState, allocation, calleeNode]
+  have substitutedContains : ContainsExpression
+      ((recorded.2.toTypedSource roots).applySubstitution
+        later.inference.substitution)
+      allocation.1
+      (calleeNode.applySubstitution later.inference.substitution) :=
+    FlexibleSubstitution.ContainsExpression.applySubstitution
+      later.inference.substitution rawContains
+  have finalContains : ContainsExpression ledgerSource allocation.1
+      (calleeNode.applySubstitution later.inference.substitution) :=
+    sourceExtension.containsExpression substitutedContains
+  have mappedInstantiationValid :
+      SourceSemantics.DeclarationInstantiation.Admissible semanticContext
+        (attempt.instantiation.applySubstitution
+          later.inference.substitution) :=
+    FlexibleSubstitution.DeclarationInstantiation.Admissible.applySubstitution
+      catalog contextValid instantiationValid
+  have allocationInferenceEq : allocation.2.inference =
+      recordState.inference := by
+    calc
+      allocation.2.inference = attachedState.inference := by rfl
+      _ = recordState.inference :=
+        Detail.attachExpressionCoercions_inference_eq recordState
+          attempt.argumentCoercions
+  have allocationExtends :
+      later.inference.substitution.SemanticallyExtends
+        allocation.2.inference.substitution := by
+    rw [allocationInferenceEq]
+    exact substitutionExtends
+  have normalizedType :
+      later.inference.substitution.apply
+          (allocation.2.resolve attempt.instantiation.type) =
+        later.inference.substitution.apply attempt.instantiation.type :=
+    TypeSystem.InferState.apply_resolve_eq_apply allocationExtends _
+  have valid : DirectDeclarationCalleeValid semanticContext ledgerSource
+      allocation.1
+      (attempt.instantiation.applySubstitution
+        later.inference.substitution) := by
+    refine DirectDeclarationCalleeValid.intro (name := name)
+      finalContains ?_ mappedInstantiationValid ?_ ?_ ?_
+    · rfl
+    · simpa [calleeNode, ExpressionNode.applySubstitution,
+        DeclarationInstantiation.applySubstitution] using normalizedType
+    · rfl
+    · rfl
+  simpa only [attachedState, allocation] using valid
+
 /-- Recording an expression node immediately materializes declarative
 expression containment. -/
 theorem recordNode_containsExpression

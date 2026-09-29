@@ -675,6 +675,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_attachedTypingSourceExtends
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_directDeclarationCalleeValid
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferConstructorApplicationFuel_success_expressionHasType_scoped
