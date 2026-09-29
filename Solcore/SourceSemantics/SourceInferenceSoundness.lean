@@ -18756,6 +18756,7 @@ theorem
     {sourceContext base active : SourceSemantics.Context}
     {ledgerSource : TypedSource}
     {closedVariables : List TypeSystem.TypeVarId}
+    {flexibleVariables : List TypeSystem.TypeVarId}
     (argumentsSuccess : Detail.inferExprsFuel fuel inferenceContext
       argumentSources argumentInitial = .ok (arguments, argumentState))
     (selectionSuccess : Detail.selectFunctionCandidateFrom inferenceContext
@@ -18798,8 +18799,13 @@ theorem
       later.inference.substitution closedVariables sourceContext active)
     (signaturesEq : sourceContext.signatures =
       inferenceContext.signatures)
-    (finalAdmissible : TypeAdmissible active
-      (later.inference.substitution.apply result.type))
+    (resultFormation : Frontend.InferenceTypeFormationValidated
+      inferenceContext.signatures inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters flexibleVariables result.type)
+    (parametersEq : sourceContext.typeParameters =
+      inferenceContext.typeParameters)
+    (ownerEq : sourceContext.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
     (traitSuccess :
       Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
         .ok (some trait))
@@ -18834,6 +18840,11 @@ theorem
     expressionBase nodesBelow argumentsSuccess
   have argumentIdsUnique :=
     Detail.inferExprsFuel_success_ids_nodup argumentsSuccess
+  have finalAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply result.type) :=
+    inferenceTypeFormationValidated_typeAdmissible_afterSubstitution
+      resultFormation binders signaturesEq parametersEq ownerEq residual
+      contextValid
   obtain ⟨signature, _, signatureMember, canonical, schemeBodyBelow,
       candidateSuccess⟩ :=
     selectFunctionCandidateFrom_success_semanticCandidate signatureFormation
