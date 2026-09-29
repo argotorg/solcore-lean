@@ -332,6 +332,18 @@ end BindersExtend
 
 namespace MonoBindersExtend
 
+/-- Installing monomorphic binders changes only the lexical tables, leaving
+the ambient predicate assumptions unchanged. -/
+theorem assumptions_eq
+    {owner : Resolved.DeclarationId} {context final : Context}
+    {binders : List TypedBinder} {types : List TypeSystem.Ty}
+    (extension : MonoBindersExtend owner context binders types final) :
+    final.assumptions = context.assumptions := by
+  induction extension with
+  | nil => rfl
+  | cons _ head _ induction =>
+      exact induction.trans head.context_fields.2.2.2.1
+
 /-- Monomorphic binder installation has the same reverse-prefix layout as
 general binder installation. -/
 theorem locals_eq

@@ -448,6 +448,34 @@ theorem expressionChild
     closed.childHasUniqueParent edge statementEdge'
   cases impossible
 
+/-- Coverage propagates from an expression occurrence to a direct statement
+child while assumptions may grow.  A statement child cannot start a
+local-scheme initializer: every retained initializer already has a statement
+parent, contradicting unique incoming parents for the supplied expression
+edge. -/
+theorem expressionStatementChild
+    {source : TypedSource} {parentContext childContext : Context}
+    {parent : ExpressionId} {child : StatementId}
+    (parentCovered :
+      TemplateScopeCovered source parentContext (.expression parent))
+    (closed : OccurrenceGraphClosed source)
+    (edge : DirectChild source (.expression parent) (.statement child))
+    (assumptions_mono :
+      parentContext.assumptions ⊆ childContext.assumptions) :
+    TemplateScopeCovered source childContext (.statement child) := by
+  apply TemplateScopeCovered.child parentCovered closed.childHasUniqueParent
+    edge assumptions_mono
+  intro owner contains initializerEq
+  obtain ⟨statement, statementEdge⟩ :=
+    InitializedLetBinding.directStatementChild (owner.binding_mem contains)
+  have statementEdge' :
+      DirectChild source (.statement statement) (.statement child) := by
+    simpa [initializerEq] using statementEdge
+  have impossible :
+      (NodeId.expression parent : NodeId) = .statement statement :=
+    closed.childHasUniqueParent edge statementEdge'
+  cases impossible
+
 /-- Enter a generalized initializer when the caller identifies every template
 rooted at that child with one of the selected binder's qualified predicates.
 The source-wide initializer-uniqueness automation is intentionally separate. -/

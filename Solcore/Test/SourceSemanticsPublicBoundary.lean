@@ -1111,6 +1111,7 @@ example :=
   @Solcore.SourceSemantics.LocalSchemeTemplateOwner.scopes_parent_of_scopes_child
 example := @Solcore.SourceSemantics.TemplateScopeCovered.root
 example := @Solcore.SourceSemantics.TemplateScopeCovered.child
+example := @Solcore.SourceSemantics.TemplateScopeCovered.expressionStatementChild
 example :=
   @Solcore.SourceSemantics.TemplateScopeCovered.localSchemeInitializer_of_newRoots
 example := @Solcore.SourceSemantics.LocalSchemeTemplateOwnership.owner_unique
@@ -1230,6 +1231,7 @@ example := @Solcore.SourceSemantics.StatementsHaveType
 example := @Solcore.SourceSemantics.BindersExtend.signatures_eq
 example := @Solcore.SourceSemantics.BindersExtend.locals_eq
 example := @Solcore.SourceSemantics.BindersExtend.localSchemeRequirements_eq
+example := @Solcore.SourceSemantics.MonoBindersExtend.assumptions_eq
 example := @Solcore.SourceSemantics.MonoBindersExtend.locals_eq
 example :=
   @Solcore.SourceSemantics.MonoBindersExtend.localSchemeRequirements_eq
