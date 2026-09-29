@@ -21968,6 +21968,43 @@ theorem expressionHasType_of_typingBase
       exact (ExpressionTypingBase.intro contains typeEq formType rawAdmissible
         requirements).expressionHasType preserved finalAdmissible
 
+/-- Finalization closes a source-ordered row of argument typing bases into
+the corresponding row of ordinary expression typings over the exact final
+source. -/
+theorem expressionsHaveTypes_of_argumentTypingBases
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {active sourceContext : SourceSemantics.Context}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {arguments : List InferredExpression}
+    (bases : ArgumentTypingBasesValid (state.toTypedSource roots)
+      result.typedSource active result.substitution arguments)
+    (binders : TypeParameterBindersWellFormed sourceContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (parameters_eq : sourceContext.typeParameters =
+      inferenceContext.typeParameters)
+    (owner_eq : sourceContext.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (residual : sourceContext.residualTypeVariables = true)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      result.substitution closedVariables sourceContext active) :
+    ExpressionsHaveTypes result.typedSource active
+      (arguments.map (·.id))
+      (arguments.map fun argument =>
+        result.substitution.apply argument.type) := by
+  induction bases with
+  | nil => exact .nil active
+  | cons head _ induction =>
+      exact .cons
+        (resources.expressionHasType_of_typingBase head binders signatures_eq
+          parameters_eq owner_eq residual contextValid)
+        induction
+
 /-- Any requirement retained by the pre-finalization state proves its closed
 predicate at the exact covered source occurrence which owns its identity. -/
 theorem requirementProvesAt

@@ -785,6 +785,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionHasType_of_typingBase
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionsHaveTypes_of_argumentTypingBases
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.requirementProvesAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt
