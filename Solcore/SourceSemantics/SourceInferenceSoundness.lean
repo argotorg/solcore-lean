@@ -9295,6 +9295,13 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
         TypeAdmissible target (outer.apply scrutinee.type) →
         ActiveLocalContextInvariant hiddenState outer target →
         outer.SemanticallyExtends checked.state.inference.substitution →
+        checked.state.integerPatterns ⊆ result.state.integerPatterns →
+        checked.state.requirements ⊆ result.state.requirements →
+        (∀ matchCase, matchCase ∈ checked.cases →
+          ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+            PrimaryRequirementOccursAt
+              ((result.state.toTypedSource roots).applySubstitution outer)
+              (.statement result.id) requirement) →
         Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
             expectedReturn hiddenState.lexicalScope cases hiddenState =
               .ok checked →
@@ -9409,13 +9416,14 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                   (fun hiddenReady hiddenScrutineeBelow hiddenReturnBelow
                       hiddenBelow sourceOwner scrutineeAdmissible
                       hiddenInvariant checkedExtension
-                      _checkedIntegerPatternsSubset
-                      _checkedRequirementsSubset _checkedRequirementsOccur
+                      checkedIntegerPatternsSubset
+                      checkedRequirementsSubset checkedRequirementsOccur
                       casesSuccess =>
                     matchCasesSound hiddenReady hiddenScrutineeBelow
                       hiddenReturnBelow hiddenBelow sourceOwner
                       scrutineeAdmissible hiddenInvariant checkedExtension
-                      casesSuccess)
+                      checkedIntegerPatternsSubset checkedRequirementsSubset
+                      checkedRequirementsOccur casesSuccess)
                   (callbacks.matchCasesPresentWithoutDefault rfl defaultEq)
                   callbacks.matchScrutinee
               exact ⟨target, facts, finalInvariant, typing, agreement⟩
@@ -9428,13 +9436,14 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                   (fun hiddenReady hiddenScrutineeBelow hiddenReturnBelow
                       hiddenBelow sourceOwner scrutineeAdmissible
                       hiddenInvariant checkedExtension
-                      _checkedIntegerPatternsSubset
-                      _checkedRequirementsSubset _checkedRequirementsOccur
+                      checkedIntegerPatternsSubset
+                      checkedRequirementsSubset checkedRequirementsOccur
                       casesSuccess =>
                     matchCasesSound hiddenReady hiddenScrutineeBelow
                       hiddenReturnBelow hiddenBelow sourceOwner
                       scrutineeAdmissible hiddenInvariant checkedExtension
-                      casesSuccess)
+                      checkedIntegerPatternsSubset checkedRequirementsSubset
+                      checkedRequirementsOccur casesSuccess)
                   callbacks.matchScrutinee
                   (fun checkedInvariant defaultSuccess =>
                     callbacks.statements checkedInvariant defaultSuccess)
@@ -13369,11 +13378,84 @@ theorem inferStatementFuel_success_sound_of_callbacks
     invariant below outerExtension roots ?_ callbacks
   intro scrutinee hiddenState checked cases hiddenReady hiddenScrutineeBelow
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
-    hiddenInvariant checkedExtension casesSuccess
+    hiddenInvariant checkedExtension _checkedIntegerPatternsSubset
+    _checkedRequirementsSubset _checkedRequirementsOccur casesSuccess
   exact inferMatchCasesFuel_success_sound signatureFormation
     functionsCanonical catalog signatures_eq patternBranches
     hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
+    (fun bodyInvariant bodySuccess =>
+      callbacks.statements bodyInvariant bodySuccess)
+    casesSuccess
+
+/-- Occurrence-aware statement inference soundness in the finalized typed
+source.  Integer-pattern evidence is owned by the inferred statement, and the
+dispatcher restricts the finalized ledgers to each explicit match traversal. -/
+theorem inferStatementFuel_success_sound_of_callbacks_at
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (parameters_eq : target.typeParameters = inferenceContext.typeParameters)
+    (declaration_eq : target.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (below : initial.LocalBindersBelowNextLocal)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (semanticOwner : target.currentDeclaration = some
+      ((result.state.toTypedSource roots).applySubstitution outer).owner)
+    (evidence : IntegerPatternEvidenceAt
+      ((result.state.toTypedSource roots).applySubstitution outer) target outer
+      evidenceState (.statement result.id))
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (callbacks : StatementInferenceSoundnessCallbacks fuel inferenceContext
+      statement expectedReturn allocated result outer target roots) :
+    ∃ finalContext facts,
+      ActiveLocalContextInvariant result.state outer finalContext ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id finalContext facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  apply inferStatementFuel_success_sound_of_callbacks_and_match_cases
+    allocationEq success signatureFormation functionsCanonical catalog
+    canonical signatures_eq parameters_eq declaration_eq ready returnBelow
+    invariant below outerExtension roots ?_ callbacks
+  intro scrutinee hiddenState checked cases hiddenReady hiddenScrutineeBelow
+    hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
+    hiddenInvariant checkedExtension checkedIntegerPatternsSubset
+    checkedRequirementsSubset checkedRequirementsOccur casesSuccess
+  exact inferMatchCasesFuel_success_sound_at signatureFormation
+    functionsCanonical catalog signatures_eq evidence hiddenReady
+    hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
+    semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
+    (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
+    (List.Subset.trans checkedRequirementsSubset requirementsSubset)
+    checkedRequirementsOccur
     (fun bodyInvariant bodySuccess =>
       callbacks.statements bodyInvariant bodySuccess)
     casesSuccess
