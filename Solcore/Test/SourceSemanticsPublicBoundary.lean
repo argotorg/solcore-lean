@@ -216,6 +216,14 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.toTypedSource_containsStatement_of_mem
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.modifyExpressionNode_containsExpression_self
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.modifyExpressionNode_containsExpression_other
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.attachExpressionCoercions_containsExpression_of_not_mem
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.attachExpressionCoercions_containsExpression
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordNode_containsExpression
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordNode_containsStatement

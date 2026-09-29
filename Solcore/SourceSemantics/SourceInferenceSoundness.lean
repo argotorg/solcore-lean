@@ -2087,6 +2087,131 @@ theorem toTypedSource_containsStatement_of_mem
   exact ⟨(by simpa [Frontend.SourceInference.State.toTypedSource] using member),
     rfl⟩
 
+/-- Updating the node at a contained expression identity retains that exact
+occurrence with the modified payload. -/
+theorem modifyExpressionNode_containsExpression_self
+    (state : Frontend.SourceInference.State) (id : ExpressionId)
+    (node : ExpressionNode) (modify : ExpressionNode → ExpressionNode)
+    (roots : List NodeId := [])
+    (contains : ContainsExpression (state.toTypedSource roots) id node) :
+    ContainsExpression
+      ((state.modifyExpressionNode id modify).toTypedSource roots)
+      id { modify node with id } := by
+  rcases contains with ⟨member, nodeId⟩
+  constructor
+  · change Node.expression { modify node with id } ∈
+      state.nodes.map fun
+        | .expression current =>
+            if current.id = id then
+              .expression { modify current with id }
+            else
+              .expression current
+        | .statement current => .statement current
+    apply List.mem_map.mpr
+    refine ⟨.expression node, member, ?_⟩
+    simp [nodeId]
+  · rfl
+
+/-- Updating a different expression identity leaves a contained expression
+payload unchanged. -/
+theorem modifyExpressionNode_containsExpression_other
+    (state : Frontend.SourceInference.State)
+    (target id : ExpressionId) (node : ExpressionNode)
+    (modify : ExpressionNode → ExpressionNode)
+    (roots : List NodeId := [])
+    (different : id ≠ target)
+    (contains : ContainsExpression (state.toTypedSource roots) id node) :
+    ContainsExpression
+      ((state.modifyExpressionNode target modify).toTypedSource roots)
+      id node := by
+  rcases contains with ⟨member, nodeId⟩
+  constructor
+  · change Node.expression node ∈
+      state.nodes.map fun
+        | .expression current =>
+            if current.id = target then
+              .expression { modify current with id := target }
+            else
+              .expression current
+        | .statement current => .statement current
+    apply List.mem_map.mpr
+    refine ⟨.expression node, member, ?_⟩
+    simp [nodeId, different]
+  · exact nodeId
+
+/-- Attaching coercions for identities other than a contained expression
+preserves its exact node payload. -/
+theorem attachExpressionCoercions_containsExpression_of_not_mem
+    (state : Frontend.SourceInference.State)
+    (entries : List Detail.ExpressionCoercions)
+    (id : ExpressionId) (node : ExpressionNode)
+    (roots : List NodeId := [])
+    (absent : id ∉ entries.map (·.expression))
+    (contains : ContainsExpression (state.toTypedSource roots) id node) :
+    ContainsExpression
+      ((Detail.attachExpressionCoercions state entries).toTypedSource roots)
+      id node := by
+  induction entries generalizing state with
+  | nil => simpa [Detail.attachExpressionCoercions] using contains
+  | cons entry entries induction =>
+      simp only [List.map_cons, List.mem_cons, not_or] at absent
+      simp only [Detail.attachExpressionCoercions]
+      apply induction (state :=
+        state.modifyExpressionNode entry.expression fun current =>
+          Detail.appendExpressionCoercions current entry.coercions) absent.2
+      exact modifyExpressionNode_containsExpression_other state
+        entry.expression id node
+        (fun current =>
+          Detail.appendExpressionCoercions current entry.coercions)
+        roots absent.1 contains
+
+/-- With pairwise-distinct attachment identities, targeting one retained
+expression replaces its payload exactly once by the coercion-appending
+refinement. -/
+theorem attachExpressionCoercions_containsExpression
+    (state : Frontend.SourceInference.State)
+    (entries : List Detail.ExpressionCoercions)
+    (entry : Detail.ExpressionCoercions)
+    (node : ExpressionNode) (roots : List NodeId := [])
+    (unique : (entries.map (·.expression)).Nodup)
+    (member : entry ∈ entries)
+    (contains : ContainsExpression (state.toTypedSource roots)
+      entry.expression node) :
+    ContainsExpression
+      ((Detail.attachExpressionCoercions state entries).toTypedSource roots)
+      entry.expression
+      (Detail.appendExpressionCoercions node entry.coercions) := by
+  induction entries generalizing state with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [List.map_cons, List.nodup_cons] at unique
+      rcases unique with ⟨headAbsent, tailUnique⟩
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · simp only [Detail.attachExpressionCoercions]
+        apply attachExpressionCoercions_containsExpression_of_not_mem
+          (roots := roots) (absent := headAbsent)
+        simpa [Detail.appendExpressionCoercions, contains.2] using
+          (modifyExpressionNode_containsExpression_self state
+            entry.expression node
+            (fun current =>
+              Detail.appendExpressionCoercions current entry.coercions)
+            roots contains)
+      · simp only [Detail.attachExpressionCoercions]
+        apply induction (state :=
+          state.modifyExpressionNode head.expression fun current =>
+            Detail.appendExpressionCoercions current head.coercions)
+          tailUnique member
+        apply modifyExpressionNode_containsExpression_other state
+          head.expression entry.expression node
+          (fun current =>
+            Detail.appendExpressionCoercions current head.coercions)
+          roots
+        · intro equal
+          apply headAbsent
+          exact List.mem_map.mpr ⟨entry, member, equal⟩
+        · exact contains
+
 /-- Recording an expression node immediately materializes declarative
 expression containment. -/
 theorem recordNode_containsExpression
