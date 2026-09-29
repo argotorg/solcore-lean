@@ -391,6 +391,24 @@ def mappingLookup? (key : Value) : List (Value × Value) → Option Value
   | entry :: rest =>
       if valueEqual key entry.1 then some entry.2 else mappingLookup? key rest
 
+/-- A successful mapping lookup returns the value component of an entry in
+the mapping.  This small bridge lets the deep mapping invariant discharge the
+selected-child obligation of a projected read or update. -/
+theorem mappingLookup?_member
+    (key selected : Value) (entries : List (Value × Value))
+    (found : mappingLookup? key entries = some selected) :
+    ∃ storedKey, (storedKey, selected) ∈ entries := by
+  induction entries with
+  | nil => simp [mappingLookup?] at found
+  | cons entry rest inductionHypothesis =>
+      by_cases sameKey : valueEqual key entry.1
+      · simp [mappingLookup?, sameKey] at found
+        subst selected
+        exact ⟨entry.1, by simp⟩
+      · simp [mappingLookup?, sameKey] at found
+        obtain ⟨storedKey, member⟩ := inductionHypothesis found
+        exact ⟨storedKey, by simp [member]⟩
+
 def mappingInsert (key value : Value) :
     List (Value × Value) → List (Value × Value)
   | [] => [(key, value)]
@@ -630,6 +648,10 @@ inductive RuntimeError where
   | controlEscapedFunction
   | functionFellThrough (expected : Ty)
   | invalidBuiltin (function : BuiltinFunctionId)
+  | deepSafetyInitialStateRejected
+  | deepSafetyInputsRejected
+  | deepSafetyFinalStateRejected
+  | deepSafetyResultRejected (expected : Ty) (actual : Option Ty)
   deriving Repr, DecidableEq
 
 inductive ExpressionResult where
@@ -899,7 +921,7 @@ private def exactCallSolvedRequirement
   | solved => .error (.duplicateSolvedRequirements caller.key occurrence
       requirement solved.length)
 
-private def runtimeEvidenceGoal :
+def runtimeEvidenceGoal :
     TypedTraitResolution.Evidence → ProgramPredicate
   | .byImpl goal _ _ => goal
 
@@ -908,6 +930,14 @@ private def availableRuntimeEvidence?
     (predicate : ProgramPredicate) : Option TypedTraitResolution.Evidence :=
   environment.find? fun evidence =>
     decide (runtimeEvidenceGoal evidence = predicate)
+
+private theorem availableRuntimeEvidence?_some_goal
+    (environment : RuntimeEvidenceEnvironment)
+    (predicate : ProgramPredicate) (evidence : TypedTraitResolution.Evidence)
+    (found : availableRuntimeEvidence? environment predicate = some evidence) :
+    runtimeEvidenceGoal evidence = predicate := by
+  have accepted := List.find?_some found
+  exact of_decide_eq_true accepted
 
 private structure LocalRequirementBinding where
   template : LocalSchemeRequirement
@@ -1017,7 +1047,7 @@ private def validateRuntimeEvidenceGoals (key : Key) :
 /-- Check the closed dictionary at a specialization boundary.  Its carrier
 already rules out assumption leaves; this additionally fixes source order and
 multiplicity to the callee's specialized `where` predicates. -/
-private def validateRuntimeEvidence (key : Key)
+def validateRuntimeEvidence (key : Key)
     (predicates : List ProgramPredicate)
     (environment : RuntimeEvidenceEnvironment) : Except RuntimeError Unit := do
   if predicates.length = environment.length then
@@ -1048,7 +1078,7 @@ private def validateRuntimeEvidenceSelection (signatures : ProgramSignatures)
   | _, predicates, evidence =>
       throw (.runtimeEvidenceCountMismatch key predicates.length evidence.length)
 
-private def validateAuthenticatedRuntimeEvidence
+def validateAuthenticatedRuntimeEvidence
     (signatures : ProgramSignatures) (key : Key)
     (predicates : List ProgramPredicate)
     (environment : RuntimeEvidenceEnvironment) : Except RuntimeError Unit := do
@@ -1089,7 +1119,7 @@ private theorem validateRuntimeEvidenceGoals_success
 
 /-- Successful executable validation exposes the ordered closed-dictionary
 invariant used by the evaluator boundary. -/
-private theorem validateRuntimeEvidence_success_matches
+theorem validateRuntimeEvidence_success_matches
     (key : Key) (predicates : List ProgramPredicate)
     (environment : RuntimeEvidenceEnvironment)
     (success : validateRuntimeEvidence key predicates environment = .ok ()) :
@@ -1100,11 +1130,34 @@ private theorem validateRuntimeEvidence_success_matches
       success
   · simp at success
 
+/-- Authentication refines ordered dictionary validation; a successfully
+authenticated environment therefore has exactly the callee's predicate
+ledger, including order and multiplicity. -/
+theorem validateAuthenticatedRuntimeEvidence_success_matches
+    (signatures : ProgramSignatures) (key : Key)
+    (predicates : List ProgramPredicate)
+    (environment : RuntimeEvidenceEnvironment)
+    (success : validateAuthenticatedRuntimeEvidence signatures key predicates
+      environment = .ok ()) :
+    environment.Matches predicates := by
+  change Except.bind (validateRuntimeEvidence key predicates environment)
+      (fun _ => validateRuntimeEvidenceSelection signatures key 0 predicates
+        environment) = .ok () at success
+  unfold Except.bind at success
+  split at success
+  · contradiction
+  · rename_i value validated
+    have validatedUnit :
+        validateRuntimeEvidence key predicates environment = .ok () := by
+      simpa only [Subsingleton.elim value ()] using validated
+    exact validateRuntimeEvidence_success_matches key predicates environment
+      validatedUnit
+
 /-- Materialize call evidence in the callee declaration's predicate order.
 Concrete implementation evidence is retained verbatim.  A caller assumption
 is closed by the dictionary supplied when the caller specialization was
 entered; no trait search occurs during execution. -/
-private def materializeCallEvidence
+def materializeCallEvidence
     (caller : SourceSpecialization.SpecializedFunction)
     (occurrence : ExpressionId)
     (available : RuntimeEvidenceEnvironment) :
@@ -1113,11 +1166,11 @@ private def materializeCallEvidence
   | [], [] => pure []
   | requirement :: requirements, predicate :: predicates => do
       let solved ← exactCallSolvedRequirement caller occurrence requirement
-      if solved.predicate != predicate then
+      if decide (solved.predicate ≠ predicate) then
         throw (.callRequirementPredicateMismatch caller.key occurrence
           requirement predicate solved.predicate)
       let goal := solved.evidence.goal
-      if goal != solved.predicate then
+      if decide (goal ≠ solved.predicate) then
         throw (.callRequirementEvidenceGoalMismatch caller.key occurrence
           requirement solved.predicate goal)
       let evidence ← match solved.evidence with
@@ -1133,7 +1186,128 @@ private def materializeCallEvidence
       throw (.callRequirementCountMismatch caller.key occurrence
         predicates.length requirements.length)
 
-private def exactDirectCallRuntimeEvidence
+private theorem exceptBind_eq_ok
+    {errorType valueType resultType : Type}
+    {first : Except errorType valueType}
+    {next : valueType → Except errorType resultType}
+    {result : resultType}
+    (success : Except.bind first next = .ok result) :
+    ∃ value, first = .ok value ∧ next value = .ok result := by
+  cases first with
+  | error error => contradiction
+  | ok value => exact ⟨value, rfl, success⟩
+
+private theorem exceptMap_eq_ok
+    {errorType valueType resultType : Type}
+    {source : Except errorType valueType}
+    {function : valueType → resultType}
+    {result : resultType}
+    (success : function <$> source = .ok result) :
+    ∃ value, source = .ok value ∧ function value = result := by
+  cases source with
+  | error error => contradiction
+  | ok value => exact ⟨value, rfl, by injection success⟩
+
+/-- Successful call-dictionary materialization preserves the callee's
+predicate order exactly, regardless of whether each requirement was already
+concrete or was discharged from the caller dictionary. -/
+theorem materializeCallEvidence_success_matches
+    (caller : SourceSpecialization.SpecializedFunction)
+    (occurrence : ExpressionId)
+    (available result : RuntimeEvidenceEnvironment)
+    (requirements : List RequirementId)
+    (predicates : List ProgramPredicate)
+    (success : materializeCallEvidence caller occurrence available requirements
+      predicates = .ok result) :
+    result.Matches predicates := by
+  induction requirements generalizing predicates result with
+  | nil =>
+      cases predicates with
+      | nil =>
+          simp [materializeCallEvidence] at success
+          subst result
+          rfl
+      | cons predicate predicates =>
+          simp [materializeCallEvidence] at success
+  | cons requirement requirements inductionHypothesis =>
+      cases predicates with
+      | nil => simp [materializeCallEvidence] at success
+      | cons predicate predicates =>
+          simp only [materializeCallEvidence] at success
+          obtain ⟨solved, solvedResult, success⟩ := exceptBind_eq_ok success
+          rcases solved with ⟨solvedId, solvedPredicate, solvedEvidence⟩
+          split at success
+          · contradiction
+          · rename_i predicateAccepted
+            have predicateRejected :
+                decide (solvedPredicate ≠ predicate) = false := by
+              simpa using predicateAccepted
+            have predicateMatches : solvedPredicate = predicate := by
+              exact Decidable.of_not_not
+                (of_decide_eq_false predicateRejected)
+            split at success
+            · contradiction
+            · rename_i goalAccepted
+              have goalRejected :
+                  decide (solvedEvidence.goal ≠ solvedPredicate) = false := by
+                simpa using goalAccepted
+              have goalMatches : solvedEvidence.goal = solvedPredicate := by
+                exact Decidable.of_not_not (of_decide_eq_false goalRejected)
+              cases solvedEvidence with
+              | implementation evidence =>
+                  change (List.cons evidence <$>
+                    materializeCallEvidence caller occurrence available
+                      requirements predicates) = .ok result at success
+                  obtain ⟨tail, tailResult, resultEq⟩ :=
+                    exceptMap_eq_ok success
+                  subst result
+                  have tailMatches := inductionHypothesis
+                    (predicates := predicates) (result := tail) tailResult
+                  unfold RuntimeEvidenceEnvironment.Matches at tailMatches ⊢
+                  change runtimeEvidenceGoal evidence ::
+                    RuntimeEvidenceEnvironment.goals tail =
+                      predicate :: predicates
+                  have evidenceMatches :
+                      runtimeEvidenceGoal evidence = solvedPredicate := by
+                    cases evidence
+                    exact goalMatches
+                  rw [evidenceMatches, predicateMatches, tailMatches]
+              | assumption assumption =>
+                  change
+                    (match availableRuntimeEvidence? available assumption with
+                    | some evidence => List.cons evidence <$>
+                        materializeCallEvidence caller occurrence available
+                          requirements predicates
+                    | none => .error
+                        (.missingRuntimeAssumptionEvidence caller.key occurrence
+                          requirement assumption)) = .ok result at success
+                  cases selected : availableRuntimeEvidence? available
+                      assumption with
+                  | some evidence =>
+                    rw [selected] at success
+                    change (List.cons evidence <$>
+                      materializeCallEvidence caller occurrence available
+                        requirements predicates) = .ok result at success
+                    obtain ⟨tail, tailResult, resultEq⟩ :=
+                      exceptMap_eq_ok success
+                    subst result
+                    have tailMatches := inductionHypothesis
+                      (predicates := predicates) (result := tail) tailResult
+                    have evidenceGoal := availableRuntimeEvidence?_some_goal
+                      available assumption evidence selected
+                    have assumptionMatches : assumption = solvedPredicate :=
+                      goalMatches
+                    unfold RuntimeEvidenceEnvironment.Matches at tailMatches ⊢
+                    change runtimeEvidenceGoal evidence ::
+                      RuntimeEvidenceEnvironment.goals tail =
+                        predicate :: predicates
+                    rw [evidenceGoal, assumptionMatches, predicateMatches,
+                      tailMatches]
+                  | none =>
+                    rw [selected] at success
+                    contradiction
+
+def exactDirectCallRuntimeEvidence
     (caller : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
     (instantiation : DeclarationInstantiation) :
@@ -1142,7 +1316,7 @@ private def exactDirectCallRuntimeEvidence
   materializeCallEvidence caller node.id available requirements
     instantiation.predicates
 
-private def exactDeclarationReferenceRuntimeEvidence
+def exactDeclarationReferenceRuntimeEvidence
     (caller : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
     (instantiation : DeclarationInstantiation) :
@@ -1151,6 +1325,34 @@ private def exactDeclarationReferenceRuntimeEvidence
     instantiation
   materializeCallEvidence caller node.id available requirements
     instantiation.predicates
+
+/-- Successful direct-call evidence recovery produces the exact ordered
+dictionary expected by the instantiated callee signature. -/
+theorem exactDirectCallRuntimeEvidence_success_matches
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available result : RuntimeEvidenceEnvironment)
+    (instantiation : DeclarationInstantiation)
+    (success : exactDirectCallRuntimeEvidence caller node available
+      instantiation = .ok result) :
+    result.Matches instantiation.predicates := by
+  simp only [exactDirectCallRuntimeEvidence] at success
+  obtain ⟨requirements, _, materialized⟩ := exceptBind_eq_ok success
+  exact materializeCallEvidence_success_matches caller node.id available result
+    requirements instantiation.predicates materialized
+
+/-- Declaration values use the same ordered dictionary contract as immediate
+direct calls. -/
+theorem exactDeclarationReferenceRuntimeEvidence_success_matches
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available result : RuntimeEvidenceEnvironment)
+    (instantiation : DeclarationInstantiation)
+    (success : exactDeclarationReferenceRuntimeEvidence caller node available
+      instantiation = .ok result) :
+    result.Matches instantiation.predicates := by
+  simp only [exactDeclarationReferenceRuntimeEvidence] at success
+  obtain ⟨requirements, _, materialized⟩ := exceptBind_eq_ok success
+  exact materializeCallEvidence_success_matches caller node.id available result
+    requirements instantiation.predicates materialized
 
 private def validateSelectedCallImplementationEvidence
     (signatures : ProgramSignatures)
@@ -1176,16 +1378,16 @@ private def validateSelectedCallImplementationEvidence
 /-- Recover one concrete requirement witness at runtime.  Assumption markers
 are discharged from the caller's closed dictionary; concrete witnesses are
 authenticated again against the authoritative whole-program resolver. -/
-private def exactRuntimeRequirementEvidence (program : CheckedProgram)
+def exactRuntimeRequirementEvidence (program : CheckedProgram)
     (caller : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
     (requirement : RequirementId) (expected : ProgramPredicate) :
     Except RuntimeError TypedTraitResolution.Evidence := do
   let solved ← exactCallSolvedRequirement caller node.id requirement
-  if solved.predicate != expected then
+  if decide (solved.predicate ≠ expected) then
     throw (.callRequirementPredicateMismatch caller.key node.id requirement
       expected solved.predicate)
-  if solved.evidence.goal != expected then
+  if decide (solved.evidence.goal ≠ expected) then
     throw (.callRequirementEvidenceGoalMismatch caller.key node.id requirement
       expected solved.evidence.goal)
   let evidence ← match solved.evidence with
@@ -1199,7 +1401,70 @@ private def exactRuntimeRequirementEvidence (program : CheckedProgram)
     requirement expected evidence
   pure evidence
 
-private def exactRuntimeRequirementEvidenceList (program : CheckedProgram)
+/-- A recovered and authenticated coercion/operator requirement has the goal
+requested by the checked method signature. -/
+theorem exactRuntimeRequirementEvidence_success_goal
+    (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
+    (requirement : RequirementId) (expected : ProgramPredicate)
+    (result : TypedTraitResolution.Evidence)
+    (success : exactRuntimeRequirementEvidence program caller node available
+      requirement expected = .ok result) :
+    runtimeEvidenceGoal result = expected := by
+  simp only [exactRuntimeRequirementEvidence] at success
+  obtain ⟨solved, solvedResult, success⟩ := exceptBind_eq_ok success
+  rcases solved with ⟨solvedId, solvedPredicate, solvedEvidence⟩
+  split at success
+  · contradiction
+  · rename_i predicateAccepted
+    have predicateRejected :
+        decide (solvedPredicate ≠ expected) = false := by
+      simpa using predicateAccepted
+    have predicateMatches : solvedPredicate = expected := by
+      exact Decidable.of_not_not (of_decide_eq_false predicateRejected)
+    split at success
+    · contradiction
+    · rename_i goalAccepted
+      have goalRejected :
+          decide (solvedEvidence.goal ≠ expected) = false := by
+        simpa using goalAccepted
+      have goalMatches : solvedEvidence.goal = expected := by
+        exact Decidable.of_not_not (of_decide_eq_false goalRejected)
+      cases solvedEvidence with
+      | implementation evidence =>
+          change Except.bind
+            (validateSelectedCallImplementationEvidence program.signatures
+              caller node.id requirement expected evidence)
+            (fun _ => .ok evidence) = .ok result at success
+          obtain ⟨_, _, resultEq⟩ := exceptBind_eq_ok success
+          injection resultEq with resultMatches
+          subst result
+          cases evidence
+          exact goalMatches
+      | assumption assumption =>
+          change
+            (match availableRuntimeEvidence? available assumption with
+            | some evidence => Except.bind
+                (validateSelectedCallImplementationEvidence program.signatures
+                  caller node.id requirement expected evidence)
+                (fun _ => .ok evidence)
+            | none => .error
+                (.missingRuntimeAssumptionEvidence caller.key node.id
+                  requirement assumption)) = .ok result at success
+          cases selected : availableRuntimeEvidence? available assumption with
+          | none =>
+              rw [selected] at success
+              contradiction
+          | some evidence =>
+              rw [selected] at success
+              obtain ⟨_, _, resultEq⟩ := exceptBind_eq_ok success
+              injection resultEq with resultMatches
+              subst result
+              exact (availableRuntimeEvidence?_some_goal available assumption
+                evidence selected).trans goalMatches
+
+def exactRuntimeRequirementEvidenceList (program : CheckedProgram)
     (caller : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) (available : RuntimeEvidenceEnvironment) :
     List RequirementId → List ProgramPredicate →
@@ -1213,6 +1478,46 @@ private def exactRuntimeRequirementEvidenceList (program : CheckedProgram)
   | requirements, predicates =>
       throw (.coercionMethodRequirementCountMismatch caller.key node.id
         { index := 0 } predicates.length requirements.length)
+
+/-- Successful method-requirement recovery preserves the method predicate
+ledger exactly.  This is the evidence contract consumed by every selected
+coercion and overloaded-operator call helper. -/
+theorem exactRuntimeRequirementEvidenceList_success_matches
+    (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available result : RuntimeEvidenceEnvironment)
+    (requirements : List RequirementId)
+    (predicates : List ProgramPredicate)
+    (success : exactRuntimeRequirementEvidenceList program caller node
+      available requirements predicates = .ok result) :
+    result.Matches predicates := by
+  induction requirements generalizing predicates result with
+  | nil =>
+      cases predicates with
+      | nil =>
+          simp [exactRuntimeRequirementEvidenceList] at success
+          subst result
+          rfl
+      | cons predicate predicates =>
+          simp [exactRuntimeRequirementEvidenceList] at success
+  | cons requirement requirements inductionHypothesis =>
+      cases predicates with
+      | nil => simp [exactRuntimeRequirementEvidenceList] at success
+      | cons predicate predicates =>
+          simp only [exactRuntimeRequirementEvidenceList] at success
+          obtain ⟨evidence, evidenceSuccess, success⟩ :=
+            exceptBind_eq_ok success
+          obtain ⟨tail, tailSuccess, resultEq⟩ := exceptMap_eq_ok success
+          subst result
+          have evidenceGoal := exactRuntimeRequirementEvidence_success_goal
+            program caller node available requirement predicate evidence
+              evidenceSuccess
+          have tailMatches := inductionHypothesis
+            (predicates := predicates) (result := tail) tailSuccess
+          unfold RuntimeEvidenceEnvironment.Matches at tailMatches ⊢
+          change runtimeEvidenceGoal evidence ::
+            RuntimeEvidenceEnvironment.goals tail = predicate :: predicates
+          rw [evidenceGoal, tailMatches]
 
 private structure RuntimeOperatorProfile where
   traitName : String
@@ -5397,6 +5702,20 @@ theorem RuntimeState.HasDeepTypes.write?_some
   intro cell member
   simp at member
 
+/-- Reading an initialized cell from a code-consistent heap exposes the
+stored value's checked-plan provenance. -/
+theorem RuntimeState.HasPlanCodes.read_value
+    {plan : Plan} {state : RuntimeState}
+    (typing : state.HasPlanCodes plan)
+    {location : Location} {cell : Cell} {value : Value}
+    (found : state.read? location = some cell)
+    (initialized : cell.value = some value) :
+    value.HasPlanCode plan := by
+  apply typing cell
+  · exact List.mem_of_getElem? (by
+      simpa [RuntimeState.read?] using found)
+  · exact initialized
+
 theorem RuntimeState.HasPlanCodes.allocate_none
     {plan : Plan} {state : RuntimeState}
     (typing : state.HasPlanCodes plan) (type : Ty) :
@@ -5659,6 +5978,255 @@ theorem Value.emptyMapping_hasPlanCode
   | succ fuel =>
       intro entry member
       cases member
+
+/-- Canonical primitive and proxy defaults are deeply typed in every heap
+world. -/
+theorem Value.unit_hasDeepType
+    (signatures : ProgramSignatures) (plan : Plan) (world : RuntimeState) :
+    Value.unit.HasDeepType signatures plan world .unit := by
+  intro fuel
+  cases fuel <;> simp [Value.HasDeepTypeFuel, Value.type?, Ty.unit]
+
+theorem Value.bool_hasDeepType
+    (signatures : ProgramSignatures) (plan : Plan) (world : RuntimeState)
+    (value : Bool) :
+    (Value.bool value).HasDeepType signatures plan world .bool := by
+  intro fuel
+  cases fuel <;> simp [Value.HasDeepTypeFuel, Value.type?, Ty.bool]
+
+theorem Value.word_hasDeepType
+    (signatures : ProgramSignatures) (plan : Plan) (world : RuntimeState)
+    (value : Core.Word) :
+    (Value.word value).HasDeepType signatures plan world .word := by
+  intro fuel
+  cases fuel <;> simp [Value.HasDeepTypeFuel, Value.type?, Ty.word]
+
+theorem Value.integer_hasDeepType
+    (signatures : ProgramSignatures) (plan : Plan) (world : RuntimeState)
+    (value : Int) :
+    (Value.integer value).HasDeepType signatures plan world .integer := by
+  intro fuel
+  cases fuel <;> simp [Value.HasDeepTypeFuel, Value.type?, Ty.integer]
+
+theorem Value.proxy_hasDeepType
+    (signatures : ProgramSignatures) (plan : Plan) (world : RuntimeState)
+    (inner : Ty) :
+    (Value.proxy inner).HasDeepType signatures plan world (.proxy inner) := by
+  intro fuel
+  cases fuel <;> simp [Value.HasDeepTypeFuel, Value.type?]
+
+/-- Products preserve deep typing componentwise. -/
+theorem Value.product_hasDeepType
+    (signatures : ProgramSignatures) (plan : Plan) (world : RuntimeState)
+    (leftType rightType : Ty) (left right : Value)
+    (leftDeep : left.HasDeepType signatures plan world leftType)
+    (rightDeep : right.HasDeepType signatures plan world rightType) :
+    (Value.product left right).HasDeepType signatures plan world
+      (.product leftType rightType) := by
+  intro fuel
+  cases fuel with
+  | zero => trivial
+  | succ fuel =>
+      have leftShape := (leftDeep (fuel + 1)).1
+      have rightShape := (rightDeep (fuel + 1)).1
+      constructor
+      · simp [Value.type?, leftShape, rightShape]
+      · exact ⟨by simpa using leftDeep fuel,
+          by simpa using rightDeep fuel⟩
+
+/-- Primitive values, proxies, and products constructed from code-consistent
+components carry no unchecked executable code. -/
+theorem Value.unit_hasPlanCode (plan : Plan) :
+    Value.unit.HasPlanCode plan := by
+  intro fuel
+  cases fuel <;> trivial
+
+theorem Value.bool_hasPlanCode (plan : Plan) (value : Bool) :
+    (Value.bool value).HasPlanCode plan := by
+  intro fuel
+  cases fuel <;> trivial
+
+theorem Value.word_hasPlanCode (plan : Plan) (value : Core.Word) :
+    (Value.word value).HasPlanCode plan := by
+  intro fuel
+  cases fuel <;> trivial
+
+theorem Value.integer_hasPlanCode (plan : Plan) (value : Int) :
+    (Value.integer value).HasPlanCode plan := by
+  intro fuel
+  cases fuel <;> trivial
+
+theorem Value.proxy_hasPlanCode (plan : Plan) (inner : Ty) :
+    (Value.proxy inner).HasPlanCode plan := by
+  intro fuel
+  cases fuel <;> trivial
+
+theorem Value.product_hasPlanCode
+    (plan : Plan) (left right : Value)
+    (leftCode : left.HasPlanCode plan)
+    (rightCode : right.HasPlanCode plan) :
+    (Value.product left right).HasPlanCode plan := by
+  intro fuel
+  cases fuel with
+  | zero => trivial
+  | succ fuel => exact ⟨leftCode fuel, rightCode fuel⟩
+
+/-- Every executable default produced by `defaultValue?` has both its deep
+source type and checked-plan code provenance.  Unsupported source types are
+excluded by the successful-result premise rather than by a separate
+defaultability predicate. -/
+theorem defaultValue?_some_hasDeepType_and_code
+    (signatures : ProgramSignatures) (plan : Plan) (world : RuntimeState) :
+    ∀ fuel expected value,
+      defaultValue? fuel expected = some value →
+      value.HasDeepType signatures plan world expected ∧
+        value.HasPlanCode plan := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro expected value found
+      simp [defaultValue?] at found
+  | succ fuel inductionHypothesis =>
+      intro expected value found
+      cases expected with
+      | «variable» metavariable => simp [defaultValue?] at found
+      | parameter parameter => simp [defaultValue?] at found
+      | constructor constructor =>
+          cases constructor with
+          | declaration declaration => simp [defaultValue?] at found
+          | builtin builtin =>
+              cases builtin with
+              | unit =>
+                  simp [defaultValue?] at found
+                  subst value
+                  exact ⟨Value.unit_hasDeepType signatures plan world,
+                    Value.unit_hasPlanCode plan⟩
+              | bool =>
+                  simp [defaultValue?] at found
+                  subst value
+                  exact ⟨Value.bool_hasDeepType signatures plan world false,
+                    Value.bool_hasPlanCode plan false⟩
+              | word =>
+                  simp [defaultValue?] at found
+                  subst value
+                  exact ⟨Value.word_hasDeepType signatures plan world
+                      Core.Word.zero,
+                    Value.word_hasPlanCode plan Core.Word.zero⟩
+              | integer =>
+                  simp [defaultValue?] at found
+                  subst value
+                  exact ⟨Value.integer_hasDeepType signatures plan world 0,
+                    Value.integer_hasPlanCode plan 0⟩
+      | application function argument => simp [defaultValue?] at found
+      | function parameter result => simp [defaultValue?] at found
+      | product leftType rightType =>
+          cases leftDefault : defaultValue? fuel leftType with
+          | none => simp [defaultValue?, leftDefault] at found
+          | some left =>
+              cases rightDefault : defaultValue? fuel rightType with
+              | none => simp [defaultValue?, leftDefault, rightDefault] at found
+              | some right =>
+                  simp [defaultValue?, leftDefault, rightDefault] at found
+                  subst value
+                  obtain ⟨leftDeep, leftCode⟩ :=
+                    inductionHypothesis leftType left leftDefault
+                  obtain ⟨rightDeep, rightCode⟩ :=
+                    inductionHypothesis rightType right rightDefault
+                  exact ⟨Value.product_hasDeepType signatures plan world
+                      leftType rightType left right leftDeep rightDeep,
+                    Value.product_hasPlanCode plan left right
+                      leftCode rightCode⟩
+      | mapping keyType valueType =>
+          simp [defaultValue?] at found
+          subst value
+          exact ⟨Value.emptyMapping_hasDeepType signatures plan world
+              keyType valueType,
+            Value.emptyMapping_hasPlanCode plan keyType valueType⟩
+      | proxy inner =>
+          simp [defaultValue?] at found
+          subst value
+          exact ⟨Value.proxy_hasDeepType signatures plan world inner,
+            Value.proxy_hasPlanCode plan inner⟩
+      | comptime inner =>
+          have inherited := inductionHypothesis inner value found
+          exact ⟨fun depth =>
+              (Value.hasDeepTypeFuel_comptime depth signatures plan world
+                inner value).2 (inherited.1 depth),
+            inherited.2⟩
+      | error => simp [defaultValue?] at found
+
+/-- `initialRootValue` either returns the already certified cell contents or
+materializes the canonical empty mapping for an uninitialized mapping cell. -/
+theorem initialRootValue_some_hasDeepType_and_code
+    (signatures : ProgramSignatures) (plan : Plan)
+    (state : RuntimeState) (location : Location) (cell : Cell)
+    (value : Value)
+    (deepHeap : state.HasDeepTypes signatures plan)
+    (codeHeap : state.HasPlanCodes plan)
+    (found : state.read? location = some cell)
+    (initial : initialRootValue cell = some value) :
+    value.HasDeepType signatures plan state cell.type ∧
+      value.HasPlanCode plan := by
+  cases stored : cell.value with
+  | some current =>
+      simp [initialRootValue, stored] at initial
+      subst value
+      exact ⟨deepHeap.read_value found stored,
+        codeHeap.read_value found stored⟩
+  | none =>
+      cases cellType : cell.type with
+      | «variable» metavariable =>
+          simp [initialRootValue, stored, cellType] at initial
+      | parameter parameter =>
+          simp [initialRootValue, stored, cellType] at initial
+      | constructor constructor =>
+          simp [initialRootValue, stored, cellType] at initial
+      | application function argument =>
+          simp [initialRootValue, stored, cellType] at initial
+      | function parameter result =>
+          simp [initialRootValue, stored, cellType] at initial
+      | product left right =>
+          simp [initialRootValue, stored, cellType] at initial
+      | mapping keyType valueType =>
+          simp [initialRootValue, stored, cellType] at initial
+          subst value
+          constructor
+          · simpa [cellType] using
+              (Value.emptyMapping_hasDeepType signatures plan state
+                keyType valueType)
+          · exact Value.emptyMapping_hasPlanCode plan keyType valueType
+      | proxy inner =>
+          simp [initialRootValue, stored, cellType] at initial
+      | comptime inner =>
+          simp [initialRootValue, stored, cellType] at initial
+      | error =>
+          simp [initialRootValue, stored, cellType] at initial
+
+/-- Looking up an existing mapping entry preserves its deep value type. -/
+theorem Value.mappingLookup?_hasDeepType
+    (signatures : ProgramSignatures) (plan : Plan) (world : RuntimeState)
+    (keyType valueType : Ty) (entries : List (Value × Value))
+    (key selected : Value)
+    (typed : (Value.mapping keyType valueType entries).HasDeepType
+      signatures plan world (.mapping keyType valueType))
+    (found : mappingLookup? key entries = some selected) :
+    selected.HasDeepType signatures plan world valueType := by
+  obtain ⟨storedKey, member⟩ := mappingLookup?_member key selected entries found
+  intro fuel
+  simpa using ((typed (fuel + 1)).2.2.2
+    (storedKey, selected) member).2
+
+/-- Looking up an existing mapping entry preserves its checked-plan code
+provenance. -/
+theorem Value.mappingLookup?_hasPlanCode
+    (plan : Plan) (keyType valueType : Ty)
+    (entries : List (Value × Value)) (key selected : Value)
+    (code : (Value.mapping keyType valueType entries).HasPlanCode plan)
+    (found : mappingLookup? key entries = some selected) :
+    selected.HasPlanCode plan := by
+  obtain ⟨storedKey, member⟩ := mappingLookup?_member key selected entries found
+  intro fuel
+  exact (code (fuel + 1) (storedKey, selected) member).2
 
 /-- The present-key path needs no abstract mapping frame premise once its
 existing mapping, key, and updated child are deeply typed. -/
