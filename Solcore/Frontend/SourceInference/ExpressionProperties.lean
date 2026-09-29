@@ -104,6 +104,110 @@ theorem qualifiedFunctionsNamed_success_subset_catalog
                   simp [qualifiedFunctionsNamed, imported, root, targets]
                     at success
 
+/-- Invert either numeric-literal branch through fresh target allocation,
+the builtin-`Int` requirement, origin-ledger insertion, and the final ordinary
+expression recording step.  Both pieces of provenance remain present in the
+state returned by expected-type fitting. -/
+theorem inferExprFuel_success_numericLiteral_record
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {literal : Syntax.CoreLiteral} {source : Syntax.CoreLiteralValue}
+    {rawValue : Nat} {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .literal literal)
+    (literalEq : literal.value = source)
+    (decoded : Frontend.numericLiteralValue? source = some rawValue)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    (let rawType := allocated.fresh.1
+     let freshState := allocated.fresh.2
+     let addition := freshState.addRequirementWithId
+       (ProgramSignatures.builtinIntPredicate rawType)
+     let origin : IntegerLiteralOrigin := {
+       metavariable := ⟨allocated.inference.next⟩
+       expression := id
+       requirement := addition.1
+     }
+     let literalState : State := {
+       addition.2 with
+       integerLiterals := addition.2.integerLiterals ++ [origin]
+     }
+     recordExpressionWithExpected context expression id rawType
+         (.integerLiteral source {
+           rawValue
+           targetType := rawType
+           requirement := addition.1
+         }) [addition.1] expected literalState = .ok result ∧
+       origin ∈ result.2.integerLiterals ∧
+       ({ id := addition.1
+          predicate := ProgramSignatures.builtinIntPredicate rawType } :
+          Requirement) ∈ result.2.requirements) := by
+  let rawType := allocated.fresh.1
+  let freshState := allocated.fresh.2
+  let addition := freshState.addRequirementWithId
+    (ProgramSignatures.builtinIntPredicate rawType)
+  let origin : IntegerLiteralOrigin := {
+    metavariable := ⟨allocated.inference.next⟩
+    expression := id
+    requirement := addition.1
+  }
+  let literalState : State := {
+    addition.2 with
+    integerLiterals := addition.2.integerLiterals ++ [origin]
+  }
+  have finish
+      (recordSuccess : recordExpressionWithExpected context expression id
+        rawType (.integerLiteral source {
+          rawValue
+          targetType := rawType
+          requirement := addition.1
+        }) [addition.1] expected literalState = .ok result) :
+      origin ∈ result.2.integerLiterals ∧
+        ({ id := addition.1
+           predicate := ProgramSignatures.builtinIntPredicate rawType } :
+          Requirement) ∈ result.2.requirements := by
+    have literalOriginsEq :=
+      recordExpressionWithExpected_integerLiterals_eq recordSuccess
+    have originMember : origin ∈ literalState.integerLiterals := by
+      simp [literalState]
+    have requirementMember :
+        ({ id := addition.1
+           predicate := ProgramSignatures.builtinIntPredicate rawType } :
+          Requirement) ∈ literalState.requirements := by
+      simp [literalState, addition, State.addRequirementWithId]
+    exact ⟨by simpa [literalOriginsEq] using originMember,
+      recordExpressionWithExpected_requirements_subset recordSuccess
+        requirementMember⟩
+  cases source with
+  | string spelling =>
+      simp [Frontend.numericLiteralValue?] at decoded
+  | decimal spelling =>
+      have recordSuccess : recordExpressionWithExpected context expression id
+          rawType (.integerLiteral (.decimal spelling) {
+            rawValue
+            targetType := rawType
+            requirement := addition.1
+          }) [addition.1] expected literalState = .ok result := by
+        unfold inferExprFuel at success
+        simp only [allocationEq, expressionEq, literalEq, decoded, bind,
+          Except.bind, pure, Pure.pure, Except.pure] at success
+        simpa only [rawType, freshState, addition, origin, literalState,
+          State.fresh, TypeSystem.InferState.fresh, Prod.eta] using success
+      exact ⟨recordSuccess, finish recordSuccess⟩
+  | hexadecimal spelling =>
+      have recordSuccess : recordExpressionWithExpected context expression id
+          rawType (.integerLiteral (.hexadecimal spelling) {
+            rawValue
+            targetType := rawType
+            requirement := addition.1
+          }) [addition.1] expected literalState = .ok result := by
+        unfold inferExprFuel at success
+        simp only [allocationEq, expressionEq, literalEq, decoded, bind,
+          Except.bind, pure, Pure.pure, Except.pure] at success
+        simpa only [rawType, freshState, addition, origin, literalState,
+          State.fresh, TypeSystem.InferState.fresh, Prod.eta] using success
+      exact ⟨recordSuccess, finish recordSuccess⟩
+
 /-- Invert the successful local-identifier branch through its canonical scheme
 instantiation and requirement allocation, stopping at the exact expression
 recording operation used by the traversal. -/

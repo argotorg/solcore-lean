@@ -4389,7 +4389,9 @@ private theorem recordExpression_integerLiterals_eq
     state.allocateExpressionId.2.integerLiterals = state.integerLiterals := by
   rfl
 
-private theorem recordExpressionWithExpected_integerLiterals_eq
+/-- Expected-type fitting and expression recording preserve the exact
+integer-literal origin ledger supplied by the caller. -/
+theorem recordExpressionWithExpected_integerLiterals_eq
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
     {expected : Option Ty} {state : State}

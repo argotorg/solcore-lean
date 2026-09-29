@@ -695,6 +695,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_requirements_subset
 example :=
+  @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_integerLiterals_eq
+example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_success_localSchemeInstantiationStart
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordExpressionWithExpected_inferenceProperties
@@ -880,6 +882,8 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.inferForItemFuel_preserves_localBindersBelowNextLocal
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_localIdentifier_record
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_numericLiteral_record
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferStatementsFuel_inferenceProperties
 example :=
