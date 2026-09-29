@@ -3969,6 +3969,166 @@ def inferMatchScrutineesFuel
       })
       pure ({ id := tupleId, type }, state)
 
+/-- Successful constructor-argument inference grows the local typed source by
+an append-only extension.  The input occurrence bound protects the complete
+input node table from payload refinements at freshly allocated occurrences. -/
+theorem inferConstructorArgumentsFuel_success_typingSourceExtends
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {sources : List Syntax.Expr} {expectedTypes : List TypeSystem.Ty}
+    {initial final : Frontend.SourceInference.State}
+    {inferred : List InferredExpression}
+    (success : Detail.inferConstructorArgumentsFuel fuel inferenceContext
+      sources expectedTypes initial = .ok (inferred, final))
+    (below : initial.NodesBelowNextOccurrence)
+    (roots : List NodeId := []) :
+    TypingSourceExtends (initial.toTypedSource roots)
+      (final.toTypedSource roots) := by
+  constructor
+  · exact Detail.inferConstructorArgumentsFuel_preserves_owner success
+  · exact Detail.inferConstructorArgumentsFuel_preserves_nodesPrefix
+      success List.prefix_rfl below (Nat.le_refl _)
+
+/-- Fixed-fuel deep soundness for the source-ordered constructor-argument
+traversal.  Each child is first typed in its own returned local source.  The
+tail's anchored source extension transports the head proof into the common
+final source, while inference progress closes every expected payload type
+under the caller's final substitution. -/
+theorem inferConstructorArgumentsFuel_success_expressionsHaveTypes_local
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {sources : List Syntax.Expr} {expectedTypes : List TypeSystem.Ty}
+    {initial final : Frontend.SourceInference.State}
+    {inferred : List InferredExpression}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (roots : List NodeId := [])
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (ready : initial.InferenceReady)
+    (expectedBelow : ∀ expected ∈ expectedTypes,
+      expected.VariablesBelow initial.inference.next)
+    (nodesBelow : initial.NodesBelowNextOccurrence)
+    (outerExtension : outer.SemanticallyExtends
+      final.inference.substitution)
+    (expressionSound :
+      ∀ {expression expected childInitial childFinal child},
+        childInitial.InferenceReady →
+        expected.VariablesBelow childInitial.inference.next →
+        childInitial.NodesBelowNextOccurrence →
+        outer.SemanticallyExtends childFinal.inference.substitution →
+        Detail.inferExprFuel fuel inferenceContext expression
+            (some (childInitial.resolve expected)) childInitial =
+              .ok (child, childFinal) →
+          ExpressionHasType
+            ((childFinal.toTypedSource roots).applySubstitution outer)
+            target child.id (outer.apply child.type))
+    (success : Detail.inferConstructorArgumentsFuel fuel inferenceContext
+      sources expectedTypes initial = .ok (inferred, final)) :
+    ExpressionsHaveTypes
+      ((final.toTypedSource roots).applySubstitution outer) target
+      (inferred.map (·.id)) (expectedTypes.map outer.apply) := by
+  induction sources generalizing expectedTypes initial inferred final with
+  | nil =>
+      cases expectedTypes with
+      | nil =>
+          simp only [Detail.inferConstructorArgumentsFuel, pure, Pure.pure,
+            Except.pure, Except.ok.injEq, Prod.mk.injEq] at success
+          rcases success with ⟨rfl, rfl⟩
+          exact .nil target
+      | cons expected expectedTypes =>
+          simp [Detail.inferConstructorArgumentsFuel] at success
+  | cons source sources induction =>
+      cases expectedTypes with
+      | nil =>
+          simp [Detail.inferConstructorArgumentsFuel] at success
+      | cons expected expectedTypes =>
+          unfold Detail.inferConstructorArgumentsFuel at success
+          cases sourceResult : Detail.inferExprFuel fuel inferenceContext source
+              (some (initial.resolve expected)) initial with
+          | error error =>
+              simp [sourceResult, bind, Except.bind] at success
+          | ok sourcePair =>
+              rcases sourcePair with ⟨head, headState⟩
+              simp only [sourceResult, bind, Except.bind] at success
+              cases tailResult : Detail.inferConstructorArgumentsFuel fuel
+                  inferenceContext sources expectedTypes headState with
+              | error error =>
+                  simp [tailResult] at success
+              | ok tailPair =>
+                  rcases tailPair with ⟨tail, tailState⟩
+                  simp only [tailResult, pure, Pure.pure, Except.pure]
+                    at success
+                  injection success with resultEq
+                  cases resultEq
+                  have expectedHeadBelow :
+                      expected.VariablesBelow initial.inference.next :=
+                    expectedBelow expected (by simp)
+                  have resolvedHeadBelow :
+                      (initial.resolve expected).VariablesBelow
+                        initial.inference.next :=
+                    ready.solved.variablesBelow_apply expectedHeadBelow
+                  have headProperties :=
+                    Detail.inferExprFuel_inferenceProperties ready
+                      signatureFormation functionsCanonical (by
+                        intro candidate member
+                        simp only [Option.mem_def] at member
+                        injection member with candidateEq
+                        subst candidate
+                        exact resolvedHeadBelow) sourceResult
+                  have headNodesBelow :
+                      headState.NodesBelowNextOccurrence :=
+                    (Detail.inferExprFuel_occurrenceBoundExtends sourceResult
+                      ).nodesBelowNextOccurrence nodesBelow
+                  have tailExpectedBelow : ∀ candidate ∈ expectedTypes,
+                      candidate.VariablesBelow
+                        headState.inference.next := by
+                    intro candidate member
+                    exact (expectedBelow candidate (by simp [member])).weaken
+                      headProperties.1.next_le
+                  have tailProperties :=
+                    Detail.inferConstructorArgumentsFuel_inferenceProperties
+                      headProperties.2.1 signatureFormation functionsCanonical
+                      tailExpectedBelow tailResult
+                  have outerHead : outer.SemanticallyExtends
+                      headState.inference.substitution :=
+                    TypeSystem.Substitution.SemanticallyExtends.trans
+                      outerExtension tailProperties.1.substitution_extends
+                  have outerInitial : outer.SemanticallyExtends
+                      initial.inference.substitution :=
+                    TypeSystem.Substitution.SemanticallyExtends.trans outerHead
+                      headProperties.1.substitution_extends
+                  have headTyping := expressionSound ready expectedHeadBelow
+                    nodesBelow outerHead sourceResult
+                  have headExpectedEq : outer.apply head.type =
+                      outer.apply expected := by
+                    calc
+                      outer.apply head.type =
+                          outer.apply (initial.resolve expected) :=
+                        Detail.inferExprFuel_expected_type_apply_eq sourceResult
+                          outerHead
+                      _ = outer.apply expected := by
+                        simpa [Frontend.SourceInference.State.resolve,
+                          TypeSystem.InferState.resolve] using
+                            outerInitial expected
+                  have headExpected : ExpressionHasType
+                      ((headState.toTypedSource roots).applySubstitution outer)
+                      target head.id (outer.apply expected) := by
+                    rw [← headExpectedEq]
+                    exact headTyping
+                  have tailTyping := induction headProperties.2.1
+                    tailExpectedBelow headNodesBelow outerExtension
+                    tailResult
+                  have sourceExtension : TypingSourceExtends
+                      ((headState.toTypedSource roots).applySubstitution outer)
+                      ((final.toTypedSource roots).applySubstitution outer) :=
+                    (inferConstructorArgumentsFuel_success_typingSourceExtends
+                      tailResult headNodesBelow roots).applySubstitution outer
+                  exact .cons
+                    (headExpected.weakenSource sourceExtension) tailTyping
+
 /-- Pointwise deep soundness for expression inference lifts through the
 source-ordered expression-list traversal.  The semantic source is fixed by
 the caller, so it may be the enclosing expression or statement's final common
