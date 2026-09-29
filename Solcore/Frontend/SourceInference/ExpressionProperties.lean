@@ -7084,6 +7084,102 @@ private theorem builtinFunction_type_variablesBelow
       (builtinFunction_parameterTypes_variablesBelow function next),
     builtinFunction_returnType_variablesBelow function next⟩
 
+/-- One successful unification preserves a pointwise row of type equalities
+already visible through the input inference state. -/
+private theorem unify_preserves_resolve_map_eq
+    {state next : State} {source target : Ty}
+    {left right : List Ty}
+    (equal : left.map state.resolve = right.map state.resolve)
+    (success : unify state source target = .ok next) :
+    left.map next.resolve = right.map next.resolve := by
+  induction left generalizing right with
+  | nil =>
+      cases right with
+      | nil => rfl
+      | cons head tail => simp at equal
+  | cons head tail induction =>
+      cases right with
+      | nil => simp at equal
+      | cons other rest =>
+          simp only [List.map_cons, List.cons.injEq] at equal ⊢
+          exact ⟨unify_preserves_resolve_eq equal.1 success,
+            induction equal.2⟩
+
+/-- The remaining builtin-argument unifications preserve any pointwise type
+equalities already established by an earlier pair. -/
+private theorem
+    unifyBuiltinFunctionArgumentsEqual_preserves_resolve_map_eq
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {state next : State} {left right : List Ty}
+    (equal : left.map state.resolve = right.map state.resolve)
+    (success : unifyBuiltinFunctionArgumentsEqual arguments parameters state =
+      .ok next) :
+    left.map next.resolve = right.map next.resolve := by
+  induction arguments generalizing parameters state next with
+  | nil =>
+      simp only [unifyBuiltinFunctionArgumentsEqual] at success
+      injection success with nextEq
+      subst next
+      exact equal
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          injection success with nextEq
+          subst next
+          exact equal
+      | cons parameter parameters =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          cases unifyResult : unify state argument.type parameter with
+          | error error =>
+              simp [unifyResult, bind, Except.bind] at success
+          | ok unifiedState =>
+              simp only [unifyResult, bind, Except.bind] at success
+              exact induction
+                (unify_preserves_resolve_map_eq equal unifyResult) success
+
+/-- Pairwise builtin-argument unification makes every complete, equal-length
+argument/parameter row pointwise equal in the returned inference state. -/
+private theorem unifyBuiltinFunctionArgumentsEqual_resolve_map_eq
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {state next : State}
+    (lengthEq : arguments.length = parameters.length)
+    (success : unifyBuiltinFunctionArgumentsEqual arguments parameters state =
+      .ok next) :
+    arguments.map (fun argument => next.resolve argument.type) =
+      parameters.map next.resolve := by
+  induction arguments generalizing parameters state next with
+  | nil =>
+      cases parameters with
+      | nil =>
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          injection success with nextEq
+          subst next
+          rfl
+      | cons parameter parameters => simp at lengthEq
+  | cons argument arguments induction =>
+      cases parameters with
+      | nil => simp at lengthEq
+      | cons parameter parameters =>
+          simp only [List.length_cons, Nat.succ.injEq] at lengthEq
+          simp only [unifyBuiltinFunctionArgumentsEqual] at success
+          cases unifyResult : unify state argument.type parameter with
+          | error error =>
+              simp [unifyResult, bind, Except.bind] at success
+          | ok unifiedState =>
+              simp only [unifyResult, bind, Except.bind] at success
+              have headAtUnified := unify_resolve_eq unifyResult
+              have headAtNext : next.resolve argument.type =
+                  next.resolve parameter := by
+                have preserved :=
+                  unifyBuiltinFunctionArgumentsEqual_preserves_resolve_map_eq
+                    (left := [argument.type]) (right := [parameter])
+                    (by simpa [State.resolve] using headAtUnified) success
+                simpa using preserved
+              have tailEq := induction lengthEq success
+              simp only [List.map_cons, List.cons.injEq]
+              exact ⟨headAtNext, tailEq⟩
+
 /-- Pairwise builtin-argument unification makes semantic inference progress
 and preserves readiness when both input rows are allocator-bounded.  The
 underlying operation deliberately stops when either row is exhausted. -/
@@ -7351,6 +7447,251 @@ theorem recordBuiltinFunctionCall_inferenceProperties
                 exact ⟨argumentsProperties.1.trans
                     (expectedProgress.trans tailProperties.1),
                   tailProperties.2⟩
+  · simp [arity, bind, Except.bind] at success
+
+/-- Successful builtin-call recording retains the pointwise argument/parameter
+equalities established before its metadata-only synthetic nodes are appended. -/
+private theorem recordBuiltinFunctionCall_success_argumentTypes_resolve_eq
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    arguments.map (fun argument => result.2.resolve argument.type) =
+      function.parameterTypes.map result.2.resolve := by
+  unfold recordBuiltinFunctionCall at success
+  by_cases arity : arguments.length = function.parameterTypes.length
+  · simp only [arity, ↓reduceIte, bind, Except.bind] at success
+    cases argumentsResult :
+        unifyBuiltinFunctionArgumentsEqual arguments function.parameterTypes
+          state with
+    | error error =>
+        simp [argumentsResult, bind, Except.bind] at success
+    | ok argumentsState =>
+        simp only [argumentsResult, bind, Except.bind] at success
+        have argumentsEq :=
+          unifyBuiltinFunctionArgumentsEqual_resolve_map_eq arity
+            argumentsResult
+        change arguments.map
+              (fun argument =>
+                argumentsState.inference.resolve argument.type) =
+            function.parameterTypes.map
+              (fun parameter =>
+                argumentsState.inference.resolve parameter) at argumentsEq
+        cases expected with
+        | none =>
+            simp only at success
+            let allocation := argumentsState.allocateExpressionId
+            let calleeExpression : InferredExpression := {
+              id := allocation.1
+              type := function.type
+            }
+            let calleeRecord := recordExpression callee calleeExpression
+              (.reference name (.builtinFunction function)) [] [] allocation.2
+            let returned : InferredExpression := {
+              id := call
+              type := calleeRecord.2.resolve function.returnType
+            }
+            let callRecord := recordExpression source returned
+              (.call allocation.1
+                (arguments.map (fun argument => argument.id))
+                (.builtinFunction function)) [] [] calleeRecord.2
+            change Except.ok callRecord = Except.ok result at success
+            injection success with resultEq
+            subst result
+            change arguments.map
+                (fun argument =>
+                  argumentsState.inference.resolve argument.type) =
+              function.parameterTypes.map
+                (fun parameter =>
+                  argumentsState.inference.resolve parameter)
+            exact argumentsEq
+        | some expectedType =>
+            cases expectedResult :
+                unify argumentsState function.returnType expectedType with
+            | error error =>
+                simp [expectedResult, bind, Except.bind] at success
+            | ok fittedState =>
+                simp only [expectedResult, bind, Except.bind] at success
+                have argumentsTypesEq :
+                    (arguments.map (fun argument => argument.type)).map
+                        argumentsState.inference.resolve =
+                      function.parameterTypes.map
+                        argumentsState.inference.resolve := by
+                  simpa [List.map_map, Function.comp_def] using argumentsEq
+                have fittedTypesEq := unify_preserves_resolve_map_eq
+                  argumentsTypesEq expectedResult
+                have fittedArgumentsEq :
+                    arguments.map
+                        (fun argument => fittedState.resolve argument.type) =
+                      function.parameterTypes.map fittedState.resolve := by
+                  simpa [List.map_map, Function.comp_def] using fittedTypesEq
+                change arguments.map
+                      (fun argument =>
+                        fittedState.inference.resolve argument.type) =
+                    function.parameterTypes.map
+                      (fun parameter => fittedState.inference.resolve parameter)
+                  at fittedArgumentsEq
+                let allocation := fittedState.allocateExpressionId
+                let calleeExpression : InferredExpression := {
+                  id := allocation.1
+                  type := function.type
+                }
+                let calleeRecord := recordExpression callee calleeExpression
+                  (.reference name (.builtinFunction function)) [] []
+                    allocation.2
+                let returned : InferredExpression := {
+                  id := call
+                  type := calleeRecord.2.resolve function.returnType
+                }
+                let callRecord := recordExpression source returned
+                  (.call allocation.1
+                    (arguments.map (fun argument => argument.id))
+                    (.builtinFunction function)) [] [] calleeRecord.2
+                change Except.ok callRecord = Except.ok result at success
+                injection success with resultEq
+                subst result
+                change arguments.map
+                    (fun argument =>
+                      fittedState.inference.resolve argument.type) =
+                  function.parameterTypes.map
+                    (fun parameter =>
+                      fittedState.inference.resolve parameter)
+                exact fittedArgumentsEq
+  · simp [arity, bind, Except.bind] at success
+
+/-- Under any final substitution extending a successful builtin call, each
+argument type is exactly the corresponding closed builtin parameter type. -/
+theorem recordBuiltinFunctionCall_success_argumentTypes_apply_eq
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State} {outer : Substitution}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result)
+    (extension : outer.SemanticallyExtends
+      result.2.inference.substitution) :
+    arguments.map (fun argument => outer.apply argument.type) =
+      function.parameterTypes := by
+  have resolved :=
+    recordBuiltinFunctionCall_success_argumentTypes_resolve_eq success
+  have argumentsNormalize :
+      arguments.map
+          (fun argument => outer.apply (result.2.resolve argument.type)) =
+        arguments.map (fun argument => outer.apply argument.type) := by
+    apply List.map_congr_left
+    intro argument _
+    change outer.apply
+        (result.2.inference.substitution.apply argument.type) =
+      outer.apply argument.type
+    exact extension argument.type
+  have parametersNormalize :
+      function.parameterTypes.map
+          (fun parameter => outer.apply (result.2.resolve parameter)) =
+        function.parameterTypes.map outer.apply := by
+    apply List.map_congr_left
+    intro parameter _
+    change outer.apply
+        (result.2.inference.substitution.apply parameter) =
+      outer.apply parameter
+    exact extension parameter
+  have mappedResolved :
+      arguments.map
+          (fun argument => outer.apply (result.2.resolve argument.type)) =
+        function.parameterTypes.map
+          (fun parameter => outer.apply (result.2.resolve parameter)) := by
+    simpa [List.map_map, Function.comp_def] using
+      congrArg (List.map outer.apply) resolved
+  calc
+    arguments.map (fun argument => outer.apply argument.type) =
+        arguments.map
+          (fun argument => outer.apply (result.2.resolve argument.type)) :=
+      argumentsNormalize.symm
+    _ = function.parameterTypes.map
+          (fun parameter => outer.apply (result.2.resolve parameter)) :=
+      mappedResolved
+    _ = function.parameterTypes.map outer.apply := parametersNormalize
+    _ = function.parameterTypes := by
+      cases function <;>
+        simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word, Ty.bool,
+          TypeSystem.Substitution.apply]
+
+/-- The recorded builtin-call result has exactly the builtin's closed return
+type; final substitution therefore needs no additional endpoint transport. -/
+theorem recordBuiltinFunctionCall_success_returnType_eq
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    result.1.type = function.returnType := by
+  unfold recordBuiltinFunctionCall at success
+  by_cases arity : arguments.length = function.parameterTypes.length
+  · simp only [arity, ↓reduceIte, bind, Except.bind] at success
+    cases argumentsResult :
+        unifyBuiltinFunctionArgumentsEqual arguments function.parameterTypes
+          state with
+    | error error =>
+        simp [argumentsResult, bind, Except.bind] at success
+    | ok argumentsState =>
+        simp only [argumentsResult, bind, Except.bind] at success
+        cases expected with
+        | none =>
+            simp only at success
+            let allocation := argumentsState.allocateExpressionId
+            let calleeExpression : InferredExpression := {
+              id := allocation.1
+              type := function.type
+            }
+            let calleeRecord := recordExpression callee calleeExpression
+              (.reference name (.builtinFunction function)) [] [] allocation.2
+            let returned : InferredExpression := {
+              id := call
+              type := calleeRecord.2.resolve function.returnType
+            }
+            let callRecord := recordExpression source returned
+              (.call allocation.1
+                (arguments.map (fun argument => argument.id))
+                (.builtinFunction function)) [] [] calleeRecord.2
+            change Except.ok callRecord = Except.ok result at success
+            injection success with resultEq
+            subst result
+            change calleeRecord.2.resolve function.returnType =
+              function.returnType
+            cases function <;>
+              rfl
+        | some expectedType =>
+            cases expectedResult :
+                unify argumentsState function.returnType expectedType with
+            | error error =>
+                simp [expectedResult, bind, Except.bind] at success
+            | ok fittedState =>
+                simp only [expectedResult, bind, Except.bind] at success
+                let allocation := fittedState.allocateExpressionId
+                let calleeExpression : InferredExpression := {
+                  id := allocation.1
+                  type := function.type
+                }
+                let calleeRecord := recordExpression callee calleeExpression
+                  (.reference name (.builtinFunction function)) [] []
+                    allocation.2
+                let returned : InferredExpression := {
+                  id := call
+                  type := calleeRecord.2.resolve function.returnType
+                }
+                let callRecord := recordExpression source returned
+                  (.call allocation.1
+                    (arguments.map (fun argument => argument.id))
+                    (.builtinFunction function)) [] [] calleeRecord.2
+                change Except.ok callRecord = Except.ok result at success
+                injection success with resultEq
+                subst result
+                change calleeRecord.2.resolve function.returnType =
+                  function.returnType
+                cases function <;>
+                  rfl
   · simp [arity, bind, Except.bind] at success
 
 /-- A fixed compiler-function call explicitly unifies its closed return type

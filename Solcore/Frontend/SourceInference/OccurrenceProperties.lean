@@ -2104,6 +2104,102 @@ private theorem recordBuiltinFunctionCall_preserves_nodesPrefix
                   calleeRecord.2 calleePrefix
   · simp [arity, bind, Except.bind] at success
 
+/-- Invert successful builtin-call recording into the exact synthetic
+builtin-reference callee and outer call nodes appended to the input node
+table.  The caller-provided call identity is exposed separately by
+`recordBuiltinFunctionCall_success_id`. -/
+theorem recordBuiltinFunctionCall_success_nodes
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {expected : Option Ty} {state : State}
+    {result : InferredExpression × State}
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call expected state = .ok result) :
+    ∃ calleeId,
+      result.2.nodes = state.nodes ++ [
+        .expression {
+          id := calleeId
+          span := callee.span
+          type := function.type
+          form := .reference name (.builtinFunction function)
+        },
+        .expression {
+          id := result.1.id
+          span := source.span
+          type := result.1.type
+          form := .call calleeId (arguments.map (fun argument => argument.id))
+            (.builtinFunction function)
+        }
+      ] := by
+  unfold recordBuiltinFunctionCall at success
+  by_cases arity : arguments.length = function.parameterTypes.length
+  · simp only [arity, ↓reduceIte, bind, Except.bind] at success
+    cases argumentsResult :
+        unifyBuiltinFunctionArgumentsEqual arguments function.parameterTypes
+          state with
+    | error error =>
+        simp [argumentsResult, bind, Except.bind] at success
+    | ok argumentsState =>
+        simp only [argumentsResult, bind, Except.bind] at success
+        have argumentsNodes : argumentsState.nodes = state.nodes :=
+          (unifyBuiltinFunctionArgumentsEqual_occurrenceState_eq
+            argumentsResult).1
+        cases expected with
+        | none =>
+            simp only at success
+            let allocation := argumentsState.allocateExpressionId
+            let calleeExpression : InferredExpression := {
+              id := allocation.1
+              type := function.type
+            }
+            let calleeRecord := recordExpression callee calleeExpression
+              (.reference name (.builtinFunction function)) [] [] allocation.2
+            change Except.ok (recordExpression source {
+              id := call
+              type := calleeRecord.2.resolve function.returnType
+            } (.call allocation.1
+              (arguments.map (fun argument => argument.id))
+              (.builtinFunction function)) [] [] calleeRecord.2) =
+                Except.ok result at success
+            injection success with resultEq
+            subst result
+            refine ⟨allocation.1, ?_⟩
+            simp [allocation, calleeExpression, calleeRecord,
+              recordExpression, State.recordNode, argumentsNodes,
+              List.append_assoc]
+        | some expectedType =>
+            cases expectedResult :
+                unify argumentsState function.returnType expectedType with
+            | error error =>
+                simp [expectedResult, bind, Except.bind] at success
+            | ok fittedState =>
+                simp only [expectedResult, bind, Except.bind] at success
+                have fittedNodes : fittedState.nodes = state.nodes :=
+                  (unify_occurrenceState_eq expectedResult).1.trans
+                    argumentsNodes
+                let allocation := fittedState.allocateExpressionId
+                let calleeExpression : InferredExpression := {
+                  id := allocation.1
+                  type := function.type
+                }
+                let calleeRecord := recordExpression callee calleeExpression
+                  (.reference name (.builtinFunction function)) [] []
+                    allocation.2
+                change Except.ok (recordExpression source {
+                  id := call
+                  type := calleeRecord.2.resolve function.returnType
+                } (.call allocation.1
+                  (arguments.map (fun argument => argument.id))
+                  (.builtinFunction function)) [] [] calleeRecord.2) =
+                    Except.ok result at success
+                injection success with resultEq
+                subst result
+                refine ⟨allocation.1, ?_⟩
+                simp [allocation, calleeExpression, calleeRecord,
+                  recordExpression, State.recordNode, fittedNodes,
+                  List.append_assoc]
+  · simp [arity, bind, Except.bind] at success
+
 /-- Successful builtin-call recording returns the caller-allocated call
 occurrence. -/
 theorem recordBuiltinFunctionCall_success_id

@@ -570,6 +570,12 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.recordBuiltinFunctionCall_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.recordBuiltinFunctionCall_success_nodes
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordBuiltinFunctionCall_success_argumentTypes_apply_eq
+example :=
+  @Solcore.Frontend.SourceInference.Detail.recordBuiltinFunctionCall_success_returnType_eq
+example :=
   @Solcore.Frontend.SourceInference.Detail.recordIndirectCall_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.attachExpressionCoercions_inference_eq
