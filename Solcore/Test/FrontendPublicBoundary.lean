@@ -505,6 +505,26 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_tuple_facts
 example :=
+  @Solcore.Frontend.SourceInference.Detail.UnaryExpressionDispatchFacts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.UnaryExpressionDispatchFacts.directFunction
+example :=
+  @Solcore.Frontend.SourceInference.Detail.UnaryExpressionDispatchFacts.selectedFunction
+example :=
+  @Solcore.Frontend.SourceInference.Detail.UnaryExpressionDispatchFacts.traitMethod
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_unary_facts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.BinaryExpressionDispatchFacts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.BinaryExpressionDispatchFacts.directFunction
+example :=
+  @Solcore.Frontend.SourceInference.Detail.BinaryExpressionDispatchFacts.selectedFunction
+example :=
+  @Solcore.Frontend.SourceInference.Detail.BinaryExpressionDispatchFacts.traitMethod
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_binary_facts
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_conditional_facts
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_index_facts

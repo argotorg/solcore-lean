@@ -377,6 +377,290 @@ theorem inferExprFuel_success_tuple_facts
       simp only [elementsSuccess, bind, Except.bind] at success
       exact ⟨inferredElements, elementsState, rfl, success⟩
 
+/-- The executable tail of unary-expression inference has three successful
+shapes: a named operator with no overload candidates, a selected named
+overload, or a trait-dispatched operator.  The literal-origin row is an index
+so consumers cannot accidentally use a row computed at another traversal
+point. -/
+inductive UnaryExpressionDispatchFacts
+    (context : Context) (expression : Syntax.Expr) (id : ExpressionId)
+    (operator : Syntax.Located Syntax.UnaryOp)
+    (operand : InferredExpression) (expected : Option Ty)
+    (integerLiterals : List IntegerLiteralOrigin) (state : State)
+    (result : InferredExpression × State) : Prop where
+  | directFunction
+      {name : String} {inferred : OperatorInferenceResult}
+      (dispatch_eq : unaryOperatorDispatch operator.value = .function name)
+      (lookup_eq : functionsNamed context name = .ok [])
+      (inference : inferUnaryOperator context operator.value operand.type
+        expected integerLiterals state = .ok inferred)
+      (recording : recordExpressionWithExpected context expression id
+        inferred.type (.unary operator.value operand.id)
+        inferred.requirements expected inferred.state = .ok result) :
+      UnaryExpressionDispatchFacts context expression id operator operand
+        expected integerLiterals state result
+  | selectedFunction
+      {name : String} {head : ProgramFunctionSignature}
+      {tail : List ProgramFunctionSignature} {attempt : CandidateAttemptResult}
+      (dispatch_eq : unaryOperatorDispatch operator.value = .function name)
+      (lookup_eq : functionsNamed context name = .ok (head :: tail))
+      (selection : selectFunctionCandidateFrom context name (head :: tail)
+        [operand] integerLiterals id expected state = .ok attempt)
+      (recording :
+        let callee : Syntax.Expr := {
+          span := operator.span
+          value := .identifier { span := operator.span, value := name }
+        }
+        recordSelectedCall expression callee name [operand] attempt = result) :
+      UnaryExpressionDispatchFacts context expression id operator operand
+        expected integerLiterals state result
+  | traitMethod
+      {traitName methodName : String} {inferred : OperatorInferenceResult}
+      (dispatch_eq : unaryOperatorDispatch operator.value =
+        .traitMethod traitName methodName)
+      (inference : inferUnaryOperator context operator.value operand.type
+        expected integerLiterals state = .ok inferred)
+      (recording : recordExpressionWithExpected context expression id
+        inferred.type (.unary operator.value operand.id)
+        inferred.requirements expected inferred.state = .ok result) :
+      UnaryExpressionDispatchFacts context expression id operator operand
+        expected integerLiterals state result
+
+/-- Invert successful unary-expression inference into operand inference and
+one exact dispatch-tail certificate.  Literal relevance is computed from the
+post-operand state and the ledger length immediately after allocating the
+outer expression identity, exactly as in the executable traversal. -/
+theorem inferExprFuel_success_unary_facts
+    {fuel : Nat} {context : Context} {expression operand : Syntax.Expr}
+    {operator : Syntax.Located Syntax.UnaryOp}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .unary operator operand)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ operandResult operandState,
+      inferExprFuel fuel context operand none allocated =
+          .ok (operandResult, operandState) ∧
+        UnaryExpressionDispatchFacts context expression id operator
+          operandResult expected
+          (relevantIntegerLiterals operandState
+            allocated.integerLiterals.length [operandResult])
+          operandState result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases operandSuccess : inferExprFuel fuel context operand none allocated with
+  | error error =>
+      simp [operandSuccess, bind, Except.bind] at success
+  | ok operandPair =>
+      rcases operandPair with ⟨operandResult, operandState⟩
+      simp only [operandSuccess, bind, Except.bind] at success
+      cases dispatchEq : unaryOperatorDispatch operator.value with
+      | traitMethod traitName methodName =>
+          simp only [dispatchEq] at success
+          cases operatorSuccess : inferUnaryOperator context operator.value
+              operandResult.type expected
+              (relevantIntegerLiterals operandState
+                allocated.integerLiterals.length [operandResult])
+              operandState with
+          | error error =>
+              simp [operatorSuccess, bind, Except.bind] at success
+          | ok inferred =>
+              simp only [operatorSuccess, bind, Except.bind] at success
+              exact ⟨operandResult, operandState, rfl,
+                .traitMethod dispatchEq operatorSuccess success⟩
+      | function name =>
+          simp only [dispatchEq] at success
+          cases lookupEq : functionsNamed context name with
+          | error error =>
+              simp [lookupEq, bind, Except.bind] at success
+          | ok candidates =>
+              cases candidates with
+              | nil =>
+                  simp only [lookupEq, bind, Except.bind] at success
+                  cases operatorSuccess : inferUnaryOperator context
+                      operator.value operandResult.type expected
+                      (relevantIntegerLiterals operandState
+                        allocated.integerLiterals.length [operandResult])
+                      operandState with
+                  | error error =>
+                      simp [operatorSuccess, bind, Except.bind] at success
+                  | ok inferred =>
+                      simp only [operatorSuccess, bind, Except.bind] at success
+                      exact ⟨operandResult, operandState, rfl,
+                        .directFunction dispatchEq lookupEq operatorSuccess
+                          success⟩
+              | cons head tail =>
+                  simp only [lookupEq, bind, Except.bind] at success
+                  cases selectionSuccess : selectFunctionCandidateFrom context
+                      name (head :: tail) [operandResult]
+                      (relevantIntegerLiterals operandState
+                        allocated.integerLiterals.length [operandResult])
+                      id expected operandState with
+                  | error error =>
+                      simp [selectionSuccess, bind, Except.bind] at success
+                  | ok attempt =>
+                      simp only [selectionSuccess, bind, Except.bind, pure,
+                        Pure.pure, Except.pure, Except.ok.injEq] at success
+                      exact ⟨operandResult, operandState, rfl,
+                        .selectedFunction dispatchEq lookupEq selectionSuccess
+                          success⟩
+
+/-- The executable tail of binary-expression inference has the analogous
+three successful shapes.  Selected named operators retain both their fixed
+Boolean selection expectation and the separate fit to the surrounding
+expectation. -/
+inductive BinaryExpressionDispatchFacts
+    (context : Context) (expression : Syntax.Expr) (id : ExpressionId)
+    (operator : Syntax.Located Syntax.BinaryOp)
+    (left right : InferredExpression) (expected : Option Ty)
+    (integerLiterals : List IntegerLiteralOrigin) (state : State)
+    (result : InferredExpression × State) : Prop where
+  | directFunction
+      {name : String} {inferred : OperatorInferenceResult}
+      (dispatch_eq : binaryOperatorDispatch operator.value = .function name)
+      (lookup_eq : functionsNamed context name = .ok [])
+      (inference : inferBinaryOperator context operator.value left.type
+        right.type expected integerLiterals state = .ok inferred)
+      (recording : recordExpressionWithExpected context expression id
+        inferred.type (.binary left.id operator.value right.id)
+        inferred.requirements expected inferred.state = .ok result) :
+      BinaryExpressionDispatchFacts context expression id operator left right
+        expected integerLiterals state result
+  | selectedFunction
+      {name : String} {head : ProgramFunctionSignature}
+      {tail : List ProgramFunctionSignature} {attempt : CandidateAttemptResult}
+      {fitted : ExpectationResult}
+      (dispatch_eq : binaryOperatorDispatch operator.value = .function name)
+      (lookup_eq : functionsNamed context name = .ok (head :: tail))
+      (selection : selectFunctionCandidateFrom context name (head :: tail)
+        [left, right] integerLiterals id (some .bool) state = .ok attempt)
+      (fitting : withExpected context attempt.state attempt.result expected =
+        .ok fitted)
+      (recording :
+        let callee : Syntax.Expr := {
+          span := operator.span
+          value := .identifier { span := operator.span, value := name }
+        }
+        recordSelectedCallResult expression callee name [left, right] attempt
+          fitted.expression fitted.coercions fitted.state = result) :
+      BinaryExpressionDispatchFacts context expression id operator left right
+        expected integerLiterals state result
+  | traitMethod
+      {traitName methodName : String} {inferred : OperatorInferenceResult}
+      (dispatch_eq : binaryOperatorDispatch operator.value =
+        .traitMethod traitName methodName)
+      (inference : inferBinaryOperator context operator.value left.type
+        right.type expected integerLiterals state = .ok inferred)
+      (recording : recordExpressionWithExpected context expression id
+        inferred.type (.binary left.id operator.value right.id)
+        inferred.requirements expected inferred.state = .ok result) :
+      BinaryExpressionDispatchFacts context expression id operator left right
+        expected integerLiterals state result
+
+/-- Invert successful binary-expression inference into source-ordered operand
+inference and one exact dispatch-tail certificate.  The relevance row is
+computed only after both operands have been inferred. -/
+theorem inferExprFuel_success_binary_facts
+    {fuel : Nat} {context : Context} {expression left right : Syntax.Expr}
+    {operator : Syntax.Located Syntax.BinaryOp}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .binary left operator right)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ leftResult leftState rightResult rightState,
+      inferExprFuel fuel context left none allocated =
+          .ok (leftResult, leftState) ∧
+        inferExprFuel fuel context right none leftState =
+          .ok (rightResult, rightState) ∧
+        BinaryExpressionDispatchFacts context expression id operator leftResult
+          rightResult expected
+          (relevantIntegerLiterals rightState
+            allocated.integerLiterals.length [leftResult, rightResult])
+          rightState result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases leftSuccess : inferExprFuel fuel context left none allocated with
+  | error error =>
+      simp [leftSuccess, bind, Except.bind] at success
+  | ok leftPair =>
+      rcases leftPair with ⟨leftResult, leftState⟩
+      simp only [leftSuccess, bind, Except.bind] at success
+      cases rightSuccess : inferExprFuel fuel context right none leftState with
+      | error error =>
+          simp [rightSuccess, bind, Except.bind] at success
+      | ok rightPair =>
+          rcases rightPair with ⟨rightResult, rightState⟩
+          simp only [rightSuccess, bind, Except.bind] at success
+          cases dispatchEq : binaryOperatorDispatch operator.value with
+          | traitMethod traitName methodName =>
+              simp only [dispatchEq] at success
+              cases operatorSuccess : inferBinaryOperator context
+                  operator.value leftResult.type rightResult.type expected
+                  (relevantIntegerLiterals rightState
+                    allocated.integerLiterals.length [leftResult, rightResult])
+                  rightState with
+              | error error =>
+                  simp [operatorSuccess, bind, Except.bind] at success
+              | ok inferred =>
+                  simp only [operatorSuccess, bind, Except.bind] at success
+                  exact ⟨leftResult, leftState, rightResult, rightState, rfl,
+                    rightSuccess,
+                    .traitMethod dispatchEq operatorSuccess success⟩
+          | function name =>
+              simp only [dispatchEq] at success
+              cases lookupEq : functionsNamed context name with
+              | error error =>
+                  simp [lookupEq, bind, Except.bind] at success
+              | ok candidates =>
+                  cases candidates with
+                  | nil =>
+                      simp only [lookupEq, bind, Except.bind] at success
+                      cases operatorSuccess : inferBinaryOperator context
+                          operator.value leftResult.type rightResult.type
+                          expected
+                          (relevantIntegerLiterals rightState
+                            allocated.integerLiterals.length
+                              [leftResult, rightResult])
+                          rightState with
+                      | error error =>
+                          simp [operatorSuccess, bind, Except.bind] at success
+                      | ok inferred =>
+                          simp only [operatorSuccess, bind, Except.bind]
+                            at success
+                          exact ⟨leftResult, leftState, rightResult, rightState,
+                            rfl, rightSuccess,
+                            .directFunction dispatchEq lookupEq operatorSuccess
+                              success⟩
+                  | cons head tail =>
+                      simp only [lookupEq, bind, Except.bind] at success
+                      cases selectionSuccess : selectFunctionCandidateFrom
+                          context name (head :: tail) [leftResult, rightResult]
+                          (relevantIntegerLiterals rightState
+                            allocated.integerLiterals.length
+                              [leftResult, rightResult])
+                          id (some .bool) rightState with
+                      | error error =>
+                          simp [selectionSuccess, bind, Except.bind] at success
+                      | ok attempt =>
+                          simp only [selectionSuccess, bind, Except.bind]
+                            at success
+                          cases fittingSuccess : withExpected context
+                              attempt.state attempt.result expected with
+                          | error error =>
+                              simp [fittingSuccess, bind, Except.bind]
+                                at success
+                          | ok fitted =>
+                              simp only [fittingSuccess, bind, Except.bind,
+                                pure, Pure.pure, Except.pure,
+                                Except.ok.injEq] at success
+                              exact ⟨leftResult, leftState, rightResult,
+                                rightState, rfl, rightSuccess,
+                                .selectedFunction dispatchEq lookupEq
+                                  selectionSuccess fittingSuccess success⟩
+
 /-- Invert successful conditional inference into the three recursive
 expression traversals, branch-type unification, and the exact final recording
 operation. -/
