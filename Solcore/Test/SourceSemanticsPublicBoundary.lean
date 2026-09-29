@@ -773,6 +773,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionTypeAdmissible_afterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionHasType_of_typingBase
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.requirementProvesAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt

@@ -21100,6 +21100,52 @@ theorem expressionTypeAdmissible_afterSubstitution
     (resources.expressionTypeFormationValidated member) binders signatures_eq
     parameters_eq owner_eq residual contextValid
 
+/-- Finalization closes a typing base over its input node table into ordinary
+expression typing over the exact final source.  Source preservation follows
+from the finalizer's source equation, while retained type formation supplies
+admissibility of the expression's final substituted type. -/
+theorem expressionHasType_of_typingBase
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {active sourceContext : SourceSemantics.Context}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {argument : InferredExpression}
+    (base : ExpressionTypingBase (state.toTypedSource roots)
+      result.typedSource active result.substitution argument)
+    (binders : TypeParameterBindersWellFormed sourceContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (parameters_eq : sourceContext.typeParameters =
+      inferenceContext.typeParameters)
+    (owner_eq : sourceContext.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (residual : sourceContext.residualTypeVariables = true)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      result.substitution closedVariables sourceContext active) :
+    ExpressionHasType result.typedSource active argument.id
+      (result.substitution.apply argument.type) := by
+  cases base with
+  | @intro node rawType plan contains typeEq formType rawAdmissible
+      requirements =>
+      have preserved : ExpressionNodesPreservedAt [argument.id]
+          ((state.toTypedSource roots).applySubstitution result.substitution)
+          result.typedSource := by
+        rw [resources.source_eq]
+        intro _ _ _ currentContains
+        exact currentContains
+      have finalAdmissible : TypeAdmissible active
+          (result.substitution.apply argument.type) := by
+        have nodeAdmissible :=
+          resources.expressionTypeAdmissible_afterSubstitution contains.1
+            binders signatures_eq parameters_eq owner_eq residual contextValid
+        simpa only [typeEq] using nodeAdmissible
+      exact (ExpressionTypingBase.intro contains typeEq formType rawAdmissible
+        requirements).expressionHasType preserved finalAdmissible
+
 /-- Any requirement retained by the pre-finalization state proves its closed
 predicate at the exact covered source occurrence which owns its identity. -/
 theorem requirementProvesAt
