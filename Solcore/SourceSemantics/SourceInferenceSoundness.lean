@@ -22107,6 +22107,168 @@ theorem integerLiteralValidAt
       TypedTraitResolution.applySubstitution] using evidence
   exact integerLiteralValid_of_evidence decoded closedSupported closedEvidence
 
+/-- A successful numeric-literal inference step closes to a reusable typing
+base once the enclosing finalization retains its origin, requirement, and
+recorded occurrence. -/
+theorem inferExprFuel_success_numericLiteral_expressionTypingBase
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      finalized)
+    {fuel : Nat} {expression : Syntax.Expr}
+    {literal : Syntax.CoreLiteral} {source : Syntax.CoreLiteralValue}
+    {rawValue : Nat} {expected : Option TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {inferred : InferredExpression × Frontend.SourceInference.State}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {sourceContext active : SourceSemantics.Context}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (expression_eq : expression.value = .literal literal)
+    (literal_eq : literal.value = source)
+    (decoded : Frontend.numericLiteralValue? source = some rawValue)
+    (allocation_eq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok inferred)
+    (substitution_extends :
+      finalized.substitution.SemanticallyExtends
+        inferred.2.inference.substitution)
+    (requirements_subset : inferred.2.requirements ⊆ state.requirements)
+    (integer_literals_subset :
+      inferred.2.integerLiterals ⊆ state.integerLiterals)
+    (source_extension : TypingSourceExtends
+      ((inferred.2.toTypedSource roots).applySubstitution
+        finalized.substitution) finalized.typedSource)
+    (active_binders : TypeParameterBindersWellFormed active)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (context_valid : FlexibleSubstitution.ContextSubstitutionValid
+      finalized.substitution closedVariables sourceContext active)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (trait_success :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profile_success :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (trait_name :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (active_signatures_eq : active.signatures =
+      (finalizedRequirementContext inferenceContext finalized).signatures)
+    (active_requirements_eq : active.solvedRequirements =
+      (finalizedRequirementContext inferenceContext finalized
+        ).solvedRequirements)
+    (assumptions_mono :
+      (finalizedRequirementContext inferenceContext finalized).assumptions ⊆
+        active.assumptions)
+    (covered : TemplateScopeCovered finalized.typedSource active
+      (.expression inferred.1.id)) :
+    ExpressionTypingBase (inferred.2.toTypedSource roots)
+      finalized.typedSource active finalized.substitution inferred.1 := by
+  let rawType := allocated.fresh.1
+  let freshState := allocated.fresh.2
+  let addition := freshState.addRequirementWithId
+    (ProgramSignatures.builtinIntPredicate rawType)
+  let origin : IntegerLiteralOrigin := {
+    metavariable := ⟨allocated.inference.next⟩
+    expression := id
+    requirement := addition.1
+  }
+  let literalState : Frontend.SourceInference.State := {
+    addition.2 with
+    integerLiterals := addition.2.integerLiterals ++ [origin]
+  }
+  let resolution : IntegerLiteralResolution := {
+    rawValue
+    targetType := rawType
+    requirement := addition.1
+  }
+  obtain ⟨recorded, originMember, requirementMember⟩ :=
+    Detail.inferExprFuel_success_numericLiteral_record expression_eq literal_eq
+      decoded allocation_eq success
+  have originMemberFinal : origin ∈ state.integerLiterals :=
+    integer_literals_subset originMember
+  have requirementMemberFinal :
+      ({ id := origin.requirement,
+          predicate := ProgramSignatures.builtinIntPredicate
+            (.variable origin.metavariable) } : Requirement) ∈
+        state.requirements := by
+    apply requirements_subset
+    simpa [origin, addition, freshState, rawType,
+      Frontend.SourceInference.State.fresh, TypeSystem.InferState.fresh] using
+        requirementMember
+  obtain ⟨coercions, recordedContains⟩ :=
+    recordExpressionWithExpected_success_containsExpression recorded roots
+  have finalContains := source_extension.containsExpression
+    (FlexibleSubstitution.ContainsExpression.applySubstitution
+      finalized.substitution recordedContains)
+  have occurs : PrimaryRequirementOccursAt finalized.typedSource
+      (.expression inferred.1.id) resolution.requirement := by
+    apply finalContains.primaryRequirementOccursAt
+    change resolution.requirement ∈
+      [addition.1] ++ Detail.coercionRequirements coercions
+    simp [resolution]
+  have literalValid : IntegerLiteralValid active source
+      (resolution.applySubstitution finalized.substitution) := by
+    apply resources.integerLiteralValidAt
+      (origin := origin) (decoded := by simpa [resolution] using decoded)
+    · simp [resolution, origin, rawType,
+        Frontend.SourceInference.State.fresh, TypeSystem.InferState.fresh]
+    · rfl
+    · exact originMemberFinal
+    · exact requirementMemberFinal
+    · exact active_signatures_eq
+    · exact active_requirements_eq
+    · exact assumptions_mono
+    · exact covered
+    · exact occurs
+  have formType : ExpressionFormHasRawType finalized.typedSource active
+      ((ExpressionForm.integerLiteral source resolution).applySubstitution
+        finalized.substitution)
+      (finalized.substitution.apply rawType) (.ordinary [addition.1]) := by
+    simpa [ExpressionForm.applySubstitution, resolution,
+      IntegerLiteralResolution.applySubstitution] using
+        (ExpressionFormHasRawType.integerLiteral literalValid)
+  have rawAdmissible : TypeAdmissible active
+      (finalized.substitution.apply rawType) := by
+    simpa [resolution, IntegerLiteralResolution.applySubstitution] using
+      literalValid.target_type_admissible active_binders
+  have finalSubstitutionEq :
+      resources.finalState.inference.substitution = finalized.substitution :=
+    resources.substitution_eq.symm
+  have finalSubstitutionExtends :
+      resources.finalState.inference.substitution.SemanticallyExtends
+        inferred.2.inference.substitution := by
+    simpa only [finalSubstitutionEq] using substitution_extends
+  have requirementsSubsetFinal :
+      inferred.2.requirements ⊆ resources.finalState.requirements := by
+    intro requirement member
+    rw [resources.requirements_eq]
+    exact requirements_subset member
+  have sourceExtensionFinal : TypingSourceExtends
+      ((inferred.2.toTypedSource roots).applySubstitution
+        resources.finalState.inference.substitution) finalized.typedSource := by
+    simpa only [finalSubstitutionEq] using source_extension
+  have contextValidFinal : FlexibleSubstitution.ContextSubstitutionValid
+      resources.finalState.inference.substitution closedVariables sourceContext
+        active := by
+    simpa only [finalSubstitutionEq] using context_valid
+  simpa only [finalSubstitutionEq] using
+    (recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped
+      (later := resources.finalState) (base :=
+        finalizedRequirementContext inferenceContext finalized)
+      recorded finalSubstitutionExtends requirementsSubsetFinal
+      sourceExtensionFinal (by simpa only [finalSubstitutionEq] using formType)
+      (by simpa only [finalSubstitutionEq] using rawAdmissible)
+      trait_success profile_success catalog contextValidFinal signatures_eq
+      trait_name resources.solve_success resources.solved_context_eq
+      resources.ledger resources.ownership active_signatures_eq
+      active_requirements_eq assumptions_mono covered)
+
 /-- Finalization turns the exact origin and requirement row retained for one
 integer pattern into declarative literal validity at its owning occurrence. -/
 theorem integerPatternValidAt
