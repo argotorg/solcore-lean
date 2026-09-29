@@ -20949,6 +20949,15 @@ structure FinalInferenceResources
     origin ∈ state.integerPatterns →
       result.substitution.apply (.variable origin.metavariable) = .word ∨
         result.substitution.apply (.variable origin.metavariable) = .integer
+  integer_literal_target_supported : ∀ origin,
+    origin ∈ state.integerLiterals →
+      result.substitution.apply (.variable origin.metavariable) = .word ∨
+        result.substitution.apply (.variable origin.metavariable) = .integer
+  expression_type_formation_validated : ∀ {node : ExpressionNode},
+    Node.expression node ∈ (state.toTypedSource roots).nodes →
+      Frontend.InferenceTypeFormationValidated inferenceContext.signatures
+        inferenceContext.scope.genericOwner inferenceContext.typeParameters
+        node.type.freeVariables node.type
   local_no_capture : ∀ binder,
     binder ∈ (state.toTypedSource roots).initializedLetBinders →
       Detail.LocalBinderInstantiationNoCapture result.substitution binder
@@ -20997,6 +21006,10 @@ def ofFinalize
     ownership := finalize_requirementOwnership rfl success
     integer_pattern_target_supported :=
       Detail.finalize_integerPatternTarget_supported success
+    integer_literal_target_supported :=
+      Detail.finalize_integerLiteralTarget_supported success
+    expression_type_formation_validated :=
+      Detail.finalize_expressionTypeFormationValidated success
     local_no_capture :=
       Detail.finalize_localBinderInstantiationNoCapture success
   }
@@ -21022,6 +21035,70 @@ def ofFinalize
     exact patternProperties.1.trans literalProperties.1
   · rw [solvedEq]
     exact witness.requirementsSolved
+
+/-- Finalization closes an integer-literal origin retained by any earlier
+inference subcomputation, provided that origin remains in the state finalized
+for the whole body. -/
+theorem integerLiteralTargetSupported_of_subset
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {integerLiterals : List IntegerLiteralOrigin}
+    (subset : integerLiterals ⊆ state.integerLiterals) :
+    ∀ origin, origin ∈ integerLiterals →
+      result.substitution.apply (.variable origin.metavariable) = .word ∨
+        result.substitution.apply (.variable origin.metavariable) = .integer :=
+  fun origin member =>
+    resources.integer_literal_target_supported origin (subset member)
+
+/-- Retrieve the open formation certificate attached by finalization to any
+expression node retained in its input source. -/
+theorem expressionTypeFormationValidated
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {node : ExpressionNode}
+    (member : Node.expression node ∈ (state.toTypedSource roots).nodes) :
+    Frontend.InferenceTypeFormationValidated inferenceContext.signatures
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters
+      node.type.freeVariables node.type :=
+  resources.expression_type_formation_validated member
+
+/-- A retained expression's open formation certificate becomes admissibility
+of its closed final type in any compatible target semantic context. -/
+theorem expressionTypeAdmissible_afterSubstitution
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {node : ExpressionNode}
+    (member : Node.expression node ∈ (state.toTypedSource roots).nodes)
+    {sourceContext active : SourceSemantics.Context}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (binders : TypeParameterBindersWellFormed sourceContext)
+    (signatures_eq : sourceContext.signatures = inferenceContext.signatures)
+    (parameters_eq : sourceContext.typeParameters =
+      inferenceContext.typeParameters)
+    (owner_eq : sourceContext.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (residual : sourceContext.residualTypeVariables = true)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      result.substitution closedVariables sourceContext active) :
+    TypeAdmissible active (result.substitution.apply node.type) :=
+  inferenceTypeFormationValidated_typeAdmissible_afterSubstitution
+    (resources.expressionTypeFormationValidated member) binders signatures_eq
+    parameters_eq owner_eq residual contextValid
 
 /-- Any requirement retained by the pre-finalization state proves its closed
 predicate at the exact covered source occurrence which owns its identity. -/

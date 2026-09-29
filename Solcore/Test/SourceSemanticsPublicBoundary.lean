@@ -767,6 +767,12 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.ofFinalize
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerLiteralTargetSupported_of_subset
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionTypeFormationValidated
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.expressionTypeAdmissible_afterSubstitution
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.requirementProvesAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt
