@@ -1559,6 +1559,32 @@ theorem ofOrdinary
   exact ofPlan contains formType rawAdmissible finalAdmissible
     (.ordinary ownedValid path layout)
 
+/-- Assemble expression typing after a further output-coercion path has been
+appended to an already valid shape-specific requirement plan.  The explicit
+list equalities let executable node-refinement proofs expose their retained
+requirements and coercions without reconstructing the plan case by case. -/
+theorem ofAppendedOutput
+    {source : TypedSource} {context : Context}
+    {id : ExpressionId} {node : ExpressionNode}
+    {rawType middleType : TypeSystem.Ty}
+    {plan : ExpressionRequirementPlan}
+    {initialRequirements : List RequirementId}
+    {initialCoercions outputCoercions : List CoercionStep}
+    (contains : ContainsExpression source id node)
+    (formType : ExpressionFormHasRawType source context node.form rawType plan)
+    (rawAdmissible : TypeAdmissible context rawType)
+    (finalAdmissible : TypeAdmissible context node.type)
+    (requirements : ExpressionRequirementPlan.Valid context rawType middleType
+      plan initialRequirements initialCoercions)
+    (output : CoercionPathValid context middleType node.type outputCoercions)
+    (requirementsEq : node.requirements =
+      initialRequirements ++ coercionRequirementIds outputCoercions)
+    (coercionsEq : node.coercions = initialCoercions ++ outputCoercions) :
+    ExpressionHasType source context id node.type := by
+  apply ofPlan contains formType rawAdmissible finalAdmissible
+  rw [requirementsEq, coercionsEq]
+  exact requirements.appendOutput output
+
 theorem stored_type
     {source : TypedSource} {context : Context}
     {id : ExpressionId} {type : TypeSystem.Ty}

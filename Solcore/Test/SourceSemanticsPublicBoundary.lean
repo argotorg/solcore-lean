@@ -43,6 +43,7 @@ example :=
 example :=
   @Solcore.SourceSemantics.OccurrenceGraphWellFormed.statement_root_exists
 example := @Solcore.SourceSemantics.OccurrenceGraphClosed
+example := @Solcore.SourceSemantics.OccurrenceGraphClosed.call_arguments_nodup
 example := @Solcore.SourceSemantics.lookupExpression?_sound
 example := @Solcore.SourceSemantics.lookupExpression?_complete
 
@@ -1103,6 +1104,7 @@ example := @Solcore.SourceSemantics.ReferenceUseValid.type_admissible
 example := @Solcore.SourceSemantics.CoercionPathValid
 example := @Solcore.SourceSemantics.CoercionPathValid.of_isValid
 example := @Solcore.SourceSemantics.CoercionPathValid.expressionNode_rawType
+example := @Solcore.SourceSemantics.CoercionPathValid.foldl_target
 example := @Solcore.SourceSemantics.IntegerLiteralValid
 example := @Solcore.SourceSemantics.IntegerLiteralValid.target_type_admissible
 example := @Solcore.SourceSemantics.WordLiteralValid
@@ -1123,6 +1125,7 @@ example := @Solcore.SourceSemantics.TypedMatchPatternHasType
 example := @Solcore.SourceSemantics.PlaceHasType
 example := @Solcore.SourceSemantics.ExpressionHasType
 example := @Solcore.SourceSemantics.ExpressionHasType.ofOrdinary
+example := @Solcore.SourceSemantics.ExpressionHasType.ofAppendedOutput
 example :=
   @Solcore.SourceSemantics.ExpressionHasType.lambda_annotation_of_uncoerced
 example := @Solcore.SourceSemantics.ExpressionsHaveTypes.each_type_admissible

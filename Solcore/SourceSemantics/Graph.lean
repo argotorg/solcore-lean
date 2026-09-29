@@ -543,6 +543,40 @@ private theorem occurrenceGraphAcyclic_of_reachable_unique_parent
 
 namespace OccurrenceGraphClosed
 
+private theorem expressionIds_nodup_of_map
+    (arguments : List ExpressionId)
+    (mappedNodup : (arguments.map NodeId.expression).Nodup) :
+    arguments.Nodup := by
+  induction arguments with
+  | nil => exact .nil
+  | cons argument arguments inductionHypothesis =>
+      simp only [List.map_cons] at mappedNodup
+      have parts := List.nodup_cons.mp mappedNodup
+      apply List.nodup_cons.mpr
+      constructor
+      · intro member
+        apply parts.1
+        exact List.mem_map.mpr ⟨_, member, rfl⟩
+      · exact inductionHypothesis parts.2
+
+/-- Every direct-call argument occupies a distinct child slot.  The stronger
+graph invariant also separates the callee from every argument; this projection
+exposes the argument-only fact needed by source-order traversal proofs. -/
+theorem call_arguments_nodup
+    {source : TypedSource} (closed : OccurrenceGraphClosed source)
+    {id : ExpressionId} {node : ExpressionNode}
+    {callee : ExpressionId} {arguments : List ExpressionId}
+    {resolution : CallResolution}
+    (contains : ContainsExpression source id node)
+    (formEq : node.form = .call callee arguments resolution) :
+    arguments.Nodup := by
+  have slots := closed.childSlotsUnique (.expression node) contains.1
+  simp only [nodeChildIds, Node.references, formEq,
+    ExpressionForm.references] at slots
+  have mappedNodup : (arguments.map NodeId.expression).Nodup :=
+    (List.nodup_cons.mp slots).2
+  exact expressionIds_nodup_of_map arguments mappedNodup
+
 /-- The executable forest certificate has only two semantic obligations beyond
 base graph well-formedness: every root/child incoming slot is globally unique,
 and every retained table node is root-reachable.  These imply all remaining

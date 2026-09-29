@@ -98,6 +98,20 @@ theorem append
   | cons head tail inductionHypothesis =>
       exact .cons head (inductionHypothesis right)
 
+/-- Folding the retained target endpoint of each edge across a valid path
+recovers the path's declared final endpoint.  This is the executable endpoint
+calculation used when source inference appends coercions to an expression
+node. -/
+theorem foldl_target
+    {context : Context} {source target : TypeSystem.Ty}
+    {steps : List CoercionStep}
+    (valid : CoercionPathValid context source target steps) :
+    steps.foldl (fun _ step => step.target) source = target := by
+  induction valid with
+  | nil => rfl
+  | cons _ _ inductionHypothesis =>
+      simpa only [List.foldl_cons] using inductionHypothesis
+
 private theorem step_requirements_valid
     {context : Context}
     {step : CoercionStep}
