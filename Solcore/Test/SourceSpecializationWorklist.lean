@@ -25,8 +25,12 @@ private def workspace : Workspace.RawWorkspace := {
       "trait Coerce<From, To> {",
       "  function coerce(value: From) returns (To);",
       "}",
+      "function coercionClosureHelper() returns (function(Word) returns (Word)) { return identity; }",
       "impl Coerce<Word, Bool> {",
-      "  function coerce(value: Word) returns (Bool) { return true; }",
+      "  function coerce(value: Word) returns (Bool) {",
+      "    coercionClosureHelper();",
+      "    return true;",
+      "  }",
       "}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function globalIdentity<T>(value: T) returns (T) { return value; }",
@@ -1515,6 +1519,170 @@ private def testQualifiedLocalSchemeCallsWithCoercions
   checkQualifiedLocalSchemeCallWithCoercion program
     "qualifiedLocalResultCoerced" "qualified local result coercion" true
 
+private def testDetachedSpecializationClosure
+    (program : CheckedProgram) : IO Unit := do
+  let identity ← signatureNamed program "identity"
+  let helper ← signatureNamed program "coercionClosureHelper"
+  let caller ← signatureNamed program "qualifiedLocalCoerced"
+  let callerFunction ← functionFor program caller
+  let coercionOccurrence ← match callerFunction.typedBody.nodes.findSome? fun
+      | .expression expression =>
+          if expression.coercions.isEmpty then none else some expression.id
+      | .statement _ => none with
+    | some occurrence => pure occurrence
+    | none => throw (IO.userError
+        "qualifiedLocalCoerced lost its coercion occurrence")
+  let base ← match ← runOrThrow "detached method base" program
+      [monomorphicRequest caller] 8 with
+    | .complete plan => pure plan
+    | outcome => throw (IO.userError
+        s!"detached method base expected complete, found {reprStr outcome}")
+  let coerce ← traitNamed program "Coerce"
+  let implementation ← match program.signatures.implementations.filter
+      fun implementation =>
+        implementation.head.trait == .declaration coerce.id with
+    | [implementation] => pure implementation
+    | implementations => throw (IO.userError
+        s!"expected one Coerce implementation, found {implementations.length}")
+  let evidence ← match (TypedTraitResolution.resolve
+      program.signatures.resolutionRules 32 implementation.head).outcome with
+    | .success evidence => pure evidence
+    | outcome => throw (IO.userError
+        s!"Coerce implementation evidence did not resolve: {reprStr outcome}")
+  let method ← match ExecutableImplMethods.checkMethodWithArity
+      program evidence 2 "coerce" with
+    | .ok method => pure method
+    | .error error => throw (IO.userError
+        s!"detached Coerce method did not specialize: {reprStr error}")
+  let helperCall ← match
+      method.specialized.function.typedBody.nodes.findSome? fun
+        | .expression expression@{
+            form := .call _ _ (.declaration instantiation), .. } =>
+            if instantiation.declaration == helper.id then
+              some expression.id
+            else
+              none
+        | _ => none with
+    | some occurrence => pure occurrence
+    | none => throw (IO.userError
+        "detached Coerce method lost its top-level helper call")
+  let helperFunction ← functionFor program helper
+  let identityReference ← match helperFunction.typedBody.nodes.findSome? fun
+      | .expression expression@{
+          form := .reference _ (.declaration instantiation), .. } =>
+          if instantiation.declaration == identity.id then
+            some expression.id
+          else
+            none
+      | _ => none with
+    | some occurrence => pure occurrence
+    | none => throw (IO.userError
+        "coercion closure helper lost its identity reference")
+  let callerKey : SourceSpecialization.SpecializationKey := {
+    declaration := caller.id
+    arguments := []
+  }
+  let helperKey : SourceSpecialization.SpecializationKey := {
+    declaration := helper.id
+    arguments := []
+  }
+  let identityKey : SourceSpecialization.SpecializationKey := {
+    declaration := identity.id
+    arguments := [.word]
+  }
+  let outerEdge : SourceSpecializationWorklist.CallEdge := {
+    caller := callerKey
+    occurrence := coercionOccurrence
+    callee := method.specialized.key
+  }
+  let helperEdge : SourceSpecializationWorklist.CallEdge := {
+    caller := method.specialized.key
+    occurrence := helperCall
+    callee := helperKey
+  }
+  let identityEdge : SourceSpecializationWorklist.ReferenceEdge := {
+    caller := helperKey
+    occurrence := identityReference
+    callee := identityKey
+  }
+  assertTrue (!(base.specializations.any fun specialized =>
+      specialized.key == method.specialized.key) &&
+      !(base.specializations.any fun specialized =>
+        specialized.key == helperKey) &&
+      !(base.specializations.any fun specialized =>
+        specialized.key == identityKey))
+    "detached method fixture was already reachable from the public seed"
+  match SourceSpecializationWorklist.extendCompletePlan program base
+      method.specialized outerEdge 0 with
+  | .ok (.budgetExhausted partialPlan next pending) =>
+      assertTrue ((partialPlan.specializations ==
+          base.specializations ++ [method.specialized]) && decide (
+          partialPlan.seedKeys = base.seedKeys ∧
+          partialPlan.callEdges = base.callEdges ++ [outerEdge, helperEdge] ∧
+          partialPlan.referenceEdges = base.referenceEdges ∧
+          next = helperKey ∧
+          pending.length = 1))
+        "the pre-resolved root consumed helper budget or lost its outer edge"
+  | result => throw (IO.userError
+      s!"zero-budget detached method extension had the wrong outcome: {reprStr result}")
+  let extended ← match SourceSpecializationWorklist.extendCompletePlan
+      program base method.specialized outerEdge 2 with
+    | .ok (.complete plan) => pure plan
+    | result => throw (IO.userError
+        s!"detached method closure did not complete: {reprStr result}")
+  assertTrue (decide (
+      extended.seedKeys = base.seedKeys ∧
+      extended.specializations.map (fun specialized => specialized.key) =
+        base.specializations.map (fun specialized => specialized.key) ++
+          [method.specialized.key, helperKey, identityKey] ∧
+      extended.callEdges = base.callEdges ++ [outerEdge, helperEdge] ∧
+      extended.referenceEdges = base.referenceEdges ++ [identityEdge]))
+    "detached method call/reference closure or original plan data changed"
+  let duplicatedEdges : SourceSpecializationWorklist.Plan := {
+    extended with
+    callEdges := extended.callEdges ++ [outerEdge, helperEdge]
+    referenceEdges := extended.referenceEdges ++ [identityEdge]
+  }
+  match SourceSpecializationWorklist.extendCompletePlan program duplicatedEdges
+      method.specialized outerEdge 0 with
+  | .ok (.complete repeated) =>
+      assertTrue (repeated == extended)
+        "re-extending an existing root did not normalize exact duplicate edges"
+  | result => throw (IO.userError
+      s!"idempotent detached method extension failed: {reprStr result}")
+  let duplicateSpecialization : SourceSpecializationWorklist.Plan := {
+    extended with
+    specializations := extended.specializations ++ [method.specialized]
+  }
+  match SourceSpecializationWorklist.extendCompletePlan program
+      duplicateSpecialization method.specialized outerEdge 0 with
+  | .error (.duplicatePlanSpecializations key 2) =>
+      assertTrue (key == method.specialized.key)
+        "duplicate-plan rejection reported the wrong specialization key"
+  | result => throw (IO.userError
+      s!"duplicate plan specialization was accepted: {reprStr result}")
+  let mismatchedRoot : SourceSpecialization.SpecializedFunction := {
+    method.specialized with declaration := helper.id
+  }
+  match SourceSpecializationWorklist.extendCompletePlan program extended
+      mismatchedRoot outerEdge 0 with
+  | .error (.existingSpecializationMismatch key) =>
+      assertTrue (key == method.specialized.key)
+        "existing-root mismatch reported the wrong specialization key"
+  | result => throw (IO.userError
+      s!"mismatched existing root was accepted: {reprStr result}")
+  let mismatchedEdge : SourceSpecializationWorklist.CallEdge := {
+    outerEdge with callee := helperKey
+  }
+  match SourceSpecializationWorklist.extendCompletePlan program base
+      method.specialized mismatchedEdge 2 with
+  | .error (.outerEdgeCalleeMismatch expected actual) =>
+      assertTrue (decide (expected = method.specialized.key ∧
+          actual = helperKey))
+        "outer-edge mismatch lost its expected or actual callee key"
+  | result => throw (IO.userError
+      s!"mismatched detached-root edge was accepted: {reprStr result}")
+
 private def testQualifiedLocalSchemeReferences
     (program : CheckedProgram) : IO Unit := do
   let keep ← signatureNamed program "keep"
@@ -1965,6 +2133,7 @@ def testSourceSpecializationWorklist : IO Unit := do
   testContextualLocalProofCalls program
   testQualifiedLocalSchemeCalls program
   testQualifiedLocalSchemeCallsWithCoercions program
+  testDetachedSpecializationClosure program
   testQualifiedLocalSchemeReferences program
   testFunctionValueReference program
   testIndirectCallBoundary program

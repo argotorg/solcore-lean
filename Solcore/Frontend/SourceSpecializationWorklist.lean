@@ -97,6 +97,12 @@ inductive Error where
   | duplicateSignatures (declaration : Resolved.DeclarationId) (count : Nat)
   | missingFunction (declaration : Resolved.DeclarationId)
   | duplicateFunctions (declaration : Resolved.DeclarationId) (count : Nat)
+  | duplicatePlanSpecializations
+      (key : SourceSpecialization.SpecializationKey) (count : Nat)
+  | existingSpecializationMismatch
+      (key : SourceSpecialization.SpecializationKey)
+  | outerEdgeCalleeMismatch
+      (root edge : SourceSpecialization.SpecializationKey)
   | specialization
       (declaration : Resolved.DeclarationId)
       (error : SourceSpecialization.Error)
@@ -953,6 +959,61 @@ def run (program : CheckedProgram) (seeds : List Request) (budget : Nat) :
     Except Error Outcome := do
   let seedKeys ← canonicalSeedKeys program seeds
   runAux program seedKeys seeds [] [] [] [] budget
+
+private def firstDuplicatePlanSpecialization :
+    List SourceSpecialization.SpecializedFunction →
+      Option (SourceSpecialization.SpecializationKey × Nat)
+  | [] => none
+  | specialized :: rest =>
+      let duplicates := rest.filter fun candidate =>
+        decide (candidate.key = specialized.key)
+      if duplicates.isEmpty then
+        firstDuplicatePlanSpecialization rest
+      else
+        some (specialized.key, duplicates.length + 1)
+
+private def validatePlanSpecializationsUnique (plan : Plan) :
+    Except Error Unit :=
+  match firstDuplicatePlanSpecialization plan.specializations with
+  | none => pure ()
+  | some (key, count) => throw (.duplicatePlanSpecializations key count)
+
+/-- Extend an already complete plan with one pre-resolved, detached callable
+root and the synthetic direct-call edge by which an existing specialization
+invokes it.  The supplied root itself is already admitted and therefore does
+not consume `budget`; the budget counts only previously unseen helpers found
+while closing its ordinary direct-call and declaration-reference frontier.
+
+`seedKeys` remains the original public-root list.  Existing exact edges are
+normalized and every newly collected edge is merged idempotently.  An existing
+root key must name exactly the supplied carrier, and every specialization key
+in the input plan must already be unique.  The root body is rescanned even when
+the root is already present, so applying this operation again is idempotent and
+can also repair a plan whose detached-root frontier was not yet merged. -/
+def extendCompletePlan (program : CheckedProgram) (plan : Plan)
+    (root : SourceSpecialization.SpecializedFunction) (outerEdge : CallEdge)
+    (budget : Nat) : Except Error Outcome := do
+  validatePlanSpecializationsUnique plan
+  if outerEdge.callee != root.key then
+    throw (.outerEdgeCalleeMismatch root.key outerEdge.callee)
+  let existingRoot := plan.specializations.find? fun specialized =>
+    decide (specialized.key = root.key)
+  let specializations ← match existingRoot with
+    | none => pure (plan.specializations ++ [root])
+    | some existing =>
+        if existing == root then
+          pure plan.specializations
+        else
+          throw (.existingSpecializationMismatch root.key)
+  let seen := specializations.map (fun specialized => specialized.key)
+  let callEdges := appendCallEdges [] plan.callEdges
+  let referenceEdges := appendReferenceEdges [] plan.referenceEdges
+  let callEdges := appendCallEdge callEdges outerEdge
+  let (requests, rootCalls, rootReferences) ←
+    collectAllReferences program root.key root.function.typedBody
+  runAux program plan.seedKeys requests seen specializations
+    (appendCallEdges callEdges rootCalls)
+    (appendReferenceEdges referenceEdges rootReferences) budget
 
 end Solcore.Frontend.SourceSpecializationWorklist
 
