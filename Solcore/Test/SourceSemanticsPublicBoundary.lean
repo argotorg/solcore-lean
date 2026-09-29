@@ -588,6 +588,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.unaryOperatorTrait_hasTypeAfterSubstitution
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.unaryOperatorInferenceCase_hasType_afterFinalization_scoped
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.binaryOperatorTrait_hasTypeAfterSubstitution
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.freshDataConstructorInstantiation_admissible

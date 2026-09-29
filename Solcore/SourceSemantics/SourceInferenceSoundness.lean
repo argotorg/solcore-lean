@@ -16625,6 +16625,140 @@ theorem unaryOperatorTrait_hasTypeAfterSubstitution
     exact solveRequirements_correspondingSequenceProves corresponds
       solve_success solved_eq valid
 
+/-- Every retained unary inference branch becomes declarative operator typing
+after whole-body substitution and scoped requirement solving.  Primitive
+typing is transported structurally, trait dispatch consumes the exact ordered
+evidence row at the operator occurrence, and the sole deferred builtin case
+is closed by the final supported carrier of its originating integer literal. -/
+theorem unaryOperatorInferenceCase_hasType_afterFinalization_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {sourceContext base active : SourceSemantics.Context}
+    {initial later : Frontend.SourceInference.State}
+    {closedVariables : List TypeSystem.TypeVarId}
+    {solved : List SolvedRequirement}
+    {ledgerSource : TypedSource} {occurrence : NodeId}
+    {operator : Syntax.UnaryOp} {operandType : TypeSystem.Ty}
+    {integerLiterals : List IntegerLiteralOrigin}
+    {result : Detail.OperatorInferenceResult}
+    (inferenceCase : UnaryOperatorInferenceCase inferenceContext sourceContext
+      initial operator operandType integerLiterals result)
+    (progress : initial.InferenceProgress result.state)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.state.inference.substitution)
+    (requirementsSubset : result.state.requirements ⊆ later.requirements)
+    (integerLiteralsSubset : integerLiterals ⊆ later.integerLiterals)
+    (integerLiteralTargetsSupported : ∀ origin,
+      origin ∈ later.integerLiterals →
+        later.inference.substitution.apply
+            (.variable origin.metavariable) = .word ∨
+          later.inference.substitution.apply
+            (.variable origin.metavariable) = .integer)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (selectedTraitName : ∀ {trait : Resolved.DeclarationId}
+      {traitName : String},
+      Detail.operatorTrait? inferenceContext traitName = .ok (some trait) →
+        (inferenceContext.signatures.trait? trait).map (·.name) =
+          some traitName)
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered ledgerSource active occurrence)
+    (occurs : ∀ requirement, requirement ∈ result.requirements →
+      PrimaryRequirementOccursAt ledgerSource occurrence requirement) :
+    UnaryOperatorHasType active operator
+      (later.inference.substitution.apply operandType)
+      (later.inference.substitution.apply result.type)
+      result.requirements := by
+  have laterExtendsInitial :
+      later.inference.substitution.SemanticallyExtends
+        initial.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans substitutionExtends
+      progress.substitution_extends
+  have resolvedOperandEq :
+      later.inference.substitution.apply
+          (result.state.resolve operandType) =
+        later.inference.substitution.apply operandType :=
+    TypeSystem.InferState.apply_resolve_eq_apply substitutionExtends
+      operandType
+  cases inferenceCase with
+  | primitive typing =>
+      have mapped :=
+        FlexibleSubstitution.UnaryOperatorHasType.applySubstitution catalog
+          contextValid typing
+      simpa only [resolvedOperandEq] using mapped
+  | deferredBitNot operatorEq requirementsEq typeEq deferred =>
+      have openTarget : Detail.isOpenIntegerLiteralTarget initial
+          integerLiterals operandType = true := by
+        unfold Detail.isDeferredBuiltinOperatorTarget at deferred
+        split at deferred <;> simp_all
+      obtain ⟨_, origin, _, originMember, originResolveEq⟩ :=
+        Detail.isOpenIntegerLiteralTarget_true_witness openTarget
+      have originTargetEq :
+          later.inference.substitution.apply
+              (.variable origin.metavariable) =
+            later.inference.substitution.apply operandType := by
+        calc
+          later.inference.substitution.apply
+                (.variable origin.metavariable) =
+              later.inference.substitution.apply
+                (initial.resolve (.variable origin.metavariable)) :=
+            (TypeSystem.InferState.apply_resolve_eq_apply
+              laterExtendsInitial (.variable origin.metavariable)).symm
+          _ = later.inference.substitution.apply
+                (initial.resolve operandType) :=
+            congrArg later.inference.substitution.apply originResolveEq
+          _ = later.inference.substitution.apply operandType :=
+            TypeSystem.InferState.apply_resolve_eq_apply laterExtendsInitial
+              operandType
+      have resultTargetEq : later.inference.substitution.apply result.type =
+          later.inference.substitution.apply operandType := by
+        rw [typeEq]
+        exact resolvedOperandEq
+      have supported := integerLiteralTargetsSupported origin
+        (integerLiteralsSubset originMember)
+      rcases supported with originWord | originInteger
+      · have operandWord : later.inference.substitution.apply operandType =
+            .word := originTargetEq.symm.trans originWord
+        have resultWord : later.inference.substitution.apply result.type =
+            .word := resultTargetEq.trans operandWord
+        simpa only [operatorEq, operandWord, resultWord, requirementsEq] using
+          (UnaryOperatorHasType.wordBitNot (context := active))
+      · have operandInteger : later.inference.substitution.apply operandType =
+            .integer := originTargetEq.symm.trans originInteger
+        have resultInteger : later.inference.substitution.apply result.type =
+            .integer := resultTargetEq.trans operandInteger
+        simpa only [operatorEq, operandInteger, resultInteger,
+          requirementsEq] using
+            (UnaryOperatorHasType.integerBitNot (context := active))
+  | @trait trait traitName methodName predicates dispatch selected profile
+      corresponds =>
+      apply UnaryOperatorHasType.trait dispatch
+      · have instantiated :=
+          operatorTraitPredicates_instantiatesAfterSubstitution catalog
+            contextValid signaturesEq (selectedTraitName selected) profile
+        simpa only [List.map_cons, List.map_nil, resolvedOperandEq] using
+          instantiated
+      · have laterCorresponds :=
+          corresponds.mono requirementsSubset
+        have sequence := solveRequirements_correspondingSequenceProvesAt
+          laterCorresponds solveSuccess solvedEq ledger ownership
+          activeSignaturesEq activeRequirementsEq assumptionsMono covered
+          occurs
+        change RequirementSequenceProves active result.requirements
+          (predicates.map (TypedTraitResolution.applySubstitution
+            later.inference.substitution)) at sequence
+        exact sequence
+
 /-- Binary trait inference has the analogous composition: a validated
 two-operand profile plus the corresponding solved ledger rows yields the
 declarative binary-operator judgment under the final substitution. -/
