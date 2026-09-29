@@ -2864,6 +2864,31 @@ theorem fitArguments_some_trace
 
 namespace ArgumentFitTrace
 
+/-- An exact argument-fitting trace replays to the successful executable
+result recorded in its indices. -/
+theorem fitArguments_eq
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (trace : ArgumentFitTrace context state arguments parameters result) :
+    fitArguments context state arguments parameters = .ok (some result) := by
+  induction trace with
+  | nil => rfl
+  | cons head rest induction =>
+      simp only [fitArguments, head, bind, Except.bind]
+      rw [induction]
+      rfl
+
+/-- The exact argument-fitting trace preserves every requirement visible
+before the pass. -/
+theorem requirements_subset
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (trace : ArgumentFitTrace context state arguments parameters result) :
+    state.requirements ⊆ result.state.requirements :=
+  fitArguments_requirements_subset trace.fitArguments_eq
+
 /-- A successful trace consumes arguments and parameters in lockstep. -/
 theorem argument_parameter_length
     {context : Context} {state : State}
@@ -2959,6 +2984,48 @@ theorem fitArguments_some_coercion_expression_ids
     result.coercions.map (fun entry => entry.expression) =
       arguments.map (fun argument => argument.id) :=
   (fitArguments_some_trace success).coercion_expression_ids
+
+/-- Recovering a canonical bundled parameter row by its source arity returns
+that row exactly.  The explicit arity is what distinguishes a single
+product-valued parameter from a multi-argument product spine. -/
+theorem parameterTypesForArity?_productMany (parameters : List Ty) :
+    parameterTypesForArity? parameters.length (Ty.productMany parameters) =
+      some parameters := by
+  induction parameters with
+  | nil => simp [parameterTypesForArity?, Ty.productMany]
+  | cons parameter parameters induction =>
+      cases parameters with
+      | nil => simp [parameterTypesForArity?, Ty.productMany]
+      | cons next rest =>
+          simp only [List.length_cons, Ty.productMany,
+            parameterTypesForArity?]
+          rw [show parameterTypesForArity? (rest.length + 1)
+              (Ty.productMany (next :: rest)) = some (next :: rest) by
+            simpa only [List.length_cons] using induction]
+          rfl
+
+/-- Rigid declaration instantiation commutes with recovering a canonical
+source parameter row.  This is the exact form consumed by overload-candidate
+fitting after the declaration scheme has been instantiated. -/
+theorem parameterTypesForArity?_apply_productMany
+    (substitution : ParameterSubstitution) (parameters : List Ty) :
+    parameterTypesForArity? parameters.length
+        (substitution.apply (Ty.productMany parameters)) =
+      some (parameters.map substitution.apply) := by
+  induction parameters with
+  | nil => simp [parameterTypesForArity?, Ty.productMany, Ty.unit,
+      ParameterSubstitution.apply]
+  | cons parameter parameters induction =>
+      cases parameters with
+      | nil => simp [parameterTypesForArity?, Ty.productMany]
+      | cons next rest =>
+          simp only [List.length_cons, Ty.productMany,
+            ParameterSubstitution.apply, parameterTypesForArity?]
+          rw [show parameterTypesForArity? (rest.length + 1)
+              (substitution.apply (Ty.productMany (next :: rest))) =
+                some ((next :: rest).map substitution.apply) by
+            simpa only [List.length_cons] using induction]
+          rfl
 
 /-- Successfully recognizing a function type transfers its allocator bound to
 both the bundled parameter type and result type. -/
@@ -3087,6 +3154,26 @@ theorem fitArguments_some_inferenceProperties
                             tailParametersBelow tailResult
                           exact ⟨fittedProperties.1.trans tailProperties.1,
                             tailProperties.2⟩
+
+namespace ArgumentFitTrace
+
+/-- Readiness and inference progress can be consumed directly from an exact
+trace, without reopening the executable `fitArguments` recursion. -/
+theorem inferenceProperties
+    {context : Context} {state : State}
+    {arguments : List InferredExpression} {parameters : List Ty}
+    {result : ArgumentFitResult}
+    (trace : ArgumentFitTrace context state arguments parameters result)
+    (ready : state.InferenceReady)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow state.inference.next)
+    (parametersBelow : ∀ parameter ∈ parameters,
+      parameter.VariablesBelow state.inference.next) :
+    state.InferenceProgress result.state ∧ result.state.InferenceReady :=
+  fitArguments_some_inferenceProperties ready argumentsBelow parametersBelow
+    trace.fitArguments_eq
+
+end ArgumentFitTrace
 
 /-- A retained overload candidate makes semantic inference progress through
 declaration instantiation, argument fitting, result fitting, and requirement
@@ -5447,6 +5534,168 @@ theorem tryFunctionCandidate_some_instantiation
   repeat' first | split at success
   all_goals try cases success
   all_goals simp_all
+
+/-- A successful canonical function-candidate attempt exposes the complete
+argument- and result-fitting witness.  Besides the source-ordered argument
+trace, this retains the exact result expectation equation and identifies the
+final candidate inference state with the state after result fitting; later
+requirement bookkeeping changes no inference data. -/
+theorem tryFunctionCandidate_some_argumentFitWitness
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (canonical : signature.scheme.body = .function
+      (Ty.productMany signature.parameterTypes)
+      (Ty.productMany signature.returnTypes))
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    let instantiated := signature.scheme.instantiate state.inference.next
+    let advancedState : State := {
+      state with inference := {
+        state.inference with next := instantiated.next
+      }
+    }
+    ∃ fittedArguments fittedResult,
+      ArgumentFitTrace context advancedState arguments
+        (signature.parameterTypes.map
+          instantiated.parameterSubstitution.apply) fittedArguments ∧
+      candidateWithExpected context fittedArguments.state {
+        id := call
+        type := instantiated.parameterSubstitution.apply
+          (Ty.productMany signature.returnTypes)
+      } expected = .ok (some fittedResult) ∧
+      result.argumentCoercions = fittedArguments.coercions ∧
+      result.state.inference = fittedResult.state.inference ∧
+      fittedArguments.state.requirements ⊆ result.state.requirements := by
+  let instantiated := signature.scheme.instantiate state.inference.next
+  let advancedState : State := {
+    state with inference := {
+      state.inference with next := instantiated.next
+    }
+  }
+  have partsResult : functionParts? instantiated.body =
+      some
+        (instantiated.parameterSubstitution.apply
+            (Ty.productMany signature.parameterTypes),
+          instantiated.parameterSubstitution.apply
+            (Ty.productMany signature.returnTypes)) := by
+    rw [ConstrainedDeclarationScheme.instantiate_body, canonical]
+    rfl
+  have parametersResult := parameterTypesForArity?_apply_productMany
+    instantiated.parameterSubstitution signature.parameterTypes
+  unfold tryFunctionCandidate at success
+  dsimp only at success
+  rw [show functionParts?
+      (signature.scheme.instantiate state.inference.next).body = _ by
+        simpa only [instantiated] using partsResult] at success
+  simp only at success
+  rw [show parameterTypesForArity? signature.parameterTypes.length
+      ((signature.scheme.instantiate state.inference.next).parameterSubstitution.apply
+        (Ty.productMany signature.parameterTypes)) =
+        some (signature.parameterTypes.map
+          (signature.scheme.instantiate
+            state.inference.next).parameterSubstitution.apply) by
+      simpa only [instantiated] using parametersResult] at success
+  cases argumentsResult : fitArguments context advancedState arguments
+      (signature.parameterTypes.map
+        instantiated.parameterSubstitution.apply) with
+  | error error =>
+      simp [instantiated, advancedState, argumentsResult, bind, Except.bind]
+        at success
+  | ok fittedArguments? =>
+      cases fittedArguments? with
+      | none =>
+          simp [instantiated, advancedState, argumentsResult, bind, Except.bind]
+            at success
+      | some fittedArguments =>
+          simp only [instantiated, advancedState, argumentsResult, bind,
+            Except.bind] at success
+          cases fittedResultResult : candidateWithExpected context
+              fittedArguments.state {
+                id := call
+                type := instantiated.parameterSubstitution.apply
+                  (Ty.productMany signature.returnTypes)
+              } expected with
+          | error error =>
+              simp [instantiated, fittedResultResult, bind, Except.bind]
+                at success
+          | ok fittedResult? =>
+              cases fittedResult? with
+              | none =>
+                  simp [instantiated, fittedResultResult, bind, Except.bind]
+                    at success
+              | some fittedResult =>
+                  have expandedFittedResult :
+                      candidateWithExpected context fittedArguments.state {
+                        id := call
+                        type := (signature.scheme.instantiate
+                          state.inference.next).parameterSubstitution.apply
+                            (Ty.productMany signature.returnTypes)
+                      } expected = .ok (some fittedResult) := by
+                    simpa only [instantiated] using fittedResultResult
+                  refine ⟨fittedArguments, fittedResult,
+                    fitArguments_some_trace argumentsResult,
+                    fittedResultResult, ?_, ?_, ?_⟩
+                  all_goals
+                    simp_all [bind, Except.bind]
+                    repeat' first | split at success
+                    all_goals try cases success
+                    all_goals simp_all [State.markDirectCallRequirements,
+                      addRequirementsWithIds_inference]
+                    all_goals try
+                      exact List.Subset.trans
+                        (candidateWithExpected_requirements_subset
+                          fittedResultResult)
+                        (State.addRequirementsWithIds_requirements_subset
+                          fittedResult.state _)
+
+/-- Projection of the complete fitting witness used by consumers which need
+only the canonical argument trace and its forwarded coercion ledger. -/
+theorem tryFunctionCandidate_some_argumentFitTrace
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (canonical : signature.scheme.body = .function
+      (Ty.productMany signature.parameterTypes)
+      (Ty.productMany signature.returnTypes))
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    let instantiated := signature.scheme.instantiate state.inference.next
+    let advancedState : State := {
+      state with inference := {
+        state.inference with next := instantiated.next
+      }
+    }
+    ∃ fittedArguments,
+      ArgumentFitTrace context advancedState arguments
+        (signature.parameterTypes.map
+          instantiated.parameterSubstitution.apply) fittedArguments ∧
+      result.argumentCoercions = fittedArguments.coercions := by
+  obtain ⟨fittedArguments, _, trace, _, coercionsEq, _, _⟩ :=
+    tryFunctionCandidate_some_argumentFitWitness canonical success
+  exact ⟨fittedArguments, trace, coercionsEq⟩
+
+/-- A successful canonical candidate preserves the complete source order and
+multiplicity of argument expression identities in its delayed coercion
+ledger. -/
+theorem tryFunctionCandidate_some_argumentCoercion_expression_ids
+    {context : Context} {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin} {call : ExpressionId}
+    {expected : Option Ty} {state : State}
+    {signature : ProgramFunctionSignature} {result : CandidateAttemptResult}
+    (canonical : signature.scheme.body = .function
+      (Ty.productMany signature.parameterTypes)
+      (Ty.productMany signature.returnTypes))
+    (success : tryFunctionCandidate context arguments integerLiteralOrigins
+      call expected state signature = .ok (some result)) :
+    result.argumentCoercions.map (fun entry => entry.expression) =
+      arguments.map (fun argument => argument.id) := by
+  obtain ⟨fittedArguments, trace, coercionsEq⟩ :=
+    tryFunctionCandidate_some_argumentFitTrace canonical success
+  rw [coercionsEq]
+  exact trace.coercion_expression_ids
 
 private theorem tryFunctionCandidate_some_state_header
     {context : Context} {arguments : List InferredExpression}

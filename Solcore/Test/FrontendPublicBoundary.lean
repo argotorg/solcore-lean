@@ -514,6 +514,10 @@ example := @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.cons
 example :=
   @Solcore.Frontend.SourceInference.Detail.fitArguments_some_trace
 example :=
+  @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.fitArguments_eq
+example :=
+  @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.requirements_subset
+example :=
   @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.argument_parameter_length
 example :=
   @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.coercions_length
@@ -528,11 +532,17 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.fitArguments_some_coercion_expression_ids
 example :=
+  @Solcore.Frontend.SourceInference.Detail.parameterTypesForArity?_productMany
+example :=
+  @Solcore.Frontend.SourceInference.Detail.parameterTypesForArity?_apply_productMany
+example :=
   @Solcore.Frontend.SourceInference.Detail.functionParts?_success_variablesBelow
 example :=
   @Solcore.Frontend.SourceInference.Detail.parameterTypesForArity?_success_variablesBelow
 example :=
   @Solcore.Frontend.SourceInference.Detail.fitArguments_some_inferenceProperties
+example :=
+  @Solcore.Frontend.SourceInference.Detail.ArgumentFitTrace.inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_inferenceProperties
 example :=
@@ -762,6 +772,12 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_requirements_subset
 example :=
   @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_instantiation
+example :=
+  @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_argumentFitWitness
+example :=
+  @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_argumentFitTrace
+example :=
+  @Solcore.Frontend.SourceInference.Detail.tryFunctionCandidate_some_argumentCoercion_expression_ids
 example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_success_candidate
 example :=
