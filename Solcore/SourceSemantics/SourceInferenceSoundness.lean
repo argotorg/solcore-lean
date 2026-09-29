@@ -20211,11 +20211,12 @@ theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
     (ExpressionNodesPreservedAt.ofTypingSourceExtends sourceExtension)
     finalAdmissible
 
-/-- Deep soundness of one constructor-application traversal at fixed child
-fuel.  Payload expressions are typed first in the source returned by their
-source-ordered traversal, then weakened through the final constructor record
-and into the caller's eventual scoped-ledger source. -/
-theorem inferConstructorApplicationFuel_success_expressionHasType_scoped
+/-- Deep typing-base soundness of one constructor-application traversal at
+fixed child fuel.  Payload expressions are typed first in the source returned
+by their source-ordered traversal, then weakened through the final constructor
+record and into the caller's eventual scoped-ledger source.  Formation of the
+stored result type remains deferred to whole-traversal finalization. -/
+theorem inferConstructorApplicationFuel_success_expressionTypingBase_scoped
     {fuel : Nat}
     {inferenceContext : Frontend.SourceInference.Context}
     {source : Syntax.Expr} {id : ExpressionId}
@@ -20259,8 +20260,6 @@ theorem inferConstructorApplicationFuel_success_expressionHasType_scoped
     (instantiationValid :
       SourceSemantics.DataConstructorInstantiation.Admissible active
         (instantiation.applySubstitution later.inference.substitution))
-    (finalAdmissible : TypeAdmissible active
-      (later.inference.substitution.apply result.type))
     (expressionSound :
       ∀ {expression : Syntax.Expr} {expectedType : TypeSystem.Ty}
         {childInitial childFinal : Frontend.SourceInference.State}
@@ -20301,8 +20300,8 @@ theorem inferConstructorApplicationFuel_success_expressionHasType_scoped
     (assumptionsMono : base.assumptions ⊆ active.assumptions)
     (covered : TemplateScopeCovered ledgerSource active
       (.expression result.id)) :
-    ExpressionHasType ledgerSource active result.id
-      (later.inference.substitution.apply result.type) := by
+    ExpressionTypingBase (resultState.toTypedSource roots) ledgerSource active
+      later.inference.substitution result := by
   have wholeSuccess := success
   have finish
       {argumentInitial argumentsState : Frontend.SourceInference.State}
@@ -20324,8 +20323,8 @@ theorem inferConstructorApplicationFuel_success_expressionHasType_scoped
         source id (argumentsState.resolve instantiation.resultType)
         (.constructor instantiation (inferredArguments.map (·.id))) [] expected
         argumentsState none = .ok (result, resultState)) :
-      ExpressionHasType ledgerSource active result.id
-        (later.inference.substitution.apply result.type) := by
+      ExpressionTypingBase (resultState.toTypedSource roots) ledgerSource
+        active later.inference.substitution result := by
     have argumentsProperties :=
       Detail.inferConstructorArgumentsFuel_inferenceProperties
         argumentInitialReady signatureFormation functionsCanonical
@@ -20420,11 +20419,11 @@ theorem inferConstructorApplicationFuel_success_expressionHasType_scoped
         DataConstructorInstantiation.applySubstitution] using
           (ExpressionFormHasRawType.constructor instantiationValid
             argumentsType)
-    exact recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
+    exact recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped
       recordSuccess substitutionExtends requirementsSubset sourceExtension
-      formType rawAdmissible finalAdmissible traitSuccess profileSuccess
-      catalog contextValid signaturesEq traitName solveSuccess solvedEq ledger
-      ownership activeSignaturesEq activeRequirementsEq assumptionsMono covered
+      formType rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
   unfold Detail.inferConstructorApplicationFuel at success
   by_cases arity : arguments.length = instantiation.payloadTypes.length
   · simp only [arity] at success
@@ -20494,6 +20493,108 @@ theorem inferConstructorApplicationFuel_success_expressionHasType_scoped
                   nodesAtArgumentInitial argumentInitialOwner argumentsResult
                   success
   · simp [arity, bind, Except.bind] at success
+
+/-- Final result admissibility closes the constructor-application typing base
+into the public expression-typing judgment used by existing clients. -/
+theorem inferConstructorApplicationFuel_success_expressionHasType_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {id : ExpressionId}
+    {instantiation : DataConstructorInstantiation}
+    {arguments : List Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial resultState later : Frontend.SourceInference.State}
+    {result : InferredExpression}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.inferConstructorApplicationFuel fuel inferenceContext
+      source id instantiation arguments expected initial =
+        .ok (result, resultState))
+    (ready : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (payloadBelow : ∀ payload ∈ instantiation.payloadTypes,
+      payload.VariablesBelow initial.inference.next)
+    (resultBelow : instantiation.resultType.VariablesBelow
+      initial.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow initial.inference.next)
+    (nodesBelow : initial.NodesBelowNextOccurrence)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        resultState.inference.substitution)
+    (requirementsSubset : resultState.requirements ⊆ later.requirements)
+    (sourceExtension : TypingSourceExtends
+      ((resultState.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (binders : TypeParameterBindersWellFormed active)
+    (instantiationValid :
+      SourceSemantics.DataConstructorInstantiation.Admissible active
+        (instantiation.applySubstitution later.inference.substitution))
+    (finalAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply result.type))
+    (expressionSound :
+      ∀ {expression : Syntax.Expr} {expectedType : TypeSystem.Ty}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        childInitial.InferenceReady →
+        expectedType.VariablesBelow childInitial.inference.next →
+        childInitial.NodesBelowNextOccurrence →
+        later.inference.substitution.SemanticallyExtends
+          childFinal.inference.substitution →
+        Detail.inferExprFuel fuel inferenceContext expression
+            (some (childInitial.resolve expectedType)) childInitial =
+              .ok (child, childFinal) →
+          ExpressionHasType
+            ((childFinal.toTypedSource roots).applySubstitution
+              later.inference.substitution)
+            active child.id (later.inference.substitution.apply child.type))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered ledgerSource active
+      (.expression result.id)) :
+    ExpressionHasType ledgerSource active result.id
+      (later.inference.substitution.apply result.type) := by
+  have typingBase :=
+    inferConstructorApplicationFuel_success_expressionTypingBase_scoped
+      success ready signatureFormation functionsCanonical payloadBelow
+      resultBelow expectedBelow nodesBelow substitutionExtends
+      requirementsSubset sourceExtension binders instantiationValid
+      expressionSound traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+  exact typingBase.expressionHasType
+    (ExpressionNodesPreservedAt.ofTypingSourceExtends sourceExtension)
+    finalAdmissible
 
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
