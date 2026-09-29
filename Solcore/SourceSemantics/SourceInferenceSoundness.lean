@@ -21531,6 +21531,209 @@ theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
     (ExpressionNodesPreservedAt.ofTypingSourceExtends sourceExtension)
     finalAdmissible
 
+/-- A successful local-identifier branch yields a reusable typing base after
+canonical scheme instantiation and requirement allocation.  The final
+no-capture certificate remains explicit: whole-body callers may discharge it
+from monomorphic-binder provenance or initialized-let validation without
+coupling this operational theorem to that provenance split. -/
+theorem inferExprFuel_success_localIdentifier_expressionTypingBase_scoped_of_retained
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier} {binder : TypedBinder}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok result)
+    (certificate :
+      let instantiationStart := allocated.inference.next
+      let instantiated :=
+        binder.scheme.instantiateWithSubstitution instantiationStart
+      let inference := {
+        allocated.inference with next := instantiated.next
+      }
+      let advanced : Frontend.SourceInference.State := {
+        allocated with inference
+      }
+      let predicates := binder.schemeRequirements.map fun requirement =>
+        Detail.applyPredicate advanced
+          (TypedTraitResolution.applySubstitution instantiated.substitution
+            requirement.predicate)
+      Frontend.SourceInference.State.LookupBinderRequirementAllocationCertificate
+        advanced binder predicates)
+    (progress :
+      let instantiationStart := allocated.inference.next
+      let instantiated :=
+        binder.scheme.instantiateWithSubstitution instantiationStart
+      let inference := {
+        allocated.inference with next := instantiated.next
+      }
+      let advanced : Frontend.SourceInference.State := {
+        allocated with inference
+      }
+      advanced.InferenceProgress later)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (localInvariant : ActiveLocalContextInvariant allocated
+      later.inference.substitution active)
+    (residual : active.residualTypeVariables = true)
+    (noCapture : Detail.LocalBinderInstantiationNoCapture
+      later.inference.substitution binder)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  let instantiationStart := allocated.inference.next
+  let instantiated :=
+    binder.scheme.instantiateWithSubstitution instantiationStart
+  let inference := {
+    allocated.inference with next := instantiated.next
+  }
+  let advanced : Frontend.SourceInference.State := {
+    allocated with inference
+  }
+  let predicates := binder.schemeRequirements.map fun requirement =>
+    Detail.applyPredicate advanced
+      (TypedTraitResolution.applySubstitution instantiated.substitution
+        requirement.predicate)
+  let allocation := advanced.addRequirementsWithIds predicates
+  change
+    Frontend.SourceInference.State.LookupBinderRequirementAllocationCertificate
+      advanced binder predicates at certificate
+  change advanced.InferenceProgress later at progress
+  have recorded : Detail.recordExpressionWithExpected inferenceContext
+      expression id (advanced.resolve instantiated.body)
+      (.reference name.value (.local binder.id)) allocation.1 expected
+      allocation.2
+      (localSchemeInstantiationStart := some instantiationStart) = .ok result := by
+    simpa only [instantiationStart, instantiated, inference, advanced,
+      predicates, allocation] using
+        (Detail.inferExprFuel_success_localIdentifier_record expressionEq
+          allocationEq lookupEq success)
+  have branchFacts := inferExprFuel_success_localIdentifier_facts
+    expressionEq allocationEq lookupEq success certificate roots
+  change ∃ coercions,
+      ContainsExpression (result.2.toTypedSource roots) result.1.id {
+        id := result.1.id
+        span := expression.span
+        type := result.1.type
+        form := .reference name.value (.local binder.id)
+        requirements := allocation.1 ++
+          Detail.coercionRequirements coercions
+        coercions
+        localSchemeInstantiationStart := some instantiationStart
+      } ∧
+      allocation.1.Nodup ∧
+      (∀ requirement, requirement ∈ allocation.1 →
+        requirement ∉ localSchemeTemplateIds binder) ∧
+      RequirementPredicatesCorrespond result.2.requirements
+        ((instantiateLocalSchemePredicates instantiated.substitution
+          binder).map (Detail.applyPredicate advanced)) allocation.1
+    at branchFacts
+  obtain ⟨coercions, recordedContains, actualUnique, actualDisjoint,
+      resultCorresponds⟩ := branchFacts
+  have laterCorresponds : RequirementPredicatesCorrespond later.requirements
+      ((instantiateLocalSchemePredicates instantiated.substitution binder).map
+        (Detail.applyPredicate advanced)) allocation.1 :=
+    resultCorresponds.mono requirementsSubset
+  have occurs : ∀ requirement, requirement ∈ allocation.1 →
+      PrimaryRequirementOccursAt evidenceSource (.expression result.1.id)
+        requirement := by
+    intro requirement member
+    apply retained recordedContains
+    change requirement ∈
+      allocation.1 ++ Detail.coercionRequirements coercions
+    exact List.mem_append_left _ member
+  have requirements := localReferenceRequirementSequenceProves_afterProgress
+    progress laterCorresponds solveSuccess solvedEq ledger ownership
+    activeSignaturesEq activeRequirementsEq assumptionsMono covered occurs
+  have environment := localReferenceEnvironmentFacts_of_lookupBinder?
+    localInvariant.aligned localInvariant.formation lookupEq
+  have appliedDisjoint : ∀ requirement,
+      requirement ∈ allocation.1 →
+        requirement ∉
+          localSchemeTemplateIds
+            (binder.applySubstitution later.inference.substitution) := by
+    simpa only
+      [FlexibleSubstitution.localSchemeTemplateIds_applySubstitution] using
+        actualDisjoint
+  have instantiationValid :=
+    canonicalLocalSchemeInstantiationValid_afterSubstitution
+      environment.2.2.1.binders residual
+      contextValid.closes.range.toAdmissible environment.2.2.2
+      environment.2.2.1 noCapture instantiationStart actualUnique
+      appliedDisjoint requirements
+  have referenceValid : ReferenceUseValid active (.local binder.id)
+      (later.inference.substitution.apply instantiated.body) allocation.1 := by
+    simpa only [FlexibleSubstitution.applyTypedBinder_id] using
+      (ReferenceUseValid.local environment.1 environment.2.1
+        instantiationValid)
+  have rawEndpointEq :
+      later.inference.substitution.apply
+          (advanced.resolve instantiated.body) =
+        later.inference.substitution.apply instantiated.body := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using
+        progress.substitution_extends instantiated.body
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.reference name.value (.local binder.id)
+        ).applySubstitution later.inference.substitution)
+      (later.inference.substitution.apply
+        (advanced.resolve instantiated.body))
+      (.ordinary allocation.1) := by
+    rw [rawEndpointEq]
+    simpa [ExpressionForm.applySubstitution,
+      ReferenceResolution.applySubstitution] using
+        (ExpressionFormHasRawType.reference (source := semanticSource)
+          referenceValid)
+  have rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply
+        (advanced.resolve instantiated.body)) := by
+    rw [rawEndpointEq]
+    exact instantiationValid.type_admissible
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recorded substitutionExtends requirementsSubset retained formType
+      rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
 /-- The builtin-Boolean identifier branch produces an ordinary reusable
 typing base without requiring exact preservation of its recorded node in the
 requirement ledger source.  The raw Boolean reference is source-independent;
