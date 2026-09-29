@@ -625,6 +625,20 @@ private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
         "typed validation exhaustion lost its expected type or initial heap"
   | result => throw (IO.userError
       s!"typed input validation exhaustion was misclassified: {reprStr result}")
+  let malformedInitial : SourceTypedRuntime.RuntimeState := {
+    heap := [{ type := .word, value := some (.bool true) }]
+  }
+  match prepared.typed.runTyped [pair] runtimeOptions malformedInitial with
+  | .ok (.typedSource (.fault
+      .deepSafetyInitialStateRejected finalState)) =>
+      match finalState.heap with
+      | [{ type := .word, value := some (.bool retained) }] =>
+          assertTrue retained
+            "deep initial-state rejection changed the supplied heap"
+      | heap => throw (IO.userError
+          s!"deep initial-state rejection mutated the supplied heap: {reprStr heap}")
+  | result => throw (IO.userError
+      s!"malformed initial heap crossed the deep boundary: {reprStr result}")
   let shallowExecution : RunOptions :=
     { inputValidationFuel := 64, executionFuel := 1 }
   match prepared.typed.runTyped [pair] shallowExecution with
@@ -652,6 +666,16 @@ private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
   let retainedState : SourceTypedRuntime.RuntimeState := {
     heap := [{ type := .word, value := some (.word (word 99)) }]
   }
+  match prepared.typed.runTyped [pair] runtimeOptions retainedState with
+  | .ok (.typedSource (.done (.word actual) finalState)) =>
+      match finalState.heap with
+      | { type := .word, value := some (.word retained) } :: _ =>
+          assertTrue (actual == word 12 && retained == word 99)
+            "deep execution changed a pre-existing cell or the source result"
+      | heap => throw (IO.userError
+          s!"deep execution did not preserve the initial type layout: {reprStr heap}")
+  | result => throw (IO.userError
+      s!"valid nonempty initial heap failed the deep boundary: {reprStr result}")
   let zeroValidation : RunOptions := {
     inputValidationFuel := 0
     executionFuel := 4096
