@@ -530,6 +530,13 @@ inductive RuntimeError where
   | invalidExpressionCoercionPath
       (expression : ExpressionId) (source target : Ty)
   | invalidIndirectArgumentCoercionPath (expression : ExpressionId)
+  | indirectCalleeNotFunction (call : ExpressionId) (type : Ty)
+  | indirectArgumentBundleMismatch
+      (call : ExpressionId) (expected actual : Ty)
+  | indirectParameterTypeMismatch
+      (call : ExpressionId) (expected actual : Ty)
+  | indirectResultTypeMismatch
+      (call : ExpressionId) (expected actual : Ty)
   | duplicateCoercionRequirement
       (caller : Key) (id : ExpressionId) (requirement : RequirementId)
   | coercionPredicateMismatch
@@ -1602,6 +1609,38 @@ private def validateForItemMetadata : ForItemForm → Except RuntimeError Unit
   | .assignBitNot assignment => validateAssignmentMetadata assignment
   | .letDecl _ _ | .expression _ => pure ()
 
+/-- Reconstruct every indirect-call endpoint from the callee and argument
+nodes.  The retained resolution metadata is useful to execution only after it
+has been checked against those authoritative children. -/
+private def validateIndirectCallMetadata (source : TypedSource)
+    (node : ExpressionNode) (callee : ExpressionId)
+    (arguments : List ExpressionId) (metadata : IndirectCallResolution) :
+    Except RuntimeError Unit := do
+  unless metadata.hasValidArgumentCoercionPath do
+    throw (.invalidIndirectArgumentCoercionPath node.id)
+  let calleeNode ← exactExpression source callee
+  let (parameterType, resultType) ← match calleeNode.type with
+    | .function parameter result => pure (parameter, result)
+    | type => throw (.indirectCalleeNotFunction node.id type)
+  let argumentTypes ← arguments.mapM fun argument => do
+    let argumentNode ← exactExpression source argument
+    pure argumentNode.type
+  unless arguments.length = metadata.argumentCount do
+    throw (.argumentArityMismatch metadata.argumentCount arguments.length)
+  let bundledType := Ty.productMany argumentTypes
+  unless metadata.argumentTypeBeforeCoercion = bundledType do
+    throw (.indirectArgumentBundleMismatch node.id bundledType
+      metadata.argumentTypeBeforeCoercion)
+  unless metadata.argumentTypeAfterCoercion = parameterType do
+    throw (.indirectParameterTypeMismatch node.id parameterType
+      metadata.argumentTypeAfterCoercion)
+  unless node.rawType = resultType do
+    throw (.indirectResultTypeMismatch node.id resultType node.rawType)
+  unless node.requirements =
+      coercionRequirementIds metadata.argumentCoercions ++
+        coercionRequirementIds node.coercions do
+    throw (.unsupportedRequirements node.requirements)
+
 private def validateExpressionMetadata
     (specialized : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) : Except RuntimeError Unit := do
@@ -1614,15 +1653,9 @@ private def validateExpressionMetadata
           [resolution.requirement] ++ coercionRequirementIds node.coercions do
         throw (.unsupportedRequirements node.requirements)
       validateLiteralResolution function source resolution
-  | .call _ arguments (.indirect metadata) =>
-      unless arguments.length = metadata.argumentCount do
-        throw (.argumentArityMismatch metadata.argumentCount arguments.length)
-      unless metadata.hasValidArgumentCoercionPath do
-        throw (.invalidIndirectArgumentCoercionPath node.id)
-      unless node.requirements =
-          coercionRequirementIds metadata.argumentCoercions ++
-            coercionRequirementIds node.coercions do
-        throw (.unsupportedRequirements node.requirements)
+  | .call callee arguments (.indirect metadata) =>
+      validateIndirectCallMetadata function.typedBody node callee arguments
+        metadata
   | .call _ _ (.declaration instantiation) =>
       validateExecutableDirectCallRequirements specialized node instantiation
   | .reference _ (.declaration instantiation) =>

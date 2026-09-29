@@ -148,6 +148,17 @@ private def rewriteFirstIndirectCall
       | _ => .expression node :: rewriteFirstIndirectCall rewrite rest
   | node :: rest => node :: rewriteFirstIndirectCall rewrite rest
 
+private def rewriteFirstIndirectCallNode
+    (rewrite : SourceInference.ExpressionNode →
+      SourceInference.ExpressionNode) :
+    List SourceInference.Node → List SourceInference.Node
+  | [] => []
+  | .expression node :: rest =>
+      match node.form with
+      | .call _ _ (.indirect _) => .expression (rewrite node) :: rest
+      | _ => .expression node :: rewriteFirstIndirectCallNode rewrite rest
+  | node :: rest => node :: rewriteFirstIndirectCallNode rewrite rest
+
 private def firstSingletonLambdaTail? :
     List SourceInference.Node → Option SourceInference.StatementId
   | [] => none
@@ -652,6 +663,17 @@ private def expectPreExecutionFault (label : String)
   | result => throw (IO.userError
       s!"{label} did not reject tampered metadata: {reprStr result}")
 
+private def expectPreExecutionFaultPreservingSentinel (label : String)
+    (accept : RuntimeError → Bool) : RunResult → IO Unit
+  | .fault error { heap := [{ type := actualType, value := none }] } => do
+      assertTrue (accept error) s!"{label} reported {reprStr error}"
+      assertTrue (actualType == .word)
+        s!"{label} changed the sentinel cell type to {reprStr actualType}"
+  | .fault error state => throw (IO.userError
+      s!"{label} changed the initial state before rejecting metadata: {reprStr error}, {reprStr state}")
+  | result => throw (IO.userError
+      s!"{label} did not reject tampered metadata: {reprStr result}")
+
 private def expectPlanValidationFault (label : String)
     (accept : RuntimeError → Bool) : Except RuntimeError Unit → IO Unit
   | .error error =>
@@ -742,6 +764,68 @@ private def testIndirectArgumentCountMetadata
       | .argumentArityMismatch 1 2 => true
       | _ => false)
     (runPrepared forgedSplit)
+
+private def testIndirectEndpointMetadata
+    (program : CheckedProgram) : IO Unit := do
+  let prepared ← prepareNamed program "indirectCoercion"
+  let initialState : RuntimeState := {
+    heap := [{ type := .word, value := none }]
+  }
+  let runTampered (tampered : Prepared) :=
+    SourceTypedRuntime.runWithValidationFuel tampered.program tampered.plan
+      tampered.key [.bool true] 4096 4096 initialState
+
+  let beforeMismatch := rewriteEntryNodes prepared <|
+    rewriteFirstIndirectCall fun metadata => {
+      metadata with
+      argumentTypeBeforeCoercion := metadata.argumentTypeAfterCoercion
+      argumentCoercions := match metadata.argumentCoercions with
+        | [] => []
+        | step :: rest =>
+            { step with source := metadata.argumentTypeAfterCoercion } :: rest
+    }
+  expectPreExecutionFaultPreservingSentinel
+    "indirect before-coercion endpoint mismatch"
+    (fun error => match error with
+      | .indirectArgumentBundleMismatch _ expected actual =>
+          decide (expected = .bool ∧ actual = .word)
+      | _ => false)
+    (runTampered beforeMismatch)
+
+  let afterMismatch := rewriteEntryNodes prepared <|
+    rewriteFirstIndirectCall fun metadata => {
+      metadata with
+      argumentTypeAfterCoercion := metadata.argumentTypeBeforeCoercion
+      argumentCoercions := match metadata.argumentCoercions.reverse with
+        | [] => []
+        | step :: rest =>
+            ({ step with target := metadata.argumentTypeBeforeCoercion } :: rest).reverse
+    }
+  expectPreExecutionFaultPreservingSentinel
+    "indirect after-coercion endpoint mismatch"
+    (fun error => match error with
+      | .indirectParameterTypeMismatch _ expected actual =>
+          decide (expected = .word ∧ actual = .bool)
+      | _ => false)
+    (runTampered afterMismatch)
+
+  let resultMismatch := rewriteEntryNodes prepared <|
+    rewriteFirstIndirectCallNode fun node =>
+      let fakeRequirement : SourceInference.RequirementId := { index := 1000001 }
+      { node with
+        coercions := [{
+          requirement := fakeRequirement
+          source := .bool
+          target := node.type
+        }]
+      }
+  expectPreExecutionFaultPreservingSentinel
+    "indirect result endpoint mismatch"
+    (fun error => match error with
+      | .indirectResultTypeMismatch _ expected actual =>
+          decide (expected = .word ∧ actual = .bool)
+      | _ => false)
+    (runTampered resultMismatch)
 
 private def letBinderNamed
     (specialized : SourceSpecialization.SpecializedFunction) (name : String) :
@@ -1495,6 +1579,7 @@ private def testAll : IO Unit := do
   testNominalInputValidation program
   testTamperedExecutableMetadata program
   testIndirectArgumentCountMetadata program
+  testIndirectEndpointMetadata program
   testAssignmentRootsAreDeferred program
   testRuntimeCoercions program
   IO.println "phase-7 typed-source runtime GREEN"
