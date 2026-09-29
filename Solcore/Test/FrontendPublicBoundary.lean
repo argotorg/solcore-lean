@@ -1120,6 +1120,12 @@ example :=
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceForest
 example := @Solcore.Frontend.SourceInference.Detail.validateSourceGraph
 example :=
+  @Solcore.Frontend.SourceInference.Detail.validateExpressionNodeTypeFormation
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceExpressionTypeFormationFrom
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceExpressionTypeFormation
+example :=
   @Solcore.Frontend.SourceInference.Detail.substitutionRangeAvoidsVariablesOn
 example :=
   @Solcore.Frontend.SourceInference.Detail.localBinderInstantiationNoCapture
@@ -1178,6 +1184,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.validateSourceGraph_success_allNodesReached
 example :=
+  @Solcore.Frontend.SourceInference.Detail.validateExpressionNodeTypeFormation_success
+example :=
+  @Solcore.Frontend.SourceInference.Detail.validateSourceExpressionTypeFormation_success
+example :=
   @Solcore.Frontend.SourceInference.Detail.LocalBinderInstantiationNoCapture
 example :=
   @Solcore.Frontend.SourceInference.Detail.substitutionRangeAvoidsVariablesOn_eq_true_iff
@@ -1221,6 +1231,10 @@ example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_validateNumericOriginsBelowNext
 example :=
   @Solcore.Frontend.SourceInference.Detail.finalize_numericOriginsBelowNext
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_validateSourceExpressionTypeFormation
+example :=
+  @Solcore.Frontend.SourceInference.Detail.finalize_expressionTypeFormationValidated
 example :=
   @Solcore.Frontend.SourceInference.Detail.FinalizeSuccessWitness
 example :=

@@ -812,6 +812,78 @@ theorem validateSourceGraph_success_allNodesReached
   validateSourceForest_success_allNodesReached
     (validateSourceGraph_success_witness success).forest
 
+/-- The executable check for one expression node produces its open structural
+formation witness. -/
+theorem validateExpressionNodeTypeFormation_success
+    {context : Context} {node : ExpressionNode}
+    (success : validateExpressionNodeTypeFormation context node = .ok ()) :
+    InferenceTypeFormationValidated context.signatures
+      context.scope.genericOwner context.typeParameters node.type.freeVariables
+      node.type := by
+  unfold validateExpressionNodeTypeFormation at success
+  cases validation : validateInferenceTypeFormation context.signatures
+      context.scope.genericOwner context.typeParameters node.type.freeVariables
+      node.type with
+  | error error => simp [validation] at success
+  | ok value =>
+      cases value
+      exact validateInferenceTypeFormation_success validation
+
+/-- Successful suffix validation covers every expression node retained by
+that suffix of the heterogeneous source table. -/
+private theorem validateSourceExpressionTypeFormationFrom_success
+    {context : Context} {nodes : List Node}
+    (success : validateSourceExpressionTypeFormationFrom context nodes =
+      .ok ()) :
+    ∀ node, Node.expression node ∈ nodes →
+      InferenceTypeFormationValidated context.signatures
+        context.scope.genericOwner context.typeParameters
+        node.type.freeVariables node.type := by
+  induction nodes with
+  | nil =>
+      intro node member
+      simp at member
+  | cons head tail induction =>
+      cases head with
+      | expression headNode =>
+          simp only [validateSourceExpressionTypeFormationFrom, bind,
+            Except.bind] at success
+          cases headResult :
+              validateExpressionNodeTypeFormation context headNode with
+          | error error => simp [headResult] at success
+          | ok value =>
+              cases value
+              have tailSuccess :
+                  validateSourceExpressionTypeFormationFrom context tail =
+                    .ok () := by
+                simpa [headResult] using success
+              intro node member
+              rcases List.mem_cons.mp member with headEq | tailMember
+              · cases headEq
+                exact validateExpressionNodeTypeFormation_success headResult
+              · exact induction tailSuccess node tailMember
+      | statement headNode =>
+          have tailSuccess :
+              validateSourceExpressionTypeFormationFrom context tail =
+                .ok () := by
+            simpa [validateSourceExpressionTypeFormationFrom] using success
+          intro node member
+          rcases List.mem_cons.mp member with headEq | tailMember
+          · cases headEq
+          · exact induction tailSuccess node tailMember
+
+/-- Successful source validation certifies the retained type of every
+expression-table member. -/
+theorem validateSourceExpressionTypeFormation_success
+    {context : Context} {source : TypedSource}
+    (success : validateSourceExpressionTypeFormation context source = .ok ())
+    {node : ExpressionNode}
+    (member : Node.expression node ∈ source.nodes) :
+    InferenceTypeFormationValidated context.signatures
+      context.scope.genericOwner context.typeParameters node.type.freeVariables
+      node.type := by
+  exact validateSourceExpressionTypeFormationFrom_success success node member
+
 /-- The proof-facing binder-local form of the executable capture check.  It
 contains exactly the freshness and relevance-restricted range facts consumed
 by canonical local-scheme instantiation; formation, admissibility, and
@@ -1778,6 +1850,44 @@ theorem finalize_numericOriginsBelowNext
   validateNumericOriginsBelowNext_success
     (finalize_validateNumericOriginsBelowNext success)
 
+/-- Finalization succeeds only after every pre-substitution expression type
+passes the declaration-scoped structural formation check. -/
+theorem finalize_validateSourceExpressionTypeFormation
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result) :
+    validateSourceExpressionTypeFormation context
+      (state.toTypedSource roots) = .ok () := by
+  have numericValidation := finalize_validateNumericOriginsBelowNext success
+  unfold finalize at success
+  simp only [numericValidation] at success
+  cases graphResult : validateSourceGraph (state.toTypedSource roots) with
+  | error error =>
+      simp [graphResult, bind, Except.bind] at success
+  | ok graphValue =>
+      cases graphValue
+      cases validation : validateSourceExpressionTypeFormation context
+          (state.toTypedSource roots) with
+      | error error =>
+          simp [graphResult, validation, bind, Except.bind] at success
+      | ok value =>
+          cases value
+          rfl
+
+/-- Every expression retained by the input source of a successful finalizer
+has a structurally formed open inference type. -/
+theorem finalize_expressionTypeFormationValidated
+    {context : Context} {type : Ty} {state : State}
+    {roots : List NodeId} {result : Result}
+    (success : finalize context type state roots = .ok result)
+    {node : ExpressionNode}
+    (member : Node.expression node ∈ (state.toTypedSource roots).nodes) :
+    InferenceTypeFormationValidated context.signatures
+      context.scope.genericOwner context.typeParameters node.type.freeVariables
+      node.type := by
+  exact validateSourceExpressionTypeFormation_success
+    (finalize_validateSourceExpressionTypeFormation success) member
+
 /-- The complete successful execution trace of `finalize`.
 
 Keeping the intermediate states and their exact equations together gives
@@ -1835,6 +1945,8 @@ def finalize_success_witness
     FinalizeSuccessWitness context type state roots result := by
   have numericOriginsValidation :=
     finalize_validateNumericOriginsBelowNext success
+  have expressionTypeFormationValidation :=
+    finalize_validateSourceExpressionTypeFormation success
   unfold finalize at success
   simp only [numericOriginsValidation] at success
   have graphValidation :
@@ -1845,6 +1957,7 @@ def finalize_success_witness
     | ok graphValue =>
         cases graphValue
         simp at graphResult ⊢
+  simp only [expressionTypeFormationValidation] at success
   have localIdentityValidation :
       validateSourceLocalIdentities (state.toTypedSource roots) = .ok () := by
     cases localResult :
@@ -2112,6 +2225,7 @@ private theorem finalize_success_witness_rangeFormationValidation
   unfold finalize at pipeline
   simp only [numericValidation, bind, Except.bind] at pipeline
   simp only [witness.graphValidation] at pipeline
+  simp only [finalize_validateSourceExpressionTypeFormation success] at pipeline
   simp only [witness.localIdentityValidation] at pipeline
   simp only [witness.templateTrackingValidation] at pipeline
   simp only [witness.ledgerValidation] at pipeline
@@ -2215,6 +2329,7 @@ theorem finalize_validateSourceLocalSchemeNoCapture
     unfold finalize at pipeline
     simp only [numericValidation, bind, Except.bind] at pipeline
     simp only [witness.graphValidation] at pipeline
+    simp only [finalize_validateSourceExpressionTypeFormation success] at pipeline
     simp only [witness.localIdentityValidation] at pipeline
     simp only [witness.templateTrackingValidation] at pipeline
     simp only [witness.ledgerValidation] at pipeline

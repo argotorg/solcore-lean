@@ -252,6 +252,34 @@ def validateSourceGraph (source : TypedSource) : Except Error Unit := do
   validateSourceChildren source
   validateSourceForest source
 
+/-- Validate one retained expression result type in the declaration's rigid,
+nominal, and residual-flexible formation scope. -/
+def validateExpressionNodeTypeFormation (context : Context)
+    (node : ExpressionNode) : Except Error Unit :=
+  match validateInferenceTypeFormation context.signatures
+      context.scope.genericOwner context.typeParameters
+      node.type.freeVariables node.type with
+  | .ok () => .ok ()
+  | .error error => .error (.typeFormation error)
+
+/-- Validate expression result types in one suffix of a heterogeneous source
+node table.  Statement nodes carry inferred control-flow summaries rather
+than expression result types and are intentionally skipped here. -/
+def validateSourceExpressionTypeFormationFrom (context : Context) :
+    List Node → Except Error Unit
+  | [] => .ok ()
+  | .expression node :: rest => do
+      validateExpressionNodeTypeFormation context node
+      validateSourceExpressionTypeFormationFrom context rest
+  | .statement _ :: rest =>
+      validateSourceExpressionTypeFormationFrom context rest
+
+/-- Validate the structural formation of every expression type retained by a
+typed source before the final inference substitution is applied. -/
+def validateSourceExpressionTypeFormation (context : Context)
+    (source : TypedSource) : Except Error Unit :=
+  validateSourceExpressionTypeFormationFrom context source.nodes
+
 /-- Executable first-match range check used to protect one generalized local
 scheme from capture by the final inference substitution.  Only substitution
 entries selected by variables occurring in `type` are relevant. -/
@@ -436,6 +464,7 @@ def finalize (context : Context) (type : Ty) (state : State)
     Except Error Result := do
   validateNumericOriginsBelowNext state
   validateSourceGraph (state.toTypedSource roots)
+  validateSourceExpressionTypeFormation context (state.toTypedSource roots)
   validateSourceLocalIdentities (state.toTypedSource roots)
   validateSourceTemplateTracking (state.toTypedSource roots) state
   validateIntegerLiteralLedger state
