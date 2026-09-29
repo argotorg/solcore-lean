@@ -13476,6 +13476,49 @@ theorem inferStatementFuel_success_sound_of_callbacks_at
       callbacks.statements bodyInvariant bodySuccess)
     casesSuccess
 
+/-- Successful single-statement inference grows the typed-source node table by
+an exact append-only extension.  The occurrence bound on the input protects
+its entire node table from the payload refinements permitted for freshly
+allocated expression nodes. -/
+theorem inferStatementFuel_success_typingSourceExtends
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.StatementResult}
+    (success : Detail.inferStatementFuel fuel inferenceContext statement
+      expectedReturn initial = .ok result)
+    (below : initial.NodesBelowNextOccurrence)
+    (roots : List NodeId := []) :
+    TypingSourceExtends (initial.toTypedSource roots)
+      (result.state.toTypedSource roots) := by
+  constructor
+  · exact Detail.inferStatementFuel_preserves_owner success
+  · exact Detail.inferStatementFuel_preserves_nodesPrefix success
+      (nodesPrefix := List.prefix_rfl)
+      (baseBelow := below)
+      (cutoffLe := Nat.le_refl _)
+
+/-- Successful statement-list inference grows the typed-source node table by
+an exact append-only extension. -/
+theorem inferStatementsFuel_success_typingSourceExtends
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.BlockResult}
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn initial = .ok result)
+    (below : initial.NodesBelowNextOccurrence)
+    (roots : List NodeId := []) :
+    TypingSourceExtends (initial.toTypedSource roots)
+      (result.state.toTypedSource roots) := by
+  constructor
+  · exact Detail.inferStatementsFuel_preserves_owner success
+  · exact Detail.inferStatementsFuel_preserves_nodesPrefix success
+      (nodesPrefix := List.prefix_rfl)
+      (baseBelow := below)
+      (cutoffLe := Nat.le_refl _)
+
 /-- Statement-list inference is a generic sequencing layer over soundness for
 one statement.  The caller chooses the relation connecting executable states
 to lexical semantic contexts and supplies one-statement soundness in the final
@@ -13553,6 +13596,239 @@ theorem inferStatementsFuel_success_statementsHaveType
                 exact .cons headTyping
                   (by simpa [tailStatementsEq] using tailTyping)
               subst result
+              exact ⟨finalContext, .cons headFacts tailFacts, finalInvariant,
+                sequenceTyping,
+                BlockResultMatchesFactsAfterSubstitution.cons headMatches
+                  tailMatches⟩
+
+/-- Statement-list sequencing from one-statement soundness proved in each
+statement's own local typed source.  The occurrence-allocation bound protects
+the completed head source while the tail is inferred, allowing head typing to
+be weakened into the final source before the declarative sequence is built. -/
+theorem inferStatementsFuel_success_statementsHaveType_from_local
+    (invariant : Frontend.SourceInference.State →
+      SourceSemantics.Context → Prop)
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    {control : ControlContext}
+    {substitution : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (roots : List NodeId := [])
+    (initialInvariant : invariant state semanticContext)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (statementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {statement : Syntax.Statement} {head : Detail.StatementResult},
+        invariant input inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext statement
+          expectedReturn input = .ok head →
+        ∃ outputContext facts,
+          invariant head.state outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution substitution)
+            control inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution substitution head facts)
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn state = .ok result) :
+    ∃ finalContext facts,
+      invariant result.state finalContext ∧
+      StatementsHaveType
+        ((result.state.toTypedSource roots).applySubstitution substitution)
+        control semanticContext result.statements finalContext facts ∧
+      BlockResultMatchesFactsAfterSubstitution substitution result facts := by
+  induction fuel generalizing statements state semanticContext result with
+  | zero =>
+      simp [Detail.inferStatementsFuel] at success
+  | succ fuel induction =>
+      cases statements with
+      | nil =>
+          have resultEq := inferStatementsFuel_success_nil_facts success
+          subst result
+          exact ⟨semanticContext, .empty, initialInvariant,
+            .nil control semanticContext,
+            BlockResultMatchesFactsAfterSubstitution.empty substitution state⟩
+      | cons statement rest =>
+          cases rest with
+          | nil =>
+              obtain ⟨head, headSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_singleton_facts success
+              obtain ⟨finalContext, headFacts, finalInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound initialInvariant headSuccess
+              subst result
+              exact ⟨finalContext, .singleton headFacts, finalInvariant,
+                .singleton headTyping,
+                BlockResultMatchesFactsAfterSubstitution.singleton headMatches⟩
+          | cons next rest =>
+              obtain ⟨head, tail, headSuccess, tailSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_cons_facts success
+              obtain ⟨middleContext, headFacts, middleInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound initialInvariant headSuccess
+              have headBelow : head.state.NodesBelowNextOccurrence :=
+                (Detail.inferStatementFuel_occurrenceBoundExtends headSuccess
+                  ).nodesBelowNextOccurrence initialBelow
+              obtain ⟨finalContext, tailFacts, finalInvariant, tailTyping,
+                  tailMatches⟩ :=
+                induction middleInvariant headBelow tailSuccess
+              have sourceExtension : TypingSourceExtends
+                  ((head.state.toTypedSource roots).applySubstitution
+                    substitution)
+                  ((tail.state.toTypedSource roots).applySubstitution
+                    substitution) :=
+                (inferStatementsFuel_success_typingSourceExtends tailSuccess
+                  headBelow roots).applySubstitution substitution
+              have headTypingFinal :=
+                StatementHasType.weakenSource sourceExtension headTyping
+              obtain ⟨tailHead, tailRest, tailStatementsEq⟩ :=
+                inferStatementsFuel_success_statements_eq_cons tailSuccess
+              have sequenceTyping : StatementsHaveType
+                  ((tail.state.toTypedSource roots).applySubstitution
+                    substitution)
+                  control semanticContext (head.id :: tail.statements)
+                  finalContext (.cons headFacts tailFacts) := by
+                rw [tailStatementsEq]
+                exact .cons headTypingFinal
+                  (by simpa [tailStatementsEq] using tailTyping)
+              subst result
+              exact ⟨finalContext, .cons headFacts tailFacts, finalInvariant,
+                sequenceTyping,
+                BlockResultMatchesFactsAfterSubstitution.cons headMatches
+                  tailMatches⟩
+
+/-- Statement-list sequencing beneath one fixed ambient typed source and one
+final evidence state.  The complete block result is assumed to embed in that
+ambient source and its ledgers in the evidence state.  The sequencing proof
+restricts those facts to each completed head statement, lets the caller prove
+the head in its own local source, and then weakens that typing back to the
+common ambient source before composing the declarative list. -/
+theorem inferStatementsFuel_success_statementsHaveType_under_ambient
+    (invariant : Frontend.SourceInference.State →
+      SourceSemantics.Context → Prop)
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    {evidenceState : Frontend.SourceInference.State}
+    {ambientSource : TypedSource} {control : ControlContext}
+    {substitution : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (roots : List NodeId := [])
+    (initialInvariant : invariant state semanticContext)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution substitution)
+      ambientSource)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (statementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {statement : Syntax.Statement} {head : Detail.StatementResult},
+        invariant input inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext statement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution substitution)
+          ambientSource →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        ∃ outputContext facts,
+          invariant head.state outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution substitution)
+            control inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution substitution head facts)
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn state = .ok result) :
+    ∃ finalContext facts,
+      invariant result.state finalContext ∧
+      StatementsHaveType ambientSource control semanticContext
+        result.statements finalContext facts ∧
+      BlockResultMatchesFactsAfterSubstitution substitution result facts := by
+  induction fuel generalizing statements state semanticContext result with
+  | zero =>
+      simp [Detail.inferStatementsFuel] at success
+  | succ fuel induction =>
+      cases statements with
+      | nil =>
+          have resultEq := inferStatementsFuel_success_nil_facts success
+          subst result
+          exact ⟨semanticContext, .empty, initialInvariant,
+            .nil control semanticContext,
+            BlockResultMatchesFactsAfterSubstitution.empty substitution state⟩
+      | cons statement rest =>
+          cases rest with
+          | nil =>
+              obtain ⟨head, headSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_singleton_facts success
+              subst result
+              obtain ⟨finalContext, headFacts, finalInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound initialInvariant headSuccess resultExtension
+                  integerPatternsSubset requirementsSubset
+              have headTypingAmbient :=
+                StatementHasType.weakenSource resultExtension headTyping
+              exact ⟨finalContext, .singleton headFacts, finalInvariant,
+                .singleton headTypingAmbient,
+                BlockResultMatchesFactsAfterSubstitution.singleton headMatches⟩
+          | cons next rest =>
+              obtain ⟨head, tail, headSuccess, tailSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_cons_facts success
+              subst result
+              have headBelow : head.state.NodesBelowNextOccurrence :=
+                (Detail.inferStatementFuel_occurrenceBoundExtends headSuccess
+                  ).nodesBelowNextOccurrence initialBelow
+              have headToTail : TypingSourceExtends
+                  ((head.state.toTypedSource roots).applySubstitution
+                    substitution)
+                  ((tail.state.toTypedSource roots).applySubstitution
+                    substitution) :=
+                (inferStatementsFuel_success_typingSourceExtends tailSuccess
+                  headBelow roots).applySubstitution substitution
+              have headExtension : TypingSourceExtends
+                  ((head.state.toTypedSource roots).applySubstitution
+                    substitution)
+                  ambientSource :=
+                TypingSourceExtends.trans headToTail resultExtension
+              have headIntegerPatternsSubset :
+                  head.state.integerPatterns ⊆
+                    evidenceState.integerPatterns :=
+                List.Subset.trans
+                  (Detail.inferStatementsFuel_integerPatterns_subset
+                    tailSuccess)
+                  integerPatternsSubset
+              have headRequirementsSubset :
+                  head.state.requirements ⊆ evidenceState.requirements :=
+                List.Subset.trans
+                  (Detail.inferStatementsFuel_requirements_subset tailSuccess)
+                  requirementsSubset
+              obtain ⟨middleContext, headFacts, middleInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound initialInvariant headSuccess headExtension
+                  headIntegerPatternsSubset headRequirementsSubset
+              obtain ⟨finalContext, tailFacts, finalInvariant, tailTyping,
+                  tailMatches⟩ :=
+                induction (statements := next :: rest)
+                  (state := head.state) (result := tail)
+                  (semanticContext := middleContext)
+                  middleInvariant headBelow resultExtension
+                  integerPatternsSubset requirementsSubset tailSuccess
+              have headTypingAmbient :=
+                StatementHasType.weakenSource headExtension headTyping
+              obtain ⟨tailHead, tailRest, tailStatementsEq⟩ :=
+                inferStatementsFuel_success_statements_eq_cons tailSuccess
+              have sequenceTyping : StatementsHaveType ambientSource control
+                  semanticContext (head.id :: tail.statements) finalContext
+                  (.cons headFacts tailFacts) := by
+                rw [tailStatementsEq]
+                exact .cons headTypingAmbient
+                  (by simpa [tailStatementsEq] using tailTyping)
               exact ⟨finalContext, .cons headFacts tailFacts, finalInvariant,
                 sequenceTyping,
                 BlockResultMatchesFactsAfterSubstitution.cons headMatches

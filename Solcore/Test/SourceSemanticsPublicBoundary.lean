@@ -489,7 +489,15 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchScrutineesFuel_preserves_localBindersBelowNextLocal
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_typingSourceExtends
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_typingSourceExtends
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_statementsHaveType
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_statementsHaveType_from_local
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementsFuel_success_statementsHaveType_under_ambient
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_localIdentifier_containsExpression
 example :=
