@@ -1390,7 +1390,7 @@ theorem withExpected_success_cases
 under every substitution which semantically extends the returned inference
 substitution.  This direct inversion covers both ordinary unification and a
 committed coercion plan. -/
-private theorem withExpected_some_apply_eq
+theorem withExpected_some_apply_eq
     {context : Context} {state : State} {actual : InferredExpression}
     {expected : Ty} {result : ExpectationResult} {outer : Substitution}
     (success : withExpected context state actual (some expected) = .ok result)

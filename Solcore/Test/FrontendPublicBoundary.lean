@@ -562,6 +562,8 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.selectFunctionCandidateFrom_inferenceProperties
 example :=
+  @Solcore.Frontend.SourceInference.Detail.withExpected_some_apply_eq
+example :=
   @Solcore.Frontend.SourceInference.Detail.applyFunctionType_success_facts
 example :=
   @Solcore.Frontend.SourceInference.Detail.applyFunctionType_inferenceProperties
