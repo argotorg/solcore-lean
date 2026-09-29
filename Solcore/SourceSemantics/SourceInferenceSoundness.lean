@@ -16574,6 +16574,159 @@ theorem withExpected_success_coercionPathValid_afterFinalization_scoped
       signaturesEq traitName solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered occurs
 
+/-- The common soundness envelope for an ordinary expression-recording step.
+
+A shape-specific proof supplies only raw-form typing and admissibility.  This
+theorem transports the exact recorded node into the eventual source, validates
+both its owned requirements and fitted output-coercion requirements at that
+occurrence, and normalizes the raw endpoint with the final inference
+substitution.  The occurrence-scoped ledger keeps the result applicable inside
+generalized local initializers. -/
+theorem recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
+    {inferenceContext : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {id : ExpressionId}
+    {rawType : TypeSystem.Ty} {form : ExpressionForm}
+    {owned : List RequirementId} {expected : Option TypeSystem.Ty}
+    {state later : Frontend.SourceInference.State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (success : Detail.recordExpressionWithExpected inferenceContext source id
+      rawType form owned expected state localSchemeInstantiationStart =
+        .ok result)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (sourceExtension : TypingSourceExtends
+      ((result.2.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (formType : ExpressionFormHasRawType ledgerSource active
+      (form.applySubstitution later.inference.substitution)
+      (later.inference.substitution.apply rawType) (.ordinary owned))
+    (rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply rawType))
+    (finalAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply result.1.type))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered ledgerSource active
+      (.expression result.1.id)) :
+    ExpressionHasType ledgerSource active result.1.id
+      (later.inference.substitution.apply result.1.type) := by
+  obtain ⟨fitted, fittedSuccess, resultExpressionEq, resultStateEq⟩ :=
+    Detail.recordExpressionWithExpected_success_record success
+  have recordedContains : ContainsExpression
+      (result.2.toTypedSource roots) result.1.id {
+        id := result.1.id
+        span := source.span
+        type := result.1.type
+        form
+        requirements := owned ++
+          Detail.coercionRequirements fitted.coercions
+        coercions := fitted.coercions
+        localSchemeInstantiationStart
+      } := by
+    rw [resultExpressionEq, resultStateEq]
+    exact recordNode_containsExpression fitted.state _ roots
+  have finalContains : ContainsExpression ledgerSource result.1.id
+      (({
+        id := result.1.id
+        span := source.span
+        type := result.1.type
+        form
+        requirements := owned ++
+          Detail.coercionRequirements fitted.coercions
+        coercions := fitted.coercions
+        localSchemeInstantiationStart
+      } : ExpressionNode).applySubstitution
+        later.inference.substitution) :=
+    sourceExtension.containsExpression
+      (FlexibleSubstitution.ContainsExpression.applySubstitution
+        later.inference.substitution recordedContains)
+  have fittedRequirementsSubset :
+      fitted.state.requirements ⊆ later.requirements := by
+    intro requirement member
+    apply requirementsSubset
+    rw [resultStateEq]
+    exact member
+  have fittedSubstitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        fitted.state.inference.substitution := by
+    simpa [resultStateEq, Frontend.SourceInference.State.recordNode] using
+      substitutionExtends
+  have occursOwned : ∀ requirement, requirement ∈ owned →
+      PrimaryRequirementOccursAt ledgerSource
+        (.expression result.1.id) requirement := by
+    intro requirement member
+    apply finalContains.primaryRequirementOccursAt
+    simp [ExpressionNode.applySubstitution, member]
+  have occursCoercion : ∀ requirement,
+      requirement ∈ coercionRequirementIds fitted.coercions →
+        PrimaryRequirementOccursAt ledgerSource
+          (.expression result.1.id) requirement := by
+    intro requirement member
+    apply finalContains.primaryRequirementOccursAt
+    change requirement ∈
+      owned ++ Detail.coercionRequirements fitted.coercions
+    apply List.mem_append_right owned
+    simpa [Detail.coercionRequirements, coercionRequirementIds] using member
+  have ownedValid : RequirementIdsValid active owned :=
+    ledger.requirementIdsValidAt ownership activeSignaturesEq
+      activeRequirementsEq assumptionsMono covered occursOwned
+  have path :=
+    withExpected_success_coercionPathValid_afterFinalization_scoped
+      fittedSuccess traitSuccess profileSuccess fittedRequirementsSubset
+      catalog contextValid signaturesEq traitName solveSuccess solvedEq ledger
+      ownership activeSignaturesEq activeRequirementsEq assumptionsMono covered
+      occursCoercion
+  have rawEndpointEq :
+      later.inference.substitution.apply (fitted.state.resolve rawType) =
+        later.inference.substitution.apply rawType :=
+    TypeSystem.InferState.apply_resolve_eq_apply fittedSubstitutionExtends
+      rawType
+  apply ExpressionHasType.ofOrdinary finalContains formType rawAdmissible
+    finalAdmissible ownedValid
+  · change CoercionPathValid active
+      (later.inference.substitution.apply rawType)
+      (later.inference.substitution.apply result.1.type)
+      (fitted.coercions.map
+        (CoercionStep.applySubstitution later.inference.substitution))
+    rw [resultExpressionEq, ← rawEndpointEq]
+    exact path
+  · change owned ++ Detail.coercionRequirements fitted.coercions =
+      owned ++ coercionRequirementIds
+        (fitted.coercions.map
+          (CoercionStep.applySubstitution later.inference.substitution))
+    rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
+    rfl
+
 /-- Every solved row classified as a qualified-local template by the input
 state retains the canonical assumption evidence for its normalized
 predicate. -/
