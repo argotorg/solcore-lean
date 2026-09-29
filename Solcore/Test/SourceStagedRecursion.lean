@@ -7,7 +7,8 @@ These tests exercise both the dedicated staged-integer evaluator and the
 general Core-representable staged-value evaluator through the public program
 preparation boundary.  Successful cases must close to constants and preserve
 the caller's store; divergent staged calls and ordinary runtime recursion keep
-distinct errors.
+distinct errors. Runtime recursion is exercised through the public compiler's
+typed-source fallback rather than the direct-Core preparation boundary.
 -/
 
 set_option autoImplicit false
@@ -261,20 +262,32 @@ private def runtimeRecursionSource : String := String.intercalate "\n" [
 
 private def testRuntimeRecursionUsesExecutionFuel : IO Unit := do
   let moduleId ← mainModule
-  match prepare (workspace runtimeRecursionSource)
-      (Seed.named moduleId "loop") (limits 1 64) with
-  | .ok prepared =>
-      match prepared.run? [.word (word 1)] 8 preservedStore with
-      | some (.outOfFuel state) =>
-          assertTrue (decide (state.store = preservedStore))
-            "runtime recursion lost the caller store at fuel exhaustion"
+  let compileOptions : SourceCompiler.CheckingOptions := {
+    checkingFuel := 4096
+    specializationBudget := 1
+    stagingFuel := 64
+  }
+  match SourceCompiler.compile (workspace runtimeRecursionSource)
+      (SourceCompiler.Seed.named moduleId "loop") compileOptions with
+  | .ok compiled =>
+      assertTrue (decide (compiled.backend = .typedSource ∧
+          compiled.specializationCount = 1))
+        "runtime recursion did not select one typed-source specialization"
+      let runOptions : SourceCompiler.RunOptions := {
+        inputValidationFuel := 64
+        executionFuel := 8
+      }
+      match compiled.runTyped [.word (word 1)] runOptions with
+      | .ok (.typedSource (.outOfFuel state)) =>
+          assertTrue (!state.heap.isEmpty)
+            "runtime recursion did not retain its allocated parameter cells"
       | result => throw (IO.userError
           s!"runtime recursion did not use execution fuel: {reprStr result}")
   | .error error => throw (IO.userError
-      s!"runtime recursion was not linked: {reprStr error}")
+      s!"runtime recursion was not compiled: {reprStr error}")
 
-/-- Exercise staged and runtime recursion through their independent public
-fuel boundaries. -/
+/-- Exercise staged and typed-source runtime recursion through their
+independent public fuel boundaries. -/
 def testSourceStagedRecursion : IO Unit := do
   testIntegerRecursion
   testGeneralWordAndBoolRecursion

@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceRuntimeLinking
+import Solcore.Frontend.SourceCoreDirectLinking
 
 /-!
 The first public raw-source execution pipeline.
@@ -9,12 +9,10 @@ arguments in declaration order.  The workspace entry source is never searched
 for a conventional function name.
 
 The pipeline deliberately composes the existing checked boundaries: whole-
-program checking, finite specialization discovery, evidence-aware finite
-linking, and the linked entry's runtime type guard.  When finite inlining meets
-a runtime cycle, lexical lambda, or indirect application, an additive checked
-runtime table retains those calls instead.  Each failure retains the stage
-that produced it.  Completion, fuel exhaustion, and runtime faults remain
-ordinary runtime results rather than pipeline errors.
+program checking, finite specialization discovery, evidence-aware direct-Core
+linking, and the linked entry's runtime type guard.  Each failure retains the
+stage that produced it.  Completion, fuel exhaustion, and runtime faults
+remain ordinary runtime results rather than pipeline errors.
 -/
 
 set_option autoImplicit false
@@ -109,20 +107,7 @@ def key (prepared : PreparedEntry) : SourceSpecialization.SpecializationKey :=
 def inputTypes (prepared : PreparedEntry) : List Core.Ty :=
   prepared.entry.elaborated.inputs.values
 
-/-- Whether execution uses the finite named-function table instead of the
-acyclic Core body retained in the compatibility inspection view. -/
-def usesRuntimeCallGraph (prepared : PreparedEntry) : Bool :=
-  prepared.entry.runtime.isSome
-
-/-- Execute without conflating a runtime-call-graph continuation or fault with
-a Core machine state. -/
-def runExact? (prepared : PreparedEntry) (inputs : List Core.Value)
-    (fuel : Nat) (store : Core.Store := []) :
-    Option SourceCoreDirectLinking.ExecutionResult :=
-  prepared.entry.runExact? inputs fuel store
-
-/-- Compatibility projection to the historical Core-only result carrier.
-Prefer `runExact?` for runtime-call-graph entries. -/
+/-- Execute only when the supplied runtime values have the checked input types. -/
 def run? (prepared : PreparedEntry) (inputs : List Core.Value)
     (fuel : Nat) (store : Core.Store := []) :
     Option Core.StatefulRunResult :=
@@ -199,20 +184,8 @@ def prepare (raw : Workspace.RawWorkspace) (seed : Seed)
     | .budgetExhausted _ next pending =>
         throw (.specializationBudgetExhausted next pending.length)
   let complete : SourceSpecializationWorklist.Outcome := .complete plan
-  let linked ← match SourceCoreDirectLinking.linkWithStagingFuel program
-      complete limits.stagingFuel with
-    | .ok linked => pure linked
-    | .error directError =>
-        -- The established linker remains authoritative whenever it succeeds.
-        -- The graph linker is an additive fallback; if its deliberately
-        -- narrower structural profile also rejects, preserve the original
-        -- evidence-aware diagnostic.
-        match SourceRuntimeLinking.link program complete with
-        | .ok runtime =>
-            match runtime.toCoreLinkedProgram with
-            | .ok linked => pure linked
-            | .error _ => throw (.linking directError)
-        | .error _ => throw (.linking directError)
+  let linked ← (SourceCoreDirectLinking.linkWithStagingFuel program
+    complete limits.stagingFuel).mapError Error.linking
   match linked.entries with
   | [entry] => pure { entry }
   | entries => throw (.linkedEntryCountMismatch entries.length)
@@ -225,18 +198,6 @@ def run (raw : Workspace.RawWorkspace) (seed : Seed)
     (store : Core.Store := []) : Except Error Core.StatefulRunResult := do
   let prepared ← prepare raw seed limits
   match prepared.run? inputs limits.executionFuel store with
-  | some result => pure result
-  | none => throw (.inputTypesMismatch prepared.inputTypes
-      (inputs.map Core.Value.type))
-
-/-- Execute one explicit source root while retaining the selected backend's
-exact result carrier. -/
-def runExact (raw : Workspace.RawWorkspace) (seed : Seed)
-    (inputs : List Core.Value) (limits : Limits := {})
-    (store : Core.Store := []) :
-    Except Error SourceCoreDirectLinking.ExecutionResult := do
-  let prepared ← prepare raw seed limits
-  match prepared.runExact? inputs limits.executionFuel store with
   | some result => pure result
   | none => throw (.inputTypesMismatch prepared.inputTypes
       (inputs.map Core.Value.type))
@@ -261,31 +222,18 @@ namespace Solcore.Frontend.SourceProgramExecution
     prepared.inputTypes = prepared.entry.elaborated.inputs.values := by
   rfl
 
-@[simp] theorem PreparedEntry.usesRuntimeCallGraph_eq_entry
-    (prepared : PreparedEntry) :
-    prepared.usesRuntimeCallGraph = prepared.entry.runtime.isSome := by
-  rfl
-
 @[simp] theorem PreparedEntry.run?_eq_entry (prepared : PreparedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store) :
     prepared.run? inputs fuel store = prepared.entry.run? inputs fuel store := by
   rfl
 
-@[simp] theorem PreparedEntry.runExact?_eq_entry (prepared : PreparedEntry)
-    (inputs : List Core.Value) (fuel : Nat) (store : Core.Store) :
-    prepared.runExact? inputs fuel store =
-      prepared.entry.runExact? inputs fuel store := by
-  rfl
-
 theorem PreparedEntry.run?_of_matching_types (prepared : PreparedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
-    (finite : prepared.entry.runtime = none)
     (typesEqual : inputs.map Core.Value.type = prepared.inputTypes) :
     prepared.run? inputs fuel store = some (Core.runStateful fuel
       (Core.State.initial prepared.entry.elaborated.core inputs store)) := by
-  simp [PreparedEntry.run?, SourceCoreDirectLinking.LinkedEntry.run?,
-    SourceCoreDirectLinking.LinkedEntry.runExact?,
-    PreparedEntry.inputTypes, finite, typesEqual]
+  simpa [PreparedEntry.run?, PreparedEntry.inputTypes] using
+    prepared.entry.run?_of_matching_types inputs fuel store typesEqual
 
 theorem PreparedEntry.run?_of_mismatched_types (prepared : PreparedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
@@ -293,8 +241,7 @@ theorem PreparedEntry.run?_of_mismatched_types (prepared : PreparedEntry)
     prepared.run? inputs fuel store = none := by
   change inputs.map Core.Value.type ≠
     prepared.entry.elaborated.inputs.values at mismatch
-  simp [PreparedEntry.run?, SourceCoreDirectLinking.LinkedEntry.run?,
-    SourceCoreDirectLinking.LinkedEntry.runExact?, mismatch]
+  exact prepared.entry.run?_of_mismatched_types inputs fuel store mismatch
 
 theorem run_of_prepared (raw : Workspace.RawWorkspace) (seed : Seed)
     (inputs : List Core.Value) (limits : Limits) (store : Core.Store)
@@ -313,14 +260,13 @@ theorem run_of_prepared_matching_types (raw : Workspace.RawWorkspace)
     (seed : Seed) (inputs : List Core.Value) (limits : Limits)
     (store : Core.Store) (prepared : PreparedEntry)
     (preparedOk : prepare raw seed limits = .ok prepared)
-    (finite : prepared.entry.runtime = none)
     (typesEqual : inputs.map Core.Value.type = prepared.inputTypes) :
     run raw seed inputs limits store = .ok (Core.runStateful
       limits.executionFuel
       (Core.State.initial prepared.entry.elaborated.core inputs store)) := by
   rw [run_of_prepared raw seed inputs limits store prepared preparedOk]
   rw [PreparedEntry.run?_of_matching_types prepared inputs
-    limits.executionFuel store finite typesEqual]
+    limits.executionFuel store typesEqual]
 
 theorem run_of_prepared_mismatched_types (raw : Workspace.RawWorkspace)
     (seed : Seed) (inputs : List Core.Value) (limits : Limits)
@@ -332,18 +278,5 @@ theorem run_of_prepared_mismatched_types (raw : Workspace.RawWorkspace)
   rw [run_of_prepared raw seed inputs limits store prepared preparedOk]
   rw [PreparedEntry.run?_of_mismatched_types prepared inputs
     limits.executionFuel store mismatch]
-
-theorem runExact_of_prepared (raw : Workspace.RawWorkspace) (seed : Seed)
-    (inputs : List Core.Value) (limits : Limits) (store : Core.Store)
-    (prepared : PreparedEntry)
-    (preparedOk : prepare raw seed limits = .ok prepared) :
-    runExact raw seed inputs limits store =
-      match prepared.runExact? inputs limits.executionFuel store with
-      | some result => .ok result
-      | none => .error (.inputTypesMismatch prepared.inputTypes
-          (inputs.map Core.Value.type)) := by
-  unfold runExact
-  rw [preparedOk]
-  rfl
 
 end Solcore.Frontend.SourceProgramExecution

@@ -214,11 +214,6 @@ private def expectCoreWord (label : String) (expected : Nat) :
   | .ok (.core (.done (.word actual) [])) =>
       assertTrue (actual == word expected) s!"{label} returned the wrong Word"
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
-private def expectGraphWord (label : String) (expected : Nat) :
-    Except RunError ExecutionResult → IO Unit
-  | .ok (.callGraph (.done (.word actual) [])) =>
-      assertTrue (actual == word expected) s!"{label} returned the wrong Word"
-  | result => throw (IO.userError s!"{label} returned {reprStr result}")
 private def expectTypedWord (label : String) (expected : Nat) :
     Except RunError ExecutionResult → IO Unit
   | .ok (.typedSource (.done (.word actual) _)) =>
@@ -249,15 +244,12 @@ private structure PreparedSet where
   checked : CheckedProgram
   direct : CompiledEntry
   recursive : CompiledEntry
-  recursiveGraph : CompiledEntry
   typed : CompiledEntry
 
 private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let checked ← checkedWorkspace
   let direct ← compileNamed checked "main.solc" "direct"
   let recursive ← compileNamed checked "main.solc" "recurse"
-  let recursiveGraph ← compileNamedWithBackend checked "main.solc" "recurse"
-    .callGraph
   let typed ← compileNamed checked "main.solc" "visibleAlias"
   let polymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
   let nestedPolymorphicLocal ←
@@ -273,7 +265,6 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   assertTrue (decide (
       direct.backend = .core ∧
       recursive.backend = .typedSource ∧
-      recursiveGraph.backend = .callGraph ∧
       typed.backend = .typedSource ∧
       polymorphicLocal.backend = .typedSource ∧
       nestedPolymorphicLocal.backend = .typedSource ∧
@@ -296,8 +287,7 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       typed.inputTypes = [.product .word .word] ∧ typed.resultType = .word))
     "backend-independent source signature metadata changed"
   assertTrue (direct.specializationCount == 1 &&
-      recursive.specializationCount == 1 &&
-      recursiveGraph.specializationCount == 1 && typed.specializationCount == 1)
+      recursive.specializationCount == 1 && typed.specializationCount == 1)
     "a single-function fixture retained an unexpected specialization plan"
   assertTrue (polymorphicLocal.specializationCount == 3)
     "local polymorphism did not retain its root and two generic helper instances"
@@ -376,8 +366,6 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       s!"direct Core execution changed its exact state: {reprStr result}")
   expectTypedWord "automatic recursive typed root" 31 <|
     recursive.runTyped [.word (word 3)] runtimeOptions
-  expectGraphWord "explicit recursive graph root" 31 <|
-    recursiveGraph.runCore [.word (word 3)] runtimeOptions
   expectTypedWord "imported alias typed root" 12 <|
     typed.runTyped [.product (.word (word 7)) (.word (word 8))] runtimeOptions
   match polymorphicLocal.runTyped [.bool true] runtimeOptions with
@@ -416,21 +404,17 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     typedCoercion.runTyped [.bool false] runtimeOptions
   expectTypedGlobal "public method-discovered function result" <|
     functionFromCoercion.runTyped [.word (word 1)] runtimeOptions
-  pure { checked, direct, recursive, recursiveGraph, typed }
+  pure { checked, direct, recursive, typed }
 
 /-- An explicit preference selects exactly the requested runtime, while all
-three executable backends agree on the same closed source computation. -/
+public backends agree on the same closed source computation. -/
 private def testExplicitBackendAgreement (checked : CheckedProgram) : IO Unit := do
   let core ← compileNamedWithBackend checked "main.solc" "direct" .core
-  let graph ← compileNamedWithBackend checked "main.solc" "direct" .callGraph
   let typed ← compileNamedWithBackend checked "main.solc" "direct" .typedSource
-  assertTrue (decide (core.backend = .core ∧
-      graph.backend = .callGraph ∧ typed.backend = .typedSource))
+  assertTrue (decide (core.backend = .core ∧ typed.backend = .typedSource))
     "an explicit backend preference selected a different runtime"
   expectCoreWord "explicit direct-Core agreement" 14 <|
     core.runCore [.word (word 7)] runtimeOptions
-  expectGraphWord "explicit call-graph agreement" 14 <|
-    graph.runCore [.word (word 7)] runtimeOptions
   expectTypedWord "explicit typed-source agreement" 14 <|
     typed.runTyped [.word (word 7)] runtimeOptions
 
@@ -655,10 +639,6 @@ private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
   | .error (.invocationKindMismatch .core .typedValues) => pure ()
   | result => throw (IO.userError
       s!"a typed invocation crossed the direct Core backend: {reprStr result}")
-  match prepared.recursiveGraph.runTyped [] runtimeOptions with
-  | .error (.invocationKindMismatch .callGraph .typedValues) => pure ()
-  | result => throw (IO.userError
-      s!"a typed invocation crossed the graph backend: {reprStr result}")
   match prepared.direct.runCore [.bool true] runtimeOptions with
   | .error (.coreInputTypesMismatch [.word] [.bool]) => pure ()
   | result => throw (IO.userError
@@ -711,7 +691,7 @@ private def testOneShotLimits : IO Unit := do
   | result => throw (IO.userError
       s!"one-shot compiler boundary returned {reprStr result}")
 
-private def testAllBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
+private def testBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
   let blocked ← moduleId "blocked.solc"
   let main ← moduleId "main.solc"
   let coreOptions := {
@@ -738,19 +718,9 @@ private def testAllBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
       | error => throw (IO.userError
           s!"typed rejection lost its evidence diagnostic: {reprStr error}")
   | .error error => throw (IO.userError
-      s!"all-backend rejection changed category: {reprStr error}")
+      s!"automatic backend rejection changed category: {reprStr error}")
   | .ok compiled => throw (IO.userError
       s!"an unsupported root selected {reprStr compiled.backend}")
-  let graphOptions := {
-    compilerOptions with backendPreference := .callGraph
-  }
-  match compileChecked checked (Seed.named blocked "blocked") graphOptions with
-  | .error (.backendRejected (.callGraph (.unsupportedType _))) => pure ()
-  | .error error => throw (IO.userError
-      s!"explicit graph rejection changed category: {reprStr error}")
-  | .ok compiled => throw (IO.userError
-      s!"an unsupported explicit graph root selected {reprStr compiled.backend}")
-
 private def typedRejection (checked : CheckedProgram) (name : String) :
     IO SourceTypedRuntime.RuntimeError := do
   let blocked ← moduleId "blocked.solc"
@@ -898,7 +868,7 @@ def testSourceCompiler : IO Unit := do
   testProgramOrchestration
   testTypedBoundary prepared
   testOneShotLimits
-  testAllBackendDiagnostics prepared.checked
+  testBackendDiagnostics prepared.checked
   testTypedCapabilityBoundary prepared.checked
   testPublicCompilationErrors prepared.checked
   testCheckingFailurePrecedence

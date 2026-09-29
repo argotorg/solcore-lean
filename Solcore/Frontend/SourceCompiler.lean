@@ -1,11 +1,8 @@
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.Frontend.SourceTypedRuntimeDeepSafety
-import Solcore.Frontend.SourceRuntimeLinking
-import Solcore.Frontend.SourceRuntimeDeepProperties
 import Solcore.Core.Safety
 import Solcore.Frontend.SourceCoreDirectLinking
-import Solcore.Frontend.SourceRuntimeEntryDeepProperties
 import Solcore.Frontend.ProgramInterfaces
 import Solcore.Abi.StaticWord
 
@@ -17,12 +14,11 @@ specialization plan.  The whole-program facade can also discover conventional
 `main` and exported Static Word ABI roots, or compile an ordered explicit root
 set after checking the workspace once.  Automatic selection prefers direct
 Core and otherwise uses the source-typed runtime.  Clients may instead request
-an exact backend; the structural runtime call graph remains available through
-that explicit preference for compatibility testing and comparison.  Resulting
-artifacts can be run repeatedly without repeating checking or specialization.
+an exact backend. Resulting artifacts can be run repeatedly without repeating
+checking or specialization.
 
 Core stores/values and source-typed heaps/values are intentionally separate
-invocation carriers.  This boundary does not guess a conversion between them.
+invocation carriers. This boundary does not guess a conversion between them.
 -/
 
 set_option autoImplicit false
@@ -37,17 +33,15 @@ abbrev Seed := SourceProgramExecution.Seed
 /-- The exact runtime selected for a compiled root. -/
 inductive Backend where
   | core
-  | callGraph
   | typedSource
   deriving Repr, BEq, DecidableEq
 
-/-- Backend policy for one compilation.  Automatic selection deliberately
-keeps the legacy Core path first but otherwise chooses the broader typed-source
-runtime.  The finite call graph is retained as an explicit comparison target. -/
+/-- Backend policy for one compilation. Automatic selection deliberately keeps
+the direct Core path first but otherwise chooses the broader typed-source
+runtime. -/
 inductive BackendPreference where
   | automatic
   | core
-  | callGraph
   | typedSource
   deriving Repr, BEq, DecidableEq
 
@@ -57,7 +51,6 @@ namespace BackendPreference
 def requested? : BackendPreference → Option Backend
   | .automatic => none
   | .core => some .core
-  | .callGraph => some .callGraph
   | .typedSource => some .typedSource
 
 end BackendPreference
@@ -103,7 +96,6 @@ explicit preference use this common carrier, so clients need only one
 diagnostic traversal. -/
 inductive BackendRejection where
   | core (error : SourceCoreDirectLinking.Error)
-  | callGraph (error : SourceRuntimeLinking.Error)
   | typedSource (error : SourceTypedRuntime.RuntimeError)
   deriving Repr
 
@@ -111,7 +103,6 @@ namespace BackendRejection
 
 def backend : BackendRejection → Backend
   | .core _ => .core
-  | .callGraph _ => .callGraph
   | .typedSource _ => .typedSource
 
 end BackendRejection
@@ -130,7 +121,6 @@ inductive CompileError where
   | backendEntryCountMismatch (backend : Backend) (actual : Nat)
   | publicCoreResultProjection (error : SourceCoreElaboration.Error)
   | publicCoreResultMismatch (expected actual : Core.Ty)
-  | publicGraphResultMismatch (expected actual : Ty)
   | noBackend (rejections : List BackendRejection)
   | backendRejected (rejection : BackendRejection)
   deriving Repr
@@ -139,13 +129,11 @@ inductive CompileError where
 constructor. -/
 private inductive Executable where
   | core (entry : SourceCoreDirectLinking.LinkedEntry)
-  | callGraph (entry : SourceRuntimeLinking.LinkedEntry)
   | typedSource
   deriving Repr
 
 private def Executable.backend : Executable → Backend
   | .core _ => .core
-  | .callGraph _ => .callGraph
   | .typedSource => .typedSource
 
 private def Executable.HasPublicResultProjection
@@ -154,8 +142,6 @@ private def Executable.HasPublicResultProjection
       SourceCoreElaboration.lowerType
         (.declaration root.declaration) root.function.inferredBodyType =
           .ok entry.elaborated.returnType
-  | .callGraph entry =>
-      root.function.inferredBodyType = entry.sourceBodyType
   | .typedSource => True
 
 /-- A checked, canonically specialized, reusable single-root artifact.  The
@@ -184,7 +170,6 @@ def resultType (compiled : CompiledEntry) : Ty :=
 def backend (compiled : CompiledEntry) : Backend :=
   match compiled.executable with
   | .core _ => .core
-  | .callGraph _ => .callGraph
   | .typedSource => .typedSource
 
 /-- Number of reachable canonical specializations retained by this artifact. -/
@@ -207,7 +192,7 @@ def HasCheckedSourceWitness (compiled : CompiledEntry) : Prop :=
 
 /-- The sealed plan passed the typed-source runtime's executable-profile
 preflight. Successful compilation guarantees this when that backend is
-selected; it is not asserted for Core or graph artifacts. -/
+selected; it is not asserted for Core artifacts. -/
 def HasValidatedTypedPlan (compiled : CompiledEntry) : Prop :=
   SourceTypedRuntime.validateExecutablePlanEvidence compiled.program
     compiled.plan = .ok ()
@@ -231,7 +216,7 @@ def TypedDeepResult (compiled : CompiledEntry)
   | .typedSource =>
       SourceTypedRuntime.PreparedDeepResult compiled.program compiled.plan
         compiled.root.function.inferredBodyType value finalState
-  | .core _ | .callGraph _ => False
+  | .core _ => False
 
 /-- Full typed-source boundary certificate for one normal execution.  It keeps
 the deeply safe initial heap and arguments, the deeply safe final heap and
@@ -246,7 +231,7 @@ def TypedDeepExecution (compiled : CompiledEntry)
       SourceTypedRuntime.PreparedDeepExecution compiled.program compiled.plan
         (compiled.root.function.typedBody.inputs.map (·.scheme.body))
         compiled.root.function.inferredBodyType arguments initial value finalState
-  | .core _ | .callGraph _ => False
+  | .core _ => False
 
 /-- The selected backend's result projection agrees with the public source
 result type.  Compilation checks this separately from runtime result typing:
@@ -267,60 +252,7 @@ def CoreResultHasPublicType (compiled : CompiledEntry)
         ∃ finalWorld,
           Core.StoreHasTypes finalWorld finalStore ∧
             Core.RuntimeValueHasType finalWorld value publicType
-  | .callGraph _ | .typedSource => False
-
-/-- The finite graph's shallow value tag is the projection of the compiler's
-public result type, in the selected checked runtime table. -/
-def GraphValueHasPublicType (compiled : CompiledEntry)
-    (value : SourceRuntime.Value) : Prop :=
-  match compiled.executable with
-  | .callGraph entry =>
-      ∃ publicType,
-        SourceRuntimeLinking.lowerType compiled.resultType = .ok publicType ∧
-          SourceRuntime.Value.HasType entry.program.program value publicType
-  | .core _ | .typedSource => False
-
-/-- Semantic graph input premise for a whole-language deep preservation
-theorem. A shallow runtime tag alone cannot validate a supplied Core closure
-or an arbitrary initial store. -/
-def GraphDeepInput (compiled : CompiledEntry)
-    (arguments : List Core.Value) (store : Core.Store) : Prop :=
-  match compiled.executable with
-  | .callGraph entry =>
-      ∃ world,
-        Core.RuntimeEnvironmentHasTypes world arguments
-          (entry.inputs.map Prod.snd) ∧
-        Core.StoreHasTypes world store
-  | .core _ | .typedSource => False
-
-/-- The exact selected-definition premise consumed by graph evaluator safety
-proofs. Successful linking certifies both table checking and signature
-identity, so only deep caller inputs and store typing remain external. -/
-def GraphRuntimeDeepInput (compiled : CompiledEntry)
-    (arguments : List Core.Value) (store : Core.Store) : Prop :=
-  match compiled.executable with
-  | .callGraph entry =>
-      ∃ world definition,
-        entry.program.RuntimeInputsHaveType entry.key arguments store
-          definition world
-  | .core _ | .typedSource => False
-
-/-- Deep finite-graph result and final-store typing at the public source
-result projection, retaining extension of the caller's initial Core world.
-Unlike the shallow graph result tag, this validates source closures and their
-captures as well as Core-projectable values. -/
-def GraphDeepResult (compiled : CompiledEntry)
-    (initialWorld : Core.StoreTyping) (value : SourceRuntime.Value)
-    (finalStore : Core.Store) : Prop :=
-  match compiled.executable with
-  | .callGraph entry =>
-      ∃ publicType finalWorld,
-        SourceRuntimeLinking.lowerType compiled.resultType = .ok publicType ∧
-        Core.WorldExtends initialWorld finalWorld ∧
-        Core.StoreHasTypes finalWorld finalStore ∧
-        SourceRuntime.Value.GraphHasType entry.program.program finalWorld
-          value publicType
-  | .core _ | .typedSource => False
+  | .typedSource => False
 
 end CompiledEntry
 
@@ -365,16 +297,14 @@ inductive RunError where
 /-- Lossless result carrier for all selected backends. -/
 inductive ExecutionResult where
   | core (result : Core.StatefulRunResult)
-  | callGraph (result : SourceRuntime.RunResult)
   | typedSource (result : SourceTypedRuntime.RunResult)
   deriving Repr
 
 namespace CompiledEntry
 
 /-- The extra semantic premise needed to lift executable runtime checks to a
-preservation theorem.  Direct Core needs genuinely typed values and store;
-the graph runtime enforces its successful result tag dynamically, while the
-typed-source runtime needs the retained canonical-root certificate. -/
+preservation theorem. Direct Core needs genuinely typed values and store,
+while the typed-source runtime needs the retained canonical-root certificate. -/
 def PreservationPrecondition (compiled : CompiledEntry) : Invocation → Prop
   | .coreValues arguments store =>
       match compiled.executable with
@@ -383,29 +313,16 @@ def PreservationPrecondition (compiled : CompiledEntry) : Invocation → Prop
             Core.RuntimeEnvironmentHasTypes world arguments
                 entry.elaborated.inputs.values ∧
               Core.StoreHasTypes world store
-      | .callGraph _ => True
       | .typedSource => False
   | .typedValues _ _ =>
       match compiled.executable with
       | .typedSource => compiled.HasCanonicalRoot
-      | .core _ | .callGraph _ => False
+      | .core _ => False
 
-/-- Successful finite-graph results carry the result type declared by the
-runtime table selected for that exact entry. -/
-def GraphResultHasType (checked : SourceRuntime.CheckedProgram)
-    (entry : SourceRuntime.Key) : SourceRuntime.RunResult → Prop
-  | .done value _ =>
-      ∃ signature,
-        checked.entrySignature? entry = some signature ∧
-          SourceRuntime.Value.HasType checked.program value
-            signature.resultType
-  | .outOfFuel _ | .fault _ _ => True
-
-/-- Backend-native typing for every successful result carrier.  Direct Core
-and typed source include their final store/heap and deeply typed values;
+/-- Backend-native typing for every successful result carrier. Direct Core and
+typed source include their final store/heap and deeply typed values;
 typed-source certificates additionally retain closure code and authenticated
-evidence.  The compatibility call graph keeps its established checked runtime
-tag.  Fault and exhaustion cases are intentionally outside this predicate. -/
+evidence. Fault and exhaustion cases are intentionally outside this predicate. -/
 def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult → Prop
   | .core (.done value finalStore) =>
       match compiled.executable with
@@ -414,23 +331,14 @@ def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult �
             Core.StoreHasTypes finalWorld finalStore ∧
               Core.RuntimeValueHasType finalWorld value
                 entry.elaborated.returnType
-      | .callGraph _ | .typedSource => False
-  | .core (.outOfFuel _) | .core (.fault _ _) => True
-  | .callGraph result@(.done _ _) =>
-      match compiled.executable with
-      | .core entry =>
-          match entry.runtime with
-          | some checked => GraphResultHasType checked entry.key result
-          | none => False
-      | .callGraph entry => GraphResultHasType entry.program entry.key result
       | .typedSource => False
-  | .callGraph (.outOfFuel _) | .callGraph (.fault _ _) => True
+  | .core (.outOfFuel _) | .core (.fault _ _) => True
   | .typedSource (.done value finalState) =>
       match compiled.executable with
       | .typedSource =>
           SourceTypedRuntime.PreparedDeepResult compiled.program compiled.plan
             compiled.root.function.inferredBodyType value finalState
-      | .core _ | .callGraph _ => False
+      | .core _ => False
   | .typedSource (.outOfFuel _) | .typedSource (.fault _ _) => True
 
 /-- Execute a reusable artifact in its selected runtime domain. -/
@@ -439,14 +347,10 @@ def run (compiled : CompiledEntry) (invocation : Invocation)
     Except RunError ExecutionResult :=
   match compiled.executable, invocation with
   | .core entry, .coreValues arguments store =>
-      match entry.runExact? arguments options.executionFuel store with
-      | some (.core result) => .ok (.core result)
-      | some (.runtime result) => .ok (.callGraph result)
+      match entry.run? arguments options.executionFuel store with
+      | some result => .ok (.core result)
       | none => .error (.coreInputTypesMismatch
           entry.elaborated.inputs.values (arguments.map Core.Value.type))
-  | .callGraph entry, .coreValues arguments store =>
-      .ok (.callGraph (entry.program.run options.executionFuel entry.key
-        arguments store))
   | .typedSource, .typedValues arguments state =>
       .ok (.typedSource (SourceTypedRuntime.runDeepCertifiedWithValidationFuel
         compiled.program compiled.plan compiled.root.key arguments
@@ -539,18 +443,6 @@ private def selectCoreBackend (program : CheckedProgram)
       | entries => .error (.backendEntryCountMismatch .core entries.length)
   | .error error => .error (.backendRejected (.core error))
 
-private def selectCallGraphBackend (program : CheckedProgram)
-    (plan : SourceSpecializationWorklist.Plan) :
-    Except CompileError Executable :=
-  let complete : SourceSpecializationWorklist.Outcome := .complete plan
-  match SourceRuntimeLinking.link program complete with
-  | .ok linked =>
-      match linked.entries with
-      | [entry] => .ok (.callGraph entry)
-      | entries => .error
-          (.backendEntryCountMismatch .callGraph entries.length)
-  | .error error => .error (.backendRejected (.callGraph error))
-
 private def selectTypedSourceBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) :
     Except CompileError Executable :=
@@ -563,7 +455,6 @@ private def selectBackend (program : CheckedProgram)
     (preference : BackendPreference) : Except CompileError Executable :=
   match preference with
   | .core => selectCoreBackend program plan stagingFuel
-  | .callGraph => selectCallGraphBackend program plan
   | .typedSource => selectTypedSourceBackend program plan
   | .automatic =>
       match selectCoreBackend program plan stagingFuel with
@@ -587,26 +478,6 @@ private theorem selectCoreBackend_success_backend
   unfold selectCoreBackend at selected
   cases linkedResult : SourceCoreDirectLinking.linkWithStagingFuel program
       (.complete plan) stagingFuel with
-  | error error => simp [linkedResult] at selected
-  | ok linked =>
-      cases entries : linked.entries with
-      | nil => simp [linkedResult, entries] at selected
-      | cons entry rest =>
-          cases rest with
-          | nil =>
-              simp [linkedResult, entries] at selected
-              cases selected
-              rfl
-          | cons another tail =>
-              simp [linkedResult, entries] at selected
-
-private theorem selectCallGraphBackend_success_backend
-    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
-    (executable : Executable)
-    (selected : selectCallGraphBackend program plan = .ok executable) :
-    executable.backend = .callGraph := by
-  unfold selectCallGraphBackend at selected
-  cases linkedResult : SourceRuntimeLinking.link program (.complete plan) with
   | error error => simp [linkedResult] at selected
   | ok linked =>
       cases entries : linked.entries with
@@ -667,12 +538,6 @@ private theorem selectBackend_backend_of_preference
       subst backend
       exact selectCoreBackend_success_backend program plan stagingFuel
         executable (by simpa [selectBackend] using selected)
-  | callGraph =>
-      have backendEq : backend = .callGraph := by
-        simpa [BackendPreference.requested?] using requested.symm
-      subst backend
-      exact selectCallGraphBackend_success_backend program plan executable
-        (by simpa [selectBackend] using selected)
   | typedSource =>
       have backendEq : backend = .typedSource := by
         simpa [BackendPreference.requested?] using requested.symm
@@ -719,10 +584,6 @@ private theorem selectBackend_typed_plan
       have impossible := selectCoreBackend_success_backend program plan
         stagingFuel .typedSource (by simpa [selectBackend] using selected)
       cases impossible
-  | callGraph =>
-      have impossible := selectCallGraphBackend_success_backend program plan
-        .typedSource (by simpa [selectBackend] using selected)
-      cases impossible
   | typedSource =>
       exact selectTypedSourceBackend_success_validation program plan
         .typedSource (by simpa [selectBackend] using selected)
@@ -731,9 +592,7 @@ private theorem selectBackend_typed_plan
         .typedSource
         (selectBackend_automatic_typed_source program plan stagingFuel selected)
 
-/-- Guard the public result signature against an inconsistent linker payload.
-The graph entry separately certifies projection from its source type to its
-Core result type; here we identify that source type with the canonical root. -/
+/-- Guard the public result signature against an inconsistent linker payload. -/
 private def validatePublicResultType
     (root : SourceSpecialization.SpecializedFunction)
     (executable : Executable) : Except CompileError Unit := do
@@ -747,12 +606,6 @@ private def validatePublicResultType
       else
         throw (.publicCoreResultMismatch projected
           entry.elaborated.returnType)
-  | .callGraph entry =>
-      if root.function.inferredBodyType = entry.sourceBodyType then
-        pure ()
-      else
-        throw (.publicGraphResultMismatch root.function.inferredBodyType
-          entry.sourceBodyType)
   | .typedSource => pure ()
 
 private theorem validatePublicResultType_correct
@@ -773,11 +626,6 @@ private theorem validatePublicResultType_correct
           · exact congrArg Except.ok same
           · simp [validatePublicResultType, projection, same,
               Except.mapError, bind, Except.bind] at accepted
-  | callGraph entry =>
-      simp only [Executable.HasPublicResultProjection]
-      by_cases same : root.function.inferredBodyType = entry.sourceBodyType
-      · exact same
-      · simp [validatePublicResultType, same] at accepted
   | typedSource =>
       trivial
 
@@ -1038,8 +886,6 @@ theorem compileChecked_hasValidatedTypedPlan
                               cases compiledOk
                               cases executable with
                               | core entry =>
-                                  simp [CompiledEntry.backend] at typedBackend
-                              | callGraph entry =>
                                   simp [CompiledEntry.backend] at typedBackend
                               | typedSource =>
                                   exact selectBackend_typed_plan program plan
@@ -2027,23 +1873,20 @@ theorem CompiledEntry.run_core_done_preserves_type
       simp only [CompiledEntry.PreservationPrecondition] at precondition
       obtain ⟨world, environmentTyped, storeTyped⟩ := precondition
       simp only [CompiledEntry.run] at ran
-      cases exactRun : entry.runExact? arguments options.executionFuel store with
+      cases exactRun : entry.run? arguments options.executionFuel store with
       | none =>
           rw [exactRun] at ran
           cases ran
       | some result =>
           rw [exactRun] at ran
           cases result with
-          | core result =>
+          | done result finalStore =>
               cases ran
               simp only [CompiledEntry.SuccessfulResultHasNativeType]
-              exact entry.runExact?_core_done_preserves_type arguments
+              exact entry.run?_done_preserves_type arguments
                 options.executionFuel store environmentTyped storeTyped exactRun
-          | runtime result =>
-              cases ran
-  | callGraph entry =>
-      simp only [CompiledEntry.run] at ran
-      cases ran
+          | outOfFuel state => cases ran
+          | fault error state => cases ran
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
 
@@ -2065,93 +1908,21 @@ theorem CompiledEntry.run_core_never_faults
       obtain ⟨world, environmentTyped, storeTyped⟩ := precondition
       intro ran
       simp only [CompiledEntry.run] at ran
-      cases exactRun : entry.runExact? arguments options.executionFuel store with
+      cases exactRun : entry.run? arguments options.executionFuel store with
       | none =>
           rw [exactRun] at ran
           cases ran
       | some result =>
           rw [exactRun] at ran
           cases result with
-          | core result =>
+          | done result finalStore => cases ran
+          | outOfFuel state => cases ran
+          | fault foundError foundState =>
               cases ran
-              exact entry.runExact?_core_never_faults arguments
-                options.executionFuel store environmentTyped storeTyped
-                error faultState exactRun
-          | runtime result =>
-              cases ran
-  | callGraph entry =>
-      simp [CompiledEntry.run]
+              exact entry.run?_never_faults arguments options.executionFuel
+                store environmentTyped storeTyped error faultState exactRun
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
-
-/-- Either facade route which reaches the finite call-graph runtime preserves
-the result type declared by the exact selected runtime signature. -/
-theorem CompiledEntry.run_callGraph_done_preserves_type
-    (compiled : CompiledEntry) (invocation : Invocation)
-    (options : RunOptions) {value : SourceRuntime.Value}
-    {finalStore : Core.Store}
-    (ran : compiled.run invocation options =
-      .ok (.callGraph (.done value finalStore))) :
-    compiled.SuccessfulResultHasNativeType
-      (.callGraph (.done value finalStore)) := by
-  cases compiled
-  rename_i program plan root executable
-  cases executable with
-  | core entry =>
-      cases invocation with
-      | coreValues arguments store =>
-          simp only [CompiledEntry.run] at ran
-          cases exactRun : entry.runExact? arguments options.executionFuel store with
-          | none =>
-              rw [exactRun] at ran
-              cases ran
-          | some result =>
-              rw [exactRun] at ran
-              cases result with
-              | core result =>
-                  cases ran
-              | runtime result =>
-                  cases ran
-                  cases runtime : entry.runtime with
-                  | none =>
-                      simp [SourceCoreDirectLinking.LinkedEntry.runExact?,
-                        runtime] at exactRun
-                  | some checked =>
-                      have completed : checked.run options.executionFuel
-                          entry.key arguments store =
-                            .done value finalStore := by
-                        have dispatched :
-                            arguments.map Core.Value.type =
-                                entry.elaborated.inputs.values ∧
-                              checked.run options.executionFuel entry.key
-                                  arguments store = .done value finalStore := by
-                          simpa [SourceCoreDirectLinking.LinkedEntry.runExact?,
-                            runtime] using exactRun
-                        exact dispatched.2
-                      obtain ⟨definition, _, signature, valueTyped⟩ :=
-                        checked.run_done_hasType options.executionFuel entry.key
-                          arguments store finalStore value completed
-                      simp only [CompiledEntry.SuccessfulResultHasNativeType, runtime,
-                        CompiledEntry.GraphResultHasType]
-                      exact ⟨definition.signature, signature, valueTyped⟩
-      | typedValues arguments state =>
-          simp [CompiledEntry.run, Invocation.kind] at ran
-  | callGraph entry =>
-      cases invocation with
-      | coreValues arguments store =>
-          have completed : entry.program.run options.executionFuel entry.key
-              arguments store = .done value finalStore := by
-            simpa [CompiledEntry.run] using ran
-          obtain ⟨definition, _, signature, valueTyped⟩ :=
-            entry.program.run_done_hasType options.executionFuel entry.key
-              arguments store finalStore value completed
-          simp only [CompiledEntry.SuccessfulResultHasNativeType,
-            CompiledEntry.GraphResultHasType]
-          exact ⟨definition.signature, signature, valueTyped⟩
-      | typedValues arguments state =>
-          simp [CompiledEntry.run, Invocation.kind] at ran
-  | typedSource =>
-      cases invocation <;> simp [CompiledEntry.run, Invocation.kind] at ran
 
 /-- A successful source-typed facade result has the inferred result type of
 the unique retained root specialization. -/
@@ -2171,8 +1942,6 @@ theorem CompiledEntry.run_typedSource_done_preserves_type
   rename_i program plan root executable
   cases executable with
   | core entry =>
-      simp only [CompiledEntry.PreservationPrecondition] at precondition
-  | callGraph entry =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
@@ -2210,8 +1979,6 @@ theorem CompiledEntry.runTyped_done_has_public_resultType
   cases executable with
   | core entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
-  | callGraph entry =>
-      simp [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simp only [CompiledEntry.SuccessfulResultHasNativeType] at native
       refine ⟨native.executablePlan, native.prepared, ?_⟩
@@ -2235,8 +2002,6 @@ theorem CompiledEntry.runTyped_done_has_public_deepExecution
   rename_i program plan root executable
   cases executable with
   | core entry =>
-      simp [CompiledEntry.PreservationPrecondition] at precondition
-  | callGraph entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
@@ -2295,8 +2060,6 @@ theorem CompiledEntry.runTyped_done_has_public_deepResult
   cases executable with
   | core entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
-  | callGraph entry =>
-      simp [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simpa [CompiledEntry.TypedDeepResult,
         CompiledEntry.SuccessfulResultHasNativeType] using native
@@ -2328,73 +2091,11 @@ theorem CompiledEntry.run_core_done_has_public_resultType
         CompiledEntry.resultType]
       exact ⟨entry.elaborated.returnType, projection, finalWorld,
         storeTyped, valueTyped⟩
-  | callGraph entry =>
-      simp only [CompiledEntry.SuccessfulResultHasNativeType] at native
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
 
-/-- A successful selected graph result has the projection of the compiler's
-public source result type, not merely an unrelated runtime-table tag. -/
-theorem CompiledEntry.run_callGraph_done_has_public_resultType
-    (compiled : CompiledEntry) (invocation : Invocation)
-    (options : RunOptions) {value : SourceRuntime.Value}
-    {finalStore : Core.Store}
-    (backend : compiled.backend = .callGraph)
-    (projection : compiled.HasPublicResultProjection)
-    (ran : compiled.run invocation options =
-      .ok (.callGraph (.done value finalStore))) :
-    compiled.GraphValueHasPublicType value := by
-  have native := compiled.run_callGraph_done_preserves_type invocation
-    options ran
-  cases compiled
-  rename_i program plan root executable
-  cases executable with
-  | core entry =>
-      simp [CompiledEntry.backend] at backend
-  | callGraph entry =>
-      simp only [CompiledEntry.SuccessfulResultHasNativeType,
-        CompiledEntry.GraphResultHasType] at native
-      obtain ⟨signature, selected, valueTyped⟩ := native
-      obtain ⟨entrySignature, entrySelected, entryResult⟩ :=
-        entry.signatureResultType
-      have sameSignature : signature = entrySignature := by
-        rw [entrySelected] at selected
-        exact (Option.some.inj selected).symm
-      subst signature
-      change root.function.inferredBodyType = entry.sourceBodyType at projection
-      simp only [CompiledEntry.GraphValueHasPublicType,
-        CompiledEntry.resultType]
-      refine ⟨entry.resultType, ?_, ?_⟩
-      · simpa [projection] using entry.resultType_eq_source
-      · simpa [entryResult] using valueTyped
-  | typedSource =>
-      simp [CompiledEntry.backend] at backend
-
-/-- The compiler-level deep graph input premise entails the exact
-selected-definition input relation used by the graph safety induction. -/
-theorem CompiledEntry.graphDeepInput_to_runtime
-    (compiled : CompiledEntry) (arguments : List Core.Value)
-    (store : Core.Store)
-    (typing : compiled.GraphDeepInput arguments store) :
-    compiled.GraphRuntimeDeepInput arguments store := by
-  cases compiled
-  rename_i program plan root executable
-  cases executable with
-  | core entry =>
-      simp only [CompiledEntry.GraphDeepInput] at typing
-  | callGraph entry =>
-      simp only [CompiledEntry.GraphDeepInput] at typing
-      obtain ⟨world, argumentsTyped, storeTyped⟩ := typing
-      obtain ⟨definition, runtimeTyped⟩ :=
-        entry.runtimeInputsHaveType arguments store world
-          argumentsTyped storeTyped
-      simp only [CompiledEntry.GraphRuntimeDeepInput]
-      exact ⟨world, definition, runtimeTyped⟩
-  | typedSource =>
-      simp only [CompiledEntry.GraphDeepInput] at typing
-
-/-- Whole-compiler successful-result preservation.  One theorem now covers
-all three selected runtimes without erasing their native value/store domains.
+/-- Whole-compiler successful-result preservation. One theorem covers both
+selected runtimes without erasing their native value/store domains.
 The precondition is substantial only for direct Core (deep values/store) and
 for the typed backend's sealed canonical-root provenance. -/
 theorem CompiledEntry.run_preserves_successful_result_native_type
@@ -2420,14 +2121,6 @@ theorem CompiledEntry.run_preserves_successful_result_native_type
           simp [CompiledEntry.SuccessfulResultHasNativeType]
       | fault error state =>
           simp [CompiledEntry.SuccessfulResultHasNativeType]
-  | callGraph result =>
-      cases result with
-      | done value finalStore =>
-          exact compiled.run_callGraph_done_preserves_type invocation options ran
-      | outOfFuel store =>
-          simp [CompiledEntry.SuccessfulResultHasNativeType]
-      | fault error store =>
-          simp [CompiledEntry.SuccessfulResultHasNativeType]
   | typedSource result =>
       cases result with
       | done value finalState =>
@@ -2439,8 +2132,6 @@ theorem CompiledEntry.run_preserves_successful_result_native_type
               | core entry =>
                   simp only [CompiledEntry.run] at ran
                   split at ran <;> cases ran
-              | callGraph entry =>
-                  simp [CompiledEntry.run] at ran
               | typedSource =>
                   simp [CompiledEntry.run, Invocation.kind] at ran
           | typedValues arguments initial =>
@@ -2476,19 +2167,6 @@ theorem CompiledEntry.runTyped_of_core (compiled : CompiledEntry)
   cases executable <;> simp_all [CompiledEntry.backend, CompiledEntry.runTyped,
     CompiledEntry.run, Invocation.kind]
 
-/-- A structural-call-graph artifact rejects source-typed inputs before
-execution. -/
-theorem CompiledEntry.runTyped_of_callGraph (compiled : CompiledEntry)
-    (arguments : List SourceTypedRuntime.Value) (options : RunOptions)
-    (state : SourceTypedRuntime.RuntimeState)
-    (hbackend : compiled.backend = .callGraph) :
-    compiled.runTyped arguments options state =
-      .error (.invocationKindMismatch .callGraph .typedValues) := by
-  cases compiled
-  rename_i program plan root executable
-  cases executable <;> simp_all [CompiledEntry.backend, CompiledEntry.runTyped,
-    CompiledEntry.run, Invocation.kind]
-
 /-- Once a typed-source artifact receives typed inputs, validation failures,
 runtime faults, and either fuel exhaustion are retained inside its native
 result carrier rather than being relabeled as facade errors. -/
@@ -2503,28 +2181,14 @@ theorem CompiledEntry.runTyped_ok_of_typedSource (compiled : CompiledEntry)
   cases executable <;> simp_all [CompiledEntry.backend, CompiledEntry.runTyped,
     CompiledEntry.run]
 
-/-- A structural call-graph runtime likewise retains faults and exhaustion in
-its native result carrier after the invocation domain has matched. -/
-theorem CompiledEntry.runCore_ok_of_callGraph (compiled : CompiledEntry)
-    (arguments : List Core.Value) (options : RunOptions) (store : Core.Store)
-    (hbackend : compiled.backend = .callGraph) :
-    ∃ result, compiled.runCore arguments options store =
-      .ok (.callGraph result) := by
-  cases compiled
-  rename_i program plan root executable
-  cases executable <;> simp_all [CompiledEntry.backend, CompiledEntry.runCore,
-    CompiledEntry.run]
-
 /-- After a Core-domain invocation reaches the direct backend, the only
 facade-level rejection is the explicit input-type mismatch.  Every runtime
-outcome remains in one of the exact backend result carriers. -/
+outcome remains in the Core result carrier. -/
 theorem CompiledEntry.runCore_outcome_of_core (compiled : CompiledEntry)
     (arguments : List Core.Value) (options : RunOptions) (store : Core.Store)
     (hbackend : compiled.backend = .core) :
     (∃ result, compiled.runCore arguments options store =
         .ok (.core result)) ∨
-      (∃ result, compiled.runCore arguments options store =
-        .ok (.callGraph result)) ∨
       (∃ expected actual, compiled.runCore arguments options store =
         .error (.coreInputTypesMismatch expected actual)) := by
   cases compiled
@@ -2532,14 +2196,12 @@ theorem CompiledEntry.runCore_outcome_of_core (compiled : CompiledEntry)
   cases executable <;> simp_all [CompiledEntry.backend]
   rename_i entry
   simp only [CompiledEntry.runCore, CompiledEntry.run]
-  cases hresult : entry.runExact? arguments options.executionFuel store with
+  cases hresult : entry.run? arguments options.executionFuel store with
   | none =>
-      exact Or.inr (Or.inr ⟨entry.elaborated.inputs.values,
-        arguments.map Core.Value.type, by simp⟩)
+      exact Or.inr ⟨entry.elaborated.inputs.values,
+        arguments.map Core.Value.type, by simp⟩
   | some result =>
-      cases result with
-      | core result => exact Or.inl ⟨result, by simp⟩
-      | runtime result => exact Or.inr (Or.inl ⟨result, by simp⟩)
+      exact Or.inl ⟨result, by simp⟩
 
 theorem run_of_compiled (raw : Workspace.RawWorkspace) (seed : Seed)
     (invocation : Invocation) (limits : Limits) (compiled : CompiledEntry)
@@ -2606,23 +2268,6 @@ theorem compileChecked_runCore_done_has_public_resultType
   exact compiled.run_core_done_has_public_resultType arguments store
     runOptions (compileChecked_hasPublicResultProjection program seed
       compileOptions compiled compiledOk) precondition ran
-
-/-- A compiler-produced finite graph entry returns a value whose checked
-runtime tag is the projection of the public source result type. -/
-theorem compileChecked_runGraph_done_has_public_resultType
-    (program : CheckedProgram) (seed : Seed)
-    (compileOptions : CompileOptions) (compiled : CompiledEntry)
-    (compiledOk : compileChecked program seed compileOptions = .ok compiled)
-    (backend : compiled.backend = .callGraph)
-    (invocation : Invocation) (runOptions : RunOptions)
-    {value : SourceRuntime.Value} {finalStore : Core.Store}
-    (ran : compiled.run invocation runOptions =
-      .ok (.callGraph (.done value finalStore))) :
-    compiled.GraphValueHasPublicType value := by
-  exact compiled.run_callGraph_done_has_public_resultType invocation
-    runOptions backend
-    (compileChecked_hasPublicResultProjection program seed compileOptions
-      compiled compiledOk) ran
 
 /-- For a compiler-produced typed backend, the root provenance required by
 the backend-native preservation theorem is automatic. -/
@@ -2796,8 +2441,8 @@ theorem compileStaticWord_root_runTyped_done_has_public_deepExecution
   exact root.entry.runTyped_done_has_public_deepExecution_of_canonical arguments
     initial runOptions certificates.2.1 typedBackend ran
 
-/-- End-to-end one-shot execution inherits the three-backend successful-result
-preservation theorem from the exact artifact produced in its compile phase. -/
+/-- End-to-end one-shot execution inherits successful-result preservation from
+the exact artifact produced in its compile phase. -/
 theorem run_of_compiled_preserves_successful_result_native_type
     (raw : Workspace.RawWorkspace) (seed : Seed) (invocation : Invocation)
     (limits : Limits) (compiled : CompiledEntry) (result : ExecutionResult)
@@ -2887,213 +2532,3 @@ theorem run_of_compile_error (raw : Workspace.RawWorkspace) (seed : Seed)
   rfl
 
 end Solcore.Frontend.SourceCompiler
-
-/-!
-## Consolidated module: `Solcore.Frontend.SourceCompilerGraphDeepProperties`
--/
-
-/-! Conditional deep preservation through the public graph-backend facade. -/
-
-set_option autoImplicit false
-
-namespace Solcore.Frontend.SourceCompiler
-
-namespace CompiledEntry
-
-/-- The public deep graph result refines the existing native result-tag
-certificate when the artifact's public result projection is known. -/
-theorem GraphDeepResult.native
-    (compiled : CompiledEntry) (initialWorld : Core.StoreTyping)
-    (value : SourceRuntime.Value) (finalStore : Core.Store)
-    (projection : compiled.HasPublicResultProjection)
-    (deep : compiled.GraphDeepResult initialWorld value finalStore) :
-    compiled.SuccessfulResultHasNativeType
-      (.callGraph (.done value finalStore)) := by
-  cases compiled
-  rename_i program plan root executable
-  cases executable with
-  | core entry => simp only [GraphDeepResult] at deep
-  | typedSource => simp only [GraphDeepResult] at deep
-  | callGraph entry =>
-      obtain ⟨publicType, finalWorld, lowered, _, _, valueTyping⟩ := deep
-      obtain ⟨signature, found, resultType⟩ :=
-        entry.signatureResultType
-      change root.function.inferredBodyType = entry.sourceBodyType at projection
-      have publicEqualsEntry : publicType = entry.resultType := by
-        have loweredEntry :
-            SourceRuntimeLinking.lowerType entry.sourceBodyType =
-              .ok publicType := by
-          simpa [CompiledEntry.resultType, projection] using lowered
-        rw [entry.resultType_eq_source] at loweredEntry
-        exact (Except.ok.inj loweredEntry).symm
-      simp only [SuccessfulResultHasNativeType, GraphResultHasType]
-      exact ⟨signature, found, by
-        simpa [publicEqualsEntry, resultType] using valueTyping.hasType⟩
-
-/-- The actual public `CompiledEntry.run` graph branch preserves deep source
-value and final-store typing after checker-certified compilation, deep caller
-input typing, and a public-result projection certificate. -/
-theorem run_callGraph_done_deep
-    (compiled : CompiledEntry) (arguments : List Core.Value)
-    (initialStore : Core.Store) (options : RunOptions)
-    (value : SourceRuntime.Value) (finalStore : Core.Store)
-    (input : compiled.GraphDeepInput arguments initialStore)
-    (projection : compiled.HasPublicResultProjection)
-    (ran : compiled.run (.coreValues arguments initialStore) options =
-      .ok (.callGraph (.done value finalStore))) :
-    ∃ initialWorld,
-      compiled.GraphDeepResult initialWorld value finalStore := by
-  cases compiled
-  rename_i program plan root executable
-  cases executable with
-  | core entry => simp only [GraphDeepInput] at input
-  | typedSource => simp only [GraphDeepInput] at input
-  | callGraph entry =>
-      obtain ⟨world, argumentsTyping, storeTyping⟩ := input
-      have completed : entry.program.run options.executionFuel entry.key
-          arguments initialStore = .done value finalStore := by
-        simpa [CompiledEntry.run] using ran
-      obtain ⟨finalWorld, extension, finalStoreTyping, valueTyping⟩ :=
-        entry.run_done_deep argumentsTyping storeTyping completed
-      change root.function.inferredBodyType = entry.sourceBodyType at projection
-      have lowered : SourceRuntimeLinking.lowerType
-          root.function.inferredBodyType = .ok entry.resultType := by
-        simpa [projection] using entry.resultType_eq_source
-      refine ⟨world, ?_⟩
-      simp only [GraphDeepResult]
-      exact ⟨entry.resultType, finalWorld, lowered, extension,
-        finalStoreTyping, valueTyping⟩
-
-end CompiledEntry
-
-/-- Successful checked-program compilation supplies the public-result
-projection certificate required by the graph deep-preservation facade. -/
-theorem compileChecked_runGraph_done_deep
-    (program : CheckedProgram) (seed : Seed)
-    (compileOptions : CompileOptions) (compiled : CompiledEntry)
-    (compiledOk : compileChecked program seed compileOptions = .ok compiled)
-    (arguments : List Core.Value) (initialStore : Core.Store)
-    (runOptions : RunOptions) (value : SourceRuntime.Value)
-    (finalStore : Core.Store)
-    (input : compiled.GraphDeepInput arguments initialStore)
-    (ran : compiled.run (.coreValues arguments initialStore) runOptions =
-      .ok (.callGraph (.done value finalStore))) :
-    ∃ initialWorld,
-      compiled.GraphDeepResult initialWorld value finalStore := by
-  exact compiled.run_callGraph_done_deep arguments initialStore runOptions
-    value finalStore input
-    (compileChecked_hasPublicResultProjection program seed compileOptions
-      compiled compiledOk) ran
-
-/-- The one-shot raw-workspace compiler likewise supplies the public-result
-projection certificate; the caller still provides genuinely deep arguments
-and an initial store in one Core world. -/
-theorem compile_runGraph_done_deep
-    (raw : Workspace.RawWorkspace) (seed : Seed)
-    (checkingOptions : CheckingOptions) (compiled : CompiledEntry)
-    (compiledOk : compile raw seed checkingOptions = .ok compiled)
-    (arguments : List Core.Value) (initialStore : Core.Store)
-    (runOptions : RunOptions) (value : SourceRuntime.Value)
-    (finalStore : Core.Store)
-    (input : compiled.GraphDeepInput arguments initialStore)
-    (ran : compiled.run (.coreValues arguments initialStore) runOptions =
-      .ok (.callGraph (.done value finalStore))) :
-    ∃ initialWorld,
-      compiled.GraphDeepResult initialWorld value finalStore := by
-  exact compiled.run_callGraph_done_deep arguments initialStore runOptions
-    value finalStore input
-    (compile_hasPublicResultProjection raw seed checkingOptions compiled
-      compiledOk) ran
-
-end Solcore.Frontend.SourceCompiler
-
-/-!
-## Consolidated module: `Solcore.Frontend.SourceCompilerSignatureProperties`
--/
-
-/-! Type-projection coherence shared by the direct-Core and finite-graph
-backends.  The finite graph additionally supports source function types, so
-the implication runs from the smaller direct-Core domain to the graph domain. -/
-
-set_option autoImplicit false
-
-namespace Solcore.Frontend
-
-open TypeSystem
-
-/-- Every result type admitted by direct Core has the same backend-native
-projection in the finite call graph. -/
-theorem sourceCore_lowerType_implies_graph_lowerType
-    (site : SourceCoreElaboration.ErrorSite) (sourceType : Ty)
-    (coreType : Core.Ty)
-    (accepted : SourceCoreElaboration.lowerType site sourceType = .ok coreType) :
-    SourceRuntimeLinking.lowerType sourceType = .ok coreType := by
-  induction sourceType generalizing coreType with
-  | «variable» id =>
-      exact nomatch accepted
-  | parameter id =>
-      exact nomatch accepted
-  | constructor id =>
-      cases id with
-      | builtin builtin =>
-          cases builtin with
-          | unit => cases accepted; rfl
-          | bool => cases accepted; rfl
-          | word => cases accepted; rfl
-          | integer => exact nomatch accepted
-      | declaration id =>
-          exact nomatch accepted
-  | application function argument ihFunction ihArgument =>
-      unfold SourceCoreElaboration.lowerType at accepted
-      split at accepted <;> exact nomatch accepted
-  | function parameter result ihParameter ihResult =>
-      exact nomatch accepted
-  | product left right ihLeft ihRight =>
-      simp only [SourceCoreElaboration.lowerType] at accepted
-      cases leftProjection : SourceCoreElaboration.lowerType site left with
-      | error error =>
-          simp [leftProjection, bind, Except.bind] at accepted
-      | ok loweredLeft =>
-          cases rightProjection : SourceCoreElaboration.lowerType site right with
-          | error error =>
-              simp [leftProjection, rightProjection, bind, Except.bind] at accepted
-          | ok loweredRight =>
-              simp [leftProjection, rightProjection, bind, Except.bind] at accepted
-              cases accepted
-              simp [SourceRuntimeLinking.lowerType,
-                ihLeft loweredLeft leftProjection,
-                ihRight loweredRight rightProjection, bind, Except.bind,
-                pure, Pure.pure, Except.pure]
-  | mapping key value ihKey ihValue =>
-      exact nomatch accepted
-  | proxy inner ih =>
-      exact nomatch accepted
-  | comptime inner ih =>
-      exact nomatch accepted
-  | error =>
-      exact nomatch accepted
-
-/-- The graph-only closure/function case extends the direct-Core projection. -/
-theorem graph_lowerType_function {parameter result : Ty}
-    {loweredParameter loweredResult : Core.Ty}
-    (parameterAccepted : SourceRuntimeLinking.lowerType parameter =
-      .ok loweredParameter)
-    (resultAccepted : SourceRuntimeLinking.lowerType result =
-      .ok loweredResult) :
-    SourceRuntimeLinking.lowerType (.function parameter result) =
-      .ok (.function loweredParameter loweredResult) := by
-  simp [SourceRuntimeLinking.lowerType, parameterAccepted, resultAccepted,
-    bind, Except.bind, pure, Pure.pure, Except.pure]
-
-/-- Both backends agree on products, including products whose components are
-themselves function types only in the graph backend. -/
-theorem graph_lowerType_product {left right : Ty}
-    {loweredLeft loweredRight : Core.Ty}
-    (leftAccepted : SourceRuntimeLinking.lowerType left = .ok loweredLeft)
-    (rightAccepted : SourceRuntimeLinking.lowerType right = .ok loweredRight) :
-    SourceRuntimeLinking.lowerType (.product left right) =
-      .ok (.product loweredLeft loweredRight) := by
-  simp [SourceRuntimeLinking.lowerType, leftAccepted, rightAccepted,
-    bind, Except.bind, pure, Pure.pure, Except.pure]
-
-end Solcore.Frontend

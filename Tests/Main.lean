@@ -1231,7 +1231,6 @@ import Solcore.Test.SourceSpecialization
 import Solcore.Test.SourceSpecializationWorklist
 import Solcore.Test.SourceCoreElaboration
 import Solcore.Test.SourceCoreDirectLinking
-import Solcore.Test.SourceRuntimeCallGraph
 import Solcore.Test.SourceTypedRuntime
 import Solcore.Test.SourceTypedRuntimeFirstClassEvidence
 import Solcore.Test.SourceTypedRuntimeOperators
@@ -2082,7 +2081,6 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceSpecializationWorklist.testSourceSpecializationWorklist
   SourceCoreElaboration.testSourceCoreElaboration
   SourceCoreDirectLinking.testSourceCoreDirectLinking
-  SourceRuntimeCallGraph.testSourceRuntimeCallGraph
   SourceTypedRuntime.testSourceTypedRuntime
   SourceTypedRuntimeFirstClassEvidence.testSourceTypedRuntimeFirstClassEvidence
   SourceTypedRuntimeOperators.testSourceTypedRuntimeOperators

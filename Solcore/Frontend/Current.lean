@@ -10,12 +10,8 @@ import Solcore.Frontend.SourceStagedValue
 import Solcore.Frontend.SourceSpecialization
 import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.Frontend.SourceCoreElaboration
-import Solcore.Frontend.SourceRuntime
-import Solcore.Frontend.SourceRuntimeDeepProperties
 import Solcore.Frontend.SourceTypedRuntime
 import Solcore.Frontend.SourceCoreDirectLinking
-import Solcore.Frontend.SourceRuntimeLinking
-import Solcore.Frontend.SourceRuntimeEntryDeepProperties
 import Solcore.Frontend.SourceTypedStaticSafetyProperties
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceCompiler

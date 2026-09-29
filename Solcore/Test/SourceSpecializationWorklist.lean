@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceRuntimeLinking
+import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceTypedRuntime
 
 /-! End-to-end regressions for finite whole-program specialization discovery. -/
@@ -1831,13 +1831,6 @@ private def testFunctionValueReference (program : CheckedProgram) : IO Unit := d
             "reference-ledger rejection lost the canonical edge"
       | result => throw (IO.userError
           s!"direct plan validation accepted a missing reference edge: {reprStr result}")
-      match SourceRuntimeLinking.link program (.complete malformed) with
-      | .error (.invalidPlan
-          (.referenceEdgesMismatch expected [])) =>
-          assertTrue (decide (expected = plan.referenceEdges))
-            "runtime linker lost the canonical reference ledger"
-      | result => throw (IO.userError
-          s!"runtime linker accepted a missing reference edge: {reprStr result}")
   | outcome => throw (IO.userError
       s!"asValue: expected a complete plan, found {reprStr outcome}")
   match ← runOrThrow "asValue budget" program
@@ -1953,11 +1946,6 @@ private def testIndirectArgumentCountCase (program : CheckedProgram)
       metadata.argumentTypeBeforeCoercion = .product .word .bool ∧
       metadata.argumentTypeAfterCoercion = .product .word .bool))
     s!"{name}: product bundle or source argument count was not retained"
-  let plan ← match ← runOrThrow name program
-      [monomorphicRequest signature] 1 with
-    | .complete plan => pure plan
-    | outcome => throw (IO.userError
-        s!"{name}: expected a complete plan, found {reprStr outcome}")
   let forgedMetadata := { metadata with argumentCount := forged }
   let malformedFunction : CheckedFunction := {
     function with
@@ -1975,31 +1963,6 @@ private def testIndirectArgumentCountCase (program : CheckedProgram)
         s!"{name}: worklist arity rejection lost its occurrence or counts"
   | result => throw (IO.userError
       s!"{name}: worklist accepted product-bundle arity tampering: {reprStr result}")
-  let malformedPlan : SourceSpecializationWorklist.Plan := {
-    plan with
-    specializations := plan.specializations.map fun specialized =>
-      if specialized.declaration == signature.id then
-        { specialized with
-          function := {
-            specialized.function with
-            typedBody := {
-              specialized.function.typedBody with
-              nodes := setIndirectMetadata
-                specialized.function.typedBody.nodes call.id forgedMetadata
-            }
-          }
-        }
-      else
-        specialized
-  }
-  match SourceRuntimeLinking.link malformedProgram (.complete malformedPlan) with
-  | .error (.invalidPlan (.worklist
-      (.indirectArgumentCountMismatch actual retained children))) =>
-      assertTrue (actual == call.id && retained == forged && children == expected)
-        s!"{name}: runtime-link rejection lost its occurrence or counts"
-  | result => throw (IO.userError
-      s!"{name}: runtime linker accepted product-bundle arity tampering: {reprStr result}")
-
 private def testIndirectArgumentCounts (program : CheckedProgram) : IO Unit := do
   testIndirectArgumentCountCase program "applyProduct" 1 2
   testIndirectArgumentCountCase program "applySplit" 2 1

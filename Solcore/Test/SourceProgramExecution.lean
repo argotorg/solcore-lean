@@ -1,4 +1,4 @@
-import Solcore
+import Solcore.Frontend.SourceProgramExecution
 
 /-! End-to-end regressions for the explicit public source execution pipeline. -/
 
@@ -66,19 +66,11 @@ private def testNamedSeedAndPreparedRun : IO Unit := do
   assertTrue (decide (prepared.run? [fortyOne, .bool true] 4096 =
       some (.done fortyOne [])))
     "prepared named root did not execute its reachable generic call"
-  match prepared.runExact? [fortyOne, .bool true] 4096 with
-  | some (.core result) =>
-      assertTrue (decide (result = .done fortyOne []))
-        "acyclic exact execution changed its Core result"
-  | result => throw (IO.userError
-      s!"acyclic entry did not use the exact Core carrier: {reprStr result}")
   assertTrue (decide (prepared.run? [fortyOne, .bool false] 4096 =
       some (.done (.word (word 7)) [])))
     "prepared named root did not execute its other conditional branch"
   assertTrue ((prepared.run? [.bool true, fortyOne] 4096).isNone)
     "prepared run? accepted runtime values in the wrong type order"
-  assertTrue ((prepared.runExact? [.bool true, fortyOne] 4096).isNone)
-    "prepared runExact? accepted runtime values in the wrong type order"
 
 private def testDeclarationSeedAndStore : IO Unit := do
   let moduleId ← mainModule "main.solc"
@@ -291,28 +283,19 @@ private def testStageErrors : IO Unit := do
   let indirect := rawWorkspace "main.solc" [("main.solc",
     "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }")]
   match prepare indirect (Seed.named moduleId "apply") generousLimits with
-  | .ok prepared =>
-      let identity : Core.Value := .closure .word .word (.var 0) []
-      let input : Core.Value := .word (word 23)
-      assertTrue (prepared.usesRuntimeCallGraph && decide (prepared.inputTypes =
-          [.function .word .word, .word] ∧
-          prepared.run? [identity, input] 128 = some (.done input [])))
-        "indirect call did not execute the supplied Core closure"
-  | .error error => throw (IO.userError
-      s!"indirect call was not prepared: {reprStr error}")
+  | .error (.linking (.sourceCore {
+      reason := .unsupportedType (.function .word .word), .. })) => pure ()
+  | result => throw (IO.userError
+      s!"indirect call did not retain its direct-linking rejection: {reprStr result}")
   let recursive := rawWorkspace "main.solc" [("main.solc",
     "function loop(value: Word) returns (Word) { return loop(value); }")]
   match prepare recursive (Seed.named moduleId "loop") generousLimits with
-  | .ok prepared =>
-      let input : Core.Value := .word (word 1)
-      assertTrue prepared.usesRuntimeCallGraph
-        "recursive source root did not retain a runtime call graph"
-      match prepared.run? [input] 16 with
-      | some (.outOfFuel _) => pure ()
-      | result => throw (IO.userError
-          s!"recursive source root did not exhaust runtime fuel: {reprStr result}")
-  | .error error => throw (IO.userError
-      s!"recursive source root was not prepared: {reprStr error}")
+  | .error (.linking (.recursiveCallCycle key)) =>
+      assertTrue (decide (key.declaration.moduleId = moduleId ∧
+          key.declaration.declarationIndex = 0 ∧ key.arguments = []))
+        "recursive direct-linking rejection lost its specialization key"
+  | result => throw (IO.userError
+      s!"recursive source root did not retain its direct-linking rejection: {reprStr result}")
 
 private def testRuntimeBoundary : IO Unit := do
   let moduleId ← mainModule "main.solc"

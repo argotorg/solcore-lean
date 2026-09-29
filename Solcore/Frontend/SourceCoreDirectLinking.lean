@@ -1,7 +1,6 @@
 import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.Frontend.ExecutableImplMethods
-import Solcore.Frontend.SourceRuntime
 import Solcore.Core.Machine
 import Solcore.Core.Safety
 
@@ -257,23 +256,11 @@ inductive Error where
 structure LinkedEntry where
   key : SpecializationKey
   elaborated : SourceCoreElaboration.ElaboratedFunction
-  /-- Present only for the additive runtime call-graph path.  `elaborated`
-  remains the first-order compatibility view used by existing inspection
-  clients, while execution dispatches through this checked finite table. -/
-  runtime : Option SourceRuntime.CheckedProgram := none
   deriving Repr
 
 /-- Linked entries preserve worklist seed order, including repeated roots. -/
 structure LinkedProgram where
   entries : List LinkedEntry
-  deriving Repr
-
-/-- Exact execution carrier for both linker backends.  Graph outcomes stay in
-their own domain so runtime faults remain precise and exhausted runs cannot be
-mistaken for resumable Core machine checkpoints. -/
-inductive ExecutionResult where
-  | core (result : Core.StatefulRunResult)
-  | runtime (result : SourceRuntime.RunResult)
   deriving Repr
 
 /-- A structural execution bound for the closed resolved fragment emitted by
@@ -295,47 +282,16 @@ private def stagedResolvedExecutionFuel : Resolved.Expr → Nat
         stagedResolvedExecutionFuel thenBranch +
         stagedResolvedExecutionFuel elseBranch + 2
 
-/-- Translate the graph runner's observable outcome to the existing public
-Core result carrier.  A graph continuation is intentionally opaque at this
-compatibility boundary, so an exhausted run retains its exact store in an
-inert Core state. -/
-private def runtimeResultToCore : SourceRuntime.RunResult →
-    Core.StatefulRunResult
-  | .done value store =>
-      match value.toCore? with
-      | some value => .done value store
-      | none =>
-          let state := Core.State.initial .unit [] store
-          .fault (.expectedFunction .unit) state
-  | .outOfFuel store =>
-      .outOfFuel (Core.State.initial .unit [] store)
-  | .fault _ store =>
-      let state := Core.State.initial .unit [] store
-      .fault (.expectedFunction .unit) state
-
-/-- Execute through the selected backend without erasing graph faults or
-manufacturing a Core continuation for graph fuel exhaustion. -/
-def LinkedEntry.runExact? (entry : LinkedEntry) (inputs : List Core.Value)
-    (fuel : Nat) (store : Core.Store := []) : Option ExecutionResult :=
-  if inputs.map Core.Value.type = entry.elaborated.inputs.values then
-    match entry.runtime with
-    | none => some (.core (Core.runStateful fuel
-        (Core.State.initial entry.elaborated.core inputs store)))
-    | some runtime => some (.runtime (runtime.run fuel entry.key inputs store))
-  else
-    none
-
 /-- Run a linked entry only when the supplied runtime values have exactly the
-source input types and order retained by elaboration.  This compatibility API
-projects graph exhaustion/faults into inert, non-resumable Core states; new
-clients should use `runExact?` when `runtime.isSome`. -/
+source input types and order retained by elaboration. -/
 def LinkedEntry.run? (entry : LinkedEntry) (inputs : List Core.Value)
     (fuel : Nat) (store : Core.Store := []) :
     Option Core.StatefulRunResult :=
-  match entry.runExact? inputs fuel store with
-  | some (.core result) => some result
-  | some (.runtime result) => some (runtimeResultToCore result)
-  | none => none
+  if inputs.map Core.Value.type = entry.elaborated.inputs.values then
+    some (Core.runStateful fuel
+      (Core.State.initial entry.elaborated.core inputs store))
+  else
+    none
 
 /-- First seed entry with a given canonical key. -/
 def LinkedProgram.findEntry? (program : LinkedProgram)
@@ -2303,106 +2259,25 @@ namespace Solcore.Frontend.SourceCoreDirectLinking
 
 theorem LinkedEntry.run?_of_matching_types (entry : LinkedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
-    (finite : entry.runtime = none)
     (typesEqual : inputs.map Core.Value.type = entry.elaborated.inputs.values) :
     entry.run? inputs fuel store = some (Core.runStateful fuel
       (Core.State.initial entry.elaborated.core inputs store)) := by
-  simp [LinkedEntry.run?, LinkedEntry.runExact?, finite, typesEqual]
-
-theorem LinkedEntry.runExact?_of_matching_types (entry : LinkedEntry)
-    (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
-    (finite : entry.runtime = none)
-    (typesEqual : inputs.map Core.Value.type = entry.elaborated.inputs.values) :
-    entry.runExact? inputs fuel store = some (.core (Core.runStateful fuel
-      (Core.State.initial entry.elaborated.core inputs store))) := by
-  simp [LinkedEntry.runExact?, finite, typesEqual]
+  simp [LinkedEntry.run?, typesEqual]
 
 theorem LinkedEntry.run?_of_mismatched_types (entry : LinkedEntry)
     (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
     (mismatch : inputs.map Core.Value.type ≠
       entry.elaborated.inputs.values) :
     entry.run? inputs fuel store = none := by
-  simp [LinkedEntry.run?, LinkedEntry.runExact?, mismatch]
-
-theorem LinkedEntry.runExact?_of_mismatched_types (entry : LinkedEntry)
-    (inputs : List Core.Value) (fuel : Nat) (store : Core.Store)
-    (mismatch : inputs.map Core.Value.type ≠
-      entry.elaborated.inputs.values) :
-    entry.runExact? inputs fuel store = none := by
-  simp [LinkedEntry.runExact?, mismatch]
+  simp [LinkedEntry.run?, mismatch]
 
 /-- A successful direct-Core entry preserves both its independently checked
 result type and a well-typed store.  The runtime environment premise is
 deliberately deep: the public tag check alone cannot justify closure or cell
 contents supplied by a caller. -/
-theorem LinkedEntry.runExact?_core_done_preserves_type
+theorem LinkedEntry.run?_done_preserves_type
     (entry : LinkedEntry) (inputs : List Core.Value) (fuel : Nat)
     (store : Core.Store) {world : Core.StoreTyping}
-    (environmentTyped : Core.RuntimeEnvironmentHasTypes world inputs
-      entry.elaborated.inputs.values)
-    (storeTyped : Core.StoreHasTypes world store)
-    {value : Core.Value} {finalStore : Core.Store}
-    (ran : entry.runExact? inputs fuel store =
-      some (.core (.done value finalStore))) :
-    ∃ finalWorld,
-      Core.StoreHasTypes finalWorld finalStore ∧
-      Core.RuntimeValueHasType finalWorld value
-        entry.elaborated.returnType := by
-  have typesEqual : inputs.map Core.Value.type =
-      entry.elaborated.inputs.values :=
-    environmentTyped.type_tags
-  have coreRan : Core.runStateful fuel
-      (Core.State.initial entry.elaborated.core inputs store) =
-        .done value finalStore := by
-    unfold LinkedEntry.runExact? at ran
-    simp only [typesEqual, ↓reduceIte] at ran
-    split at ran
-    · simpa using ran
-    · simp at ran
-  have initialTyped : Core.StateHasType
-      (Core.State.initial entry.elaborated.core inputs store)
-      entry.elaborated.returnType :=
-    .eval storeTyped environmentTyped
-      (Core.infer_sound entry.elaborated.coreTypeChecked) .nil
-  exact Core.well_typed_runStateful_preserves_result_type
-    initialTyped coreRan
-
-/-- Deeply typed caller values and store also exclude every Core machine fault
-on the direct backend, at every finite fuel budget. -/
-theorem LinkedEntry.runExact?_core_never_faults
-    (entry : LinkedEntry) (inputs : List Core.Value) (fuel : Nat)
-    (store : Core.Store) {world : Core.StoreTyping}
-    (environmentTyped : Core.RuntimeEnvironmentHasTypes world inputs
-      entry.elaborated.inputs.values)
-    (storeTyped : Core.StoreHasTypes world store)
-    (error : Core.MachineFault) (faultState : Core.State) :
-    entry.runExact? inputs fuel store ≠
-      some (.core (.fault error faultState)) := by
-  have typesEqual : inputs.map Core.Value.type =
-      entry.elaborated.inputs.values :=
-    environmentTyped.type_tags
-  have initialTyped : Core.StateHasType
-      (Core.State.initial entry.elaborated.core inputs store)
-      entry.elaborated.returnType :=
-    .eval storeTyped environmentTyped
-      (Core.infer_sound entry.elaborated.coreTypeChecked) .nil
-  intro faulted
-  have coreFaulted : Core.runStateful fuel
-      (Core.State.initial entry.elaborated.core inputs store) =
-        .fault error faultState := by
-    unfold LinkedEntry.runExact? at faulted
-    simp only [typesEqual, ↓reduceIte] at faulted
-    split at faulted
-    · simpa using faulted
-    · simp at faulted
-  exact Core.well_typed_runStateful_never_faults initialTyped coreFaulted
-
-/-- The compatibility projection has the same preservation guarantee on the
-finite direct-Core path. -/
-theorem LinkedEntry.run?_core_done_preserves_type
-    (entry : LinkedEntry) (inputs : List Core.Value) (fuel : Nat)
-    (store : Core.Store) {world : Core.StoreTyping}
-    (finite : entry.runtime = none)
     (environmentTyped : Core.RuntimeEnvironmentHasTypes world inputs
       entry.elaborated.inputs.values)
     (storeTyped : Core.StoreHasTypes world store)
@@ -2418,7 +2293,9 @@ theorem LinkedEntry.run?_core_done_preserves_type
   have coreRan : Core.runStateful fuel
       (Core.State.initial entry.elaborated.core inputs store) =
         .done value finalStore := by
-    simpa [LinkedEntry.run?, LinkedEntry.runExact?, finite, typesEqual] using ran
+    unfold LinkedEntry.run? at ran
+    simp only [typesEqual, ↓reduceIte] at ran
+    simpa using ran
   have initialTyped : Core.StateHasType
       (Core.State.initial entry.elaborated.core inputs store)
       entry.elaborated.returnType :=
@@ -2426,6 +2303,33 @@ theorem LinkedEntry.run?_core_done_preserves_type
       (Core.infer_sound entry.elaborated.coreTypeChecked) .nil
   exact Core.well_typed_runStateful_preserves_result_type
     initialTyped coreRan
+
+/-- Deeply typed caller values and store also exclude every Core machine fault
+on the direct backend, at every finite fuel budget. -/
+theorem LinkedEntry.run?_never_faults
+    (entry : LinkedEntry) (inputs : List Core.Value) (fuel : Nat)
+    (store : Core.Store) {world : Core.StoreTyping}
+    (environmentTyped : Core.RuntimeEnvironmentHasTypes world inputs
+      entry.elaborated.inputs.values)
+    (storeTyped : Core.StoreHasTypes world store)
+    (error : Core.MachineFault) (faultState : Core.State) :
+    entry.run? inputs fuel store ≠ some (.fault error faultState) := by
+  have typesEqual : inputs.map Core.Value.type =
+      entry.elaborated.inputs.values :=
+    environmentTyped.type_tags
+  have initialTyped : Core.StateHasType
+      (Core.State.initial entry.elaborated.core inputs store)
+      entry.elaborated.returnType :=
+    .eval storeTyped environmentTyped
+      (Core.infer_sound entry.elaborated.coreTypeChecked) .nil
+  intro faulted
+  have coreFaulted : Core.runStateful fuel
+      (Core.State.initial entry.elaborated.core inputs store) =
+        .fault error faultState := by
+    unfold LinkedEntry.run? at faulted
+    simp only [typesEqual, ↓reduceIte] at faulted
+    simpa using faulted
+  exact Core.well_typed_runStateful_never_faults initialTyped coreFaulted
 
 @[simp] theorem link_budgetExhausted (program : CheckedProgram) (plan : Plan)
     (next : SpecializationKey)
