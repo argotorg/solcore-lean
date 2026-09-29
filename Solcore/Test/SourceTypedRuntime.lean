@@ -1165,12 +1165,10 @@ private def testContextualCallRequirementValidation
       } :: prepared.plan.referenceEdges
     }
   }
-  expectPlanValidationFault "constrained first-class reference"
-    (fun error => match error with
-      | .unresolvedAssumptions key assumptions =>
-          decide (key = fixture.callee ∧ assumptions = [fixture.predicate])
-      | _ => false)
-    (SourceTypedRuntime.validateExecutablePlan constrainedReference.plan)
+  match SourceTypedRuntime.validateExecutablePlan constrainedReference.plan with
+  | .ok () => pure ()
+  | .error error => throw (IO.userError
+      s!"constrained first-class reference was rejected: {reprStr error}")
 
 private def specializationNamedInPlan (program : CheckedProgram)
     (prepared : Prepared) (name : String) :
@@ -1306,10 +1304,8 @@ private def testQualifiedLocalRequirementValidation
     fixture.actualRequirement (.assumption fixture.actualSolved.predicate)
   expectPreExecutionFault "qualified-local actual assumption evidence"
     (fun error => match error with
-      | .localSchemeActualExpectedImplementation caller occurrence binder
-          requirement =>
+      | .missingRuntimeAssumptionEvidence caller occurrence requirement _ =>
           decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
-            binder = fixture.binder.id ∧
             requirement = fixture.actualRequirement)
       | _ => false)
     (runPrepared assumption [.bool true])
@@ -1360,21 +1356,6 @@ private def testQualifiedLocalRequirementValidation
             requirement = unusedId)
       | _ => false)
     (runPrepared unusedTemplate [.bool true])
-
-  let escapedReference := rewriteEntryFunction prepared fun function => {
-    function with
-    typedBody := {
-      function.typedBody with
-      roots := .expression fixture.reference.id :: function.typedBody.roots
-    }
-  }
-  expectPreExecutionFault "escaped qualified-local reference"
-    (fun error => match error with
-      | .unsupportedQualifiedLocalReference caller occurrence binder =>
-          decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
-            binder = fixture.binder.id)
-      | _ => false)
-    (runPrepared escapedReference [.bool true])
 
   let escapedCallee := rewriteEntryFunction prepared fun function => {
     function with

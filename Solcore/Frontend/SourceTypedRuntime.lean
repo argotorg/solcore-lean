@@ -104,7 +104,10 @@ inductive Value where
       (substitution : Substitution)
       (requirements : List LocalRequirementWitness)
       (principal : Value)
-  | global (key : Key)
+  /-- One closed view of a source declaration.  The evidence list is stored
+  in the declaration's predicate order so an indirect invocation has the same
+  authenticated dictionary that was available at the reference occurrence. -/
+  | global (key : Key) (evidence : RuntimeEvidenceEnvironment)
   | builtin (function : BuiltinFunctionId)
   deriving Repr
 
@@ -182,7 +185,7 @@ mutual
         some (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType)
     | .instantiated substitution _ principal =>
         substitution.apply <$> principal.type? plan
-    | .global key => do
+    | .global key _ => do
         let specialized ← findSpecialization? plan key
         pure specialized.function.type
     | .builtin function => some function.type
@@ -325,7 +328,8 @@ mutual
     | .constructed left leftArguments,
         .constructed right rightArguments =>
         decide (left = right) && valuesEqual leftArguments rightArguments
-    | .global left, .global right => decide (left = right)
+    | .global left leftEvidence, .global right rightEvidence =>
+        decide (left = right) && leftEvidence == rightEvidence
     | .builtin left, .builtin right => left == right
     | _, _ => false
 
@@ -414,6 +418,9 @@ inductive RuntimeError where
   | runtimeEvidenceResolutionInconclusive (key : Key)
       (reason : TraitResolution.InconclusiveReason
         ProgramTraitId Ty ProgramImplId)
+  | runtimeEvidenceNotSelected
+      (key : Key) (index : Nat) (goal : ProgramPredicate)
+      (implementation : ProgramImplId)
   | missingRuntimeAssumptionEvidence
       (caller : Key) (id : ExpressionId) (requirement : RequirementId)
       (predicate : ProgramPredicate)
@@ -437,6 +444,9 @@ inductive RuntimeError where
   | callRequirementCountMismatch
       (caller : Key) (id : ExpressionId) (expected actual : Nat)
   | invalidDirectCallRequirementLayout
+      (caller : Key) (id : ExpressionId)
+      (requirements : List RequirementId)
+  | invalidDeclarationReferenceRequirementLayout
       (caller : Key) (id : ExpressionId)
       (requirements : List RequirementId)
   | duplicateCallRequirement
@@ -750,6 +760,30 @@ private def ordinaryOwnedRequirements? (node : ExpressionNode) :
       (node.requirements.length - coercions.length)
     if node.requirements = owned ++ coercions then some owned else none
 
+/-- Recover the predicate-owned portion of a standalone declaration
+reference.  Result-coercion requirements remain outside this ledger, exactly
+as they do for other ordinary expressions. -/
+private def exactDeclarationReferenceRequirementIds
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    Except RuntimeError (List RequirementId) := do
+  let requirements ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.invalidDeclarationReferenceRequirementLayout caller.key
+        node.id node.requirements)
+  if requirements.length != instantiation.predicates.length then
+    throw (.callRequirementCountMismatch caller.key node.id
+      instantiation.predicates.length requirements.length)
+  match firstDuplicateRequirement requirements with
+  | some requirement =>
+      throw (.duplicateCallRequirement caller.key node.id requirement)
+  | none => pure ()
+  unless requirementPredicatesMatch caller.function requirements
+      instantiation.predicates do
+    throw (.invalidDeclarationReferenceRequirementLayout caller.key node.id
+      requirements)
+  pure requirements
+
 private def directLambdaLetBinder? (source : TypedSource)
     (id : Resolved.LocalId) : Option TypedBinder :=
   source.nodes.findSome? fun
@@ -775,10 +809,26 @@ private def exactCallSolvedRequirement
   | solved => .error (.duplicateSolvedRequirements caller.key occurrence
       requirement solved.length)
 
-private def localRequirementWitnesses
+private def runtimeEvidenceGoal :
+    TypedTraitResolution.Evidence → ProgramPredicate
+  | .byImpl goal _ _ => goal
+
+private def availableRuntimeEvidence?
+    (environment : RuntimeEvidenceEnvironment)
+    (predicate : ProgramPredicate) : Option TypedTraitResolution.Evidence :=
+  environment.find? fun evidence =>
+    decide (runtimeEvidenceGoal evidence = predicate)
+
+private structure LocalRequirementBinding where
+  template : LocalSchemeRequirement
+  actualRequirement : RequirementId
+  predicate : ProgramPredicate
+  actualSolved : SolvedRequirement
+
+private def localRequirementBindings
     (caller : SourceSpecialization.SpecializedFunction)
     (binder : TypedBinder) (node : ExpressionNode) :
-    Except RuntimeError (Substitution × List LocalRequirementWitness) := do
+    Except RuntimeError (Substitution × List LocalRequirementBinding) := do
   let substitution ←
     match SourceSpecialization.matchClosedSchemeInstance? binder.scheme
         node.rawType with
@@ -800,7 +850,7 @@ private def localRequirementWitnesses
         binder.id requirement)
   | none => pure ()
   let pairs := List.zip binder.schemeRequirements node.requirements
-  let mut witnesses := []
+  let mut bindings := []
   for (template, actualRequirement) in pairs do
     let templateSolved ← exactCallSolvedRequirement caller node.id
       template.templateRequirement
@@ -830,22 +880,36 @@ private def localRequirementWitnesses
     if actualSolved.evidence.goal != predicate then
       throw (.callRequirementEvidenceGoalMismatch caller.key node.id
         actualRequirement predicate actualSolved.evidence.goal)
-    let evidence ← match actualSolved.evidence with
-      | .implementation evidence => pure evidence
-      | .assumption _ =>
-          throw (.localSchemeActualExpectedImplementation caller.key node.id
-            binder.id actualRequirement)
-    witnesses := witnesses ++ [{
-      templateRequirement := template.templateRequirement
+    bindings := bindings ++ [{
+      template
       actualRequirement
       predicate
+      actualSolved
+    }]
+  pure (substitution, bindings)
+
+private def localRequirementWitnesses
+    (caller : SourceSpecialization.SpecializedFunction)
+    (available : RuntimeEvidenceEnvironment)
+    (binder : TypedBinder) (node : ExpressionNode) :
+    Except RuntimeError (Substitution × List LocalRequirementWitness) := do
+  let (substitution, bindings) ← localRequirementBindings caller binder node
+  let mut witnesses := []
+  for binding in bindings do
+    let evidence ← match binding.actualSolved.evidence with
+      | .implementation evidence => pure evidence
+      | .assumption assumption =>
+          match availableRuntimeEvidence? available assumption with
+          | some evidence => pure evidence
+          | none => throw (.missingRuntimeAssumptionEvidence caller.key node.id
+              binding.actualRequirement assumption)
+    witnesses := witnesses ++ [{
+      templateRequirement := binding.template.templateRequirement
+      actualRequirement := binding.actualRequirement
+      predicate := binding.predicate
       evidence
     }]
   pure (substitution, witnesses)
-
-private def runtimeEvidenceGoal :
-    TypedTraitResolution.Evidence → ProgramPredicate
-  | .byImpl goal _ _ => goal
 
 private def validateRuntimeEvidenceGoals (key : Key) :
     Nat → List ProgramPredicate → RuntimeEvidenceEnvironment →
@@ -871,6 +935,35 @@ private def validateRuntimeEvidence (key : Key)
   else
     throw (.runtimeEvidenceCountMismatch key predicates.length
       environment.length)
+
+private def validateRuntimeEvidenceSelection (signatures : ProgramSignatures)
+    (key : Key) : Nat → List ProgramPredicate → RuntimeEvidenceEnvironment →
+      Except RuntimeError Unit
+  | _, [], [] => pure ()
+  | index, predicate :: predicates, evidence :: evidenceRest =>
+      match (TypedTraitResolution.resolve signatures.resolutionRules 32
+          predicate).outcome with
+      | .noSolution =>
+          throw (.runtimeEvidenceResolutionNoSolution key predicate)
+      | .inconclusive reason =>
+          throw (.runtimeEvidenceResolutionInconclusive key reason)
+      | .success selected =>
+          if selected == evidence then
+            validateRuntimeEvidenceSelection signatures key (index + 1)
+              predicates evidenceRest
+          else
+            let .byImpl _ implementation _ := evidence
+            throw (.runtimeEvidenceNotSelected key index predicate
+              implementation)
+  | _, predicates, evidence =>
+      throw (.runtimeEvidenceCountMismatch key predicates.length evidence.length)
+
+private def validateAuthenticatedRuntimeEvidence
+    (signatures : ProgramSignatures) (key : Key)
+    (predicates : List ProgramPredicate)
+    (environment : RuntimeEvidenceEnvironment) : Except RuntimeError Unit := do
+  validateRuntimeEvidence key predicates environment
+  validateRuntimeEvidenceSelection signatures key 0 predicates environment
 
 private theorem validateRuntimeEvidenceGoals_success
     (key : Key) (index : Nat) (predicates : List ProgramPredicate)
@@ -917,12 +1010,6 @@ private theorem validateRuntimeEvidence_success_matches
       success
   · simp at success
 
-private def availableRuntimeEvidence?
-    (environment : RuntimeEvidenceEnvironment)
-    (predicate : ProgramPredicate) : Option TypedTraitResolution.Evidence :=
-  environment.find? fun evidence =>
-    decide (runtimeEvidenceGoal evidence = predicate)
-
 /-- Materialize call evidence in the callee declaration's predicate order.
 Concrete implementation evidence is retained verbatim.  A caller assumption
 is closed by the dictionary supplied when the caller specialization was
@@ -962,6 +1049,16 @@ private def exactDirectCallRuntimeEvidence
     (instantiation : DeclarationInstantiation) :
     Except RuntimeError RuntimeEvidenceEnvironment := do
   let requirements ← exactDirectCallRequirementIds caller node instantiation
+  materializeCallEvidence caller node.id available requirements
+    instantiation.predicates
+
+private def exactDeclarationReferenceRuntimeEvidence
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
+    (instantiation : DeclarationInstantiation) :
+    Except RuntimeError RuntimeEvidenceEnvironment := do
+  let requirements ← exactDeclarationReferenceRequirementIds caller node
+    instantiation
   materializeCallEvidence caller node.id available requirements
     instantiation.predicates
 
@@ -1293,6 +1390,26 @@ private def validateExecutableDirectCallImplementationEvidence
   validateExecutableCallImplementationEvidence signatures caller node.id
     requirements instantiation.predicates
 
+private def validateExecutableDeclarationReferenceRequirements
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    Except RuntimeError Unit := do
+  let requirements ← exactDeclarationReferenceRequirementIds caller node
+    instantiation
+  validateExecutableCallRequirementEvidence caller node.id requirements
+    instantiation.predicates
+
+private def validateExecutableDeclarationReferenceImplementationEvidence
+    (signatures : ProgramSignatures)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
+    Except RuntimeError Unit := do
+  validateExecutableDeclarationReferenceRequirements caller node instantiation
+  let requirements ← exactDeclarationReferenceRequirementIds caller node
+    instantiation
+  validateExecutableCallImplementationEvidence signatures caller node.id
+    requirements instantiation.predicates
+
 private def nodeUseCount (source : TypedSource) (target : NodeId) : Nat :=
   let rootCount := (source.roots.filter fun root => root == target).length
   source.nodes.foldl (fun count node =>
@@ -1304,19 +1421,6 @@ private def nodeUseCount (source : TypedSource) (target : NodeId) : Nat :=
           (SourceSpecialization.statementChildNodeIds source statement |>.filter
             fun child => child == target).length) rootCount
 
-private def indirectCalleeUseCount (source : TypedSource)
-    (target : ExpressionId) : Nat :=
-  source.nodes.foldl (fun count node =>
-    match node with
-    | .expression { form := .call callee _ (.indirect _), .. } =>
-        if callee == target then count + 1 else count
-    | _ => count) 0
-
-private def isExclusiveIndirectCallee (source : TypedSource)
-    (target : ExpressionId) : Bool :=
-  indirectCalleeUseCount source target == 1 &&
-    nodeUseCount source (.expression target) == 1
-
 private def directDeclarationCalleeUseCount (source : TypedSource)
     (target : ExpressionId) : Nat :=
   source.nodes.foldl (fun count node =>
@@ -1324,6 +1428,17 @@ private def directDeclarationCalleeUseCount (source : TypedSource)
     | .expression { form := .call callee _ (.declaration _), .. } =>
         if callee == target then count + 1 else count
     | _ => count) 0
+
+private def declarationUse?
+    (node : ExpressionNode) :
+    Option (List RequirementId × DeclarationInstantiation) :=
+  match node.form with
+  | .call _ _ (.declaration instantiation) =>
+      some (node.requirements, instantiation)
+  | .reference _ (.declaration instantiation) => do
+      let requirements ← ordinaryOwnedRequirements? node
+      some (requirements, instantiation)
+  | _ => none
 
 private def validateQualifiedLocalTemplateCoverage
     (caller : SourceSpecialization.SpecializedFunction)
@@ -1341,18 +1456,20 @@ private def validateQualifiedLocalTemplateCoverage
         binder.id)
   unless nodeUseCount source (.expression initializer) == 1 do
     throw (.unsupportedQualifiedLocalInitializer caller.key binder.id initializer)
-  let templateCalls := source.nodes.filterMap fun
-    | .expression expression@{
-        form := .call _ _ (.declaration instantiation), .. } =>
-        if expression.requirements.any templateIds.contains then
-          some (expression, instantiation)
-        else
-          none
+  let templateUses := source.nodes.filterMap fun
+    | .expression expression =>
+        match declarationUse? expression with
+        | some (requirements, instantiation) =>
+            if requirements.any templateIds.contains then
+              some (expression, requirements, instantiation)
+            else
+              none
+        | none => none
     | _ => none
-  for (call, instantiation) in templateCalls do
+  for (declarationUse, requirements, instantiation) in templateUses do
     let expected := binder.schemeRequirements.filter fun template =>
-      call.requirements.contains template.templateRequirement
-    let actual := (List.zip call.requirements instantiation.predicates).filter
+      requirements.contains template.templateRequirement
+    let actual := (List.zip requirements instantiation.predicates).filter
       fun pair => templateIds.contains pair.1
     unless actual.map Prod.fst == expected.map (·.templateRequirement) &&
         actual.map Prod.snd == expected.map (·.predicate) do
@@ -1360,7 +1477,7 @@ private def validateQualifiedLocalTemplateCoverage
       | some first =>
           throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
             first.templateRequirement)
-      | none => throw (.unsupportedRequirements call.requirements)
+      | none => throw (.unsupportedRequirements declarationUse.requirements)
   for template in binder.schemeRequirements do
     let uses := source.nodes.filterMap fun
       | .expression expression =>
@@ -1369,44 +1486,59 @@ private def validateQualifiedLocalTemplateCoverage
           else
             none
       | .statement _ => none
-    let (call, callee, instantiation) ← match uses with
-      | [call] =>
-          match call.form with
-          | .call callee _ (.declaration instantiation) =>
-              pure (call, callee, instantiation)
-          | _ => throw (.unsupportedLocalSchemeTemplateUse caller.key
+    let (declarationUse, requirements, instantiation) ← match uses with
+      | [declarationUse] =>
+          match declarationUse? declarationUse with
+          | some (requirements, instantiation) =>
+              pure (declarationUse, requirements, instantiation)
+          | none => throw (.unsupportedLocalSchemeTemplateUse caller.key
               binder.id template.templateRequirement)
       | _ => throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
           template.templateRequirement)
-    unless directLambdaBodyContains source binder call.id do
+    unless directLambdaBodyContains source binder declarationUse.id do
       throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
         template.templateRequirement)
-    unless call.requirements.length == instantiation.predicates.length &&
-        (List.zip call.requirements instantiation.predicates).any (fun pair =>
+    unless requirements.length == instantiation.predicates.length &&
+        (List.zip requirements instantiation.predicates).any (fun pair =>
           pair.1 == template.templateRequirement &&
             pair.2 == template.predicate) do
       throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
         template.templateRequirement)
-    unless directDeclarationCalleeUseCount source callee == 1 &&
-        nodeUseCount source (.expression callee) == 1 do
-      throw (.unsupportedConstrainedDeclarationReference caller.key call.id
-        callee)
+    match declarationUse.form with
+    | .call callee _ (.declaration _) =>
+        unless directDeclarationCalleeUseCount source callee == 1 &&
+            nodeUseCount source (.expression callee) == 1 do
+          throw (.unsupportedConstrainedDeclarationReference caller.key
+            declarationUse.id callee)
+    | .reference _ (.declaration _) =>
+        unless directDeclarationCalleeUseCount source declarationUse.id == 0 do
+          throw (.unsupportedConstrainedDeclarationReference caller.key
+            declarationUse.id declarationUse.id)
+    | _ =>
+        throw (.unsupportedLocalSchemeTemplateUse caller.key binder.id
+          template.templateRequirement)
+
+private def validateQualifiedLocalReferenceLayout
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (binder : TypedBinder) : Except RuntimeError Unit := do
+  validateQualifiedLocalTemplateCoverage caller node binder
+  discard <| localRequirementBindings caller binder node
 
 private def validateQualifiedLocalReference
     (caller : SourceSpecialization.SpecializedFunction)
+    (available : RuntimeEvidenceEnvironment)
     (node : ExpressionNode) (binder : TypedBinder) :
     Except RuntimeError (List LocalRequirementWitness) := do
   validateQualifiedLocalTemplateCoverage caller node binder
-  unless isExclusiveIndirectCallee caller.function.typedBody node.id do
-    throw (.unsupportedQualifiedLocalReference caller.key node.id binder.id)
-  let (_, witnesses) ← localRequirementWitnesses caller binder node
+  let (_, witnesses) ← localRequirementWitnesses caller available binder node
   pure witnesses
 
 private def validateQualifiedLocalReferenceEvidence
     (signatures : ProgramSignatures)
     (caller : SourceSpecialization.SpecializedFunction)
+    (available : RuntimeEvidenceEnvironment)
     (node : ExpressionNode) (binder : TypedBinder) : Except RuntimeError Unit := do
-  let witnesses ← validateQualifiedLocalReference caller node binder
+  let witnesses ← validateQualifiedLocalReference caller available node binder
   for witness in witnesses do
     validateSelectedCallImplementationEvidence signatures caller node.id
       witness.actualRequirement witness.predicate witness.evidence
@@ -1493,6 +1625,15 @@ private def validateExpressionMetadata
         throw (.unsupportedRequirements node.requirements)
   | .call _ _ (.declaration instantiation) =>
       validateExecutableDirectCallRequirements specialized node instantiation
+  | .reference _ (.declaration instantiation) =>
+      let directUses := directDeclarationCalleeUseCount function.typedBody node.id
+      if directUses != 0 then
+        unless node.requirements.isEmpty do
+          throw (.unsupportedConstrainedDeclarationReference specialized.key
+            node.id node.id)
+      else
+        validateExecutableDeclarationReferenceRequirements specialized node
+          instantiation
   | .reference _ (.local binderId) =>
       let owned ← match ordinaryOwnedRequirements? node with
         | some requirements => pure requirements
@@ -1504,7 +1645,7 @@ private def validateExpressionMetadata
             unless owned.isEmpty do
               throw (.unsupportedRequirements owned)
           else
-            discard <| validateQualifiedLocalReference specialized ownedNode binder
+            validateQualifiedLocalReferenceLayout specialized ownedNode binder
       | none =>
           unless owned.isEmpty do
             throw (.unsupportedRequirements owned)
@@ -1634,13 +1775,14 @@ private def validateSpecializationMetadata
     Except RuntimeError Unit :=
   validateSpecializationMetadataWith false specialized
 
-/-- Assumptions are executable only for a specialization reached exclusively
-as a direct-call target.  Public seeds and first-class declaration references
-continue to use the closed-specialization contract. -/
-private def allowsDirectAssumptionInvocation (plan : Plan) (key : Key) : Bool :=
-  plan.callEdges.any (fun edge => edge.callee == key) &&
-    !plan.seedKeys.contains key &&
-    !plan.referenceEdges.any fun edge => edge.callee == key
+/-- An assumed specialization is executable only when every public entry has
+already discharged its dictionary.  Both direct calls and first-class
+declaration references carry that closed evidence across the boundary; a seed
+still has no enclosing provider and therefore must remain closed. -/
+private def allowsEvidenceInvocation (plan : Plan) (key : Key) : Bool :=
+  (plan.callEdges.any (fun edge => edge.callee == key) ||
+    plan.referenceEdges.any fun edge => edge.callee == key) &&
+    !plan.seedKeys.contains key
 
 /-- Preflight every reachable specialization before selecting this runtime as
 an executable backend.  The canonical worklist has already fixed the finite
@@ -1649,7 +1791,7 @@ does not dispatch instead of postponing that rejection until a call happens. -/
 def validateExecutablePlan (plan : Plan) : Except RuntimeError Unit := do
   for specialized in plan.specializations do
     validateSpecializationMetadataWith
-      (allowsDirectAssumptionInvocation plan specialized.key) specialized
+      (allowsEvidenceInvocation plan specialized.key) specialized
 
 /-- Signature-aware safe-boundary validation.  The structural pass retains
 its existing diagnostics and ordering; the second pass authenticates every
@@ -1682,13 +1824,20 @@ def validateExecutablePlanEvidence (program : CheckedProgram)
               validateExecutableDirectCallImplementationEvidence
                 program.signatures
                 specialized node instantiation
+          | .reference _ (.declaration instantiation) =>
+              if directDeclarationCalleeUseCount
+                  specialized.function.typedBody node.id == 0 then
+                validateExecutableDeclarationReferenceImplementationEvidence
+                  program.signatures specialized node instantiation
+              else
+                pure ()
           | .reference _ (.local binderId) =>
               match directLambdaLetBinder?
                   specialized.function.typedBody binderId with
               | some binder =>
                   unless binder.schemeRequirements.isEmpty do
                     validateQualifiedLocalReferenceEvidence program.signatures
-                      specialized node binder
+                      specialized available node binder
               | none => pure ()
           | _ => pure ()
       | .statement _ => pure ()
@@ -2316,6 +2465,7 @@ private def modifyLeafBitNot (plan : Plan) :
 stored in the heap.  The occurrence must be closed and every quantified
 variable must have been determined by matching the scheme body. -/
 private def instantiateDirectLambdaLet? (plan : Plan) (owner : Key)
+    (available : RuntimeEvidenceEnvironment)
     (source : TypedSource) (id : Resolved.LocalId) (node : ExpressionNode)
     (value : Value) : Except RuntimeError (Option Value) := do
   let some binder := directLambdaLetBinder? source id
@@ -2329,7 +2479,7 @@ private def instantiateDirectLambdaLet? (plan : Plan) (owner : Key)
     | none => throw (.unsupportedRequirements node.requirements)
   let node := { node with requirements := owned, coercions := [] }
   let (substitution, requirements) ←
-    localRequirementWitnesses caller binder node
+    localRequirementWitnesses caller available binder node
   match value with
   | .closure _ _ _ _ _ _ _ =>
       pure (some (.instantiated substitution requirements value))
@@ -2469,8 +2619,8 @@ mutual
                   | some { value := none, .. } =>
                       .fault (.uninitializedLocal binder) state
                   | some { value := some value, .. } =>
-                      match instantiateDirectLambdaLet? plan owner source binder
-                          node value with
+                      match instantiateDirectLambdaLet? plan owner evidence
+                          source binder node value with
                       | .ok (some instantiated) => .done instantiated state
                       | .ok none => .done value state
                       | .error error => .fault error state
@@ -2483,7 +2633,20 @@ mutual
               | .error error => .fault error state
               | .ok target =>
                   match exactReferenceKey plan owner id target with
-                  | .ok key => .done (.global key) state
+                  | .ok key =>
+                      match exactSpecialization plan owner with
+                      | .error error => .fault error state
+                      | .ok caller =>
+                          match exactDeclarationReferenceRuntimeEvidence caller
+                              node evidence instantiation with
+                          | .ok referenceEvidence =>
+                              match validateAuthenticatedRuntimeEvidence
+                                  program.signatures key
+                                  instantiation.predicates referenceEvidence with
+                              | .ok () =>
+                                  .done (.global key referenceEvidence) state
+                              | .error error => .fault error state
+                          | .error error => .fault error state
                   | .error error => .fault error state
           | .group inner => descend state inner
           | .tuple elements =>
@@ -2662,9 +2825,10 @@ mutual
           match applyBuiltin builtin arguments with
           | .ok value => .done value state
           | .error error => .fault error state
-      | .global key =>
+      | .global key evidence =>
           expressionOfRunResult
-            (invokeSpecialization fuel program plan key arguments state)
+            (invokeDirectSpecialization fuel program plan key evidence arguments
+              state)
       | .closure parameters expected body source owner captured evidence =>
           if parameters.length != arguments.length then
             .fault (.argumentArityMismatch parameters.length arguments.length) state
@@ -2724,8 +2888,7 @@ mutual
                         finishFunctionFlow plan expected flow
 
   /-- Enter a specialization whose where-predicates were discharged by the
-  immediately enclosing, validated direct declaration call.  This entry point
-  is deliberately absent from `Value.global`, roots, and indirect calls. -/
+  immediately enclosing direct call or declaration-value construction. -/
   private def invokeDirectSpecialization (fuel : Nat) (program : CheckedProgram)
       (plan : Plan) (key : Key)
       (evidence : RuntimeEvidenceEnvironment)
@@ -2738,11 +2901,11 @@ mutual
       | .ok specialized =>
           let function := specialized.function
           match validateSpecializationMetadataWith
-              (allowsDirectAssumptionInvocation plan key) specialized with
+              (allowsEvidenceInvocation plan key) specialized with
           | .error error => .fault error state
           | .ok () =>
-              match validateRuntimeEvidence key specialized.assumptions
-                  evidence with
+              match validateAuthenticatedRuntimeEvidence program.signatures key
+                  specialized.assumptions evidence with
               | .error error => .fault error state
               | .ok () =>
                   let expected := function.inferredBodyType
@@ -3210,10 +3373,15 @@ mutual
                   instantiation.payloadTypes arguments
             else
               .invalid
-        | .function _ _, .global key =>
+        | .function _ _, .global key evidence =>
             match exactSpecialization plan key with
             | .ok specialized =>
-                if specialized.function.type = expected then .valid else .invalid
+                if specialized.function.type = expected then
+                  match validateAuthenticatedRuntimeEvidence signatures key
+                      specialized.assumptions evidence with
+                  | .ok () => .valid
+                  | .error _ => .invalid
+                else .invalid
             | .error _ => .invalid
         | .function _ _, .builtin function =>
             if function.type = expected then .valid else .invalid
@@ -3287,9 +3455,11 @@ def Value.HasDeepTypeFuel :
             | some principalType =>
                 principal.HasDeepTypeFuel fuel signatures plan state principalType
             | none => False
-        | .global key =>
+        | .global key evidence =>
             ∃ specialized, exactSpecialization plan key = .ok specialized ∧
-              specialized.function.type = expected
+              specialized.function.type = expected ∧
+              validateAuthenticatedRuntimeEvidence signatures key
+                specialized.assumptions evidence = .ok ()
         | _ => True
 
 /-- All finite structural-heap observations of one value; this still does not
@@ -3439,9 +3609,11 @@ def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
       | .instantiated substitution requirements principal =>
           principal.HasPlanCodeFuel fuel plan ∧
             principal.HasInstantiatedPlanCode substitution plan requirements
-      | .global key =>
+      | .global key evidence =>
           validateExecutablePlan plan = .ok () ∧
-            ∃ specialized, exactSpecialization plan key = .ok specialized
+            ∃ specialized, exactSpecialization plan key = .ok specialized ∧
+              validateRuntimeEvidence key specialized.assumptions evidence =
+                .ok ()
       | _ => True
 
 def Value.HasPlanCode (value : Value) (plan : Plan) : Prop :=
