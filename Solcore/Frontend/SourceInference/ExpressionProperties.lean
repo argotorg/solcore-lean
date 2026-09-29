@@ -3440,6 +3440,19 @@ path to one expression node. -/
   simp [appendExpressionCoercions, ExpressionNode.applySubstitution,
     coercionRequirements_applySubstitution]
 
+/-- Attaching delayed argument coercions rewrites only the typed node table;
+the complete inference state is unchanged. -/
+@[simp] theorem attachExpressionCoercions_inference_eq
+    (state : State) (entries : List ExpressionCoercions) :
+    (attachExpressionCoercions state entries).inference = state.inference := by
+  unfold attachExpressionCoercions
+  induction entries generalizing state with
+  | nil => rfl
+  | cons entry entries induction =>
+      simp only [List.foldl_cons]
+      rw [induction]
+      rfl
+
 /-- Attaching delayed argument-coercion metadata leaves semantic inference
 unchanged and preserves the stable-binder readiness invariant. -/
 theorem attachExpressionCoercions_inferenceProperties
@@ -6414,17 +6427,6 @@ private theorem selectFunctionCandidateFrom_nextLocal
       rw [induction]
       rfl
 
-@[simp] private theorem attachExpressionCoercions_inference
-    (state : State) (entries : List ExpressionCoercions) :
-    (attachExpressionCoercions state entries).inference = state.inference := by
-  unfold attachExpressionCoercions
-  induction entries generalizing state with
-  | nil => rfl
-  | cons entry entries induction =>
-      simp only [List.foldl_cons]
-      rw [induction]
-      rfl
-
 @[simp] private theorem recordSelectedCall_state_header
     (source callee : Syntax.Expr) (name : String)
     (arguments : List InferredExpression) (attempt : CandidateAttemptResult) :
@@ -6483,7 +6485,7 @@ private theorem selectFunctionCandidateFrom_nextLocal
   unfold recordSelectedCallResult
   simp only [recordExpression, State.recordNode, State.resolve,
     TypeSystem.InferState.resolve, allocateExpressionId_inference,
-    attachExpressionCoercions_inference]
+    attachExpressionCoercions_inference_eq]
 
 @[simp] private theorem recordSelectedCallResult_inference
     (source callee : Syntax.Expr) (name : String)
@@ -6494,7 +6496,7 @@ private theorem selectFunctionCandidateFrom_nextLocal
       trailingCoercions state).2.inference = state.inference := by
   unfold recordSelectedCallResult
   simp only [recordExpression, State.recordNode,
-    allocateExpressionId_inference, attachExpressionCoercions_inference]
+    allocateExpressionId_inference, attachExpressionCoercions_inference_eq]
 
 @[simp] private theorem recordSelectedCall_resolve
     (source callee : Syntax.Expr) (name : String)
