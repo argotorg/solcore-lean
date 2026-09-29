@@ -1,6 +1,6 @@
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceSpecializationWorklist
-import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Frontend.SourceTypedRuntimeDeepSafety
 import Solcore.Frontend.SourceRuntimeLinking
 import Solcore.Frontend.SourceRuntimeDeepProperties
 import Solcore.Core.Safety
@@ -220,6 +220,34 @@ def TypedValueHasResultType (compiled : CompiledEntry)
     (value : SourceTypedRuntime.Value) : Prop :=
   value.HasPreparedType compiled.program compiled.plan compiled.resultType
 
+/-- Deep typed-source result at the exact prepared plan used for execution.
+This includes final-heap typing, closure/global code provenance, and
+authenticated runtime evidence rather than only the returned value's outer
+runtime tag. -/
+def TypedDeepResult (compiled : CompiledEntry)
+    (value : SourceTypedRuntime.Value)
+    (finalState : SourceTypedRuntime.RuntimeState) : Prop :=
+  match compiled.executable with
+  | .typedSource =>
+      SourceTypedRuntime.PreparedDeepResult compiled.program compiled.plan
+        compiled.root.function.inferredBodyType value finalState
+  | .core _ | .callGraph _ => False
+
+/-- Full typed-source boundary certificate for one normal execution.  It keeps
+the deeply safe initial heap and arguments, the deeply safe final heap and
+result, and preservation of every pre-existing location's declared type. -/
+def TypedDeepExecution (compiled : CompiledEntry)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState)
+    (value : SourceTypedRuntime.Value)
+    (finalState : SourceTypedRuntime.RuntimeState) : Prop :=
+  match compiled.executable with
+  | .typedSource =>
+      SourceTypedRuntime.PreparedDeepExecution compiled.program compiled.plan
+        (compiled.root.function.typedBody.inputs.map (·.scheme.body))
+        compiled.root.function.inferredBodyType arguments initial value finalState
+  | .core _ | .callGraph _ => False
+
 /-- The selected backend's result projection agrees with the public source
 result type.  Compilation checks this separately from runtime result typing:
 the latter alone would only refer to a backend-native declaration. -/
@@ -373,11 +401,11 @@ def GraphResultHasType (checked : SourceRuntime.CheckedProgram)
             signature.resultType
   | .outOfFuel _ | .fault _ _ => True
 
-/-- Backend-native typing for every successful result carrier.  The direct
-Core branch is deep and includes final-store typing; finite-graph and
-typed-source branches currently record only their runtime-checked result tags.
-They do not yet claim closure/capture or final store/heap preservation.  Fault
-and exhaustion cases are intentionally outside this predicate. -/
+/-- Backend-native typing for every successful result carrier.  Direct Core
+and typed source include their final store/heap and deeply typed values;
+typed-source certificates additionally retain closure code and authenticated
+evidence.  The compatibility call graph keeps its established checked runtime
+tag.  Fault and exhaustion cases are intentionally outside this predicate. -/
 def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult → Prop
   | .core (.done value finalStore) =>
       match compiled.executable with
@@ -397,11 +425,11 @@ def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult �
       | .callGraph entry => GraphResultHasType entry.program entry.key result
       | .typedSource => False
   | .callGraph (.outOfFuel _) | .callGraph (.fault _ _) => True
-  | .typedSource (.done value _) =>
+  | .typedSource (.done value finalState) =>
       match compiled.executable with
       | .typedSource =>
-          value.HasPreparedType compiled.program compiled.plan
-            compiled.root.function.inferredBodyType
+          SourceTypedRuntime.PreparedDeepResult compiled.program compiled.plan
+            compiled.root.function.inferredBodyType value finalState
       | .core _ | .callGraph _ => False
   | .typedSource (.outOfFuel _) | .typedSource (.fault _ _) => True
 
@@ -420,7 +448,7 @@ def run (compiled : CompiledEntry) (invocation : Invocation)
       .ok (.callGraph (entry.program.run options.executionFuel entry.key
         arguments store))
   | .typedSource, .typedValues arguments state =>
-      .ok (.typedSource (SourceTypedRuntime.runWithValidationFuel
+      .ok (.typedSource (SourceTypedRuntime.runDeepCertifiedWithValidationFuel
         compiled.program compiled.plan compiled.root.key arguments
         options.inputValidationFuel options.executionFuel state))
   | _, invocation =>
@@ -1276,6 +1304,102 @@ def compileManyChecked (program : CheckedProgram) (seeds : List Seed)
   let entries ← compileRootsFrom program options 0 seeds
   pure ⟨entries⟩
 
+/-- Pointwise certificate retained by an ordered multi-root artifact.  It
+records the exact successful single-root compilation for every request, so
+all single-root provenance and preservation theorems can be reused without
+re-running checking or specialization. -/
+def CompiledProgram.Certifies (compiled : CompiledProgram)
+    (program : CheckedProgram) (seeds : List Seed)
+    (options : CompileOptions) : Prop :=
+  Workspace.ListCorresponds
+    (fun seed entry => compileChecked program seed options = .ok entry)
+    seeds compiled.entries
+
+private theorem compileRootsFrom_certifies
+    (program : CheckedProgram) (options : CompileOptions)
+    (start : Nat) (seeds : List Seed) (entries : List CompiledEntry)
+    (success : compileRootsFrom program options start seeds = .ok entries) :
+    Workspace.ListCorresponds
+      (fun seed entry => compileChecked program seed options = .ok entry)
+      seeds entries := by
+  induction seeds generalizing start entries with
+  | nil =>
+      simp [compileRootsFrom] at success
+      cases success
+      exact .nil
+  | cons seed seeds induction =>
+      simp only [compileRootsFrom] at success
+      cases compiledResult : compileChecked program seed options with
+      | error error =>
+          rw [compiledResult] at success
+          cases success
+      | ok entry =>
+          simp only [compiledResult, Except.mapError, bind, Except.bind] at success
+          cases restResult : compileRootsFrom program options (start + 1) seeds with
+          | error error =>
+              rw [restResult] at success
+              cases success
+          | ok rest =>
+              simp [restResult] at success
+              cases success
+              exact .cons compiledResult
+                (induction (start := start + 1) (entries := rest) restResult)
+
+/-- Successful ordered compilation retains the exact single-root derivation
+for every entry, in caller-supplied order and including duplicates. -/
+theorem compileManyChecked_certifies
+    (program : CheckedProgram) (seeds : List Seed)
+    (options : CompileOptions) (compiled : CompiledProgram)
+    (success : compileManyChecked program seeds options = .ok compiled) :
+    compiled.Certifies program seeds options := by
+  unfold compileManyChecked at success
+  cases rootsResult : compileRootsFrom program options 0 seeds with
+  | error error =>
+      rw [rootsResult] at success
+      cases success
+  | ok entries =>
+      simp [rootsResult] at success
+      cases success
+      exact compileRootsFrom_certifies program options 0 seeds entries rootsResult
+
+private theorem certified_entry_member
+    {program : CheckedProgram} {options : CompileOptions}
+    {seeds : List Seed} {entries : List CompiledEntry}
+    (certified : Workspace.ListCorresponds
+      (fun seed entry => compileChecked program seed options = .ok entry)
+      seeds entries) {entry : CompiledEntry} (member : entry ∈ entries) :
+    ∃ seed, seed ∈ seeds ∧
+      compileChecked program seed options = .ok entry := by
+  induction certified with
+  | nil => simp at member
+  | @cons seed head seeds tail headCompiled tailCertified induction =>
+      simp only [List.mem_cons] at member
+      cases member with
+      | inl equal =>
+          subst head
+          exact ⟨seed, by simp, headCompiled⟩
+      | inr tailMember =>
+          obtain ⟨selected, selectedMember, selectedCompiled⟩ :=
+            induction tailMember
+          exact ⟨selected, by simp [selectedMember], selectedCompiled⟩
+
+/-- Every member of a checked multi-root artifact has the same canonical-root
+and public-result certificates as a directly compiled entry. -/
+theorem compileManyChecked_entry_certificates
+    (program : CheckedProgram) (seeds : List Seed)
+    (options : CompileOptions) (compiled : CompiledProgram)
+    (success : compileManyChecked program seeds options = .ok compiled)
+    (entry : CompiledEntry) (member : entry ∈ compiled.entries) :
+    entry.HasCanonicalRoot ∧ entry.HasPublicResultProjection := by
+  have certified := compileManyChecked_certifies program seeds options compiled
+    success
+  obtain ⟨seed, _seedMember, compiledEntry⟩ :=
+    certified_entry_member certified member
+  exact ⟨compileChecked_hasCanonicalRoot program seed options entry
+      compiledEntry,
+    compileChecked_hasPublicResultProjection program seed options entry
+      compiledEntry⟩
+
 /-- Raw-workspace multi-root failures keep checking separate from the exact
 root position that failed after checking. -/
 inductive ProgramCompileError where
@@ -1291,6 +1415,74 @@ def compileMany (raw : Workspace.RawWorkspace) (seeds : List Seed)
     ProgramCompileError.checking
   (compileManyChecked program seeds options.toCompileOptions).mapError
     ProgramCompileError.root
+
+/-- Raw multi-root compilation exposes the one checker result shared by all
+root artifacts together with their exact ordered compilation certificates. -/
+theorem compileMany_certifies
+    (raw : Workspace.RawWorkspace) (seeds : List Seed)
+    (options : CheckingOptions) (compiled : CompiledProgram)
+    (success : compileMany raw seeds options = .ok compiled) :
+    ∃ program,
+      checkProgram raw options.checkingFuel = .ok program ∧
+        compiled.Certifies program seeds options.toCompileOptions := by
+  unfold compileMany at success
+  cases checked : checkProgram raw options.checkingFuel with
+  | error errors =>
+      rw [checked] at success
+      cases success
+  | ok program =>
+      rw [checked] at success
+      simp only [Except.mapError, bind, Except.bind] at success
+      cases compiledResult : compileManyChecked program seeds
+          options.toCompileOptions with
+      | error error =>
+          rw [compiledResult] at success
+          cases success
+      | ok actual =>
+          rw [compiledResult] at success
+          cases success
+          exact ⟨program, rfl,
+            compileManyChecked_certifies program seeds options.toCompileOptions
+              compiled compiledResult⟩
+
+/-- Every member produced from a raw workspace retains checker provenance,
+canonical-root identity, and the public result projection. -/
+theorem compileMany_entry_certificates
+    (raw : Workspace.RawWorkspace) (seeds : List Seed)
+    (options : CheckingOptions) (compiled : CompiledProgram)
+    (success : compileMany raw seeds options = .ok compiled)
+    (entry : CompiledEntry) (member : entry ∈ compiled.entries) :
+    entry.HasCheckedSourceWitness ∧ entry.HasCanonicalRoot ∧
+      entry.HasPublicResultProjection := by
+  obtain ⟨program, checked, certified⟩ :=
+    compileMany_certifies raw seeds options compiled success
+  obtain ⟨seed, _seedMember, compiledEntry⟩ :=
+    certified_entry_member certified member
+  have sourceWitness : entry.HasCheckedSourceWitness := by
+    refine ⟨raw, options.checkingFuel, ?_⟩
+    simpa [compileChecked_program program seed options.toCompileOptions entry
+      compiledEntry] using checked
+  exact ⟨sourceWitness,
+    compileChecked_hasCanonicalRoot program seed options.toCompileOptions entry
+      compiledEntry,
+    compileChecked_hasPublicResultProjection program seed
+      options.toCompileOptions entry compiledEntry⟩
+
+/-- Typed entries inside a checked multi-root artifact retain the same
+executable-plan validation certificate as a single-root compilation. -/
+theorem compileManyChecked_entry_hasValidatedTypedPlan
+    (program : CheckedProgram) (seeds : List Seed)
+    (options : CompileOptions) (compiled : CompiledProgram)
+    (success : compileManyChecked program seeds options = .ok compiled)
+    (entry : CompiledEntry) (member : entry ∈ compiled.entries)
+    (typedBackend : entry.backend = .typedSource) :
+    entry.HasValidatedTypedPlan := by
+  have certified := compileManyChecked_certifies program seeds options compiled
+    success
+  obtain ⟨seed, _seedMember, compiledEntry⟩ :=
+    certified_entry_member certified member
+  exact compileChecked_hasValidatedTypedPlan program seed options entry
+    compiledEntry typedBackend
 
 private def checkWorkspaceAtEntry (raw : Workspace.RawWorkspace) (fuel : Nat) :
     Except (List ProgramCheckError) (CheckedProgram × Workspace.ModuleId) := do
@@ -1313,6 +1505,67 @@ def compileEntry (raw : Workspace.RawWorkspace)
     (checkWorkspaceAtEntry raw options.checkingFuel).mapError
       CompileError.checking
   compileEntryChecked program entryModule options.toCompileOptions
+
+/-- The conventional checked entry is exactly a single-root compilation, so
+its canonical root and public result projection are available directly. -/
+theorem compileEntryChecked_certificates
+    (program : CheckedProgram) (entryModule : Workspace.ModuleId)
+    (options : CompileOptions) (compiled : CompiledEntry)
+    (success : compileEntryChecked program entryModule options = .ok compiled) :
+    compiled.HasCanonicalRoot ∧ compiled.HasPublicResultProjection := by
+  exact ⟨compileChecked_hasCanonicalRoot program
+      (Seed.named entryModule "main") options compiled success,
+    compileChecked_hasPublicResultProjection program
+      (Seed.named entryModule "main") options compiled success⟩
+
+private theorem checkWorkspaceAtEntry_checked
+    (raw : Workspace.RawWorkspace) (fuel : Nat)
+    (program : CheckedProgram) (entryModule : Workspace.ModuleId)
+    (success : checkWorkspaceAtEntry raw fuel = .ok (program, entryModule)) :
+    checkProgram raw fuel = .ok program := by
+  unfold checkWorkspaceAtEntry at success
+  cases loadedResult : loadProgram raw with
+  | error errors =>
+      rw [loadedResult] at success
+      cases success
+  | ok loaded =>
+      rw [loadedResult] at success
+      simp only [Except.mapError, bind, Except.bind] at success
+      cases checked : checkLoadedProgram loaded fuel with
+      | error errors =>
+          rw [checked] at success
+          cases success
+      | ok actual =>
+          rw [checked] at success
+          cases success
+          simpa [checkProgram, loadedResult] using checked
+
+/-- Automatic entry discovery preserves raw checker provenance in addition to
+the single-root compiler certificates. -/
+theorem compileEntry_certificates
+    (raw : Workspace.RawWorkspace) (options : CheckingOptions)
+    (compiled : CompiledEntry)
+    (success : compileEntry raw options = .ok compiled) :
+    compiled.HasCheckedSourceWitness ∧ compiled.HasCanonicalRoot ∧
+      compiled.HasPublicResultProjection := by
+  unfold compileEntry at success
+  cases checkedEntry : checkWorkspaceAtEntry raw options.checkingFuel with
+  | error errors =>
+      rw [checkedEntry] at success
+      cases success
+  | ok pair =>
+      obtain ⟨program, entryModule⟩ := pair
+      rw [checkedEntry] at success
+      simp only [Except.mapError, bind, Except.bind] at success
+      have checked := checkWorkspaceAtEntry_checked raw options.checkingFuel
+        program entryModule checkedEntry
+      have certificates := compileEntryChecked_certificates program entryModule
+        options.toCompileOptions compiled success
+      have sourceWitness : compiled.HasCheckedSourceWitness := by
+        refine ⟨raw, options.checkingFuel, ?_⟩
+        simpa [compileChecked_program program (Seed.named entryModule "main")
+          options.toCompileOptions compiled success] using checked
+      exact ⟨sourceWitness, certificates⟩
 
 /-!
 ## Exported Static Word ABI profile
@@ -1543,6 +1796,126 @@ def compileStaticWordChecked (program : CheckedProgram)
     StaticWordCompileError.root
   pure ⟨compiled⟩
 
+/-- Pointwise certificate for an exported Static Word artifact.  Besides the
+exact single-root compilation, it retains the public ABI metadata paired with
+that root. -/
+def CompiledStaticWordProgram.Certifies
+    (compiled : CompiledStaticWordProgram) (program : CheckedProgram)
+    (roots : List StaticWordRoot) (options : CompileOptions) : Prop :=
+  Workspace.ListCorresponds
+    (fun root compiledRoot =>
+      compiledRoot.metadata = root.metadata ∧
+        compileChecked program root.seed options = .ok compiledRoot.entry)
+    roots compiled.roots
+
+private theorem compileStaticWordRootsFrom_certifies
+    (program : CheckedProgram) (options : CompileOptions)
+    (start : Nat) (roots : List StaticWordRoot)
+    (compiled : List CompiledStaticWordRoot)
+    (success : compileStaticWordRootsFrom program options start roots =
+      .ok compiled) :
+    Workspace.ListCorresponds
+      (fun root compiledRoot =>
+        compiledRoot.metadata = root.metadata ∧
+          compileChecked program root.seed options = .ok compiledRoot.entry)
+      roots compiled := by
+  induction roots generalizing start compiled with
+  | nil =>
+      simp [compileStaticWordRootsFrom] at success
+      cases success
+      exact .nil
+  | cons root roots induction =>
+      simp only [compileStaticWordRootsFrom] at success
+      cases entryResult : compileChecked program root.seed options with
+      | error error =>
+          rw [entryResult] at success
+          cases success
+      | ok entry =>
+          simp only [entryResult, Except.mapError, bind, Except.bind] at success
+          cases restResult : compileStaticWordRootsFrom program options
+              (start + 1) roots with
+          | error error =>
+              rw [restResult] at success
+              cases success
+          | ok rest =>
+              simp [restResult] at success
+              cases success
+              exact .cons ⟨rfl, entryResult⟩
+                (induction (start := start + 1) (compiled := rest) restResult)
+
+/-- Successful checked ABI compilation exposes discovery and exact
+single-root compilation certificates in one deterministic order. -/
+theorem compileStaticWordChecked_certifies
+    (program : CheckedProgram) (entryModule : Workspace.ModuleId)
+    (options : CompileOptions) (compiled : CompiledStaticWordProgram)
+    (success : compileStaticWordChecked program entryModule options =
+      .ok compiled) :
+    ∃ roots,
+      discoverStaticWordRoots program entryModule = .ok roots ∧
+        compiled.Certifies program roots options := by
+  unfold compileStaticWordChecked at success
+  cases discovered : discoverStaticWordRoots program entryModule with
+  | error error =>
+      rw [discovered] at success
+      cases success
+  | ok roots =>
+      rw [discovered] at success
+      simp only [Except.mapError, bind, Except.bind] at success
+      cases compiledResult : compileStaticWordRootsFrom program options 0 roots with
+      | error error =>
+          rw [compiledResult] at success
+          cases success
+      | ok compiledRoots =>
+          rw [compiledResult] at success
+          cases success
+          exact ⟨roots, rfl,
+            compileStaticWordRootsFrom_certifies program options 0 roots
+              compiledRoots compiledResult⟩
+
+private theorem certified_static_word_member
+    {program : CheckedProgram} {options : CompileOptions}
+    {roots : List StaticWordRoot} {compiled : List CompiledStaticWordRoot}
+    (certified : Workspace.ListCorresponds
+      (fun root compiledRoot =>
+        compiledRoot.metadata = root.metadata ∧
+          compileChecked program root.seed options = .ok compiledRoot.entry)
+      roots compiled) {compiledRoot : CompiledStaticWordRoot}
+    (member : compiledRoot ∈ compiled) :
+    ∃ root, root ∈ roots ∧ compiledRoot.metadata = root.metadata ∧
+      compileChecked program root.seed options = .ok compiledRoot.entry := by
+  induction certified with
+  | nil => simp at member
+  | @cons root head roots tail headCertified tailCertified induction =>
+      simp only [List.mem_cons] at member
+      cases member with
+      | inl equal =>
+          subst head
+          exact ⟨root, by simp, headCertified⟩
+      | inr tailMember =>
+          obtain ⟨selected, selectedMember, metadata, compiledEntry⟩ :=
+            induction tailMember
+          exact ⟨selected, by simp [selectedMember], metadata, compiledEntry⟩
+
+/-- Every exported ABI root has the same canonical and public-result
+certificates as its underlying single-root compiler artifact. -/
+theorem compileStaticWordChecked_root_certificates
+    (program : CheckedProgram) (entryModule : Workspace.ModuleId)
+    (options : CompileOptions) (compiled : CompiledStaticWordProgram)
+    (success : compileStaticWordChecked program entryModule options =
+      .ok compiled) (root : CompiledStaticWordRoot)
+    (member : root ∈ compiled.roots) :
+    root.entry.HasCanonicalRoot ∧
+      root.entry.HasPublicResultProjection := by
+  obtain ⟨roots, _discovered, certified⟩ :=
+    compileStaticWordChecked_certifies program entryModule options compiled
+      success
+  obtain ⟨sourceRoot, _sourceMember, _metadata, compiledEntry⟩ :=
+    certified_static_word_member certified member
+  exact ⟨compileChecked_hasCanonicalRoot program sourceRoot.seed options
+      root.entry compiledEntry,
+    compileChecked_hasPublicResultProjection program sourceRoot.seed options
+      root.entry compiledEntry⟩
+
 /-- Check a raw workspace once, derive its canonical entry module, then
 discover and compile its exported Static Word ABI roots. -/
 def compileStaticWord (raw : Workspace.RawWorkspace)
@@ -1552,6 +1925,41 @@ def compileStaticWord (raw : Workspace.RawWorkspace)
     (checkWorkspaceAtEntry raw options.checkingFuel).mapError
       StaticWordCompileError.checking
   compileStaticWordChecked program entryModule options.toCompileOptions
+
+/-- Raw ABI compilation retains checker provenance for every exported root,
+not merely the discovery order and selector metadata. -/
+theorem compileStaticWord_root_certificates
+    (raw : Workspace.RawWorkspace) (options : CheckingOptions)
+    (compiled : CompiledStaticWordProgram)
+    (success : compileStaticWord raw options = .ok compiled)
+    (root : CompiledStaticWordRoot) (member : root ∈ compiled.roots) :
+    root.entry.HasCheckedSourceWitness ∧ root.entry.HasCanonicalRoot ∧
+      root.entry.HasPublicResultProjection := by
+  unfold compileStaticWord at success
+  cases checkedEntry : checkWorkspaceAtEntry raw options.checkingFuel with
+  | error errors =>
+      rw [checkedEntry] at success
+      cases success
+  | ok pair =>
+      obtain ⟨program, entryModule⟩ := pair
+      rw [checkedEntry] at success
+      simp only [Except.mapError, bind, Except.bind] at success
+      obtain ⟨roots, _discovered, certified⟩ :=
+        compileStaticWordChecked_certifies program entryModule
+          options.toCompileOptions compiled success
+      obtain ⟨sourceRoot, _sourceMember, _metadata, compiledEntry⟩ :=
+        certified_static_word_member certified member
+      have checked := checkWorkspaceAtEntry_checked raw options.checkingFuel
+        program entryModule checkedEntry
+      have sourceWitness : root.entry.HasCheckedSourceWitness := by
+        refine ⟨raw, options.checkingFuel, ?_⟩
+        simpa [compileChecked_program program sourceRoot.seed
+          options.toCompileOptions root.entry compiledEntry] using checked
+      exact ⟨sourceWitness,
+        compileChecked_hasCanonicalRoot program sourceRoot.seed
+          options.toCompileOptions root.entry compiledEntry,
+        compileChecked_hasPublicResultProjection program sourceRoot.seed
+          options.toCompileOptions root.entry compiledEntry⟩
 
 /-- Combined failure carrier for the one-shot convenience boundary. -/
 inductive Error where
@@ -1768,15 +2176,19 @@ theorem CompiledEntry.run_typedSource_done_preserves_type
       simp only [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
-      have completed : SourceTypedRuntime.runWithValidationFuel
+      have completed : SourceTypedRuntime.runDeepCertifiedWithValidationFuel
           program plan root.key arguments
             options.inputValidationFuel options.executionFuel initial =
           .done value finalState := by
         simpa [CompiledEntry.run] using ran
       simp only [CompiledEntry.SuccessfulResultHasNativeType]
-      exact SourceTypedRuntime.runWithValidationFuel_done_has_inferredBodyType
+      have selected : SourceTypedRuntime.exactSpecialization plan root.key =
+          .ok root := by
+        unfold SourceTypedRuntime.exactSpecialization
+        rw [precondition]
+      exact SourceTypedRuntime.runDeepCertifiedWithValidationFuel_done
         program plan root.key arguments options.inputValidationFuel
-        options.executionFuel initial finalState value root precondition completed
+        options.executionFuel initial finalState value root selected completed
 
 /-- On the typed backend, the common native-type conclusion is exactly the
 artifact's public source result type, not a separate runtime declaration. -/
@@ -1801,9 +2213,93 @@ theorem CompiledEntry.runTyped_done_has_public_resultType
   | callGraph entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
-      simpa [CompiledEntry.TypedValueHasResultType,
-        CompiledEntry.SuccessfulResultHasNativeType,
-        CompiledEntry.resultType] using native
+      simp only [CompiledEntry.SuccessfulResultHasNativeType] at native
+      refine ⟨native.executablePlan, native.prepared, ?_⟩
+      exact native.value_safe.typed.outer
+
+/-- A normally completing typed-source artifact exposes its complete
+pre/post boundary certificate, including input safety and heap type-layout
+extension across mutation and allocation. -/
+theorem CompiledEntry.runTyped_done_has_public_deepExecution
+    (compiled : CompiledEntry)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (options : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (precondition : compiled.PreservationPrecondition
+      (.typedValues arguments initial))
+    (ran : compiled.runTyped arguments options initial =
+      .ok (.typedSource (.done value finalState))) :
+    compiled.TypedDeepExecution arguments initial value finalState := by
+  cases compiled
+  rename_i program plan root executable
+  cases executable with
+  | core entry =>
+      simp [CompiledEntry.PreservationPrecondition] at precondition
+  | callGraph entry =>
+      simp [CompiledEntry.PreservationPrecondition] at precondition
+  | typedSource =>
+      simp only [CompiledEntry.PreservationPrecondition] at precondition
+      have completed : SourceTypedRuntime.runDeepCertifiedWithValidationFuel
+          program plan root.key arguments options.inputValidationFuel
+            options.executionFuel initial = .done value finalState := by
+        simpa [CompiledEntry.runTyped, CompiledEntry.run] using ran
+      have selected : SourceTypedRuntime.exactSpecialization plan root.key =
+          .ok root := by
+        unfold SourceTypedRuntime.exactSpecialization
+        rw [precondition]
+      exact SourceTypedRuntime.runDeepCertifiedWithValidationFuel_done_certificate
+        program plan root.key arguments options.inputValidationFuel
+          options.executionFuel initial finalState value root selected completed
+
+/-- Canonical-root provenance is the only additional proof needed to use the
+typed deep boundary on an already compiled artifact. -/
+theorem CompiledEntry.runTyped_done_has_public_deepExecution_of_canonical
+    (compiled : CompiledEntry)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (options : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (canonical : compiled.HasCanonicalRoot)
+    (typedBackend : compiled.backend = .typedSource)
+    (ran : compiled.runTyped arguments options initial =
+      .ok (.typedSource (.done value finalState))) :
+    compiled.TypedDeepExecution arguments initial value finalState := by
+  have precondition : compiled.PreservationPrecondition
+      (.typedValues arguments initial) := by
+    cases compiled
+    rename_i program plan root executable
+    cases executable <;>
+      simp_all [CompiledEntry.backend, CompiledEntry.HasCanonicalRoot,
+        CompiledEntry.PreservationPrecondition]
+  exact compiled.runTyped_done_has_public_deepExecution arguments initial
+    options precondition ran
+
+/-- A normally completing typed-source artifact exposes the full deep result,
+final-heap, closure-code, and evidence certificate at its public result type. -/
+theorem CompiledEntry.runTyped_done_has_public_deepResult
+    (compiled : CompiledEntry)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (options : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (precondition : compiled.PreservationPrecondition
+      (.typedValues arguments initial))
+    (ran : compiled.runTyped arguments options initial =
+      .ok (.typedSource (.done value finalState))) :
+    compiled.TypedDeepResult value finalState := by
+  have native := compiled.run_typedSource_done_preserves_type arguments
+    initial options precondition ran
+  cases compiled
+  rename_i program plan root executable
+  cases executable with
+  | core entry =>
+      simp [CompiledEntry.PreservationPrecondition] at precondition
+  | callGraph entry =>
+      simp [CompiledEntry.PreservationPrecondition] at precondition
+  | typedSource =>
+      simpa [CompiledEntry.TypedDeepResult,
+        CompiledEntry.SuccessfulResultHasNativeType] using native
 
 /-- The deep direct-Core preservation result uses the compiler's public source
 result type once its checked backend projection is supplied. -/
@@ -2180,6 +2676,125 @@ theorem compileChecked_runTyped_done_has_public_resultType
     (compileChecked_typed_preservation_precondition program seed
       compileOptions compiled compiledOk typedBackend arguments initial)
     ran
+
+/-- The same compiler-produced typed entry exposes the stronger deep
+prepared-plan certificate without any caller-supplied provenance proof. -/
+theorem compileChecked_runTyped_done_has_public_deepResult
+    (program : CheckedProgram) (seed : Seed) (compileOptions : CompileOptions)
+    (compiled : CompiledEntry)
+    (compiledOk : compileChecked program seed compileOptions = .ok compiled)
+    (typedBackend : compiled.backend = .typedSource)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (runOptions : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (ran : compiled.runTyped arguments runOptions initial =
+      .ok (.typedSource (.done value finalState))) :
+    compiled.TypedDeepResult value finalState := by
+  exact compiled.runTyped_done_has_public_deepResult arguments initial
+    runOptions
+    (compileChecked_typed_preservation_precondition program seed
+      compileOptions compiled compiledOk typedBackend arguments initial)
+    ran
+
+/-- Compiler-produced typed artifacts also expose the complete initial/input
+and final/result certificate, including heap type-layout extension. -/
+theorem compileChecked_runTyped_done_has_public_deepExecution
+    (program : CheckedProgram) (seed : Seed) (compileOptions : CompileOptions)
+    (compiled : CompiledEntry)
+    (compiledOk : compileChecked program seed compileOptions = .ok compiled)
+    (typedBackend : compiled.backend = .typedSource)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (runOptions : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (ran : compiled.runTyped arguments runOptions initial =
+      .ok (.typedSource (.done value finalState))) :
+    compiled.TypedDeepExecution arguments initial value finalState := by
+  exact compiled.runTyped_done_has_public_deepExecution arguments initial
+    runOptions
+    (compileChecked_typed_preservation_precondition program seed
+      compileOptions compiled compiledOk typedBackend arguments initial)
+    ran
+
+/-- Every typed member of a checked multi-root artifact inherits the complete
+deep execution certificate. -/
+theorem compileManyChecked_entry_runTyped_done_has_public_deepExecution
+    (program : CheckedProgram) (seeds : List Seed)
+    (compileOptions : CompileOptions) (compiled : CompiledProgram)
+    (compiledOk : compileManyChecked program seeds compileOptions = .ok compiled)
+    (entry : CompiledEntry) (member : entry ∈ compiled.entries)
+    (typedBackend : entry.backend = .typedSource)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (runOptions : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (ran : entry.runTyped arguments runOptions initial =
+      .ok (.typedSource (.done value finalState))) :
+    entry.TypedDeepExecution arguments initial value finalState := by
+  have certificates := compileManyChecked_entry_certificates program seeds
+    compileOptions compiled compiledOk entry member
+  exact entry.runTyped_done_has_public_deepExecution_of_canonical arguments
+    initial runOptions certificates.1 typedBackend ran
+
+/-- Raw-workspace multi-root compilation retains the same deep runtime
+certificate for every typed member. -/
+theorem compileMany_entry_runTyped_done_has_public_deepExecution
+    (raw : Workspace.RawWorkspace) (seeds : List Seed)
+    (compileOptions : CheckingOptions) (compiled : CompiledProgram)
+    (compiledOk : compileMany raw seeds compileOptions = .ok compiled)
+    (entry : CompiledEntry) (member : entry ∈ compiled.entries)
+    (typedBackend : entry.backend = .typedSource)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (runOptions : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (ran : entry.runTyped arguments runOptions initial =
+      .ok (.typedSource (.done value finalState))) :
+    entry.TypedDeepExecution arguments initial value finalState := by
+  have certificates := compileMany_entry_certificates raw seeds compileOptions
+    compiled compiledOk entry member
+  exact entry.runTyped_done_has_public_deepExecution_of_canonical arguments
+    initial runOptions certificates.2.1 typedBackend ran
+
+/-- Automatic conventional-entry compilation lifts the typed deep certificate
+without exposing its internally selected checked program or seed. -/
+theorem compileEntry_runTyped_done_has_public_deepExecution
+    (raw : Workspace.RawWorkspace) (compileOptions : CheckingOptions)
+    (compiled : CompiledEntry)
+    (compiledOk : compileEntry raw compileOptions = .ok compiled)
+    (typedBackend : compiled.backend = .typedSource)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (runOptions : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (ran : compiled.runTyped arguments runOptions initial =
+      .ok (.typedSource (.done value finalState))) :
+    compiled.TypedDeepExecution arguments initial value finalState := by
+  have certificates := compileEntry_certificates raw compileOptions compiled
+    compiledOk
+  exact compiled.runTyped_done_has_public_deepExecution_of_canonical arguments
+    initial runOptions certificates.2.1 typedBackend ran
+
+/-- Every exported Static Word root which selects the typed backend inherits
+the same public pre/post certificate as an ordinary compiled entry. -/
+theorem compileStaticWord_root_runTyped_done_has_public_deepExecution
+    (raw : Workspace.RawWorkspace) (compileOptions : CheckingOptions)
+    (compiled : CompiledStaticWordProgram)
+    (compiledOk : compileStaticWord raw compileOptions = .ok compiled)
+    (root : CompiledStaticWordRoot) (member : root ∈ compiled.roots)
+    (typedBackend : root.entry.backend = .typedSource)
+    (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (runOptions : RunOptions)
+    {value : SourceTypedRuntime.Value}
+    {finalState : SourceTypedRuntime.RuntimeState}
+    (ran : root.entry.runTyped arguments runOptions initial =
+      .ok (.typedSource (.done value finalState))) :
+    root.entry.TypedDeepExecution arguments initial value finalState := by
+  have certificates := compileStaticWord_root_certificates raw compileOptions
+    compiled compiledOk root member
+  exact root.entry.runTyped_done_has_public_deepExecution_of_canonical arguments
+    initial runOptions certificates.2.1 typedBackend ran
 
 /-- End-to-end one-shot execution inherits the three-backend successful-result
 preservation theorem from the exact artifact produced in its compile phase. -/
