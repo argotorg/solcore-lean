@@ -9658,6 +9658,45 @@ structure IntegerPatternEvidenceAt
       IntegerLiteralValid context literal
         (resolution.applySubstitution substitution)
 
+/-- A successful direct flat integer-pattern branch can consume finalized
+occurrence-local evidence without asking its caller to reconstruct the
+literal's origin or canonical requirement row.  The two subset premises
+transport branch-local metadata to the retained root state; primary ownership
+is selected from the root pattern's requirement list. -/
+theorem IntegerPatternEvidenceAt.integerLiteralValid_of_flat
+    {source : TypedSource} {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {state : Frontend.SourceInference.State} {occurrence : NodeId}
+    (evidence : IntegerPatternEvidenceAt source context substitution state
+      occurrence)
+    {inferenceContext : Frontend.SourceInference.Context}
+    {fuel : Nat} {pattern : Syntax.Pattern}
+    {literal : Syntax.CoreLiteral} {literalSource : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution} {expected : TypeSystem.Ty}
+    {seen : List String} {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (patternValue : pattern.value = .literal literal)
+    (success : Detail.inferMatchPatternFlatFuel fuel inferenceContext pattern
+      expected seen initial = .ok result)
+    (resolutionEq : result.resolution =
+      .integerLiteral literalSource resolution)
+    (integerPatterns_subset :
+      result.state.integerPatterns ⊆ state.integerPatterns)
+    (requirements_subset :
+      result.state.requirements ⊆ state.requirements)
+    (requirements_occur : ∀ requirement ∈ result.requirements,
+      PrimaryRequirementOccursAt source occurrence requirement) :
+    IntegerLiteralValid context literalSource
+      (resolution.applySubstitution substitution) := by
+  obtain ⟨origin, decoded, resolutionTarget, resolutionRequirement, _,
+      originMember, requirementMember, resolutionMember⟩ :=
+    Detail.inferMatchPatternFlatFuel_integerLiteral_metadata_of_resolution
+      patternValue success resolutionEq
+  exact evidence.valid decoded resolutionTarget resolutionRequirement
+    (integerPatterns_subset originMember)
+    (requirements_subset requirementMember)
+    (requirements_occur resolution.requirement resolutionMember)
+
 /-- Semantic result of one successful internal flat-pattern traversal.  The
 typing field is suffix-polymorphic so source-ordered prefix programs compose
 without a separate weakening theorem. -/
@@ -10176,6 +10215,49 @@ private theorem inferMatchPatternFlatFuel_success_literal_sound
       rw [namesEq]
       exact seen_nodup
   }⟩
+
+/-- Occurrence-provenance form of the direct integer-literal leaf.  This is
+the base case used by the additive `_at` flat-pattern induction: finalized
+evidence is fixed at a retained root state, while this branch contributes only
+its monotone ledger transport and root requirement ownership. -/
+theorem inferMatchPatternFlatFuel_success_literal_sound_at
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {fuel : Nat} {pattern : Syntax.Pattern} {literal : Syntax.CoreLiteral}
+    {expected : TypeSystem.Ty} {seen : List String}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (pattern_eq : pattern.value = .literal literal)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (integerPatterns_subset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirements_subset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (requirements_occur : ∀ requirement ∈ result.requirements,
+      PrimaryRequirementOccursAt source occurrence requirement)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (below : initial.LocalBindersBelowNextLocal)
+    (seen_nodup : seen.Nodup)
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (success : Detail.inferMatchPatternFlatFuel (fuel + 1) inferenceContext
+      pattern expected seen initial = .ok result) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  apply inferMatchPatternFlatFuel_success_literal_sound pattern_eq
+    (matchPatternFlatStateCallbacks inferenceContext) ready expectedBelow
+    validated below seen_nodup invariant outerExtension ?_ success
+  intro literalSource resolution resolutionEq
+  exact evidence.integerLiteralValid_of_flat pattern_eq success resolutionEq
+    integerPatterns_subset requirements_subset requirements_occur
 
 /-- A successful binder pattern installs exactly one closed monomorphic
 binder in the active arm context. -/
