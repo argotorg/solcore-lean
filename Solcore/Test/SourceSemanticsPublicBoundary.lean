@@ -695,9 +695,15 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_directDeclarationCalleeValid
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_expressionTypingBase
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_expressionHasType
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_some_recordSelectedCallResult_success_expressionTypingBase_scoped
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHasType_scoped
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_success_expressionTypingBase_scoped
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_success_expressionHasType_scoped
 example :=
