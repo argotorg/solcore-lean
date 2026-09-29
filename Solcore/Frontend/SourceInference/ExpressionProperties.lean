@@ -15,6 +15,20 @@ namespace Solcore.Frontend.SourceInference.Detail
 
 open TypeSystem
 
+/-- An accepted open integer-literal target exposes both the unresolved
+metavariable and a retained literal origin whose target is equal after the
+current inference substitution. -/
+theorem isOpenIntegerLiteralTarget_true_witness
+    {state : State} {origins : List IntegerLiteralOrigin} {type : Ty}
+    (accepted : isOpenIntegerLiteralTarget state origins type = true) :
+    ∃ metavariableId origin,
+      state.resolve type = .variable metavariableId ∧
+      origin ∈ origins ∧
+      state.resolve (.variable origin.metavariable) = state.resolve type := by
+  unfold isOpenIntegerLiteralTarget at accepted
+  generalize resolvedEq : state.resolve type = resolved at accepted ⊢
+  cases resolved <;> simp_all [List.any_eq_true]
+
 /-- Module-local name filtering never invents function signatures outside
 the whole-program catalog. -/
 theorem localFunctionsNamed_subset_catalog (context : Context) (name : String) :

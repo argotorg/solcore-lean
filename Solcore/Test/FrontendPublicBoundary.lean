@@ -477,6 +477,8 @@ example := @Solcore.Frontend.SourceInference.Detail.unify_inferenceProgress
 example :=
   @Solcore.Frontend.SourceInference.Detail.unify_preserves_inferenceReady
 example :=
+  @Solcore.Frontend.SourceInference.Detail.isOpenIntegerLiteralTarget_true_witness
+example :=
   @Solcore.Frontend.SourceInference.Detail.localBinderInstantiation_inferenceProperties
 example :=
   @Solcore.Frontend.SourceInference.Detail.freshTypes_inferenceProperties
