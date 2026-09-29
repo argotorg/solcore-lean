@@ -645,9 +645,27 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentCoercionsValid.cons
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentCoercionsValid.expression_ids
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase.intro
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.nil
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.cons
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionNodesPreservedAt
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionNodesPreservedAt.ofTypingSourceExtends
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.argumentFitTrace_argumentCoercionsValid_afterFinalization_scoped
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_some_argumentCoercionsValid_afterFinalization_scoped
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordExpressionWithExpected_success_ordinaryExpressionHasType_scoped
 example :=

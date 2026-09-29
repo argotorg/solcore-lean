@@ -16891,6 +16891,90 @@ inductive ArgumentCoercionsValid
         (argument :: arguments) (parameter :: parameters)
         ({ expression := argument.id, coercions } :: entries)
 
+namespace ArgumentCoercionsValid
+
+/-- The delayed-coercion ledger retains exactly the source-ordered argument
+identities certified by the semantic path relation. -/
+theorem expression_ids
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {arguments : List InferredExpression}
+    {parameters : List TypeSystem.Ty}
+    {entries : List Detail.ExpressionCoercions}
+    (valid : ArgumentCoercionsValid context substitution arguments parameters
+      entries) :
+    entries.map (·.expression) = arguments.map (·.id) := by
+  induction valid with
+  | nil => rfl
+  | cons _ _ _ induction => simp only [List.map_cons, induction]
+
+end ArgumentCoercionsValid
+
+/-- The pre-attachment semantic facts for one inferred argument.
+
+Containment deliberately refers to the original executable node table, while
+raw-form typing already refers to the eventual semantic source.  This split
+avoids pretending that attaching delayed coercions is a monotone source
+extension: it rewrites the selected expression nodes in place. -/
+inductive ExpressionTypingBase
+    (nodeSource semanticSource : TypedSource)
+    (context : SourceSemantics.Context)
+    (substitution : TypeSystem.Substitution)
+    (argument : InferredExpression) : Prop where
+  | intro
+      {node : ExpressionNode}
+      {rawType : TypeSystem.Ty}
+      {plan : ExpressionRequirementPlan}
+      (contains : ContainsExpression nodeSource argument.id node)
+      (typeEq : node.type = argument.type)
+      (formType : ExpressionFormHasRawType semanticSource context
+        (node.form.applySubstitution substitution) rawType plan)
+      (rawAdmissible : TypeAdmissible context rawType)
+      (requirements : ExpressionRequirementPlan.Valid context rawType
+        (substitution.apply node.type) plan node.requirements
+        (node.coercions.map (CoercionStep.applySubstitution substitution))) :
+      ExpressionTypingBase nodeSource semanticSource context substitution
+        argument
+
+/-- Source-ordered pre-attachment typing bases for an inferred argument row. -/
+inductive ArgumentTypingBasesValid
+    (nodeSource semanticSource : TypedSource)
+    (context : SourceSemantics.Context)
+    (substitution : TypeSystem.Substitution) :
+    List InferredExpression → Prop where
+  | nil : ArgumentTypingBasesValid nodeSource semanticSource context
+      substitution []
+  | cons
+      {argument : InferredExpression}
+      {arguments : List InferredExpression}
+      (head : ExpressionTypingBase nodeSource semanticSource context
+        substitution argument)
+      (tail : ArgumentTypingBasesValid nodeSource semanticSource context
+        substitution arguments) :
+      ArgumentTypingBasesValid nodeSource semanticSource context substitution
+        (argument :: arguments)
+
+/-- Exact preservation of expression payloads, restricted to a selected set
+of stable expression identities. -/
+def ExpressionNodesPreservedAt (ids : List ExpressionId)
+    (before after : TypedSource) : Prop :=
+  ∀ {id node}, id ∈ ids → ContainsExpression before id node →
+    ContainsExpression after id node
+
+namespace ExpressionNodesPreservedAt
+
+/-- An ordinary source extension preserves exact payloads at every selected
+identity.  The scoped predicate is also usable when only those identities,
+rather than the whole source, are known to survive. -/
+theorem ofTypingSourceExtends
+    {ids : List ExpressionId} {before after : TypedSource}
+    (extension : TypingSourceExtends before after) :
+    ExpressionNodesPreservedAt ids before after := by
+  intro id node _ contains
+  exact extension.containsExpression contains
+
+end ExpressionNodesPreservedAt
+
 /-- An exact frontend argument-fitting trace becomes a source-ordered row of
 semantically valid coercion paths once the enclosing inference traversal and
 requirement solver have finished.  Tail progress transports the final
@@ -17220,6 +17304,181 @@ theorem tryFunctionCandidate_some_argumentCoercionsValid_afterFinalization_scope
     signaturesEq traitName solveSuccess solvedEq ledger ownership
     activeSignaturesEq activeRequirementsEq assumptionsMono fittedCovered
     fittedOccurs
+
+/-- Internal form of post-attachment argument typing.  `attachedEntries` is
+kept fixed while recursion consumes the certified subrow, so every argument
+is recovered from the same fully refined node table. -/
+private theorem
+    argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes_of_subset
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {semanticSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {arguments : List InferredExpression}
+    {parameters : List TypeSystem.Ty}
+    {entries attachedEntries : List Detail.ExpressionCoercions}
+    (bases : ArgumentTypingBasesValid (state.toTypedSource roots)
+      semanticSource context substitution arguments)
+    (coercions : ArgumentCoercionsValid context substitution arguments
+      parameters entries)
+    (entriesSubset : entries ⊆ attachedEntries)
+    (attachedUnique : (attachedEntries.map (·.expression)).Nodup)
+    (preserved : ExpressionNodesPreservedAt (arguments.map (·.id))
+      ((Detail.attachExpressionCoercions state attachedEntries
+        |>.toTypedSource roots).applySubstitution substitution)
+      semanticSource) :
+    ExpressionsHaveTypes semanticSource context (arguments.map (·.id))
+      (parameters.map substitution.apply) := by
+  induction coercions with
+  | nil =>
+      cases bases
+      exact .nil context
+  | @cons argument arguments parameter parameters coercionSteps tailEntries
+      targetAdmissible path tailValid induction =>
+      cases bases with
+      | cons base tailBases =>
+          cases base with
+          | @intro node rawType plan contains typeEq formType rawAdmissible
+              requirements =>
+              let entry : Detail.ExpressionCoercions := {
+                expression := argument.id
+                coercions := coercionSteps
+              }
+              have entryMember : entry ∈ attachedEntries := by
+                apply entriesSubset
+                simp only [entry, List.mem_cons, true_or]
+              have attachedContains : ContainsExpression
+                  ((Detail.attachExpressionCoercions state attachedEntries
+                    |>.toTypedSource roots))
+                  argument.id
+                  (Detail.appendExpressionCoercions node coercionSteps) := by
+                simpa only [entry] using
+                  (attachExpressionCoercions_containsExpression state
+                    attachedEntries entry node roots attachedUnique entryMember
+                    contains)
+              have substitutedContains :=
+                FlexibleSubstitution.ContainsExpression.applySubstitution
+                  substitution attachedContains
+              have closedAttachedContains : ContainsExpression
+                  ((Detail.attachExpressionCoercions state attachedEntries
+                    |>.toTypedSource roots).applySubstitution substitution)
+                  argument.id
+                  (Detail.appendExpressionCoercions
+                    (node.applySubstitution substitution)
+                    (coercionSteps.map
+                      (CoercionStep.applySubstitution substitution))) := by
+                simpa only [
+                  Detail.appendExpressionCoercions_applySubstitution] using
+                    substitutedContains
+              have finalContains : ContainsExpression semanticSource
+                  argument.id
+                  (Detail.appendExpressionCoercions
+                    (node.applySubstitution substitution)
+                    (coercionSteps.map
+                      (CoercionStep.applySubstitution substitution))) :=
+                preserved (by simp) closedAttachedContains
+              have outputPath : CoercionPathValid context
+                  (substitution.apply node.type)
+                  (substitution.apply parameter)
+                  (coercionSteps.map
+                    (CoercionStep.applySubstitution substitution)) := by
+                rw [typeEq]
+                exact path
+              have finalTypeEq :
+                  (Detail.appendExpressionCoercions
+                    (node.applySubstitution substitution)
+                    (coercionSteps.map
+                      (CoercionStep.applySubstitution substitution))).type =
+                    substitution.apply parameter := by
+                change
+                  (coercionSteps.map
+                    (CoercionStep.applySubstitution substitution)).foldl
+                      (fun _ step => step.target)
+                      (substitution.apply node.type) =
+                    substitution.apply parameter
+                exact outputPath.foldl_target
+              have finalFormType : ExpressionFormHasRawType semanticSource
+                  context
+                  (Detail.appendExpressionCoercions
+                    (node.applySubstitution substitution)
+                    (coercionSteps.map
+                      (CoercionStep.applySubstitution substitution))).form
+                  rawType plan := by
+                simpa [Detail.appendExpressionCoercions,
+                  ExpressionNode.applySubstitution] using formType
+              have finalAdmissible : TypeAdmissible context
+                  (Detail.appendExpressionCoercions
+                    (node.applySubstitution substitution)
+                    (coercionSteps.map
+                      (CoercionStep.applySubstitution substitution))).type := by
+                rw [finalTypeEq]
+                exact targetAdmissible
+              have storedOutputPath : CoercionPathValid context
+                  (substitution.apply node.type)
+                  (Detail.appendExpressionCoercions
+                    (node.applySubstitution substitution)
+                    (coercionSteps.map
+                      (CoercionStep.applySubstitution substitution))).type
+                  (coercionSteps.map
+                    (CoercionStep.applySubstitution substitution)) := by
+                rw [finalTypeEq]
+                exact outputPath
+              have headTyping : ExpressionHasType semanticSource context
+                  argument.id (substitution.apply parameter) := by
+                have storedTyping := ExpressionHasType.ofAppendedOutput
+                  finalContains finalFormType rawAdmissible finalAdmissible
+                  requirements storedOutputPath (by
+                    rfl) (by
+                    rfl)
+                simpa only [finalTypeEq] using storedTyping
+              have tailSubset : tailEntries ⊆ attachedEntries := by
+                intro tailEntry member
+                apply entriesSubset
+                exact List.mem_cons_of_mem _ member
+              have tailPreserved : ExpressionNodesPreservedAt
+                  (arguments.map (·.id))
+                  ((Detail.attachExpressionCoercions state attachedEntries
+                    |>.toTypedSource roots).applySubstitution substitution)
+                  semanticSource := by
+                intro id retainedNode member retainedContains
+                apply preserved
+                · exact List.mem_cons_of_mem _ member
+                · exact retainedContains
+              exact .cons headTyping
+                (induction tailBases tailSubset tailPreserved)
+
+/-- Attaching an exact, source-ordered row of semantically valid argument
+coercions turns the corresponding base nodes into expressions typed at the
+final parameter row.  The result uses identity-scoped exact preservation
+rather than a whole-source extension, because attachment intentionally
+rewrites those nodes' payloads. -/
+theorem argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {semanticSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {arguments : List InferredExpression}
+    {parameters : List TypeSystem.Ty}
+    {entries : List Detail.ExpressionCoercions}
+    (bases : ArgumentTypingBasesValid (state.toTypedSource roots)
+      semanticSource context substitution arguments)
+    (coercions : ArgumentCoercionsValid context substitution arguments
+      parameters entries)
+    (argumentIdsUnique : (arguments.map (·.id)).Nodup)
+    (preserved : ExpressionNodesPreservedAt (arguments.map (·.id))
+      ((Detail.attachExpressionCoercions state entries
+        |>.toTypedSource roots).applySubstitution substitution)
+      semanticSource) :
+    ExpressionsHaveTypes semanticSource context (arguments.map (·.id))
+      (parameters.map substitution.apply) := by
+  have entryIdsUnique : (entries.map (·.expression)).Nodup := by
+    rw [coercions.expression_ids]
+    exact argumentIdsUnique
+  exact
+    argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes_of_subset
+      bases coercions (fun _ member => member) entryIdsUnique preserved
 
 /-- The common soundness envelope for an ordinary expression-recording step.
 
