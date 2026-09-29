@@ -505,6 +505,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_tuple_facts
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_conditional_facts
+example :=
+  @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_index_facts
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_success_proxy_facts
 example :=
   @Solcore.Frontend.SourceInference.Detail.LambdaPrefixFacts

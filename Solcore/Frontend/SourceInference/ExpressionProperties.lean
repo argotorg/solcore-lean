@@ -377,6 +377,121 @@ theorem inferExprFuel_success_tuple_facts
       simp only [elementsSuccess, bind, Except.bind] at success
       exact ⟨inferredElements, elementsState, rfl, success⟩
 
+/-- Invert successful conditional inference into the three recursive
+expression traversals, branch-type unification, and the exact final recording
+operation. -/
+theorem inferExprFuel_success_conditional_facts
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {condition thenBranch elseBranch : Syntax.Expr}
+    {question colon : Syntax.SourceSpan}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value =
+      .conditional condition question thenBranch colon elseBranch)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ conditionResult conditionState thenResult thenState elseResult elseState
+        unifiedState,
+      inferExprFuel fuel context condition (some .bool) allocated =
+          .ok (conditionResult, conditionState) ∧
+        inferExprFuel fuel context thenBranch expected conditionState =
+          .ok (thenResult, thenState) ∧
+        inferExprFuel fuel context elseBranch expected thenState =
+          .ok (elseResult, elseState) ∧
+        unify elseState thenResult.type elseResult.type = .ok unifiedState ∧
+        recordExpressionWithExpected context expression id
+          (unifiedState.resolve thenResult.type)
+          (.conditional conditionResult.id thenResult.id elseResult.id) []
+          expected unifiedState = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases conditionSuccess : inferExprFuel fuel context condition (some .bool)
+      allocated with
+  | error error =>
+      simp [conditionSuccess, bind, Except.bind] at success
+  | ok conditionPair =>
+      rcases conditionPair with ⟨conditionResult, conditionState⟩
+      simp only [conditionSuccess, bind, Except.bind] at success
+      cases thenSuccess : inferExprFuel fuel context thenBranch expected
+          conditionState with
+      | error error =>
+          simp [thenSuccess, bind, Except.bind] at success
+      | ok thenPair =>
+          rcases thenPair with ⟨thenResult, thenState⟩
+          simp only [thenSuccess, bind, Except.bind] at success
+          cases elseSuccess : inferExprFuel fuel context elseBranch expected
+              thenState with
+          | error error =>
+              simp [elseSuccess, bind, Except.bind] at success
+          | ok elsePair =>
+              rcases elsePair with ⟨elseResult, elseState⟩
+              simp only [elseSuccess, bind, Except.bind] at success
+              cases unifySuccess : unify elseState thenResult.type
+                  elseResult.type with
+              | error error =>
+                  simp [unifySuccess, bind, Except.bind] at success
+              | ok unifiedState =>
+                  simp only [unifySuccess, bind, Except.bind] at success
+                  exact ⟨conditionResult, conditionState, thenResult,
+                    thenState, elseResult, elseState, unifiedState,
+                    rfl, thenSuccess, elseSuccess, unifySuccess,
+                    success⟩
+
+/-- Invert successful index inference through base traversal, both fresh type
+allocations, mapping-shape unification, index traversal, and the exact final
+recording operation. -/
+theorem inferExprFuel_success_index_facts
+    {fuel : Nat} {context : Context} {expression base index : Syntax.Expr}
+    {brackets : Syntax.SourceSpan}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .index base brackets index)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ baseResult baseState keyType keyState valueType valueState mappingState
+        indexResult indexState,
+      inferExprFuel fuel context base none allocated =
+          .ok (baseResult, baseState) ∧
+        baseState.fresh = (keyType, keyState) ∧
+        keyState.fresh = (valueType, valueState) ∧
+        unify valueState baseResult.type (.mapping keyType valueType) =
+          .ok mappingState ∧
+        inferExprFuel fuel context index (some (mappingState.resolve keyType))
+            mappingState = .ok (indexResult, indexState) ∧
+        recordExpressionWithExpected context expression id
+          (indexState.resolve valueType) (.index baseResult.id indexResult.id) []
+          expected indexState = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases baseSuccess : inferExprFuel fuel context base none allocated with
+  | error error =>
+      simp [baseSuccess, bind, Except.bind] at success
+  | ok basePair =>
+      rcases basePair with ⟨baseResult, baseState⟩
+      simp only [baseSuccess, bind, Except.bind] at success
+      generalize keyFresh : baseState.fresh = keyPair at success
+      rcases keyPair with ⟨keyType, keyState⟩
+      generalize valueFresh : keyState.fresh = valuePair at success
+      rcases valuePair with ⟨valueType, valueState⟩
+      cases mappingSuccess : unify valueState baseResult.type
+          (.mapping keyType valueType) with
+      | error error =>
+          simp [mappingSuccess, bind, Except.bind] at success
+      | ok mappingState =>
+          simp only [mappingSuccess, bind, Except.bind] at success
+          cases indexSuccess : inferExprFuel fuel context index
+              (some (mappingState.resolve keyType)) mappingState with
+          | error error =>
+              simp [indexSuccess, bind, Except.bind] at success
+          | ok indexPair =>
+              rcases indexPair with ⟨indexResult, indexState⟩
+              simp only [indexSuccess, bind, Except.bind] at success
+              exact ⟨baseResult, baseState, keyType, keyState, valueType,
+                valueState, mappingState, indexResult, indexState, rfl,
+                keyFresh, valueFresh, mappingSuccess, indexSuccess, success⟩
+
 /-- Invert successful proxy-type expression inference into source-type
 resolution and the exact proxy-recording operation. -/
 theorem inferExprFuel_success_proxy_facts
