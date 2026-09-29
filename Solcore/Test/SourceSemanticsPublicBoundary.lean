@@ -749,6 +749,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_tuple_expressionTypingBase_scoped_of_retained
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_conditional_expressionTypingBase_scoped_of_retained
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_index_expressionTypingBase_scoped_of_retained
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferUnaryOperator_recordExpressionWithExpected_success_expressionTypingBase_scoped_of_retained
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferBinaryOperator_recordExpressionWithExpected_success_expressionTypingBase_scoped_of_retained

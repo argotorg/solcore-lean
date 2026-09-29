@@ -21878,6 +21878,427 @@ theorem inferExprFuel_success_tuple_expressionTypingBase_scoped_of_retained
       signaturesEq traitName solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
 
+/-- Conditional inference composes three recursively typed children with
+branch unification and occurrence-retained ordinary expression recording. -/
+theorem inferExprFuel_success_conditional_expressionTypingBase_scoped_of_retained
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression condition thenBranch elseBranch : Syntax.Expr}
+    {question colon : Syntax.SourceSpan}
+    {expected : Option TypeSystem.Ty}
+    {initial allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (expressionEq : expression.value =
+      .conditional condition question thenBranch colon elseBranch)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok result)
+    (allocatedReady : allocated.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes))
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow allocated.inference.next)
+    (expressionSound :
+      ∀ {childFuel : Nat} {childExpression : Syntax.Expr}
+        {childExpected : Option TypeSystem.Ty}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext childExpression
+            childExpected childInitial = .ok (child, childFinal) →
+          ExpressionHasType semanticSource active child.id
+            (later.inference.substitution.apply child.type))
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  obtain ⟨conditionResult, conditionState, thenResult, thenState, elseResult,
+      elseState, unifiedState, conditionSuccess, thenSuccess, elseSuccess,
+      unifySuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_conditional_facts expressionEq allocationEq
+      success
+  have conditionProperties := Detail.inferExprFuel_inferenceProperties
+    allocatedReady signatureFormation functionsCanonical (by
+      intro expectedType member
+      simp only [Option.mem_def] at member
+      have expectedTypeEq : expectedType = .bool :=
+        (Option.some.inj member).symm
+      rw [expectedTypeEq]
+      change TypeSystem.Ty.VariablesBelow allocated.inference.next
+        (.constructor (.builtin .bool))
+      exact TypeSystem.Ty.variablesBelow_constructor _ _) conditionSuccess
+  have expectedAtCondition : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow conditionState.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken
+      conditionProperties.1.next_le
+  have thenProperties := Detail.inferExprFuel_inferenceProperties
+    conditionProperties.2.1 signatureFormation functionsCanonical
+      expectedAtCondition thenSuccess
+  have expectedAtThen : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow thenState.inference.next := by
+    intro expectedType member
+    exact (expectedAtCondition expectedType member).weaken
+      thenProperties.1.next_le
+  have elseProperties := Detail.inferExprFuel_inferenceProperties
+    thenProperties.2.1 signatureFormation functionsCanonical expectedAtThen
+      elseSuccess
+  have thenAtElse : thenResult.type.VariablesBelow
+      elseState.inference.next :=
+    thenProperties.2.2.weaken elseProperties.1.next_le
+  have unifyProgress := Detail.unify_inferenceProgress
+    elseProperties.2.1.solved thenAtElse elseProperties.2.2 unifySuccess
+  have unifiedReady := Detail.unify_preserves_inferenceReady
+    elseProperties.2.1 thenAtElse elseProperties.2.2 unifySuccess
+  have allocatedToUnified : allocated.InferenceProgress unifiedState :=
+    conditionProperties.1.trans
+      (thenProperties.1.trans (elseProperties.1.trans unifyProgress))
+  have expectedAtUnified : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow unifiedState.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken
+      allocatedToUnified.next_le
+  have thenAtUnified : thenResult.type.VariablesBelow
+      unifiedState.inference.next :=
+    thenAtElse.weaken unifyProgress.next_le
+  have resolvedThenBelow :
+      (unifiedState.resolve thenResult.type).VariablesBelow
+        unifiedState.inference.next :=
+    unifiedReady.solved.variablesBelow_apply thenAtUnified
+  have recordedProperties :=
+    Detail.recordExpressionWithExpected_inferenceProperties unifiedReady
+      resolvedThenBelow expectedAtUnified recorded
+  have laterUnified : later.inference.substitution.SemanticallyExtends
+      unifiedState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans substitutionExtends
+      recordedProperties.1.substitution_extends
+  have laterElse : later.inference.substitution.SemanticallyExtends
+      elseState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans laterUnified
+      unifyProgress.substitution_extends
+  have laterThen : later.inference.substitution.SemanticallyExtends
+      thenState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans laterElse
+      elseProperties.1.substitution_extends
+  have laterCondition : later.inference.substitution.SemanticallyExtends
+      conditionState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans laterThen
+      thenProperties.1.substitution_extends
+  have conditionEq : later.inference.substitution.apply conditionResult.type =
+      .bool := by
+    simpa using Detail.inferExprFuel_expected_type_apply_eq conditionSuccess
+      laterCondition
+  have conditionType : ExpressionHasType semanticSource active
+      conditionResult.id .bool := by
+    rw [← conditionEq]
+    exact expressionSound conditionSuccess
+  have resolvedThenEq :
+      later.inference.substitution.apply
+          (unifiedState.resolve thenResult.type) =
+        later.inference.substitution.apply thenResult.type := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using laterUnified thenResult.type
+  have resolvedElseEq :
+      later.inference.substitution.apply
+          (unifiedState.resolve elseResult.type) =
+        later.inference.substitution.apply elseResult.type := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using laterUnified elseResult.type
+  have unifiedEq : unifiedState.resolve thenResult.type =
+      unifiedState.resolve elseResult.type := by
+    simpa [Frontend.SourceInference.State.resolve] using
+      Detail.unify_resolve_eq unifySuccess
+  have branchEq : later.inference.substitution.apply thenResult.type =
+      later.inference.substitution.apply elseResult.type := by
+    calc
+      later.inference.substitution.apply thenResult.type =
+          later.inference.substitution.apply
+            (unifiedState.resolve thenResult.type) := resolvedThenEq.symm
+      _ = later.inference.substitution.apply
+          (unifiedState.resolve elseResult.type) :=
+        congrArg later.inference.substitution.apply unifiedEq
+      _ = later.inference.substitution.apply elseResult.type := resolvedElseEq
+  have thenType : ExpressionHasType semanticSource active thenResult.id
+      (later.inference.substitution.apply
+        (unifiedState.resolve thenResult.type)) := by
+    rw [resolvedThenEq]
+    exact expressionSound thenSuccess
+  have elseType : ExpressionHasType semanticSource active elseResult.id
+      (later.inference.substitution.apply
+        (unifiedState.resolve thenResult.type)) := by
+    rw [resolvedThenEq, branchEq]
+    exact expressionSound elseSuccess
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.conditional conditionResult.id thenResult.id
+        elseResult.id).applySubstitution later.inference.substitution)
+      (later.inference.substitution.apply
+        (unifiedState.resolve thenResult.type)) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution] using
+      ExpressionFormHasRawType.conditional conditionType thenType elseType
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recorded substitutionExtends requirementsSubset retained formType
+      thenType.type_admissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
+/-- Mapping-index inference composes recursive base and key typing with the
+fresh mapping shape, its successful unification, and occurrence-retained
+ordinary expression recording. -/
+theorem inferExprFuel_success_index_expressionTypingBase_scoped_of_retained
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expression baseExpression indexExpression : Syntax.Expr}
+    {brackets : Syntax.SourceSpan}
+    {expected : Option TypeSystem.Ty}
+    {initial allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (expressionEq : expression.value =
+      .index baseExpression brackets indexExpression)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok result)
+    (allocatedReady : allocated.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes))
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow allocated.inference.next)
+    (expressionSound :
+      ∀ {childFuel : Nat} {childExpression : Syntax.Expr}
+        {childExpected : Option TypeSystem.Ty}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext childExpression
+            childExpected childInitial = .ok (child, childFinal) →
+          ExpressionHasType semanticSource active child.id
+            (later.inference.substitution.apply child.type))
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState,
+      mappingState, indexResult, indexState, baseSuccess, keyFresh, valueFresh,
+      mappingSuccess, indexSuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_index_facts expressionEq allocationEq success
+  have baseProperties := Detail.inferExprFuel_inferenceProperties
+    allocatedReady signatureFormation functionsCanonical (by
+      intro expectedType member
+      simp at member) baseSuccess
+  have keyProperties := Detail.fresh_eq_inferenceProperties
+    baseProperties.2.1 keyFresh
+  have valueProperties := Detail.fresh_eq_inferenceProperties
+    keyProperties.2.1 valueFresh
+  have baseAtValue : baseResult.type.VariablesBelow
+      valueState.inference.next :=
+    baseProperties.2.2.weaken
+      (keyProperties.1.trans valueProperties.1).next_le
+  have keyAtValue : keyType.VariablesBelow valueState.inference.next :=
+    keyProperties.2.2.weaken valueProperties.1.next_le
+  have mappingBelow : (TypeSystem.Ty.mapping keyType valueType).VariablesBelow
+      valueState.inference.next :=
+    (TypeSystem.Ty.variablesBelow_mapping_iff _ _ _).2
+      ⟨keyAtValue, valueProperties.2.2⟩
+  have unifyProgress := Detail.unify_inferenceProgress
+    valueProperties.2.1.solved baseAtValue mappingBelow mappingSuccess
+  have mappingReady := Detail.unify_preserves_inferenceReady
+    valueProperties.2.1 baseAtValue mappingBelow mappingSuccess
+  have keyAtMapping : keyType.VariablesBelow mappingState.inference.next :=
+    keyAtValue.weaken unifyProgress.next_le
+  have resolvedKeyBelow :
+      (mappingState.resolve keyType).VariablesBelow
+        mappingState.inference.next :=
+    mappingReady.solved.variablesBelow_apply keyAtMapping
+  have indexProperties := Detail.inferExprFuel_inferenceProperties
+    mappingReady signatureFormation functionsCanonical (by
+      intro expectedType member
+      simp only [Option.mem_def] at member
+      have expectedTypeEq : expectedType = mappingState.resolve keyType :=
+        (Option.some.inj member).symm
+      rw [expectedTypeEq]
+      exact resolvedKeyBelow) indexSuccess
+  have allocatedToIndex : allocated.InferenceProgress indexState :=
+    baseProperties.1.trans
+      (keyProperties.1.trans
+        (valueProperties.1.trans
+          (unifyProgress.trans indexProperties.1)))
+  have expectedAtIndex : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow indexState.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken allocatedToIndex.next_le
+  have valueAtIndex : valueType.VariablesBelow indexState.inference.next :=
+    valueProperties.2.2.weaken
+      (unifyProgress.trans indexProperties.1).next_le
+  have resolvedValueBelow :
+      (indexState.resolve valueType).VariablesBelow
+        indexState.inference.next :=
+    indexProperties.2.1.solved.variablesBelow_apply valueAtIndex
+  have recordedProperties :=
+    Detail.recordExpressionWithExpected_inferenceProperties
+      indexProperties.2.1 resolvedValueBelow expectedAtIndex recorded
+  have laterIndex : later.inference.substitution.SemanticallyExtends
+      indexState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans substitutionExtends
+      recordedProperties.1.substitution_extends
+  have laterMapping : later.inference.substitution.SemanticallyExtends
+      mappingState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans laterIndex
+      indexProperties.1.substitution_extends
+  have unifiedEq : mappingState.resolve baseResult.type =
+      mappingState.resolve (.mapping keyType valueType) := by
+    simpa [Frontend.SourceInference.State.resolve] using
+      Detail.unify_resolve_eq mappingSuccess
+  have resolvedBaseEq :
+      later.inference.substitution.apply
+          (mappingState.resolve baseResult.type) =
+        later.inference.substitution.apply baseResult.type := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using laterMapping baseResult.type
+  have resolvedMappingEq :
+      later.inference.substitution.apply
+          (mappingState.resolve (.mapping keyType valueType)) =
+        later.inference.substitution.apply (.mapping keyType valueType) := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using
+        laterMapping (.mapping keyType valueType)
+  have baseEq : later.inference.substitution.apply baseResult.type =
+      .mapping (later.inference.substitution.apply keyType)
+        (later.inference.substitution.apply valueType) := by
+    calc
+      later.inference.substitution.apply baseResult.type =
+          later.inference.substitution.apply
+            (mappingState.resolve baseResult.type) := resolvedBaseEq.symm
+      _ = later.inference.substitution.apply
+          (mappingState.resolve (.mapping keyType valueType)) :=
+        congrArg later.inference.substitution.apply unifiedEq
+      _ = later.inference.substitution.apply
+          (.mapping keyType valueType) := resolvedMappingEq
+      _ = .mapping (later.inference.substitution.apply keyType)
+          (later.inference.substitution.apply valueType) := rfl
+  have indexExpectedEq :
+      later.inference.substitution.apply indexResult.type =
+        later.inference.substitution.apply
+          (mappingState.resolve keyType) :=
+    Detail.inferExprFuel_expected_type_apply_eq indexSuccess laterIndex
+  have resolvedKeyEq :
+      later.inference.substitution.apply (mappingState.resolve keyType) =
+        later.inference.substitution.apply keyType := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using laterMapping keyType
+  have resolvedValueEq :
+      later.inference.substitution.apply (indexState.resolve valueType) =
+        later.inference.substitution.apply valueType := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using laterIndex valueType
+  have baseType : ExpressionHasType semanticSource active baseResult.id
+      (.mapping (later.inference.substitution.apply keyType)
+        (later.inference.substitution.apply valueType)) := by
+    rw [← baseEq]
+    exact expressionSound baseSuccess
+  have indexType : ExpressionHasType semanticSource active indexResult.id
+      (later.inference.substitution.apply keyType) := by
+    rw [← resolvedKeyEq, ← indexExpectedEq]
+    exact expressionSound indexSuccess
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.index baseResult.id indexResult.id).applySubstitution
+        later.inference.substitution)
+      (later.inference.substitution.apply (indexState.resolve valueType))
+      (.ordinary []) := by
+    rw [resolvedValueEq]
+    simpa [ExpressionForm.applySubstitution] using
+      ExpressionFormHasRawType.index baseType indexType
+  have rawAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply (indexState.resolve valueType)) := by
+    rw [resolvedValueEq]
+    exact TypeAdmissible.mapping_value baseType.type_admissible
+  exact
+    recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
+      recorded substitutionExtends requirementsSubset retained formType
+      rawAdmissible traitSuccess profileSuccess catalog contextValid
+      signaturesEq traitName solveSuccess solvedEq ledger ownership
+      activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
+
 /-- The ordinary-recording tail of unary inference becomes a reusable typing
 base once its recursively inferred operand and the retained operator evidence
 have been validated.  This theorem is shared by both the builtin-function
