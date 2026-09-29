@@ -39,6 +39,13 @@ private def workspace : Workspace.RawWorkspace := {
         "  let f = lam(value) { return keepAs(1, value); };",
         "  return (f(2), f(flag));",
         "}",
+        "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
+        "function relay<T>(value: T) returns (T) where T: Eq { return keep(value); }",
+        "function typedEvidence(value: Word) returns (Word) {",
+        "  let table: mapping(Word => Word);",
+        "  table[0] = relay(value);",
+        "  return table[0];",
+        "}",
         "function polymorphicLocal(flag: Bool) returns (Word, Bool) {",
         "  let id = lam(value) { return globalIdentity(value); };",
         "  return (id(11), id(flag));",
@@ -142,6 +149,7 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let recursiveContextPolymorphicLocal ←
     compileNamed checked "main.solc" "recursiveContextPolymorphicLocal"
   let localProof ← compileNamed checked "main.solc" "localProof"
+  let typedEvidence ← compileNamed checked "main.solc" "typedEvidence"
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
@@ -150,7 +158,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       polymorphicLocal.backend = .typedSource ∧
       nestedPolymorphicLocal.backend = .typedSource ∧
       recursiveContextPolymorphicLocal.backend = .typedSource ∧
-      localProof.backend = .typedSource))
+      localProof.backend = .typedSource ∧
+      typedEvidence.backend = .typedSource))
     "automatic backend precedence changed"
   assertTrue (decide (
       direct.key.declaration.moduleId = main ∧
@@ -175,6 +184,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
     "recursive local contexts did not retain their root and two generic helper instances"
   assertTrue (localProof.specializationCount == 3)
     "local proof calls did not retain their root and two constrained helper instances"
+  assertTrue (typedEvidence.specializationCount == 3)
+    "typed evidence forwarding did not retain root, relay, and callee"
   let polymorphicRequest ←
     match SourceProgramExecution.resolveSeed checked
         (Seed.named main "polymorphicLocal") with
@@ -272,6 +283,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "runtime local proof calls did not retain Word/Bool results"
   | result => throw (IO.userError
       s!"runtime local proof calls returned {reprStr result}")
+  expectTypedWord "public typed evidence forwarding" 73 <|
+    typedEvidence.runTyped [.word (word 73)] runtimeOptions
   pure { checked, direct, recursive, typed }
 
 private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do

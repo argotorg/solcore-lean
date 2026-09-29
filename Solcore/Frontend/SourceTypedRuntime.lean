@@ -32,6 +32,35 @@ structure Location where
 
 abbrev Environment := List (Resolved.LocalId × Location)
 
+/-- Closed trait evidence available while one specialized function body is
+executing.  The carrier deliberately excludes `PredicateEvidence.assumption`:
+every entry has already been discharged by an enclosing call.  Call assembly
+and `Matches`, rather than the list carrier itself, enforce the specialized
+signature's predicate order. -/
+abbrev RuntimeEvidenceEnvironment := List TypedTraitResolution.Evidence
+
+namespace RuntimeEvidenceEnvironment
+
+def goals (environment : RuntimeEvidenceEnvironment) : List ProgramPredicate :=
+  environment.map fun
+    | .byImpl goal _ _ => goal
+
+/-- The executable dictionary has exactly the goals, order, and multiplicity
+declared by the specialization about to execute. -/
+def Matches (environment : RuntimeEvidenceEnvironment)
+    (predicates : List ProgramPredicate) : Prop :=
+  environment.goals = predicates
+
+theorem Matches.length_eq
+    {environment : RuntimeEvidenceEnvironment}
+    {predicates : List ProgramPredicate}
+    (agreement : environment.Matches predicates) :
+    environment.length = predicates.length := by
+  unfold Matches goals at agreement
+  rw [← agreement, List.length_map]
+
+end RuntimeEvidenceEnvironment
+
 /-- Runtime evidence attached to one concrete use of a qualified local
 scheme.  Requirement identities, rather than predicate equality, connect the
 assumption in the stored lambda body to the independently solved obligation at
@@ -65,6 +94,7 @@ inductive Value where
       (source : TypedSource)
       (owner : Key)
       (captured : Environment)
+      (evidence : RuntimeEvidenceEnvironment)
   /-- A runtime-only view of a principal value at one concrete occurrence.
   The wrapper keeps the stored closure and its plan provenance unchanged;
   callable execution applies the substitution to the closure's checked source
@@ -147,7 +177,7 @@ mutual
         else
           none
     | .mapping keyType valueType _ => some (.mapping keyType valueType)
-    | .closure parameters resultType _ _ _ _ =>
+    | .closure parameters resultType _ _ _ _ _ =>
         some (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType)
     | .instantiated substitution _ principal =>
         substitution.apply <$> principal.type? plan
@@ -374,6 +404,13 @@ inductive RuntimeError where
   | invalidFunctionType (key : Key) (type : Ty)
   | inferredResultTypeMismatch (key : Key) (declared inferred : Ty)
   | unresolvedAssumptions (key : Key) (predicates : List ProgramPredicate)
+  | runtimeEvidenceCountMismatch (key : Key) (expected actual : Nat)
+  | runtimeEvidenceGoalMismatch
+      (key : Key) (index : Nat)
+      (expected actual : ProgramPredicate)
+  | missingRuntimeAssumptionEvidence
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+      (predicate : ProgramPredicate)
   | comptimeContract
       (key : Key) (parameterComptime : List Bool) (returnComptime : Bool)
   | markedBinder (id : Resolved.LocalId)
@@ -708,11 +745,97 @@ private def localRequirementWitnesses
     }]
   pure (substitution, witnesses)
 
-private def validateCallRequirementEvidence
+private def runtimeEvidenceGoal :
+    TypedTraitResolution.Evidence → ProgramPredicate
+  | .byImpl goal _ _ => goal
+
+private def validateRuntimeEvidenceGoals (key : Key) :
+    Nat → List ProgramPredicate → RuntimeEvidenceEnvironment →
+      Except RuntimeError Unit
+  | _, [], [] => pure ()
+  | index, expected :: expectedRest, evidence :: evidenceRest => do
+      let actual := runtimeEvidenceGoal evidence
+      if actual = expected then
+        validateRuntimeEvidenceGoals key (index + 1) expectedRest evidenceRest
+      else
+        throw (.runtimeEvidenceGoalMismatch key index expected actual)
+  | _, expected, evidence =>
+      throw (.runtimeEvidenceCountMismatch key expected.length evidence.length)
+
+/-- Check the closed dictionary at a specialization boundary.  Its carrier
+already rules out assumption leaves; this additionally fixes source order and
+multiplicity to the callee's specialized `where` predicates. -/
+private def validateRuntimeEvidence (key : Key)
+    (predicates : List ProgramPredicate)
+    (environment : RuntimeEvidenceEnvironment) : Except RuntimeError Unit := do
+  if predicates.length = environment.length then
+    validateRuntimeEvidenceGoals key 0 predicates environment
+  else
+    throw (.runtimeEvidenceCountMismatch key predicates.length
+      environment.length)
+
+private theorem validateRuntimeEvidenceGoals_success
+    (key : Key) (index : Nat) (predicates : List ProgramPredicate)
+    (environment : RuntimeEvidenceEnvironment)
+    (success : validateRuntimeEvidenceGoals key index predicates environment =
+      .ok ()) :
+    environment.Matches predicates := by
+  induction predicates generalizing index environment with
+  | nil =>
+      cases environment with
+      | nil => rfl
+      | cons evidence rest =>
+          simp [validateRuntimeEvidenceGoals] at success
+  | cons predicate predicates induction =>
+      cases environment with
+      | nil => simp [validateRuntimeEvidenceGoals] at success
+      | cons evidence rest =>
+          cases evidence with
+          | byImpl goal implementation premises =>
+              by_cases same : goal = predicate
+              · have tailSuccess :
+                    validateRuntimeEvidenceGoals key (index + 1) predicates
+                      rest = .ok () := by
+                  simpa [validateRuntimeEvidenceGoals, runtimeEvidenceGoal,
+                    same] using success
+                have tail := induction (index := index + 1)
+                  (environment := rest) tailSuccess
+                unfold RuntimeEvidenceEnvironment.Matches
+                  RuntimeEvidenceEnvironment.goals at tail ⊢
+                simp [same, tail]
+              · simp [validateRuntimeEvidenceGoals, runtimeEvidenceGoal,
+                  same] at success
+
+/-- Successful executable validation exposes the ordered closed-dictionary
+invariant used by the evaluator boundary. -/
+private theorem validateRuntimeEvidence_success_matches
+    (key : Key) (predicates : List ProgramPredicate)
+    (environment : RuntimeEvidenceEnvironment)
+    (success : validateRuntimeEvidence key predicates environment = .ok ()) :
+    environment.Matches predicates := by
+  unfold validateRuntimeEvidence at success
+  split at success
+  · exact validateRuntimeEvidenceGoals_success key 0 predicates environment
+      success
+  · simp at success
+
+private def availableRuntimeEvidence?
+    (environment : RuntimeEvidenceEnvironment)
+    (predicate : ProgramPredicate) : Option TypedTraitResolution.Evidence :=
+  environment.find? fun evidence =>
+    decide (runtimeEvidenceGoal evidence = predicate)
+
+/-- Materialize call evidence in the callee declaration's predicate order.
+Concrete implementation evidence is retained verbatim.  A caller assumption
+is closed by the dictionary supplied when the caller specialization was
+entered; no trait search occurs during execution. -/
+private def materializeCallEvidence
     (caller : SourceSpecialization.SpecializedFunction)
-    (occurrence : ExpressionId) :
-    List RequirementId → List ProgramPredicate → Except RuntimeError Unit
-  | [], [] => pure ()
+    (occurrence : ExpressionId)
+    (available : RuntimeEvidenceEnvironment) :
+    List RequirementId → List ProgramPredicate →
+      Except RuntimeError RuntimeEvidenceEnvironment
+  | [], [] => pure []
   | requirement :: requirements, predicate :: predicates => do
       let solved ← exactCallSolvedRequirement caller occurrence requirement
       if solved.predicate != predicate then
@@ -722,24 +845,24 @@ private def validateCallRequirementEvidence
       if goal != solved.predicate then
         throw (.callRequirementEvidenceGoalMismatch caller.key occurrence
           requirement solved.predicate goal)
-      match solved.evidence with
-      | .assumption assumption =>
-          throw (.unsupportedCallAssumptionEvidence caller.key occurrence
-            requirement assumption)
-      | .implementation _ =>
-          validateCallRequirementEvidence caller occurrence requirements
-            predicates
+      let evidence ← match solved.evidence with
+        | .implementation evidence => pure evidence
+        | .assumption assumption =>
+            match availableRuntimeEvidence? available assumption with
+            | some evidence => pure evidence
+            | none => throw (.missingRuntimeAssumptionEvidence caller.key
+                occurrence requirement assumption)
+      pure (evidence :: (← materializeCallEvidence caller occurrence available
+        requirements predicates))
   | requirements, predicates =>
       throw (.callRequirementCountMismatch caller.key occurrence
         predicates.length requirements.length)
 
-/-- Validate the exact, ordered proof obligations carried by a direct
-declaration call.  This runtime slice accepts only already-selected
-implementation evidence; forwarding a caller assumption remains unsupported. -/
-private def validateDirectCallRequirements
+private def exactDirectCallRuntimeEvidence
     (caller : SourceSpecialization.SpecializedFunction)
-    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
-    Except RuntimeError Unit := do
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment)
+    (instantiation : DeclarationInstantiation) :
+    Except RuntimeError RuntimeEvidenceEnvironment := do
   if node.requirements.length != instantiation.predicates.length then
     throw (.callRequirementCountMismatch caller.key node.id
       instantiation.predicates.length node.requirements.length)
@@ -747,7 +870,7 @@ private def validateDirectCallRequirements
   | some requirement =>
       throw (.duplicateCallRequirement caller.key node.id requirement)
   | none =>
-      validateCallRequirementEvidence caller node.id node.requirements
+      materializeCallEvidence caller node.id available node.requirements
         instantiation.predicates
 
 private def validateSelectedCallImplementationEvidence
@@ -770,39 +893,6 @@ private def validateSelectedCallImplementationEvidence
         let .byImpl _ implementation _ := evidence
         .error (.callEvidenceNotSelected caller.key occurrence requirement
           goal implementation)
-
-private def validateCallImplementationEvidence
-    (signatures : ProgramSignatures)
-    (caller : SourceSpecialization.SpecializedFunction)
-    (occurrence : ExpressionId) :
-    List RequirementId → List ProgramPredicate → Except RuntimeError Unit
-  | [], [] => pure ()
-  | requirement :: requirements, predicate :: predicates => do
-      let solved ← exactCallSolvedRequirement caller occurrence requirement
-      match solved.evidence with
-      | .assumption assumption =>
-          throw (.unsupportedCallAssumptionEvidence caller.key occurrence
-            requirement assumption)
-      | .implementation evidence =>
-          validateSelectedCallImplementationEvidence signatures caller
-            occurrence requirement predicate evidence
-          validateCallImplementationEvidence signatures caller occurrence
-            requirements predicates
-  | requirements, predicates =>
-      throw (.callRequirementCountMismatch caller.key occurrence
-        predicates.length requirements.length)
-
-/-- Re-resolve a direct call's implementation witnesses against the supplied
-signature authority.  Equality with the selected evidence checks the complete
-recursive premise tree, not only its outer goal and implementation identity. -/
-private def validateDirectCallImplementationEvidence
-    (signatures : ProgramSignatures)
-    (caller : SourceSpecialization.SpecializedFunction)
-    (node : ExpressionNode) (instantiation : DeclarationInstantiation) :
-    Except RuntimeError Unit := do
-  validateDirectCallRequirements caller node instantiation
-  validateCallImplementationEvidence signatures caller node.id
-    node.requirements instantiation.predicates
 
 private def directLambdaBodyRoots? (source : TypedSource)
     (binderId : Resolved.LocalId) : Option (List NodeId) :=
@@ -914,8 +1004,11 @@ private def validateExecutableCallRequirementEvidence
       match solved.evidence with
       | .implementation _ => pure ()
       | .assumption assumption =>
-          if (scopedLocalTemplateOwner? caller.function.typedBody occurrence
-              requirement predicate).isNone then
+          let declarationAssumption := caller.assumptions.contains predicate
+          let localTemplate :=
+            (scopedLocalTemplateOwner? caller.function.typedBody occurrence
+              requirement predicate).isSome
+          unless declarationAssumption || localTemplate do
             throw (.unsupportedCallAssumptionEvidence caller.key occurrence
               requirement assumption)
       validateExecutableCallRequirementEvidence caller occurrence requirements
@@ -1976,7 +2069,7 @@ private def instantiateDirectLambdaLet? (plan : Plan) (owner : Key)
   let (substitution, requirements) ←
     localRequirementWitnesses caller binder node
   match value with
-  | .closure _ _ _ _ _ _ =>
+  | .closure _ _ _ _ _ _ _ =>
       pure (some (.instantiated substitution requirements value))
   | _ => pure none
 
@@ -2015,6 +2108,7 @@ private def rewriteLocalRequirements
 mutual
 
   private def evaluate (fuel : Nat) (plan : Plan) (owner : Key)
+      (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (id : ExpressionId) : ExpressionResult :=
     match fuel with
@@ -2023,7 +2117,7 @@ mutual
       match exactExpression source id with
       | .error error => .fault error state
       | .ok node =>
-        let descend := evaluate fuel plan owner source environment
+        let descend := evaluate fuel plan owner evidence source environment
         let raw : ExpressionResult :=
           match node.form with
           | .literal literal =>
@@ -2114,8 +2208,8 @@ mutual
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
           | .lambda parameters resultType body =>
-              .done (.closure parameters resultType body source owner environment)
-                state
+              .done (.closure parameters resultType body source owner environment
+                evidence) state
           | .call callee arguments (.declaration instantiation) =>
               match evaluateList descend state arguments with
               | .done values finalState =>
@@ -2131,13 +2225,13 @@ mutual
                               match exactSpecialization plan owner with
                               | .error error => .fault error finalState
                               | .ok caller =>
-                                  match validateDirectCallRequirements caller
-                                      node instantiation with
+                                  match exactDirectCallRuntimeEvidence caller node
+                                      evidence instantiation with
                                   | .error error => .fault error finalState
-                                  | .ok () =>
+                                  | .ok calleeEvidence =>
                                       expressionOfRunResult
                                         (invokeDirectSpecialization fuel plan key
-                                          values finalState)
+                                          calleeEvidence values finalState)
                           | .error error => .fault error finalState
               | .outOfFuel finalState => .outOfFuel finalState
               | .fault error finalState => .fault error finalState
@@ -2220,18 +2314,18 @@ mutual
           | .error error => .fault error state
       | .global key =>
           expressionOfRunResult (invokeSpecialization fuel plan key arguments state)
-      | .closure parameters expected body source owner captured =>
+      | .closure parameters expected body source owner captured evidence =>
           if parameters.length != arguments.length then
             .fault (.argumentArityMismatch parameters.length arguments.length) state
           else
             match bindValues plan captured state (List.zip parameters arguments) with
             | .error error => .fault error state
             | .ok (environment, bodyState) =>
-                let flow := executeFunctionSequence fuel plan owner source
-                  environment bodyState body
+                let flow := executeFunctionSequence fuel plan owner evidence
+                  source environment bodyState body
                 expressionOfRunResult (finishFunctionFlow plan expected flow)
       | .instantiated substitution requirements
-          (.closure parameters expected body source owner captured) =>
+          (.closure parameters expected body source owner captured evidence) =>
           let parameters := parameters.map
             (TypedBinder.applySubstitution substitution)
           let expected := substitution.apply expected
@@ -2243,8 +2337,8 @@ mutual
             match bindValues plan captured state (List.zip parameters arguments) with
             | .error error => .fault error state
             | .ok (environment, bodyState) =>
-                let flow := executeFunctionSequence fuel plan owner source
-                  environment bodyState body
+                let flow := executeFunctionSequence fuel plan owner evidence
+                  source environment bodyState body
                 expressionOfRunResult (finishFunctionFlow plan expected flow)
       | actual => .fault (.expectedFunction (actual.type? plan)) state
 
@@ -2273,7 +2367,7 @@ mutual
                     match statementIds function.typedBody.roots with
                     | .error error => .fault error bodyState
                     | .ok roots =>
-                        let flow := executeFunctionSequence fuel plan key
+                        let flow := executeFunctionSequence fuel plan key []
                           function.typedBody environment bodyState roots
                         finishFunctionFlow plan expected flow
 
@@ -2281,6 +2375,7 @@ mutual
   immediately enclosing, validated direct declaration call.  This entry point
   is deliberately absent from `Value.global`, roots, and indirect calls. -/
   private def invokeDirectSpecialization (fuel : Nat) (plan : Plan) (key : Key)
+      (evidence : RuntimeEvidenceEnvironment)
       (arguments : List Value) (state : RuntimeState) : RunResult :=
     match fuel with
     | 0 => .outOfFuel state
@@ -2293,24 +2388,30 @@ mutual
               (allowsDirectAssumptionInvocation plan key) specialized with
           | .error error => .fault error state
           | .ok () =>
-              let expected := function.inferredBodyType
-              let parameters := function.typedBody.inputs
-              if parameters.length != arguments.length then
-                .fault (.argumentArityMismatch parameters.length
-                  arguments.length) state
-              else
-                match bindValues plan [] state
-                    (List.zip parameters arguments) with
-                | .error error => .fault error state
-                | .ok (environment, bodyState) =>
-                    match statementIds function.typedBody.roots with
-                    | .error error => .fault error bodyState
-                    | .ok roots =>
-                        let flow := executeFunctionSequence fuel plan key
-                          function.typedBody environment bodyState roots
-                        finishFunctionFlow plan expected flow
+              match validateRuntimeEvidence key specialized.assumptions
+                  evidence with
+              | .error error => .fault error state
+              | .ok () =>
+                  let expected := function.inferredBodyType
+                  let parameters := function.typedBody.inputs
+                  if parameters.length != arguments.length then
+                    .fault (.argumentArityMismatch parameters.length
+                      arguments.length) state
+                  else
+                    match bindValues plan [] state
+                        (List.zip parameters arguments) with
+                    | .error error => .fault error state
+                    | .ok (environment, bodyState) =>
+                        match statementIds function.typedBody.roots with
+                        | .error error => .fault error bodyState
+                        | .ok roots =>
+                            let flow := executeFunctionSequence fuel plan key
+                              evidence function.typedBody environment bodyState
+                              roots
+                            finishFunctionFlow plan expected flow
 
   private def executeStatement (fuel : Nat) (plan : Plan) (owner : Key)
+      (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (id : StatementId) : FlowOutcome :=
     match fuel with
@@ -2319,7 +2420,7 @@ mutual
       match exactStatement source id with
       | .error error => .fault error state
       | .ok node =>
-        let descend := evaluate fuel plan owner source environment
+        let descend := evaluate fuel plan owner evidence source environment
         match node.form with
         | .letDecl binder initializer =>
             match initializer with
@@ -2383,20 +2484,21 @@ mutual
             match descend state condition with
             | .done (.bool true) branchState =>
                 restoreScope environment <| executeSequence
-                  (executeStatement fuel plan owner source)
+                  (executeStatement fuel plan owner evidence source)
                   environment branchState thenBody
             | .done (.bool false) branchState =>
                 match elseBody with
                 | none => .fallthrough environment branchState
                 | some body => restoreScope environment <| executeSequence
-                    (executeStatement fuel plan owner source)
+                    (executeStatement fuel plan owner evidence source)
                     environment branchState body
             | .done actual finalState =>
                 .fault (.expectedBool (actual.type? plan)) finalState
             | .outOfFuel finalState => .outOfFuel finalState
             | .fault error finalState => .fault error finalState
         | .block body => restoreScope environment <| executeSequence
-            (executeStatement fuel plan owner source) environment state body
+            (executeStatement fuel plan owner evidence source) environment state
+              body
         | .matchWith resolution =>
             match descend state resolution.scrutinee with
             | .done scrutinee matchState =>
@@ -2406,16 +2508,16 @@ mutual
                 let matchEnvironment :=
                   (resolution.hiddenScrutinee, hidden) :: environment
                 restoreScope environment <| executeMatchCases fuel plan owner
-                  source matchEnvironment hiddenState scrutinee
+                  evidence source matchEnvironment hiddenState scrutinee
                   resolution.cases resolution.defaultBody
             | .outOfFuel finalState => .outOfFuel finalState
             | .fault error finalState => .fault error finalState
         | .forLoop initializer condition post body =>
-            match executeForItems fuel plan owner source environment state
-                initializer with
+            match executeForItems fuel plan owner evidence source environment
+                state initializer with
             | .fallthrough loopEnvironment loopState =>
                 restoreScope environment <| executeForIterations fuel plan owner
-                  source loopEnvironment loopState condition post body
+                  evidence source loopEnvironment loopState condition post body
             | .returned value finalState => .returned value finalState
             | .breaking _ finalState
             | .continuing _ finalState =>
@@ -2423,30 +2525,32 @@ mutual
             | .outOfFuel finalState => .outOfFuel finalState
             | .fault error finalState => .fault error finalState
         | .whileLoop condition body =>
-            restoreScope environment <| executeWhile fuel plan owner source
-              environment state condition body
+            restoreScope environment <| executeWhile fuel plan owner evidence
+              source environment state condition body
         | .breakStmt => .breaking environment state
         | .continueStmt => .continuing environment state
 
   private def executeWhile (fuel : Nat) (plan : Plan) (owner : Key)
+      (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (condition : ExpressionId)
       (body : List StatementId) : FlowOutcome :=
     match fuel with
     | 0 => .outOfFuel state
     | fuel + 1 =>
-      match evaluate fuel plan owner source environment state condition with
+      match evaluate fuel plan owner evidence source environment state
+          condition with
       | .done (.bool false) finalState =>
           .fallthrough environment finalState
       | .done (.bool true) bodyState =>
           let outcome := restoreScope environment <| executeSequence
-            (executeStatement fuel plan owner source)
+            (executeStatement fuel plan owner evidence source)
             environment bodyState body
           match outcome with
           | .fallthrough nextEnvironment nextState
           | .continuing nextEnvironment nextState =>
-              executeWhile fuel plan owner source nextEnvironment nextState
-                condition body
+              executeWhile fuel plan owner evidence source nextEnvironment
+                nextState condition body
           | .breaking _ finalState => .fallthrough environment finalState
           | .returned value finalState => .returned value finalState
           | .outOfFuel finalState => .outOfFuel finalState
@@ -2457,18 +2561,20 @@ mutual
       | .fault error finalState => .fault error finalState
 
   private def executeForIterations (fuel : Nat) (plan : Plan) (owner : Key)
+      (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (condition : ExpressionId)
       (post : List ForItemForm) (body : List StatementId) : FlowOutcome :=
     match fuel with
     | 0 => .outOfFuel state
     | fuel + 1 =>
-      match evaluate fuel plan owner source environment state condition with
+      match evaluate fuel plan owner evidence source environment state
+          condition with
       | .done (.bool false) finalState =>
           .fallthrough environment finalState
       | .done (.bool true) bodyState =>
           let outcome := restoreScope environment <| executeSequence
-            (executeStatement fuel plan owner source)
+            (executeStatement fuel plan owner evidence source)
             environment bodyState body
           match outcome with
           | .breaking _ finalState => .fallthrough environment finalState
@@ -2477,11 +2583,11 @@ mutual
           | .fault error finalState => .fault error finalState
           | .fallthrough postEnvironment postState
           | .continuing postEnvironment postState =>
-              match executeForItems fuel plan owner source postEnvironment
-                  postState post with
+              match executeForItems fuel plan owner evidence source
+                  postEnvironment postState post with
               | .fallthrough _ nextState =>
-                  executeForIterations fuel plan owner source environment
-                    nextState condition post body
+                  executeForIterations fuel plan owner evidence source
+                    environment nextState condition post body
               | .returned value finalState => .returned value finalState
               | .breaking _ finalState
               | .continuing _ finalState =>
@@ -2494,6 +2600,7 @@ mutual
       | .fault error finalState => .fault error finalState
 
   private def executeForItems (fuel : Nat) (plan : Plan) (owner : Key)
+      (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (items : List ForItemForm) : FlowOutcome :=
     match items with
@@ -2502,9 +2609,10 @@ mutual
       match fuel with
       | 0 => .outOfFuel state
       | fuel + 1 =>
-        let descend := evaluate fuel plan owner source environment
+        let descend := evaluate fuel plan owner evidence source environment
         let next (nextEnvironment : Environment) (nextState : RuntimeState) :=
-          executeForItems fuel plan owner source nextEnvironment nextState rest
+          executeForItems fuel plan owner evidence source nextEnvironment
+            nextState rest
         match item with
         | .letDecl binder initializer =>
             match initializer with
@@ -2558,6 +2666,7 @@ mutual
             | .fault error finalState => .fault error finalState
 
   private def executeMatchCases (fuel : Nat) (plan : Plan) (owner : Key)
+      (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) (scrutinee : Value)
       (cases : List TypedMatchCase)
@@ -2570,18 +2679,19 @@ mutual
           match defaultBody with
           | none => .fallthrough environment state
           | some body => restoreScope environment <| executeSequence
-              (executeStatement fuel plan owner source) environment state body
+              (executeStatement fuel plan owner evidence source) environment
+                state body
       | arm :: rest =>
           match matchPattern arm.pattern scrutinee with
           | .malformed => .fault .malformedPattern state
-          | .noMatch => executeMatchCases fuel plan owner source environment
-              state scrutinee rest defaultBody
+          | .noMatch => executeMatchCases fuel plan owner evidence source
+              environment state scrutinee rest defaultBody
           | .matched bindings =>
               match bindValues plan environment state bindings with
               | .error error => .fault error state
               | .ok (armEnvironment, armState) =>
                   restoreScope environment <| executeSequence
-                    (executeStatement fuel plan owner source)
+                    (executeStatement fuel plan owner evidence source)
                     armEnvironment armState arm.body
 
   /-- Execute a function or closure body with the source language's implicit
@@ -2590,6 +2700,7 @@ mutual
   and expression values inside nested statement bodies, remain ordinary
   fallthrough effects. -/
   private def executeFunctionSequence (fuel : Nat) (plan : Plan) (owner : Key)
+      (evidence : RuntimeEvidenceEnvironment)
       (source : TypedSource) (environment : Environment)
       (state : RuntimeState) : List StatementId → FlowOutcome
     | [] => .fallthrough environment state
@@ -2604,18 +2715,18 @@ mutual
                 | .ok node =>
                     match node.form with
                     | .expression expression false =>
-                        match evaluate fuel plan owner source environment state
-                            expression with
+                        match evaluate fuel plan owner evidence source environment
+                            state expression with
                         | .done value finalState => .returned value finalState
                         | .outOfFuel finalState => .outOfFuel finalState
                         | .fault error finalState => .fault error finalState
-                    | _ => executeStatement fuel plan owner source environment
-                        state statement
+                    | _ => executeStatement fuel plan owner evidence source
+                        environment state statement
             | _ =>
-                match executeStatement fuel plan owner source environment state
-                    statement with
+                match executeStatement fuel plan owner evidence source
+                    environment state statement with
                 | .fallthrough nextEnvironment nextState =>
-                    executeFunctionSequence fuel plan owner source
+                    executeFunctionSequence fuel plan owner evidence source
                       nextEnvironment nextState rest
                 | .returned value finalState => .returned value finalState
                 | .breaking finalEnvironment finalState =>
@@ -2774,9 +2885,10 @@ one layer of products, mappings, nominal payloads, and captured closure
 locations.  The index permits cyclic closure heaps.
 
 This is deliberately not semantic closure typing: it does not certify a
-closure's `body`, `source`, or `owner` against the typed plan.  A whole-language
-type-preservation theorem needs that separate static closure certificate and
-an evaluator induction in addition to this heap invariant. -/
+closure's `body`, `source`, `owner`, or captured evidence against the typed
+plan.  A whole-language type-preservation theorem needs those separate static
+closure/frame certificates and an evaluator induction in addition to this heap
+invariant. -/
 def Value.HasDeepTypeFuel :
     Nat → ProgramSignatures → Plan → RuntimeState → Ty → Value → Prop
   | 0, _, _, _, _, _ => True
@@ -2803,7 +2915,7 @@ def Value.HasDeepTypeFuel :
               instantiation.payloadTypes.length = arguments.length ∧
               ∀ pair, pair ∈ List.zip instantiation.payloadTypes arguments →
                 pair.2.HasDeepTypeFuel fuel signatures plan state pair.1
-        | .closure parameters resultType _ _ _ captured =>
+        | .closure parameters resultType _ _ _ captured _ =>
             expected = .function
               (Ty.productMany (parameters.map (·.scheme.body))) resultType ∧
               ∀ binding, binding ∈ captured →
@@ -2920,7 +3032,7 @@ def Value.HasInstantiatedPlanCode (principal : Value)
     (substitution : Substitution) (plan : Plan)
     (requirements : List LocalRequirementWitness := []) : Prop :=
   match principal with
-  | .closure parameters resultType body source owner _ =>
+  | .closure parameters resultType body source owner _ _ =>
       validateExecutablePlan plan = .ok () ∧
         ∃ specialized, exactSpecialization plan owner = .ok specialized ∧
           specialized.function.typedBody = source ∧
@@ -2940,8 +3052,10 @@ def Value.HasInstantiatedPlanCode (principal : Value)
 /-- Static provenance of executable code carried by a value.  A closure must
 point at a lambda node in the unique checked specialization for its owner;
 a global must resolve to a unique specialization.  This relation is separate
-from structural heap typing, and does not by itself prove the checked IR's
-semantic type-soundness. -/
+from structural heap typing and deliberately does not authenticate a closure's
+captured runtime evidence.  Safe entry validation authenticates those evidence
+trees; a future whole-evaluator preservation invariant must retain that fact in
+addition to this code-only certificate. -/
 def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
   | 0, _, _ => True
   | fuel + 1, plan, value =>
@@ -2954,7 +3068,7 @@ def Value.HasPlanCodeFuel : Nat → Plan → Value → Prop
           ∀ entry, entry ∈ entries →
             entry.1.HasPlanCodeFuel fuel plan ∧
               entry.2.HasPlanCodeFuel fuel plan
-      | .closure parameters resultType body source owner _ =>
+      | .closure parameters resultType body source owner _ _ =>
           validateExecutablePlan plan = .ok () ∧
             ∃ specialized, exactSpecialization plan owner = .ok specialized ∧
               specialized.function.typedBody = source ∧
@@ -2979,12 +3093,13 @@ checked-code provenance and explicitly relates the source graph executed by
 theorem Value.HasPlanCode.instantiated
     {plan : Plan} {parameters : List TypedBinder} {resultType : Ty}
     {body : List StatementId} {source : TypedSource} {owner : Key}
-    {captured : Environment} (substitution : Substitution)
+    {captured : Environment} {evidence : RuntimeEvidenceEnvironment}
+    (substitution : Substitution)
     (code : (Value.closure parameters resultType body source owner
-      captured).HasPlanCode plan)
+      captured evidence).HasPlanCode plan)
     (requirements : List LocalRequirementWitness := []) :
     (Value.instantiated substitution requirements
-      (.closure parameters resultType body source owner captured)).HasPlanCode
+      (.closure parameters resultType body source owner captured evidence)).HasPlanCode
         plan := by
   have origin := code 1
   change validateExecutablePlan plan = .ok () ∧
@@ -2998,8 +3113,8 @@ theorem Value.HasPlanCode.instantiated
     ⟨validated, specialized, specializedAt, sameSource,
       id, node, found, shape, nodeType⟩
   have instantiatedOrigin :
-      (Value.closure parameters resultType body source owner captured).HasInstantiatedPlanCode
-        substitution plan requirements := by
+      (Value.closure parameters resultType body source owner captured
+        evidence).HasInstantiatedPlanCode substitution plan requirements := by
     exact ⟨validated, specialized, specializedAt, sameSource,
       id, node, found, shape, nodeType,
       TypedSource.lookupExpression?_rewriteLocalRequirements
@@ -3045,6 +3160,7 @@ source and owner.  This is one concrete evaluator transition linking dynamic
 code values to the plan-provenance predicate. -/
 theorem evaluate_lambda_hasPlanCode
     (fuel : Nat) (plan : Plan) (owner : Key) (source : TypedSource)
+    (evidence : RuntimeEvidenceEnvironment)
     (environment : Environment) (state : RuntimeState)
     (id : ExpressionId) (node : ExpressionNode)
     (parameters : List TypedBinder) (resultType : Ty)
@@ -3058,11 +3174,11 @@ theorem evaluate_lambda_hasPlanCode
     (noCoercions : node.coercions = [])
     (nodeType : node.type = .function
       (Ty.productMany (parameters.map (·.scheme.body))) resultType) :
-    evaluate (fuel + 1) plan owner source environment state id =
-      .done (.closure parameters resultType body source owner environment)
-        state ∧
-    (Value.closure parameters resultType body source owner environment).HasPlanCode
-      plan := by
+    evaluate (fuel + 1) plan owner evidence source environment state id =
+      .done (.closure parameters resultType body source owner environment
+        evidence) state ∧
+    (Value.closure parameters resultType body source owner environment
+      evidence).HasPlanCode plan := by
   constructor
   · rw [evaluate.eq_2]
     unfold exactExpression
@@ -3070,18 +3186,19 @@ theorem evaluate_lambda_hasPlanCode
     simp [shape, noCoercions, finishExpression, nodeType,
       applyCoercions]
     change (if Value.type? plan
-        (.closure parameters resultType body source owner environment) =
+        (.closure parameters resultType body source owner environment evidence) =
         some (Ty.function
           (Ty.productMany (parameters.map (·.scheme.body))) resultType) then
         ExpressionResult.done
-          (.closure parameters resultType body source owner environment)
+          (.closure parameters resultType body source owner environment evidence)
           state
       else
         ExpressionResult.fault (.typeMismatch
           (Ty.function (Ty.productMany (parameters.map (·.scheme.body)))
             resultType)
           (Value.type? plan
-            (.closure parameters resultType body source owner environment)))
+            (.closure parameters resultType body source owner environment
+              evidence)))
           state) = _
     simp [Value.type?]
   · intro depth
@@ -3437,9 +3554,10 @@ theorem Value.HasDeepTypeFuel.closure_captured
     {state : RuntimeState} {parameters : List TypedBinder}
     {resultType : Ty} {body : List StatementId} {source : TypedSource}
     {owner : Key} {captured : Environment}
+    {evidence : RuntimeEvidenceEnvironment}
     {binding : Resolved.LocalId × Location}
-    (typed : (Value.closure parameters resultType body source owner captured).HasDeepTypeFuel
-      (fuel + 1) signatures plan state
+    (typed : (Value.closure parameters resultType body source owner captured
+      evidence).HasDeepTypeFuel (fuel + 1) signatures plan state
         (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType))
     (member : binding ∈ captured) :
     ∃ cell, state.read? binding.2 = some cell ∧

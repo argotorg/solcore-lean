@@ -142,9 +142,10 @@ typing derivation. -/
 theorem closure_hasPlanCode_checkedLambdaNode
     (plan : Plan) (owner : Key) (source : TypedSource)
     (environment : Environment) (parameters : List TypedBinder)
+    (evidence : RuntimeEvidenceEnvironment)
     (resultType : Ty) (body : List StatementId)
     (code : (Value.closure parameters resultType body source owner
-      environment).HasPlanCode plan) :
+      environment evidence).HasPlanCode plan) :
     ∃ (specialized : SourceSpecialization.SpecializedFunction)
       (id : ExpressionId) (node : ExpressionNode),
       validateExecutablePlan plan = .ok () ∧

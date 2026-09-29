@@ -35,11 +35,12 @@ private theorem closureInstantiationExposesSubstitutedOrigin
     (source : SourceInference.TypedSource)
     (owner : SourceSpecialization.SpecializationKey)
     (captured : SourceTypedRuntime.Environment)
+    (evidence : SourceTypedRuntime.RuntimeEvidenceEnvironment)
     (substitution : TypeSystem.Substitution)
     (code : Value.HasPlanCode
-      (.closure parameters resultType body source owner captured) plan) :
+      (.closure parameters resultType body source owner captured evidence) plan) :
     Value.HasInstantiatedPlanCode
-      (.closure parameters resultType body source owner captured)
+      (.closure parameters resultType body source owner captured evidence)
       substitution plan := by
   exact (Value.HasPlanCode.instantiated_origin
     (Value.HasPlanCode.instantiated substitution code)).2
@@ -302,7 +303,33 @@ private def source : String := String.intercalate "\n" [
   "trait Eq<T> {}",
   "impl Eq<Word> where Word: Proof {}",
   "impl Eq<Bool> {}",
+  "trait Mark<T> {}",
+  "impl Mark<Word> {}",
   "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
+  "function relay<T>(value: T) returns (T) where T: Eq { return keep(value); }",
+  "function nestedConstrained(value: Word) returns (Word) { return relay(value); }",
+  "function repeat<T>(value: T, count: Word) returns (T) where T: Eq {",
+  "  return count == 0 ? value : repeat(value, count - 1);",
+  "}",
+  "function recursiveConstrained(value: Word) returns (Word) {",
+  "  return repeat(value, 3);",
+  "}",
+  "function closureRelay<T>(value: T) returns (T) where T: Eq {",
+  "  let invoke = lam(inner: T) -> T { return keep(inner); };",
+  "  return invoke(value);",
+  "}",
+  "function closureConstrained(value: Word) returns (Word) {",
+  "  return closureRelay(value);",
+  "}",
+  "function keepBoth<T>(value: T) returns (T) where T: Eq, T: Mark {",
+  "  return value;",
+  "}",
+  "function relayBoth<T>(value: T) returns (T) where T: Mark, T: Eq {",
+  "  return keepBoth(value);",
+  "}",
+  "function orderedConstrained(value: Word) returns (Word) {",
+  "  return relayBoth(value);",
+  "}",
   "function qualifiedLocalProof(flag: Bool) returns (Word, Bool) {",
   "  let f = lam(value) { return keep(value); };",
   "  return (f(53), f(flag));",
@@ -1107,6 +1134,77 @@ private def testContextualCallRequirementValidation
       | _ => false)
     (SourceTypedRuntime.validateExecutablePlan constrainedReference.plan)
 
+private def specializationNamedInPlan (program : CheckedProgram)
+    (prepared : Prepared) (name : String) :
+    IO SourceSpecialization.SpecializedFunction := do
+  let signature ← signatureNamed program name
+  match prepared.plan.specializations.filter fun specialized =>
+      specialized.declaration == signature.id with
+  | [specialized] => pure specialized
+  | specializations => throw (IO.userError
+      s!"`{name}` retained {specializations.length} specializations")
+
+private def hasImplementationEvidence
+    (specialized : SourceSpecialization.SpecializedFunction) : Bool :=
+  specialized.function.solvedRequirements.any fun solved =>
+    solved.evidence matches .implementation _
+
+private def hasAssumptionEvidence
+    (specialized : SourceSpecialization.SpecializedFunction) : Bool :=
+  specialized.function.solvedRequirements.any fun solved =>
+    solved.evidence matches .assumption _
+
+/-- A closed root supplies implementation evidence to a generic relay, which
+then forwards its own assumption to a second generic callee.  The recursive
+case verifies that the same closed dictionary survives a self edge, and the
+closure case verifies that deferred code captures the dictionary at creation
+rather than borrowing it from its eventual invoker. -/
+private def testRuntimeEvidenceForwarding
+    (program : CheckedProgram) : IO Unit := do
+  let nested ← prepareNamed program "nestedConstrained"
+  let nestedRoot ← entrySpecialization nested
+  let relay ← specializationNamedInPlan program nested "relay"
+  let keep ← specializationNamedInPlan program nested "keep"
+  assertTrue (hasImplementationEvidence nestedRoot &&
+      hasAssumptionEvidence relay && relay.assumptions.length == 1 &&
+      keep.assumptions.length == 1)
+    "nested constrained calls lost their implementation/assumption chain"
+  expectWord "nested runtime evidence forwarding" 61
+    (runPrepared nested [.word (word 61)])
+
+  let recursive ← prepareNamed program "recursiveConstrained"
+  let repeated ← specializationNamedInPlan program recursive "repeat"
+  let selfEdges := recursive.plan.callEdges.filter fun edge =>
+    decide (edge.caller = repeated.key ∧ edge.callee = repeated.key)
+  assertTrue (selfEdges.length == 1 && hasAssumptionEvidence repeated &&
+      repeated.assumptions.length == 1)
+    "constrained recursion lost its self edge or caller assumption"
+  expectWord "recursive runtime evidence forwarding" 67
+    (runPrepared recursive [.word (word 67)])
+  match runPrepared recursive [.word (word 67)] 1 with
+  | .outOfFuel _ => pure ()
+  | result => throw (IO.userError
+      s!"constrained recursion ignored its fuel boundary: {reprStr result}")
+
+  let closure ← prepareNamed program "closureConstrained"
+  let closureRelay ← specializationNamedInPlan program closure "closureRelay"
+  assertTrue (hasAssumptionEvidence closureRelay &&
+      closureRelay.assumptions.length == 1)
+    "constrained closure lost its retained caller assumption"
+  expectWord "captured runtime evidence forwarding" 71
+    (runPrepared closure [.word (word 71)])
+
+  let ordered ← prepareNamed program "orderedConstrained"
+  let relayBoth ← specializationNamedInPlan program ordered "relayBoth"
+  let keepBoth ← specializationNamedInPlan program ordered "keepBoth"
+  assertTrue (relayBoth.assumptions.length == 2 &&
+      keepBoth.assumptions.length == 2 &&
+      decide (relayBoth.assumptions.reverse = keepBoth.assumptions) &&
+      hasAssumptionEvidence relayBoth)
+    "callee-ordered runtime evidence lost or reused caller predicate order"
+  expectWord "callee-ordered runtime evidence forwarding" 79
+    (runPrepared ordered [.word (word 79)])
+
 private def testQualifiedLocalRequirementValidation
     (program : CheckedProgram) : IO Unit := do
   let fixture ← qualifiedLocalFixture program
@@ -1298,6 +1396,7 @@ private def testAll : IO Unit := do
   testQualifiedLocalLetPolymorphism program
   testContextualLocalGenericCalls program
   testContextualCallRequirementValidation program
+  testRuntimeEvidenceForwarding program
   testQualifiedLocalRequirementValidation program
   testNominalInputValidation program
   testTamperedExecutableMetadata program
