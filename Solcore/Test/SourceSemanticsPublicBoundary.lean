@@ -789,6 +789,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.requirementProvesAt
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerLiteralValidAt
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternEvidenceAt
