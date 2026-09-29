@@ -663,6 +663,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionNodesPreservedAt.ofTypingSourceExtends
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase.expressionHasType
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.argumentFitTrace_argumentCoercionsValid_afterFinalization_scoped
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_some_argumentCoercionsValid_afterFinalization_scoped

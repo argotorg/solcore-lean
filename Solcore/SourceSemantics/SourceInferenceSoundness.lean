@@ -17051,6 +17051,45 @@ theorem ofTypingSourceExtends
 
 end ExpressionNodesPreservedAt
 
+namespace ExpressionTypingBase
+
+/-- Recover expression typing when the pre-attachment node survives
+unchanged after closing its flexible types.  The scoped preservation premise
+is intentionally restricted to the expression being recovered; callers need
+not claim that attachment preserved the whole source. -/
+theorem expressionHasType
+    {nodeSource semanticSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {argument : InferredExpression}
+    (base : ExpressionTypingBase nodeSource semanticSource context
+      substitution argument)
+    (preserved : ExpressionNodesPreservedAt [argument.id]
+      (nodeSource.applySubstitution substitution) semanticSource)
+    (finalAdmissible : TypeAdmissible context
+      (substitution.apply argument.type)) :
+    ExpressionHasType semanticSource context argument.id
+      (substitution.apply argument.type) := by
+  cases base with
+  | @intro node rawType plan contains typeEq formType rawAdmissible
+      requirements =>
+      have substitutedContains :=
+        FlexibleSubstitution.ContainsExpression.applySubstitution substitution
+          contains
+      have finalContains : ContainsExpression semanticSource argument.id
+          (node.applySubstitution substitution) :=
+        preserved (by simp) substitutedContains
+      have storedAdmissible : TypeAdmissible context
+          (node.applySubstitution substitution).type := by
+        simpa [ExpressionNode.applySubstitution, typeEq] using finalAdmissible
+      have typing := ExpressionHasType.ofPlan finalContains
+        (by simpa [ExpressionNode.applySubstitution] using formType)
+        rawAdmissible storedAdmissible
+        (by simpa [ExpressionNode.applySubstitution] using requirements)
+      simpa [ExpressionNode.applySubstitution, typeEq] using typing
+
+end ExpressionTypingBase
+
 /-- An exact frontend argument-fitting trace becomes a source-ordered row of
 semantically valid coercion paths once the enclosing inference traversal and
 requirement solver have finished.  Tail progress transports the final
