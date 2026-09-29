@@ -9869,6 +9869,156 @@ private def MatchPatternsFlatSoundAt
     Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
       activeContext outer expected seen initial result)
 
+/-- Occurrence-aware semantic contract for one flat-pattern traversal at a
+fixed fuel.  In addition to the ordinary inference invariants, the successful
+root result must retain its integer-pattern and requirement metadata in the
+state consumed by finalized evidence, and every emitted requirement must be
+owned by the fixed source occurrence. -/
+private def MatchPatternFlatSoundAtOccurrence
+    (source : TypedSource)
+    (inferenceContext : Frontend.SourceInference.Context)
+    (semanticContext : SourceSemantics.Context)
+    (outer : TypeSystem.Substitution)
+    (evidenceState : Frontend.SourceInference.State)
+    (occurrence : NodeId) (fuel : Nat) : Prop :=
+  ∀ {pattern : Syntax.Pattern} {expected : TypeSystem.Ty}
+    {seen : List String} {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    {activeContext : SourceSemantics.Context},
+    initial.InferenceReady →
+    expected.VariablesBelow initial.inference.next →
+    initial.LocalBindersBelowNextLocal →
+    source.owner = initial.owner →
+    seen.Nodup →
+    TypeAdmissible semanticContext (outer.apply expected) →
+    TypeAdmissible activeContext (outer.apply expected) →
+    activeContext.signatures = semanticContext.signatures →
+    ActiveLocalContextInvariant initial outer activeContext →
+    outer.SemanticallyExtends result.state.inference.substitution →
+    result.state.integerPatterns ⊆ evidenceState.integerPatterns →
+    result.state.requirements ⊆ evidenceState.requirements →
+    (∀ requirement, requirement ∈ result.requirements →
+      PrimaryRequirementOccursAt source occurrence requirement) →
+    Detail.inferMatchPatternFlatFuel fuel inferenceContext pattern expected
+        seen initial = .ok result →
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result)
+
+/-- Occurrence-aware semantic contract for a source-ordered row of flat
+patterns at a fixed fuel.  The provenance premises describe the complete row
+result; structural recursion below restricts them to the head and tail. -/
+private def MatchPatternsFlatSoundAtOccurrence
+    (source : TypedSource)
+    (inferenceContext : Frontend.SourceInference.Context)
+    (semanticContext : SourceSemantics.Context)
+    (outer : TypeSystem.Substitution)
+    (evidenceState : Frontend.SourceInference.State)
+    (occurrence : NodeId) (fuel : Nat) : Prop :=
+  ∀ {patterns : List Syntax.Pattern} {expected : List TypeSystem.Ty}
+    {seen : List String} {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPatterns}
+    {activeContext : SourceSemantics.Context},
+    initial.InferenceReady →
+    (∀ type ∈ expected,
+      type.VariablesBelow initial.inference.next) →
+    initial.LocalBindersBelowNextLocal →
+    source.owner = initial.owner →
+    seen.Nodup →
+    (∀ type ∈ expected,
+      TypeAdmissible semanticContext (outer.apply type)) →
+    (∀ type ∈ expected,
+      TypeAdmissible activeContext (outer.apply type)) →
+    activeContext.signatures = semanticContext.signatures →
+    ActiveLocalContextInvariant initial outer activeContext →
+    outer.SemanticallyExtends result.state.inference.substitution →
+    result.state.integerPatterns ⊆ evidenceState.integerPatterns →
+    result.state.requirements ⊆ evidenceState.requirements →
+    (∀ requirement, requirement ∈ result.requirements →
+      PrimaryRequirementOccursAt source occurrence requirement) →
+    Detail.inferMatchPatternsFlatFuel fuel inferenceContext patterns expected
+        seen initial = .ok result →
+    Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result)
+
+/-- Result-local premise used to share the constructor and tuple assembly
+proofs between the callback-based and occurrence-aware inductions. -/
+private def MatchPatternMetadataAt
+    (source : TypedSource)
+    (evidenceState : Frontend.SourceInference.State)
+    (occurrence : NodeId) (state : Frontend.SourceInference.State)
+    (requirements : List RequirementId) : Prop :=
+  state.integerPatterns ⊆ evidenceState.integerPatterns ∧
+    state.requirements ⊆ evidenceState.requirements ∧
+    ∀ requirement, requirement ∈ requirements →
+      PrimaryRequirementOccursAt source occurrence requirement
+
+/-- Internal row contract parameterized by an arbitrary result-local premise.
+The ordinary and occurrence-aware contracts below both specialize to this
+shape, allowing the large constructor and tuple proofs to remain shared. -/
+private def MatchPatternsFlatSoundAtWith
+    (resultPremise : Frontend.SourceInference.State →
+      List RequirementId → Prop)
+    (source : TypedSource)
+    (inferenceContext : Frontend.SourceInference.Context)
+    (semanticContext : SourceSemantics.Context)
+    (outer : TypeSystem.Substitution) (fuel : Nat) : Prop :=
+  ∀ {patterns : List Syntax.Pattern} {expected : List TypeSystem.Ty}
+    {seen : List String} {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPatterns}
+    {activeContext : SourceSemantics.Context},
+    initial.InferenceReady →
+    (∀ type ∈ expected,
+      type.VariablesBelow initial.inference.next) →
+    initial.LocalBindersBelowNextLocal →
+    source.owner = initial.owner →
+    seen.Nodup →
+    (∀ type ∈ expected,
+      TypeAdmissible semanticContext (outer.apply type)) →
+    (∀ type ∈ expected,
+      TypeAdmissible activeContext (outer.apply type)) →
+    activeContext.signatures = semanticContext.signatures →
+    ActiveLocalContextInvariant initial outer activeContext →
+    outer.SemanticallyExtends result.state.inference.substitution →
+    resultPremise result.state result.requirements →
+    Detail.inferMatchPatternsFlatFuel fuel inferenceContext patterns expected
+        seen initial = .ok result →
+    Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result)
+
+private theorem matchPatternsFlatSoundAtWith_of_plain
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {fuel : Nat}
+    (sound : MatchPatternsFlatSoundAt source inferenceContext semanticContext
+      outer fuel) :
+    MatchPatternsFlatSoundAtWith (fun _ _ => True) source inferenceContext
+      semanticContext outer fuel := by
+  intro patterns expected seen initial result activeContext ready expectedBelow
+    below owner_eq seen_nodup semanticAdmissible activeAdmissible
+    activeSignaturesEq invariant outerExtension _ success
+  exact sound ready expectedBelow below owner_eq seen_nodup semanticAdmissible
+    activeAdmissible activeSignaturesEq invariant outerExtension success
+
+private theorem matchPatternsFlatSoundAtWith_of_occurrence
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State}
+    {occurrence : NodeId} {fuel : Nat}
+    (sound : MatchPatternsFlatSoundAtOccurrence source inferenceContext
+      semanticContext outer evidenceState occurrence fuel) :
+    MatchPatternsFlatSoundAtWith
+      (MatchPatternMetadataAt source evidenceState occurrence) source
+      inferenceContext semanticContext outer fuel := by
+  intro patterns expected seen initial result activeContext ready expectedBelow
+    below owner_eq seen_nodup semanticAdmissible activeAdmissible
+    activeSignaturesEq invariant outerExtension metadata success
+  exact sound ready expectedBelow below owner_eq seen_nodup semanticAdmissible
+    activeAdmissible activeSignaturesEq invariant outerExtension metadata.1
+    metadata.2.1 metadata.2.2 success
+
 /-- Exact semantic frontier for integer patterns.  Only irreducible solved
 literal evidence crosses this boundary; source correspondence, instruction
 typing, state facts, and every other pattern form are proved by the
@@ -10042,6 +10192,193 @@ private theorem matchPatternsFlatSoundAt_of_pattern
                     headCertificate.names_nodup tailSemanticAdmissible
                     tailActiveAdmissible tailActiveSignaturesEq
                     headCertificate.invariant outerExtension tailSuccess
+                  exact ⟨{
+                    binders := headCertificate.binders ++
+                      tailCertificate.binders
+                    finalContext := tailCertificate.finalContext
+                    instructions_type := fun suffix => by
+                      simp only [List.map_append]
+                      simpa only [List.append_assoc, List.map_cons] using
+                        (PatternInstructionsHaveTypes.cons
+                          (headCertificate.instruction_type
+                            (tail.instructions.map
+                              (MatchPatternInstruction.applySubstitution outer) ++
+                              suffix))
+                          (tailCertificate.instructions_type suffix))
+                    binders_extend := bindersExtend_append
+                      headCertificate.binders_extend
+                      tailCertificate.binders_extend
+                    invariant := tailCertificate.invariant
+                    progress := properties.1
+                    ready := properties.2.1
+                    below := properties.2.2.1
+                    owner_eq := properties.2.2.2
+                    names_eq := by
+                      calc
+                        tail.names = head.names ++
+                            tailCertificate.binders.map
+                              (fun binder => binder.name) :=
+                          tailCertificate.names_eq
+                        _ = (seen ++ headCertificate.binders.map
+                              (fun binder => binder.name)) ++
+                            tailCertificate.binders.map
+                              (fun binder => binder.name) := by
+                          exact congrArg
+                            (fun names => names ++
+                              tailCertificate.binders.map
+                                (fun binder => binder.name))
+                            headCertificate.names_eq
+                        _ = seen ++
+                            (headCertificate.binders ++
+                              tailCertificate.binders).map
+                                (fun binder => binder.name) := by
+                          simp [List.map_append, List.append_assoc]
+                    names_nodup := tailCertificate.names_nodup
+                  }⟩
+
+/-- The occurrence-aware one-pattern contract induces the corresponding row
+contract.  Metadata produced by the head reaches the retained evidence state
+through the successful tail traversal, while the append-shaped requirement
+row selects the appropriate ownership proof for each recursive side. -/
+private theorem matchPatternsFlatSoundAtOccurrence_of_pattern
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State}
+    {occurrence : NodeId} {fuel : Nat}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (patternSound : MatchPatternFlatSoundAtOccurrence source inferenceContext
+      semanticContext outer evidenceState occurrence fuel) :
+    MatchPatternsFlatSoundAtOccurrence source inferenceContext semanticContext
+      outer evidenceState occurrence fuel := by
+  intro patterns expected seen initial result activeContext ready expectedBelow
+    below owner_eq seen_nodup semanticAdmissible activeAdmissible
+    activeSignaturesEq invariant outerExtension integerPatternsSubset
+    requirementsSubset requirementsOccur success
+  let stateCallbacks := matchPatternFlatStateCallbacks inferenceContext
+  induction patterns generalizing expected seen initial result activeContext with
+  | nil =>
+      cases expected with
+      | nil =>
+          have properties := stateCallbacks.patterns ready expectedBelow
+            validated below success
+          simp only [Detail.inferMatchPatternsFlatFuel, pure, Pure.pure,
+            Except.pure] at success
+          injection success with resultEq
+          subst result
+          exact ⟨{
+            binders := []
+            finalContext := activeContext
+            instructions_type := fun suffix => by
+              simpa using (PatternInstructionsHaveTypes.nil
+                (context := semanticContext) (instructions := suffix))
+            binders_extend := .nil activeContext
+            invariant
+            progress := properties.1
+            ready := properties.2.1
+            below := properties.2.2.1
+            owner_eq := properties.2.2.2
+            names_eq := by simp
+            names_nodup := seen_nodup
+          }⟩
+      | cons type types =>
+          simp [Detail.inferMatchPatternsFlatFuel] at success
+  | cons pattern patterns tailSound =>
+      cases expected with
+      | nil => simp [Detail.inferMatchPatternsFlatFuel] at success
+      | cons type types =>
+          have properties := stateCallbacks.patterns ready expectedBelow
+            validated below success
+          simp only [Detail.inferMatchPatternsFlatFuel, bind, Except.bind]
+            at success
+          cases headSuccess : Detail.inferMatchPatternFlatFuel fuel
+              inferenceContext pattern type seen initial with
+          | error error => simp [headSuccess] at success
+          | ok head =>
+              simp only [headSuccess] at success
+              cases tailSuccess : Detail.inferMatchPatternsFlatFuel fuel
+                  inferenceContext patterns types head.names head.state with
+              | error error => simp [tailSuccess] at success
+              | ok tail =>
+                  simp only [tailSuccess, pure, Pure.pure, Except.pure]
+                    at success
+                  injection success with resultEq
+                  subst result
+                  have headProperties := stateCallbacks.pattern ready
+                    (expectedBelow type (by simp)) validated below headSuccess
+                  have tailExpectedBelow : ∀ candidate ∈ types,
+                      candidate.VariablesBelow head.state.inference.next := by
+                    intro candidate member
+                    exact (expectedBelow candidate (by simp [member])).weaken
+                      headProperties.1.next_le
+                  have tailProperties := stateCallbacks.patterns
+                    headProperties.2.1 tailExpectedBelow validated
+                    headProperties.2.2.1 tailSuccess
+                  have outerHead : outer.SemanticallyExtends
+                      head.state.inference.substitution :=
+                    TypeSystem.Substitution.SemanticallyExtends.trans
+                      outerExtension tailProperties.1.substitution_extends
+                  have headIntegerPatternsSubset :
+                      head.state.integerPatterns ⊆
+                        evidenceState.integerPatterns :=
+                    List.Subset.trans
+                      (Detail.inferMatchPatternsFlatFuel_integerPatterns_subset
+                        tailSuccess)
+                      integerPatternsSubset
+                  have headRequirementsSubset :
+                      head.state.requirements ⊆ evidenceState.requirements :=
+                    List.Subset.trans
+                      (Detail.inferMatchPatternsFlatFuel_requirements_subset
+                        tailSuccess)
+                      requirementsSubset
+                  have headRequirementsOccur : ∀ requirement,
+                      requirement ∈ head.requirements →
+                        PrimaryRequirementOccursAt source occurrence
+                          requirement := by
+                    intro requirement member
+                    exact requirementsOccur requirement (by simp [member])
+                  obtain ⟨headCertificate⟩ := patternSound ready
+                    (expectedBelow type (by simp)) below owner_eq seen_nodup
+                    (semanticAdmissible type (by simp))
+                    (activeAdmissible type (by simp)) activeSignaturesEq
+                    invariant outerHead headIntegerPatternsSubset
+                    headRequirementsSubset headRequirementsOccur headSuccess
+                  have tailOwner : source.owner = head.state.owner :=
+                    owner_eq.trans headProperties.2.2.2.symm
+                  have tailSemanticAdmissible : ∀ candidate ∈ types,
+                      TypeAdmissible semanticContext
+                        (outer.apply candidate) := by
+                    intro candidate member
+                    exact semanticAdmissible candidate (by simp [member])
+                  have tailActiveAdmissible : ∀ candidate ∈ types,
+                      TypeAdmissible headCertificate.finalContext
+                        (outer.apply candidate) := by
+                    intro candidate member
+                    exact typeAdmissible_of_bindersExtend
+                      headCertificate.binders_extend
+                      (activeAdmissible candidate (by simp [member]))
+                  have tailActiveSignaturesEq :
+                      headCertificate.finalContext.signatures =
+                        semanticContext.signatures :=
+                    (BindersExtend.signatures_eq
+                      headCertificate.binders_extend).trans activeSignaturesEq
+                  have tailRequirementsOccur : ∀ requirement,
+                      requirement ∈ tail.requirements →
+                        PrimaryRequirementOccursAt source occurrence
+                          requirement := by
+                    intro requirement member
+                    exact requirementsOccur requirement (by simp [member])
+                  obtain ⟨tailCertificate⟩ := tailSound
+                    (result := tail)
+                    headProperties.2.1 tailExpectedBelow
+                    headProperties.2.2.1 tailOwner
+                    headCertificate.names_nodup tailSemanticAdmissible
+                    tailActiveAdmissible tailActiveSignaturesEq
+                    headCertificate.invariant outerExtension
+                    integerPatternsSubset requirementsSubset
+                    tailRequirementsOccur tailSuccess
                   exact ⟨{
                     binders := headCertificate.binders ++
                       tailCertificate.binders
@@ -10446,6 +10783,8 @@ private theorem inferMatchPatternFlatFuel_success_constructor_core
     {inferenceContext : Frontend.SourceInference.Context}
     {semanticContext activeContext : SourceSemantics.Context}
     {outer : TypeSystem.Substitution} {fuel : Nat}
+    {resultPremise : Frontend.SourceInference.State →
+      List RequirementId → Prop}
     {span : Syntax.SourceSpan} {leadingDot : Option Syntax.SourceSpan}
     {qualifierNames : List String} {name : String}
     {sourceArguments : List Syntax.Pattern}
@@ -10465,8 +10804,9 @@ private theorem inferMatchPatternFlatFuel_success_constructor_core
     (validated : ProgramSignatureFormationValidated
       inferenceContext.signatures)
     (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
-    (recursivePatterns : MatchPatternsFlatSoundAt source inferenceContext
-      semanticContext outer fuel)
+    (recursivePatterns : MatchPatternsFlatSoundAtWith resultPremise source
+      inferenceContext semanticContext outer fuel)
+    (childrenPremise : resultPremise children.state children.requirements)
     (owner_eq : source.owner = initial.owner)
     (seen_nodup : seen.Nodup)
     (semanticAdmissible :
@@ -10609,7 +10949,7 @@ private theorem inferMatchPatternFlatFuel_success_constructor_core
   obtain ⟨childrenCertificate⟩ := recursivePatterns unifiedReady payloadBelow
     unifiedBelow recursiveOwner seen_nodup semanticPayloadAdmissible
     activePayloadAdmissible activeSignaturesEq unifiedInvariant outerExtension
-    childrenResult
+    childrenPremise childrenResult
   have closedArity : sourceArguments.length =
       (instantiation.applySubstitution outer).payloadTypes.length := by
     simpa [DataConstructorInstantiation.applySubstitution] using arity
@@ -10647,6 +10987,8 @@ private theorem inferMatchPatternFlatFuel_success_constructor_sound
     {inferenceContext : Frontend.SourceInference.Context}
     {semanticContext activeContext : SourceSemantics.Context}
     {outer : TypeSystem.Substitution} {fuel : Nat}
+    {resultPremise : Frontend.SourceInference.State →
+      List RequirementId → Prop}
     {pattern : Syntax.Pattern} {leadingDot : Option Syntax.SourceSpan}
     {qualifiers : List Syntax.Identifier} {name : Syntax.Identifier}
     {arguments : Option
@@ -10664,8 +11006,9 @@ private theorem inferMatchPatternFlatFuel_success_constructor_sound
     (validated : ProgramSignatureFormationValidated
       inferenceContext.signatures)
     (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
-    (recursivePatterns : MatchPatternsFlatSoundAt source inferenceContext
-      semanticContext outer fuel)
+    (recursivePatterns : MatchPatternsFlatSoundAtWith resultPremise source
+      inferenceContext semanticContext outer fuel)
+    (rootPremise : resultPremise result.state result.requirements)
     (ready : initial.InferenceReady)
     (expectedBelow : expected.VariablesBelow initial.inference.next)
     (below : initial.LocalBindersBelowNextLocal)
@@ -10758,7 +11101,7 @@ private theorem inferMatchPatternFlatFuel_success_constructor_sound
                       (span := pattern.span) (leadingDot := leadingDot)
                       (qualifierNames := qualifierNames) (name := name.value)
                       catalog semanticSignaturesEq activeSignaturesEq validated
-                      stateCallbacks recursivePatterns owner_eq seen_nodup
+                      stateCallbacks recursivePatterns rootPremise owner_eq seen_nodup
                       semanticAdmissible activeAdmissible outerExtension
                       properties.1 properties.2.1 properties.2.2.1
                       properties.2.2.2 candidateFacts.1 candidateFacts.2.1
@@ -10861,7 +11204,7 @@ private theorem inferMatchPatternFlatFuel_success_constructor_sound
                           (qualifierNames := qualifierNames)
                           (name := name.value) catalog semanticSignaturesEq
                           activeSignaturesEq validated stateCallbacks
-                          recursivePatterns
+                          recursivePatterns rootPremise
                           owner_eq seen_nodup semanticAdmissible
                           activeAdmissible outerExtension properties.1
                           properties.2.1 properties.2.2.1 properties.2.2.2
@@ -10907,6 +11250,8 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
     {inferenceContext : Frontend.SourceInference.Context}
     {semanticContext activeContext : SourceSemantics.Context}
     {outer : TypeSystem.Substitution} {fuel : Nat}
+    {resultPremise : Frontend.SourceInference.State →
+      List RequirementId → Prop}
     {pattern : Syntax.Pattern}
     {elements : Syntax.DelimitedList (Syntax.Located Syntax.PatternValue)}
     {expected : TypeSystem.Ty} {seen : List String}
@@ -10916,8 +11261,9 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
     (validated : ProgramSignatureFormationValidated
       inferenceContext.signatures)
     (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
-    (recursivePatterns : MatchPatternsFlatSoundAt source inferenceContext
-      semanticContext outer fuel)
+    (recursivePatterns : MatchPatternsFlatSoundAtWith resultPremise source
+      inferenceContext semanticContext outer fuel)
+    (rootPremise : resultPremise result.state result.requirements)
     (ready : initial.InferenceReady)
     (expectedBelow : expected.VariablesBelow initial.inference.next)
     (below : initial.LocalBindersBelowNextLocal)
@@ -11051,7 +11397,8 @@ private theorem inferMatchPatternFlatFuel_success_tuple_sound
             unifiedReady elementTypesBelow unifiedBelow recursiveOwner
             seen_nodup
             eachSemantic eachActive
-            activeSignaturesEq unifiedInvariant outerExtension childrenResult
+            activeSignaturesEq unifiedInvariant outerExtension rootPremise
+            childrenResult
           have arity : elements.elements.length =
               (elementTypes.map outer.apply).length := by
             have lengthEq := freshTypes_length elements.elements.length initial
@@ -11127,6 +11474,9 @@ private theorem inferMatchPatternFlatFuel_success_sound_step
     Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
       activeContext outer expected seen initial result) := by
   let stateCallbacks := matchPatternFlatStateCallbacks inferenceContext
+  have recursivePatternsWith : MatchPatternsFlatSoundAtWith
+      (fun _ _ => True) source inferenceContext semanticContext outer fuel :=
+    matchPatternsFlatSoundAtWith_of_plain recursivePatterns
   cases valueEq : pattern.value with
   | wildcard marker =>
       exact inferMatchPatternFlatFuel_success_wildcard_sound
@@ -11145,8 +11495,9 @@ private theorem inferMatchPatternFlatFuel_success_sound_step
         invariant outerExtension success
   | constructor leadingDot qualifiers name arguments =>
       exact inferMatchPatternFlatFuel_success_constructor_sound valueEq
+        (resultPremise := fun _ _ => True)
         catalog semanticSignaturesEq activeSignaturesEq validated
-        stateCallbacks recursivePatterns ready expectedBelow below owner_eq
+        stateCallbacks recursivePatternsWith trivial ready expectedBelow below owner_eq
         seen_nodup semanticAdmissible activeAdmissible invariant
         outerExtension success
   | comptime keyword expression =>
@@ -11186,7 +11537,8 @@ private theorem inferMatchPatternFlatFuel_success_sound_step
           }⟩
   | tuple elements =>
       exact inferMatchPatternFlatFuel_success_tuple_sound valueEq validated
-        stateCallbacks recursivePatterns ready expectedBelow below owner_eq
+        (resultPremise := fun _ _ => True)
+        stateCallbacks recursivePatternsWith trivial ready expectedBelow below owner_eq
         seen_nodup semanticAdmissible activeAdmissible activeSignaturesEq
         invariant outerExtension success
   | error =>
