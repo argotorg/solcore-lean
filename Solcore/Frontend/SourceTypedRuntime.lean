@@ -6,9 +6,8 @@ import Solcore.Frontend.WordLiteral
 /-!
 Execution of closed, specialized typed-source programs.
 
-This runtime is intentionally additive.  The established `SourceRuntime`
-continues to provide the Core-compatible execution path, while this module
-keeps source types and source occurrence identities intact.  In particular it
+This runtime complements the direct Core backend while keeping source types and
+source occurrence identities intact. In particular it
 can represent nominal constructors, mappings, proxies, mutable lexical cells,
 and statement control flow which have no faithful `Core.Ty` projection.
 

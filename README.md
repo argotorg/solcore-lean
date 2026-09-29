@@ -78,13 +78,12 @@ globals discovered only inside a selected operator or coercion method.
 
 The public source compiler now owns the initial orchestration policy. Automatic
 selection tries direct Semantic Core first and the typed-source runtime second;
-the finite `callGraph` runtime is retained only as an explicitly requested
-compatibility and differential-testing backend. A backend preference can force
-any exact backend, and automatic exhaustion and explicit-backend rejection use
-one backend-tagged diagnostic carrier. Raw-workspace helpers can select the
-conventional `main` entry automatically, while ordered compile-many preserves
-the requested root order and permits different roots to select different
-backends.
+the obsolete finite call-graph backend and its legacy fallback have been
+removed. A backend preference can force either remaining backend, and automatic
+exhaustion and explicit-backend rejection use one backend-tagged diagnostic
+carrier. Raw-workspace helpers can select the conventional `main` entry
+automatically, while ordered compile-many preserves the requested root order
+and permits different roots to select different backends.
 
 Initial Static Word ABI discovery is also executable. Every function explicitly
 exported by the workspace entry module is treated as an intended endpoint and
@@ -122,6 +121,11 @@ boundary.
   staging, specialization, and each runtime, and the independent declarative
   `SourceSemantics` judgments; include unification, trait solving, and module
   resolution.
+- Replace the typed-source runtime's checked pre/post execution certificate
+  with, or supplement it by, an inductive preservation proof for the evaluator
+  itself. The removed call-graph backend had this narrower guarantee for its
+  recursion/closure fragment; typed-source covers more language features but
+  currently validates deep safety at the executable boundary.
 - Complete general progress and determinism results, exhaustive fault
   classification, divergence/fuel correspondence, plan-validator completeness,
   aggregate work bounds, and—if useful—a single backend-independent
