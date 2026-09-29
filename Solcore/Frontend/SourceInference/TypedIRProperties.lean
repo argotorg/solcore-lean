@@ -66,6 +66,21 @@ theorem IntegerLiteralResolution.applySubstitution_predicate
     (step.applySubstitution substitution).requirements = step.requirements := by
   rfl
 
+/-- Closing flexible types commutes with advancing an expression type through
+the targets of an already selected coercion path. -/
+@[simp] theorem coercionTargetFold_applySubstitution
+    (substitution : TypeSystem.Substitution) (initial : TypeSystem.Ty)
+    (coercions : List CoercionStep) :
+    (coercions.map (CoercionStep.applySubstitution substitution)).foldl
+        (fun _ step => step.target) (substitution.apply initial) =
+      substitution.apply
+        (coercions.foldl (fun _ step => step.target) initial) := by
+  induction coercions generalizing initial with
+  | nil => rfl
+  | cons step coercions induction =>
+      simp only [List.map_cons, List.foldl_cons]
+      exact induction step.target
+
 namespace CoercionPath
 
 /-- Closing flexible types preserves exact coercion endpoints and adjacency;

@@ -4,6 +4,11 @@ set_option autoImplicit false
 
 namespace Tests
 
+example :=
+  @Solcore.Frontend.SourceInference.Detail.appendExpressionCoercions
+example :=
+  @Solcore.Frontend.SourceInference.coercionTargetFold_applySubstitution
+
 example := @Solcore.Frontend.SourceSpecialization.matchClosedSchemeInstance?
 example :=
   @Solcore.Frontend.SourceSpecialization.matchClosedSchemeInstance?_sound

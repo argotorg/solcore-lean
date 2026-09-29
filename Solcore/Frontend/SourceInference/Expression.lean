@@ -1148,15 +1148,22 @@ private def missingExplicitConstructor? (context : Context) (state : State)
       | [] => pure none
   | none => pure none
 
+/-- Append an already allocated coercion path to one expression node.  The
+node's authoritative type advances to the final coercion target while its
+requirements and retained path preserve source order. -/
+def appendExpressionCoercions (node : ExpressionNode)
+    (coercions : List CoercionStep) : ExpressionNode := {
+  node with
+  type := coercions.foldl (fun _ step => step.target) node.type
+  requirements := node.requirements ++ coercionRequirements coercions
+  coercions := node.coercions ++ coercions
+}
+
 def attachExpressionCoercions (state : State)
     (entries : List ExpressionCoercions) : State :=
   entries.foldl (fun state entry =>
-    state.modifyExpressionNode entry.expression fun node => {
-      node with
-      type := entry.coercions.foldl (fun _ step => step.target) node.type
-      requirements := node.requirements ++ coercionRequirements entry.coercions
-      coercions := node.coercions ++ entry.coercions
-    }) state
+    state.modifyExpressionNode entry.expression fun node =>
+      appendExpressionCoercions node entry.coercions) state
 
 def recordExpression (source : Syntax.Expr) (expression : InferredExpression)
     (form : ExpressionForm) (requirements : List RequirementId)
