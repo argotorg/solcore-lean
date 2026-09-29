@@ -2294,6 +2294,64 @@ theorem recordSelectedCallResult_success_containsExpression
     simp [attachedState, allocation, callNode]
   simpa only [attachedState, allocation, callNode] using contains
 
+/-- Every argument identity retained by a successfully recorded selected call
+is an exact expression child of that call in any later append-only semantic
+source. -/
+theorem recordSelectedCallResult_success_argumentDirectChild
+    {source callee : Syntax.Expr} {name : String}
+    {arguments : List InferredExpression}
+    {attempt : Detail.CandidateAttemptResult}
+    {result : InferredExpression}
+    {trailingCoercions : List CoercionStep}
+    {state : Frontend.SourceInference.State}
+    {recorded : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {substitution : TypeSystem.Substitution}
+    {semanticSource : TypedSource}
+    {argument : ExpressionId}
+    (success : Detail.recordSelectedCallResult source callee name arguments
+      attempt result trailingCoercions state = recorded)
+    (sourceExtension : TypingSourceExtends
+      ((recorded.2.toTypedSource roots).applySubstitution substitution)
+      semanticSource)
+    (member : argument ∈ arguments.map (·.id)) :
+    DirectChild semanticSource (.expression result.id)
+      (.expression argument) := by
+  let attachedState := Detail.attachExpressionCoercions state
+    attempt.argumentCoercions
+  let allocation := attachedState.allocateExpressionId
+  let callNode : ExpressionNode := {
+    id := result.id
+    span := source.span
+    type := result.type
+    form := .call allocation.1 (arguments.map (·.id))
+      (.declaration attempt.instantiation)
+    requirements :=
+      Detail.coercionRequirements attempt.callCoercions ++
+        attempt.signatureRequirements ++
+        Detail.coercionRequirements trailingCoercions
+    coercions := attempt.callCoercions ++ trailingCoercions
+  }
+  have rawContains : ContainsExpression (recorded.2.toTypedSource roots)
+      result.id callNode := by
+    simpa only [attachedState, allocation, callNode] using
+      recordSelectedCallResult_success_containsExpression success roots
+  have rawEdge : DirectChild (recorded.2.toTypedSource roots)
+      (.expression result.id) (.expression argument) := by
+    refine ⟨.expression callNode, ?_, ?_⟩
+    · refine ⟨rawContains.1, ?_⟩
+      change NodeId.expression callNode.id = NodeId.expression result.id
+      exact congrArg NodeId.expression rawContains.2
+    · simp only [nodeChildIds, Node.references, callNode,
+        ExpressionForm.references, List.mem_cons]
+      exact Or.inr (List.mem_map.mpr ⟨argument, member, rfl⟩)
+  have substitutedEdge :=
+    FlexibleSubstitution.directChild_applySubstitution substitution rawEdge
+  rcases substitutedEdge with ⟨node, contains, childMember⟩
+  exact ⟨node,
+    ⟨sourceExtension.nodes_prefix.subset contains.1, contains.2⟩,
+    childMember⟩
+
 /-- Every requirement stored on a successfully recorded selected call occurs
 primarily at that exact call identity in any later append-only semantic
 source.  Flexible substitution changes types and evidence, but not stable
@@ -17277,6 +17335,27 @@ end ExpressionTypingBase
 
 namespace ArgumentTypingBasesValid
 
+/-- Every argument represented in a source-ordered base row retains an exact
+expression occurrence in the row's node source. -/
+theorem containsExpression_of_mem
+    {nodeSource semanticSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {arguments : List InferredExpression}
+    (bases : ArgumentTypingBasesValid nodeSource semanticSource context
+      substitution arguments)
+    {argument : InferredExpression}
+    (member : argument ∈ arguments) :
+    ∃ node, ContainsExpression nodeSource argument.id node := by
+  induction bases with
+  | nil => simp at member
+  | cons head _ induction =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · cases head with
+        | intro contains _ _ _ _ => exact ⟨_, contains⟩
+      · exact induction member
+
 /-- A source-ordered row of pre-attachment typing bases remains valid when
 its shared node source is extended by an append-only node suffix. -/
 theorem weakenNodeSource
@@ -17293,6 +17372,59 @@ theorem weakenNodeSource
   | nil => exact .nil
   | cons head _ induction =>
       exact .cons (head.weakenNodeSource nodesPrefix) induction
+
+/-- Exact, identity-unique attachment turns every requirement in one delayed
+argument-coercion entry into a primary requirement occurrence at that
+argument's expression identity in the eventual semantic source. -/
+theorem attachExpressionCoercions_primaryRequirementOccursAt
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {semanticSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {arguments : List InferredExpression}
+    {entries : List Detail.ExpressionCoercions}
+    (bases : ArgumentTypingBasesValid (state.toTypedSource roots)
+      semanticSource context substitution arguments)
+    (expressionIds : entries.map (·.expression) = arguments.map (·.id))
+    (argumentIdsUnique : (arguments.map (·.id)).Nodup)
+    (sourceExtension : TypingSourceExtends
+      ((Detail.attachExpressionCoercions state entries
+        |>.toTypedSource roots).applySubstitution substitution)
+      semanticSource)
+    {entry : Detail.ExpressionCoercions}
+    (entryMember : entry ∈ entries)
+    {requirement : RequirementId}
+    (requirementMember : requirement ∈
+      coercionRequirementIds entry.coercions) :
+    PrimaryRequirementOccursAt semanticSource
+      (.expression entry.expression) requirement := by
+  have entryIdsUnique : (entries.map (·.expression)).Nodup := by
+    rw [expressionIds]
+    exact argumentIdsUnique
+  have entryIdMember : entry.expression ∈ arguments.map (·.id) := by
+    rw [← expressionIds]
+    exact List.mem_map.mpr ⟨entry, entryMember, rfl⟩
+  obtain ⟨argument, argumentMember, argumentIdEq⟩ :=
+    List.mem_map.mp entryIdMember
+  obtain ⟨node, contains⟩ :=
+    bases.containsExpression_of_mem argumentMember
+  have entryContains : ContainsExpression (state.toTypedSource roots)
+      entry.expression node := by
+    rwa [← argumentIdEq]
+  have attachedContains := attachExpressionCoercions_containsExpression
+    state entries entry node roots entryIdsUnique entryMember entryContains
+  have substitutedContains :=
+    FlexibleSubstitution.ContainsExpression.applySubstitution substitution
+      attachedContains
+  have finalContains := sourceExtension.containsExpression
+    substitutedContains
+  apply finalContains.primaryRequirementOccursAt
+  change requirement ∈
+    node.requirements ++ Detail.coercionRequirements entry.coercions
+  apply List.mem_append_right
+  simpa [Detail.coercionRequirements, coercionRequirementIds] using
+    requirementMember
 
 end ArgumentTypingBasesValid
 
@@ -18465,13 +18597,7 @@ theorem tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHas
     (activeRequirementsEq :
       active.solvedRequirements = base.solvedRequirements)
     (assumptionsMono : base.assumptions ⊆ active.assumptions)
-    (argumentCovered : ∀ entry ∈ attempt.argumentCoercions,
-      TemplateScopeCovered ledgerSource active
-        (.expression entry.expression))
-    (argumentOccurs : ∀ entry ∈ attempt.argumentCoercions, ∀ requirement,
-      requirement ∈ coercionRequirementIds entry.coercions →
-        PrimaryRequirementOccursAt ledgerSource
-          (.expression entry.expression) requirement)
+    (graphClosed : OccurrenceGraphClosed ledgerSource)
     (callCovered : TemplateScopeCovered ledgerSource active
       (.expression result.id))
     (trailingPath : CoercionPathValid active
@@ -18498,6 +18624,54 @@ theorem tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHas
     FlexibleSubstitution.TypeAdmissible.applySubstitution contextValid.closes
       (DeclarationApplicationValid.result_type_admissible catalog binders
         application)
+  have candidateNodesEq : attempt.state.nodes = state.nodes :=
+    (Detail.tryFunctionCandidate_some_occurrenceState_eq candidateSuccess).1
+  have nodesPrefix :
+      (state.toTypedSource roots).nodes <+:
+        (recordState.toTypedSource roots).nodes := by
+    change state.nodes <+: recordState.nodes
+    rw [recordNodesEq, candidateNodesEq]
+    exact List.prefix_rfl
+  have recordBases : ArgumentTypingBasesValid
+      (recordState.toTypedSource roots) ledgerSource active
+      later.inference.substitution arguments :=
+    bases.weakenNodeSource nodesPrefix
+  have attachedToRecorded : TypingSourceExtends
+      ((Detail.attachExpressionCoercions recordState
+        attempt.argumentCoercions).toTypedSource roots)
+      (recorded.2.toTypedSource roots) :=
+    recordSelectedCallResult_success_attachedTypingSourceExtends recordSuccess
+      roots
+  have attachedToLedger : TypingSourceExtends
+      ((Detail.attachExpressionCoercions recordState
+          attempt.argumentCoercions
+        |>.toTypedSource roots).applySubstitution
+          later.inference.substitution)
+      ledgerSource :=
+    (attachedToRecorded.applySubstitution
+      later.inference.substitution).trans sourceExtension
+  have argumentExpressionIds :
+      attempt.argumentCoercions.map (·.expression) =
+        arguments.map (·.id) :=
+    Detail.tryFunctionCandidate_some_argumentCoercion_expression_ids
+      canonical candidateSuccess
+  have argumentCovered : ∀ entry ∈ attempt.argumentCoercions,
+      TemplateScopeCovered ledgerSource active
+        (.expression entry.expression) := by
+    intro entry entryMember
+    apply callCovered.expressionChild graphClosed
+    apply recordSelectedCallResult_success_argumentDirectChild recordSuccess
+      sourceExtension
+    rw [← argumentExpressionIds]
+    exact List.mem_map.mpr ⟨entry, entryMember, rfl⟩
+  have argumentOccurs : ∀ entry ∈ attempt.argumentCoercions, ∀ requirement,
+      requirement ∈ coercionRequirementIds entry.coercions →
+        PrimaryRequirementOccursAt ledgerSource
+          (.expression entry.expression) requirement := by
+    intro entry entryMember requirement requirementMember
+    exact recordBases.attachExpressionCoercions_primaryRequirementOccursAt
+      argumentExpressionIds argumentIdsUnique attachedToLedger entryMember
+      requirementMember
   have argumentCoercions : ArgumentCoercionsValid active
       later.inference.substitution arguments
       (signature.parameterTypes.map instantiated.parameterSubstitution.apply)
@@ -18551,18 +18725,6 @@ theorem tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHas
         traitSuccess profileSuccess traitName solveSuccess solvedEq ledger
         ownership activeSignaturesEq activeRequirementsEq assumptionsMono
         selectedCovered selectedOccurs
-  have candidateNodesEq : attempt.state.nodes = state.nodes :=
-    (Detail.tryFunctionCandidate_some_occurrenceState_eq candidateSuccess).1
-  have nodesPrefix :
-      (state.toTypedSource roots).nodes <+:
-        (recordState.toTypedSource roots).nodes := by
-    change state.nodes <+: recordState.nodes
-    rw [recordNodesEq, candidateNodesEq]
-    exact List.prefix_rfl
-  have recordBases : ArgumentTypingBasesValid
-      (recordState.toTypedSource roots) ledgerSource active
-      later.inference.substitution arguments :=
-    bases.weakenNodeSource nodesPrefix
   exact recordSelectedCallResult_success_expressionHasType recordSuccess
     recordSubstitutionExtends sourceExtension recordBases argumentCoercions
     argumentIdsUnique catalog contextValid application rawAdmissible

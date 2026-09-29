@@ -663,7 +663,11 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.cons
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.containsExpression_of_mem
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.weakenNodeSource
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.attachExpressionCoercions_primaryRequirementOccursAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_success_argumentTypingBasesValid
 example :=
@@ -682,6 +686,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.argumentTypingBasesValid_attachExpressionCoercions_expressionsHaveTypes
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_containsExpression
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_argumentDirectChild
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.recordSelectedCallResult_success_primaryRequirementOccursAt
 example :=
