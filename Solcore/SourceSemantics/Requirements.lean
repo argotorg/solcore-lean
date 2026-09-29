@@ -65,6 +65,52 @@ structure RequirementLedgerWellFormed (context : Context) : Prop where
     ∀ requirement, requirement ∈ context.solvedRequirements →
       SolvedRequirementValid context requirement
 
+namespace RequirementProves
+
+/-- A proved requirement remains valid when the solved ledger and signature
+catalog are unchanged and the target context makes at least the source
+assumptions available. -/
+theorem transportContext
+    {source target : Context} {id : RequirementId}
+    {predicate : ProgramPredicate}
+    (signatures_eq : target.signatures = source.signatures)
+    (solved_eq : target.solvedRequirements = source.solvedRequirements)
+    (assumptions_mono : source.assumptions ⊆ target.assumptions)
+    (proves : RequirementProves source id predicate) :
+    RequirementProves target id predicate := by
+  rcases proves with
+    ⟨requirement, ⟨member, id_eq⟩, predicate_eq, valid⟩
+  refine ⟨requirement, ⟨?_, id_eq⟩, predicate_eq, ?_⟩
+  · rw [solved_eq]
+    exact member
+  · cases valid with
+    | intro evidence_valid =>
+        apply SolvedRequirementValid.intro
+        simpa [signatures_eq] using
+          evidence_valid.weakenAssumptions assumptions_mono
+
+end RequirementProves
+
+namespace RequirementSequenceProves
+
+/-- Context transport acts pointwise on a source-ordered requirement spine. -/
+theorem transportContext
+    {source target : Context} {ids : List RequirementId}
+    {predicates : List ProgramPredicate}
+    (signatures_eq : target.signatures = source.signatures)
+    (solved_eq : target.solvedRequirements = source.solvedRequirements)
+    (assumptions_mono : source.assumptions ⊆ target.assumptions)
+    (proves : RequirementSequenceProves source ids predicates) :
+    RequirementSequenceProves target ids predicates := by
+  induction proves with
+  | nil => exact .nil
+  | cons head _ induction =>
+      exact .cons
+        (head.transportContext signatures_eq solved_eq assumptions_mono)
+        induction
+
+end RequirementSequenceProves
+
 namespace RequirementIdsValid
 
 /-- Any sublist of a valid identity inventory is valid, independently of its

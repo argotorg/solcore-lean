@@ -1085,6 +1085,8 @@ example := @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionVali
 example :=
   @Solcore.SourceSemantics.FlexibleSubstitution.ContextSubstitutionValid.ofTargetScopedRequirementLedger
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed.proves_predicate_eq
+example := @Solcore.SourceSemantics.RequirementProves.transportContext
+example := @Solcore.SourceSemantics.RequirementSequenceProves.transportContext
 example := @Solcore.SourceSemantics.RequirementIdsUnique.proves_predicate_eq
 example := @Solcore.SourceSemantics.RequirementIdsUnique.filter_id_eq_singleton
 example := @Solcore.SourceSemantics.RequirementLedgerWellFormed.transport
@@ -1208,6 +1210,7 @@ example := @Solcore.SourceSemantics.CoercionPathValid.expressionNode_rawType
 example := @Solcore.SourceSemantics.CoercionPathValid.foldl_target
 example := @Solcore.SourceSemantics.IntegerLiteralValid
 example := @Solcore.SourceSemantics.IntegerLiteralValid.target_type_admissible
+example := @Solcore.SourceSemantics.IntegerLiteralValid.transportContext
 example := @Solcore.SourceSemantics.WordLiteralValid
 example :=
   @Solcore.SourceSemantics.OperatorProfileInstantiates.return_types_admissible

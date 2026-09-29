@@ -73,6 +73,27 @@ theorem target_type_admissible
       rw [targetEq]
       exact TypeAdmissible.integer binders
 
+/-- Literal validity is stable under lexical-context growth when the target
+retains the same signature catalog and solved requirement ledger. -/
+theorem transportContext
+    {sourceContext targetContext : Context}
+    {source : Syntax.CoreLiteralValue}
+    {resolution : IntegerLiteralResolution}
+    (signatures_eq : targetContext.signatures = sourceContext.signatures)
+    (solved_eq : targetContext.solvedRequirements =
+      sourceContext.solvedRequirements)
+    (assumptions_mono : sourceContext.assumptions ⊆
+      targetContext.assumptions)
+    (valid : IntegerLiteralValid sourceContext source resolution) :
+    IntegerLiteralValid targetContext source resolution := by
+  cases valid with
+  | word meaning target_eq evidence =>
+      exact .word meaning target_eq
+        (evidence.transportContext signatures_eq solved_eq assumptions_mono)
+  | integer meaning target_eq evidence =>
+      exact .integer meaning target_eq
+        (evidence.transportContext signatures_eq solved_eq assumptions_mono)
+
 end IntegerLiteralValid
 
 /-- Compatibility literal nodes are the strict primitive-Word form. -/
