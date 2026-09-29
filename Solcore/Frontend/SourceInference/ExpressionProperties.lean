@@ -11131,6 +11131,146 @@ theorem inferMatchCasesFuel_success_cases_length
                       subst result
                       simp [induction tailResult]
 
+/-- A successful case traversal reports a wildcard exactly through one of its
+retained patterns; the Boolean fold cannot manufacture a catch-all arm. -/
+theorem inferMatchCasesFuel_success_hasWildcard_member
+    {fuel : Nat} {context : Context}
+    {scrutineeType expectedReturn : Ty} {outerScope : LexicalScope}
+    {cases : List Syntax.MatchCase} {state : State}
+    {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result)
+    (hasWildcard : result.hasWildcard = true) :
+    ∃ arm ∈ result.cases, typedPatternIsCatchall arm.pattern = true := by
+  induction fuel generalizing cases state result with
+  | zero =>
+      simp [inferMatchCasesFuel] at success
+  | succ fuel induction =>
+      cases cases with
+      | nil =>
+          simp [inferMatchCasesFuel] at success
+          subst result
+          simp at hasWildcard
+      | cons sourceArm rest =>
+          unfold inferMatchCasesFuel at success
+          simp only [bind, Except.bind] at success
+          cases patternResult : inferMatchPatternFuel fuel context
+              sourceArm.value.pattern scrutineeType state with
+          | error error =>
+              simp [patternResult, bind, Except.bind] at success
+          | ok patternPair =>
+              rcases patternPair with ⟨pattern, patternState⟩
+              simp only [patternResult, bind, Except.bind] at success
+              cases bodyResult : inferStatementsFuel fuel context
+                  sourceArm.value.body.value expectedReturn patternState with
+              | error error =>
+                  simp [bodyResult, bind, Except.bind] at success
+              | ok body =>
+                  simp only [bodyResult, bind, Except.bind] at success
+                  cases tailResult : inferMatchCasesFuel fuel context
+                      scrutineeType expectedReturn outerScope rest
+                      (body.state.restoreLexicalScope outerScope) with
+                  | error error =>
+                      simp [tailResult, bind, Except.bind] at success
+                  | ok tail =>
+                      simp only [tailResult, bind, Except.bind] at success
+                      injection success with resultEq
+                      subst result
+                      rcases Bool.or_eq_true_iff.mp hasWildcard with
+                        headCatchall | tailCatchall
+                      · exact ⟨{
+                            span := sourceArm.span
+                            pattern
+                            body := body.statements
+                          }, by simp, headCatchall⟩
+                      · obtain ⟨arm, member, catchall⟩ :=
+                          induction tailResult tailCatchall
+                        exact ⟨arm, by simp [member], catchall⟩
+
+private theorem programDataConstructorId_beq_iff_eq
+    (left right : ProgramDataConstructorId) :
+    (left == right) = true ↔ left = right := by
+  exact beq_iff_eq
+
+private theorem programDataConstructorId_contains_iff_mem
+    (ids : List ProgramDataConstructorId) (id : ProgramDataConstructorId) :
+    ids.contains id = true ↔ id ∈ ids := by
+  induction ids with
+  | nil => simp
+  | cons head tail induction =>
+      simp only [List.contains_cons, List.mem_cons]
+      rw [Bool.or_eq_true, programDataConstructorId_beq_iff_eq, induction]
+
+/-- A positive nominal-coverage check exposes the cataloged data type, the
+exact resolved scrutinee spine, and one irrefutable constructor-pattern arm
+for every constructor in the declaration. -/
+theorem exhaustsNominalConstructors_eq_true_facts
+    {context : Context} {state : State} {scrutineeType : Ty}
+    {cases : List TypedMatchCase}
+    (accepted : exhaustsNominalConstructors context state scrutineeType
+      cases = true) :
+    ∃ dataType arguments,
+      dataType ∈ context.signatures.dataTypes ∧
+      state.resolve scrutineeType = Ty.nominal dataType.id arguments ∧
+      ∀ constructor, constructor ∈ dataType.constructors →
+        ∃ matchCase ∈ cases, ∃ instantiation instructions,
+          matchCase.pattern.resolution =
+            .constructor instantiation instructions ∧
+          instantiation.constructor = constructor.id ∧
+          constructorArgumentsIrrefutable instantiation instructions = true := by
+  unfold exhaustsNominalConstructors at accepted
+  cases parts : nominalTypeParts? (state.resolve scrutineeType) with
+  | none => simp [parts] at accepted
+  | some pair =>
+      rcases pair with ⟨declaration, arguments⟩
+      simp only [parts] at accepted
+      cases found : context.signatures.dataType? declaration with
+      | none => simp [found] at accepted
+      | some dataType =>
+          simp only [found] at accepted
+          have rawFound : context.signatures.dataTypes.find?
+              (fun candidate => decide (candidate.id = declaration)) =
+                some dataType := by
+            simpa [ProgramSignatures.dataType?] using found
+          have dataTypeMember : dataType ∈ context.signatures.dataTypes :=
+            List.mem_of_find?_eq_some rawFound
+          have acceptedId : decide (dataType.id = declaration) = true :=
+            List.find?_some
+              (p := fun candidate : ProgramDataSignature =>
+                decide (candidate.id = declaration)) rawFound
+          have dataTypeId : dataType.id = declaration :=
+            of_decide_eq_true acceptedId
+          refine ⟨dataType, arguments, dataTypeMember, ?_, ?_⟩
+          · have reconstructed := nominalTypeParts?_success_reconstruct parts
+            simpa [dataTypeId] using reconstructed
+          · intro constructor constructorMember
+            let covered := cases.filterMap fun arm =>
+              match arm.pattern.resolution with
+              | .constructor instantiation instructions =>
+                  if constructorArgumentsIrrefutable instantiation instructions
+                  then some instantiation.constructor
+                  else none
+              | _ => none
+            have contained : covered.contains constructor.id = true := by
+              exact List.all_eq_true.mp accepted constructor constructorMember
+            have coveredMember : constructor.id ∈ covered := by
+              exact (programDataConstructorId_contains_iff_mem _ _).mp
+                contained
+            rcases List.mem_filterMap.mp coveredMember with
+              ⟨matchCase, matchCaseMember, selected⟩
+            cases resolutionEq : matchCase.pattern.resolution with
+            | wildcard => simp [covered, resolutionEq] at selected
+            | integerLiteral source resolution =>
+                simp [covered, resolutionEq] at selected
+            | binder binder => simp [covered, resolutionEq] at selected
+            | tuple instructions => simp [covered, resolutionEq] at selected
+            | constructor instantiation instructions =>
+                cases irrefutableEq :
+                    constructorArgumentsIrrefutable instantiation instructions <;>
+                  simp [covered, resolutionEq, irrefutableEq] at selected
+                exact ⟨matchCase, matchCaseMember, instantiation, instructions,
+                  resolutionEq, selected, irrefutableEq⟩
+
 set_option maxHeartbeats 1000000 in
 private theorem inferFuel_preserves_lexicalScope_internal :
     (∀ fuel context expression expected state,

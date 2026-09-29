@@ -385,6 +385,18 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithoutDefault_sound
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.consumeIrrefutableInstruction_true_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.consumeIrrefutableInstructions_true_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.constructorArgumentsIrrefutable_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.typedPatternIsCatchall_true_sound
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.matchExhaustiveWithoutDefault_of_nominal
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.matchExhaustiveWithoutDefault_of_guard
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithoutDefault_deep_sound
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferStatementFuel_success_matchWithDefault_sound
@@ -1101,6 +1113,7 @@ example := @Solcore.SourceSemantics.ForItemHasType.letInitializedGeneralized
 example := @Solcore.SourceSemantics.ForItemsHaveType
 example := @Solcore.SourceSemantics.MatchCaseHasType
 example := @Solcore.SourceSemantics.MatchCasesHaveType
+example := @Solcore.SourceSemantics.MatchCasesHaveType.pattern_type_of_mem
 example := @Solcore.SourceSemantics.TypingSourceExtends
 example := @Solcore.SourceSemantics.TypingSourceExtends.refl
 example := @Solcore.SourceSemantics.TypingSourceExtends.trans

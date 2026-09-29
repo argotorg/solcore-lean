@@ -551,7 +551,7 @@ the same zero-based tag. -/
 structure ProgramDataConstructorId where
   dataType : Resolved.DeclarationId
   constructorIndex : Nat
-  deriving Repr, BEq, DecidableEq
+  deriving Repr, BEq, ReflBEq, LawfulBEq, DecidableEq
 
 /-- One constructor after resolving every positional payload type in the
 generic scope of its owning data declaration. -/

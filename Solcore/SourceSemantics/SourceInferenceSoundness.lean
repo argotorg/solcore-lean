@@ -4455,8 +4455,8 @@ end ActiveLocalContextInvariant
 
 /-- A successful `match` without a default arm exposes the common executable
 scrutinee step, hidden-local allocation, explicit-case traversal, the passed
-exhaustiveness guard, and the exact retained statement.  The existential
-Boolean is the result of the implementation's private nominal-coverage test. -/
+exhaustiveness guard, and the exact retained statement.  The guard keeps the
+implementation's concrete nominal-constructor coverage decision visible. -/
 theorem inferStatementFuel_success_matchWithoutDefault_facts
     {fuel : Nat} {context : Frontend.SourceInference.Context}
     {statement : Syntax.Statement}
@@ -4470,8 +4470,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
     (success : Detail.inferStatementFuel (fuel + 1) context statement
       expectedReturn initial = .ok result)
     (roots : List NodeId := []) :
-    ∃ scrutinee scrutineeState hiddenScrutinee hiddenState checked
-        nominallyExhaustive,
+    ∃ scrutinee scrutineeState hiddenScrutinee hiddenState checked,
       inferMatchScrutineesFuel fuel context statement.span
         scrutinees.elements.toList allocated =
           .ok (scrutinee, scrutineeState) ∧
@@ -4479,7 +4478,9 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
         (hiddenScrutinee, hiddenState) ∧
       Detail.inferMatchCasesFuel fuel context scrutinee.type expectedReturn
         hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked ∧
-      (checked.hasWildcard || false || nominallyExhaustive) = true ∧
+      (checked.hasWildcard || false ||
+        Detail.exhaustsNominalConstructors context checked.state
+          scrutinee.type checked.cases) = true ∧
       result = {
         id
         type := if checked.allReturn then
@@ -4521,13 +4522,14 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
   have finish
       (scrutinee : InferredExpression)
       (scrutineeState : Frontend.SourceInference.State)
-      (nominalCoverage : Detail.MatchCasesResult → Bool)
       (residualSuccess : (do
     let (hiddenScrutinee, state) := scrutineeState.allocateHiddenLocal
     let outerScope := state.lexicalScope
     let checked ← Detail.inferMatchCasesFuel fuel context scrutinee.type
       expectedReturn outerScope arms.value.cases state
-    if checked.hasWildcard = false ∧ nominalCoverage checked = false then
+    if checked.hasWildcard = false ∧
+        Detail.exhaustsNominalConstructors context checked.state
+          scrutinee.type checked.cases = false then
       throw (Frontend.SourceInference.Error.nonExhaustiveMatch statement.span)
     else
       let requirements := checked.cases.flatMap fun arm : TypedMatchCase =>
@@ -4560,7 +4562,9 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
           (hiddenScrutinee, hiddenState) ∧
         Detail.inferMatchCasesFuel fuel context scrutinee.type expectedReturn
           hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked ∧
-        (checked.hasWildcard || false || nominalCoverage checked) = true ∧
+        (checked.hasWildcard || false ||
+          Detail.exhaustsNominalConstructors context checked.state
+            scrutinee.type checked.cases) = true ∧
         result = {
           id
           type := if checked.allReturn then
@@ -4651,13 +4655,13 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
                   .ok (scrutinee, scrutineeState) := by
             simp only [inferMatchScrutineesFuel, sourcesEq, elementsSuccess]
             rfl
-          rcases finish scrutinee scrutineeState _
+          rcases finish scrutinee scrutineeState
               (by simpa [scrutinee, scrutineeState, bind, Except.bind,
                 pure, Pure.pure, Except.pure] using success) with
             ⟨hiddenScrutinee, hiddenState, checked, hiddenAllocation,
               checkedSuccess, guardPassed, resultEq, contains⟩
           exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
-            checked, _, (by simpa [sourcesEq] using scrutineeSuccess),
+            checked, (by simpa [sourcesEq] using scrutineeSuccess),
             hiddenAllocation, checkedSuccess,
             guardPassed, resultEq, contains⟩
   | cons first rest =>
@@ -4677,13 +4681,13 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
                     scrutinees.elements.toList allocated =
                       .ok (scrutinee, scrutineeState) := by
                 simpa [inferMatchScrutineesFuel, sourcesEq] using sourceSuccess
-              rcases finish scrutinee scrutineeState _
+              rcases finish scrutinee scrutineeState
                   (by simpa [bind, Except.bind, pure, Pure.pure, Except.pure]
                     using success) with
                 ⟨hiddenScrutinee, hiddenState, checked, hiddenAllocation,
                   checkedSuccess, guardPassed, resultEq, contains⟩
               exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
-                checked, _, (by simpa [sourcesEq] using scrutineeSuccess),
+                checked, (by simpa [sourcesEq] using scrutineeSuccess),
                 hiddenAllocation, checkedSuccess,
                 guardPassed, resultEq, contains⟩
       | cons second tail =>
@@ -4713,13 +4717,13 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
                       .ok (scrutinee, scrutineeState) := by
                 simp only [inferMatchScrutineesFuel, sourcesEq, elementsSuccess]
                 rfl
-              rcases finish scrutinee scrutineeState _
+              rcases finish scrutinee scrutineeState
                   (by simpa [scrutinee, scrutineeState, bind, Except.bind,
                     pure, Pure.pure, Except.pure] using success) with
                 ⟨hiddenScrutinee, hiddenState, checked, hiddenAllocation,
                   checkedSuccess, guardPassed, resultEq, contains⟩
               exact ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState,
-                checked, _, (by simpa [sourcesEq] using scrutineeSuccess),
+                checked, (by simpa [sourcesEq] using scrutineeSuccess),
                 hiddenAllocation, checkedSuccess,
                 guardPassed, resultEq, contains⟩
 
@@ -5646,6 +5650,302 @@ theorem blockStatementHasType_afterSubstitution
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl bodyType (by
       simpa [StatementNode.applySubstitution] using agreement.type_eq.symm)
+
+private theorem consumeIrrefutable_true_sound :
+    (∀ fuel instructions rest,
+      Detail.consumeIrrefutableInstruction fuel instructions =
+          some (true, rest) →
+        PatternInstructionIrrefutable instructions rest) ∧
+    (∀ fuel count instructions rest,
+      Detail.consumeIrrefutableInstructions fuel count instructions =
+          some (true, rest) →
+        PatternInstructionsIrrefutable instructions count rest) := by
+  apply Detail.consumeIrrefutableInstruction.mutual_induct
+    (motive1 := fun fuel instructions => ∀ rest,
+      Detail.consumeIrrefutableInstruction fuel instructions =
+          some (true, rest) →
+        PatternInstructionIrrefutable instructions rest)
+    (motive2 := fun fuel count instructions => ∀ rest,
+      Detail.consumeIrrefutableInstructions fuel count instructions =
+          some (true, rest) →
+        PatternInstructionsIrrefutable instructions count rest)
+  · intro fuel rest success
+    simp [Detail.consumeIrrefutableInstruction] at success
+  · intro instruction rest final success
+    simp [Detail.consumeIrrefutableInstruction] at success
+  · intro rest fuel final success
+    simp [Detail.consumeIrrefutableInstruction] at success
+    subst final
+    exact .wildcard
+  · intro rest fuel binder final success
+    simp [Detail.consumeIrrefutableInstruction] at success
+    subst final
+    exact .binder
+  · intro rest fuel source resolution final success
+    simp [Detail.consumeIrrefutableInstruction] at success
+  · intro rest fuel instantiation count induction final success
+    cases consumed : Detail.consumeIrrefutableInstructions fuel count rest with
+    | none => simp [Detail.consumeIrrefutableInstruction, consumed] at success
+    | some pair =>
+        rcases pair with ⟨accepted, after⟩
+        simp [Detail.consumeIrrefutableInstruction, consumed] at success
+  · intro rest fuel count induction final success
+    apply PatternInstructionIrrefutable.tuple
+    apply induction final
+    simpa [Detail.consumeIrrefutableInstruction] using success
+  · intro fuel instructions rest success
+    simp [Detail.consumeIrrefutableInstructions] at success
+    subst rest
+    exact .zero
+  · intro fuel count instructions headInduction tailInduction final success
+    cases headResult :
+        Detail.consumeIrrefutableInstruction fuel instructions with
+    | none =>
+        simp [Detail.consumeIrrefutableInstructions, headResult] at success
+    | some pair =>
+        rcases pair with ⟨headAccepted, afterHead⟩
+        cases tailResult :
+            Detail.consumeIrrefutableInstructions fuel count afterHead with
+        | none =>
+            simp [Detail.consumeIrrefutableInstructions, headResult,
+              tailResult] at success
+        | some pair =>
+            rcases pair with ⟨tailAccepted, afterTail⟩
+            cases headAccepted <;> cases tailAccepted <;>
+              simp [Detail.consumeIrrefutableInstructions, headResult,
+                tailResult] at success
+            subst final
+            exact .succ (headInduction afterHead headResult)
+              (tailInduction afterHead afterTail tailResult)
+
+/-- A successful single-instruction catch-all check yields the corresponding
+declarative prefix-consumption derivation. -/
+theorem consumeIrrefutableInstruction_true_sound
+    {fuel : Nat} {instructions rest : List MatchPatternInstruction}
+    (success : Detail.consumeIrrefutableInstruction fuel instructions =
+      some (true, rest)) :
+    PatternInstructionIrrefutable instructions rest :=
+  consumeIrrefutable_true_sound.1 fuel instructions rest success
+
+/-- A successful fixed-length catch-all check yields declarative
+irrefutability for every consumed instruction tree. -/
+theorem consumeIrrefutableInstructions_true_sound
+    {fuel count : Nat} {instructions rest : List MatchPatternInstruction}
+    (success : Detail.consumeIrrefutableInstructions fuel count instructions =
+      some (true, rest)) :
+    PatternInstructionsIrrefutable instructions count rest :=
+  consumeIrrefutable_true_sound.2 fuel count instructions rest success
+
+/-- Constructor payloads accepted by the executable catch-all check consume
+the complete payload instruction stream declaratively. -/
+theorem constructorArgumentsIrrefutable_sound
+    {instantiation : DataConstructorInstantiation}
+    {instructions : List MatchPatternInstruction}
+    (accepted : Detail.constructorArgumentsIrrefutable instantiation
+      instructions = true) :
+    PatternInstructionsIrrefutable instructions
+      instantiation.payloadTypes.length [] := by
+  unfold Detail.constructorArgumentsIrrefutable at accepted
+  cases consumed : Detail.consumeIrrefutableInstructions
+      (instructions.length + 1) instantiation.payloadTypes.length
+      instructions with
+  | none => simp [consumed] at accepted
+  | some pair =>
+      rcases pair with ⟨irrefutable, rest⟩
+      cases irrefutable with
+      | false => simp [consumed] at accepted
+      | true =>
+          cases rest with
+          | nil => exact consumeIrrefutableInstructions_true_sound consumed
+          | cons head tail => simp [consumed] at accepted
+
+/-- An executable catch-all classification, together with finalized pattern
+typing, yields source-connected declarative irrefutability. -/
+theorem typedPatternIsCatchall_true_sound
+    {context : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {pattern : TypedMatchPattern}
+    {type : TypeSystem.Ty} {binders : List TypedBinder} {rootArity : Nat}
+    (typing : TypedMatchPatternHasType context
+      (pattern.applySubstitution outer) type binders rootArity)
+    (accepted : Detail.typedPatternIsCatchall pattern = true) :
+    TypedMatchPatternIrrefutable context
+      (pattern.applySubstitution outer) := by
+  refine ⟨rootArity, typing.source_represents, ?_⟩
+  unfold MatchPatternResolutionIrrefutable
+  cases resolutionEq : pattern.resolution with
+  | wildcard =>
+      simpa [TypedMatchPattern.applySubstitution, resolutionEq,
+        MatchPatternResolution.applySubstitution,
+        matchPatternResolutionInstructions] using
+        (PatternInstructionIrrefutable.wildcard (rest := []))
+  | integerLiteral source resolution =>
+      simp [Detail.typedPatternIsCatchall, resolutionEq] at accepted
+  | binder binder =>
+      simpa [TypedMatchPattern.applySubstitution, resolutionEq,
+        MatchPatternResolution.applySubstitution,
+        matchPatternResolutionInstructions] using
+        (PatternInstructionIrrefutable.binder (rest := [])
+          (binder := binder.applySubstitution outer))
+  | constructor instantiation instructions =>
+      simp [Detail.typedPatternIsCatchall, resolutionEq] at accepted
+  | tuple instructions =>
+      cases sourceEq : pattern.source with
+      | wildcard span marker =>
+          simp [Detail.typedPatternIsCatchall, resolutionEq, sourceEq]
+            at accepted
+      | integerLiteral span literal =>
+          simp [Detail.typedPatternIsCatchall, resolutionEq, sourceEq]
+            at accepted
+      | binder span name =>
+          simp [Detail.typedPatternIsCatchall, resolutionEq, sourceEq]
+            at accepted
+      | constructor span leadingDot qualifiers name argumentCount =>
+          simp [Detail.typedPatternIsCatchall, resolutionEq, sourceEq]
+            at accepted
+      | group span inner =>
+          simp [Detail.typedPatternIsCatchall, resolutionEq, sourceEq]
+            at accepted
+      | tuple span elementCount =>
+          have represents := typing.source_represents
+          change MatchPatternSourceRepresents context pattern.source
+            (pattern.resolution.applySubstitution outer) rootArity at represents
+          rw [sourceEq, resolutionEq] at represents
+          simp only [MatchPatternResolution.applySubstitution] at represents
+          cases represents
+          cases consumed : Detail.consumeIrrefutableInstructions
+              (instructions.length + 1) rootArity instructions with
+          | none =>
+              simp [Detail.typedPatternIsCatchall, resolutionEq, sourceEq,
+                consumed] at accepted
+          | some pair =>
+              rcases pair with ⟨irrefutable, rest⟩
+              cases irrefutable with
+              | false =>
+                  simp [Detail.typedPatternIsCatchall, resolutionEq, sourceEq,
+                    consumed] at accepted
+              | true =>
+                  cases rest with
+                  | cons head tail =>
+                      simp [Detail.typedPatternIsCatchall, resolutionEq,
+                        sourceEq, consumed] at accepted
+                  | nil =>
+                      have elementsIrrefutable :
+                          PatternInstructionsIrrefutable instructions
+                            rootArity [] :=
+                        consumeIrrefutableInstructions_true_sound consumed
+                      have substituted :=
+                        FlexibleSubstitution.PatternInstructionsIrrefutable.applySubstitution
+                          (substitution := outer) elementsIrrefutable
+                      simpa [TypedMatchPattern.applySubstitution, resolutionEq,
+                        MatchPatternResolution.applySubstitution,
+                        matchPatternResolutionInstructions] using
+                        (PatternInstructionIrrefutable.tuple substituted)
+
+/-- A positive nominal coverage check constructs the declarative constructor
+coverage witness after closing the scrutinee and every retained case. -/
+theorem matchExhaustiveWithoutDefault_of_nominal
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {scrutineeType : TypeSystem.Ty} {cases : List TypedMatchCase}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (scrutineeAdmissible : TypeAdmissible target
+      (outer.apply scrutineeType))
+    (extension : outer.SemanticallyExtends state.inference.substitution)
+    (accepted : Detail.exhaustsNominalConstructors inferenceContext state
+      scrutineeType cases = true) :
+    MatchExhaustive target (outer.apply scrutineeType)
+      (cases.map (TypedMatchCase.applySubstitution outer)) none := by
+  obtain ⟨dataType, arguments, dataTypeMember, resolvedEq, covered⟩ :=
+    Detail.exhaustsNominalConstructors_eq_true_facts accepted
+  have targetMember : dataType ∈ target.signatures.dataTypes := by
+    rw [signatures_eq]
+    exact dataTypeMember
+  have resolvedByOuter :
+      outer.apply (state.resolve scrutineeType) =
+        outer.apply scrutineeType := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension scrutineeType
+  have scrutineeEq :
+      outer.apply scrutineeType =
+        TypeSystem.Ty.nominal dataType.id (arguments.map outer.apply) := by
+    calc
+      outer.apply scrutineeType =
+          outer.apply (state.resolve scrutineeType) :=
+        resolvedByOuter.symm
+      _ = outer.apply (TypeSystem.Ty.nominal dataType.id arguments) :=
+        congrArg outer.apply resolvedEq
+      _ = TypeSystem.Ty.nominal dataType.id
+          (arguments.map outer.apply) := by
+        simp [StructuralSubstitution.applyFlexible_nominal]
+  have nominalAdmissible : TypeAdmissible target
+      (TypeSystem.Ty.nominal dataType.id (arguments.map outer.apply)) := by
+    rw [← scrutineeEq]
+    exact scrutineeAdmissible
+  have argumentsLength :
+      (arguments.map outer.apply).length = dataType.parameters.length :=
+    (TypeAdmissible.nominal_data_arguments catalog targetMember
+      nominalAdmissible).1
+  have parametersNodup :=
+    (catalog.data_semantic dataType targetMember).parameters_nodup
+  refine MatchExhaustive.constructors targetMember
+    (ParameterSubstitution.exact_zip parametersNodup argumentsLength) ?_ ?_
+  · rw [ParameterSubstitution.orderedArguments_zip parametersNodup
+      argumentsLength]
+    exact scrutineeEq
+  · intro constructor constructorMember
+    obtain ⟨matchCase, matchCaseMember, instantiation, instructions,
+        resolutionEq, constructorEq, irrefutable⟩ :=
+      covered constructor constructorMember
+    refine ⟨matchCase.applySubstitution outer, ?_, ?_⟩
+    · exact List.mem_map.mpr ⟨matchCase, matchCaseMember, rfl⟩
+    · apply FlexibleSubstitution.PatternCoversConstructor.applySubstitution
+      exact ⟨instantiation, instructions, resolutionEq, constructorEq,
+        constructorArgumentsIrrefutable_sound irrefutable⟩
+
+/-- The default-free executable guard is sound whether it succeeds through a
+typed catch-all arm or through complete nominal-constructor coverage. -/
+theorem matchExhaustiveWithoutDefault_of_guard
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {outerScope : LexicalScope} {sourceCases : List Syntax.MatchCase}
+    {initial : Frontend.SourceInference.State}
+    {checked : Detail.MatchCasesResult}
+    {source : TypedSource} {control : ControlContext}
+    {target : SourceSemantics.Context} {outer : TypeSystem.Substitution}
+    {caseFacts : List BodyFacts}
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (casesSuccess : Detail.inferMatchCasesFuel fuel inferenceContext
+      scrutineeType expectedReturn outerScope sourceCases initial =
+        .ok checked)
+    (casesTyping : MatchCasesHaveType source control target
+      (outer.apply scrutineeType)
+      (checked.cases.map (TypedMatchCase.applySubstitution outer)) caseFacts)
+    (scrutineeAdmissible : TypeAdmissible target
+      (outer.apply scrutineeType))
+    (extension : outer.SemanticallyExtends
+      checked.state.inference.substitution)
+    (guard : (checked.hasWildcard || false ||
+      Detail.exhaustsNominalConstructors inferenceContext checked.state
+        scrutineeType checked.cases) = true) :
+    MatchExhaustive target (outer.apply scrutineeType)
+      (checked.cases.map (TypedMatchCase.applySubstitution outer)) none := by
+  simp only [Bool.or_false] at guard
+  rcases Bool.or_eq_true_iff.mp guard with hasWildcard | nominallyExhaustive
+  · obtain ⟨matchCase, matchCaseMember, catchall⟩ :=
+      Detail.inferMatchCasesFuel_success_hasWildcard_member casesSuccess
+        hasWildcard
+    have substitutedMember : matchCase.applySubstitution outer ∈
+        checked.cases.map (TypedMatchCase.applySubstitution outer) :=
+      List.mem_map.mpr ⟨matchCase, matchCaseMember, rfl⟩
+    obtain ⟨binders, rootArity, patternTyping⟩ :=
+      MatchCasesHaveType.pattern_type_of_mem casesTyping substitutedMember
+    exact .catchall substitutedMember
+      (typedPatternIsCatchall_true_sound patternTyping catchall)
+  · exact matchExhaustiveWithoutDefault_of_nominal catalog signatures_eq
+      scrutineeAdmissible extension nominallyExhaustive
 
 /-- A retained default-free match is typed from its finalized scrutinee and
 explicit cases.  Case agreement transports the executable all-return flag,
@@ -7175,7 +7475,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_sound
       ActiveLocalContextInvariant allocated outer target :=
     invariant.allocateStatementId allocationEq
   obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
-      nominallyExhaustive, scrutineeSuccess, hiddenAllocation, casesSuccess,
+      scrutineeSuccess, hiddenAllocation, casesSuccess,
       guardPassed, resultEq, contains⟩ :=
     inferStatementFuel_success_matchWithoutDefault_facts statementEq defaultEq
       allocationEq success roots
@@ -7214,10 +7514,10 @@ theorem inferStatementFuel_success_matchWithoutDefault_sound
       allReturnEq checkedExtension id _
 
 /-- A successful default-free match is deeply sound once explicit-case typing
-is reconstructed, the recovery AST is known to contain an explicit arm, and
-accepted semantic exhaustiveness is supplied.  Nonemptiness is transported
-through inference and declarative case typing to construct the control merge
-internally. -/
+is reconstructed and the recovery AST is known to contain an explicit arm.
+The executable coverage guard supplies semantic exhaustiveness, while
+nonemptiness is transported through inference and declarative case typing to
+construct the control merge internally. -/
 private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement}
@@ -7238,6 +7538,8 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
       signature.scheme.body = .function
         (TypeSystem.Ty.productMany signature.parameterTypes)
         (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
     (ready : initial.InferenceReady)
     (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
     (below : initial.LocalBindersBelowNextLocal)
@@ -7279,21 +7581,7 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
               .ok (scrutinee, scrutineeState) →
           ExpressionHasType
             ((result.state.toTypedSource roots).applySubstitution outer)
-            target scrutinee.id (outer.apply scrutinee.type))
-    (exhaustivenessSound :
-      ∀ {scrutinee : InferredExpression}
-        {scrutineeState hiddenState : Frontend.SourceInference.State}
-        {checked : Detail.MatchCasesResult} {nominallyExhaustive : Bool},
-        inferMatchScrutineesFuel fuel inferenceContext statement.span
-            scrutinees.elements.toList allocated =
-              .ok (scrutinee, scrutineeState) →
-          Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
-              expectedReturn hiddenState.lexicalScope arms.value.cases
-              hiddenState = .ok checked →
-          (checked.hasWildcard || false || nominallyExhaustive) = true →
-          MatchExhaustive target (outer.apply scrutinee.type)
-            (checked.cases.map
-              (TypedMatchCase.applySubstitution outer)) none) :
+            target scrutinee.id (outer.apply scrutinee.type)) :
     ∃ facts,
       ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
@@ -7327,7 +7615,7 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
     rw [allocatedEq] at retained
     exact retained
   obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
-      nominallyExhaustive, scrutineeSuccess, hiddenAllocation, casesSuccess,
+      scrutineeSuccess, hiddenAllocation, casesSuccess,
       guardPassed, resultEq, contains⟩ :=
     inferStatementFuel_success_matchWithoutDefault_facts statementEq defaultEq
       allocationEq success roots
@@ -7375,8 +7663,6 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
   have checkedInvariant : ActiveLocalContextInvariant checked.state outer
       target := hiddenInvariant.inferMatchCasesFuel casesSuccess
   have scrutineeTyping := scrutineeSound scrutineeSuccess
-  have exhaustive := exhaustivenessSound scrutineeSuccess casesSuccess
-    guardPassed
   subst result
   have checkedExtension : outer.SemanticallyExtends
       checked.state.inference.substitution := by
@@ -7393,6 +7679,9 @@ private theorem inferStatementFuel_success_matchWithoutDefault_deep_of_cases
           TypedSource.applySubstitution] using checkedOwner)
       scrutineeTyping.type_admissible hiddenInvariant checkedExtension
       casesSuccess
+  have exhaustive :=
+    matchExhaustiveWithoutDefault_of_guard catalog signatures_eq casesSuccess
+      casesTyping scrutineeTyping.type_admissible checkedExtension guardPassed
   have checkedCasesPresent : checked.cases ≠ [] := by
     intro checkedCasesEq
     have lengthEq := Detail.inferMatchCasesFuel_success_cases_length
@@ -8899,22 +9188,6 @@ structure StatementInferenceSoundnessCallbacks
       statement.value = .matchWith scrutinees arms →
       arms.value.defaultBody = none →
       arms.value.cases ≠ []
-  matchExhaustiveWithoutDefault :
-    ∀ {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
-      {arms : Syntax.MatchArms} {scrutinee : InferredExpression}
-      {scrutineeState hiddenState : Frontend.SourceInference.State}
-      {checked : Detail.MatchCasesResult} {nominallyExhaustive : Bool},
-      statement.value = .matchWith scrutinees arms →
-      arms.value.defaultBody = none →
-      inferMatchScrutineesFuel fuel inferenceContext statement.span
-          scrutinees.elements.toList allocated =
-            .ok (scrutinee, scrutineeState) →
-      Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
-          expectedReturn hiddenState.lexicalScope arms.value.cases
-          hiddenState = .ok checked →
-      (checked.hasWildcard || false || nominallyExhaustive) = true →
-        MatchExhaustive target (outer.apply scrutinee.type)
-          (checked.cases.map (TypedMatchCase.applySubstitution outer)) none
 
 /-- Internal constructor dispatcher parameterized by the shared explicit-case
 soundness theorem.  The public wrapper below instantiates that one boundary
@@ -8935,6 +9208,7 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
       signature.scheme.body = .function
         (TypeSystem.Ty.productMany signature.parameterTypes)
         (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
     (canonical : SignatureParametersWellFormed
       inferenceContext.scope.genericOwner inferenceContext.typeParameters)
     (signatures_eq : target.signatures = inferenceContext.signatures)
@@ -9070,8 +9344,8 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
               obtain ⟨facts, finalInvariant, typing, agreement⟩ :=
                 inferStatementFuel_success_matchWithoutDefault_deep_of_cases
                   rfl defaultEq allocationEq success signatureFormation
-                  functionsCanonical ready returnBelow below invariant
-                  outerExtension roots
+                  functionsCanonical catalog signatures_eq ready returnBelow
+                  below invariant outerExtension roots
                   (fun hiddenReady hiddenScrutineeBelow hiddenReturnBelow
                       hiddenBelow sourceOwner scrutineeAdmissible
                       hiddenInvariant checkedExtension casesSuccess =>
@@ -9081,9 +9355,6 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                       casesSuccess)
                   (callbacks.matchCasesPresentWithoutDefault rfl defaultEq)
                   callbacks.matchScrutinee
-                  (fun scrutineeSuccess casesSuccess guardPassed =>
-                    callbacks.matchExhaustiveWithoutDefault rfl defaultEq
-                      scrutineeSuccess casesSuccess guardPassed)
               exact ⟨target, facts, finalInvariant, typing, agreement⟩
           | some defaultBody =>
               obtain ⟨facts, finalInvariant, typing, agreement⟩ :=
@@ -11496,8 +11767,8 @@ theorem inferMatchCasesFuel_success_sound
 /-- The deep default-free match theorem reconstructs every explicit arm and
 its control merge from pattern soundness, ordinary recursive statement-list
 soundness, and the parser/recovery-sensitive fact that an arm is present.
-Only semantic exhaustiveness remains as a substantive match-specific proof
-boundary. -/
+The executable coverage guard is proved sound for both catch-all patterns and
+nominal constructor coverage, so no semantic-exhaustiveness callback remains. -/
 theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement}
@@ -11557,21 +11828,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
                 returnType := outer.apply expectedReturn
                 loopDepth := inferenceContext.loopDepth
               } childContext childResult.statements finalContext facts ∧
-            BlockResultMatchesFactsAfterSubstitution outer childResult facts)
-    (exhaustivenessSound :
-      ∀ {scrutinee : InferredExpression}
-        {scrutineeState hiddenState : Frontend.SourceInference.State}
-        {checked : Detail.MatchCasesResult} {nominallyExhaustive : Bool},
-        inferMatchScrutineesFuel fuel inferenceContext statement.span
-            scrutinees.elements.toList allocated =
-              .ok (scrutinee, scrutineeState) →
-          Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
-              expectedReturn hiddenState.lexicalScope arms.value.cases
-              hiddenState = .ok checked →
-          (checked.hasWildcard || false || nominallyExhaustive) = true →
-          MatchExhaustive target (outer.apply scrutinee.type)
-            (checked.cases.map
-              (TypedMatchCase.applySubstitution outer)) none) :
+            BlockResultMatchesFactsAfterSubstitution outer childResult facts) :
     ∃ facts,
       ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
@@ -11582,8 +11839,8 @@ theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
       StatementResultMatchesFactsAfterSubstitution outer result facts := by
   apply inferStatementFuel_success_matchWithoutDefault_deep_of_cases
     statementEq defaultEq allocationEq success signatureFormation
-    functionsCanonical ready returnBelow below invariant outerExtension roots
-    ?_ casesPresent scrutineeSound exhaustivenessSound
+    functionsCanonical catalog signatures_eq ready returnBelow below invariant
+    outerExtension roots ?_ casesPresent scrutineeSound
   intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
     hiddenInvariant checkedExtension casesSuccess
@@ -11726,9 +11983,9 @@ theorem inferStatementFuel_success_sound_of_callbacks
         } target result.id finalContext facts ∧
       StatementResultMatchesFactsAfterSubstitution outer result facts := by
   apply inferStatementFuel_success_sound_of_callbacks_and_match_cases
-    allocationEq success signatureFormation functionsCanonical canonical
-    signatures_eq parameters_eq declaration_eq ready returnBelow invariant
-    below outerExtension roots ?_ callbacks
+    allocationEq success signatureFormation functionsCanonical catalog
+    canonical signatures_eq parameters_eq declaration_eq ready returnBelow
+    invariant below outerExtension roots ?_ callbacks
   intro scrutinee hiddenState checked cases hiddenReady hiddenScrutineeBelow
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
     hiddenInvariant checkedExtension casesSuccess

@@ -779,6 +779,10 @@ example :=
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_success_cases_length
 example :=
+  @Solcore.Frontend.SourceInference.Detail.inferMatchCasesFuel_success_hasWildcard_member
+example :=
+  @Solcore.Frontend.SourceInference.Detail.exhaustsNominalConstructors_eq_true_facts
+example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_state_header
 example :=
   @Solcore.Frontend.SourceInference.Detail.inferExprFuel_preserves_owner

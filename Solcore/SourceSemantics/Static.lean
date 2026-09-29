@@ -1100,6 +1100,34 @@ mutual
 
 end
 
+namespace MatchCasesHaveType
+
+/-- Membership in a typed explicit-case row exposes the selected arm's
+pattern typing independently of its body facts and final arm context. -/
+theorem pattern_type_of_mem
+    {source : TypedSource} {control : ControlContext} {context : Context}
+    {scrutineeType : TypeSystem.Ty} {cases : List TypedMatchCase}
+    {caseFacts : List BodyFacts} {matchCase : TypedMatchCase}
+    (typing : MatchCasesHaveType source control context scrutineeType cases
+      caseFacts)
+    (member : matchCase ∈ cases) :
+    ∃ binders rootArity,
+      TypedMatchPatternHasType context matchCase.pattern scrutineeType
+        binders rootArity := by
+  cases typing with
+  | nil => simp at member
+  | cons head tail =>
+      simp only [List.mem_cons] at member
+      rcases member with rfl | member
+      · cases head with
+        | intro patternType bindersExtend bodyType =>
+            exact ⟨_, _, patternType⟩
+      · exact MatchCasesHaveType.pattern_type_of_mem tail member
+termination_by cases.length
+decreasing_by simp_all
+
+end MatchCasesHaveType
+
 /-! ## Source-table weakening
 
 All thirteen mutually recursive static judgments are monotone in their source

@@ -435,7 +435,7 @@ private def nominalTypePartsAux? (type : Ty) (arguments : List Ty) :
   | .constructor (.declaration declaration) => some (declaration, arguments)
   | _ => none
 
-private def nominalTypeParts? (type : Ty) :
+def nominalTypeParts? (type : Ty) :
     Option (Resolved.DeclarationId × List Ty) :=
   nominalTypePartsAux? type []
 
@@ -460,7 +460,7 @@ private theorem nominalTypePartsAux?_success_reconstruct
   | error =>
       simp [nominalTypePartsAux?] at success
 
-private theorem nominalTypeParts?_success_reconstruct
+theorem nominalTypeParts?_success_reconstruct
     {type : Ty} {declaration : Resolved.DeclarationId}
     {arguments : List Ty}
     (success : nominalTypeParts? type = some (declaration, arguments)) :
@@ -1473,7 +1473,7 @@ def inferMatchPatternFuel (fuel : Nat) (context : Context)
 
 mutual
 
-  private def consumeIrrefutableInstruction (fuel : Nat) :
+  def consumeIrrefutableInstruction (fuel : Nat) :
       List MatchPatternInstruction → Option (Bool × List MatchPatternInstruction)
     | [] => none
     | instruction :: rest =>
@@ -1488,7 +1488,7 @@ mutual
                 pure (false, rest)
             | .tuple count => consumeIrrefutableInstructions fuel count rest
 
-  private def consumeIrrefutableInstructions (fuel : Nat) :
+  def consumeIrrefutableInstructions (fuel : Nat) :
       Nat → List MatchPatternInstruction →
         Option (Bool × List MatchPatternInstruction)
     | 0, instructions => some (true, instructions)
@@ -1501,7 +1501,7 @@ mutual
 
 end
 
-private def constructorArgumentsIrrefutable
+def constructorArgumentsIrrefutable
     (instantiation : DataConstructorInstantiation)
     (instructions : List MatchPatternInstruction) : Bool :=
   match consumeIrrefutableInstructions (instructions.length + 1)
@@ -1509,7 +1509,7 @@ private def constructorArgumentsIrrefutable
   | some (true, []) => true
   | _ => false
 
-private def typedPatternIsCatchall (pattern : TypedMatchPattern) : Bool :=
+def typedPatternIsCatchall (pattern : TypedMatchPattern) : Bool :=
   match pattern.resolution with
   | .wildcard | .binder _ => true
   | .tuple instructions =>
@@ -1522,7 +1522,7 @@ private def typedPatternIsCatchall (pattern : TypedMatchPattern) : Bool :=
       | _ => false
   | .integerLiteral .. | .constructor .. => false
 
-private def exhaustsNominalConstructors (context : Context) (state : State)
+def exhaustsNominalConstructors (context : Context) (state : State)
     (scrutineeType : Ty) (cases : List TypedMatchCase) : Bool :=
   match nominalTypeParts? (state.resolve scrutineeType) with
   | none => false
