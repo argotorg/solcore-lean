@@ -18181,6 +18181,124 @@ theorem weakenNodeSource
         (ContainsExpression.of_nodes_prefix nodesPrefix contains)
         typeEq formType rawAdmissible requirements
 
+/-- Recording an indirect application preserves the already typed callee and
+arguments while storing its bundled-argument coercion path in call metadata
+and its output path on the call expression itself. -/
+theorem ofRecordIndirectCall
+    {source : Syntax.Expr}
+    {callee : InferredExpression}
+    {arguments : List InferredExpression}
+    {application : Detail.IndirectApplicationResult}
+    {roots : List NodeId}
+    {semanticSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {parameterType rawResult : TypeSystem.Ty}
+    (callee_type : ExpressionHasType semanticSource context callee.id
+      (.function (substitution.apply parameterType)
+        (substitution.apply rawResult)))
+    (arguments_type : ExpressionsHaveTypes semanticSource context
+      (arguments.map (·.id))
+      (arguments.map fun argument => substitution.apply argument.type))
+    (argument_path : CoercionPathValid context
+      (substitution.apply (TypeSystem.Ty.productMany
+        (arguments.map (·.type))))
+      (substitution.apply parameterType)
+      (application.argumentCoercions.map
+        (CoercionStep.applySubstitution substitution)))
+    (output_path : CoercionPathValid context
+      (substitution.apply rawResult)
+      (substitution.apply application.result.type)
+      (application.callCoercions.map
+        (CoercionStep.applySubstitution substitution))) :
+    ExpressionTypingBase
+      ((Detail.recordIndirectCall source callee arguments application).2
+        |>.toTypedSource roots)
+      semanticSource context substitution
+      (Detail.recordIndirectCall source callee arguments application).1 := by
+  let argumentType := TypeSystem.Ty.productMany (arguments.map (·.type))
+  let coercedArgumentType := application.argumentCoercions.foldl
+    (fun _ step => step.target) argumentType
+  let metadata : IndirectCallResolution := {
+    argumentCount := arguments.length
+    argumentTypeBeforeCoercion := argumentType
+    argumentTypeAfterCoercion := coercedArgumentType
+    argumentCoercions := application.argumentCoercions
+  }
+  have contains : ContainsExpression
+      ((Detail.recordIndirectCall source callee arguments application).2
+        |>.toTypedSource roots)
+      (Detail.recordIndirectCall source callee arguments application).1.id {
+        id := application.result.id
+        span := source.span
+        type := application.result.type
+        form := .call callee.id (arguments.map (·.id)) (.indirect metadata)
+        requirements :=
+          Detail.coercionRequirements application.argumentCoercions ++
+            Detail.coercionRequirements application.callCoercions
+        coercions := application.callCoercions
+      } := by
+    rw [Detail.recordIndirectCall_fst]
+    simpa only [Detail.recordIndirectCall, argumentType,
+      coercedArgumentType, metadata] using
+        (recordExpression_containsExpression source application.result
+          (.call callee.id (arguments.map (·.id)) (.indirect metadata))
+          (Detail.coercionRequirements application.argumentCoercions ++
+            Detail.coercionRequirements application.callCoercions)
+          application.callCoercions application.state roots)
+  have afterEq : substitution.apply coercedArgumentType =
+      substitution.apply parameterType := by
+    rw [← Frontend.SourceInference.coercionTargetFold_applySubstitution]
+    exact argument_path.foldl_target
+  have applicationValid : IndirectApplicationValid context
+      (metadata.applySubstitution substitution)
+      (arguments.map fun argument => substitution.apply argument.type)
+      (substitution.apply parameterType) := by
+    refine .intro (by
+      simp [metadata, IndirectCallResolution.applySubstitution]) ?_ ?_
+      argument_path
+    · simpa [metadata, argumentType,
+        IndirectCallResolution.applySubstitution, Function.comp_def] using
+        (FlexibleSubstitution.apply_productMany substitution
+          (arguments.map (·.type)))
+    · simpa [metadata, coercedArgumentType,
+        IndirectCallResolution.applySubstitution] using afterEq
+  have formType : ExpressionFormHasRawType semanticSource context
+      ((ExpressionForm.call callee.id (arguments.map (·.id))
+        (.indirect metadata)).applySubstitution substitution)
+      (substitution.apply rawResult)
+      (.indirectCall (application.argumentCoercions.map
+        (CoercionStep.applySubstitution substitution))) := by
+    simpa [ExpressionForm.applySubstitution, CallResolution.applySubstitution,
+      IndirectCallResolution.applySubstitution] using
+        (ExpressionFormHasRawType.indirectCall callee_type arguments_type
+          applicationValid)
+  have rawAdmissible : TypeAdmissible context
+      (substitution.apply rawResult) :=
+    callee_type.type_admissible.function_result
+  have requirements : ExpressionRequirementPlan.Valid context
+      (substitution.apply rawResult)
+      (substitution.apply application.result.type)
+      (.indirectCall (application.argumentCoercions.map
+        (CoercionStep.applySubstitution substitution)))
+      (Detail.coercionRequirements application.argumentCoercions ++
+        Detail.coercionRequirements application.callCoercions)
+      (application.callCoercions.map
+        (CoercionStep.applySubstitution substitution)) := by
+    apply ExpressionRequirementPlan.Valid.indirectCall
+      argument_path.requirements_valid output_path
+    change coercionRequirementIds application.argumentCoercions ++
+        coercionRequirementIds application.callCoercions =
+      coercionRequirementIds
+          (application.argumentCoercions.map
+            (CoercionStep.applySubstitution substitution)) ++
+        coercionRequirementIds
+          (application.callCoercions.map
+            (CoercionStep.applySubstitution substitution))
+    rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution,
+      FlexibleSubstitution.coercionRequirementIds_applySubstitution]
+  exact .intro contains rfl formType rawAdmissible requirements
+
 end ExpressionTypingBase
 
 namespace ArgumentTypingBasesValid

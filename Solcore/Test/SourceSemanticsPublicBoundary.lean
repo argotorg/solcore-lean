@@ -667,6 +667,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase.weakenNodeSource
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase.ofRecordIndirectCall
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.nil
