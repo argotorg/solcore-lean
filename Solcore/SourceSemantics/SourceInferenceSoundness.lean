@@ -8855,54 +8855,36 @@ structure StatementInferenceSoundnessCallbacks
         ExpressionHasType
           ((result.state.toTypedSource roots).applySubstitution outer)
           target scrutinee.id (outer.apply scrutinee.type)
-  matchCasesWithoutDefault :
+  matchIntegerLiteral :
+    ∀ {childFuel : Nat} {pattern : Syntax.Pattern}
+      {literal : Syntax.CoreLiteral} {literalSource : Syntax.CoreLiteralValue}
+      {resolution : IntegerLiteralResolution} {expected : TypeSystem.Ty}
+      {seen : List String} {childInitial : Frontend.SourceInference.State}
+      {patternResult : Detail.InferredPattern},
+      pattern.value = .literal literal →
+      Detail.inferMatchPatternFlatFuel childFuel inferenceContext pattern
+          expected seen childInitial = .ok patternResult →
+      patternResult.resolution = .integerLiteral literalSource resolution →
+      IntegerLiteralValid target literalSource
+        (resolution.applySubstitution outer)
+  matchControlMergeWithoutDefault :
     ∀ {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
       {arms : Syntax.MatchArms} {scrutinee : InferredExpression}
       {hiddenState : Frontend.SourceInference.State}
-      {checked : Detail.MatchCasesResult},
+      {checked : Detail.MatchCasesResult} {caseFacts : List BodyFacts},
       statement.value = .matchWith scrutinees arms →
       arms.value.defaultBody = none →
-      ActiveLocalContextInvariant hiddenState outer target →
-      ExpressionHasType
-        ((result.state.toTypedSource roots).applySubstitution outer)
-        target scrutinee.id (outer.apply scrutinee.type) →
       Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
           expectedReturn hiddenState.lexicalScope arms.value.cases
           hiddenState = .ok checked →
-        ∃ caseFacts summary,
-          MatchCasesHaveType
-            ((result.state.toTypedSource roots).applySubstitution outer) {
-              returnType := outer.apply expectedReturn
-              loopDepth := inferenceContext.loopDepth
-            } target (outer.apply scrutinee.type)
-              (checked.cases.map (TypedMatchCase.applySubstitution outer))
-              caseFacts ∧
-          allBodiesSawReturn caseFacts = checked.allReturn ∧
-          mergeBodyControls caseFacts none = some summary
-  matchCasesWithDefault :
-    ∀ {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
-      {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
-      {scrutinee : InferredExpression}
-      {hiddenState : Frontend.SourceInference.State}
-      {checked : Detail.MatchCasesResult},
-      statement.value = .matchWith scrutinees arms →
-      arms.value.defaultBody = some defaultBody →
-      ActiveLocalContextInvariant hiddenState outer target →
-      ExpressionHasType
-        ((result.state.toTypedSource roots).applySubstitution outer)
-        target scrutinee.id (outer.apply scrutinee.type) →
-      Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
-          expectedReturn hiddenState.lexicalScope arms.value.cases
-          hiddenState = .ok checked →
-        ∃ caseFacts,
-          MatchCasesHaveType
-            ((result.state.toTypedSource roots).applySubstitution outer) {
-              returnType := outer.apply expectedReturn
-              loopDepth := inferenceContext.loopDepth
-            } target (outer.apply scrutinee.type)
-              (checked.cases.map (TypedMatchCase.applySubstitution outer))
-              caseFacts ∧
-          allBodiesSawReturn caseFacts = checked.allReturn
+      MatchCasesHaveType
+          ((result.state.toTypedSource roots).applySubstitution outer) {
+            returnType := outer.apply expectedReturn
+            loopDepth := inferenceContext.loopDepth
+          } target (outer.apply scrutinee.type)
+          (checked.cases.map (TypedMatchCase.applySubstitution outer))
+          caseFacts →
+        ∃ summary, mergeBodyControls caseFacts none = some summary
   matchExhaustiveWithoutDefault :
     ∀ {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
       {arms : Syntax.MatchArms} {scrutinee : InferredExpression}
@@ -8920,13 +8902,10 @@ structure StatementInferenceSoundnessCallbacks
         MatchExhaustive target (outer.apply scrutinee.type)
           (checked.cases.map (TypedMatchCase.applySubstitution outer)) none
 
-/-- Conditional statement soundness for the fixed control context carried by
-executable inference.  This theorem is the constructor dispatcher: it selects
-one of the branch wrappers above, while the uniform callback bundle contains
-recursive semantic obligations in the already chosen eventual source.  It
-does not itself discharge the callback bundle or establish child/source
-provenance. -/
-theorem inferStatementFuel_success_sound_of_callbacks
+/-- Internal constructor dispatcher parameterized by the shared explicit-case
+soundness theorem.  The public wrapper below instantiates that one boundary
+with the direct pattern/body proof, after its dependencies are available. -/
+private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
     {initial allocated : Frontend.SourceInference.State}
@@ -8955,6 +8934,31 @@ theorem inferStatementFuel_success_sound_of_callbacks
     (outerExtension : outer.SemanticallyExtends
       result.state.inference.substitution)
     (roots : List NodeId := [])
+    (matchCasesSound :
+      ∀ {scrutinee : InferredExpression}
+        {hiddenState : Frontend.SourceInference.State}
+        {checked : Detail.MatchCasesResult} {cases : List Syntax.MatchCase},
+        hiddenState.InferenceReady →
+        scrutinee.type.VariablesBelow hiddenState.inference.next →
+        expectedReturn.VariablesBelow hiddenState.inference.next →
+        hiddenState.LocalBindersBelowNextLocal →
+        ((result.state.toTypedSource roots).applySubstitution outer).owner =
+          hiddenState.owner →
+        TypeAdmissible target (outer.apply scrutinee.type) →
+        ActiveLocalContextInvariant hiddenState outer target →
+        outer.SemanticallyExtends checked.state.inference.substitution →
+        Detail.inferMatchCasesFuel fuel inferenceContext scrutinee.type
+            expectedReturn hiddenState.lexicalScope cases hiddenState =
+              .ok checked →
+          ∃ caseFacts,
+            MatchCasesHaveType
+              ((result.state.toTypedSource roots).applySubstitution outer) {
+                returnType := outer.apply expectedReturn
+                loopDepth := inferenceContext.loopDepth
+              } target (outer.apply scrutinee.type)
+              (checked.cases.map
+                (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+            allBodiesSawReturn caseFacts = checked.allReturn)
     (callbacks : StatementInferenceSoundnessCallbacks fuel inferenceContext
       statement expectedReturn allocated result outer target roots) :
     ∃ finalContext facts,
@@ -9050,24 +9054,39 @@ theorem inferStatementFuel_success_sound_of_callbacks
           cases defaultEq : arms.value.defaultBody with
           | none =>
               obtain ⟨facts, finalInvariant, typing, agreement⟩ :=
-                inferStatementFuel_success_matchWithoutDefault_sound rfl
-                  defaultEq allocationEq success invariant outerExtension roots
+                inferStatementFuel_success_matchWithoutDefault_deep_of_cases
+                  rfl defaultEq allocationEq success signatureFormation
+                  functionsCanonical ready returnBelow below invariant
+                  outerExtension roots
+                  (fun hiddenReady hiddenScrutineeBelow hiddenReturnBelow
+                      hiddenBelow sourceOwner scrutineeAdmissible
+                      hiddenInvariant checkedExtension casesSuccess =>
+                    matchCasesSound hiddenReady hiddenScrutineeBelow
+                      hiddenReturnBelow hiddenBelow sourceOwner
+                      scrutineeAdmissible hiddenInvariant checkedExtension
+                      casesSuccess)
+                  (fun casesSuccess casesTyping =>
+                    callbacks.matchControlMergeWithoutDefault rfl defaultEq
+                      casesSuccess casesTyping)
                   callbacks.matchScrutinee
-                  (fun hiddenInvariant scrutineeTyping casesSuccess =>
-                    callbacks.matchCasesWithoutDefault rfl defaultEq
-                      hiddenInvariant scrutineeTyping casesSuccess)
                   (fun scrutineeSuccess casesSuccess guardPassed =>
                     callbacks.matchExhaustiveWithoutDefault rfl defaultEq
                       scrutineeSuccess casesSuccess guardPassed)
               exact ⟨target, facts, finalInvariant, typing, agreement⟩
           | some defaultBody =>
               obtain ⟨facts, finalInvariant, typing, agreement⟩ :=
-                inferStatementFuel_success_matchWithDefault_sound rfl
-                  defaultEq allocationEq success invariant outerExtension roots
+                inferStatementFuel_success_matchWithDefault_deep_of_cases rfl
+                  defaultEq allocationEq success signatureFormation
+                  functionsCanonical ready returnBelow below invariant
+                  outerExtension roots
+                  (fun hiddenReady hiddenScrutineeBelow hiddenReturnBelow
+                      hiddenBelow sourceOwner scrutineeAdmissible
+                      hiddenInvariant checkedExtension casesSuccess =>
+                    matchCasesSound hiddenReady hiddenScrutineeBelow
+                      hiddenReturnBelow hiddenBelow sourceOwner
+                      scrutineeAdmissible hiddenInvariant checkedExtension
+                      casesSuccess)
                   callbacks.matchScrutinee
-                  (fun hiddenInvariant scrutineeTyping casesSuccess =>
-                    callbacks.matchCasesWithDefault rfl defaultEq
-                      hiddenInvariant scrutineeTyping casesSuccess)
                   (fun checkedInvariant defaultSuccess =>
                     callbacks.statements checkedInvariant defaultSuccess)
               exact ⟨target, facts, finalInvariant, typing, agreement⟩
@@ -11659,6 +11678,72 @@ theorem inferStatementFuel_success_matchWithDefault_deep_sound
     hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
     bodySound casesSuccess
+
+/-- Successful statement inference is sound in the finalized typed source.
+The constructor dispatcher handles every statement form, while explicit match
+arms are reconstructed here from the common integer-pattern evidence and the
+ordinary recursive statement-list callback.  No whole-arm match typing
+callback remains in the public contract. -/
+theorem inferStatementFuel_success_sound_of_callbacks
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (canonical : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (parameters_eq : target.typeParameters = inferenceContext.typeParameters)
+    (declaration_eq : target.currentDeclaration =
+      some inferenceContext.scope.genericOwner)
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (below : initial.LocalBindersBelowNextLocal)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (semanticOwner : target.currentDeclaration = some
+      ((result.state.toTypedSource roots).applySubstitution outer).owner)
+    (callbacks : StatementInferenceSoundnessCallbacks fuel inferenceContext
+      statement expectedReturn allocated result outer target roots) :
+    ∃ finalContext facts,
+      ActiveLocalContextInvariant result.state outer finalContext ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id finalContext facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  apply inferStatementFuel_success_sound_of_callbacks_and_match_cases
+    allocationEq success signatureFormation functionsCanonical canonical
+    signatures_eq parameters_eq declaration_eq ready returnBelow invariant
+    below outerExtension roots ?_ callbacks
+  intro scrutinee hiddenState checked cases hiddenReady hiddenScrutineeBelow
+    hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
+    hiddenInvariant checkedExtension casesSuccess
+  exact inferMatchCasesFuel_success_sound signatureFormation
+    functionsCanonical catalog signatures_eq
+    ({ literal := callbacks.matchIntegerLiteral } :
+      MatchPatternBranchSoundnessCallbacks
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        inferenceContext target outer)
+    hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
+    semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
+    (fun bodyInvariant bodySuccess =>
+      callbacks.statements bodyInvariant bodySuccess)
+    casesSuccess
 
 /-- Statement-list inference is a generic sequencing layer over soundness for
 one statement.  The caller chooses the relation connecting executable states
