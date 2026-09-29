@@ -15692,6 +15692,60 @@ theorem instantiatedFunctionResultTypeAdmissible
       (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
         signatureWellFormed.return_types))
 
+/-- A successful overload selection retains one exact successful candidate
+from the supplied list together with the catalog, canonical-shape, and scope
+facts needed by the candidate-specific direct-call soundness lemmas.  Catalog
+transport is performed once here so every downstream fact refers to the same
+selected signature. -/
+theorem selectFunctionCandidateFrom_success_semanticCandidate
+    {inferenceContext : Frontend.SourceInference.Context}
+    {name : String} {candidates : List ProgramFunctionSignature}
+    {arguments : List InferredExpression}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {attempt : Detail.CandidateAttemptResult}
+    {sourceContext : SourceSemantics.Context}
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (signaturesEq : sourceContext.signatures =
+      inferenceContext.signatures)
+    (candidatesSubset : candidates ⊆
+      inferenceContext.signatures.functions)
+    (success : Detail.selectFunctionCandidateFrom inferenceContext name
+      candidates arguments integerLiteralOrigins call expected state =
+        .ok attempt) :
+    ∃ signature,
+      signature ∈ candidates ∧
+      signature ∈ sourceContext.signatures.functions ∧
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes) ∧
+      signature.scheme.body.VariablesBelow state.inference.next ∧
+      Detail.tryFunctionCandidate inferenceContext arguments
+        integerLiteralOrigins call expected state signature =
+          .ok (some attempt) := by
+  obtain ⟨signature, candidateMember, candidateSuccess⟩ :=
+    Detail.selectFunctionCandidateFrom_success_candidate success
+  have inferenceMember : signature ∈
+      inferenceContext.signatures.functions :=
+    candidatesSubset candidateMember
+  have canonical := functionsCanonical signature inferenceMember
+  have schemeBodyBelow :=
+    signatureFormation.function_scheme_body_variablesBelow
+      inferenceMember canonical state.inference.next
+  have sourceMember : signature ∈
+      sourceContext.signatures.functions := by
+    rw [signaturesEq]
+    exact inferenceMember
+  exact ⟨signature, candidateMember, sourceMember, canonical,
+    schemeBodyBelow, candidateSuccess⟩
+
 /-- A successful overload selection comes from one semantic-catalog member
 in the supplied candidate list and retains that member's exact declarative
 application profile.  This theorem intentionally forgets ranking optimality;

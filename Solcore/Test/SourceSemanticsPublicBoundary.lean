@@ -592,6 +592,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.tryFunctionCandidate_declarationApplicationValid
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.selectFunctionCandidateFrom_success_semanticCandidate
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.selectFunctionCandidateFrom_declarationApplicationValid
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.selectFunctionCandidate_declarationApplicationValid
