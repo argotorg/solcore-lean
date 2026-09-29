@@ -18730,6 +18730,152 @@ theorem tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHas
     argumentIdsUnique catalog contextValid application rawAdmissible
     finalAdmissible callRequirements trailingPath
 
+/-- Source-ordered argument inference, explicit overload selection, and the
+ordinary selected-call recorder compose into the declarative direct-call
+typing rule.  Qualified and unqualified name lookup share this theorem; their
+only branch-specific obligation is that the returned candidate row is drawn
+from the whole-program function catalog. -/
+theorem
+    inferExprsFuel_selectFunctionCandidateFrom_recordSelectedCall_success_expressionHasType_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {argumentSources : List Syntax.Expr}
+    {argumentInitial argumentState : Frontend.SourceInference.State}
+    {arguments : List InferredExpression}
+    {source callee : Syntax.Expr} {name : String}
+    {candidates : List ProgramFunctionSignature}
+    {integerLiteralOrigins : List IntegerLiteralOrigin}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {attempt : Detail.CandidateAttemptResult}
+    {result : InferredExpression}
+    {resultState later : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (argumentsSuccess : Detail.inferExprsFuel fuel inferenceContext
+      argumentSources argumentInitial = .ok (arguments, argumentState))
+    (selectionSuccess : Detail.selectFunctionCandidateFrom inferenceContext
+      name candidates arguments integerLiteralOrigins call expected
+      argumentState = .ok attempt)
+    (recordEq : Detail.recordSelectedCall source callee name arguments attempt =
+      (result, resultState))
+    (candidatesSubset : candidates ⊆
+      inferenceContext.signatures.functions)
+    (argumentInitialReady : argumentInitial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow argumentInitial.inference.next)
+    (nodesBelow : argumentInitial.NodesBelowNextOccurrence)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        resultState.inference.substitution)
+    (requirementsSubset : resultState.requirements ⊆ later.requirements)
+    (sourceExtension : TypingSourceExtends
+      ((resultState.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (expressionBase :
+      ∀ {childFuel : Nat} {expression : Syntax.Expr}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext expression none
+            childInitial = .ok (child, childFinal) →
+          ExpressionTypingBase (childFinal.toTypedSource roots) ledgerSource
+            active later.inference.substitution child)
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (binders : TypeParameterBindersWellFormed sourceContext)
+    (residual : sourceContext.residualTypeVariables = true)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures =
+      inferenceContext.signatures)
+    (finalAdmissible : TypeAdmissible active
+      (later.inference.substitution.apply result.type))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (graphClosed : OccurrenceGraphClosed ledgerSource)
+    (callCovered : TemplateScopeCovered ledgerSource active
+      (.expression result.id)) :
+    ExpressionHasType ledgerSource active result.id
+      (later.inference.substitution.apply result.type) := by
+  have argumentProperties := Detail.inferExprsFuel_inferenceProperties
+    argumentInitialReady signatureFormation functionsCanonical argumentsSuccess
+  have expectedAtArguments : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow argumentState.inference.next := by
+    intro expectedType member
+    exact (expectedBelow expectedType member).weaken
+      argumentProperties.1.next_le
+  have bases := inferExprsFuel_success_argumentTypingBasesValid roots
+    expressionBase nodesBelow argumentsSuccess
+  have argumentIdsUnique :=
+    Detail.inferExprsFuel_success_ids_nodup argumentsSuccess
+  obtain ⟨signature, _, signatureMember, canonical, schemeBodyBelow,
+      candidateSuccess⟩ :=
+    selectFunctionCandidateFrom_success_semanticCandidate signatureFormation
+      functionsCanonical signaturesEq candidatesSubset selectionSuccess
+  have candidateProperties :=
+    Detail.tryFunctionCandidate_some_inferenceProperties
+      argumentProperties.2.1 argumentProperties.2.2 schemeBodyBelow
+      expectedAtArguments candidateSuccess
+  have recordProperties := Detail.recordSelectedCall_inferenceProperties
+    source callee name arguments attempt candidateProperties.2.1
+      candidateProperties.2.2
+  rw [recordEq] at recordProperties
+  have laterExtendsAttempt :
+      later.inference.substitution.SemanticallyExtends
+        attempt.state.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans substitutionExtends
+      recordProperties.1.substitution_extends
+  have attemptRequirementsAtResult :=
+    Detail.recordSelectedCall_requirements_subset source callee name arguments
+      attempt
+  rw [recordEq] at attemptRequirementsAtResult
+  have attemptRequirementsAtLater :
+      attempt.state.requirements ⊆ later.requirements :=
+    List.Subset.trans attemptRequirementsAtResult requirementsSubset
+  have recordSuccess : Detail.recordSelectedCallResult source callee name
+      arguments attempt attempt.result [] attempt.state =
+        (result, resultState) := by
+    simpa only [Detail.recordSelectedCall] using recordEq
+  have resultEq : result = attempt.result :=
+    (Detail.recordSelectedCallResult_success_nodes recordSuccess).1
+  subst result
+  exact
+    tryFunctionCandidate_some_recordSelectedCallResult_success_expressionHasType_scoped
+      canonical candidateSuccess recordSuccess rfl rfl bases
+      argumentIdsUnique argumentProperties.2.1 argumentProperties.2.2
+      schemeBodyBelow expectedAtArguments laterExtendsAttempt
+      laterExtendsAttempt attemptRequirementsAtLater sourceExtension catalog
+      binders residual signatureMember contextValid signaturesEq
+      finalAdmissible traitSuccess profileSuccess traitName solveSuccess
+      solvedEq ledger ownership activeSignaturesEq activeRequirementsEq
+      assumptionsMono graphClosed callCovered (.nil _)
+
 /-- The common soundness envelope for an ordinary expression-recording step.
 
 A shape-specific proof supplies only raw-form typing and admissibility.  This
