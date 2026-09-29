@@ -17134,6 +17134,49 @@ inductive ArgumentTypingBasesValid
       ArgumentTypingBasesValid nodeSource semanticSource context substitution
         (argument :: arguments)
 
+namespace ExpressionTypingBase
+
+/-- A pre-attachment typing base remains valid when its node source is
+extended by an append-only node suffix.  Its semantic typing evidence already
+refers to the eventual semantic source, so only exact node containment moves. -/
+theorem weakenNodeSource
+    {before after semanticSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {argument : InferredExpression}
+    (base : ExpressionTypingBase before semanticSource context substitution
+      argument)
+    (nodesPrefix : before.nodes <+: after.nodes) :
+    ExpressionTypingBase after semanticSource context substitution argument := by
+  cases base with
+  | intro contains typeEq formType rawAdmissible requirements =>
+      exact .intro
+        (ContainsExpression.of_nodes_prefix nodesPrefix contains)
+        typeEq formType rawAdmissible requirements
+
+end ExpressionTypingBase
+
+namespace ArgumentTypingBasesValid
+
+/-- A source-ordered row of pre-attachment typing bases remains valid when
+its shared node source is extended by an append-only node suffix. -/
+theorem weakenNodeSource
+    {before after semanticSource : TypedSource}
+    {context : SourceSemantics.Context}
+    {substitution : TypeSystem.Substitution}
+    {arguments : List InferredExpression}
+    (bases : ArgumentTypingBasesValid before semanticSource context
+      substitution arguments)
+    (nodesPrefix : before.nodes <+: after.nodes) :
+    ArgumentTypingBasesValid after semanticSource context substitution
+      arguments := by
+  induction bases with
+  | nil => exact .nil
+  | cons head _ induction =>
+      exact .cons (head.weakenNodeSource nodesPrefix) induction
+
+end ArgumentTypingBasesValid
+
 /-- Pointwise pre-attachment expression bases lift through the source-ordered
 expression-list traversal.  Each head base is first established in the state
 returned by that head expression.  The tail traversal preserves that complete

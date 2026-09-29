@@ -653,11 +653,15 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase.intro
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionTypingBase.weakenNodeSource
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.nil
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.cons
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.weakenNodeSource
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_success_argumentTypingBasesValid
 example :=
