@@ -11544,6 +11544,133 @@ private theorem inferMatchPatternFlatFuel_success_sound_step
   | error =>
       simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
 
+/-- One positive-fuel occurrence-aware pattern step.  Recursive constructor
+and tuple rows consume the same result-local metadata predicate as the root;
+the integer-literal leaf is the only branch which consumes finalized evidence
+directly. -/
+private theorem inferMatchPatternFlatFuel_success_sound_step_at
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {fuel : Nat} {pattern : Syntax.Pattern} {expected : TypeSystem.Ty}
+    {seen : List String} {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (recursivePattern : MatchPatternFlatSoundAtOccurrence source
+      inferenceContext semanticContext outer evidenceState occurrence fuel)
+    (recursivePatterns : MatchPatternsFlatSoundAtOccurrence source
+      inferenceContext semanticContext outer evidenceState occurrence fuel)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initial.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (seen_nodup : seen.Nodup)
+    (semanticAdmissible :
+      TypeAdmissible semanticContext (outer.apply expected))
+    (activeAdmissible :
+      TypeAdmissible activeContext (outer.apply expected))
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (requirementsOccur : ∀ requirement,
+      requirement ∈ result.requirements →
+        PrimaryRequirementOccursAt source occurrence requirement)
+    (success : Detail.inferMatchPatternFlatFuel (fuel + 1) inferenceContext
+      pattern expected seen initial = .ok result) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  let stateCallbacks := matchPatternFlatStateCallbacks inferenceContext
+  have recursivePatternsWith : MatchPatternsFlatSoundAtWith
+      (MatchPatternMetadataAt source evidenceState occurrence) source
+      inferenceContext semanticContext outer fuel :=
+    matchPatternsFlatSoundAtWith_of_occurrence recursivePatterns
+  have metadata : MatchPatternMetadataAt source evidenceState occurrence
+      result.state result.requirements :=
+    ⟨integerPatternsSubset, requirementsSubset, requirementsOccur⟩
+  cases valueEq : pattern.value with
+  | wildcard marker =>
+      exact inferMatchPatternFlatFuel_success_wildcard_sound
+        valueEq stateCallbacks ready expectedBelow validated below owner_eq
+        seen_nodup invariant success
+  | literal literal =>
+      exact inferMatchPatternFlatFuel_success_literal_sound_at valueEq evidence
+        integerPatternsSubset requirementsSubset requirementsOccur ready
+        expectedBelow validated below seen_nodup invariant outerExtension
+        success
+  | binder name =>
+      exact inferMatchPatternFlatFuel_success_binder_sound valueEq
+        stateCallbacks ready expectedBelow validated below owner_eq
+        semanticOwner seen_nodup semanticAdmissible activeAdmissible
+        invariant outerExtension success
+  | constructor leadingDot qualifiers name arguments =>
+      exact inferMatchPatternFlatFuel_success_constructor_sound valueEq
+        (resultPremise :=
+          MatchPatternMetadataAt source evidenceState occurrence)
+        catalog semanticSignaturesEq activeSignaturesEq validated
+        stateCallbacks recursivePatternsWith metadata ready expectedBelow below
+        owner_eq seen_nodup semanticAdmissible activeAdmissible invariant
+        outerExtension success
+  | comptime keyword expression =>
+      simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
+  | group inner =>
+      unfold Detail.inferMatchPatternFlatFuel at success
+      simp only [valueEq, bind, Except.bind] at success
+      cases innerSuccess : Detail.inferMatchPatternFlatFuel fuel
+          inferenceContext inner expected seen initial with
+      | error error => simp [innerSuccess] at success
+      | ok innerResult =>
+          simp only [innerSuccess, pure, Pure.pure, Except.pure] at success
+          injection success with resultEq
+          subst result
+          have innerOuter : outer.SemanticallyExtends
+              innerResult.state.inference.substitution := outerExtension
+          obtain ⟨certificate⟩ := recursivePattern
+            (result := innerResult) ready expectedBelow below owner_eq
+            seen_nodup semanticAdmissible activeAdmissible activeSignaturesEq
+            invariant innerOuter integerPatternsSubset requirementsSubset
+            requirementsOccur innerSuccess
+          exact ⟨{
+            binders := certificate.binders
+            rootArity := certificate.rootArity
+            finalContext := certificate.finalContext
+            source_represents :=
+              MatchPatternSourceRepresents.group certificate.source_represents
+            instructions_eq := certificate.instructions_eq
+            instruction_type := certificate.instruction_type
+            binders_extend := certificate.binders_extend
+            invariant := certificate.invariant
+            progress := certificate.progress
+            ready := certificate.ready
+            below := certificate.below
+            owner_eq := certificate.owner_eq
+            names_eq := certificate.names_eq
+            names_nodup := certificate.names_nodup
+          }⟩
+  | tuple elements =>
+      exact inferMatchPatternFlatFuel_success_tuple_sound valueEq validated
+        (resultPremise :=
+          MatchPatternMetadataAt source evidenceState occurrence)
+        stateCallbacks recursivePatternsWith metadata ready expectedBelow below
+        owner_eq seen_nodup semanticAdmissible activeAdmissible
+        activeSignaturesEq invariant outerExtension success
+  | error =>
+      simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
+
 /-- Fuel induction closes every strict recursive pattern call.  At each
 successor step, the same-fuel row contract is derived structurally from the
 smaller single-pattern theorem. -/
@@ -11580,6 +11707,49 @@ private theorem matchPatternFlatSoundAt
         semanticSignaturesEq activeSignaturesEq patternSound patternsSound
         branches ready expectedBelow below owner_eq semanticOwner seen_nodup
         semanticAdmissible activeAdmissible invariant outerExtension
+        (by simpa only [Nat.succ_eq_add_one] using success)
+
+/-- Fuel induction for occurrence-aware flat-pattern soundness.  The fixed
+finalized evidence state and source occurrence are shared by every strict
+subpattern; structural row recursion restricts root metadata to each child. -/
+private theorem matchPatternFlatSoundAtOccurrence
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State}
+    {occurrence : NodeId}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner) :
+    ∀ fuel, MatchPatternFlatSoundAtOccurrence source inferenceContext
+      semanticContext outer evidenceState occurrence fuel := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro pattern expected seen initial result activeContext ready
+        expectedBelow below owner_eq seen_nodup semanticAdmissible
+        activeAdmissible activeSignaturesEq invariant outerExtension
+        integerPatternsSubset requirementsSubset requirementsOccur success
+      simp [Detail.inferMatchPatternFlatFuel] at success
+  | succ fuel patternSound =>
+      have patternsSound : MatchPatternsFlatSoundAtOccurrence source
+          inferenceContext semanticContext outer evidenceState occurrence fuel :=
+        matchPatternsFlatSoundAtOccurrence_of_pattern validated patternSound
+      intro pattern expected seen initial result activeContext ready
+        expectedBelow below owner_eq seen_nodup semanticAdmissible
+        activeAdmissible activeSignaturesEq invariant outerExtension
+        integerPatternsSubset requirementsSubset requirementsOccur success
+      exact inferMatchPatternFlatFuel_success_sound_step_at validated catalog
+        semanticSignaturesEq activeSignaturesEq evidence patternSound
+        patternsSound ready expectedBelow below owner_eq semanticOwner
+        seen_nodup semanticAdmissible activeAdmissible invariant outerExtension
+        integerPatternsSubset requirementsSubset requirementsOccur
         (by simpa only [Nat.succ_eq_add_one] using success)
 
 /-- Every successful flat-pattern traversal has a complete semantic
@@ -11669,6 +11839,113 @@ theorem inferMatchPatternsFlatFuel_success_sound
   exact matchPatternsFlatSoundAt_of_pattern validated patternSound ready
     expectedBelow below owner_eq seen_nodup semanticAdmissible activeAdmissible
     activeSignaturesEq invariant outerExtension success
+
+/-- Every successful flat-pattern traversal is semantically sound from
+finalized occurrence-local integer-pattern evidence.  The root-result
+premises transport the locally retained origin and requirement ledgers to the
+evidence state and identify the source occurrence owning every requirement. -/
+theorem inferMatchPatternFlatFuel_success_sound_at
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {fuel : Nat} {pattern : Syntax.Pattern} {expected : TypeSystem.Ty}
+    {seen : List String} {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initial.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (seen_nodup : seen.Nodup)
+    (semanticAdmissible :
+      TypeAdmissible semanticContext (outer.apply expected))
+    (activeAdmissible :
+      TypeAdmissible activeContext (outer.apply expected))
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (requirementsOccur : ∀ requirement,
+      requirement ∈ result.requirements →
+        PrimaryRequirementOccursAt source occurrence requirement)
+    (success : Detail.inferMatchPatternFlatFuel fuel inferenceContext pattern
+      expected seen initial = .ok result) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  exact matchPatternFlatSoundAtOccurrence validated catalog
+    semanticSignaturesEq evidence semanticOwner fuel ready expectedBelow below
+    owner_eq seen_nodup semanticAdmissible activeAdmissible activeSignaturesEq
+    invariant outerExtension integerPatternsSubset requirementsSubset
+    requirementsOccur success
+
+/-- Every successful same-fuel row traversal has the occurrence-aware
+semantic certificate induced by the corresponding one-pattern theorem. -/
+theorem inferMatchPatternsFlatFuel_success_sound_at
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {fuel : Nat} {patterns : List Syntax.Pattern}
+    {expected : List TypeSystem.Ty} {seen : List String}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPatterns}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (ready : initial.InferenceReady)
+    (expectedBelow : ∀ type ∈ expected,
+      type.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initial.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (seen_nodup : seen.Nodup)
+    (semanticAdmissible : ∀ type ∈ expected,
+      TypeAdmissible semanticContext (outer.apply type))
+    (activeAdmissible : ∀ type ∈ expected,
+      TypeAdmissible activeContext (outer.apply type))
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (requirementsOccur : ∀ requirement,
+      requirement ∈ result.requirements →
+        PrimaryRequirementOccursAt source occurrence requirement)
+    (success : Detail.inferMatchPatternsFlatFuel fuel inferenceContext patterns
+      expected seen initial = .ok result) :
+    Nonempty (MatchPatternsFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  have patternSound : MatchPatternFlatSoundAtOccurrence source
+      inferenceContext semanticContext outer evidenceState occurrence fuel :=
+    matchPatternFlatSoundAtOccurrence validated catalog semanticSignaturesEq
+      evidence semanticOwner fuel
+  exact matchPatternsFlatSoundAtOccurrence_of_pattern validated patternSound
+    ready expectedBelow below owner_eq seen_nodup semanticAdmissible
+    activeAdmissible activeSignaturesEq invariant outerExtension
+    integerPatternsSubset requirementsSubset requirementsOccur success
 
 /-- Lift a complete flat traversal certificate through the public pattern
 wrapper.  The wrapper only closes the retained expected type and packages the

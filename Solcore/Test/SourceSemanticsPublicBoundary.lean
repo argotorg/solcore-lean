@@ -455,6 +455,10 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFlatFuel_success_literal_sound_at
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFlatFuel_success_sound_at
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternsFlatFuel_success_sound_at
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFuel_success_sound_of_flat
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchPatternFuel_success_sound
