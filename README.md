@@ -48,15 +48,25 @@ Leaf files, `*Properties` modules, parser grammar/trace units, and
 
 ## Remaining work
 
+The typed-source backend now executes the closed specialization slice end to
+end: constrained generic calls and first-class function values carry checked
+trait evidence, selected `Coerce.coerce` bodies run with their complete helper
+frontier, and closures share mutable locals, mappings, and proxy values through
+one runtime heap.
+
 ## Priority implementation
 
-- Broaden whole-program execution to cover advanced generic/type cases,
-  coherent unrestricted trait resolution (including implementation premises
-  discharged by caller assumptions), constrained let-polymorphic runtime
-  values, evidence dispatch for constrained first-class declaration values
-  and indirect calls beyond the closed direct/recursive dictionary path,
-  general coercion dispatch, members,
-  mappings, proxies, mutation, and higher-order or effectful staging.
+- Execute trait-selected unary and binary operator methods in the typed-source
+  backend. The checker and declarative semantics already retain this evidence;
+  the runtime currently executes primitive operators and selected coercion
+  methods only.
+- Broaden the closed specialization profile to the remaining unrestricted
+  trait-resolution and higher-order/effectful staging cases, including runtime
+  `comptime` values and types.
+- Add contract-storage field execution when the target source language defines
+  that access path. The current upstream source syntax has no general value
+  member projection; the latent typed-IR member form is therefore not exposed
+  as invented source syntax.
 - Complete public compiler orchestration: automatic entry and ABI-root
   discovery, multi-root and mixed-backend compilation, backend override, and
   serialization of source values, closures, heaps, and results.

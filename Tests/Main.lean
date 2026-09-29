@@ -1234,6 +1234,7 @@ import Solcore.Test.SourceCoreDirectLinking
 import Solcore.Test.SourceRuntimeCallGraph
 import Solcore.Test.SourceTypedRuntime
 import Solcore.Test.SourceTypedRuntimeFirstClassEvidence
+import Solcore.Test.SourceTypedRuntimeStateInteractions
 import Solcore.Test.ProgramChecking
 import Solcore.Test.SourceProgramExecution
 import Solcore.Test.SourceCompiler
@@ -2083,6 +2084,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceRuntimeCallGraph.testSourceRuntimeCallGraph
   SourceTypedRuntime.testSourceTypedRuntime
   SourceTypedRuntimeFirstClassEvidence.testSourceTypedRuntimeFirstClassEvidence
+  SourceTypedRuntimeStateInteractions.testSourceTypedRuntimeStateInteractions
   ProgramChecking.testProgramChecking
   SourceProgramExecution.testSourceProgramExecution
   SourceCompiler.testSourceCompiler
