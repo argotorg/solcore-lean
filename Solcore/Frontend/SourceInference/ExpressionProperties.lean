@@ -242,6 +242,65 @@ theorem inferExprFuel_success_localIdentifier_record
   simp only [allocationEq, expressionEq, lookupEq] at success
   simpa only using success
 
+/-- Invert a successful nonlocal identifier with exactly one visible function
+candidate through canonical scheme instantiation, predicate allocation, and
+the precise declaration-reference recording operation. -/
+theorem inferExprFuel_success_declarationIdentifier_record
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {signature : ProgramFunctionSignature}
+    {result : InferredExpression × State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = none)
+    (notBoolean :
+      (name.value == "true" || name.value == "false") = false)
+    (functionsEq : functionsNamed context name.value = .ok [signature])
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    (let instantiated :=
+       signature.scheme.instantiate allocated.inference.next
+     let inference := {
+       allocated.inference with next := instantiated.next
+     }
+     let (requirements, recorded) :=
+       ({ allocated with inference }).addRequirementsWithIds
+         instantiated.predicates
+     recordExpressionWithExpected context expression id instantiated.body
+       (.reference name.value (.declaration
+         (DeclarationInstantiation.ofInstantiated signature instantiated)))
+       requirements expected recorded = .ok result) := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, lookupEq, notBoolean, functionsEq,
+    Bool.false_eq_true, if_false, bind, Except.bind] at success
+  simpa only using success
+
+/-- Invert a successful nonlocal identifier with no visible declaration
+candidate through the exact builtin-function reference recording operation. -/
+theorem inferExprFuel_success_builtinFunctionIdentifier_record
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {function : BuiltinFunctionId}
+    {result : InferredExpression × State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = none)
+    (notBoolean :
+      (name.value == "true" || name.value == "false") = false)
+    (functionsEq : functionsNamed context name.value = .ok [])
+    (builtinEq : builtinFunctionNamed? name.value = some function)
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    recordExpressionWithExpected context expression id function.type
+      (.reference name.value (.builtinFunction function)) [] expected
+      allocated = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, lookupEq, notBoolean, functionsEq,
+    builtinEq, Bool.false_eq_true, if_false, bind, Except.bind] at success
+  simpa only using success
+
 namespace PlannedCoercionStep
 
 /-- A planned coercion edge retains the canonical `Coerce<source, target>`
