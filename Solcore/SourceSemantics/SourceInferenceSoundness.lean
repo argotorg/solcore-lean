@@ -4397,6 +4397,28 @@ def inferMatchScrutineesFuel
       })
       pure ({ id := tupleId, type }, state)
 
+/-- Successful expression inference grows the local typed source by an exact
+append-only extension.  The input occurrence bound prevents refinements at
+fresh expression identities from changing any node already present in the
+input source. -/
+theorem inferExprFuel_success_typingSourceExtends
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial : Frontend.SourceInference.State}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (success : Detail.inferExprFuel fuel inferenceContext source expected
+      initial = .ok result)
+    (below : initial.NodesBelowNextOccurrence)
+    (roots : List NodeId := []) :
+    TypingSourceExtends (initial.toTypedSource roots)
+      (result.2.toTypedSource roots) := by
+  constructor
+  · exact Detail.inferExprFuel_preserves_owner success
+  · exact Detail.inferExprFuel_preserves_nodesPrefix success
+      (nodesPrefix := List.prefix_rfl)
+      (baseBelow := below)
+      (cutoffLe := Nat.le_refl _)
+
 /-- Successful constructor-argument inference grows the local typed source by
 an append-only extension.  The input occurrence bound protects the complete
 input node table from payload refinements at freshly allocated occurrences. -/

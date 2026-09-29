@@ -300,6 +300,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferMatchScrutineesFuel
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprFuel_success_typingSourceExtends
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferConstructorArgumentsFuel_success_typingSourceExtends
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.inferConstructorArgumentsFuel_success_expressionsHaveTypes_local
