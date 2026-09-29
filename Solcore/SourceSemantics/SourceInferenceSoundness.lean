@@ -9170,18 +9170,6 @@ structure StatementInferenceSoundnessCallbacks
         ExpressionHasType
           ((result.state.toTypedSource roots).applySubstitution outer)
           target scrutinee.id (outer.apply scrutinee.type)
-  matchIntegerLiteral :
-    ∀ {childFuel : Nat} {pattern : Syntax.Pattern}
-      {literal : Syntax.CoreLiteral} {literalSource : Syntax.CoreLiteralValue}
-      {resolution : IntegerLiteralResolution} {expected : TypeSystem.Ty}
-      {seen : List String} {childInitial : Frontend.SourceInference.State}
-      {patternResult : Detail.InferredPattern},
-      pattern.value = .literal literal →
-      Detail.inferMatchPatternFlatFuel childFuel inferenceContext pattern
-          expected seen childInitial = .ok patternResult →
-      patternResult.resolution = .integerLiteral literalSource resolution →
-      IntegerLiteralValid target literalSource
-        (resolution.applySubstitution outer)
   matchCasesPresentWithoutDefault :
     ∀ {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
       {arms : Syntax.MatchArms},
@@ -9644,6 +9632,31 @@ The following certificates keep the three results of that pass together: the
 typed prefix program, the exact semantic binder extension, and the active
 local-state invariant needed by the arm body.
 -/
+
+/-- Finalized semantic evidence for integer-pattern metadata retained at one
+source occurrence.  Pattern inference supplies the exact origin and
+requirement row; whole-body finalization supplies validity in the active
+occurrence context. -/
+structure IntegerPatternEvidenceAt
+    (source : TypedSource) (context : SourceSemantics.Context)
+    (substitution : TypeSystem.Substitution)
+    (state : Frontend.SourceInference.State) (occurrence : NodeId) : Prop where
+  valid :
+    ∀ {literal : Syntax.CoreLiteralValue}
+      {resolution : IntegerLiteralResolution}
+      {origin : IntegerPatternOrigin},
+      Frontend.numericLiteralValue? literal = some resolution.rawValue →
+      resolution.targetType = .variable origin.metavariable →
+      resolution.requirement = origin.requirement →
+      origin ∈ state.integerPatterns →
+      ({
+        id := origin.requirement
+        predicate := ProgramSignatures.builtinIntPredicate
+          (.variable origin.metavariable)
+      } : Requirement) ∈ state.requirements →
+      PrimaryRequirementOccursAt source occurrence resolution.requirement →
+      IntegerLiteralValid context literal
+        (resolution.applySubstitution substitution)
 
 /-- Semantic result of one successful internal flat-pattern traversal.  The
 typing field is suffix-polymorphic so source-ordered prefix programs compose
@@ -11972,6 +11985,9 @@ theorem inferStatementFuel_success_sound_of_callbacks
     (roots : List NodeId := [])
     (semanticOwner : target.currentDeclaration = some
       ((result.state.toTypedSource roots).applySubstitution outer).owner)
+    (patternBranches : MatchPatternBranchSoundnessCallbacks
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      inferenceContext target outer)
     (callbacks : StatementInferenceSoundnessCallbacks fuel inferenceContext
       statement expectedReturn allocated result outer target roots) :
     ∃ finalContext facts,
@@ -11990,11 +12006,7 @@ theorem inferStatementFuel_success_sound_of_callbacks
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
     hiddenInvariant checkedExtension casesSuccess
   exact inferMatchCasesFuel_success_sound signatureFormation
-    functionsCanonical catalog signatures_eq
-    ({ literal := callbacks.matchIntegerLiteral } :
-      MatchPatternBranchSoundnessCallbacks
-        ((result.state.toTypedSource roots).applySubstitution outer)
-        inferenceContext target outer)
+    functionsCanonical catalog signatures_eq patternBranches
     hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
     (fun bodyInvariant bodySuccess =>
@@ -15902,6 +15914,34 @@ theorem integerPatternValidAt
       resolution_requirement, ProgramSignatures.builtinIntPredicate,
       TypedTraitResolution.applySubstitution] using evidence
   exact integerLiteralValid_of_evidence decoded closedSupported closedEvidence
+
+/-- Package the finalization-wide integer-pattern proof as reusable evidence
+at one covered source occurrence. -/
+theorem integerPatternEvidenceAt
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext type state roots
+      result)
+    {active : SourceSemantics.Context} {occurrence : NodeId}
+    (signatures_eq : active.signatures =
+      (finalizedRequirementContext inferenceContext result).signatures)
+    (requirements_eq : active.solvedRequirements =
+      (finalizedRequirementContext inferenceContext result).solvedRequirements)
+    (assumptions_mono :
+      (finalizedRequirementContext inferenceContext result).assumptions ⊆
+        active.assumptions)
+    (covered : TemplateScopeCovered result.typedSource active occurrence) :
+    IntegerPatternEvidenceAt result.typedSource active result.substitution
+      state occurrence := by
+  constructor
+  intro literal resolution origin decoded resolutionTarget
+    resolutionRequirement originMember requirementMember occurs
+  exact resources.integerPatternValidAt decoded resolutionTarget
+    resolutionRequirement originMember requirementMember signatures_eq
+    requirements_eq assumptions_mono covered occurs
 
 /-- A successful direct flat integer-pattern inference supplies exactly the
 origin metadata needed by `integerPatternValidAt`.  The two subset premises

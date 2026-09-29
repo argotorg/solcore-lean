@@ -433,6 +433,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.BlockResultMatchesFactsAfterSubstitution.cons
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.IntegerPatternEvidenceAt
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternFlatInferenceCertificate
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.MatchPatternsFlatInferenceCertificate
@@ -645,6 +647,8 @@ example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.requirementProvesAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt
+example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternEvidenceAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.FinalInferenceResources.integerPatternValidAt_of_flatLiteral
 example :=
