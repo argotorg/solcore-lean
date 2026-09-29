@@ -7,6 +7,10 @@ namespace Tests
 example :=
   @Solcore.Frontend.SourceInference.Detail.appendExpressionCoercions
 example :=
+  @Solcore.Frontend.SourceInference.Detail.coercionRequirements_applySubstitution
+example :=
+  @Solcore.Frontend.SourceInference.Detail.appendExpressionCoercions_applySubstitution
+example :=
   @Solcore.Frontend.SourceInference.coercionTargetFold_applySubstitution
 
 example := @Solcore.Frontend.SourceSpecialization.matchClosedSchemeInstance?

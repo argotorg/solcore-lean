@@ -2,6 +2,7 @@ import Solcore.Frontend.SourceInference.Expression
 import Solcore.Frontend.SourceInference.OccurrenceProperties
 import Solcore.Frontend.SourceInference.RequirementProperties
 import Solcore.Frontend.SourceInference.StateProperties
+import Solcore.Frontend.SourceInference.TypedIRProperties
 import Solcore.Frontend.ProgramSignatureFormationProperties
 import Solcore.TypeSystem.InferenceProperties
 
@@ -3409,6 +3410,35 @@ theorem tryFunctionCandidate_some_inferenceProperties
                                           (requirementsProgress.trans
                                             directProgress))),
                                     finalReady, resolvedTypeBelow⟩
+
+/-- Closing flexible types leaves the stable requirement identities carried by
+an already selected coercion path unchanged. -/
+@[simp] theorem coercionRequirements_applySubstitution
+    (substitution : Substitution) (coercions : List CoercionStep) :
+    coercionRequirements
+        (coercions.map (CoercionStep.applySubstitution substitution)) =
+      coercionRequirements coercions := by
+  induction coercions with
+  | nil => rfl
+  | cons coercion coercions induction =>
+      change
+        (coercion.applySubstitution substitution).requirements ++
+            coercionRequirements
+              (coercions.map
+                (CoercionStep.applySubstitution substitution)) =
+          coercion.requirements ++ coercionRequirements coercions
+      rw [CoercionStep.applySubstitution_requirements, induction]
+
+/-- Closing flexible types commutes with appending a delayed output-coercion
+path to one expression node. -/
+@[simp] theorem appendExpressionCoercions_applySubstitution
+    (substitution : Substitution) (node : ExpressionNode)
+    (coercions : List CoercionStep) :
+    (appendExpressionCoercions node coercions).applySubstitution substitution =
+      appendExpressionCoercions (node.applySubstitution substitution)
+        (coercions.map (CoercionStep.applySubstitution substitution)) := by
+  simp [appendExpressionCoercions, ExpressionNode.applySubstitution,
+    coercionRequirements_applySubstitution]
 
 /-- Attaching delayed argument-coercion metadata leaves semantic inference
 unchanged and preserves the stable-binder readiness invariant. -/
