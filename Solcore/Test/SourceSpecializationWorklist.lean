@@ -22,6 +22,12 @@ private def workspace : Workspace.RawWorkspace := {
       "trait Eq<T> {}",
       "impl Eq<Word> {}",
       "impl Eq<Bool> {}",
+      "trait Coerce<From, To> {",
+      "  function coerce(value: From) returns (To);",
+      "}",
+      "impl Coerce<Word, Bool> {",
+      "  function coerce(value: Word) returns (Bool) { return true; }",
+      "}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function globalIdentity<T>(value: T) returns (T) { return value; }",
       "function choose3<A, B, C>(first: A, second: B, third: C) returns (C) { return third; }",
@@ -129,6 +135,16 @@ private def workspace : Workspace.RawWorkspace := {
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
       "function qualifiedLocal(flag: Bool) returns (Word, Bool) {",
       "  let f = lam(value) { return keep(value); };",
+      "  return (f(1), f(flag));",
+      "}",
+      "function guarded<T>(guard: T) returns (Word) where T: Eq { return 1; }",
+      "function requireBool(value: Bool) returns (Bool) { return value; }",
+      "function qualifiedLocalCoerced(flag: Bool) returns (Bool, Bool) {",
+      "  let f = lam(value) { return requireBool(guarded(value)); };",
+      "  return (f(1), f(flag));",
+      "}",
+      "function qualifiedLocalResultCoerced(flag: Bool) returns (Bool, Bool) {",
+      "  let f = lam(value) -> Bool { return guarded(value); };",
       "  return (f(1), f(flag));",
       "}",
       "function constrained(value: Word) returns (Word) { return keep(value); }",
@@ -1421,6 +1437,84 @@ private def testQualifiedLocalSchemeCalls
   | result => throw (IO.userError
       s!"detached qualified call requirement was accepted: {reprStr result}")
 
+private def checkQualifiedLocalSchemeCallWithCoercion
+    (program : CheckedProgram) (name label : String)
+    (coercionBeforeSignature : Bool) : IO Unit := do
+  let guarded ← signatureNamed program "guarded"
+  let qualified ← signatureNamed program name
+  let function ← functionFor program qualified
+  let binder ← match function.typedBody.nodes.findSome? fun
+      | .statement { form := .letDecl binder (some _), .. } =>
+          if binder.name == "f" then some binder else none
+      | _ => none with
+    | some binder => pure binder
+    | none => throw (IO.userError
+        s!"{name} lost its f binder")
+  let template ← match binder.schemeRequirements with
+    | [requirement] => pure requirement
+    | requirements => throw (IO.userError
+        s!"{name} retained {requirements.length} scheme requirements")
+  let (call, instantiation) ← match
+      function.typedBody.nodes.findSome? fun
+        | .expression node@{
+            form := .call _ _ (.declaration instantiation), .. } =>
+            if instantiation.declaration == guarded.id then
+              some (node, instantiation)
+            else
+              none
+        | _ => none with
+    | some selected => pure selected
+    | none => throw (IO.userError
+        s!"{name} lost its guarded call")
+  let coercionRequirements := call.coercions.flatMap (fun step =>
+    step.requirements)
+  let expectedRequirements := if coercionBeforeSignature then
+    coercionRequirements ++ [template.templateRequirement]
+  else
+    [template.templateRequirement] ++ coercionRequirements
+  assertTrue (decide (instantiation.predicates = [template.predicate] ∧
+      call.coercions ≠ [] ∧
+      call.requirements = expectedRequirements))
+    s!"{name} did not retain its signature/coercion ledger order"
+  let entryKey : SourceSpecialization.SpecializationKey := {
+    declaration := qualified.id
+    arguments := []
+  }
+  let wordKey : SourceSpecialization.SpecializationKey := {
+    declaration := guarded.id
+    arguments := [.word]
+  }
+  let boolKey : SourceSpecialization.SpecializationKey := {
+    declaration := guarded.id
+    arguments := [.bool]
+  }
+  let expectedEdges : List SourceSpecializationWorklist.CallEdge := [{
+    caller := entryKey
+    occurrence := call.id
+    callee := wordKey
+  }, {
+    caller := entryKey
+    occurrence := call.id
+    callee := boolKey
+  }]
+  match ← runOrThrow label program
+      [monomorphicRequest qualified] 8 with
+  | .complete plan =>
+      let actualEdges := plan.callEdges.filter fun edge => edge.occurrence == call.id
+      assertTrue (decide (actualEdges = expectedEdges) &&
+          (plan.specializations.any fun specialized => specialized.key == wordKey) &&
+          (plan.specializations.any fun specialized => specialized.key == boolKey))
+        s!"{label} lost its concrete calls"
+  | outcome => throw (IO.userError
+      s!"{label} expected complete, found {reprStr outcome}")
+
+private def testQualifiedLocalSchemeCallsWithCoercions
+    (program : CheckedProgram) : IO Unit := do
+  checkQualifiedLocalSchemeCallWithCoercion program "qualifiedLocalCoerced"
+    "qualified local contextual coercion" false
+  checkQualifiedLocalSchemeCallWithCoercion program
+    "qualifiedLocalResultCoerced" "qualified local result coercion" true
+
 private def testQualifiedLocalSchemeReferences
     (program : CheckedProgram) : IO Unit := do
   let keep ← signatureNamed program "keep"
@@ -1870,6 +1964,7 @@ def testSourceSpecializationWorklist : IO Unit := do
   testAssumptionPreservation program
   testContextualLocalProofCalls program
   testQualifiedLocalSchemeCalls program
+  testQualifiedLocalSchemeCallsWithCoercions program
   testQualifiedLocalSchemeReferences program
   testFunctionValueReference program
   testIndirectCallBoundary program

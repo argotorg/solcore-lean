@@ -705,10 +705,39 @@ private def firstDuplicateRequirement :
       if rest.contains requirement then some requirement
       else firstDuplicateRequirement rest
 
-private def validateQualifiedLocalDeclarationUse
-    (localInstance : LocalLambdaInstance) (expression : ExpressionNode)
-    (instantiation : DeclarationInstantiation) : Except Error Unit := do
-  if expression.requirements.length != instantiation.predicates.length then
+private def deduplicateRequirementLists
+    (candidates : List (List RequirementId)) : List (List RequirementId) :=
+  candidates.foldl (fun unique candidate =>
+    if unique.contains candidate then unique else unique ++ [candidate]) []
+
+/-- A declaration use owns the instantiated signature requirements between a
+possible overload-result coercion prefix and a contextual coercion suffix.
+References have only the suffix case, which is the split at zero. -/
+private def declarationRequirementCandidates (expression : ExpressionNode)
+    (predicateCount : Nat) : List (List RequirementId) :=
+  let splits := match expression.form with
+    | .call _ _ (.declaration _) =>
+        List.range (expression.coercions.length + 1)
+    | .reference _ (.declaration _) => [0]
+    | _ => []
+  deduplicateRequirementLists <|
+    splits.filterMap fun split =>
+      let before := coercionRequirements (expression.coercions.take split)
+      let after := coercionRequirements (expression.coercions.drop split)
+      let middleAndAfter := expression.requirements.drop before.length
+      let middle := middleAndAfter.take predicateCount
+      if expression.requirements.take before.length = before &&
+          middle.length = predicateCount &&
+          middleAndAfter.drop predicateCount = after then
+        some middle
+      else
+        none
+
+private def exactDeclarationRequirementIds (expression : ExpressionNode)
+    (instantiation : DeclarationInstantiation) :
+    Except Error (List RequirementId) := do
+  if expression.coercions.isEmpty &&
+      expression.requirements.length != instantiation.predicates.length then
     throw (.localSchemeCallRequirementCountMismatch expression.id
       instantiation.predicates.length expression.requirements.length)
   match firstDuplicateRequirement expression.requirements with
@@ -717,10 +746,20 @@ private def validateQualifiedLocalDeclarationUse
         candidate == requirement).length
       throw (.localSchemeRequirementIdMultiplicity expression.id requirement count)
   | none => pure ()
+  match declarationRequirementCandidates expression
+      instantiation.predicates.length with
+  | [requirements] => pure requirements
+  | _ => throw (.localSchemeCallRequirementCountMismatch expression.id
+      instantiation.predicates.length expression.requirements.length)
+
+private def validateQualifiedLocalDeclarationUse
+    (localInstance : LocalLambdaInstance) (expression : ExpressionNode)
+    (instantiation : DeclarationInstantiation) : Except Error Unit := do
+  let requirements ← exactDeclarationRequirementIds expression instantiation
   let owned := localInstance.binding.binder.schemeRequirements.filter fun owned =>
-    expression.requirements.contains owned.templateRequirement
+    requirements.contains owned.templateRequirement
   for requirement in owned do
-    let count := (expression.requirements.filter fun candidate =>
+    let count := (requirements.filter fun candidate =>
       candidate == requirement.templateRequirement).length
     if count != 1 then
       throw (.localSchemeRequirementIdMultiplicity expression.id
