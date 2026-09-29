@@ -657,6 +657,8 @@ example :=
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ArgumentTypingBasesValid.cons
 example :=
+  @Solcore.SourceSemantics.SourceInferenceSoundness.inferExprsFuel_success_argumentTypingBasesValid
+example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionNodesPreservedAt
 example :=
   @Solcore.SourceSemantics.SourceInferenceSoundness.ExpressionNodesPreservedAt.ofTypingSourceExtends

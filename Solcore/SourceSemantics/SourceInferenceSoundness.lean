@@ -16954,6 +16954,82 @@ inductive ArgumentTypingBasesValid
       ArgumentTypingBasesValid nodeSource semanticSource context substitution
         (argument :: arguments)
 
+/-- Pointwise pre-attachment expression bases lift through the source-ordered
+expression-list traversal.  Each head base is first established in the state
+returned by that head expression.  The tail traversal preserves that complete
+node table as an anchored prefix, so only the containment component needs to
+be transported into the common final argument state; all semantic facts
+already refer to the caller's fixed eventual source. -/
+theorem inferExprsFuel_success_argumentTypingBasesValid
+    {semanticSource : TypedSource} {target : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution}
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {expressions : List Syntax.Expr}
+    {state final : Frontend.SourceInference.State}
+    {inferred : List InferredExpression}
+    (roots : List NodeId := [])
+    (expressionSound :
+      ∀ {childFuel : Nat} {expression : Syntax.Expr}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext expression none
+            childInitial = .ok (child, childFinal) →
+          ExpressionTypingBase (childFinal.toTypedSource roots) semanticSource
+            target outer child)
+    (nodesBelow : state.NodesBelowNextOccurrence)
+    (success : Detail.inferExprsFuel fuel inferenceContext expressions state =
+      .ok (inferred, final)) :
+    ArgumentTypingBasesValid (final.toTypedSource roots) semanticSource target
+      outer inferred := by
+  induction fuel generalizing expressions state inferred final with
+  | zero =>
+      simp [Detail.inferExprsFuel] at success
+  | succ fuel induction =>
+      cases expressions with
+      | nil =>
+          simp only [Detail.inferExprsFuel, Except.ok.injEq,
+            Prod.mk.injEq] at success
+          rcases success with ⟨rfl, rfl⟩
+          exact .nil
+      | cons expression rest =>
+          unfold Detail.inferExprsFuel at success
+          cases headSuccess : Detail.inferExprFuel fuel inferenceContext
+              expression none state with
+          | error error =>
+              simp [headSuccess, bind, Except.bind] at success
+          | ok headPair =>
+              rcases headPair with ⟨head, headState⟩
+              simp only [headSuccess, bind, Except.bind] at success
+              cases tailSuccess : Detail.inferExprsFuel fuel inferenceContext
+                  rest headState with
+              | error error =>
+                  simp [tailSuccess] at success
+              | ok tailPair =>
+                  rcases tailPair with ⟨tail, tailState⟩
+                  simp only [tailSuccess, pure, Pure.pure, Except.pure]
+                    at success
+                  injection success with resultEq
+                  cases resultEq
+                  have headNodesBelow : headState.NodesBelowNextOccurrence :=
+                    (Detail.inferExprFuel_occurrenceBoundExtends headSuccess
+                      ).nodesBelowNextOccurrence nodesBelow
+                  have headNodesPrefix : headState.nodes <+: final.nodes :=
+                    Detail.inferExprsFuel_preserves_nodesPrefix tailSuccess
+                      List.prefix_rfl headNodesBelow (Nat.le_refl _)
+                  have headBase := expressionSound headSuccess
+                  have finalHead : ExpressionTypingBase
+                      (final.toTypedSource roots) semanticSource target outer
+                      head := by
+                    cases headBase with
+                    | @intro node rawType plan contains typeEq formType
+                        rawAdmissible requirements =>
+                        exact .intro
+                          (ContainsExpression.of_nodes_prefix headNodesPrefix
+                            contains)
+                          typeEq formType rawAdmissible requirements
+                  exact .cons finalHead
+                    (induction headNodesBelow tailSuccess)
+
 /-- Exact preservation of expression payloads, restricted to a selected set
 of stable expression identities. -/
 def ExpressionNodesPreservedAt (ids : List ExpressionId)
