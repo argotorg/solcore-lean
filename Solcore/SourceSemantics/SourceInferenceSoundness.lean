@@ -9600,8 +9600,9 @@ private theorem forItemHasType_context_fields
 /-- Install the generalized binder produced by an unannotated initialized
 `for` item.  This is the node-free counterpart of the ordinary statement
 wrapper: the semantic certificate supplies the genuine generalization facts,
-while allocation alignment supplies the final lexical context. -/
-private theorem unannotatedInitializedForItemHasType_afterSubstitution
+while allocation alignment supplies the final lexical context.  Exported for
+the downstream actual-success for-item induction. -/
+theorem unannotatedInitializedForItemHasType_afterSubstitution
     {source : TypedSource} {outer : TypeSystem.Substitution}
     {control : ControlContext} {target : SourceSemantics.Context}
     {name : Syntax.Identifier} {initializer : ExpressionId}
