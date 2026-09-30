@@ -6,6 +6,9 @@ import Solcore.Core.LanguageResult
 import Solcore.Core.OptionalCell
 import Solcore.Core.LocalSequence
 import Solcore.Core.LocalControl
+import Solcore.Core.LocalPrimitiveResults
+import Solcore.Core.LocalLoop
+import Solcore.Core.TaggedFunction
 import Solcore.Core.FirstOrderWeakening
 import Solcore.Core.Check
 import Solcore.Core.ExactFuelProperties
