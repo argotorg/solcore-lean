@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.SourceInferenceStatementExpressionSoundness
 import Solcore.SourceSemantics.SourceInferenceUnannotatedLetCertificate
+import Solcore.SourceSemantics.SourceInferencePlaceIndexedTyping
 
 /-!
 Actual-success source-place inference.  The recursive index case is tied to
@@ -60,6 +61,8 @@ theorem RecursiveExpressionInvariant.ofPlace
       invariant.bindersBelow success
     nodesBelow := (Detail.inferPlaceFuel_occurrenceBoundExtends success
       ).nodesBelowNextOccurrence invariant.nodesBelow
+    schemeIsolation := activeSchemeQuantifierIsolation_inferPlaceFuel
+      invariant.schemeIsolation success
     substitutionExtension
     signaturesEq := invariant.signaturesEq
     typeParametersEq := invariant.typeParametersEq
@@ -87,6 +90,8 @@ theorem RecursiveExpressionInvariant.fresh
     invariant.bindersBelow
   nodesBelow := (State.OccurrenceBoundExtends.fresh initial
     ).nodesBelowNextOccurrence invariant.nodesBelow
+  schemeIsolation := activeSchemeQuantifierIsolation_transport
+    invariant.schemeIsolation (by rfl)
   substitutionExtension
   signaturesEq := invariant.signaturesEq
   typeParametersEq := invariant.typeParametersEq
@@ -120,6 +125,11 @@ theorem RecursiveExpressionInvariant.unify
     invariant.bindersBelow success
   nodesBelow := (Detail.unify_occurrenceBoundExtends success
     ).nodesBelowNextOccurrence invariant.nodesBelow
+  schemeIsolation := activeSchemeQuantifierIsolation_transport
+    invariant.schemeIsolation (by
+      have scopeEq := Detail.unify_preserves_lexicalScope success
+      simpa only [State.lexicalScope] using
+        congrArg LexicalScope.binders scopeEq)
   substitutionExtension
   signaturesEq := invariant.signaturesEq
   typeParametersEq := invariant.typeParametersEq
@@ -202,16 +212,24 @@ theorem inferPlaceFuel_index_key_invariant
     (finalSubstitutionExtension :
       finalized.substitution.SemanticallyExtends
         final.inference.substitution) :
-    ∃ basePlace baseState expected keyInitial inferredKey,
+    ∃ basePlace baseState keyInitial inferredKey,
       Detail.inferPlaceFuel fuel inferenceContext base initial =
         .ok (basePlace, baseState) ∧
       RecursiveExpressionInvariant wholeContext finalized baseState
         semanticContext ∧
-      Detail.inferExprFuel fuel inferenceContext key (some expected)
+      Detail.unify baseState.fresh.2.fresh.2 basePlace.type
+        (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) =
+          .ok keyInitial ∧
+      Detail.inferExprFuel fuel inferenceContext key
+        (some (keyInitial.resolve baseState.fresh.1))
         keyInitial = .ok (inferredKey, final) ∧
+      place = { basePlace with
+        projections := basePlace.projections ++ [.index inferredKey.id]
+        type := final.resolve baseState.fresh.2.fresh.1 } ∧
       RecursiveExpressionInvariant wholeContext finalized keyInitial
         semanticContext ∧
-      expected.VariablesBelow keyInitial.inference.next ∧
+      (keyInitial.resolve baseState.fresh.1).VariablesBelow
+        keyInitial.inference.next ∧
       .expression inferredKey.id ∈ place.references := by
   unfold Detail.inferPlaceFuel at success
   simp only [targetEq, bind, Except.bind] at success
@@ -314,10 +332,9 @@ theorem inferPlaceFuel_index_key_invariant
                   wholeContext finalized unifiedState semanticContext :=
                 valueFreshInvariant.unify baseAtValue mappingBelow
                   outerUnified unifyResult
-              refine ⟨basePlace, baseState,
-                unifiedState.resolve keyAllocation.1, unifiedState,
-                inferredKey, rfl, baseInvariant, keyResult,
-                unifiedInvariant, expectedBelow, ?_⟩
+              refine ⟨basePlace, baseState, unifiedState,
+                inferredKey, rfl, baseInvariant, unifyResult, keyResult,
+                rfl, unifiedInvariant, expectedBelow, ?_⟩
               simp [PlaceResolution.references, PlaceProjection.references]
 
 /-- Extending a place by one mapping index retains every reference of the
@@ -361,5 +378,117 @@ theorem inferPlaceFuel_index_base_references_subset
               PlaceProjection.references
           rw [List.flatMap_append]
           exact List.mem_append.mpr (Or.inl member)
+
+/-- Every actually successful place traversal is sound in the enclosing
+statement source, provided recursive expression inference is sound at smaller
+fuel.  The index case uses only its actual base place and key expression. -/
+theorem inferPlaceFuelScopedSoundness :
+    ∀ fuel, (∀ childFuel, childFuel < fuel →
+      InferExprFuelScopedSoundness childFuel) →
+      InferPlaceFuelScopedSoundness fuel := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro _ wholeContext inferenceContext wholeReturn targetExpression
+        initial final parentState evidenceState place roots finalized
+        semanticContext success
+      simp [Detail.inferPlaceFuel] at success
+  | succ fuel induction =>
+      intro expressionSound wholeContext inferenceContext wholeReturn
+        targetExpression initial final parentState evidenceState place roots
+        finalized semanticContext success resources signaturesEq ownerEq
+        parametersEq assumptionsEq signatureFormation functionsCanonical
+        catalog signatureParameters invariant finalSubstitutionExtension
+        finalToParent rawParentToEvidence patternsSubset literalsSubset
+        requirementsSubset keysCovered
+      cases targetEq : targetExpression.value
+      case identifier name =>
+        exact inferPlaceFuel_success_identifier_sound targetEq success
+          invariant.active finalSubstitutionExtension
+      case group inner =>
+        have innerSuccess : Detail.inferPlaceFuel fuel inferenceContext inner
+            initial = .ok (place, final) := by
+          simpa only [Detail.inferPlaceFuel, targetEq] using success
+        exact induction
+          (fun childFuel childLt => expressionSound childFuel
+            (Nat.lt_trans childLt (Nat.lt_succ_self fuel)))
+          innerSuccess resources signaturesEq ownerEq parametersEq
+          assumptionsEq signatureFormation functionsCanonical catalog
+          signatureParameters invariant finalSubstitutionExtension
+          finalToParent rawParentToEvidence patternsSubset literalsSubset
+          requirementsSubset keysCovered
+      case index base brackets key =>
+        obtain ⟨basePlace, baseState, keyInitial, inferredKey, baseSuccess,
+            baseInvariant, unifySuccess, keySuccess, placeEq, keyInvariant,
+            keyExpectedBelow, keyMember⟩ :=
+          inferPlaceFuel_index_key_invariant targetEq success
+            signatureFormation functionsCanonical invariant
+            finalSubstitutionExtension
+        obtain ⟨actualBasePlace, actualBaseState, actualBaseSuccess,
+            _baseBelow, baseToFinal, baseLiteralsToFinal,
+            basePatternsToFinal, baseRequirementsToFinal⟩ :=
+          inferPlaceFuel_success_index_base_state_provenance targetEq
+            success invariant.nodesBelow roots
+        rw [baseSuccess] at actualBaseSuccess
+        obtain ⟨rfl, rfl⟩ := (Except.ok.inj actualBaseSuccess).symm
+        have baseToParent : TypingSourceExtends
+            (baseState.toTypedSource roots)
+            (parentState.toTypedSource roots) :=
+          baseToFinal.trans finalToParent
+        have baseKeysCovered : ∀ keyId,
+            .expression keyId ∈ basePlace.references →
+              TemplateScopeCovered finalized.typedSource semanticContext
+                (.expression keyId) := by
+          intro keyId member
+          exact keysCovered keyId
+            (inferPlaceFuel_index_base_references_subset targetEq
+              baseSuccess success member)
+        have baseTyped : SourcePlaceHasType
+            ((parentState.toTypedSource roots).applySubstitution
+              finalized.substitution) semanticContext
+            (basePlace.applySubstitution finalized.substitution)
+            (finalized.substitution.apply basePlace.type) :=
+          induction
+            (fun childFuel childLt => expressionSound childFuel
+              (Nat.lt_trans childLt (Nat.lt_succ_self fuel)))
+            baseSuccess resources signaturesEq ownerEq parametersEq
+            assumptionsEq signatureFormation functionsCanonical catalog
+            signatureParameters invariant baseInvariant.substitutionExtension
+            baseToParent rawParentToEvidence
+            (List.Subset.trans basePatternsToFinal patternsSubset)
+            (List.Subset.trans baseLiteralsToFinal literalsSubset)
+            (List.Subset.trans baseRequirementsToFinal requirementsSubset)
+            baseKeysCovered
+        have parentToFinal : TypingSourceExtends
+            ((parentState.toTypedSource roots).applySubstitution
+              finalized.substitution) finalized.typedSource := by
+          rw [resources.source_eq]
+          exact rawParentToEvidence.applySubstitution
+            finalized.substitution
+        have keyExpectedBound :
+            ∀ expectedType ∈
+              (some (keyInitial.resolve baseState.fresh.1) : Option Ty),
+              expectedType.VariablesBelow keyInitial.inference.next := by
+          intro expectedType member
+          simp only [Option.mem_def] at member
+          cases member
+          exact keyExpectedBelow
+        have keyTyped : ExpressionHasType
+            ((parentState.toTypedSource roots).applySubstitution
+              finalized.substitution) semanticContext inferredKey.id
+            (finalized.substitution.apply inferredKey.type) :=
+          expressionSound fuel (Nat.lt_succ_self fuel) keySuccess resources
+            finalSubstitutionExtension signaturesEq ownerEq parametersEq
+            assumptionsEq signatureFormation functionsCanonical catalog
+            signatureParameters keyInvariant keyExpectedBound
+            (finalToParent.applySubstitution finalized.substitution)
+            parentToFinal (finalToParent.trans rawParentToEvidence)
+            patternsSubset literalsSubset requirementsSubset
+            (keysCovered inferredKey.id keyMember)
+        exact inferPlaceFuel_index_sound_of_actual_typed_children
+          baseSuccess unifySuccess keySuccess placeEq
+          keyInvariant.substitutionExtension finalSubstitutionExtension
+          baseTyped keyTyped
+      all_goals simp [Detail.inferPlaceFuel, targetEq] at success
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
