@@ -28,6 +28,9 @@ import Solcore.SourceSemantics.CoreLowering.LoopStatementReflectionBridge
 import Solcore.SourceSemantics.CoreLowering.DataPatternDecision
 import Solcore.SourceSemantics.CoreLowering.DataPatternEncoding
 import Solcore.SourceSemantics.CoreLowering.DataPatternParametricLeaves
+import Solcore.SourceSemantics.CoreLowering.DataPlaceMembers
+import Solcore.SourceSemantics.CoreLowering.ForLoopStatementCertificates
+import Solcore.SourceSemantics.CoreLowering.ForPostMeaning
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that

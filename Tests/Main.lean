@@ -1071,6 +1071,8 @@ import Solcore.Test.SourceCoreDataPatternProofs
 import Solcore.Test.SourceCoreDataPatternEncoding
 import Solcore.Test.SourceCoreLoopBranchReflection
 import Solcore.Test.SourceCorePlanCatalog
+import Solcore.Test.SourceCoreForHeaderCertificates
+import Solcore.Test.SourceCoreForLoopStatementCertificates
 import Solcore.Test.SourceCoreLoopStatementCertificates
 import Solcore.Test.SourceCoreLoopStatementMeaning
 import Solcore.Test.SourceCoreLoopFiniteComposition
@@ -2492,6 +2494,8 @@ def run : IO Unit := do
   SourceCoreLoopStatementReflection.run
   SourceCoreDataPlaces.run
   SourceCorePlanCatalog.run
+  SourceCoreForHeaderCertificates.run
+  SourceCoreForLoopStatementCertificates.run
   SourceCoreLoopStatementMeaning.run
   SourceCoreLoopFiniteComposition.run
   CoreLocalLoop.run
