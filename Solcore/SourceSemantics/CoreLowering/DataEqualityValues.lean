@@ -62,18 +62,43 @@ theorem metadata_eq {catalog : SourceCoreDataCatalog.Catalog} {signatures : Prog
   cases left; cases right
   simp_all
 
-inductive Carrier : Ty → Prop where
-  | unit : Carrier .unit
-  | bool : Carrier .bool
-  | word : Carrier .word
-  | integer : Carrier .integer
-  | product {left right : Ty} (first : Carrier left) (second : Carrier right) : Carrier (.product left right)
-  | namedData (id : DataTypeId) : Carrier (.namedData id)
-  | function (parameter result : Ty) : Carrier (TaggedFunction.functionType parameter result)
+inductive Carrier (callableContracts : Bool) : Ty → Prop where
+  | unit : Carrier callableContracts .unit
+  | bool : Carrier callableContracts .bool
+  | word : Carrier callableContracts .word
+  | integer : Carrier callableContracts .integer
+  | product {left right : Ty} (first : Carrier callableContracts left) (second : Carrier callableContracts right) :
+      Carrier callableContracts (.product left right)
+  | namedData (id : DataTypeId) : Carrier callableContracts (.namedData id)
+  | function (parameter result : Ty) (profile : callableContracts = false) :
+      Carrier callableContracts (TaggedFunction.functionType parameter result)
+  | contractedFunction (parameter result : Ty) (profile : callableContracts = true) :
+      Carrier callableContracts (CallableContract.functionType parameter result)
 
-theorem Carrier.not_sum {left right : Ty} : ¬ Carrier (.sum left right) := by
+theorem Carrier.not_sum {profile : Bool} {left right : Ty} : ¬ Carrier profile (.sum left right) := by
   intro impossible
   cases impossible
+
+theorem Carrier.not_tagged_contract {parameter result : Ty} :
+    ¬ Carrier true (TaggedFunction.functionType parameter result) := by
+  intro impossible
+  cases impossible with
+  | product first => exact Carrier.not_sum first
+  | function _ _ profile => cases profile
+
+theorem Carrier.product_contract_shape {profile : Bool} {left right : Ty}
+    (first : Carrier profile left) :
+    (profile && SourceCoreDataEquality.isCallableContractType (.product left right)) = false := by
+  cases profile with
+  | false => rfl
+  | true =>
+      cases first with
+      | unit | bool | word | integer | namedData | contractedFunction => rfl
+      | function _ _ impossible => cases impossible
+      | product head tail =>
+          cases head with
+          | unit | bool | word | integer | product | namedData | contractedFunction => rfl
+          | function _ _ impossible => cases impossible
 
 inductive Observation (catalog : SourceCoreDataCatalog.Catalog) (signatures : ProgramSignatures)
     (identities : Dynamic.Value → Word → Prop) : Ty → Dynamic.Value → Value → Prop where
@@ -94,12 +119,22 @@ inductive Observation (catalog : SourceCoreDataCatalog.Catalog) (signatures : Pr
       (key value : TypeSystem.Ty) (entries : List (Dynamic.Value × Dynamic.Value)) (carrier : Value) :
       Observation catalog signatures identities (.namedData id) (.mapping key value entries) carrier
   | identified {source : Dynamic.Value} {identity : Word} (parameter result : Ty) (code : Value)
-      (meaning : identities source identity) :
+      (meaning : identities source identity) (profile : catalog.callableContracts = false) :
       Observation catalog signatures identities (TaggedFunction.functionType parameter result)
         source (.pair (.inRight .unit (.word identity)) code)
-  | anonymous (source : Dynamic.Closure) (parameter result : Ty) (code : Value) :
+  | anonymous (source : Dynamic.Closure) (parameter result : Ty) (code : Value)
+      (profile : catalog.callableContracts = false) :
       Observation catalog signatures identities (TaggedFunction.functionType parameter result)
         (.closure source) (.pair (.inLeft .word .unit) code)
+  | contractedIdentified {source : Dynamic.Value} {identity : Word} (parameter result : Ty)
+      (code : Value) (contract : Word) (meaning : identities source identity)
+      (profile : catalog.callableContracts = true) :
+      Observation catalog signatures identities (CallableContract.functionType parameter result)
+        source (.pair (.pair (.inRight .unit (.word identity)) code) (.word contract))
+  | contractedAnonymous (source : Dynamic.Closure) (parameter result : Ty)
+      (code : Value) (contract : Word) (profile : catalog.callableContracts = true) :
+      Observation catalog signatures identities (CallableContract.functionType parameter result)
+        (.closure source) (.pair (.pair (.inLeft .word .unit) code) (.word contract))
   | constructed {id : DataTypeId} {index : Nat} {entry : SourceCoreDataCatalog.Entry}
       {metadata : DataConstructorInstantiation} {declaration : Resolved.DeclarationId} {arguments : List TypeSystem.Ty}
       {sources : List Dynamic.Value} {packed : Dynamic.Value} {payloadType : Ty} {payload : Value}
@@ -116,7 +151,8 @@ inductive Observation (catalog : SourceCoreDataCatalog.Catalog) (signatures : Pr
 
 theorem Observation.carrier {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
     {identities : Dynamic.Value → Word → Prop} {type : Ty} {source : Dynamic.Value} {value : Value}
-    (observed : Observation catalog signatures identities type source value) : Carrier type := by
+    (observed : Observation catalog signatures identities type source value) :
+    Carrier catalog.callableContracts type := by
   induction observed with
   | unit => exact .unit
   | bool => exact .bool
@@ -124,7 +160,9 @@ theorem Observation.carrier {catalog : SourceCoreDataCatalog.Catalog} {signature
   | integer => exact .integer
   | product _ _ first second => exact .product first second
   | proxy | mapping | constructed => exact .namedData _
-  | identified | anonymous => exact .function _ _
+  | identified _ _ _ _ profile | anonymous _ _ _ _ profile => exact .function _ _ profile
+  | contractedIdentified _ _ _ _ _ profile | contractedAnonymous _ _ _ _ _ profile =>
+      exact .contractedFunction _ _ profile
 
 theorem Observation.proxy_of_identity {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
     {identities : Dynamic.Value → Word → Prop} {inner : TypeSystem.Ty} {id : DataTypeId}

@@ -15,6 +15,16 @@ inductive ScalarType : Ty → Prop where
   | integer : ScalarType .integer
   | product {left right : Ty} (first : ScalarType left) (second : ScalarType right) : ScalarType (.product left right)
 
+private theorem ScalarType.product_contract_shape {left right : Ty}
+    (scalar : ScalarType left) (profile : Bool) :
+    (profile && isCallableContractType (.product left right)) = false := by
+  cases profile with
+  | false => rfl
+  | true =>
+      cases scalar with
+      | unit | bool | word | integer => rfl
+      | product first => cases first <;> rfl
+
 private theorem bind_ok {α β ε : Type} {computation : Except ε α} {next : α → Except ε β}
     {result : β} (accepted : computation >>= next = .ok result) :
     ∃ value, computation = .ok value ∧ next value = .ok result := by
@@ -77,8 +87,9 @@ theorem tree_of_compareType {type : Ty} (scalar : ScalarType type)
           let left ← compareType fuel catalog depth leftType (.first leftExpression) (.first rightExpression)
           let right ← compareType fuel catalog depth rightType (.second leftExpression) (.second rightExpression)
           pure (.ifE left right (.bool false))) = .ok compiled := by
+        have shape := first.product_contract_shape (right := rightType) catalog.callableContracts
         cases leftType <;> try cases first
-        all_goals exact accepted
+        all_goals simpa only [compareType, shape, Bool.false_eq_true, ↓reduceIte] using accepted
       obtain ⟨leftCode, leftCompiled, generated⟩ := bind_ok generated
       obtain ⟨rightCode, rightCompiled, generated⟩ := bind_ok generated
       simp only [pure, Except.pure, Except.ok.injEq] at generated

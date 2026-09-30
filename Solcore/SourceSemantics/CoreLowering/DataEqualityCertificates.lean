@@ -60,6 +60,10 @@ theorem tree_of_compareType {catalog : Catalog} {signatures : ProgramSignatures}
     cases rightObserved with
     | identified => exact False.elim (Carrier.not_sum first.carrier)
     | anonymous => exact False.elim (Carrier.not_sum first.carrier)
+    | contractedIdentified _ _ _ _ _ profile =>
+        exact False.elim (Carrier.not_tagged_contract (by simpa only [profile] using first.carrier))
+    | contractedAnonymous _ _ _ _ _ profile =>
+        exact False.elim (Carrier.not_tagged_contract (by simpa only [profile] using first.carrier))
     | product otherFirst otherSecond =>
       cases fuel with
       | zero => simp [compareType] at accepted
@@ -69,8 +73,9 @@ theorem tree_of_compareType {catalog : Catalog} {signatures : ProgramSignatures}
             let right ← compareType fuel catalog depth rightType (.second leftExpression) (.second rightExpression)
             pure (.ifE left right (.bool false))) = .ok compiled := by
           have carrier := first.carrier
+          have shape := Carrier.product_contract_shape (right := rightType) carrier
           cases leftType <;> try cases carrier
-          all_goals exact accepted
+          all_goals simpa only [compareType, shape, Bool.false_eq_true, ↓reduceIte] using accepted
         obtain ⟨leftCode, leftCompiled, generated⟩ := bind_ok generated
         obtain ⟨rightCode, rightCompiled, generated⟩ := bind_ok generated
         simp only [pure, Except.pure, Except.ok.injEq] at generated
@@ -78,7 +83,7 @@ theorem tree_of_compareType {catalog : Catalog} {signatures : ProgramSignatures}
         obtain ⟨leftResult, leftTree⟩ := firstIH otherFirst leftCompiled environment mapping references (.first leftSelected) (.first rightSelected)
         obtain ⟨rightResult, rightTree⟩ := secondIH otherSecond rightCompiled environment mapping references (.second leftSelected) (.second rightSelected)
         exact ⟨_, .product leftTree rightTree⟩
-  | @identified source identity parameter result code meaning =>
+  | @identified source identity parameter result code meaning profile =>
     cases fuel with
     | zero => simp [compareType] at accepted
     | succ fuel =>
@@ -88,9 +93,9 @@ theorem tree_of_compareType {catalog : Catalog} {signatures : ProgramSignatures}
       rw [functionEqual_rename]
       cases rightObserved with
       | product first => exact False.elim (Carrier.not_sum first.carrier)
-      | identified _ _ _ other => exact ⟨_, .identified meaning other leftSelected rightSelected⟩
+      | identified _ _ _ other _ => exact ⟨_, .identified meaning other leftSelected rightSelected⟩
       | anonymous source => exact ⟨false, .anonymousRight _ source leftSelected rightSelected⟩
-  | @anonymous source parameter result code =>
+  | @anonymous source parameter result code profile =>
     cases fuel with
     | zero => simp [compareType] at accepted
     | succ fuel =>
@@ -101,6 +106,36 @@ theorem tree_of_compareType {catalog : Catalog} {signatures : ProgramSignatures}
       cases rightObserved with
       | product first => exact False.elim (Carrier.not_sum first.carrier)
       | identified | anonymous => exact ⟨false, .anonymousLeft source _ leftSelected rightSelected⟩
+  | @contractedIdentified source identity parameter result code contract meaning profile =>
+    cases fuel with
+    | zero => simp [compareType] at accepted
+    | succ fuel =>
+      simp only [CallableContract.functionType, TaggedFunction.functionType, TaggedFunction.identityType,
+        LanguageResult.resultType, compareType, isCallableContractType, profile,
+        Bool.true_and, ↓reduceIte, pure, Except.pure, Except.ok.injEq] at accepted
+      subst compiled
+      rw [functionEqual_rename]
+      cases rightObserved with
+      | product first =>
+          exact False.elim (Carrier.not_tagged_contract (by simpa only [profile] using first.carrier))
+      | contractedIdentified _ _ _ _ other _ =>
+          exact ⟨_, .identified meaning other (.first leftSelected) (.first rightSelected)⟩
+      | contractedAnonymous source =>
+          exact ⟨false, .anonymousRight _ source (.first leftSelected) (.first rightSelected)⟩
+  | @contractedAnonymous source parameter result code contract profile =>
+    cases fuel with
+    | zero => simp [compareType] at accepted
+    | succ fuel =>
+      simp only [CallableContract.functionType, TaggedFunction.functionType, TaggedFunction.identityType,
+        LanguageResult.resultType, compareType, isCallableContractType, profile,
+        Bool.true_and, ↓reduceIte, pure, Except.pure, Except.ok.injEq] at accepted
+      subst compiled
+      rw [functionEqual_rename]
+      cases rightObserved with
+      | product first =>
+          exact False.elim (Carrier.not_tagged_contract (by simpa only [profile] using first.carrier))
+      | contractedIdentified | contractedAnonymous =>
+          exact ⟨false, .anonymousLeft source _ (.first leftSelected) (.first rightSelected)⟩
   | @proxy id entry inner selected sourceType =>
     cases fuel with
     | zero => simp [compareType] at accepted

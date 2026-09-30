@@ -38,8 +38,14 @@ def invoke (reference left right : Expr) : Expr :=
 def functionEqual (left right : Expr) : Expr :=
   .letE left (.letE (right.weakenAt 0) TaggedFunction.equalBody)
 
-/-- The special function-carrier pattern cannot be a projected source product:
-a raw Core function is introduced only inside TaggedFunction.functionType. -/
+/-- The descriptor is a call contract, while source equality observes only
+the tagged function's identity. This shape is special only in that profile. -/
+def isCallableContractType : Core.Ty → Bool
+  | .product (.product (.sum .unit .word) (.function _ (.sum .word _))) .word => true
+  | _ => false
+
+/-- Function patterns are selected according to the catalog profile. A source
+product containing a function therefore retains its ordinary product fields. -/
 def compareType (fuel : Nat) (catalog : Catalog) (depth : Nat)
     (type : Core.Ty) (left right : Expr) : Except Error Expr :=
   match fuel with
@@ -52,10 +58,13 @@ def compareType (fuel : Nat) (catalog : Catalog) (depth : Nat)
     | .product (.sum .unit .word) (.function _ (.sum .word _)) =>
         pure (functionEqual left right)
     | .product first second => do
-        pure (.ifE
-          (← compareType fuel catalog depth first (.first left) (.first right))
-          (← compareType fuel catalog depth second (.second left) (.second right))
-          (.bool false))
+        if catalog.callableContracts && isCallableContractType type then
+          pure (functionEqual (.first left) (.first right))
+        else
+          pure (.ifE
+            (← compareType fuel catalog depth first (.first left) (.first right))
+            (← compareType fuel catalog depth second (.second left) (.second right))
+            (.bool false))
     | .namedData id => do
         let entry ← match catalog.entries[id.index]? with
           | some entry => pure entry

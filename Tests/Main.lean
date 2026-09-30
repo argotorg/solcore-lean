@@ -5,6 +5,7 @@ import Solcore.Test.SourceCoreStageCodebook
 import Solcore.Test.SourceCoreCallableContracts
 import Solcore.Test.SourceCoreStagedExecution
 import Solcore.Test.CoreCallableContract
+import Solcore.Test.SourceCoreCallableEquality
 import Solcore.Test.SourceCoreFunctionCertificates
 import Solcore.Test.SourceCoreFunctionArguments
 import Solcore.Test.SourceCoreFunctionCalls
@@ -2541,6 +2542,7 @@ def run : IO Unit := do
   SourceCoreCallableContracts.run
   SourceCoreStagedExecution.run
   CoreCallableContract.run
+  SourceCoreCallableEquality.run
   SourceTypedClosureCaptureBoundary.run
   SourceCoreLocalPolymorphicExecution.run
   SourceCoreDataPlaceMappingProofs.run

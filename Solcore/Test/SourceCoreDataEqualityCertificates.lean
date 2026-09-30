@@ -149,9 +149,9 @@ example (prepared : Prepared checked) (type : prepared.type = TaggedFunction.fun
         (DataEqualityInstalled.allocatedEnvironment catalog store.length
           [.pair (.inRight .unit (.word Word.zero)) leftCode, .pair (.inRight .unit (.word Word.zero)) rightCode]) prepared.bodies) := by
   have left : Observation catalog signatures (oneIdentity function) prepared.type (.global function)
-      (.pair (.inRight .unit (.word Word.zero)) leftCode) := type ▸ .identified _ _ _ ⟨rfl, rfl⟩
+      (.pair (.inRight .unit (.word Word.zero)) leftCode) := type ▸ .identified _ _ _ ⟨rfl, rfl⟩ rfl
   have right : Observation catalog signatures (oneIdentity function) prepared.type (.global function)
-      (.pair (.inRight .unit (.word Word.zero)) rightCode) := type ▸ .identified _ _ _ ⟨rfl, rfl⟩
+      (.pair (.inRight .unit (.word Word.zero)) rightCode) := type ▸ .identified _ _ _ ⟨rfl, rfl⟩ rfl
   obtain ⟨result, meaning, evaluated⟩ := prepared_compare_preserves prepared (oneFaithful function) left right
     [.pair (.inRight .unit (.word Word.zero)) leftCode, .pair (.inRight .unit (.word Word.zero)) rightCode]
     store (.var 0) (.var 1) (.var rfl) (.var rfl)
@@ -184,7 +184,7 @@ example (prepared : Prepared checked) (type : prepared.type = .namedData ⟨3⟩
     · rfl
     · rfl
     · exact .singleton _
-    · exact .anonymous _ _ _ _
+    · exact .anonymous _ _ _ _ rfl
   obtain ⟨result, meaning, evaluated⟩ := prepared_compare_preserves prepared noIdentities observed observed
     [anonymousBox code, anonymousBox code] [.integer 900] (.var 0) (.var 1) (.var rfl) (.var rfl)
   have different : result = false := by
