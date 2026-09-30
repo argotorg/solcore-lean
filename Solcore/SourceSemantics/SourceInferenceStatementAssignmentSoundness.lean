@@ -766,4 +766,107 @@ theorem inferAssignedValueFuel_success_place_state_provenance
       | bitXor => exact finishNonEqual success
       | bitOr => exact finishNonEqual success
 
+/-- In an indexed place, the recursive base traversal is an anchored prefix
+of the whole place traversal.  In particular, a selected call used as the new
+mapping key may refine only nodes allocated after that base prefix. -/
+theorem inferPlaceFuel_success_index_base_state_provenance
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression base key : Syntax.Expr}
+    {brackets : Syntax.SourceSpan}
+    {initial final : Frontend.SourceInference.State}
+    {place : PlaceResolution}
+    (targetEq : targetExpression.value = .index base brackets key)
+    (success : Detail.inferPlaceFuel (fuel + 1) inferenceContext
+      targetExpression initial = .ok (place, final))
+    (below : initial.NodesBelowNextOccurrence)
+    (roots : List NodeId := []) :
+    ∃ basePlace baseState,
+      Detail.inferPlaceFuel fuel inferenceContext base initial =
+        .ok (basePlace, baseState) ∧
+      baseState.NodesBelowNextOccurrence ∧
+      TypingSourceExtends (baseState.toTypedSource roots)
+        (final.toTypedSource roots) ∧
+      baseState.integerPatterns ⊆ final.integerPatterns ∧
+      baseState.requirements ⊆ final.requirements := by
+  unfold Detail.inferPlaceFuel at success
+  simp only [targetEq, bind, Except.bind] at success
+  cases baseResult : Detail.inferPlaceFuel fuel inferenceContext base
+      initial with
+  | error error =>
+      simp [baseResult] at success
+  | ok basePair =>
+      rcases basePair with ⟨basePlace, baseState⟩
+      simp only [baseResult] at success
+      let keyAllocation := baseState.fresh
+      let valueAllocation := keyAllocation.2.fresh
+      cases unifyResult : Detail.unify valueAllocation.2 basePlace.type
+          (.mapping keyAllocation.1 valueAllocation.1) with
+      | error error =>
+          simp [keyAllocation, valueAllocation, unifyResult] at success
+      | ok unifiedState =>
+          simp only [keyAllocation, valueAllocation, unifyResult] at success
+          cases keyResult : Detail.inferExprFuel fuel inferenceContext key
+              (some (unifiedState.resolve keyAllocation.1)) unifiedState with
+          | error error =>
+              simp [keyAllocation, keyResult] at success
+          | ok keyPair =>
+              rcases keyPair with ⟨inferredKey, keyState⟩
+              simp only [keyAllocation, keyResult, pure, Pure.pure,
+                Except.pure] at success
+              injection success with resultEq
+              injection resultEq with placeEq finalEq
+              subst place
+              subst final
+              have baseBelow : baseState.NodesBelowNextOccurrence :=
+                (Detail.inferPlaceFuel_occurrenceBoundExtends
+                  baseResult).nodesBelowNextOccurrence below
+              have keyAllocatedBelow :
+                  keyAllocation.2.NodesBelowNextOccurrence :=
+                (Frontend.SourceInference.State.OccurrenceBoundExtends.fresh
+                  baseState).nodesBelowNextOccurrence baseBelow
+              have valueAllocatedBelow :
+                  valueAllocation.2.NodesBelowNextOccurrence :=
+                (Frontend.SourceInference.State.OccurrenceBoundExtends.fresh
+                  keyAllocation.2).nodesBelowNextOccurrence
+                    keyAllocatedBelow
+              have unifiedBelow : unifiedState.NodesBelowNextOccurrence :=
+                (Detail.unify_occurrenceBoundExtends
+                  unifyResult).nodesBelowNextOccurrence valueAllocatedBelow
+              have baseToUnified : TypingSourceExtends
+                  (baseState.toTypedSource roots)
+                  (unifiedState.toTypedSource roots) := by
+                constructor
+                · have headerEq := Detail.unify_state_header unifyResult
+                  have ownerEq :=
+                    congrArg Frontend.SourceInference.State.Header.owner
+                      headerEq
+                  simpa [Frontend.SourceInference.State.toTypedSource,
+                    Frontend.SourceInference.State.header,
+                    Frontend.SourceInference.State.fresh,
+                    keyAllocation, valueAllocation] using ownerEq
+                · have nodesEq :=
+                    (Detail.unify_occurrenceState_eq unifyResult).1
+                  change baseState.nodes <+: unifiedState.nodes
+                  rw [nodesEq]
+                  simp [keyAllocation, valueAllocation,
+                    Frontend.SourceInference.State.fresh]
+              refine ⟨basePlace, baseState, rfl, baseBelow,
+                baseToUnified.trans
+                  (inferExprFuel_success_typingSourceExtends keyResult
+                    unifiedBelow roots), ?_, ?_⟩
+              · intro pattern member
+                have inUnified : pattern ∈ unifiedState.integerPatterns := by
+                  rw [Detail.unify_integerPatterns unifyResult]
+                  simpa [keyAllocation, valueAllocation,
+                    Frontend.SourceInference.State.fresh] using member
+                exact Detail.inferExprFuel_integerPatterns_subset keyResult
+                  inUnified
+              · intro requirement member
+                have inUnified : requirement ∈ unifiedState.requirements := by
+                  rw [Detail.unify_requirements_eq unifyResult]
+                  simpa [keyAllocation, valueAllocation,
+                    Frontend.SourceInference.State.fresh] using member
+                exact Detail.inferExprFuel_requirements_subset keyResult
+                  inUnified
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
