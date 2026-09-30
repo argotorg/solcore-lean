@@ -21,6 +21,35 @@ open Frontend
 open Frontend.SourceInference
 open TypeSystem
 
+/-- Canonical shallow runtime type of every mathematical source value. -/
+inductive ValueRuntimeType : Value → Ty → Prop where
+  | unit : ValueRuntimeType .unit .unit
+  | bool (value : Bool) : ValueRuntimeType (.bool value) .bool
+  | word (value : Core.Word) : ValueRuntimeType (.word value) .word
+  | integer (value : Int) : ValueRuntimeType (.integer value) .integer
+  | product
+      {left right : Value} {leftType rightType : Ty}
+      (left_type : ValueRuntimeType left leftType)
+      (right_type : ValueRuntimeType right rightType) :
+      ValueRuntimeType (.product left right) (.product leftType rightType)
+  | proxy (inner : Ty) : ValueRuntimeType (.proxy inner) (.proxy inner)
+  | constructed
+      (instantiation : DataConstructorInstantiation) (arguments : List Value) :
+      ValueRuntimeType (.constructed instantiation arguments)
+        instantiation.resultType
+  | mapping (keyType valueType : Ty) (entries : List (Value × Value)) :
+      ValueRuntimeType (.mapping keyType valueType entries)
+        (.mapping keyType valueType)
+  | closure (function : Closure) :
+      ValueRuntimeType (.closure function)
+        (.function
+          (Ty.productMany (function.parameters.map fun binder => binder.scheme.body))
+          function.resultType)
+  | global (function : GlobalFunction) :
+      ValueRuntimeType (.global function) function.instantiation.type
+  | builtin (function : BuiltinFunction) :
+      ValueRuntimeType (.builtin function) function.id.type
+
 /-- A place projection after all index occurrences have been evaluated. -/
 inductive EvaluatedProjection where
   | index (key : Value)
@@ -242,6 +271,80 @@ theorem functional
 
 end ProjectionsRead
 
+/-- A missing mapping default encountered while traversing a fixed path.
+Each earlier index has passed its key-type guard and selected a real or default
+value. The relation is pure: index expressions have already run, and no leaf
+modifier or heap write has occurred. Other projection failures are not covered. -/
+inductive ProjectionsFaults :
+    Option Value → List EvaluatedProjection → SemanticFault → Prop where
+  | indexDefaultUnavailable
+      {key keyType valueType entries projections}
+      (key_type : ValueRuntimeType key keyType)
+      (absent : MappingAbsent key entries)
+      (not_defaultable : ¬ Defaultable valueType) :
+      ProjectionsFaults (some (.mapping keyType valueType entries))
+        (.index key :: projections) (.missingMappingDefault valueType)
+  | indexFound
+      {key keyType valueType entries selected projections reason}
+      (key_type : ValueRuntimeType key keyType)
+      (lookup : MappingLookup key entries selected)
+      (tail : ProjectionsFaults (some selected) projections reason) :
+      ProjectionsFaults (some (.mapping keyType valueType entries))
+        (.index key :: projections) reason
+  | indexDefault
+      {key keyType valueType entries defaultValue projections reason}
+      (key_type : ValueRuntimeType key keyType)
+      (absent : MappingAbsent key entries)
+      (defaulted : DefaultValue valueType defaultValue)
+      (tail : ProjectionsFaults (some defaultValue) projections reason) :
+      ProjectionsFaults (some (.mapping keyType valueType entries))
+        (.index key :: projections) reason
+  | member
+      {instantiation arguments name index selected projections reason}
+      (selectedAt : ValueAt arguments index selected)
+      (tail : ProjectionsFaults (some selected) projections reason) :
+      ProjectionsFaults (some (.constructed instantiation arguments))
+        (.member name index :: projections) reason
+
+namespace ProjectionsFaults
+
+/-- A structural missing-default failure cannot also select a leaf. -/
+theorem excludes_read
+    {current : Option Value} {projections : List EvaluatedProjection}
+    {reason : SemanticFault} (fault : ProjectionsFaults current projections reason)
+    {selected : Option Value} : ¬ ProjectionsRead current projections selected := by
+  induction fault generalizing selected with
+  | indexDefaultUnavailable _ absent notDefaultable =>
+      intro selectedRead
+      cases selectedRead with
+      | indexFound lookup _ => exact absent.excludes_lookup lookup
+      | indexDefault _ defaulted _ => exact notDefaultable defaulted.defaultable
+  | indexFound _ lookup _ inductionHypothesis =>
+      intro selectedRead
+      cases selectedRead with
+      | indexFound otherLookup tail =>
+          have equal := lookup.functional otherLookup
+          cases equal
+          exact inductionHypothesis tail
+      | indexDefault absent _ _ => exact absent.excludes_lookup lookup
+  | indexDefault _ absent defaulted _ inductionHypothesis =>
+      intro selectedRead
+      cases selectedRead with
+      | indexFound lookup _ => exact absent.excludes_lookup lookup
+      | indexDefault _ otherDefault tail =>
+          have equal := defaulted.functional otherDefault
+          cases equal
+          exact inductionHypothesis tail
+  | member selectedAt _ inductionHypothesis =>
+      intro selectedRead
+      cases selectedRead with
+      | member otherAt tail =>
+          have equal := selectedAt.functional otherAt
+          cases equal
+          exact inductionHypothesis tail
+
+end ProjectionsFaults
+
 /-- A leaf modification relation is deterministic when it chooses at most one
 replacement for each current optional value. -/
 def LeafModificationFunctional
@@ -289,6 +392,25 @@ inductive ProjectionsUpdate (Modify : Option Value → Value → Prop) :
 
 namespace ProjectionsUpdate
 
+/-- Successful reconstruction must have reached a readable leaf through the
+same structural path, independently of the leaf modification relation. -/
+theorem readable
+    {Modify : Option Value → Value → Prop}
+    {current : Option Value} {projections : List EvaluatedProjection}
+    {updated : Value} (update : ProjectionsUpdate Modify current projections updated) :
+    ∃ selected, ProjectionsRead current projections selected := by
+  induction update with
+  | leaf => exact ⟨_, .nil⟩
+  | indexFound lookup _ _ inductionHypothesis =>
+      obtain ⟨selected, read⟩ := inductionHypothesis
+      exact ⟨selected, .indexFound lookup read⟩
+  | indexDefault absent defaulted _ _ inductionHypothesis =>
+      obtain ⟨selected, read⟩ := inductionHypothesis
+      exact ⟨selected, .indexDefault absent defaulted read⟩
+  | member selectedAt _ _ inductionHypothesis =>
+      obtain ⟨selected, read⟩ := inductionHypothesis
+      exact ⟨selected, .member selectedAt read⟩
+
 /-- A deterministic leaf operation induces a deterministic structural update. -/
 theorem functional
     {Modify : Option Value → Value → Prop}
@@ -332,6 +454,15 @@ theorem functional
           rw [leftReplace.functional rightReplace]
 
 end ProjectionsUpdate
+
+theorem ProjectionsFaults.excludes_update
+    {Modify : Option Value → Value → Prop}
+    {current : Option Value} {projections : List EvaluatedProjection}
+    {reason : SemanticFault} (fault : ProjectionsFaults current projections reason)
+    {updated : Value} : ¬ ProjectionsUpdate Modify current projections updated := by
+  intro update
+  obtain ⟨selected, read⟩ := update.readable
+  exact fault.excludes_read read
 
 /-- A resolved semantic place.  `selected` is the leaf snapshot captured
 after target-index evaluation and before a right-hand side is evaluated. -/

@@ -560,35 +560,6 @@ theorem requirements_produce_or_fault
         · exact .inr ⟨failed, .tail produces tailFault⟩
       · exact .inr ⟨id, .head unavailable⟩
 
-/-- Canonical shallow runtime type of every mathematical source value. -/
-inductive ValueRuntimeType : Value → Ty → Prop where
-  | unit : ValueRuntimeType .unit .unit
-  | bool (value : Bool) : ValueRuntimeType (.bool value) .bool
-  | word (value : Core.Word) : ValueRuntimeType (.word value) .word
-  | integer (value : Int) : ValueRuntimeType (.integer value) .integer
-  | product
-      {left right : Value} {leftType rightType : Ty}
-      (left_type : ValueRuntimeType left leftType)
-      (right_type : ValueRuntimeType right rightType) :
-      ValueRuntimeType (.product left right) (.product leftType rightType)
-  | proxy (inner : Ty) : ValueRuntimeType (.proxy inner) (.proxy inner)
-  | constructed
-      (instantiation : DataConstructorInstantiation) (arguments : List Value) :
-      ValueRuntimeType (.constructed instantiation arguments)
-        instantiation.resultType
-  | mapping (keyType valueType : Ty) (entries : List (Value × Value)) :
-      ValueRuntimeType (.mapping keyType valueType entries)
-        (.mapping keyType valueType)
-  | closure (function : Closure) :
-      ValueRuntimeType (.closure function)
-        (.function
-          (Ty.productMany (function.parameters.map fun binder => binder.scheme.body))
-          function.resultType)
-  | global (function : GlobalFunction) :
-      ValueRuntimeType (.global function) function.instantiation.type
-  | builtin (function : BuiltinFunction) :
-      ValueRuntimeType (.builtin function) function.id.type
-
 /-- The first source-ordered argument whose runtime type differs from the
 declared parameter type.  A successfully typed prefix is explicit. -/
 inductive ValuesFirstTypeMismatch :
@@ -2000,6 +1971,18 @@ mutual
         (missing : after.Dangling location) :
         SourcePlaceFaults program context evidence source environment before place
           (.danglingLocation location) after
+    | projectionRead
+        {context evidence source environment before after place location initialCell
+          currentCell evaluated initial reason}
+        (lookup : Environment.LooksUp environment place.root location)
+        (initial_read : Heap.Reads before location initialCell)
+        (evaluate : SourceProjectionsEvaluate program context evidence source
+          environment before place.projections evaluated after)
+        (current_read : Heap.Reads after location currentCell)
+        (initial_value : RootInitialValue currentCell initial)
+        (fault : ProjectionsFaults initial evaluated reason) :
+        SourcePlaceFaults program context evidence source environment before place
+          reason after
     | uninitialized
         {context evidence source environment before after place location initialCell
           currentCell evaluated}
@@ -2063,16 +2046,37 @@ mutual
           targetHeap rhs reason after) :
         SourcePlaceAssignmentFaults program context evidence source environment
           before place operator rhs reason after
+    /-- Operand validation occurs only after traversing the latest root. -/
     | operands
         {context evidence source environment before targetHeap rhsHeap place operator
-          rhs target right}
+          rhs target right currentCell initial currentSelected}
         (resolve : SourcePlaceResolves program context evidence source environment
           before place target targetHeap)
         (evaluate : ExpressionEvaluates program context evidence source environment
           targetHeap rhs right rhsHeap)
+        (current_read : Heap.Reads rhsHeap target.location currentCell)
+        (root_type_eq : currentCell.type = target.rootType)
+        (initial_value : RootInitialValue currentCell initial)
+        (path_read : ProjectionsRead initial target.projections currentSelected)
         (invalid : AssignmentOperandsInvalid operator target.selected right) :
         SourcePlaceAssignmentFaults program context evidence source environment
           before place operator rhs (.invalidAssignmentOperands operator) rhsHeap
+
+    /-- Structural traversal precedes the leaf modifier, so this fault wins
+    even if the old snapshot would make a compound operation fail. -/
+    | structuralUpdate
+        {context evidence source environment before targetHeap rhsHeap place operator
+          rhs target right currentCell initial reason}
+        (resolve : SourcePlaceResolves program context evidence source environment
+          before place target targetHeap)
+        (evaluate : ExpressionEvaluates program context evidence source environment
+          targetHeap rhs right rhsHeap)
+        (current_read : Heap.Reads rhsHeap target.location currentCell)
+        (root_type_eq : currentCell.type = target.rootType)
+        (initial_value : RootInitialValue currentCell initial)
+        (fault : ProjectionsFaults initial target.projections reason) :
+        SourcePlaceAssignmentFaults program context evidence source environment
+          before place operator rhs reason rhsHeap
 
   /-- Fault in snapshot-only bit-not assignment. -/
   inductive SourcePlaceBitNotFaults (program : Program) :
@@ -2416,5 +2420,27 @@ theorem contains_or_missing
           exact .inl ⟨_, contains⟩
 
 end ExpressionEvaluatesOutcome
+
+/-- With no intervening RHS, a successful place resolution cannot develop a
+missing-default path failure. This covers the structural path of bit-not
+assignment, whose write uses the same post-index heap. -/
+theorem SourcePlaceResolves.excludes_projection_fault
+    {program : Program} {context : Context} {evidence : EvidenceEnvironment}
+    {source : TypedSource} {environment : Environment}
+    {before after : Heap} {place : PlaceResolution} {target : ResolvedPlace}
+    (resolved : SourcePlaceResolves program context evidence source environment
+      before place target after)
+    {currentCell : Cell} {initial : Option Value} {reason : SemanticFault}
+    (current_read : Heap.Reads after target.location currentCell)
+    (initial_value : RootInitialValue currentCell initial) :
+    ¬ ProjectionsFaults initial target.projections reason := by
+  cases resolved with
+  | intro _ _ _ read rootValue selected =>
+      have sameCell := read.functional current_read
+      cases sameCell
+      have sameInitial := rootValue.functional initial_value
+      cases sameInitial
+      intro fault
+      exact fault.excludes_read selected
 
 end Solcore.SourceSemantics.Dynamic
