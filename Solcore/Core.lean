@@ -44,7 +44,10 @@ import Solcore.Core.SignedComparison
 import Solcore.Core.ShortCircuit
 
 import Solcore.Core.LocalAssignment
+import Solcore.Core.IntegerAssignment
 import Solcore.Core.WordMapping
+
+import Solcore.Core.OrderedMapping
 
 /-!
 Umbrella module for the Semantic Core syntax, declarative judgments, explicit

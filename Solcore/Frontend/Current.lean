@@ -34,4 +34,11 @@ import Solcore.Frontend.SourceCoreAssignmentFaultSites
 import Solcore.Frontend.SourceCoreRuntimeFaultSites
 import Solcore.Frontend.SourceCoreAssignmentPolicy
 
+import Solcore.Frontend.SourceCoreDataCatalog
+
+import Solcore.Frontend.SourceCoreScalar
+import Solcore.Frontend.SourceCoreInteger
+import Solcore.Frontend.SourceCoreGeneralEntry
+import Solcore.Frontend.SourceCoreGeneralFunctions
+
 /-! Current whole-program source pipeline and preservation results. -/

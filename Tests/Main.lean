@@ -1046,6 +1046,27 @@ import Solcore.Test.SourceCompilerAssignments
 import Solcore.Test.SourceCompilerFunctions
 import Solcore.Test.SourceCoreBasicStatementTreeCertificates
 import Solcore.Test.CoreWordMapping
+import Solcore.Test.CoreIntegers
+import Solcore.Test.CoreWireInteger
+import Solcore.Test.CoreOrderedMapping
+import Solcore.Test.SourceCoreIntegerEntry
+import Solcore.Test.SourceCoreScalarExpressionReflection
+import Solcore.Test.SourceCoreControlStatementCertificates
+import Solcore.Test.SourceCoreControlStatementMeaning
+import Solcore.Test.SourceCoreDataCatalog
+import Solcore.Test.SourceCoreDataEquality
+import Solcore.Test.SourceCoreDataEqualityProofs
+import Solcore.Test.SourceCoreGeneralEntry
+import Solcore.Test.CoreIntegerAssignment
+import Solcore.Test.SourceCoreIntegerAssignments
+import Solcore.Test.SourceCoreIntegerFunctionEntry
+import Solcore.Test.SourceCompilerIntegers
+import Solcore.Test.SourceCoreDataExpressions
+import Solcore.Test.SourceCoreDataMatches
+import Solcore.Test.SourceCoreGeneralFunctions
+import Solcore.Test.SourceCoreLoopStatementCertificates
+import Solcore.Test.SourceCoreLoopStatementMeaning
+import Solcore.Test.SourceCoreLoopFiniteComposition
 import Solcore.Test.SourceCoreBasicEntry
 import Solcore.Test.SourceCompilerCoreCells
 import Solcore.Test.ContractLanguageResult
@@ -2444,6 +2465,24 @@ def run : IO Unit := do
   SourceCompilerAssignments.run
   SourceCompilerFunctions.run
   CoreWordMapping.run
+  CoreIntegers.run
+  CoreWireInteger.run
+  CoreOrderedMapping.run
+  SourceCoreIntegerEntry.run
+  SourceCoreScalarExpressionReflection.run
+  SourceCoreControlStatementMeaning.run
+  SourceCoreDataCatalog.run
+  SourceCoreDataEquality.run
+  SourceCoreGeneralEntry.run
+  CoreIntegerAssignment.run
+  SourceCoreIntegerAssignments.run
+  SourceCoreIntegerFunctionEntry.run
+  SourceCompilerIntegers.run
+  SourceCoreDataExpressions.run
+  SourceCoreDataMatches.run
+  SourceCoreGeneralFunctions.run
+  SourceCoreLoopStatementMeaning.run
+  SourceCoreLoopFiniteComposition.run
   CoreLocalLoop.run
   CoreTaggedFunction.run
   SourceCoreBasicEntry.run

@@ -3798,4 +3798,102 @@ theorem validateWordIntegerLiteral_sound
                               ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
               · simp [ensureTypeWith, lowered, wordType, Except.mapError, failWith, bind, Except.bind] at checked
 
+
+/-- The native Integer validator establishes the same source metadata facts as
+its Word counterpart while retaining the exact unbounded integer value. -/
+structure NativeIntegerLiteralCertificate
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
+    (validated : NativeIntegerLiteral) : Prop where
+  targetType : resolution.targetType = .integer
+  nodeType : node.type = .integer
+  requirements : node.requirements = [resolution.requirement]
+  coercions : node.coercions = []
+  meaning : NumericLiteralDenotes source resolution.rawValue
+  value : validated.value = Int.ofNat resolution.rawValue
+  consumedRequirements : validated.consumedRequirements = [resolution.requirement]
+  solved : ∃ solved ∈ solvedRequirements, solved.id = resolution.requirement ∧
+    solved.predicate = ProgramSignatures.builtinIntPredicate .integer
+
+private theorem builtinIntegerPredicate_of_beq {predicate : ProgramPredicate}
+    (equal : (predicate == ProgramSignatures.builtinIntPredicate .integer) = true) :
+    predicate = ProgramSignatures.builtinIntPredicate .integer := by
+  cases predicate with
+  | mk trait subject arguments =>
+    cases trait with
+    | builtin builtin =>
+      cases builtin
+      change ((subject == .integer) && (arguments == [])) = true at equal
+      simp only [Bool.and_eq_true, beq_iff_eq] at equal
+      rcases equal with ⟨rfl, rfl⟩
+      rfl
+    | declaration id =>
+      change false = true at equal
+      contradiction
+
+theorem validateNativeIntegerLiteral_sound
+    {solvedRequirements : List SolvedRequirement} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {validated : NativeIntegerLiteral}
+    (accepted : validateNativeIntegerLiteral solvedRequirements node source resolution = .ok validated) :
+    NativeIntegerLiteralCertificate solvedRequirements node source resolution validated := by
+  have emptyCoercions : node.coercions = [] := by
+    by_cases empty : node.coercions = []
+    · exact empty
+    · simp [validateNativeIntegerLiteral, empty, fail, bind, Except.bind] at accepted
+  simp only [validateNativeIntegerLiteral, emptyCoercions, List.isEmpty_nil, ↓reduceIte] at accepted
+  cases checked : validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+      solvedRequirements node.type node.requirements source resolution (.builtin .intInteger)
+      (fun target => if target = Ty.integer then pure ()
+        else fail (.occurrence node.id.occurrence) (.unsupportedType target)) with
+  | error err => simp [checked, bind, Except.bind] at accepted
+  | ok rawValidated =>
+    simp only [pure, Pure.pure, Except.pure] at checked
+    simp only [checked, bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+    subst validated
+    unfold validateIntegerLiteralResolutionWith at checked
+    split at checked
+    · simp [failWith] at checked
+    · rename_i target
+      split at checked
+      · simp [failWith] at checked
+      · rename_i requirements
+        cases decodedEq : numericLiteralValue? source with
+        | none => simp [decodedEq, failWith, bind, Except.bind] at checked
+        | some decoded =>
+          simp only [decodedEq, bind, Except.bind, pure, Pure.pure, Except.pure] at checked
+          split at checked
+          · simp [failWith] at checked
+          · rename_i raw
+            by_cases targetInteger : resolution.targetType = Ty.integer
+            · simp only [targetInteger, ↓reduceIte] at checked
+              cases found : exactIntegerLiteralRequirementWith id (.occurrence node.id.occurrence)
+                  solvedRequirements resolution.requirement with
+              | error err => simp [found] at checked
+              | ok solved =>
+                simp only [found] at checked
+                split at checked
+                · simp [failWith] at checked
+                · rename_i predicate
+                  split at checked
+                  · simp [failWith] at checked
+                  · split at checked
+                    · simp [failWith] at checked
+                    · split at checked
+                      · simp [failWith] at checked
+                      · split at checked
+                        · simp [failWith] at checked
+                        · simp only [Except.ok.injEq] at checked
+                          subst rawValidated
+                          have targetEq : resolution.targetType = node.type := by simpa using target
+                          have attached : node.requirements = [resolution.requirement] := by simpa using requirements
+                          have rawEq : decoded = resolution.rawValue := by simpa using raw
+                          have predicateEq : solved.predicate = ProgramSignatures.builtinIntPredicate .integer :=
+                            builtinIntegerPredicate_of_beq (by simpa [bne, IntegerLiteralResolution.predicate, targetInteger] using predicate)
+                          have solvedMember := exactIntegerLiteralRequirementWith_member found
+                          exact ⟨targetInteger, targetEq ▸ targetInteger, attached, emptyCoercions,
+                            numericLiteralValue?_sound (rawEq ▸ decodedEq), rfl, rfl,
+                            ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
+            · simp [targetInteger, fail] at checked
+
 end Solcore.Frontend.SourceCoreElaboration

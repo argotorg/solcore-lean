@@ -16,6 +16,15 @@ import Solcore.SourceSemantics.CoreLowering.GeneralStatements
 import Solcore.SourceSemantics.CoreLowering.BasicStatementTreeCertificates
 import Solcore.SourceSemantics.CoreLowering.WordMapping
 
+import Solcore.SourceSemantics.CoreLowering.IntegerPrimitives
+import Solcore.SourceSemantics.CoreLowering.ControlStatementBridge
+
+import Solcore.SourceSemantics.CoreLowering.OrderedMapping
+import Solcore.SourceSemantics.CoreLowering.DataEquality
+import Solcore.SourceSemantics.CoreLowering.DataDefaults
+import Solcore.SourceSemantics.CoreLowering.ScalarExpressionReflection
+import Solcore.SourceSemantics.CoreLowering.LoopStatementBridge
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

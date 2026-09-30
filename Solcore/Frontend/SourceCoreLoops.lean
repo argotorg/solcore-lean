@@ -21,6 +21,8 @@ abbrev Scope := SourceCoreBasic.Scope
 abbrev Error := SourceCoreBasic.Error
 abbrev Context := SourceCorePrimitive.Context
 abbrev ExpressionLowerer := SourceCoreControl.ExpressionLowerer
+abbrev FlowLowerer := Nat → TypedSource → Scope → List StatementId → Core.Ty →
+  (ExpressionId → Core.Word) → Core.Word → Except Error Core.Expr
 
 /-- Entry profiles supply type and binder projection independently of control. -/
 structure Policy where
@@ -36,6 +38,8 @@ structure Policy where
     (ExpressionId → Core.Word) → Except Error Core.Expr) := none
   assignBitNot : Option (TypedSource → Scope → SourceCoreElaboration.ErrorSite →
     AssignmentResolution → Core.Ty → Core.Expr → Except Error Core.Expr) := none
+  lowerMatch : Option (ExpressionLowerer → FlowLowerer → Nat → TypedSource → Scope → StatementId →
+    MatchResolution → Core.Ty → (ExpressionId → Core.Word) → Core.Word → Except Error Core.Expr) := none
 
 private def assignValue (policy : Policy) (fuel : Nat) (source : TypedSource) (scope : Scope)
     (site : SourceCoreElaboration.ErrorSite) (assignment : AssignmentResolution)
@@ -172,13 +176,23 @@ def lowerFlowStatementsWithPolicy (policy : Policy) : Nat → TypedSource → Sc
             pure (Core.LocalLoop.iterate resultType condition.expression loopBody post selfReason)
           let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason
           pure (Core.LocalLoop.sequence resultType loop body)
+      | .matchWith resolution =>
+          match policy.lowerMatch with
+          | none => .error (.unsupportedStatement id node.form)
+          | some callback =>
+              let matched ← callback policy.lowerExpression
+                (fun _ childSource childScope statements resultType childReasonAt childSelfReason =>
+                  lowerFlowStatementsWithPolicy policy fuel childSource childScope statements
+                    resultType childReasonAt false childSelfReason)
+                fuel source scope id resolution resultType reasonAt selfReason
+              let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason
+              pure (Core.LocalLoop.sequence resultType matched body)
       | .breakStmt =>
           SourceCoreBasic.ensureType site .unit type
           pure (Core.LocalLoop.breaking resultType)
       | .continueStmt =>
           SourceCoreBasic.ensureType site .unit type
           pure (Core.LocalLoop.continuing resultType)
-      | form => .error (.unsupportedStatement id form)
 
 /-- Compatibility wrapper for the ordinary scalar/product profile. -/
 def lowerFlowStatementsWithExpression (lowerExpression : ExpressionLowerer)
