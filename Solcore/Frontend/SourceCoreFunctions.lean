@@ -110,7 +110,8 @@ def bindParameters (parameters : List (TypedBinder × Core.Ty)) (resultType : Co
     Core.LocalSequence.letInitialized resultType type
       (Core.LanguageResult.success (argumentProjection index parameters.length (.var index))) continuation) body
 
-private def lambdaParameters (policy : Policy) (source : TypedSource) : Scope → List TypedBinder →
+/-- Ordered parameter metadata lowering, exposed for compiler certificates. -/
+def lambdaParameters (policy : Policy) (source : TypedSource) : Scope → List TypedBinder →
     Except Error (List (TypedBinder × Core.Ty) × Scope)
   | scope, [] => pure ([], scope)
   | scope, parameter :: parameters => do

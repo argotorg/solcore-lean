@@ -3,6 +3,7 @@ import Solcore.Test.SourceCoreDataPlaceWriteBack
 import Solcore.Test.SourceCoreStageContracts
 import Solcore.Test.SourceCoreStageCodebook
 import Solcore.Test.CoreCallableContract
+import Solcore.Test.SourceCoreFunctionCertificates
 import Solcore.Test.SourceTypedClosureCaptureBoundary
 import Solcore.Test.SourceCoreGenericMatchPreservation
 import Solcore.Test.SourceCoreDataPlacePaths
