@@ -12,7 +12,7 @@ namespace Solcore.SourceSemantics
 
 open Frontend Frontend.SourceInference
 
-private theorem eq_of_mem_of_nodup_map
+theorem eq_of_mem_of_nodup_map
     {α β : Type} {items : List α} {project : α → β}
     (unique : (items.map project).Nodup)
     {left right : α} (leftMember : left ∈ items)
@@ -78,7 +78,7 @@ private theorem predicatesWellFormed_applySubstitution_eq_self
 /-- All assumptions of a cataloged implementation method are closed under
 flexible inference substitution, including the trait predicates instantiated
 at the implementation head. -/
-private theorem methodAssumptions_applySubstitution_eq_self
+theorem methodAssumptions_applySubstitution_eq_self
     {signatures : ProgramSignatures}
     {implementation : ProgramImplementationSignature}
     {method : ProgramImplMethodSignature}
