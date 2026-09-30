@@ -114,4 +114,64 @@ theorem inferStatementFuel_captureOrigins
               simp [Detail.inferStatementFuel, statementEq]
                 at success
 
+/-- The one-statement theorem composes over the executable statement-list
+traversal.  Each prefix result is retained in the final raw evidence source,
+so an initialized binder remains certified at every later lookup. -/
+theorem inferStatementsFuel_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement} {expectedReturn : Ty}
+    {initial evidenceState : State} {result : Detail.BlockResult}
+    {roots : List NodeId}
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn initial = .ok result)
+    (below : initial.NodesBelowNextOccurrence)
+    (origins : ActiveBinderCaptureOrigins initial
+      (evidenceState.toTypedSource roots))
+    (resultToEvidence : TypingSourceExtends
+      (result.state.toTypedSource roots)
+      (evidenceState.toTypedSource roots)) :
+    ActiveBinderCaptureOrigins result.state
+      (evidenceState.toTypedSource roots) := by
+  induction fuel generalizing statements initial result with
+  | zero => simp [Detail.inferStatementsFuel] at success
+  | succ fuel induction =>
+      cases statements with
+      | nil =>
+          simp [Detail.inferStatementsFuel] at success
+          subst result
+          exact origins
+      | cons statement rest =>
+          cases rest with
+          | nil =>
+              obtain ⟨head, headSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_singleton_facts success
+              have headToEvidence : TypingSourceExtends
+                  (head.state.toTypedSource roots)
+                  (evidenceState.toTypedSource roots) := by
+                simpa only [resultEq] using resultToEvidence
+              have headOrigins := inferStatementFuel_captureOrigins
+                headSuccess origins headToEvidence
+              simpa only [resultEq] using headOrigins
+          | cons next tail =>
+              obtain ⟨head, restResult, headSuccess, tailSuccess,
+                  resultEq⟩ :=
+                inferStatementsFuel_success_cons_facts success
+              have headBelow : head.state.NodesBelowNextOccurrence :=
+                (Detail.inferStatementFuel_occurrenceBoundExtends
+                  headSuccess).nodesBelowNextOccurrence below
+              have tailToEvidence : TypingSourceExtends
+                  (restResult.state.toTypedSource roots)
+                  (evidenceState.toTypedSource roots) := by
+                simpa only [resultEq] using resultToEvidence
+              have headToEvidence : TypingSourceExtends
+                  (head.state.toTypedSource roots)
+                  (evidenceState.toTypedSource roots) :=
+                (inferStatementsFuel_success_typingSourceExtends tailSuccess
+                  headBelow roots).trans tailToEvidence
+              have headOrigins := inferStatementFuel_captureOrigins
+                headSuccess origins headToEvidence
+              have restOrigins := induction tailSuccess headBelow headOrigins
+                tailToEvidence
+              simpa only [resultEq] using restOrigins
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
