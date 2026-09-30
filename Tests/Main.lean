@@ -1,4 +1,5 @@
 import Solcore.Test.SourceCoreDataPlacePathFaults
+import Solcore.Test.SourceCoreDataPlaceWriteBack
 import Solcore.Test.SourceCoreGenericMatchPreservation
 import Solcore.Test.SourceCoreDataPlacePaths
 import Solcore.Test.SourceCoreGenericMatch
