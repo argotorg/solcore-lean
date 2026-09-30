@@ -1,4 +1,6 @@
 import Solcore.SourceSemantics.SourceInferenceCheckedBodyTypingBridge
+import Solcore.SourceSemantics.SourceStageAnalysisSoundness
+import Solcore.SourceSemantics.Staging.Program
 
 /-!
 Assemble the one remaining recursive statement-inference theorem into the
@@ -110,3 +112,58 @@ theorem programWellFormed_ofCheckProgram_inferStatementsFuel_sound
       success recursiveSound)
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
+
+namespace Solcore.SourceSemantics
+
+open Frontend Frontend.SourceInference
+
+/-- Every checked executable body has passed the executable staging traversal.
+This is deliberately separate from static checking: stage analysis is a
+distinct public compiler pass. -/
+structure CheckedProgramStagesAnalyzed (checked : CheckedProgram) : Prop where
+  functions : ∀ function, function ∈ checked.functions →
+    ∃ analysis, Frontend.SourceStageAnalysis.analyzeFunction function = .ok analysis
+  methods : ∀ method, method ∈ checked.methods →
+    ∃ analysis, Frontend.SourceStageAnalysis.analyzeFunction method.checked =
+      .ok analysis
+
+/-- The successful stage traversal and the recursive source-checking proof
+jointly admit the checked program to the independent whole-program staging
+judgment.  No staging conclusion is inferred from static checking alone. -/
+theorem programHasStages_ofCheckProgram_and_analysis
+    {raw : Workspace.RawWorkspace} {fuel : Nat}
+    {checked : CheckedProgram}
+    (success : Frontend.checkProgram raw fuel = .ok checked)
+    (recursiveSound : SourceInferenceSoundness.InferStatementsFuelSoundness fuel)
+    (analyzed : CheckedProgramStagesAnalyzed checked) :
+    Staging.ProgramHasStages (Program.ofChecked checked) := by
+  refine ⟨SourceInferenceSoundness.programWellFormed_ofCheckProgram_inferStatementsFuel_sound
+    success recursiveSound, ?_, ?_⟩
+  · intro definition member
+    obtain ⟨function, functionMember, rfl⟩ := List.mem_map.mp member
+    obtain ⟨analysis, stageSuccess⟩ := analyzed.functions function functionMember
+    have valid := SourceInferenceSoundness.programWellFormed_ofCheckProgram_inferStatementsFuel_sound
+      success recursiveSound
+    have functionValid := valid.functions_valid _ member
+    cases functionValid with
+    | intro _ _ bodyValid =>
+        cases bodyValid with
+        | intro _ _ _ _ _ _ _ _ _ _ graphClosed localIdentities _ _ _ _ =>
+            exact (Staging.bodyDefinitionOfChecked_iff function).2
+              (SourceStageAnalysisSoundness.analyzeFunction_success_hasStages_of_wellFormed
+                function analysis graphClosed localIdentities stageSuccess)
+  · intro definition member
+    obtain ⟨method, methodMember, rfl⟩ := List.mem_map.mp member
+    obtain ⟨analysis, stageSuccess⟩ := analyzed.methods method methodMember
+    have valid := SourceInferenceSoundness.programWellFormed_ofCheckProgram_inferStatementsFuel_sound
+      success recursiveSound
+    have methodValid := valid.methods_valid _ member
+    cases methodValid with
+    | intro _ _ _ _ _ _ _ _ _ bodyValid =>
+        cases bodyValid with
+        | intro _ _ _ _ _ _ _ _ _ _ graphClosed localIdentities _ _ _ _ =>
+            exact (Staging.bodyDefinitionOfChecked_iff method.checked).2
+              (SourceStageAnalysisSoundness.analyzeFunction_success_hasStages_of_wellFormed
+                method.checked analysis graphClosed localIdentities stageSuccess)
+
+end Solcore.SourceSemantics
