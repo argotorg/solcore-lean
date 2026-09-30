@@ -59,6 +59,51 @@ theorem allocateStatementId {state : State}
         id ∈ state.requirements.map (fun requirement => requirement.id)
       exact tracked.templates.covered
 
+theorem allocateExpressionId {state : State}
+    {pending : List RequirementId}
+    (tracked : RecursiveLedgerInvariant state pending) :
+    RecursiveLedgerInvariant state.allocateExpressionId.2 pending := by
+  constructor
+  · exact State.allocateExpressionId_preserves_requirementsWellFormed
+      state tracked.requirements
+  · constructor
+    · change state.localSchemeAssumptions.Perm
+        (sourceLocalSchemeTemplateIds (state.toTypedSource []) ++ pending)
+      exact tracked.templates.classified
+    · change state.localSchemeAssumptions.Nodup
+      exact tracked.templates.unique
+    · change ∀ id, id ∈ state.localSchemeAssumptions →
+        id ∈ state.requirements.map (fun requirement => requirement.id)
+      exact tracked.templates.covered
+
+theorem allocateHiddenLocal {state : State}
+    {pending : List RequirementId}
+    (tracked : RecursiveLedgerInvariant state pending) :
+    RecursiveLedgerInvariant state.allocateHiddenLocal.2 pending := by
+  constructor
+  · exact State.allocateHiddenLocal_preserves_requirementsWellFormed
+      state tracked.requirements
+  · constructor
+    · change state.localSchemeAssumptions.Perm
+        (sourceLocalSchemeTemplateIds (state.toTypedSource []) ++ pending)
+      exact tracked.templates.classified
+    · change state.localSchemeAssumptions.Nodup
+      exact tracked.templates.unique
+    · change ∀ id, id ∈ state.localSchemeAssumptions →
+        id ∈ state.requirements.map (fun requirement => requirement.id)
+      exact tracked.templates.covered
+
+theorem recordExpression {state : State}
+    {pending : List RequirementId}
+    (tracked : RecursiveLedgerInvariant state pending)
+    (node : ExpressionNode) :
+    RecursiveLedgerInvariant (state.recordNode (.expression node)) pending := by
+  constructor
+  · exact State.recordNode_preserves_requirementsWellFormed state
+      (.expression node) tracked.requirements
+  · apply TemplateTracking.recordNode
+    simpa [nodeLocalSchemeTemplateIds] using tracked.templates
+
 /-- A statement without initialized `let` bindings does not materialize any
 qualified template identities when it is recorded. -/
 theorem recordStatement_noBindings {state : State}
@@ -556,6 +601,180 @@ theorem inferStatementFuel_ifWithElse_ledger
         conditionState.lexicalScope
   exact ((statementsIH elseSuccess thenTracked).restoreLexicalScope
     conditionState.lexicalScope).recordStatement_noBindings _ rfl
+
+/-- A `for` header deliberately accumulates pending qualified-template IDs
+across initializer and post items.  Recording the enclosing loop node
+materializes exactly those two source-ordered inventories. -/
+theorem inferStatementFuel_forLoop_ledger
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {headerSpan : Syntax.SourceSpan}
+    {initializer post : List Syntax.ForItem} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : Ty}
+    {initial : State} {result : Detail.StatementResult}
+    {pending : List RequirementId}
+    (statementEq : statement.value =
+      .forLoop headerSpan initializer condition post body)
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (forItemsIH : InferForItemsFuelLedgerPreservation fuel)
+    (expressionIH : InferExprFuelLedgerPreservation fuel)
+    (statementsIH : InferStatementsFuelLedgerPreservation fuel)
+    (tracked : RecursiveLedgerInvariant initial pending) :
+    RecursiveLedgerInvariant result.state pending := by
+  rcases allocationEq : initial.allocateStatementId with ⟨id, allocated⟩
+  have allocatedTracked : RecursiveLedgerInvariant allocated pending := by
+    simpa [allocationEq] using tracked.allocateStatementId
+  obtain ⟨initializerResult, inferredCondition, conditionState, bodyResult,
+      postResult, initializerSuccess, conditionSuccess, bodySuccess,
+      postSuccess, resultEq, _⟩ :=
+    inferStatementFuel_success_forLoop_facts statementEq allocationEq success
+  have initializerTracked := forItemsIH initializerSuccess allocatedTracked
+  have conditionTracked := expressionIH conditionSuccess initializerTracked
+  have bodyTracked := statementsIH bodySuccess conditionTracked
+  have postTracked := forItemsIH postSuccess
+    (bodyTracked.restoreLexicalScope initializerResult.state.lexicalScope)
+  rw [resultEq]
+  apply RecursiveLedgerInvariant.recordStatement
+  simpa [nodeLocalSchemeTemplateIds, statementInitializedLetBindings,
+    List.flatMap_append, List.append_assoc] using
+    (postTracked.restoreLexicalScope allocated.lexicalScope)
+
+/-- Match scrutinee inference is either one expression or a source-ordered
+expression list followed by a synthetic tuple occurrence. -/
+theorem inferMatchScrutineesFuel_ledger
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
+    {initial final : State} {inferred : InferredExpression}
+    {pending : List RequirementId}
+    (success : inferMatchScrutineesFuel fuel context span sources initial =
+      .ok (inferred, final))
+    (expressionIH : InferExprFuelLedgerPreservation fuel)
+    (expressionsIH : InferExprsFuelLedgerPreservation fuel)
+    (tracked : RecursiveLedgerInvariant initial pending) :
+    RecursiveLedgerInvariant final pending := by
+  have finishTuple
+      (expressions : List Syntax.Expr)
+      (elements : List InferredExpression) (elementsState : State)
+      (elementsSuccess : Detail.inferExprsFuel fuel context expressions initial =
+        .ok (elements, elementsState))
+      (residualSuccess :
+        ((do
+          let (tupleId, allocated) := elementsState.allocateExpressionId
+          let type := Ty.productMany
+            (elements.map (fun element : InferredExpression => element.type))
+          let retained := allocated.recordNode (.expression {
+            id := tupleId, span, type,
+            form := .tuple
+              (elements.map (fun element : InferredExpression => element.id))
+          })
+          pure ({ id := tupleId, type }, retained)) :
+            Except Frontend.SourceInference.Error
+              (InferredExpression × State)) = .ok (inferred, final)) :
+      RecursiveLedgerInvariant final pending := by
+    rcases allocation : elementsState.allocateExpressionId with
+      ⟨tupleId, allocated⟩
+    simp only [allocation, pure, Pure.pure, Except.pure] at residualSuccess
+    injection residualSuccess with resultEq
+    cases resultEq
+    have elementsTracked := expressionsIH elementsSuccess tracked
+    have allocatedTracked : RecursiveLedgerInvariant allocated pending := by
+      simpa only [allocation] using elementsTracked.allocateExpressionId
+    exact allocatedTracked.recordExpression _
+  cases sources with
+  | nil =>
+      unfold inferMatchScrutineesFuel at success
+      cases elementsSuccess : Detail.inferExprsFuel fuel context [] initial with
+      | error error =>
+          simp [elementsSuccess, bind, Except.bind] at success
+      | ok elementsPair =>
+          rcases elementsPair with ⟨elements, elementsState⟩
+          simp only [elementsSuccess, bind, Except.bind] at success
+          exact finishTuple [] elements elementsState elementsSuccess success
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          exact expressionIH
+            (by simpa [inferMatchScrutineesFuel] using success) tracked
+      | cons second tail =>
+          unfold inferMatchScrutineesFuel at success
+          cases elementsSuccess : Detail.inferExprsFuel fuel context
+              (first :: second :: tail) initial with
+          | error error =>
+              simp [elementsSuccess, bind, Except.bind] at success
+          | ok elementsPair =>
+              rcases elementsPair with ⟨elements, elementsState⟩
+              simp only [elementsSuccess, bind, Except.bind] at success
+              exact finishTuple (first :: second :: tail) elements
+                elementsState elementsSuccess success
+
+/-- A match without a default records no local-scheme template owners at the
+parent node.  Explicit arm binders are scoped inside the actual case trace. -/
+theorem inferStatementFuel_matchWithoutDefault_ledger
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {expectedReturn : Ty}
+    {initial : State} {result : Detail.StatementResult}
+    {pending : List RequirementId}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = none)
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (expressionIH : InferExprFuelLedgerPreservation fuel)
+    (expressionsIH : InferExprsFuelLedgerPreservation fuel)
+    (casesIH : InferMatchCasesFuelLedgerPreservation fuel)
+    (tracked : RecursiveLedgerInvariant initial pending) :
+    RecursiveLedgerInvariant result.state pending := by
+  rcases allocationEq : initial.allocateStatementId with ⟨id, allocated⟩
+  have allocatedTracked : RecursiveLedgerInvariant allocated pending := by
+    simpa [allocationEq] using tracked.allocateStatementId
+  obtain ⟨_, scrutineeState, _, hiddenState, checked,
+      scrutineeSuccess, hiddenAllocation, checkedSuccess, _, resultEq, _⟩ :=
+    inferStatementFuel_success_matchWithoutDefault_facts statementEq
+      defaultEq allocationEq success
+  have scrutineeTracked := inferMatchScrutineesFuel_ledger
+    scrutineeSuccess expressionIH expressionsIH allocatedTracked
+  have hiddenTracked : RecursiveLedgerInvariant hiddenState pending := by
+    simpa [hiddenAllocation] using scrutineeTracked.allocateHiddenLocal
+  rw [resultEq]
+  exact (casesIH checkedSuccess hiddenTracked).recordStatement_noBindings
+    _ rfl
+
+/-- Default-arm inference follows the explicit case traversal in the same
+pending-template context before the parent match node is recorded. -/
+theorem inferStatementFuel_matchWithDefault_ledger
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
+    {expectedReturn : Ty} {initial : State}
+    {result : Detail.StatementResult} {pending : List RequirementId}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = some defaultBody)
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (expressionIH : InferExprFuelLedgerPreservation fuel)
+    (expressionsIH : InferExprsFuelLedgerPreservation fuel)
+    (casesIH : InferMatchCasesFuelLedgerPreservation fuel)
+    (statementsIH : InferStatementsFuelLedgerPreservation fuel)
+    (tracked : RecursiveLedgerInvariant initial pending) :
+    RecursiveLedgerInvariant result.state pending := by
+  rcases allocationEq : initial.allocateStatementId with ⟨id, allocated⟩
+  have allocatedTracked : RecursiveLedgerInvariant allocated pending := by
+    simpa [allocationEq] using tracked.allocateStatementId
+  obtain ⟨_, scrutineeState, _, hiddenState, checked, defaultResult,
+      scrutineeSuccess, hiddenAllocation, checkedSuccess, defaultSuccess, _,
+      resultEq, _⟩ :=
+    inferStatementFuel_success_matchWithDefault_facts statementEq defaultEq
+      allocationEq success
+  have scrutineeTracked := inferMatchScrutineesFuel_ledger
+    scrutineeSuccess expressionIH expressionsIH allocatedTracked
+  have hiddenTracked : RecursiveLedgerInvariant hiddenState pending := by
+    simpa [hiddenAllocation] using scrutineeTracked.allocateHiddenLocal
+  rw [resultEq]
+  exact ((statementsIH defaultSuccess
+    (casesIH checkedSuccess hiddenTracked)).restoreLexicalScope
+      hiddenState.lexicalScope).recordStatement_noBindings _ rfl
 
 /-- A successful statement list preserves the canonical requirement and
 qualified-template ledgers once the actual smaller-fuel head and tail calls
