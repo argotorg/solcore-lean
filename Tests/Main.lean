@@ -9,6 +9,7 @@ import Solcore.Test.SourceCoreCallableEquality
 import Solcore.Test.SourceCoreFunctionCertificates
 import Solcore.Test.SourceCoreFunctionArguments
 import Solcore.Test.SourceCoreFunctionCalls
+import Solcore.Test.SourceCoreContractedFunctions
 import Solcore.Test.SourceCoreDataPayload
 import Solcore.Test.SourceCoreDataPayloadMapping
 import Solcore.Test.SourceCoreDataPayloadPaths
