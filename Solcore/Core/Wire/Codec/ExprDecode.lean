@@ -84,6 +84,11 @@ private def decodeExprAtFuel :
           let value ← liftProtocol <| decodeWordAt (path.field "value")
             (← liftProtocol <| requireField path json "value")
           pure (.word value, state)
+      | "integer" =>
+          liftProtocol <| ensureExactObject path json ["tag", "value"] ["tag", "value"]
+          let (value, state) ← decodeIntegerAtWithBudget limits state (path.field "value")
+            (← liftProtocol <| requireField path json "value")
+          pure (.integer value, state)
       | "var" =>
           liftProtocol <| ensureExactObject path json ["index", "tag"] ["index", "tag"]
           let index ← liftProtocol <| decodeNatAt (path.field "index")
@@ -242,7 +247,7 @@ private def decodeExprAtFuel :
           arguments := .mkObj [
             ("actual", tag),
             ("expected", .arr #[
-              "unit", "bool", "word", "var", "pair", "first", "second",
+              "unit", "bool", "word", "integer", "var", "pair", "first", "second",
               "lambda", "apply", "inLeft", "inRight", "case", "newCell",
               "loadCell", "storeCell", "construct", "matchData", "unary",
               "binary", "ternary", "let", "if"

@@ -12,6 +12,7 @@ def toCore : Ty → Solcore.Core.Ty
   | .unit => .unit
   | .bool => .bool
   | .word => .word
+  | .integer => .integer
   | .product left right => .product left.toCore right.toCore
   | .function parameter result => .function parameter.toCore result.toCore
   | .sum left right => .sum left.toCore right.toCore
@@ -23,6 +24,7 @@ def ofCore? : Solcore.Core.Ty → Option Ty
   | .unit => some .unit
   | .bool => some .bool
   | .word => some .word
+  | .integer => some .integer
   | .product left right => return .product (← ofCore? left) (← ofCore? right)
   | .function parameter result =>
       return .function (← ofCore? parameter) (← ofCore? result)
@@ -74,12 +76,18 @@ def toCore : UnaryOp → Solcore.Core.UnaryOp
   | .boolNot => .boolNot
   | .wordNot => .wordNot
   | .wordClz => .wordClz
+  | .integerNot => .integerNot
+  | .integerToWord => .integerToWord
+  | .wordToInteger => .wordToInteger
 
 set_option match.ignoreUnusedAlts true in
 def ofCore? : Solcore.Core.UnaryOp → Option UnaryOp
   | .boolNot => some .boolNot
   | .wordNot => some .wordNot
   | .wordClz => some .wordClz
+  | .integerNot => some .integerNot
+  | .integerToWord => some .integerToWord
+  | .wordToInteger => some .wordToInteger
   | _ => none
 
 @[simp] theorem ofCore?_toCore (op : UnaryOp) :
@@ -110,6 +118,16 @@ def toCore : BinaryOp → Solcore.Core.BinaryOp
   | .wordSignExtend => .wordSignExtend
   | .wordSdiv => .wordSdiv
   | .wordSmod => .wordSmod
+  | .integerAdd => .integerAdd
+  | .integerSub => .integerSub
+  | .integerMul => .integerMul
+  | .integerDiv => .integerDiv
+  | .integerMod => .integerMod
+  | .integerEq => .integerEq
+  | .integerLt => .integerLt
+  | .integerAnd => .integerAnd
+  | .integerOr => .integerOr
+  | .integerXor => .integerXor
 
 set_option match.ignoreUnusedAlts true in
 def ofCore? : Solcore.Core.BinaryOp → Option BinaryOp
@@ -132,6 +150,16 @@ def ofCore? : Solcore.Core.BinaryOp → Option BinaryOp
   | .wordSignExtend => some .wordSignExtend
   | .wordSdiv => some .wordSdiv
   | .wordSmod => some .wordSmod
+  | .integerAdd => some .integerAdd
+  | .integerSub => some .integerSub
+  | .integerMul => some .integerMul
+  | .integerDiv => some .integerDiv
+  | .integerMod => some .integerMod
+  | .integerEq => some .integerEq
+  | .integerLt => some .integerLt
+  | .integerAnd => some .integerAnd
+  | .integerOr => some .integerOr
+  | .integerXor => some .integerXor
   | _ => none
 
 @[simp] theorem ofCore?_toCore (op : BinaryOp) :
@@ -164,6 +192,7 @@ def toCore : Expr → Solcore.Core.Expr
   | .unit => .unit
   | .bool value => .bool value
   | .word value => .word value
+  | .integer value => .integer value
   | .var index => .var index
   | .pair left right => .pair left.toCore right.toCore
   | .first operand => .first operand.toCore
@@ -199,6 +228,7 @@ def ofCore? : Solcore.Core.Expr → Option Expr
   | .unit => some .unit
   | .bool value => some (.bool value)
   | .word value => some (.word value)
+  | .integer value => some (.integer value)
   | .var index => some (.var index)
   | .pair left right => return .pair (← ofCore? left) (← ofCore? right)
   | .first operand => return .first (← ofCore? operand)
@@ -247,6 +277,7 @@ mutual
     | .unit => by simp [toCore, ofCore?]
     | .bool _ => by simp [toCore, ofCore?]
     | .word _ => by simp [toCore, ofCore?]
+    | .integer _ => by simp [toCore, ofCore?]
     | .var _ => by simp [toCore, ofCore?]
     | .pair left right => by
         simp [toCore, ofCore?, ofCore?_toCore left, ofCore?_toCore right]

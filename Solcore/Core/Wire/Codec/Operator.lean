@@ -10,6 +10,9 @@ def encodeUnaryOp : UnaryOp → Lean.Json
   | .boolNot => "boolNot"
   | .wordNot => "wordNot"
   | .wordClz => "wordClz"
+  | .integerNot => "integerNot"
+  | .integerToWord => "integerToWord"
+  | .wordToInteger => "wordToInteger"
 
 def decodeUnaryOpAt
     (path : DecodePath)
@@ -20,10 +23,14 @@ def decodeUnaryOpAt
   | "boolNot" => pure .boolNot
   | "wordNot" => pure .wordNot
   | "wordClz" => pure .wordClz
+  | "integerNot" => pure .integerNot
+  | "integerToWord" => pure .integerToWord
+  | "wordToInteger" => pure .wordToInteger
   | _ =>
       failAt path .invalidTag (.mkObj [
         ("actual", name),
-        ("expected", .arr #["boolNot", "wordNot", "wordClz"])
+        ("expected", .arr #["boolNot", "wordNot", "wordClz",
+          "integerNot", "integerToWord", "wordToInteger"])
       ])
 
 def decodeUnaryOp (json : Lean.Json) : DecodeResult UnaryOp :=
@@ -59,6 +66,16 @@ def encodeBinaryOp : BinaryOp → Lean.Json
   | .wordSignExtend => "wordSignExtend"
   | .wordSdiv => "wordSdiv"
   | .wordSmod => "wordSmod"
+  | .integerAdd => "integerAdd"
+  | .integerSub => "integerSub"
+  | .integerMul => "integerMul"
+  | .integerDiv => "integerDiv"
+  | .integerMod => "integerMod"
+  | .integerEq => "integerEq"
+  | .integerLt => "integerLt"
+  | .integerAnd => "integerAnd"
+  | .integerOr => "integerOr"
+  | .integerXor => "integerXor"
 
 def decodeBinaryOpAt
     (path : DecodePath)
@@ -85,6 +102,16 @@ def decodeBinaryOpAt
   | "wordSignExtend" => pure .wordSignExtend
   | "wordSdiv" => pure .wordSdiv
   | "wordSmod" => pure .wordSmod
+  | "integerAdd" => pure .integerAdd
+  | "integerSub" => pure .integerSub
+  | "integerMul" => pure .integerMul
+  | "integerDiv" => pure .integerDiv
+  | "integerMod" => pure .integerMod
+  | "integerEq" => pure .integerEq
+  | "integerLt" => pure .integerLt
+  | "integerAnd" => pure .integerAnd
+  | "integerOr" => pure .integerOr
+  | "integerXor" => pure .integerXor
   | _ =>
       failAt path .invalidTag (.mkObj [
         ("actual", name),
@@ -92,7 +119,9 @@ def decodeBinaryOpAt
           "wordAdd", "wordSub", "wordMul", "wordDiv", "wordMod",
           "wordEq", "wordGt", "wordSgt", "wordAnd", "wordOr", "wordXor",
           "wordShl", "wordShr", "wordByte", "wordSar", "wordPow",
-          "wordSignExtend", "wordSdiv", "wordSmod"
+          "wordSignExtend", "wordSdiv", "wordSmod",
+          "integerAdd", "integerSub", "integerMul", "integerDiv", "integerMod",
+          "integerEq", "integerLt", "integerAnd", "integerOr", "integerXor"
         ])
       ])
 

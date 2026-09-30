@@ -18,7 +18,7 @@ private theorem arithmeticLocal (cutoff : Nat) : Expr.LocalFragment (arithmetic 
   .unary (.binary .var .var)
 private theorem arithmeticTyped (leading suffix : Context) (definitions : DataEnvironment) :
     HasType (leading ++ .word :: .word :: suffix) (arithmetic leading.length) .word definitions :=
-  .unary (.binary (.var (by simp [BinaryOp.leftType])) (.var (by simp [BinaryOp.rightType])))
+  .unary (.binary (.var (by simp [BinaryOp.leftType])) (.var (by simp [BinaryOp.rightType, BinaryOp.leftType])))
 
 private def nested : Expr := .letE (.var 1) (.letE (.var 0) (.var 2))
 private def nestedShifted : Expr := .letE (.var 2) (.letE (.var 0) (.var 2))

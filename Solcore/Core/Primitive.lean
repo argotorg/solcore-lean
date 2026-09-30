@@ -1,3 +1,4 @@
+import Solcore.Core.IntegerPrimitives
 import Solcore.Core.Syntax
 
 set_option autoImplicit false
@@ -158,6 +159,9 @@ def apply : UnaryOp → Value → Option Value
   | .boolNot, .bool value => some (.bool (!value))
   | .wordNot, .word value => some (.word value.bitNot)
   | .wordClz, .word value => some (.word value.clz)
+  | .integerNot, .integer value => some (.integer (~~~value))
+  | .integerToWord, .integer value => some (.word (Word.ofIntModulo value))
+  | .wordToInteger, .word value => some (.integer (Int.ofNat value.val))
   | _, _ => none
 
 theorem apply_total_of_type
@@ -207,6 +211,16 @@ def apply : BinaryOp → Value → Value → Option Value
       some (.word (dividend.sdiv divisor))
   | .wordSmod, .word dividend, .word divisor =>
       some (.word (dividend.smod divisor))
+  | .integerAdd, .integer left, .integer right => some (.integer (left + right))
+  | .integerSub, .integer left, .integer right => some (.integer (left - right))
+  | .integerMul, .integer left, .integer right => some (.integer (left * right))
+  | .integerDiv, .integer left, .integer right => some (.integer (Integer.divide left right))
+  | .integerMod, .integer left, .integer right => some (.integer (Integer.modulo left right))
+  | .integerAnd, .integer left, .integer right => some (.integer (Integer.bitAnd left right))
+  | .integerOr, .integer left, .integer right => some (.integer (Integer.bitOr left right))
+  | .integerXor, .integer left, .integer right => some (.integer (Integer.bitXor left right))
+  | .integerEq, .integer left, .integer right => some (.bool (left == right))
+  | .integerLt, .integer left, .integer right => some (.bool (decide (left < right)))
   | _, _, _ => none
 
 theorem apply_total_of_types
@@ -277,6 +291,7 @@ def weakenAt (expr : Expr) (cutoff : Nat) : Expr :=
   | .unit => .unit
   | .bool value => .bool value
   | .word value => .word value
+  | .integer value => .integer value
   | .var index =>
       if cutoff ≤ index then .var (index + 1) else .var index
   | .pair left right =>

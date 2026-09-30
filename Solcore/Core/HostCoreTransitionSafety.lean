@@ -22,6 +22,9 @@ theorem transition_preserves_host_state_type
   | word =>
       cases stateTyping with
       | eval store env expr cont => cases expr; exact .ret store .word cont
+  | integer =>
+      cases stateTyping with
+      | eval store env expr cont => cases expr; exact .ret store .integer cont
   | enterPair =>
       cases stateTyping with
       | eval store env expr cont =>

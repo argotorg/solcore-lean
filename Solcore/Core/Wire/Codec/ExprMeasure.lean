@@ -12,7 +12,7 @@ private def max3 (first second third : Nat) : Nat :=
 mutual
 
   def exprDepth : Expr → Nat
-    | .unit | .bool _ | .word _ | .var _ => 1
+    | .unit | .bool _ | .word _ | .integer _ | .var _ => 1
     | .pair left right | .apply left right | .storeCell left right |
         .binary _ left right | .letE left right =>
         Nat.max (exprDepth left) (exprDepth right) + 1
@@ -45,7 +45,7 @@ end
 mutual
 
   def exprNodes : Expr → Nat
-    | .unit | .bool _ | .word _ | .var _ => 1
+    | .unit | .bool _ | .word _ | .integer _ | .var _ => 1
     | .pair left right | .apply left right | .storeCell left right |
         .binary _ left right | .letE left right =>
         1 + exprNodes left + exprNodes right
@@ -68,6 +68,32 @@ mutual
   def exprListNodes : List Expr → Nat
     | [] => 0
     | expression :: rest => exprNodes expression + exprListNodes rest
+  termination_by expressions => sizeOf expressions
+
+end
+
+mutual
+
+  /-- Cumulative bytes charged to canonical integer literal spellings. -/
+  def exprIntegerBytes : Expr → Nat
+    | .integer value => (encodeIntegerText value).utf8ByteSize
+    | .unit | .bool _ | .word _ | .var _ => 0
+    | .pair left right | .apply left right | .storeCell left right |
+        .binary _ left right | .letE left right =>
+        exprIntegerBytes left + exprIntegerBytes right
+    | .first operand | .second operand | .loadCell operand |
+        .construct _ operand | .unary _ operand | .lambda _ _ operand |
+        .inLeft _ operand | .inRight _ operand | .newCell _ operand =>
+        exprIntegerBytes operand
+    | .caseE first second third | .ternary _ first second third | .ifE first second third =>
+        exprIntegerBytes first + exprIntegerBytes second + exprIntegerBytes third
+    | .matchData _ _ scrutinee branches =>
+        exprIntegerBytes scrutinee + exprListIntegerBytes branches
+  termination_by expression => sizeOf expression
+
+  def exprListIntegerBytes : List Expr → Nat
+    | [] => 0
+    | expression :: rest => exprIntegerBytes expression + exprListIntegerBytes rest
   termination_by expressions => sizeOf expressions
 
 end

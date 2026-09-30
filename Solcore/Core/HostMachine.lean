@@ -690,7 +690,7 @@ def hostAdvance (state : State) : HostAdvanceResult :=
   cases actual with
   | pair left right =>
       cases left <;> cases right <;> simp_all [hostAdvance]
-  | unit | bool | word | hostFunction | closure | inLeft | inRight | cellRef |
+  | unit | bool | word | integer | hostFunction | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
 
@@ -725,7 +725,7 @@ def hostAdvance (state : State) : HostAdvanceResult :=
       .fault (.invalidHostArgument .storageAddress actual) := by
   cases actual with
   | unit => exact (notUnit rfl).elim
-  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+  | bool | word | integer | hostFunction | pair | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
 
@@ -760,7 +760,7 @@ def hostAdvance (state : State) : HostAdvanceResult :=
       .fault (.invalidHostArgument .codeAddress actual) := by
   cases actual with
   | unit => exact (notUnit rfl).elim
-  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+  | bool | word | integer | hostFunction | pair | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
 
@@ -795,7 +795,7 @@ def hostAdvance (state : State) : HostAdvanceResult :=
       .fault (.invalidHostArgument .callValue actual) := by
   cases actual with
   | unit => exact (notUnit rfl).elim
-  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+  | bool | word | integer | hostFunction | pair | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
 
@@ -830,7 +830,7 @@ def hostAdvance (state : State) : HostAdvanceResult :=
       .fault (.invalidHostArgument .callerAddress actual) := by
   cases actual with
   | unit => exact (notUnit rfl).elim
-  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+  | bool | word | integer | hostFunction | pair | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
 
@@ -897,7 +897,7 @@ def hostAdvance (state : State) : HostAdvanceResult :=
       .fault (.invalidHostArgument .inputDataSize actual) := by
   cases actual with
   | unit => exact (notUnit rfl).elim
-  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+  | bool | word | integer | hostFunction | pair | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
 
@@ -965,7 +965,7 @@ def hostAdvance (state : State) : HostAdvanceResult :=
       .fault (.invalidHostArgument .currentAddress actual) := by
   cases actual with
   | unit => exact (notUnit rfl).elim
-  | bool | word | hostFunction | pair | closure | inLeft | inRight | cellRef |
+  | bool | word | integer | hostFunction | pair | closure | inLeft | inRight | cellRef |
       constructed =>
       rfl
 
@@ -1482,7 +1482,7 @@ theorem hostAdvance_next_iff
               | hostFunction function =>
                   cases advanced
                   exact .beginApplication
-              | unit | bool | word | pair | closure | inLeft | inRight | cellRef |
+              | unit | bool | word | integer | pair | closure | inLeft | inRight | cellRef |
                   constructed =>
                   exact .core
                     (advance_next_iff.mp (by simpa [hostAdvance] using advanced))
@@ -1495,7 +1495,7 @@ theorem hostAdvance_next_iff
                   | pair left right =>
                       cases left <;> cases right <;>
                         simp [hostAdvance] at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
               | storageAddress =>
@@ -1519,7 +1519,7 @@ theorem hostAdvance_next_iff
                   | pair left right =>
                       cases left <;> cases right <;>
                         simp [hostAdvance] at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
               | callContractWordWithValue =>
@@ -1531,13 +1531,13 @@ theorem hostAdvance_next_iff
                           | pair middle last =>
                               cases middle <;> cases last <;>
                                 simp [hostAdvance] at advanced
-                          | unit | bool | word | hostFunction | closure |
+                          | unit | bool | word | integer | hostFunction | closure |
                               inLeft | inRight | cellRef | constructed =>
                               simp [hostAdvance] at advanced
-                      | unit | bool | hostFunction | pair | closure | inLeft |
+                      | unit | bool | integer | hostFunction | pair | closure | inLeft |
                           inRight | cellRef | constructed =>
                           simp [hostAdvance] at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
               | createContractWord =>
@@ -1549,13 +1549,13 @@ theorem hostAdvance_next_iff
                           | pair middle last =>
                               cases middle <;> cases last <;>
                                 simp [hostAdvance] at advanced
-                          | unit | bool | word | hostFunction | closure |
+                          | unit | bool | word | integer | hostFunction | closure |
                               inLeft | inRight | cellRef | constructed =>
                               simp [hostAdvance] at advanced
-                      | unit | bool | hostFunction | pair | closure | inLeft |
+                      | unit | bool | integer | hostFunction | pair | closure | inLeft |
                           inRight | cellRef | constructed =>
                           simp [hostAdvance] at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
               | emitLogWord =>
@@ -1563,7 +1563,7 @@ theorem hostAdvance_next_iff
                   | pair left right =>
                       cases left <;> cases right <;>
                         simp [hostAdvance] at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
   · intro step
@@ -1599,7 +1599,7 @@ theorem hostAdvance_suspended_iff
                       injection advanced with suspensionEquality
                       cases suspensionEquality
                       exact .storageRead
-                  | unit | bool | hostFunction | pair | closure | inLeft |
+                  | unit | bool | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | storageWrite =>
@@ -1610,7 +1610,7 @@ theorem hostAdvance_suspended_iff
                       case word.word slot value =>
                         cases advanced
                         exact .storageWrite
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | storageAddress =>
@@ -1618,7 +1618,7 @@ theorem hostAdvance_suspended_iff
                   | unit =>
                       cases advanced
                       exact .storageAddress
-                  | bool | word | hostFunction | pair | closure | inLeft |
+                  | bool | word | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | codeAddress =>
@@ -1626,7 +1626,7 @@ theorem hostAdvance_suspended_iff
                   | unit =>
                       cases advanced
                       exact .codeAddress
-                  | bool | word | hostFunction | pair | closure | inLeft |
+                  | bool | word | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | callValue =>
@@ -1634,7 +1634,7 @@ theorem hostAdvance_suspended_iff
                   | unit =>
                       cases advanced
                       exact .callValue
-                  | bool | word | hostFunction | pair | closure | inLeft |
+                  | bool | word | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | callerAddress =>
@@ -1642,7 +1642,7 @@ theorem hostAdvance_suspended_iff
                   | unit =>
                       cases advanced
                       exact .callerAddress
-                  | bool | word | hostFunction | pair | closure | inLeft |
+                  | bool | word | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | inputDataByte? =>
@@ -1651,7 +1651,7 @@ theorem hostAdvance_suspended_iff
                       injection advanced with suspensionEquality
                       cases suspensionEquality
                       exact .inputDataByte?
-                  | unit | bool | hostFunction | pair | closure | inLeft |
+                  | unit | bool | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | inputDataSize =>
@@ -1659,7 +1659,7 @@ theorem hostAdvance_suspended_iff
                   | unit =>
                       cases advanced
                       exact .inputDataSize
-                  | bool | word | hostFunction | pair | closure | inLeft |
+                  | bool | word | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | inputDataWordBE? =>
@@ -1668,7 +1668,7 @@ theorem hostAdvance_suspended_iff
                       injection advanced with suspensionEquality
                       cases suspensionEquality
                       exact .inputDataWordBE?
-                  | unit | bool | hostFunction | pair | closure | inLeft |
+                  | unit | bool | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | currentAddress =>
@@ -1676,7 +1676,7 @@ theorem hostAdvance_suspended_iff
                   | unit =>
                       cases advanced
                       exact .currentAddress
-                  | bool | word | hostFunction | pair | closure | inLeft |
+                  | bool | word | integer | hostFunction | pair | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | callContractWord =>
@@ -1687,7 +1687,7 @@ theorem hostAdvance_suspended_iff
                       case word.word target input =>
                         cases advanced
                         exact .callContractWord
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | callContractWordWithValue =>
@@ -1702,13 +1702,13 @@ theorem hostAdvance_suspended_iff
                               case word.word value input =>
                                 cases advanced
                                 exact .callContractWordWithValue
-                          | unit | bool | word | hostFunction | closure |
+                          | unit | bool | word | integer | hostFunction | closure |
                               inLeft | inRight | cellRef | constructed =>
                               simp at advanced
-                      | unit | bool | hostFunction | pair | closure | inLeft |
+                      | unit | bool | integer | hostFunction | pair | closure | inLeft |
                           inRight | cellRef | constructed =>
                           simp at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | createContractWord =>
@@ -1723,13 +1723,13 @@ theorem hostAdvance_suspended_iff
                               case word.word value input =>
                                 cases advanced
                                 exact .createContractWord
-                          | unit | bool | word | hostFunction | closure |
+                          | unit | bool | word | integer | hostFunction | closure |
                               inLeft | inRight | cellRef | constructed =>
                               simp at advanced
-                      | unit | bool | hostFunction | pair | closure | inLeft |
+                      | unit | bool | integer | hostFunction | pair | closure | inLeft |
                           inRight | cellRef | constructed =>
                           simp at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
               | emitLogWord =>
@@ -1740,7 +1740,7 @@ theorem hostAdvance_suspended_iff
                       case word.word topic payload =>
                         cases advanced
                         exact .emitLogWord
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp at advanced
   · intro emission

@@ -1,4 +1,5 @@
 import Solcore.Core.Wire.Codec.Foundation
+import Solcore.Core.Wire.Codec.Budget
 import Solcore.Core.Wire.Syntax
 import Solcore.ContractRuntime.RuntimeScalars.TextProperties
 
@@ -7,6 +8,83 @@ import Solcore.ContractRuntime.RuntimeScalars.TextProperties
 set_option autoImplicit false
 
 namespace Solcore.Core.Wire
+
+/-- Integers use signed decimal strings rather than JSON numbers. -/
+def encodeIntegerText (value : Int) : String := toString value
+
+private def decodeCanonicalIntegerTextAt
+    (path : DecodePath) (text : String) : DecodeResult Int :=
+  match text.toInt? with
+  | some value =>
+      if encodeIntegerText value = text then pure value
+      else failAt path .invalidInteger (.mkObj [("reason", "canonical-decimal")])
+  | none => failAt path .invalidInteger (.mkObj [("reason", "signed-decimal")])
+
+private theorem encodeIntegerText_of_decodeCanonicalIntegerTextAt_eq_ok
+    (path : DecodePath) (text : String) (value : Int)
+    (success : decodeCanonicalIntegerTextAt path text = .ok value) :
+    encodeIntegerText value = text := by
+  unfold decodeCanonicalIntegerTextAt at success
+  split at success
+  · split at success
+    · cases success
+      assumption
+    · contradiction
+  · contradiction
+
+/-- The byte budget is consumed before parsing even malformed spellings. -/
+def decodeIntegerTextAtWithBudget
+    (limits : CoreBudgetLimits) (state : CoreBudgetState)
+    (path : DecodePath) (text : String) : CoreDecodeResult (Int × CoreBudgetState) := do
+  let state ← consumeIntegerBytes limits state text.utf8ByteSize
+  let value ← liftProtocol <| decodeCanonicalIntegerTextAt path text
+  pure (value, state)
+
+theorem encodeIntegerText_of_decodeIntegerTextAtWithBudget_eq_ok
+    (limits : CoreBudgetLimits) (state finalState : CoreBudgetState)
+    (path : DecodePath) (text : String) (value : Int)
+    (success : decodeIntegerTextAtWithBudget limits state path text = .ok (value, finalState)) :
+    encodeIntegerText value = text := by
+  unfold decodeIntegerTextAtWithBudget at success
+  cases consumed : consumeIntegerBytes limits state text.utf8ByteSize with
+  | error error =>
+      simp [consumed] at success
+      cases success
+  | ok consumedState =>
+      cases decoded : decodeCanonicalIntegerTextAt path text with
+      | error error =>
+          simp [consumed, liftProtocol, decoded] at success
+          cases success
+      | ok decodedValue =>
+          simp [consumed, liftProtocol, decoded] at success
+          rcases success with ⟨rfl, _⟩
+          exact encodeIntegerText_of_decodeCanonicalIntegerTextAt_eq_ok path text value decoded
+
+def encodeInteger (value : Int) : Lean.Json := encodeIntegerText value
+
+def decodeIntegerAtWithBudget
+    (limits : CoreBudgetLimits) (state : CoreBudgetState)
+    (path : DecodePath) (json : Lean.Json) : CoreDecodeResult (Int × CoreBudgetState) := do
+  let text ← liftProtocol <| decodeStringAt path json
+  decodeIntegerTextAtWithBudget limits state path text
+
+def decodeIntegerWithBudget (limits : CoreBudgetLimits) (json : Lean.Json) : CoreDecodeResult Int := do
+  let (value, _) ← decodeIntegerAtWithBudget limits .initial .root json
+  pure value
+
+def decodeInteger (json : Lean.Json) : CoreDecodeResult Int :=
+  decodeIntegerWithBudget .default json
+
+def canonicalizeIntegerWithBudget
+    (limits : CoreBudgetLimits) (json : Lean.Json) : CoreDecodeResult Lean.Json :=
+  encodeInteger <$> decodeIntegerWithBudget limits json
+
+theorem canonicalizeIntegerWithBudget_of_decode_eq_ok
+    (limits : CoreBudgetLimits) (json : Lean.Json) (value : Int)
+    (success : decodeIntegerWithBudget limits json = .ok value) :
+    canonicalizeIntegerWithBudget limits json = .ok (encodeInteger value) := by
+  rw [canonicalizeIntegerWithBudget, success]
+  rfl
 
 def encodeWordText (value : Solcore.Core.Word) : String :=
   Solcore.ContractRuntime.encodeWordText value

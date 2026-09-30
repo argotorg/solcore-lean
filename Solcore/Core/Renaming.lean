@@ -56,6 +56,7 @@ mutual
     | .unit => .unit
     | .bool value => .bool value
     | .word value => .word value
+    | .integer value => .integer value
     | .var index => .var (mapping index)
     | .pair left right => .pair (left.rename mapping) (right.rename mapping)
     | .first operand => .first (operand.rename mapping)
@@ -107,7 +108,7 @@ end
 mutual
 
   @[simp] theorem Expr.rename_id : ∀ expr : Expr, expr.rename Renaming.id = expr
-    | .unit | .bool _ | .word _ | .var _ => rfl
+    | .unit | .bool _ | .word _ | .integer _ | .var _ => rfl
     | .pair left right
     | .apply left right
     | .storeCell left right
@@ -144,7 +145,7 @@ mutual
 
   theorem Expr.rename_comp : ∀ (expr : Expr) (outer inner : Renaming),
       (expr.rename inner).rename outer = expr.rename (outer.comp inner)
-    | .unit, _, _ | .bool _, _, _ | .word _, _, _ | .var _, _, _ => rfl
+    | .unit, _, _ | .bool _, _, _ | .word _, _, _ | .integer _, _, _ | .var _, _, _ => rfl
     | .pair left right, outer, inner
     | .apply left right, outer, inner
     | .storeCell left right, outer, inner
@@ -193,6 +194,7 @@ mutual
     | .unit, _ => by simp [Expr.rename, Expr.weakenAt]
     | .bool _, _ => by simp [Expr.rename, Expr.weakenAt]
     | .word _, _ => by simp [Expr.rename, Expr.weakenAt]
+    | .integer _, _ => by simp [Expr.rename, Expr.weakenAt]
     | .var index, cutoff => by
         by_cases shifted : cutoff ≤ index <;>
           simp [Expr.rename, Expr.weakenAt, Renaming.insertion, shifted]
@@ -322,6 +324,7 @@ theorem HasType.rename
   | unit => exact .unit
   | bool => exact .bool
   | word => exact .word
+  | integer => exact .integer
   | var found => exact .var (respect found)
   | pair _ _ leftIH rightIH => exact .pair (leftIH respect) (rightIH respect)
   | first _ operandIH => exact .first (operandIH respect)
@@ -420,6 +423,7 @@ mutual
     | unit : ValuesRelated .unit .unit
     | bool (value : Bool) : ValuesRelated (.bool value) (.bool value)
     | word (value : Word) : ValuesRelated (.word value) (.word value)
+    | integer (value : Int) : ValuesRelated (.integer value) (.integer value)
     | hostFunction (function : HostFunction) :
         ValuesRelated (.hostFunction function) (.hostFunction function)
     | pair {left left' right right' : Value} :
@@ -517,6 +521,7 @@ mutual
     | .unit => .unit
     | .bool value => .bool value
     | .word value => .word value
+    | .integer value => .integer value
     | .hostFunction function => .hostFunction function
     | .pair left right =>
         .pair (ValuesRelated.refl left) (ValuesRelated.refl right)
@@ -565,6 +570,15 @@ theorem word_iff {value : Word} {target : Value} :
     rfl
   · rintro rfl
     exact .word value
+
+theorem integer_iff {value : Int} {target : Value} :
+    ValuesRelated (.integer value) target ↔ target = .integer value := by
+  constructor
+  · intro related
+    cases related
+    rfl
+  · rintro rfl
+    exact .integer value
 
 end ValuesRelated
 
@@ -677,7 +691,7 @@ private theorem UnaryOp.apply_related
     ∃ result', op.apply target = some result' ∧ ValuesRelated result result' := by
   cases op <;> cases values <;>
     simp [UnaryOp.apply] at applied ⊢ <;>
-    cases applied <;> first | exact .bool _ | exact .word _
+    cases applied <;> first | exact .bool _ | exact .word _ | exact .integer _
 
 private theorem BinaryOp.apply_related
     {op : BinaryOp} {left left' right right' result : Value}
@@ -688,7 +702,7 @@ private theorem BinaryOp.apply_related
       op.apply left' right' = some result' ∧ ValuesRelated result result' := by
   cases op <;> cases leftValues <;> cases rightValues <;>
     simp [BinaryOp.apply] at applied ⊢ <;>
-    cases applied <;> first | exact .bool _ | exact .word _
+    cases applied <;> first | exact .bool _ | exact .word _ | exact .integer _
 
 private theorem TernaryOp.apply_related
     {op : TernaryOp}
@@ -742,6 +756,7 @@ theorem Evaluates.rename
   | unit => exact ⟨.unit, _, .unit, .unit, stores⟩
   | bool => exact ⟨_, _, .bool, .bool _, stores⟩
   | word => exact ⟨_, _, .word, .word _, stores⟩
+  | integer => exact ⟨_, _, .integer, .integer _, stores⟩
   | pair _ _ leftIH rightIH =>
       obtain ⟨left', middleStore', leftEvaluation, leftRelated, middleRelated⟩ :=
         leftIH environments stores
@@ -943,6 +958,9 @@ theorem ValuesRelated.eq_of_cellPayload
   | word =>
       cases typing
       exact (ValuesRelated.word_iff.mp related).symm
+  | integer =>
+      cases typing
+      exact (ValuesRelated.integer_iff.mp related).symm
   | product leftPayload rightPayload leftIH rightIH =>
       cases typing with
       | pair leftTyping rightTyping =>

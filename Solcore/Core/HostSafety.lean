@@ -19,6 +19,8 @@ mutual
         HostRuntimeValueHasType world (.bool value) .bool definitions
     | word {definitions : DataEnvironment} {value : Word} :
         HostRuntimeValueHasType world (.word value) .word definitions
+    | integer {definitions : DataEnvironment} {value : Int} :
+        HostRuntimeValueHasType world (.integer value) .integer definitions
     | hostFunction
         {definitions : DataEnvironment} {function : HostFunction} :
         HostRuntimeValueHasType world
@@ -95,7 +97,7 @@ theorem HostRuntimeEnvironmentHasTypes.lookup
         HostRuntimeValueHasType world value type definitions := by
   induction hasTypes using HostRuntimeEnvironmentHasTypes.rec
       (motive_1 := fun _ _ _ _ => True) generalizing index with
-  | unit | bool | word | hostFunction | pair | inLeft | inRight | closure
+  | unit | bool | word | integer | hostFunction | pair | inLeft | inRight | closure
   | cellRef | constructed =>
       exact True.intro
   | nil => simp at typeLookup
@@ -117,7 +119,7 @@ theorem HostRuntimeValueHasType.type_eq
     value.type = type := by
   induction typing using HostRuntimeValueHasType.rec
       (motive_2 := fun _ _ _ _ => True) with
-  | unit | bool | word | hostFunction | closure | cellRef | constructed => rfl
+  | unit | bool | word | integer | hostFunction | closure | cellRef | constructed => rfl
   | pair _ _ leftIH rightIH => simp [Value.type, leftIH, rightIH]
   | inLeft _ payloadIH => simp [Value.type, payloadIH]
   | inRight _ payloadIH => simp [Value.type, payloadIH]
@@ -212,6 +214,7 @@ mutual
     | unit => exact .unit
     | bool => exact .bool
     | word => exact .word
+    | integer => exact .integer
     | pair _ _ leftIH rightIH => exact .pair leftIH rightIH
     | inLeft _ payloadIH => exact .inLeft payloadIH
     | inRight _ payloadIH => exact .inRight payloadIH
@@ -239,6 +242,7 @@ mutual
     case unit => intros; exact .unit
     case bool => intros; exact .bool
     case word => intros; exact .word
+    case integer => intros; exact .integer
     case pair =>
       intro _ _ _ _ _ _ _ leftIH rightIH
       exact .pair leftIH rightIH
@@ -281,6 +285,7 @@ theorem HostRuntimeValueHasType.weaken
   case unit => intros; exact .unit
   case bool => intros; exact .bool
   case word => intros; exact .word
+  case integer => intros; exact .integer
   case hostFunction => intros; exact .hostFunction
   case pair => intros; exact .pair ‹_› ‹_›
   case inLeft => intros; exact .inLeft ‹_›
@@ -299,7 +304,7 @@ theorem HostRuntimeEnvironmentHasTypes.weaken
     HostRuntimeEnvironmentHasTypes future environment context definitions := by
   induction typing using HostRuntimeEnvironmentHasTypes.rec
       (motive_1 := fun _ _ _ _ => True) with
-  | unit | bool | word | hostFunction | pair | inLeft | inRight | closure
+  | unit | bool | word | integer | hostFunction | pair | inLeft | inRight | closure
   | cellRef | constructed =>
       exact True.intro
   | nil => exact .nil
@@ -317,6 +322,7 @@ theorem CellPayload.valueHasType_of_hostRuntimeValueHasType
   | unit => cases typing; exact .unit
   | bool => cases typing; exact .bool
   | word => cases typing; exact .word
+  | integer => cases typing; exact .integer
   | product leftPayload rightPayload leftIH rightIH =>
       cases typing with
       | pair leftTyping rightTyping =>

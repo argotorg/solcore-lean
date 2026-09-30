@@ -154,7 +154,7 @@ theorem hostAdvance_done_iff
             case applyArgument argument environment =>
               cases returned with
               | hostFunction function => simp [hostAdvance] at advanced
-              | unit | bool | word | pair | closure | inLeft | inRight | cellRef |
+              | unit | bool | word | integer | pair | closure | inLeft | inRight | cellRef |
                   constructed =>
                   exact advance_done_iff.mp
                     (by simpa [hostAdvance] using advanced)
@@ -167,7 +167,7 @@ theorem hostAdvance_done_iff
                   | pair left right =>
                       cases left <;> cases right <;>
                         simp [hostAdvance] at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
               | storageAddress =>
@@ -191,7 +191,7 @@ theorem hostAdvance_done_iff
                   | pair left right =>
                       cases left <;> cases right <;>
                         simp [hostAdvance] at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
               | callContractWordWithValue =>
@@ -204,10 +204,10 @@ theorem hostAdvance_done_iff
                         | pair transferredValue input =>
                             cases transferredValue <;> cases input <;>
                               simp at advanced
-                        | unit | bool | word | hostFunction | closure | inLeft |
+                        | unit | bool | word | integer | hostFunction | closure | inLeft |
                             inRight | cellRef | constructed =>
                             simp at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
               | createContractWord =>
@@ -220,10 +220,10 @@ theorem hostAdvance_done_iff
                         | pair transferredValue input =>
                             cases transferredValue <;> cases input <;>
                               simp at advanced
-                        | unit | bool | word | hostFunction | closure | inLeft |
+                        | unit | bool | word | integer | hostFunction | closure | inLeft |
                             inRight | cellRef | constructed =>
                             simp at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
               | emitLogWord =>
@@ -231,7 +231,7 @@ theorem hostAdvance_done_iff
                   | pair topic payload =>
                       cases topic <;> cases payload <;>
                         simp [hostAdvance] at advanced
-                  | unit | bool | word | hostFunction | closure | inLeft |
+                  | unit | bool | word | integer | hostFunction | closure | inLeft |
                       inRight | cellRef | constructed =>
                       simp [hostAdvance] at advanced
   · rintro ⟨store, rfl⟩

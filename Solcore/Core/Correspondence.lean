@@ -32,6 +32,8 @@ theorem Evaluates.toStepsWithContinuation
       exact ⟨1, .cons .bool .refl⟩
   | word =>
       exact ⟨1, .cons .word .refl⟩
+  | integer =>
+      exact ⟨1, .cons .integer .refl⟩
   | @pair environment initialStore middleStore finalStore left right
       leftValue rightValue leftEvaluation rightEvaluation leftIH rightIH =>
       obtain ⟨leftSteps, leftPath⟩ :=
@@ -735,6 +737,9 @@ theorem transition_reflects_denotation
   | word =>
       cases denotes with
       | ret continuation => exact .eval .word continuation
+  | integer =>
+      cases denotes with
+      | ret continuation => exact .eval .integer continuation
   | enterPair =>
       cases denotes with
       | eval leftEvaluation continuation =>

@@ -84,6 +84,7 @@ inductive WellFormed (definitions : DataEnvironment) : Ty → Prop where
   | unit : WellFormed definitions .unit
   | bool : WellFormed definitions .bool
   | word : WellFormed definitions .word
+  | integer : WellFormed definitions .integer
   | product {left right : Ty} :
       WellFormed definitions left →
       WellFormed definitions right →
@@ -106,7 +107,8 @@ inductive WellFormed (definitions : DataEnvironment) : Ty → Prop where
 def isWellFormed (definitions : DataEnvironment) : Ty → Bool
   | .unit
   | .bool
-  | .word => true
+  | .word
+  | .integer => true
   | .product left right
   | .function left right
   | .sum left right =>
@@ -123,6 +125,7 @@ theorem isWellFormed_sound
   | unit => exact .unit
   | bool => exact .bool
   | word => exact .word
+  | integer => exact .integer
   | product left right leftIH rightIH =>
       simp [isWellFormed] at accepted
       exact .product (leftIH accepted.1) (rightIH accepted.2)
@@ -146,7 +149,8 @@ theorem isWellFormed_complete
   induction wellFormed with
   | unit
   | bool
-  | word => rfl
+  | word
+  | integer => rfl
   | product leftWellFormed rightWellFormed leftIH rightIH
   | function leftWellFormed rightWellFormed leftIH rightIH
   | sum leftWellFormed rightWellFormed leftIH rightIH =>
@@ -215,6 +219,7 @@ theorem wellFormed
   | unit => exact .unit
   | bool => exact .bool
   | word => exact .word
+  | integer => exact .integer
   | product leftPayload rightPayload leftIH rightIH =>
       exact .product leftIH rightIH
   | sum leftPayload rightPayload leftIH rightIH =>

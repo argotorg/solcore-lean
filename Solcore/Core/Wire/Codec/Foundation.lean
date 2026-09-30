@@ -51,6 +51,7 @@ inductive DecodeErrorCode where
   | invalidTag
   | invalidType
   | invalidWord
+  | invalidInteger
   deriving Repr, BEq, DecidableEq
 
 namespace DecodeErrorCode
@@ -67,6 +68,7 @@ def wireName : DecodeErrorCode → String
   | .invalidTag => "invalid-tag"
   | .invalidType => "invalid-type"
   | .invalidWord => "invalid-word"
+  | .invalidInteger => "invalid-integer"
 
 end DecodeErrorCode
 

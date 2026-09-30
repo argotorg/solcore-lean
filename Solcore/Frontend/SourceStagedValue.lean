@@ -117,7 +117,7 @@ private theorem project_reflect (core : Core.Value) {value : Value}
       cases Option.some.inj equality
       simp only [toCore]
       rw [project_reflect left leftProjected, project_reflect right rightProjected]
-  | hostFunction | closure | inLeft | inRight | cellRef | constructed =>
+  | integer | hostFunction | closure | inLeft | inRight | cellRef | constructed =>
       simp only [ofCore?, reduceCtorEq] at projected
 termination_by sizeOf core
 decreasing_by

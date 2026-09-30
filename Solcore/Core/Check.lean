@@ -180,7 +180,8 @@ private def firstUnknownNamedDataType?
     (definitions : DataEnvironment) : Ty → Option DataTypeId
   | .unit
   | .bool
-  | .word => none
+  | .word
+  | .integer => none
   | .product left right
   | .function left right
   | .sum left right =>
@@ -243,7 +244,8 @@ mutual
         match expr with
         | .unit
         | .bool _
-        | .word _ => { path, data := .inferenceFailure }
+        | .word _
+        | .integer _ => { path, data := .inferenceFailure }
         | .var index =>
             { path, data := .unboundVariable index context.length }
         | .pair left right =>
@@ -521,6 +523,7 @@ mutual
     | .unit
     | .bool _
     | .word _
+    | .integer _
     | .var _ => 1
     | .first operand
     | .second operand

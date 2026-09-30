@@ -23,6 +23,8 @@ def programNodes (program : Program) : Nat :=
   1 + typeNodes program.resultType +
     dataEnvironmentNodes program.dataDefinitions + exprNodes program.body
 
+def programIntegerBytes (program : Program) : Nat := exprIntegerBytes program.body
+
 def decodeProgramAtWithBudget
     (limits : CoreBudgetLimits)
     (state : CoreBudgetState)
@@ -83,7 +85,7 @@ private def decodeLocatedProgramList
       let (programs, state) ← decodeLocatedProgramList limits state rest
       pure (program :: programs, state)
 
-/-- Decode canonical package order with cumulative nodes and fresh root depth. -/
+/-- Decode canonical package order with cumulative nodes/integers and fresh root depth. -/
 def decodeProgramsWithBudget
     (limits : CoreBudgetLimits)
     (programs : List LocatedProgramJson) :
@@ -97,6 +99,10 @@ def programListDepth : List Program → Nat
 def programListNodes : List Program → Nat
   | [] => 0
   | program :: rest => programNodes program + programListNodes rest
+
+def programListIntegerBytes : List Program → Nat
+  | [] => 0
+  | program :: rest => programIntegerBytes program + programListIntegerBytes rest
 
 def canonicalizeProgramWithBudget
     (limits : CoreBudgetLimits)

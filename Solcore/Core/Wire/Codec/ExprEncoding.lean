@@ -11,6 +11,8 @@ def encodeExpr : Expr → Lean.Json
   | .bool value => .mkObj [("tag", "bool"), ("value", value)]
   | .word value =>
       .mkObj [("tag", "word"), ("value", encodeWord value)]
+  | .integer value =>
+      .mkObj [("tag", "integer"), ("value", encodeInteger value)]
   | .var index => .mkObj [("tag", "var"), ("index", index)]
   | .pair left right =>
       .mkObj [

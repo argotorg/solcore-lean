@@ -341,7 +341,7 @@ theorem HasType.wordLt_inv_local_right
                       have rightTypeEq : rightType = .word := by
                         simpa [BinaryOp.leftType] using foundRight
                       have leftTypeEq : leftType = .word := by
-                        simpa [BinaryOp.rightType] using foundLeft
+                        simpa [BinaryOp.rightType, BinaryOp.leftType] using foundLeft
                       cases rightTypeEq
                       cases leftTypeEq
                       exact ⟨rfl, leftTyping,

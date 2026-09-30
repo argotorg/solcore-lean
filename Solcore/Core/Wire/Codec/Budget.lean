@@ -9,11 +9,14 @@ namespace Solcore.Core.Wire
 inductive CoreBudgetResource where
   | depth
   | nodes
+  | integerBytes
   deriving Repr, BEq, DecidableEq
 
 structure CoreBudgetLimits where
   maxDepth : Nat
   maxNodes : Nat
+  /-- Cumulative UTF-8 bytes of integer literal spellings, before parsing. -/
+  maxIntegerBytes : Nat := 1000000
   deriving Repr, BEq, DecidableEq
 
 namespace CoreBudgetLimits
@@ -27,6 +30,7 @@ end CoreBudgetLimits
 
 structure CoreBudgetState where
   consumedNodes : Nat := 0
+  consumedIntegerBytes : Nat := 0
   deriving Repr, BEq, DecidableEq
 
 namespace CoreBudgetState
@@ -82,7 +86,7 @@ def consumeCoreNode
       consumed
       exceeded
     })
-  pure { consumedNodes := consumed }
+  pure { state with consumedNodes := consumed }
 
 @[simp] theorem consumeCoreNode_at_limits
     (limits : CoreBudgetLimits)
@@ -91,8 +95,46 @@ def consumeCoreNode
     (depthFits : depth ≤ limits.maxDepth)
     (nodesFit : state.consumedNodes + 1 ≤ limits.maxNodes) :
     consumeCoreNode limits state depth =
-      .ok { consumedNodes := state.consumedNodes + 1 } := by
+      .ok { state with consumedNodes := state.consumedNodes + 1 } := by
   simp [consumeCoreNode, Nat.not_lt.mpr depthFits, Nat.not_lt.mpr nodesFit]
   rfl
+
+/-- Consume the spelling before any conversion to an arbitrary precision integer. -/
+def consumeIntegerBytes
+    (limits : CoreBudgetLimits)
+    (state : CoreBudgetState)
+    (bytes : Nat) : CoreDecodeResult CoreBudgetState := do
+  let consumed := state.consumedIntegerBytes + bytes
+  if exceeded : limits.maxIntegerBytes < consumed then
+    throw (.exhausted {
+      resource := .integerBytes
+      limit := limits.maxIntegerBytes
+      consumed
+      exceeded
+    })
+  pure { state with consumedIntegerBytes := consumed }
+
+@[simp] theorem consumeIntegerBytes_at_limits
+    (limits : CoreBudgetLimits)
+    (state : CoreBudgetState)
+    (bytes : Nat)
+    (fits : state.consumedIntegerBytes + bytes ≤ limits.maxIntegerBytes) :
+    consumeIntegerBytes limits state bytes =
+      .ok { state with consumedIntegerBytes := state.consumedIntegerBytes + bytes } := by
+  simp [consumeIntegerBytes, Nat.not_lt.mpr fits]
+  rfl
+
+theorem consumeIntegerBytes_of_eq_ok
+    {limits : CoreBudgetLimits} {state finalState : CoreBudgetState} {bytes : Nat}
+    (success : consumeIntegerBytes limits state bytes = .ok finalState) :
+    finalState.consumedIntegerBytes = state.consumedIntegerBytes + bytes ∧
+    finalState.consumedIntegerBytes ≤ limits.maxIntegerBytes ∧
+    finalState.consumedNodes = state.consumedNodes := by
+  by_cases exceeded : limits.maxIntegerBytes < state.consumedIntegerBytes + bytes
+  · simp [consumeIntegerBytes, exceeded] at success
+    cases success
+  · rw [consumeIntegerBytes_at_limits limits state bytes (Nat.le_of_not_gt exceeded)] at success
+    cases success
+    exact ⟨rfl, Nat.le_of_not_gt exceeded, rfl⟩
 
 end Solcore.Core.Wire

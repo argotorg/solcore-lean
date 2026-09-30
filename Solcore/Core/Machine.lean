@@ -86,6 +86,12 @@ inductive Transition : State → State → Prop where
       Transition
         ⟨.eval (.word value) environment, continuation, store⟩
         ⟨.ret (.word value), continuation, store⟩
+  | integer
+      {environment : Environment} {value : Int} {continuation : List Frame}
+      {store : Store} :
+      Transition
+        ⟨.eval (.integer value) environment, continuation, store⟩
+        ⟨.ret (.integer value), continuation, store⟩
   | enterPair
       {environment : Environment} {left right : Expr}
       {continuation : List Frame} {store : Store} :
@@ -430,6 +436,8 @@ def advance (state : State) : AdvanceResult :=
           .next ⟨.ret (.bool value), state.continuation, state.store⟩
       | .word value =>
           .next ⟨.ret (.word value), state.continuation, state.store⟩
+      | .integer value =>
+          .next ⟨.ret (.integer value), state.continuation, state.store⟩
       | .pair left right =>
           .next ⟨.eval left environment,
             .pairRight right environment :: state.continuation, state.store⟩
@@ -679,6 +687,10 @@ theorem advance_next_iff {state next : State} :
             simp [advance] at advanced
             cases advanced
             exact .word
+        | integer value =>
+            simp [advance] at advanced
+            cases advanced
+            exact .integer
         | pair left right =>
             simp [advance] at advanced
             cases advanced
@@ -806,7 +818,7 @@ theorem advance_next_iff {state next : State} :
                 exact .applyPair
             | firstApply =>
                 cases value with
-                | unit | bool | word | hostFunction | inLeft | inRight | closure | cellRef |
+                | unit | bool | word | integer | hostFunction | inLeft | inRight | closure | cellRef |
                     constructed =>
                     simp [advance] at advanced
                 | pair leftValue rightValue =>
@@ -815,7 +827,7 @@ theorem advance_next_iff {state next : State} :
                     exact .applyFirst
             | secondApply =>
                 cases value with
-                | unit | bool | word | hostFunction | inLeft | inRight | closure | cellRef |
+                | unit | bool | word | integer | hostFunction | inLeft | inRight | closure | cellRef |
                     constructed =>
                     simp [advance] at advanced
                 | pair leftValue rightValue =>
@@ -832,7 +844,7 @@ theorem advance_next_iff {state next : State} :
                 exact .applyInRight
             | caseBranches leftBranch rightBranch environment =>
                 cases value with
-                | unit | bool | word | hostFunction | pair | closure | cellRef |
+                | unit | bool | word | integer | hostFunction | pair | closure | cellRef |
                     constructed =>
                     simp [advance] at advanced
                 | inLeft rightType payload =>
@@ -849,7 +861,7 @@ theorem advance_next_iff {state next : State} :
                 exact .applyNewCell
             | loadCellApply =>
                 cases value with
-                | unit | bool | word | hostFunction | pair | closure | inLeft | inRight |
+                | unit | bool | word | integer | hostFunction | pair | closure | inLeft | inRight |
                     constructed =>
                     simp [advance] at advanced
                 | cellRef elementType location =>
@@ -861,7 +873,7 @@ theorem advance_next_iff {state next : State} :
                         exact .applyLoadCell lookup
             | storeCellValue valueExpr environment =>
                 cases value with
-                | unit | bool | word | hostFunction | pair | closure | inLeft | inRight |
+                | unit | bool | word | integer | hostFunction | pair | closure | inLeft | inRight |
                     constructed =>
                     simp [advance] at advanced
                 | cellRef elementType location =>
@@ -884,7 +896,7 @@ theorem advance_next_iff {state next : State} :
                 exact .applyConstruct
             | matchDataApply dataType branches environment =>
                 cases value with
-                | unit | bool | word | hostFunction | pair | closure | inLeft | inRight |
+                | unit | bool | word | integer | hostFunction | pair | closure | inLeft | inRight |
                     cellRef =>
                     simp [advance] at advanced
                 | constructed constructor payload =>
@@ -899,7 +911,7 @@ theorem advance_next_iff {state next : State} :
                     · simp [advance, sameOwner] at advanced
             | applyArgument argument callerEnvironment =>
                 cases value with
-                | unit | bool | word | hostFunction | pair | inLeft | inRight | cellRef |
+                | unit | bool | word | integer | hostFunction | pair | inLeft | inRight | cellRef |
                     constructed =>
                     simp [advance] at advanced
                 | closure parameterType resultType body capturedEnvironment =>
@@ -918,7 +930,7 @@ theorem advance_next_iff {state next : State} :
                 exact .bindLet
             | ifBranches thenBranch elseBranch environment =>
                 cases value with
-                | unit | word | hostFunction | pair | inLeft | inRight | closure | cellRef |
+                | unit | word | integer | hostFunction | pair | inLeft | inRight | closure | cellRef |
                     constructed =>
                     simp [advance] at advanced
                 | bool decision =>
@@ -943,7 +955,7 @@ theorem advance_done_iff {state : State} {value : Value} :
     cases control with
     | eval expr environment =>
         cases expr with
-        | unit | bool | word | pair | first | second | inLeft | inRight | caseE |
+        | unit | bool | word | integer | pair | first | second | inLeft | inRight | caseE |
             newCell | loadCell | storeCell | construct | matchData | lambda |
             apply | unary | binary | ternary | letE | ifE =>
             simp [advance] at advanced
@@ -985,7 +997,7 @@ theorem advance_done_iff {state : State} {value : Value} :
             | newCellApply elementType => simp [advance] at advanced
             | loadCellApply =>
                 cases returned with
-                | unit | bool | word | hostFunction | pair | closure | inLeft | inRight |
+                | unit | bool | word | integer | hostFunction | pair | closure | inLeft | inRight |
                     constructed =>
                     simp [advance] at advanced
                 | cellRef elementType location =>
@@ -993,7 +1005,7 @@ theorem advance_done_iff {state : State} {value : Value} :
                       simp [advance, lookup] at advanced
             | storeCellValue valueExpr environment =>
                 cases returned with
-                | unit | bool | word | hostFunction | pair | closure | inLeft | inRight |
+                | unit | bool | word | integer | hostFunction | pair | closure | inLeft | inRight |
                     constructed =>
                     simp [advance] at advanced
                 | cellRef elementType location =>
@@ -1006,7 +1018,7 @@ theorem advance_done_iff {state : State} {value : Value} :
                 simp [advance] at advanced
             | matchDataApply dataType branches environment =>
                 cases returned with
-                | unit | bool | word | hostFunction | pair | closure | inLeft | inRight |
+                | unit | bool | word | integer | hostFunction | pair | closure | inLeft | inRight |
                     cellRef =>
                     simp [advance] at advanced
                 | constructed constructor payload =>
@@ -1022,7 +1034,7 @@ theorem advance_done_iff {state : State} {value : Value} :
             | letBody body environment => simp [advance] at advanced
             | ifBranches thenBranch elseBranch environment =>
                 cases returned with
-                | unit | word | hostFunction | pair | inLeft | inRight | closure | cellRef |
+                | unit | word | integer | hostFunction | pair | inLeft | inRight | closure | cellRef |
                     constructed =>
                     simp [advance] at advanced
                 | bool decision =>

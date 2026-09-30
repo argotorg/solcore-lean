@@ -59,6 +59,7 @@ inductive Ty where
   | unit
   | bool
   | word
+  | integer
   | product (left right : Ty)
   | function (parameter result : Ty)
   | sum (left right : Ty)
@@ -76,6 +77,9 @@ inductive UnaryOp where
   | boolNot
   | wordNot
   | wordClz
+  | integerNot
+  | integerToWord
+  | wordToInteger
   deriving Repr, BEq, DecidableEq
 
 inductive BinaryOp where
@@ -98,6 +102,16 @@ inductive BinaryOp where
   | wordSignExtend
   | wordSdiv
   | wordSmod
+  | integerAdd
+  | integerSub
+  | integerMul
+  | integerDiv
+  | integerMod
+  | integerEq
+  | integerLt
+  | integerAnd
+  | integerOr
+  | integerXor
   deriving Repr, BEq, DecidableEq
 
 inductive TernaryOp where
@@ -109,6 +123,7 @@ inductive Expr where
   | unit
   | bool (value : Bool)
   | word (value : Solcore.Core.Word)
+  | integer (value : Int)
   | var (index : Nat)
   | pair (left right : Expr)
   | first (operand : Expr)

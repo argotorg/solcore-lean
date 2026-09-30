@@ -26,6 +26,7 @@ inductive Ty where
   | unit
   | bool
   | word
+  | integer
   | product (left : Ty) (right : Ty)
   | function (parameter : Ty) (result : Ty)
   | sum (left : Ty) (right : Ty)
@@ -48,6 +49,7 @@ inductive CellPayload : Ty → Prop where
   | unit : CellPayload .unit
   | bool : CellPayload .bool
   | word : CellPayload .word
+  | integer : CellPayload .integer
   | product {left right : Ty} :
       CellPayload left →
       CellPayload right →
@@ -62,7 +64,8 @@ namespace Ty
 def isCellPayload : Ty → Bool
   | .unit
   | .bool
-  | .word => true
+  | .word
+  | .integer => true
   | .product left right
   | .sum left right => left.isCellPayload && right.isCellPayload
   | .function _ _
@@ -77,6 +80,7 @@ theorem isCellPayload_sound
   | unit => exact .unit
   | bool => exact .bool
   | word => exact .word
+  | integer => exact .integer
   | product left right leftIH rightIH =>
       simp [isCellPayload] at accepted
       exact .product (leftIH accepted.1) (rightIH accepted.2)
@@ -97,7 +101,8 @@ theorem isCellPayload_complete
   induction payload with
   | unit
   | bool
-  | word => rfl
+  | word
+  | integer => rfl
   | product leftPayload rightPayload leftIH rightIH
   | sum leftPayload rightPayload leftIH rightIH =>
       simp [isCellPayload, leftIH, rightIH]
@@ -418,6 +423,9 @@ inductive UnaryOp where
   | boolNot
   | wordNot
   | wordClz
+  | integerNot
+  | integerToWord
+  | wordToInteger
   deriving Repr, BEq, DecidableEq
 
 namespace UnaryOp
@@ -425,12 +433,15 @@ namespace UnaryOp
 def operandType : UnaryOp → Ty
   | .boolNot => .bool
   | .wordNot
-  | .wordClz => .word
+  | .wordClz
+  | .wordToInteger => .word
+  | .integerNot
+  | .integerToWord => .integer
 
 def resultType : UnaryOp → Ty
   | .boolNot => .bool
-  | .wordNot
-  | .wordClz => .word
+  | .wordNot | .wordClz | .integerToWord => .word
+  | .integerNot | .wordToInteger => .integer
 
 end UnaryOp
 
@@ -454,18 +465,33 @@ inductive BinaryOp where
   | wordSignExtend
   | wordSdiv
   | wordSmod
+  | integerAdd
+  | integerSub
+  | integerMul
+  | integerDiv
+  | integerMod
+  | integerEq
+  | integerLt
+  | integerAnd
+  | integerOr
+  | integerXor
   deriving Repr, BEq, DecidableEq
 
 namespace BinaryOp
 
-def leftType (_ : BinaryOp) : Ty := .word
+def leftType : BinaryOp → Ty
+  | .integerAdd | .integerSub | .integerMul | .integerDiv | .integerMod
+  | .integerEq | .integerLt | .integerAnd | .integerOr | .integerXor => .integer
+  | _ => .word
 
-def rightType (_ : BinaryOp) : Ty := .word
+def rightType (op : BinaryOp) : Ty := op.leftType
 
 def resultType : BinaryOp → Ty
   | .wordEq
   | .wordGt
-  | .wordSgt => .bool
+  | .wordSgt
+  | .integerEq
+  | .integerLt => .bool
   | .wordAdd
   | .wordSub
   | .wordMul
@@ -482,6 +508,8 @@ def resultType : BinaryOp → Ty
   | .wordSignExtend
   | .wordSdiv
   | .wordSmod => .word
+  | .integerAdd | .integerSub | .integerMul | .integerDiv | .integerMod
+  | .integerAnd | .integerOr | .integerXor => .integer
 
 end BinaryOp
 
@@ -508,6 +536,7 @@ inductive Expr where
   | unit
   | bool (value : Bool)
   | word (value : Word)
+  | integer (value : Int)
   | var (index : Nat)
   | pair (left : Expr) (right : Expr)
   | first (operand : Expr)
@@ -539,6 +568,7 @@ mutual
     | .unit, .unit => true
     | .bool left, .bool right
     | .word left, .word right
+    | .integer left, .integer right
     | .var left, .var right => decide (left = right)
     | .pair leftFirst leftSecond, .pair rightFirst rightSecond
     | .apply leftFirst leftSecond, .apply rightFirst rightSecond
@@ -672,6 +702,7 @@ inductive Value where
   | unit
   | bool (value : Bool)
   | word (value : Word)
+  | integer (value : Int)
   | hostFunction (function : HostFunction)
   | pair (left : Value) (right : Value)
   | closure
@@ -698,6 +729,14 @@ mutual
             cases valueEquality
             exact equality rfl)
     | .word leftValue, .word rightValue =>
+        if equality : leftValue = rightValue then
+          isTrue (by cases equality; rfl)
+        else
+          isFalse (by
+            intro valueEquality
+            cases valueEquality
+            exact equality rfl)
+    | .integer leftValue, .integer rightValue =>
         if equality : leftValue = rightValue then
           isTrue (by cases equality; rfl)
         else
@@ -831,6 +870,26 @@ mutual
             intro valueEquality
             cases valueEquality
             exact constructorEquality rfl)
+    | .integer _, .unit
+    | .unit, .integer _
+    | .integer _, .bool _
+    | .bool _, .integer _
+    | .integer _, .word _
+    | .word _, .integer _
+    | .integer _, .pair _ _
+    | .pair _ _, .integer _
+    | .integer _, .hostFunction _
+    | .hostFunction _, .integer _
+    | .integer _, .closure _ _ _ _
+    | .closure _ _ _ _, .integer _
+    | .integer _, .inLeft _ _
+    | .inLeft _ _, .integer _
+    | .integer _, .inRight _ _
+    | .inRight _ _, .integer _
+    | .integer _, .cellRef _ _
+    | .cellRef _ _, .integer _
+    | .integer _, .constructed _ _
+    | .constructed _ _, .integer _
     | .unit, .bool _
     | .unit, .word _
     | .unit, .pair _ _
@@ -972,6 +1031,7 @@ def Value.type : Value → Ty
   | .unit => .unit
   | .bool _ => .bool
   | .word _ => .word
+  | .integer _ => .integer
   | .hostFunction function => function.functionType
   | .pair left right => .product left.type right.type
   | .closure parameterType resultType _ _ =>

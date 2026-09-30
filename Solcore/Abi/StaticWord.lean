@@ -1128,12 +1128,13 @@ private theorem reverted_hasType (context : Context) (reason : Word) :
 
 private theorem binaryWordOperands_hasType
     (context : Context) (op : BinaryOp) (left right : Expr)
+    (wordOperands : op.leftType = .word)
     (leftTyping : HasType context left .word [])
     (rightTyping : HasType context right .word []) :
     HasType context (.binary op left right) op.resultType [] := by
   apply HasType.binary
-  · simpa [BinaryOp.leftType] using leftTyping
-  · simpa [BinaryOp.rightType] using rightTyping
+  · simpa [wordOperands] using leftTyping
+  · simpa [BinaryOp.rightType, wordOperands] using rightTyping
 
 /-- Move one method implementation beneath the dispatcher's four locals. -/
 private def underDispatcherLocals (implementation : WordImplementation) : Expr :=
@@ -1166,7 +1167,7 @@ private theorem route_hasType (entries : List IndexedMethod) :
   | cons entry rest inductionHypothesis =>
       apply HasType.ifE
       · simpa [BinaryOp.resultType] using
-          binaryWordOperands_hasType _ .wordEq _ _
+          binaryWordOperands_hasType _ .wordEq _ _ rfl
             (HasType.var (by simp)) HasType.word
       · apply HasType.inLeft
         · exact .sum .word .word
@@ -1226,7 +1227,7 @@ theorem MethodTable.dispatchProgram_checked (table : MethodTable) :
         (HasType.var hostContext_inputDataSize) HasType.unit
     · apply HasType.ifE
       · simpa [BinaryOp.resultType] using
-          binaryWordOperands_hasType _ .wordGt _ _
+          binaryWordOperands_hasType _ .wordGt _ _ rfl
             HasType.word (HasType.var (by simp))
       · exact reverted_hasType _ malformedCalldataReason
       · apply HasType.caseE (leftType := .unit) (rightType := .word)
@@ -1235,7 +1236,7 @@ theorem MethodTable.dispatchProgram_checked (table : MethodTable) :
         · exact reverted_hasType _ malformedCalldataReason
         · apply HasType.letE
           · simpa [BinaryOp.resultType] using
-              binaryWordOperands_hasType _ .wordShr _ _
+              binaryWordOperands_hasType _ .wordShr _ _ rfl
                 (HasType.var (by simp)) HasType.word
           · apply HasType.caseE (leftType := .unit) (rightType := .word)
             · exact HasType.apply (HasType.var (by simpa using

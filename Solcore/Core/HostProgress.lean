@@ -297,6 +297,7 @@ theorem host_state_progress
       | unit => exact .inr (.inl ⟨_, .core .unit⟩)
       | bool => exact .inr (.inl ⟨_, .core .bool⟩)
       | word => exact .inr (.inl ⟨_, .core .word⟩)
+      | integer => exact .inr (.inl ⟨_, .core .integer⟩)
       | var typeLookup =>
           obtain ⟨value, valueLookup, _⟩ := environmentTyping.lookup typeLookup
           exact .inr (.inl ⟨_, .core (.var valueLookup)⟩)

@@ -15,6 +15,8 @@ mutual
         ValueHasType (.bool value) .bool definitions
     | word {definitions : DataEnvironment} {value : Word} :
         ValueHasType (.word value) .word definitions
+    | integer {definitions : DataEnvironment} {value : Int} :
+        ValueHasType (.integer value) .integer definitions
     | pair
         {definitions : DataEnvironment}
         {left right : Value} {leftType rightType : Ty} :
@@ -77,7 +79,7 @@ theorem EnvironmentHasTypes.lookup
       environment[index]? = some value ∧ ValueHasType value type definitions := by
   induction hasTypes using EnvironmentHasTypes.rec
       (motive_1 := fun _ _ _ _ => True) generalizing index with
-  | unit | bool | word | pair | inLeft | inRight | closure | cellRef
+  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef
   | constructed =>
       exact True.intro
   | nil => simp at typeLookup
@@ -107,7 +109,7 @@ theorem ValueHasType.type_eq
     value.type = type := by
   induction typing using ValueHasType.rec
       (motive_2 := fun _ _ _ _ => True) with
-  | unit | bool | word | closure | cellRef | constructed => rfl
+  | unit | bool | word | integer | closure | cellRef | constructed => rfl
   | pair _ _ leftIH rightIH => simp [Value.type, leftIH, rightIH]
   | inLeft _ payloadIH => simp [Value.type, payloadIH]
   | inRight _ payloadIH => simp [Value.type, payloadIH]
@@ -197,6 +199,8 @@ mutual
         RuntimeValueHasType world (.bool value) .bool definitions
     | word {definitions : DataEnvironment} {value : Word} :
         RuntimeValueHasType world (.word value) .word definitions
+    | integer {definitions : DataEnvironment} {value : Int} :
+        RuntimeValueHasType world (.integer value) .integer definitions
     | pair
         {definitions : DataEnvironment}
         {left right : Value} {leftType rightType : Ty} :
@@ -267,7 +271,7 @@ theorem RuntimeEnvironmentHasTypes.lookup
         RuntimeValueHasType world value type definitions := by
   induction hasTypes using RuntimeEnvironmentHasTypes.rec
       (motive_1 := fun _ _ _ _ => True) generalizing index with
-  | unit | bool | word | pair | inLeft | inRight | closure | cellRef
+  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef
   | constructed =>
       exact True.intro
   | nil => simp at typeLookup
@@ -297,6 +301,7 @@ theorem RuntimeValueHasType.erase
   case unit => intros; exact .unit
   case bool => intros; exact .bool
   case word => intros; exact .word
+  case integer => intros; exact .integer
   case pair =>
     intro _ _ _ _ _ _ _ leftIH rightIH
     exact .pair leftIH rightIH
@@ -333,6 +338,7 @@ theorem RuntimeEnvironmentHasTypes.erase
   case unit => intros; exact .unit
   case bool => intros; exact .bool
   case word => intros; exact .word
+  case integer => intros; exact .integer
   case pair =>
     intro _ _ _ _ _ _ _ leftIH rightIH
     exact .pair leftIH rightIH
@@ -370,7 +376,7 @@ theorem RuntimeEnvironmentHasTypes.type_tags
     environment.map Value.type = context := by
   induction typing using RuntimeEnvironmentHasTypes.rec
       (motive_1 := fun _ _ _ _ => True) with
-  | unit | bool | word | pair | inLeft | inRight | closure | cellRef
+  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef
   | constructed =>
       trivial
   | nil => rfl
@@ -402,6 +408,7 @@ theorem RuntimeValueHasType.weaken
   case unit => intros; exact .unit
   case bool => intros; exact .bool
   case word => intros; exact .word
+  case integer => intros; exact .integer
   case pair =>
     intro _ _ _ _ _ _ _ leftIH rightIH
     exact .pair leftIH rightIH
@@ -442,6 +449,7 @@ theorem RuntimeEnvironmentHasTypes.weaken
   case unit => intros; exact .unit
   case bool => intros; exact .bool
   case word => intros; exact .word
+  case integer => intros; exact .integer
   case pair =>
     intro _ _ _ _ _ _ _ leftIH rightIH
     exact .pair leftIH rightIH
@@ -708,6 +716,7 @@ theorem CellPayload.valueHasType_rebase
   | unit => cases typing; exact .unit
   | bool => cases typing; exact .bool
   | word => cases typing; exact .word
+  | integer => cases typing; exact .integer
   | product leftPayload rightPayload leftIH rightIH =>
       cases typing with
       | pair leftTyping rightTyping =>
@@ -728,6 +737,7 @@ theorem CellPayload.runtimeValueHasType
   | unit => cases typing; exact .unit
   | bool => cases typing; exact .bool
   | word => cases typing; exact .word
+  | integer => cases typing; exact .integer
   | product leftPayload rightPayload leftIH rightIH =>
       cases typing with
       | pair leftTyping rightTyping =>
@@ -796,7 +806,7 @@ theorem BranchesHaveType.lookup
     HasType (payloadType :: context) branch resultType definitions := by
   induction typing using BranchesHaveType.rec
       (motive_1 := fun _ _ _ _ _ => True) generalizing index with
-  | unit | bool | word | var | pair | first | second | lambda | apply
+  | unit | bool | word | integer | var | pair | first | second | lambda | apply
   | inLeft | inRight | caseE | newCell | loadCell | storeCell | construct
   | matchData | unary | binary | ternary | letE | ifE =>
       exact True.intro
@@ -822,7 +832,7 @@ theorem BranchesHaveType.length_eq
     payloadTypes.length = branches.length := by
   induction typing using BranchesHaveType.rec
       (motive_1 := fun _ _ _ _ _ => True) with
-  | unit | bool | word | var | pair | first | second | lambda | apply
+  | unit | bool | word | integer | var | pair | first | second | lambda | apply
   | inLeft | inRight | caseE | newCell | loadCell | storeCell | construct
   | matchData | unary | binary | ternary | letE | ifE =>
       exact True.intro
@@ -870,6 +880,9 @@ theorem evaluation_preserves_type
   | word =>
       cases typing
       exact ⟨world, .refl world, storeTyping, .word⟩
+  | integer =>
+      cases typing
+      exact ⟨world, .refl world, storeTyping, .integer⟩
   | pair _ _ leftIH rightIH =>
       cases typing with
       | pair leftTyping rightTyping =>
@@ -1541,6 +1554,11 @@ theorem transition_preserves_state_type
       | eval storeTyping environmentTyping exprTyping continuationTyping =>
           cases exprTyping
           exact .ret storeTyping .word continuationTyping
+  | integer =>
+      cases stateTyping with
+      | eval storeTyping environmentTyping exprTyping continuationTyping =>
+          cases exprTyping
+          exact .ret storeTyping .integer continuationTyping
   | enterPair =>
       cases stateTyping with
       | eval storeTyping environmentTyping exprTyping continuationTyping =>
@@ -1980,6 +1998,7 @@ theorem state_progress
       | unit => exact .inr ⟨_, .unit⟩
       | bool => exact .inr ⟨_, .bool⟩
       | word => exact .inr ⟨_, .word⟩
+      | integer => exact .inr ⟨_, .integer⟩
       | var typeLookup =>
           obtain ⟨value, valueLookup, _⟩ := environmentTyping.lookup typeLookup
           exact .inr ⟨_, .var valueLookup⟩

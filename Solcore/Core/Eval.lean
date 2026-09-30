@@ -16,6 +16,8 @@ inductive Evaluates : Environment → Store → Expr → Value → Store → Pro
       Evaluates environment store (.bool value) (.bool value) store
   | word {environment : Environment} {store : Store} {value : Word} :
       Evaluates environment store (.word value) (.word value) store
+  | integer {environment : Environment} {store : Store} {value : Int} :
+      Evaluates environment store (.integer value) (.integer value) store
   | pair
       {environment : Environment} {initialStore middleStore finalStore : Store}
       {left right : Expr} {leftValue rightValue : Value} :
@@ -202,6 +204,9 @@ theorem evaluation_deterministic
   | word =>
       cases rightEvaluation
       exact ⟨rfl, rfl⟩
+  | integer =>
+      cases rightEvaluation
+      exact ⟨rfl, rfl⟩
   | pair _ _ leftIH rightIH =>
       cases rightEvaluation with
       | pair otherLeft otherRight =>
@@ -358,6 +363,7 @@ theorem evaluation_store_length_monotone
   | unit
   | bool
   | word
+  | integer
   | lambda
   | var => exact Nat.le_refl _
   | pair _ _ leftIH rightIH =>
@@ -405,6 +411,7 @@ inductive CellFree : Expr → Prop where
   | unit : CellFree .unit
   | bool {value : Bool} : CellFree (.bool value)
   | word {value : Word} : CellFree (.word value)
+  | integer {value : Int} : CellFree (.integer value)
   | var {index : Nat} : CellFree (.var index)
   | pair {left right : Expr} :
       CellFree left → CellFree right → CellFree (.pair left right)
@@ -460,6 +467,7 @@ mutual
     | unit : StorePassiveValue .unit
     | bool {value : Bool} : StorePassiveValue (.bool value)
     | word {value : Word} : StorePassiveValue (.word value)
+    | integer {value : Int} : StorePassiveValue (.integer value)
     | pair {left right : Value} :
         StorePassiveValue left →
         StorePassiveValue right →
@@ -499,7 +507,7 @@ theorem StorePassiveEnvironment.lookup
     StorePassiveValue value := by
   induction passive using StorePassiveEnvironment.rec
       (motive_1 := fun _ _ => True) generalizing index with
-  | unit | bool | word | pair | closure | inLeft | inRight | cellRef
+  | unit | bool | word | integer | pair | closure | inLeft | inRight | cellRef
   | constructed =>
       exact True.intro
   | nil => simp at found
@@ -559,6 +567,7 @@ theorem evaluation_preserves_store_of_cellFree
   | unit => exact ⟨rfl, .unit⟩
   | bool => exact ⟨rfl, .bool⟩
   | word => exact ⟨rfl, .word⟩
+  | integer => exact ⟨rfl, .integer⟩
   | pair _ _ leftIH rightIH =>
       cases exprFree with
       | pair leftFree rightFree =>

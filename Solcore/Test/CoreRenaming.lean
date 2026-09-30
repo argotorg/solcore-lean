@@ -26,7 +26,7 @@ private theorem freeVariableLetTyping :
   exact .letE .word
     (.binary
       (.var (by simp [BinaryOp.leftType]))
-      (.var (by simp [BinaryOp.rightType])))
+      (.var (by simp [BinaryOp.rightType, BinaryOp.leftType])))
 
 private theorem branchesTyping :
     BranchesHaveType [.word] .word [.bool, .unit] [.var 1, .var 1] := by

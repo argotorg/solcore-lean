@@ -15,6 +15,8 @@ mutual
         HasType context (.bool value) .bool definitions
     | word {context : Context} {definitions : DataEnvironment} {value : Word} :
         HasType context (.word value) .word definitions
+    | integer {context : Context} {definitions : DataEnvironment} {value : Int} :
+        HasType context (.integer value) .integer definitions
     | var
         {context : Context} {definitions : DataEnvironment}
         {index : Nat} {type : Ty} :
@@ -166,6 +168,7 @@ mutual
     | .unit => some .unit
     | .bool _ => some .bool
     | .word _ => some .word
+    | .integer _ => some .integer
     | .var index => context[index]?
     | .pair left right =>
         match
@@ -337,7 +340,7 @@ theorem infer_complete
   induction typing using HasType.rec
       (motive_2 := fun context resultType payloadTypes branches definitions _ =>
         branchesHaveType? definitions context resultType payloadTypes branches = true) with
-  | unit | bool | word | var => simp_all [inferWithDefinitions?]
+  | unit | bool | word | integer | var => simp_all [inferWithDefinitions?]
   | pair _ _ leftIH rightIH =>
       simp [inferWithDefinitions?, leftIH, rightIH]
   | first _ operandIH => simp [inferWithDefinitions?, operandIH]
@@ -420,6 +423,10 @@ theorem infer_sound
       simp [inferWithDefinitions?] at inferred
       cases inferred
       exact .word
+  | integer =>
+      simp [inferWithDefinitions?] at inferred
+      cases inferred
+      exact .integer
   | var index => exact .var inferred
   | pair left right leftIH rightIH =>
       cases leftInferred : inferWithDefinitions? definitions context left with
@@ -445,7 +452,7 @@ theorem infer_sound
                   simpa [inferWithDefinitions?, operandInferred] using inferred)
               subst type
               exact .first (operandIH operandInferred)
-          | unit | bool | word | function | sum | cell | namedData =>
+          | unit | bool | word | integer | function | sum | cell | namedData =>
               simp [inferWithDefinitions?, operandInferred] at inferred
   | second operand operandIH =>
       cases operandInferred : inferWithDefinitions? definitions context operand with
@@ -458,7 +465,7 @@ theorem infer_sound
                   simpa [inferWithDefinitions?, operandInferred] using inferred)
               subst type
               exact .second (operandIH operandInferred)
-          | unit | bool | word | function | sum | cell | namedData =>
+          | unit | bool | word | integer | function | sum | cell | namedData =>
               simp [inferWithDefinitions?, operandInferred] at inferred
   | lambda parameterType resultType body bodyIH =>
       by_cases parameterAccepted : parameterType.isWellFormed definitions = true
@@ -504,7 +511,7 @@ theorem infer_sound
                   (functionIH functionInferred)
                   (argumentIH argumentInferred)
               · simp [inferWithDefinitions?, functionInferred, argumentInferred] at inferred
-          | unit | bool | word | product | sum | cell | namedData =>
+          | unit | bool | word | integer | product | sum | cell | namedData =>
               simp [inferWithDefinitions?, functionInferred] at inferred
   | inLeft rightType payload payloadIH =>
       by_cases annotationAccepted : rightType.isWellFormed definitions = true
@@ -579,7 +586,7 @@ theorem infer_sound
                           rightInferred,
                           equalTypes
                         ] at inferred
-          | unit | bool | word | product | function | cell | namedData =>
+          | unit | bool | word | integer | product | function | cell | namedData =>
               simp [inferWithDefinitions?, scrutineeInferred] at inferred
   | newCell elementType initializer initializerIH =>
       by_cases initializerInferred :
@@ -601,7 +608,7 @@ theorem infer_sound
                   simpa [inferWithDefinitions?, referenceInferred] using inferred)
               subst type
               exact .loadCell (referenceIH referenceInferred)
-          | unit | bool | word | product | function | sum | namedData =>
+          | unit | bool | word | integer | product | function | sum | namedData =>
               simp [inferWithDefinitions?, referenceInferred] at inferred
   | storeCell reference value referenceIH valueIH =>
       cases referenceInferred : inferWithDefinitions? definitions context reference with
@@ -618,7 +625,7 @@ theorem infer_sound
                 subst type
                 exact .storeCell (referenceIH referenceInferred) (valueIH valueInferred)
               · simp [inferWithDefinitions?, referenceInferred, valueInferred] at inferred
-          | unit | bool | word | product | function | sum | namedData =>
+          | unit | bool | word | integer | product | function | sum | namedData =>
               simp [inferWithDefinitions?, referenceInferred] at inferred
   | construct constructor payload payloadIH =>
       cases payloadLookup : definitions.lookupConstructorPayloadType? constructor with
@@ -765,7 +772,7 @@ theorem infer_sound
                           elseInferred,
                           equalTypes
                         ] at inferred
-          | unit | word | product | function | sum | cell | namedData =>
+          | unit | word | integer | product | function | sum | cell | namedData =>
               simp [inferWithDefinitions?, conditionInferred] at inferred
   | nil =>
       rename_i context resultType payloadTypes definitions accepted

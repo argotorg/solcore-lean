@@ -11,6 +11,7 @@ def encodeType : Ty → Lean.Json
   | .unit => "unit"
   | .bool => "bool"
   | .word => "word"
+  | .integer => "integer"
   | .product left right =>
       .mkObj [
         ("tag", "product"),
@@ -42,13 +43,13 @@ def encodeType : Ty → Lean.Json
 termination_by type => sizeOf type
 
 def typeDepth : Ty → Nat
-  | .unit | .bool | .word | .namedData _ => 1
+  | .unit | .bool | .word | .integer | .namedData _ => 1
   | .product left right | .function left right | .sum left right =>
       Nat.max (typeDepth left) (typeDepth right) + 1
   | .cell elementType => typeDepth elementType + 1
 
 def typeNodes : Ty → Nat
-  | .unit | .bool | .word | .namedData _ => 1
+  | .unit | .bool | .word | .integer | .namedData _ => 1
   | .product left right | .function left right | .sum left right =>
       1 + typeNodes left + typeNodes right
   | .cell elementType => 1 + typeNodes elementType
@@ -77,12 +78,13 @@ private def decodeTypeAtFuel :
           | "unit" => pure (.unit, state)
           | "bool" => pure (.bool, state)
           | "word" => pure (.word, state)
+          | "integer" => pure (.integer, state)
           | _ => throw (.protocol {
               path
               code := .invalidType
               arguments := .mkObj [
                 ("actual", name),
-                ("allowed", .arr #["unit", "bool", "word"])
+                ("allowed", .arr #["unit", "bool", "word", "integer"])
               ]
             })
       | .obj _ => do

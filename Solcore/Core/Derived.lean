@@ -63,7 +63,7 @@ theorem wordLt
   · simpa [Context.insertAt] using
       rightTyping.weakenAt (inserted := .word) 0
   · exact .binary (.var (by simp [BinaryOp.leftType]))
-      (.var (by simp [BinaryOp.rightType]))
+      (.var (by simp [BinaryOp.rightType, BinaryOp.leftType]))
 
 theorem wordLe
     {context : Context} {definitions : DataEnvironment} {left right : Expr}
@@ -202,7 +202,7 @@ theorem wordSlt
   · simpa [Context.insertAt] using
       rightTyping.weakenAt (inserted := .word) 0
   · exact .binary (.var (by simp [BinaryOp.leftType]))
-      (.var (by simp [BinaryOp.rightType]))
+      (.var (by simp [BinaryOp.rightType, BinaryOp.leftType]))
 
 end HasType
 
