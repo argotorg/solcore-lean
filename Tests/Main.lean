@@ -6,6 +6,7 @@ import Solcore.Test.SourceCoreCallableContracts
 import Solcore.Test.SourceCoreStagedExecution
 import Solcore.Test.CoreCallableContract
 import Solcore.Test.SourceCoreFunctionCertificates
+import Solcore.Test.SourceCoreFunctionArguments
 import Solcore.Test.SourceCoreDataPayload
 import Solcore.Test.SourceTypedClosureCaptureBoundary
 import Solcore.Test.SourceCoreGenericMatchPreservation
