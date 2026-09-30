@@ -1079,6 +1079,7 @@ import Solcore.Test.SourceCoreDataEqualityInitialization
 import Solcore.Test.SourceCoreDataEqualityStoreProofs
 import Solcore.Test.SourceCoreDataEqualityScalarProofs
 import Solcore.Test.SourceCoreDataEqualityCertificates
+import Solcore.Test.SourceCoreDataMatchCertificates
 import Solcore.Test.SourceCoreSession
 import Solcore.Test.SourceCompilerCoreGeneral
 import Solcore.Test.SourceCompilerSession
