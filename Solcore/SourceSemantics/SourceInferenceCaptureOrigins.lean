@@ -311,4 +311,97 @@ theorem inferStatementFuel_assignBitNot_captureOrigins
       })
   simpa only [resultEq] using recorded
 
+/-- A bare return unifies its type and records a node without changing the
+lexical binder stack. -/
+theorem inferStatementFuel_returnUnit_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value = .returnStmt none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨unified, unifySuccess, _, resultEq, _⟩ :=
+    inferStatementFuel_success_returnUnit_facts statementEq allocationEq
+      success
+  have recorded :=
+    ((origins.allocateStatementId allocationEq).unify
+      unifySuccess).recordNode (.statement {
+        id, span := statement.span,
+        type := unified.resolve expectedReturn,
+        form := .returnStmt none
+      })
+  simpa only [resultEq] using recorded
+
+/-- A value return preserves capture origins across its actual expression
+traversal. -/
+theorem inferStatementFuel_returnValue_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {value : Syntax.Expr}
+    {expectedReturn : Ty} {initial allocated : State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {wholeSource : TypedSource}
+    (statementEq : statement.value = .returnStmt (some value))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨inferred, valueState, valueSuccess, resultEq, _⟩ :=
+    inferStatementFuel_success_returnValue_facts statementEq allocationEq
+      success
+  have recorded :=
+    ((origins.allocateStatementId allocationEq).inferExprFuel
+      valueSuccess).recordNode (.statement {
+        id, span := statement.span,
+        type := valueState.resolve expectedReturn,
+        form := .returnStmt (some inferred.id)
+      })
+  simpa only [resultEq] using recorded
+
+/-- Loop-control statements allocate only their own occurrence. -/
+theorem inferStatementFuel_break_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value = .breakStmt)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨_, resultEq, _⟩ :=
+    inferStatementFuel_success_break_facts statementEq allocationEq success
+  have recorded := (origins.allocateStatementId allocationEq).recordNode
+    (.statement {
+      id, span := statement.span, type := .unit,
+      form := .breakStmt
+    })
+  simpa only [resultEq] using recorded
+
+/-- `continue` has the same capture-origin behavior as `break`. -/
+theorem inferStatementFuel_continue_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value = .continueStmt)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨_, resultEq, _⟩ :=
+    inferStatementFuel_success_continue_facts statementEq allocationEq success
+  have recorded := (origins.allocateStatementId allocationEq).recordNode
+    (.statement {
+      id, span := statement.span, type := .unit,
+      form := .continueStmt
+    })
+  simpa only [resultEq] using recorded
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
