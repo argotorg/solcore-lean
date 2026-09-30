@@ -14,6 +14,7 @@ import Solcore.Test.SourceCoreDataExpressionSequence
 import Solcore.Test.SourceCoreDataPlaceKeyOrder
 import Solcore.Test.SourceCoreDataPlaceModifier
 import Solcore.Test.SourceCoreDataPlaceAssignmentMeaning
+import Solcore.Test.SourceCoreDataPlaceContinuation
 import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCoreHeapMarkers
 import Solcore.Test.SourceRuntimeValidationBoundary

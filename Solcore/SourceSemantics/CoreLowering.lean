@@ -20,6 +20,7 @@ import Solcore.SourceSemantics.CoreLowering.DataPlaceResolvedTarget
 import Solcore.SourceSemantics.CoreLowering.DataPlaceAssignmentPrefix
 import Solcore.SourceSemantics.CoreLowering.DataPlaceAssignmentWriteBack
 import Solcore.SourceSemantics.CoreLowering.DataPlaceAssignmentSuccess
+import Solcore.SourceSemantics.CoreLowering.DataPlaceContinuation
 import Solcore.SourceSemantics.CoreLowering.GenericMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.DataPlacePathHelpers
 import Solcore.SourceSemantics.CoreLowering.GenericMatchMeaning
