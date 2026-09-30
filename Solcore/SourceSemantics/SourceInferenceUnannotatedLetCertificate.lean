@@ -468,6 +468,305 @@ theorem oldVariablesProtected_applySubstitution
       exact induction sourceProtected metavariable member old
   | error => simp [Substitution.apply, Ty.freeVariables]
 
+/-- Relevance-restricted variant: only first-match substitution entries
+reachable from free variables of this particular input type need provenance.
+Dead entries may contain earlier scheme quantifiers without affecting this
+application. -/
+theorem oldVariablesProtected_applySubstitution_relevant
+    (substitution : Substitution) (type : Ty)
+    (cutoff : Nat) (protectedVars : List TypeVarId)
+    (rangeProtected : ∀ candidate,
+      candidate ∈ type.freeVariables →
+        ∀ replacement, substitution.lookup? candidate = some replacement →
+          ∀ metavariable, metavariable ∈ replacement.freeVariables →
+            metavariable.index < cutoff →
+              metavariable ∈ protectedVars)
+    (sourceProtected : ∀ metavariable,
+      metavariable ∈ type.freeVariables →
+        metavariable ∉ substitution.domain →
+          metavariable.index < cutoff → metavariable ∈ protectedVars) :
+    ∀ metavariable,
+      metavariable ∈ (substitution.apply type).freeVariables →
+        metavariable.index < cutoff → metavariable ∈ protectedVars := by
+  induction type with
+  | «variable» candidate =>
+      cases found : substitution.lookup? candidate with
+      | none =>
+          intro metavariable member old
+          simp only [Substitution.apply, found, Option.getD_none,
+            Ty.freeVariables, List.mem_singleton] at member
+          subst metavariable
+          exact sourceProtected candidate (by simp [Ty.freeVariables])
+            ((Substitution.lookup?_eq_none_iff_not_mem_domain
+              substitution candidate).mp found) old
+      | some replacement =>
+          intro metavariable member old
+          simp only [Substitution.apply, found, Option.getD_some] at member
+          exact rangeProtected candidate (by simp [Ty.freeVariables])
+            replacement found metavariable member old
+  | parameter parameter => simp [Substitution.apply, Ty.freeVariables]
+  | constructor constructor => simp [Substitution.apply, Ty.freeVariables]
+  | application left right leftInduction rightInduction =>
+      intro metavariable member old
+      simp only [Substitution.apply] at member
+      rw [Ty.mem_freeVariables_application_iff] at member
+      rcases member with leftMember | rightMember
+      · exact leftInduction
+          (fun candidate occurs replacement found rangeVariable rangeOccurs
+              lower =>
+            rangeProtected candidate
+              ((Ty.mem_freeVariables_application_iff candidate left right).mpr
+                (Or.inl occurs)) replacement found rangeVariable rangeOccurs
+              lower)
+          (fun candidate occurs absent lower =>
+            sourceProtected candidate
+              ((Ty.mem_freeVariables_application_iff candidate left right).mpr
+                (Or.inl occurs)) absent lower)
+          metavariable leftMember old
+      · exact rightInduction
+          (fun candidate occurs replacement found rangeVariable rangeOccurs
+              lower =>
+            rangeProtected candidate
+              ((Ty.mem_freeVariables_application_iff candidate left right).mpr
+                (Or.inr occurs)) replacement found rangeVariable rangeOccurs
+              lower)
+          (fun candidate occurs absent lower =>
+            sourceProtected candidate
+              ((Ty.mem_freeVariables_application_iff candidate left right).mpr
+                (Or.inr occurs)) absent lower)
+          metavariable rightMember old
+  | function parameter result parameterInduction resultInduction =>
+      intro metavariable member old
+      simp only [Substitution.apply] at member
+      rw [Ty.mem_freeVariables_function_iff] at member
+      rcases member with parameterMember | resultMember
+      · exact parameterInduction
+          (fun candidate occurs replacement found rangeVariable rangeOccurs
+              lower =>
+            rangeProtected candidate
+              ((Ty.mem_freeVariables_function_iff candidate parameter result).mpr
+                (Or.inl occurs)) replacement found rangeVariable rangeOccurs
+              lower)
+          (fun candidate occurs absent lower =>
+            sourceProtected candidate
+              ((Ty.mem_freeVariables_function_iff candidate parameter result).mpr
+                (Or.inl occurs)) absent lower)
+          metavariable parameterMember old
+      · exact resultInduction
+          (fun candidate occurs replacement found rangeVariable rangeOccurs
+              lower =>
+            rangeProtected candidate
+              ((Ty.mem_freeVariables_function_iff candidate parameter result).mpr
+                (Or.inr occurs)) replacement found rangeVariable rangeOccurs
+              lower)
+          (fun candidate occurs absent lower =>
+            sourceProtected candidate
+              ((Ty.mem_freeVariables_function_iff candidate parameter result).mpr
+                (Or.inr occurs)) absent lower)
+          metavariable resultMember old
+  | product left right leftInduction rightInduction =>
+      intro metavariable member old
+      simp only [Substitution.apply] at member
+      rw [Ty.mem_freeVariables_product_iff] at member
+      rcases member with leftMember | rightMember
+      · exact leftInduction
+          (fun candidate occurs replacement found rangeVariable rangeOccurs
+              lower =>
+            rangeProtected candidate
+              ((Ty.mem_freeVariables_product_iff candidate left right).mpr
+                (Or.inl occurs)) replacement found rangeVariable rangeOccurs
+              lower)
+          (fun candidate occurs absent lower =>
+            sourceProtected candidate
+              ((Ty.mem_freeVariables_product_iff candidate left right).mpr
+                (Or.inl occurs)) absent lower)
+          metavariable leftMember old
+      · exact rightInduction
+          (fun candidate occurs replacement found rangeVariable rangeOccurs
+              lower =>
+            rangeProtected candidate
+              ((Ty.mem_freeVariables_product_iff candidate left right).mpr
+                (Or.inr occurs)) replacement found rangeVariable rangeOccurs
+              lower)
+          (fun candidate occurs absent lower =>
+            sourceProtected candidate
+              ((Ty.mem_freeVariables_product_iff candidate left right).mpr
+                (Or.inr occurs)) absent lower)
+          metavariable rightMember old
+  | mapping key value keyInduction valueInduction =>
+      intro metavariable member old
+      simp only [Substitution.apply] at member
+      rw [Ty.mem_freeVariables_mapping_iff] at member
+      rcases member with keyMember | valueMember
+      · exact keyInduction
+          (fun candidate occurs replacement found rangeVariable rangeOccurs
+              lower =>
+            rangeProtected candidate
+              ((Ty.mem_freeVariables_mapping_iff candidate key value).mpr
+                (Or.inl occurs)) replacement found rangeVariable rangeOccurs
+              lower)
+          (fun candidate occurs absent lower =>
+            sourceProtected candidate
+              ((Ty.mem_freeVariables_mapping_iff candidate key value).mpr
+                (Or.inl occurs)) absent lower)
+          metavariable keyMember old
+      · exact valueInduction
+          (fun candidate occurs replacement found rangeVariable rangeOccurs
+              lower =>
+            rangeProtected candidate
+              ((Ty.mem_freeVariables_mapping_iff candidate key value).mpr
+                (Or.inr occurs)) replacement found rangeVariable rangeOccurs
+              lower)
+          (fun candidate occurs absent lower =>
+            sourceProtected candidate
+              ((Ty.mem_freeVariables_mapping_iff candidate key value).mpr
+                (Or.inr occurs)) absent lower)
+          metavariable valueMember old
+  | proxy inner induction =>
+      intro metavariable member old
+      simp only [Substitution.apply, Ty.freeVariables] at member
+      exact induction rangeProtected sourceProtected metavariable member old
+  | comptime inner induction =>
+      intro metavariable member old
+      simp only [Substitution.apply, Ty.freeVariables] at member
+      exact induction rangeProtected sourceProtected metavariable member old
+  | error => simp [Substitution.apply, Ty.freeVariables]
+
+/-- A no-capture check restricted to the free variables of the concrete input
+is sufficient to keep its resolved output disjoint from protected variables.
+No condition is imposed on dead or shadowed substitution entries. -/
+theorem rangeAvoidsVariablesOn_apply_variables_outside
+    (substitution : Substitution) (protectedVars : List TypeVarId)
+    (type : Ty)
+    (rangeAvoids : substitution.RangeAvoidsVariablesOn protectedVars type)
+    (sourceOutside : ∀ metavariable,
+      metavariable ∈ type.freeVariables → metavariable ∉ protectedVars) :
+    ∀ metavariable,
+      metavariable ∈ (substitution.apply type).freeVariables →
+        metavariable ∉ protectedVars := by
+  induction type with
+  | «variable» candidate =>
+      intro metavariable member
+      cases found : substitution.lookup? candidate with
+      | none =>
+          simp only [Substitution.apply, found, Option.getD_none,
+            Ty.freeVariables, List.mem_singleton] at member
+          subst metavariable
+          exact sourceOutside candidate (by simp [Ty.freeVariables])
+      | some replacement =>
+          simp only [Substitution.apply, found, Option.getD_some] at member
+          exact rangeAvoids candidate (by simp [Ty.freeVariables])
+            replacement found metavariable member
+  | parameter parameter => simp [Substitution.apply, Ty.freeVariables]
+  | constructor constructor => simp [Substitution.apply, Ty.freeVariables]
+  | application left right leftInduction rightInduction =>
+      intro metavariable member
+      simp only [Substitution.apply] at member
+      rw [Ty.mem_freeVariables_application_iff] at member
+      rcases member with leftMember | rightMember
+      · apply leftInduction
+          (rangeAvoids.mono (fun candidate occurs =>
+            (Ty.mem_freeVariables_application_iff candidate left right).mpr
+              (Or.inl occurs)))
+          (fun candidate occurs => sourceOutside candidate
+            ((Ty.mem_freeVariables_application_iff candidate left right).mpr
+              (Or.inl occurs))) metavariable leftMember
+      · apply rightInduction
+          (rangeAvoids.mono (fun candidate occurs =>
+            (Ty.mem_freeVariables_application_iff candidate left right).mpr
+              (Or.inr occurs)))
+          (fun candidate occurs => sourceOutside candidate
+            ((Ty.mem_freeVariables_application_iff candidate left right).mpr
+              (Or.inr occurs))) metavariable rightMember
+  | function parameter result parameterInduction resultInduction =>
+      intro metavariable member
+      simp only [Substitution.apply] at member
+      rw [Ty.mem_freeVariables_function_iff] at member
+      rcases member with parameterMember | resultMember
+      · apply parameterInduction
+          (rangeAvoids.mono (fun candidate occurs =>
+            (Ty.mem_freeVariables_function_iff candidate parameter result).mpr
+              (Or.inl occurs)))
+          (fun candidate occurs => sourceOutside candidate
+            ((Ty.mem_freeVariables_function_iff candidate parameter result).mpr
+              (Or.inl occurs))) metavariable parameterMember
+      · apply resultInduction
+          (rangeAvoids.mono (fun candidate occurs =>
+            (Ty.mem_freeVariables_function_iff candidate parameter result).mpr
+              (Or.inr occurs)))
+          (fun candidate occurs => sourceOutside candidate
+            ((Ty.mem_freeVariables_function_iff candidate parameter result).mpr
+              (Or.inr occurs))) metavariable resultMember
+  | product left right leftInduction rightInduction =>
+      intro metavariable member
+      simp only [Substitution.apply] at member
+      rw [Ty.mem_freeVariables_product_iff] at member
+      rcases member with leftMember | rightMember
+      · apply leftInduction
+          (rangeAvoids.mono (fun candidate occurs =>
+            (Ty.mem_freeVariables_product_iff candidate left right).mpr
+              (Or.inl occurs)))
+          (fun candidate occurs => sourceOutside candidate
+            ((Ty.mem_freeVariables_product_iff candidate left right).mpr
+              (Or.inl occurs))) metavariable leftMember
+      · apply rightInduction
+          (rangeAvoids.mono (fun candidate occurs =>
+            (Ty.mem_freeVariables_product_iff candidate left right).mpr
+              (Or.inr occurs)))
+          (fun candidate occurs => sourceOutside candidate
+            ((Ty.mem_freeVariables_product_iff candidate left right).mpr
+              (Or.inr occurs))) metavariable rightMember
+  | mapping key value keyInduction valueInduction =>
+      intro metavariable member
+      simp only [Substitution.apply] at member
+      rw [Ty.mem_freeVariables_mapping_iff] at member
+      rcases member with keyMember | valueMember
+      · apply keyInduction
+          (rangeAvoids.mono (fun candidate occurs =>
+            (Ty.mem_freeVariables_mapping_iff candidate key value).mpr
+              (Or.inl occurs)))
+          (fun candidate occurs => sourceOutside candidate
+            ((Ty.mem_freeVariables_mapping_iff candidate key value).mpr
+              (Or.inl occurs))) metavariable keyMember
+      · apply valueInduction
+          (rangeAvoids.mono (fun candidate occurs =>
+            (Ty.mem_freeVariables_mapping_iff candidate key value).mpr
+              (Or.inr occurs)))
+          (fun candidate occurs => sourceOutside candidate
+            ((Ty.mem_freeVariables_mapping_iff candidate key value).mpr
+              (Or.inr occurs))) metavariable valueMember
+  | proxy inner induction => exact induction rangeAvoids sourceOutside
+  | comptime inner induction => exact induction rangeAvoids sourceOutside
+  | error => simp [Substitution.apply, Ty.freeVariables]
+
+/-- A new unifier update can be composed with an older substitution without
+requiring the *older* substitution to avoid the protected variables on dead
+entries.  Only old entries selected from the concrete source type matter. -/
+theorem rangeAvoidsVariablesOn_compose_of_newerRangeAvoids
+    (newer older guard : Substitution) (type : Ty)
+    (newerAvoids : newer.RangeAvoidsDomain guard)
+    (olderAvoids : older.RangeAvoidsVariablesOn guard.domain type) :
+    (newer.compose older).RangeAvoidsVariablesOn guard.domain type := by
+  intro candidate sourceMember replacement found metavariable occurs
+  rw [Substitution.lookup?_compose] at found
+  cases olderFound : older.lookup? candidate with
+  | none =>
+      rw [olderFound] at found
+      exact newerAvoids (Substitution.lookup?_eq_some_mem found)
+        metavariable occurs
+  | some olderReplacement =>
+      rw [olderFound] at found
+      injection found with replacementEq
+      subst replacement
+      have olderRangeOutside : ∀ sourceVariable,
+          sourceVariable ∈ olderReplacement.freeVariables →
+            sourceVariable ∉ guard.domain := by
+        intro sourceVariable sourceOccurs
+        exact olderAvoids candidate sourceMember olderReplacement olderFound
+          sourceVariable sourceOccurs
+      exact newerAvoids.apply_variables_outside_older_domain
+        olderReplacement olderRangeOutside metavariable occurs
+
 /-- Unification cannot reintroduce a protected old quantifier in its range
 when both normalized inputs already avoid it.  The checker composes its new
 solution with the old one; both parts preserve avoidance by the existing
@@ -500,6 +799,43 @@ theorem inferState_unify_rangeAvoidsProtected
       injection success with afterEq
       subst after
       exact Substitution.RangeAvoidsDomain.compose
+        (Unification.unifyTypes_rangeAvoidsDomain leftOutside rightOutside
+          unified) beforeAvoids
+
+/-- Relevant form of `inferState_unify_rangeAvoidsProtected`: the older
+substitution needs protection only where `sourceType` can consult it.  The
+unifier's *new* entries are still all protected by the actual resolved input
+types. -/
+theorem inferState_unify_rangeAvoidsProtected_on
+    {before after : InferState} {left right sourceType : Ty}
+    (protectedDomain : Substitution)
+    (beforeAvoids : before.substitution.RangeAvoidsVariablesOn
+      protectedDomain.domain sourceType)
+    (leftOutside : ∀ metavariable,
+      metavariable ∈ (before.resolve left).freeVariables →
+        metavariable ∉ protectedDomain.domain)
+    (rightOutside : ∀ metavariable,
+      metavariable ∈ (before.resolve right).freeVariables →
+        metavariable ∉ protectedDomain.domain)
+    (success : before.unify left right = .ok after) :
+    after.substitution.RangeAvoidsVariablesOn protectedDomain.domain
+      sourceType := by
+  unfold InferState.unify at success
+  cases unified : Unification.unifyTypes (before.resolve left)
+      (before.resolve right) with
+  | error error =>
+      rw [unified] at success
+      change Except.error error = Except.ok after at success
+      cases success
+  | ok update =>
+      rw [unified] at success
+      change Except.ok {
+        before with substitution := update.compose before.substitution
+      } = Except.ok after at success
+      injection success with afterEq
+      subst after
+      exact rangeAvoidsVariablesOn_compose_of_newerRangeAvoids update
+        before.substitution protectedDomain sourceType
         (Unification.unifyTypes_rangeAvoidsDomain leftOutside rightOutside
           unified) beforeAvoids
 
@@ -547,6 +883,29 @@ theorem inferState_unify_rangeAvoidsActiveSchemeQuantifiers
   · simpa using rightOutside
   · exact success
 
+/-- Reachability-restricted variant for the active scheme quantifiers. -/
+theorem inferState_unify_rangeAvoidsActiveSchemeQuantifiers_on
+    (state : Frontend.SourceInference.State)
+    {after : InferState} {left right sourceType : Ty}
+    (beforeAvoids : state.inference.substitution.RangeAvoidsVariablesOn
+      (activeSchemeQuantifiers state) sourceType)
+    (leftOutside : ∀ metavariable,
+      metavariable ∈ (state.inference.resolve left).freeVariables →
+        metavariable ∉ activeSchemeQuantifiers state)
+    (rightOutside : ∀ metavariable,
+      metavariable ∈ (state.inference.resolve right).freeVariables →
+        metavariable ∉ activeSchemeQuantifiers state)
+    (success : state.inference.unify left right = .ok after) :
+    after.substitution.RangeAvoidsVariablesOn
+      (activeSchemeQuantifiers state) sourceType := by
+  simpa only [activeSchemeQuantifierGuard_domain] using
+    (inferState_unify_rangeAvoidsProtected_on
+      (activeSchemeQuantifierGuard state)
+      (by simpa only [activeSchemeQuantifierGuard_domain] using beforeAvoids)
+      (by simpa only [activeSchemeQuantifierGuard_domain] using leftOutside)
+      (by simpa only [activeSchemeQuantifierGuard_domain] using rightOutside)
+      success)
+
 /-- A local scheme instantiation cannot expose any of its protected
 quantified variables as an *old* result variable.  Fresh instantiation ranges
 start at `next`; an older survivor must have been unquantified in the source
@@ -586,6 +945,40 @@ theorem instantiateWithSubstitution_oldVariables_in_schemeFreeVariables
       exact absent (domainPerm.mem_iff.mpr quantified)
     exact List.mem_filter.mpr ⟨occurs, by simp [notQuantified]⟩
 
+/-- Fresh instantiation cannot expose a protected old scheme quantifier if
+the source scheme's unquantified free variables already avoid the protected
+set.  This isolates the precise lexical invariant needed by the actual local
+identifier branch. -/
+theorem instantiateWithSubstitution_avoidsOldQuantifiers
+    (scheme : Scheme) (cutoff next : Nat) (guarded : List TypeVarId)
+    (cutoffLe : cutoff ≤ next)
+    (quantifiedUnique : scheme.quantified.Nodup)
+    (guardedBelow : ∀ metavariable,
+      metavariable ∈ guarded → metavariable.index < cutoff)
+    (schemeFreeOutside : ∀ metavariable,
+      metavariable ∈ scheme.freeVariables → metavariable ∉ guarded) :
+    ∀ metavariable,
+      metavariable ∈
+        (scheme.instantiateWithSubstitution next).body.freeVariables →
+        metavariable ∉ guarded := by
+  intro metavariable occurs guardedMember
+  have schemeFree :=
+    instantiateWithSubstitution_oldVariables_in_schemeFreeVariables
+      scheme cutoff next cutoffLe quantifiedUnique metavariable occurs
+      (guardedBelow metavariable guardedMember)
+  exact schemeFreeOutside metavariable schemeFree guardedMember
+
+theorem activeSchemeQuantifiers_below_next
+    {state : Frontend.SourceInference.State}
+    (bound : ActiveQuantifiersBelowNext state) :
+    ∀ metavariable,
+      metavariable ∈ activeSchemeQuantifiers state →
+        metavariable.index < state.inference.next := by
+  intro metavariable member
+  rcases List.mem_flatMap.mp member with
+    ⟨binder, binderMember, quantified⟩
+  exact bound binder binderMember metavariable quantified
+
 /-- The exact additional state invariant needed to carry old-variable
 provenance through `State.resolve`: every substitution replacement that
 mentions an old allocator variable must place it in the active executable
@@ -600,6 +993,58 @@ def InferenceRangeOldVariablesBlockedAt
         metavariable.index < initial.inference.next →
           metavariable ∈ Detail.generalizeValueBlockedVariables state locals
             requirementStart
+
+/-- Only entries reached by the free variables of the concrete input type
+can contribute an old variable to its resolved value.  In particular, a
+shadowed or otherwise dead substitution entry need not satisfy the let
+generalization barrier. -/
+def InferenceRangeOldVariablesBlockedOn
+    (initial state : Frontend.SourceInference.State)
+    (locals : Environment) (requirementStart : Nat) (type : Ty) : Prop :=
+  ∀ candidate, candidate ∈ type.freeVariables →
+    ∀ replacement, state.inference.substitution.lookup? candidate =
+      some replacement →
+      ∀ metavariable, metavariable ∈ replacement.freeVariables →
+        metavariable.index < initial.inference.next →
+          metavariable ∈ Detail.generalizeValueBlockedVariables state locals
+            requirementStart
+
+theorem InferenceRangeOldVariablesBlockedAt.on
+    {initial state : Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat} {type : Ty}
+    (blocked : InferenceRangeOldVariablesBlockedAt initial state locals
+      requirementStart) :
+    InferenceRangeOldVariablesBlockedOn initial state locals requirementStart
+      type := by
+  intro candidate _ replacement found metavariable occurs older
+  exact blocked (Substitution.lookup?_eq_some_mem found) metavariable
+    occurs older
+
+/-- The checker need only preserve range provenance at first-match entries
+actually reachable from the type being resolved. -/
+theorem oldVariablesBlockedAt_resolve_on
+    {initial state : Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat} {type : Ty}
+    (rangeBlocked : InferenceRangeOldVariablesBlockedOn initial state locals
+      requirementStart type)
+    (sourceBlocked : ∀ metavariable,
+      metavariable ∈ type.freeVariables →
+        metavariable ∉ state.inference.substitution.domain →
+          metavariable.index < initial.inference.next →
+            metavariable ∈ Detail.generalizeValueBlockedVariables state locals
+              requirementStart) :
+    OldVariablesBlockedAt initial state locals requirementStart
+      (state.resolve type) := by
+  change ∀ metavariable,
+    metavariable ∈
+      (state.inference.substitution.apply type).freeVariables →
+      metavariable.index < initial.inference.next →
+        metavariable ∈ Detail.generalizeValueBlockedVariables state locals
+          requirementStart
+  exact oldVariablesProtected_applySubstitution_relevant
+    state.inference.substitution type initial.inference.next
+    (Detail.generalizeValueBlockedVariables state locals requirementStart)
+    rangeBlocked sourceBlocked
 
 /-- Resolve preserves the executable old-variable barrier when its
 substitution range satisfies the provenance invariant and untouched source
@@ -617,16 +1062,30 @@ theorem oldVariablesBlockedAt_resolve
               requirementStart) :
     OldVariablesBlockedAt initial state locals requirementStart
       (state.resolve type) := by
-  change ∀ metavariable,
-    metavariable ∈
-      (state.inference.substitution.apply type).freeVariables →
-      metavariable.index < initial.inference.next →
-        metavariable ∈ Detail.generalizeValueBlockedVariables state locals
-          requirementStart
-  exact oldVariablesProtected_applySubstitution
-    state.inference.substitution type initial.inference.next
-    (Detail.generalizeValueBlockedVariables state locals requirementStart)
-    rangeBlocked sourceBlocked
+  exact oldVariablesBlockedAt_resolve_on rangeBlocked.on sourceBlocked
+
+/-- Local-scheme instantiation needs range provenance only for the fresh
+instantiated body that is actually resolved by this branch. -/
+theorem oldVariablesBlockedAt_resolvedLocalInstantiation_on
+    {initial state : Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat}
+    (binder : TypedBinder) (instantiationStart : Nat)
+    (startLe : initial.inference.next ≤ instantiationStart)
+    (quantifiedUnique : binder.scheme.quantified.Nodup)
+    (binderFreeInLocals : binder.scheme.freeVariables ⊆ locals.freeVariables)
+    (rangeBlocked : InferenceRangeOldVariablesBlockedOn initial state locals
+      requirementStart
+      (binder.scheme.instantiateWithSubstitution instantiationStart).body) :
+    OldVariablesBlockedAt initial state locals requirementStart
+      (state.resolve
+        (binder.scheme.instantiateWithSubstitution instantiationStart).body) := by
+  apply oldVariablesBlockedAt_resolve_on rangeBlocked
+  intro metavariable member _ old
+  have schemeFree :=
+    instantiateWithSubstitution_oldVariables_in_schemeFreeVariables
+      binder.scheme initial.inference.next instantiationStart startLe
+      quantifiedUnique metavariable member old
+  exact List.mem_append.mpr (Or.inl (binderFreeInLocals schemeFree))
 
 /-- In the local-reference branch, fresh scheme instantiation itself cannot
 leak an older quantified binder.  After its explicit `state.resolve`, the only
@@ -645,13 +1104,9 @@ theorem oldVariablesBlockedAt_resolvedLocalInstantiation
     OldVariablesBlockedAt initial state locals requirementStart
       (state.resolve
         (binder.scheme.instantiateWithSubstitution instantiationStart).body) := by
-  apply oldVariablesBlockedAt_resolve rangeBlocked
-  intro metavariable member _ old
-  have schemeFree :=
-    instantiateWithSubstitution_oldVariables_in_schemeFreeVariables
-      binder.scheme initial.inference.next instantiationStart startLe
-      quantifiedUnique metavariable member old
-  exact List.mem_append.mpr (Or.inl (binderFreeInLocals schemeFree))
+  exact oldVariablesBlockedAt_resolvedLocalInstantiation_on binder
+    instantiationStart startLe quantifiedUnique binderFreeInLocals
+    rangeBlocked.on
 
 /-- The concrete local-identifier traversal with no expected type exposes
 the resolved instantiated body as its returned type.  Requirement allocation
@@ -748,7 +1203,7 @@ state's substitution range is isolated from unblocked old variables.  Fresh
 scheme instantiation discharges the potentially dangerous quantified case;
 the explicit range invariant covers later substitutions and both resolves
 performed by this branch. -/
-theorem inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked
+theorem inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked_on
     {fuel : Nat} {context : Frontend.SourceInference.Context}
     {expression : Syntax.Expr}
     {initial allocated : Frontend.SourceInference.State}
@@ -764,8 +1219,13 @@ theorem inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked
     (startLe : initial.inference.next ≤ allocated.inference.next)
     (quantifiedUnique : binder.scheme.quantified.Nodup)
     (binderFreeInLocals : binder.scheme.freeVariables ⊆ locals.freeVariables)
-    (rangeBlocked : InferenceRangeOldVariablesBlockedAt initial result.2
-      locals requirementStart) :
+    (rangeBlockedFirst : InferenceRangeOldVariablesBlockedOn initial result.2
+      locals requirementStart
+      (binder.scheme.instantiateWithSubstitution allocated.inference.next).body)
+    (rangeBlockedSecond : InferenceRangeOldVariablesBlockedOn initial result.2
+      locals requirementStart
+      (result.2.resolve
+        (binder.scheme.instantiateWithSubstitution allocated.inference.next).body)) :
     OldVariablesBlockedAt initial result.2 locals requirementStart
       result.1.type := by
   let instantiated := binder.scheme.instantiateWithSubstitution
@@ -791,16 +1251,316 @@ theorem inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked
   rw [resolveEq] at typeEq
   have innerBlocked : OldVariablesBlockedAt initial result.2 locals
       requirementStart (result.2.resolve instantiated.body) :=
-    oldVariablesBlockedAt_resolvedLocalInstantiation binder
+    oldVariablesBlockedAt_resolvedLocalInstantiation_on binder
       allocated.inference.next startLe quantifiedUnique binderFreeInLocals
-      rangeBlocked
+      rangeBlockedFirst
   have outerBlocked : OldVariablesBlockedAt initial result.2 locals
       requirementStart
       (result.2.resolve (result.2.resolve instantiated.body)) :=
-    oldVariablesBlockedAt_resolve rangeBlocked
+    oldVariablesBlockedAt_resolve_on rangeBlockedSecond
       (fun metavariable member _ old => innerBlocked metavariable member old)
   rw [typeEq]
   exact outerBlocked
+
+/-- Compatibility wrapper for a whole-range invariant.  The useful actual
+branch contract above needs provenance only for two concrete resolve inputs,
+not for all entries of the substitution. -/
+theorem inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {binder : TypedBinder}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : Detail.inferExprFuel (fuel + 1) context expression none
+      initial = .ok result)
+    (startLe : initial.inference.next ≤ allocated.inference.next)
+    (quantifiedUnique : binder.scheme.quantified.Nodup)
+    (binderFreeInLocals : binder.scheme.freeVariables ⊆ locals.freeVariables)
+    (rangeBlocked : InferenceRangeOldVariablesBlockedAt initial result.2
+      locals requirementStart) :
+    OldVariablesBlockedAt initial result.2 locals requirementStart
+      result.1.type := by
+  exact inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked_on
+    expressionEq allocationEq lookupEq success startLe quantifiedUnique
+    binderFreeInLocals rangeBlocked.on rangeBlocked.on
+
+/-- A local identifier does not expose any previously active scheme
+quantifier in its returned type.  The lexical part follows from fresh scheme
+instantiation; each of this branch's two concrete resolves needs only
+first-match, source-reachable range avoidance.  No condition is imposed on
+dead substitution entries. -/
+theorem inferExprFuel_success_localIdentifier_noExpected_avoidsActiveQuantifiers
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {binder : TypedBinder}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : Detail.inferExprFuel (fuel + 1) context expression none
+      initial = .ok result)
+    (bound : ActiveQuantifiersBelowNext initial)
+    (startLe : initial.inference.next ≤ allocated.inference.next)
+    (quantifiedUnique : binder.scheme.quantified.Nodup)
+    (binderFreeOutside : ∀ metavariable,
+      metavariable ∈ binder.scheme.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial)
+    (firstRange : result.2.inference.substitution.RangeAvoidsVariablesOn
+      (activeSchemeQuantifiers initial)
+      (binder.scheme.instantiateWithSubstitution
+        allocated.inference.next).body)
+    (secondRange : result.2.inference.substitution.RangeAvoidsVariablesOn
+      (activeSchemeQuantifiers initial)
+      (result.2.resolve
+        (binder.scheme.instantiateWithSubstitution
+          allocated.inference.next).body)) :
+    ∀ metavariable,
+      metavariable ∈ result.1.type.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial := by
+  let instantiated := binder.scheme.instantiateWithSubstitution
+    allocated.inference.next
+  let advanced : Frontend.SourceInference.State := {
+    allocated with inference := {
+      allocated.inference with next := instantiated.next
+    }
+  }
+  have typeEq : result.1.type =
+      result.2.resolve (advanced.resolve instantiated.body) := by
+    simpa only [instantiated, advanced] using
+      (inferExprFuel_success_localIdentifier_noExpected_type expressionEq
+        allocationEq lookupEq success)
+  have inferenceEq : result.2.inference = advanced.inference := by
+    simpa only [instantiated, advanced] using
+      (inferExprFuel_success_localIdentifier_noExpected_inference expressionEq
+        allocationEq lookupEq success)
+  have resolveEq : advanced.resolve instantiated.body =
+      result.2.resolve instantiated.body := by
+    simp only [Frontend.SourceInference.State.resolve, InferState.resolve]
+    rw [inferenceEq]
+  rw [resolveEq] at typeEq
+  have sourceOutside : ∀ metavariable,
+      metavariable ∈ instantiated.body.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial := by
+    exact instantiateWithSubstitution_avoidsOldQuantifiers binder.scheme
+      initial.inference.next allocated.inference.next
+      (activeSchemeQuantifiers initial) startLe quantifiedUnique
+      (activeSchemeQuantifiers_below_next bound) binderFreeOutside
+  have firstOutside : ∀ metavariable,
+      metavariable ∈
+        (result.2.resolve instantiated.body).freeVariables →
+          metavariable ∉ activeSchemeQuantifiers initial := by
+    intro metavariable member
+    exact rangeAvoidsVariablesOn_apply_variables_outside
+      result.2.inference.substitution
+      (activeSchemeQuantifiers initial) instantiated.body firstRange
+      sourceOutside metavariable (by
+        simpa [Frontend.SourceInference.State.resolve,
+          TypeSystem.InferState.resolve] using member)
+  have secondOutside : ∀ metavariable,
+      metavariable ∈
+        (result.2.resolve (result.2.resolve instantiated.body)).freeVariables →
+          metavariable ∉ activeSchemeQuantifiers initial := by
+    intro metavariable member
+    exact rangeAvoidsVariablesOn_apply_variables_outside
+      result.2.inference.substitution
+      (activeSchemeQuantifiers initial)
+      (result.2.resolve instantiated.body) secondRange firstOutside
+      metavariable (by
+        simpa [Frontend.SourceInference.State.resolve,
+          TypeSystem.InferState.resolve] using member)
+  rw [typeEq]
+  exact secondOutside
+
+/-- The common no-expected recording tail leaves the inference solution
+unchanged and resolves the raw result type exactly once.  This is the small
+bridge needed to lift old-quantifier isolation through grouping and other
+composite expression constructors. -/
+theorem recordExpressionWithExpected_none_typeAndInference
+    {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {id : ExpressionId} {type : Ty}
+    {form : ExpressionForm} {requirements : List RequirementId}
+    {state : Frontend.SourceInference.State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (success : Detail.recordExpressionWithExpected context expression id type
+      form requirements none state
+      (localSchemeInstantiationStart := localSchemeInstantiationStart) =
+        .ok result) :
+    result.1.type = state.resolve type ∧
+      result.2.inference = state.inference := by
+  simp only [Detail.recordExpressionWithExpected, Detail.withExpected,
+    bind, Except.bind, Detail.recordExpression] at success
+  injection success with resultEq
+  subst result
+  exact ⟨rfl, rfl⟩
+
+/-- One actual group-expression parent preserves old-quantifier isolation
+from its *actual* recursive child.  The callback is required only for the
+child returned by the successful group trace; this is not a hypothesis over
+arbitrary expressions. -/
+theorem inferExprFuel_success_group_noExpected_avoidsActiveQuantifiers
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression inner : Syntax.Expr}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .group inner)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) context expression none
+      initial = .ok result)
+    (childIsolation : ∀ childResult childState,
+      Detail.inferExprFuel fuel context inner none allocated =
+        .ok (childResult, childState) →
+      childState.inference.substitution.RangeAvoidsVariablesOn
+        (activeSchemeQuantifiers initial) childResult.type ∧
+      (∀ metavariable,
+        metavariable ∈ childResult.type.freeVariables →
+          metavariable ∉ activeSchemeQuantifiers initial)) :
+    ∀ metavariable,
+      metavariable ∈ result.1.type.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial := by
+  obtain ⟨innerResult, innerState, innerSuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_group_facts expressionEq allocationEq
+      success
+  obtain ⟨rangeAvoids, innerAvoids⟩ :=
+    childIsolation innerResult innerState innerSuccess
+  obtain ⟨typeEq, _⟩ :=
+    recordExpressionWithExpected_none_typeAndInference recorded
+  intro metavariable member
+  rw [typeEq] at member
+  exact rangeAvoidsVariablesOn_apply_variables_outside
+    innerState.inference.substitution
+    (activeSchemeQuantifiers initial) innerResult.type rangeAvoids
+    innerAvoids metavariable (by
+      simpa [Frontend.SourceInference.State.resolve,
+        TypeSystem.InferState.resolve] using member)
+
+/-- Product assembly introduces no flexible variable beyond those already
+present in one of its source-ordered element types. -/
+theorem productMany_avoidsVariables
+    (types : List Ty) (guarded : List TypeVarId)
+    (eachAvoids : ∀ type ∈ types, ∀ metavariable,
+      metavariable ∈ type.freeVariables → metavariable ∉ guarded) :
+    ∀ metavariable,
+      metavariable ∈ (Ty.productMany types).freeVariables →
+        metavariable ∉ guarded := by
+  induction types with
+  | nil =>
+      intro metavariable member
+      simp [Ty.productMany, Ty.unit, Ty.freeVariables] at member
+  | cons head tail induction =>
+      cases tail with
+      | nil =>
+          simpa [Ty.productMany] using eachAvoids head (by simp)
+      | cons next rest =>
+          intro metavariable member
+          change metavariable ∈
+            (Ty.product head (Ty.productMany (next :: rest))).freeVariables at member
+          rw [Ty.mem_freeVariables_product_iff] at member
+          rcases member with headMember | tailMember
+          · exact eachAvoids head (by simp) metavariable headMember
+          · exact induction (by
+              intro type typeMember metavariable occurs
+              exact eachAvoids type (by simp [typeMember]) metavariable
+                occurs) metavariable tailMember
+
+/-- Relevance-restricted replacement avoidance composes over the types
+actually used to assemble a tuple product. -/
+theorem productMany_rangeAvoidsVariablesOn
+    (substitution : Substitution) (guarded : List TypeVarId)
+    (types : List Ty)
+    (eachAvoids : ∀ type ∈ types,
+      substitution.RangeAvoidsVariablesOn guarded type) :
+    substitution.RangeAvoidsVariablesOn guarded
+      (Ty.productMany types) := by
+  induction types with
+  | nil =>
+      intro candidate member
+      simp [Ty.productMany, Ty.unit, Ty.freeVariables] at member
+  | cons head tail induction =>
+      cases tail with
+      | nil =>
+          simpa [Ty.productMany] using eachAvoids head (by simp)
+      | cons next rest =>
+          intro candidate member replacement found protectedVariable captured
+          change candidate ∈
+            (Ty.product head (Ty.productMany (next :: rest))).freeVariables at member
+          rw [Ty.mem_freeVariables_product_iff] at member
+          rcases member with headMember | tailMember
+          · exact eachAvoids head (by simp) candidate headMember
+              replacement found protectedVariable captured
+          · exact induction (by
+              intro type typeMember
+              exact eachAvoids type (by simp [typeMember])) candidate
+                tailMember replacement found protectedVariable captured
+
+/-- A concrete tuple-expression parent preserves old-quantifier isolation
+from the actual source-ordered element traversal.  Its product type is formed
+only from inferred element types, then resolved by the same isolated state. -/
+theorem inferExprFuel_success_tuple_noExpected_avoidsActiveQuantifiers
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr}
+    {elements : Syntax.DelimitedList Syntax.Expr}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .tuple elements)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : Detail.inferExprFuel (fuel + 1) context expression none
+      initial = .ok result)
+    (childrenIsolation : ∀ inferredElements elementsState,
+      Detail.inferExprsFuel fuel context elements.elements allocated =
+        .ok (inferredElements, elementsState) →
+      (∀ inferred, inferred ∈ inferredElements →
+        elementsState.inference.substitution.RangeAvoidsVariablesOn
+          (activeSchemeQuantifiers initial) inferred.type) ∧
+      (∀ inferred, inferred ∈ inferredElements →
+        ∀ metavariable, metavariable ∈ inferred.type.freeVariables →
+          metavariable ∉ activeSchemeQuantifiers initial)) :
+    ∀ metavariable,
+      metavariable ∈ result.1.type.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial := by
+  obtain ⟨inferredElements, elementsState, elementsSuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_tuple_facts expressionEq allocationEq
+      success
+  obtain ⟨elementsRangeAvoid, elementsAvoid⟩ :=
+    childrenIsolation inferredElements elementsState elementsSuccess
+  obtain ⟨typeEq, _⟩ :=
+    recordExpressionWithExpected_none_typeAndInference recorded
+  intro metavariable member
+  rw [typeEq] at member
+  have productAvoids : ∀ candidate,
+      candidate ∈ (Ty.productMany (inferredElements.map (·.type))
+        ).freeVariables →
+        candidate ∉ activeSchemeQuantifiers initial := by
+    apply productMany_avoidsVariables
+    intro type typeMember candidate occurs
+    rcases List.mem_map.mp typeMember with
+      ⟨inferred, inferredMember, rfl⟩
+    exact elementsAvoid inferred inferredMember candidate occurs
+  have productRangeAvoids :
+      elementsState.inference.substitution.RangeAvoidsVariablesOn
+        (activeSchemeQuantifiers initial)
+        (Ty.productMany (inferredElements.map (·.type))) := by
+    apply productMany_rangeAvoidsVariablesOn
+    intro type typeMember
+    rcases List.mem_map.mp typeMember with
+      ⟨inferred, inferredMember, rfl⟩
+    exact elementsRangeAvoid inferred inferredMember
+  exact rangeAvoidsVariablesOn_apply_variables_outside
+    elementsState.inference.substitution
+    (activeSchemeQuantifiers initial)
+    (Ty.productMany (inferredElements.map (·.type))) productRangeAvoids
+    productAvoids metavariable (by
+      simpa [Frontend.SourceInference.State.resolve,
+        TypeSystem.InferState.resolve] using member)
 
 /-- The state bound, executable/semantic local alignment, and the actual
 initializer's old-variable barrier imply precisely the prior-quantifier
@@ -1046,6 +1806,58 @@ theorem generalizeValue_binderFormation_finalAdmissible
             finalized.substitution
             (noCapture.quantified_fresh metavariable
               (by simpa [schemeEq] using quantified)) occurs)
+
+/-- Inductive provenance contract for qualified predicate formation.  It is
+indexed by *actual generated ledger rows* selected as templates by this
+binder, rather than by arbitrary predicates or by the solver's entailment
+evidence.  The recursive requirement-generating branches must establish this
+formation at the final initializer context; finalization's template-scope
+validator checks identity/ownership but not predicate type formation. -/
+def RetainedRequirementPredicateFormationAt
+    (state : Frontend.SourceInference.State) (binder : TypedBinder)
+    (outer : Substitution) (target : SourceSemantics.Context) : Prop :=
+  ∀ rawRequirement, rawRequirement ∈ state.requirements →
+    rawRequirement.id ∈ localSchemeTemplateIds binder →
+      PredicateAdmissible
+        (localSchemeInitializerContext target
+          (binder.applySubstitution outer))
+        (TypedTraitResolution.applySubstitution
+          (outer.without binder.scheme.quantified)
+          (Detail.applyPredicate state rawRequirement.predicate))
+
+/-- Exact `generalizeValue` source provenance turns formation of selected
+generated rows into formation of every finalized qualified requirement
+carried by the binder.  No entailment-to-formation inference is used. -/
+theorem generalizeValue_finalPredicates_of_requirementGeneration
+    {state : Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat} {valueType : Ty}
+    {binder : TypedBinder} {outer : Substitution}
+    {target : SourceSemantics.Context}
+    (requirementsEq : binder.schemeRequirements =
+      (Detail.generalizeValue state locals requirementStart valueType
+        ).requirements)
+    (generated : RetainedRequirementPredicateFormationAt state binder outer
+      target) :
+    ∀ requirement,
+      requirement ∈ (binder.applySubstitution outer).schemeRequirements →
+        PredicateAdmissible
+          (localSchemeInitializerContext target
+            (binder.applySubstitution outer)) requirement.predicate := by
+  intro requirement member
+  rw [FlexibleSubstitution.applyTypedBinder_schemeRequirements] at member
+  rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
+  have generalizedMember : original ∈
+      (Detail.generalizeValue state locals requirementStart valueType
+        ).requirements := by
+    simpa [requirementsEq] using originalMember
+  obtain ⟨rawRequirement, rawMember, idEq, predicateEq⟩ :=
+    Detail.generalizeValue_requirement_source state locals requirementStart
+      valueType original generalizedMember
+  have selectedId : rawRequirement.id ∈ localSchemeTemplateIds binder := by
+    unfold localSchemeTemplateIds
+    exact List.mem_map.mpr ⟨original, originalMember, idEq.symm⟩
+  simpa [LocalSchemeRequirement.applySubstitution, predicateEq] using
+    generated rawRequirement rawMember selectedId
 
 /-- Residual-aware certificate assembly for an actual initialized `let`.
 Finalization itself supplies capture avoidance and the scoped ledger.  The two

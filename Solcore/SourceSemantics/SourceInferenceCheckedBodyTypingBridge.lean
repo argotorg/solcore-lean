@@ -137,6 +137,9 @@ def InferStatementsFuelSoundness (fuel : Nat) : Prop :=
     finalized.substitution.SemanticallyExtends
       result.state.inference.substitution →
     TypingSourceExtends
+      (result.state.toTypedSource roots)
+      (evidenceState.toTypedSource roots) →
+    TypingSourceExtends
       ((result.state.toTypedSource roots).applySubstitution
         finalized.substitution) finalized.typedSource →
     result.state.integerPatterns ⊆ evidenceState.integerPatterns →
@@ -283,6 +286,13 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
         result.substitution) checked.typedBody := by
     rw [sourceEq, checkedEq]
     exact TypingSourceExtends.refl result.typedSource
+  have rawSourceExtends : TypingSourceExtends
+      (body.state.toTypedSource
+        (body.statements.map NodeId.statement))
+      (finalState.toTypedSource
+        (body.statements.map NodeId.statement)) := by
+    rw [unify_toTypedSource_eq unified]
+    exact TypingSourceExtends.refl _
   have patternsSubset : body.state.integerPatterns ⊆
       finalState.integerPatterns := by
     rw [Detail.unify_integerPatterns unified]
@@ -422,6 +432,7 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
         using signatureParameters)
       initialInvariant initialReady returnBelow initialBindersBelow initialBelow
       substitutionExtends
+      rawSourceExtends
       (by simpa only [checkedEq] using sourceExtends)
       patternsSubset literalsSubset requirementsSubset activeSignaturesEq
       activeParametersEq

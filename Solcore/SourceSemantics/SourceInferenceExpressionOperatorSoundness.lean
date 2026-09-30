@@ -70,6 +70,10 @@ def ordinaryUnary_childProvenance
       operandState.integerLiterals ⊆ result.2.integerLiterals)
     (parentIntegerSubset :
       result.2.integerLiterals ⊆ evidenceState.integerLiterals)
+    (operandPatternSubset :
+      operandState.integerPatterns ⊆ result.2.integerPatterns)
+    (parentPatternSubset :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentRequirementsSubset :
       result.2.requirements ⊆ evidenceState.requirements) :
     ExpressionChildInferenceProvenance (fuel + 1) inferenceContext
@@ -120,6 +124,8 @@ def ordinaryUnary_childProvenance
       parentExtension
     integerLiteralsSubset := List.Subset.trans operandIntegerSubset
       parentIntegerSubset
+    integerPatternsSubset := List.Subset.trans operandPatternSubset
+      parentPatternSubset
     requirementsSubset := operandRequirementsSubset
   }
 
@@ -162,6 +168,10 @@ def ordinaryBinary_childProvenances
       rightState.integerLiterals ⊆ result.2.integerLiterals)
     (parentIntegerSubset :
       result.2.integerLiterals ⊆ evidenceState.integerLiterals)
+    (rightPatternSubset :
+      rightState.integerPatterns ⊆ result.2.integerPatterns)
+    (parentPatternSubset :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentRequirementsSubset :
       result.2.requirements ⊆ evidenceState.requirements) :
     ExpressionChildInferenceProvenance (fuel + 1) inferenceContext
@@ -219,6 +229,9 @@ def ordinaryBinary_childProvenances
   have rightIntegerEvidence : rightState.integerLiterals ⊆
       evidenceState.integerLiterals :=
     List.Subset.trans rightIntegerSubset parentIntegerSubset
+  have rightPatternEvidence : rightState.integerPatterns ⊆
+      evidenceState.integerPatterns :=
+    List.Subset.trans rightPatternSubset parentPatternSubset
   have leftRequirementsSubset : leftState.requirements ⊆
       evidenceState.requirements :=
     List.Subset.trans (Detail.inferExprFuel_requirements_subset rightSuccess)
@@ -227,6 +240,10 @@ def ordinaryBinary_childProvenances
       evidenceState.integerLiterals :=
     List.Subset.trans (Detail.inferExprFuel_integerLiterals_subset rightSuccess)
       rightIntegerEvidence
+  have leftPatternEvidence : leftState.integerPatterns ⊆
+      evidenceState.integerPatterns :=
+    List.Subset.trans (Detail.inferExprFuel_integerPatterns_subset rightSuccess)
+      rightPatternEvidence
   exact ({
     fuel
     expression := left
@@ -239,6 +256,7 @@ def ordinaryBinary_childProvenances
     success := leftSuccess
     sourceExtension := TypingSourceExtends.trans leftToRight rightToEvidence
     integerLiteralsSubset := leftIntegerEvidence
+    integerPatternsSubset := leftPatternEvidence
     requirementsSubset := leftRequirementsSubset
   }, {
     fuel
@@ -252,6 +270,7 @@ def ordinaryBinary_childProvenances
     success := rightSuccess
     sourceExtension := rightToEvidence
     integerLiteralsSubset := rightIntegerEvidence
+    integerPatternsSubset := rightPatternEvidence
     requirementsSubset := rightRequirementsSubset
   })
 
@@ -293,6 +312,10 @@ theorem ordinaryUnary_expressionTypingBase_under_ambient_bounded
       operandState.integerLiterals ⊆ result.2.integerLiterals)
     (parentIntegerSubset :
       result.2.integerLiterals ⊆ evidenceState.integerLiterals)
+    (operandPatternSubset :
+      operandState.integerPatterns ⊆ result.2.integerPatterns)
+    (parentPatternSubset :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentRequirementsSubset :
       result.2.requirements ⊆ evidenceState.requirements)
     (childSound : ExpressionChildTypingCallback (fuel + 1)
@@ -351,7 +374,8 @@ theorem ordinaryUnary_expressionTypingBase_under_ambient_bounded
       finalized.typedSource active finalized.substitution result.1 := by
   let child := ordinaryUnary_childProvenance allocationEq parentSuccess
     operandSuccess operatorSuccess recordSuccess initialBelow parentExtension
-    operandIntegerSubset parentIntegerSubset parentRequirementsSubset
+    operandIntegerSubset parentIntegerSubset operandPatternSubset
+    parentPatternSubset parentRequirementsSubset
   have operandType : ExpressionHasType finalized.typedSource active
       operandResult.id (finalized.substitution.apply operandResult.type) :=
     resources.expressionHasType_of_childProvenance childSound child
@@ -439,6 +463,10 @@ theorem ordinaryBinary_expressionTypingBase_under_ambient_bounded
       rightState.integerLiterals ⊆ result.2.integerLiterals)
     (parentIntegerSubset :
       result.2.integerLiterals ⊆ evidenceState.integerLiterals)
+    (rightPatternSubset :
+      rightState.integerPatterns ⊆ result.2.integerPatterns)
+    (parentPatternSubset :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentRequirementsSubset :
       result.2.requirements ⊆ evidenceState.requirements)
     (childSound : ExpressionChildTypingCallback (fuel + 1)
@@ -500,7 +528,7 @@ theorem ordinaryBinary_expressionTypingBase_under_ambient_bounded
   let children := ordinaryBinary_childProvenances allocationEq parentSuccess
     leftSuccess rightSuccess operatorSuccess recordSuccess initialBelow
     parentExtension rightIntegerSubset parentIntegerSubset
-    parentRequirementsSubset
+    rightPatternSubset parentPatternSubset parentRequirementsSubset
   have leftType : ExpressionHasType finalized.typedSource active
       leftResult.id (finalized.substitution.apply leftResult.type) :=
     resources.expressionHasType_of_childProvenance childSound children.1
@@ -566,6 +594,8 @@ theorem selectedUnary_argumentTypingBases_of_retainedChild
     (success : Detail.inferExprFuel fuel inferenceContext operand expected
       initial = .ok (inferred, final))
     (integerSubset : final.integerLiterals ⊆ evidenceState.integerLiterals)
+    (integerPatternSubset :
+      final.integerPatterns ⊆ evidenceState.integerPatterns)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements)
     (retained : ExpressionRequirementsRetainedAt
       (final.toTypedSource roots) evidenceSource inferred.id)
@@ -586,6 +616,7 @@ theorem selectedUnary_argumentTypingBases_of_retainedChild
     success
     sourceExtension := TypingSourceExtends.refl _
     integerLiteralsSubset := integerSubset
+    integerPatternsSubset := integerPatternSubset
     requirementsSubset
   } retained) .nil
 
@@ -613,10 +644,14 @@ theorem selectedBinary_argumentTypingBases_of_retainedChildren
       leftState = .ok (rightResult, rightState))
     (leftIntegerSubset :
       leftState.integerLiterals ⊆ evidenceState.integerLiterals)
+    (leftPatternSubset :
+      leftState.integerPatterns ⊆ evidenceState.integerPatterns)
     (leftRequirementsSubset :
       leftState.requirements ⊆ evidenceState.requirements)
     (rightIntegerSubset :
       rightState.integerLiterals ⊆ evidenceState.integerLiterals)
+    (rightPatternSubset :
+      rightState.integerPatterns ⊆ evidenceState.integerPatterns)
     (rightRequirementsSubset :
       rightState.requirements ⊆ evidenceState.requirements)
     (leftRetained : ExpressionRequirementsRetainedAt
@@ -641,6 +676,7 @@ theorem selectedBinary_argumentTypingBases_of_retainedChildren
     success := leftSuccess
     sourceExtension := leftToRight
     integerLiteralsSubset := leftIntegerSubset
+    integerPatternsSubset := leftPatternSubset
     requirementsSubset := leftRequirementsSubset
   } leftRetained
   have rightBase : ExpressionTypingBase (rightState.toTypedSource roots)
@@ -656,6 +692,7 @@ theorem selectedBinary_argumentTypingBases_of_retainedChildren
     success := rightSuccess
     sourceExtension := TypingSourceExtends.refl _
     integerLiteralsSubset := rightIntegerSubset
+    integerPatternsSubset := rightPatternSubset
     requirementsSubset := rightRequirementsSubset
   } rightRetained
   exact .cons (leftBase.weakenNodeSource leftToRight.nodes_prefix)
