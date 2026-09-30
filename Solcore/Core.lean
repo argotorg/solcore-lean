@@ -4,6 +4,7 @@ import Solcore.Core.RuntimeStoreSafety
 import Solcore.Core.BoundedSafety
 import Solcore.Core.LanguageResult
 import Solcore.Core.OptionalCell
+import Solcore.Core.LocalSequence
 import Solcore.Core.Check
 import Solcore.Core.ExactFuelProperties
 import Solcore.Core.FuelResumptionProperties
