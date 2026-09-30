@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.DataPlacePathHelpers
 import Solcore.SourceSemantics.CoreLowering.GenericMatchMeaning
 import Solcore.SourceSemantics.CoreLowering.DataPlaceMappingHelpers

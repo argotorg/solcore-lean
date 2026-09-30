@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreGenericMatchPreservation
 import Solcore.Test.SourceCoreDataPlacePaths
 import Solcore.Test.SourceCoreGenericMatch
 import Solcore.Test.SourceCoreGenericHeap
