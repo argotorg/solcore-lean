@@ -441,6 +441,9 @@ theorem mappingInsert_member
 inductive RuntimeError where
   | missingSpecialization (key : Key)
   | duplicateSpecialization (key : Key) (count : Nat)
+  | inputPlanWorklist (error : SourceSpecializationWorklist.Error)
+  | inputPlanBudgetExhausted (next : Key)
+  | nonCanonicalInputPlan
   | specializationOwnershipMismatch
       (key : Key) (declaration functionDeclaration typedBodyOwner :
         Resolved.DeclarationId)
@@ -2690,6 +2693,28 @@ private def prepareExecutablePlanEvidenceAux (program : CheckedProgram)
           prepareExecutablePlanEvidenceAux program helperBudget remaining
             (next + 1) extended
 
+/-- A caller-supplied plan is executable only if replaying its roots against
+the checked program reconstructs *all* of its specialized bodies and edges.
+In particular, ground built-in operator layouts cannot be forged by erasing
+the trait requirements of a generic source occurrence.  Detached method
+specializations are appended only after this input-plan check. -/
+def validateCanonicalInputPlan (program : CheckedProgram) (plan : Plan) :
+    Except RuntimeError Unit := do
+  let seeds ← plan.seedKeys.mapM fun key => do
+    let specialized ← exactSpecialization plan key
+    pure ({
+      declaration := specialized.declaration
+      parameterSubstitution := specialized.parameterSubstitution
+    } : SourceSpecializationWorklist.Request)
+  let outcome ← (SourceSpecializationWorklist.run program seeds
+    plan.specializations.length).mapError RuntimeError.inputPlanWorklist
+  match outcome with
+  | .budgetExhausted _ next _ =>
+      throw (.inputPlanBudgetExhausted next)
+  | .complete expected =>
+      unless expected == plan do
+        throw .nonCanonicalInputPlan
+
 /-- Close and authenticate every executable operator and coercion method before
 execution.  The outer budget bounds the number of specializations inspected,
 including detached methods appended during the pass.  The helper budget
@@ -2697,8 +2722,11 @@ independently bounds ordinary call/reference closure discovered from each
 detached method. -/
 def prepareExecutablePlanEvidenceWithBudget (program : CheckedProgram)
     (plan : Plan) (closureFuel helperBudget : Nat) :
-    Except RuntimeError Plan :=
-  prepareExecutablePlanEvidenceAux program helperBudget closureFuel 0 plan
+    Except RuntimeError Plan := do
+  let prepared ← prepareExecutablePlanEvidenceAux program helperBudget
+    closureFuel 0 plan
+  validateCanonicalInputPlan program plan
+  pure prepared
 
 /-- Default checked execution plan preparation.  The bound mirrors the public
 compiler's default specialization budget while remaining explicit through the

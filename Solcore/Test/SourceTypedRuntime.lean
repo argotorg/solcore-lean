@@ -530,8 +530,15 @@ private def testClosuresOrderProxyAndFuel
   let closureImplicitTail ← prepareNamed program "closureImplicitTail"
   let closureImplicitTail := rewriteEntryNodes closureImplicitTail
     rewriteFirstLambdaReturnAsImplicitTail
+  /- This test-only carrier is not the checker-produced plan.  The trusted
+  entry exercises its evaluator branch; the safe entry must reject it. -/
+  match runPrepared closureImplicitTail with
+  | .fault .nonCanonicalInputPlan _ => pure ()
+  | result => throw (IO.userError
+      s!"forged closure tail escaped plan validation: {reprStr result}")
   expectWord "closure implicit tail return" 42
-    (runPrepared closureImplicitTail)
+    (SourceTypedRuntime.runTrusted closureImplicitTail.program
+      closureImplicitTail.plan closureImplicitTail.key [] 4096)
   let spin ← prepareNamed program "spin"
   match runPrepared spin [.word (word 1)] 3 with
   | .outOfFuel _ => pure ()
@@ -612,10 +619,16 @@ private def testContextualGenericEdgeTampering
   }
   expectRuntimeFault "duplicate contextual generic edge"
     (fun error => match error with
+      | .nonCanonicalInputPlan => true
+      | _ => false)
+    (runPrepared duplicate [.bool true])
+  expectRuntimeFault "trusted duplicate contextual generic edge"
+    (fun error => match error with
       | .duplicateCallEdge caller occurrence 2 =>
           decide (caller = prepared.key ∧ occurrence = wordEdge.occurrence)
       | _ => false)
-    (runPrepared duplicate [.bool true])
+    (SourceTypedRuntime.runTrusted duplicate.program duplicate.plan
+      duplicate.key [.bool true] 4096)
 
   let missing := {
     prepared with
@@ -627,10 +640,16 @@ private def testContextualGenericEdgeTampering
   }
   expectRuntimeFault "missing contextual generic edge"
     (fun error => match error with
+      | .nonCanonicalInputPlan => true
+      | _ => false)
+    (runPrepared missing [.bool true])
+  expectRuntimeFault "trusted missing contextual generic edge"
+    (fun error => match error with
       | .missingCallEdge caller occurrence =>
           decide (caller = prepared.key ∧ occurrence = wordEdge.occurrence)
       | _ => false)
-    (runPrepared missing [.bool true])
+    (SourceTypedRuntime.runTrusted missing.program missing.plan
+      missing.key [.bool true] 4096)
 
 private def testContextualLocalGenericCalls
     (program : CheckedProgram) : IO Unit := do

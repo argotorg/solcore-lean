@@ -121,6 +121,7 @@ private def source : String := String.intercalate "\n" [
   "}",
   "enum Token { A, B, C }",
   "impl Witness<Token> {}",
+  "impl Witness<Word> {}",
   "function rotate(value: Token) returns (Token) {",
   "  match (value) {",
   "    case .A { return .B; }",
@@ -149,6 +150,12 @@ private def source : String := String.intercalate "\n" [
   "  function eq(left: Token, right: Token) returns (Bool)",
   "      where Token: Witness {",
   "    return true;",
+  "  }",
+  "}",
+  "impl Eq<Word> {",
+  "  function eq(left: Word, right: Word) returns (Bool)",
+  "      where Word: Witness {",
+  "    return false;",
   "  }",
   "}",
   "impl Coerce<Token, Word> {",
@@ -191,6 +198,11 @@ private def source : String := String.intercalate "\n" [
   "function equalityEntry() returns (Bool) {",
   "  let left: Token = .A;",
   "  let right: Token = .B;",
+  "  return viaEq(left, right);",
+  "}",
+  "function wordEqualityEntry() returns (Bool) {",
+  "  let left: Word = 7;",
+  "  let right: Word = 7;",
   "  return viaEq(left, right);",
   "}",
   "function coercedOperatorEntry() returns (Word) {",
@@ -343,6 +355,9 @@ private def testSelectedOperatorMethods (program : CheckedProgram) : IO Unit := 
   let equality ← prepareNamed program "equalityEntry"
   expectBoolAndShallowHeap "selected Bool-result operator method" true
     equality.plan (runPrepared equality)
+  let wordEquality ← prepareNamed program "wordEqualityEntry"
+  expectBoolAndShallowHeap "selected Word equality override" false
+    wordEquality.plan (runPrepared wordEquality)
 
 private def testOperatorResultCoercion (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "coercedOperatorEntry"
@@ -428,6 +443,25 @@ private def testOperatorPreflight (program : CheckedProgram) : IO Unit := do
             actual = [equalitySubject, equalitySubject])
       | _ => false)
     (runTampered strippedEquality)
+
+  let wordEqualityPrepared ← prepareNamed program "wordEqualityEntry"
+  let wordEqualitySpecialized ← specializationNamed wordEqualityPrepared "viaEq"
+  let wordEquality ← equalityNode wordEqualitySpecialized
+  let wordRequirement ← match wordEquality.requirements with
+    | [primary, _method] => pure primary
+    | requirements => throw (IO.userError
+        s!"specialized Word equality retained {requirements.length} requirements")
+  let wordSolved ← exactSolved wordEqualitySpecialized wordRequirement
+  assertTrue (decide (wordSolved.predicate.subject = Ty.word))
+    "generic equality did not specialize its trait requirement to Word"
+  let strippedWordEquality := rewriteSpecializationExpression
+    wordEqualityPrepared wordEqualitySpecialized.key wordEquality.id fun node =>
+      { node with requirements := [] }
+  expectSentinelFault "stripped specialized Word equality requirements"
+    (fun error => match error with
+      | .nonCanonicalInputPlan => true
+      | _ => false)
+    (runTampered strippedWordEquality)
 
 private def testAll : IO Unit := do
   let program ← checkedProgram source
