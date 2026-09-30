@@ -10,6 +10,7 @@ import Solcore.Frontend.SourceStagedValue
 import Solcore.Frontend.SourceSpecialization
 import Solcore.Frontend.SourceSpecializationWorklist
 import Solcore.Frontend.SourceCoreElaboration
+import Solcore.Frontend.SourceCoreLocalCell
 import Solcore.Frontend.SourceTypedRuntime
 import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceTypedStaticSafetyProperties

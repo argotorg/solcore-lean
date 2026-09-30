@@ -1010,6 +1010,10 @@ import Solcore.Test.CoreCells
 import Solcore.Test.CoreRuntimeStoreSafety
 import Solcore.Test.CoreGeneralCells
 import Solcore.Test.CoreRecursiveCells
+import Solcore.Test.CoreLanguageResult
+import Solcore.Test.CoreOptionalCells
+import Solcore.Test.SourceCoreLocalCell
+import Solcore.Test.ContractLanguageResult
 import Solcore.Test.HostRuntimeStoreSafety
 import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
@@ -2387,6 +2391,9 @@ def run : IO Unit := do
   testCoreSums
   testCoreCells
   CoreRecursiveCells.run
+  CoreLanguageResult.run
+  SourceCoreLocalCell.run
+  ContractLanguageResult.test
   testCoreBooleanConnectives
   testCoreBitwiseLogic
   testCoreByteSelection
