@@ -94,8 +94,8 @@ structure LambdaCertificate (bodyCertificate : BodyCertificate)
 
 /-- Static extraction is relative to the chosen metadata policy and body
 compiler.  Their certificates are kept explicit, and no child evaluation is
-assumed. This certificate uses the default tagged callable representation and
-an absent special-expression hook. -/
+assumed. This certificate uses the default tagged callable representation,
+ordinary source-cell allocation and an absent special-expression hook. -/
 theorem lambda_of_accepted
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy}
     {lowerBody : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -104,6 +104,7 @@ theorem lambda_of_accepted
     {parameters : List TypedBinder} {resultType : TypeSystem.Ty} {statements : List StatementId}
     {reportedType : Core.Ty} {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
     (ordinary : policy.lowerSpecial? = none)
+    (ordinaryCells : policy.sourceCells = none)
     (defaultCallables : policy.callables = {})
     (found : source.lookupExpression? id = some node)
     (read : policy.readExpression source id = .ok (node, reportedType))
@@ -119,7 +120,7 @@ theorem lambda_of_accepted
   | succ fuel =>
     rw [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
     by_cases owned : id.occurrence.owner = source.owner
-    · simp only [owned, ne_eq, not_true_eq_false, ↓reduceIte, found, ordinary, read, form,
+    · simp only [owned, ne_eq, not_true_eq_false, ↓reduceIte, found, ordinary, ordinaryCells, read, form,
         bind, Except.bind, pure, Except.pure] at accepted
       cases type : node.type with
       | function parameter result =>
@@ -152,13 +153,13 @@ theorem lambda_of_accepted
                       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (min budget fuel) context
                         childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
                           reasonAt context.internalReason context.internalReason = _ at compiledBody
-                    simp only [compiledBody, defaultCallables] at accepted
+                    simp only [compiledBody, pure, Except.pure, defaultCallables] at accepted
                     cases checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
                         (Core.TaggedFunction.functionType parameterCore resultCore) with
                     | error error => simp [checked] at accepted
                     | ok doneUnit =>
                       cases doneUnit
-                      simp only [checked, pure, Except.pure] at accepted
+                      simp only [checked] at accepted
                       cases accepted
                       exact ⟨⟨parameter, parameterCore, resultCore, loweredParameters, bodyScope, bodyCode,
                       found, read, form, type, bundle, parameterProjection, resultProjection,
@@ -179,6 +180,7 @@ theorem lambda_of_accepted_metadata
     {parameters : List TypedBinder} {resultType : TypeSystem.Ty} {statements : List StatementId}
     {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
     (ordinary : policy.lowerSpecial? = none)
+    (ordinaryCells : policy.sourceCells = none)
     (defaultCallables : policy.callables = {})
     (found : source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters resultType statements)
@@ -203,7 +205,7 @@ theorem lambda_of_accepted_metadata
     obtain ⟨selected, type⟩ := pair
     have same := Option.some.inj ((readSound selected type read).symm.trans found)
     subst selected
-    exact ⟨type, lambda_of_accepted ordinary defaultCallables found read form extractBody accepted⟩
+    exact ⟨type, lambda_of_accepted ordinary ordinaryCells defaultCallables found read form extractBody accepted⟩
 
 def LambdaCertificate.rawBody
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy} {source : TypedSource}

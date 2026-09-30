@@ -17,6 +17,7 @@ import Solcore.Test.SourceCoreDataPlaceAssignmentMeaning
 import Solcore.Test.SourceCoreDataPlaceContinuation
 import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCoreHeapMarkers
+import Solcore.Test.SourceCoreSourceCells
 import Solcore.Test.SourceRuntimeValidationBoundary
 import Solcore.Test.SourceRuntimeDeepValidationBoundary
 import Solcore.Test.SourceCallableLedger
@@ -2537,6 +2538,7 @@ def run : IO Unit := do
   SourceCoreDataEquality.run
   SourceCoreMappingWithDefault.run
   SourceCoreHeapMarkers.run
+  SourceCoreSourceCells.run
   SourceCoreRawMetadata.run
   SourceCoreCompatibleValues.run
   SourceCompilerSourceBoundaryObservations.run

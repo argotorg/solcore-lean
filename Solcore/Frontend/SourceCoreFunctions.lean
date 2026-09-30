@@ -1,6 +1,7 @@
 import Solcore.Frontend.SourceCoreFunctionTypes
 import Solcore.Frontend.SourceCoreCalls
 import Solcore.Frontend.SourceCoreInteger
+import Solcore.Frontend.SourceCoreSourceCells
 
 /-! Monomorphic function values over shared optional cells. Named references
 carry a deterministic plan-local identity; lambdas retain anonymous identity
@@ -57,6 +58,7 @@ The leaf callback receives the same recursive expression compiler, so nominal
 payloads can contain calls and closures without a second evaluator. -/
 structure Policy where
   callables : CallablePolicy := {}
+  sourceCells : Option SourceCoreSourceCells.Allocator := none
   projectType : SourceCoreElaboration.ErrorSite → TypeSystem.Ty → Except Error Core.Ty :=
     SourceCoreFunctionTypes.projectType
   readExpression : TypedSource → ExpressionId → Except Error (ExpressionNode × Core.Ty) :=
@@ -269,7 +271,11 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                 (fun budget childSource childScope childId childReasonAt =>
                   lowerExpressionWithPolicy policy lowerBody (min budget fuel) context childSource childScope childId childReasonAt)
                 fuel source bodyScope statements resultCore reasonAt context.internalReason context.internalReason
-              let rawBody := bindParameters parameters resultCore (body.weakenAt parameters.length)
+              let rawBody ← match policy.sourceCells with
+                | none => pure (bindParameters parameters resultCore (body.weakenAt parameters.length))
+                | some allocate =>
+                    SourceCoreSourceCells.bindParameters allocate source scope parameters resultCore
+                      argumentProjection (body.weakenAt parameters.length)
               SourceCoreBasic.ensureType site type (policy.callables.functionType parameterCore resultCore)
               let expression ← policy.callables.decorateCallable context source node (.lambda id) parameterCore resultCore
                 (Core.LanguageResult.success (Core.TaggedFunction.anonymous

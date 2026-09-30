@@ -1,6 +1,7 @@
 import Solcore.Frontend.SourceCoreControl
 import Solcore.Frontend.SourceCorePrimitive
 import Solcore.Core.LocalLoop
+import Solcore.Frontend.SourceCoreSourceCells
 
 /-! Scalar/product source loops compiled to ordinary Core. Initializer bindings
 are visible to a for loop's condition, body and post, then discharged before
@@ -27,6 +28,7 @@ abbrev FlowLowerer := Nat → TypedSource → Scope → List StatementId → Cor
 /-- Entry profiles supply type and binder projection independently of control. -/
 structure Policy where
   lowerExpression : ExpressionLowerer
+  sourceCells : Option SourceCoreSourceCells.Allocator := none
   readStatement : TypedSource → StatementId → Except Error (StatementNode × Core.Ty) :=
     SourceCoreBasic.readStatement
   lowerBinder : TypedSource → Scope → TypedBinder → Except Error Core.Ty :=
@@ -84,11 +86,14 @@ def lowerForItems (policy : Policy) (parentSite : SourceCoreElaboration.ErrorSit
           let body ← lowerForItems policy parentSite fuel source ((binder.id, payloadType) :: scope)
             rest resultType reasonAt next
           match initializer with
-          | none => pure (Core.LocalSequence.letUninitialized payloadType body)
+          | none =>
+              SourceCoreSourceCells.letUninitialized policy.sourceCells source scope Core.Renaming.id
+                binder payloadType body
           | some initializer =>
               let initializer ← policy.lowerExpression fuel source scope initializer reasonAt
               SourceCoreBasic.ensureType (.binder binder.id) payloadType initializer.type
-              pure (Core.LocalSequence.letInitialized controlType payloadType initializer.expression body)
+              SourceCoreSourceCells.letInitialized policy.sourceCells source scope Core.Renaming.id binder
+                controlType payloadType initializer.expression body
       | .expression expression =>
           let expression ← policy.lowerExpression fuel source scope expression reasonAt
           let body ← lowerForItems policy parentSite fuel source scope rest resultType reasonAt next
@@ -123,13 +128,15 @@ def lowerFlowStatementsWithPolicy (policy : Policy) : Nat → TypedSource → Sc
           | none =>
               let body ← lowerFlowStatementsWithPolicy policy fuel source ((binder.id, payloadType) :: scope)
                 rest resultType reasonAt tailReturns selfReason
-              pure (Core.LocalSequence.letUninitialized payloadType body)
+              SourceCoreSourceCells.letUninitialized policy.sourceCells source scope Core.Renaming.id binder
+                payloadType body
           | some initializer =>
               let initializer ← policy.lowerExpression fuel source scope initializer reasonAt
               SourceCoreBasic.ensureType (.binder binder.id) payloadType initializer.type
               let body ← lowerFlowStatementsWithPolicy policy fuel source ((binder.id, payloadType) :: scope)
                 rest resultType reasonAt tailReturns selfReason
-              pure (Core.LocalSequence.letInitialized controlType payloadType initializer.expression body)
+              SourceCoreSourceCells.letInitialized policy.sourceCells source scope Core.Renaming.id binder
+                controlType payloadType initializer.expression body
       | .assignValue assignment operator value =>
           SourceCoreBasic.ensureType site .unit type
           let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason
