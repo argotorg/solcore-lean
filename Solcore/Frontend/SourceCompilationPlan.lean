@@ -1748,7 +1748,7 @@ def sourceTypeIsComptimeOnly : Ty → Bool
   | .comptime _ => true
   | _ => false
 
-private def requireComptimeArgumentStage
+def requireComptimeArgumentStage
     (caller : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) (index : Nat) (argument : ExpressionId) :
     Except RuntimeError Unit :=
@@ -1759,7 +1759,7 @@ private def requireComptimeArgumentStage
       throw (.comptimeArgumentStageMismatch caller.key node.id index argument
         actual)
 
-private def validateStagedArguments
+def validateStagedArguments
     (caller : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) (forceComptime : Bool) :
     Nat → List TypedBinder → List ExpressionId → Except RuntimeError Unit

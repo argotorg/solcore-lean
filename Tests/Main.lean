@@ -13,6 +13,8 @@ import Solcore.Test.SourceCoreContractedFunctions
 import Solcore.Test.SourceCoreDataExpressionSequence
 import Solcore.Test.SourceCoreDataPlaceKeyOrder
 import Solcore.Test.SourceCoreMappingWithDefault
+import Solcore.Test.SourceCallStageGuards
+import Solcore.Test.SourceCallStageBoundary
 import Solcore.Test.SourceCoreDataPayload
 import Solcore.Test.SourceCoreDataPayloadMapping
 import Solcore.Test.SourceCoreDataPayloadPaths
