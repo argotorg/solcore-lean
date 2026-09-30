@@ -4,6 +4,7 @@ import Solcore.Frontend.SourceTypedRuntimeDeepSafety
 import Solcore.Core.Safety
 import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceCoreBasicEntry
+import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.ProgramInterfaces
 import Solcore.Abi.StaticWord
 
@@ -470,6 +471,13 @@ private theorem exactRoot_specializations
     next roots rootsEqual => cases accepted
   next keys seedKeysEqual => cases accepted
 
+private def prepareCoreRuntime (program : CheckedProgram)
+    (plan : SourceSpecializationWorklist.Plan) (compilationFuel : Nat) (reason : Core.Word) :
+    Except SourceCoreRecursiveEntry.Error SourceCoreBasicEntry.PreparedProgram :=
+  match SourceCoreBasicEntry.prepare program plan compilationFuel reason with
+  | .ok prepared => .ok prepared
+  | .error _ => SourceCoreRecursiveEntry.prepare program plan compilationFuel reason
+
 private def selectCoreBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat) :
     Except CompileError Executable :=
@@ -481,7 +489,7 @@ private def selectCoreBackend (program : CheckedProgram)
       | [entry] => .ok (.core entry)
       | entries => .error (.backendEntryCountMismatch .core entries.length)
   | .error error =>
-      match SourceCoreBasicEntry.prepare program plan stagingFuel Core.Word.zero with
+      match prepareCoreRuntime program plan stagingFuel Core.Word.zero with
       | .ok prepared =>
           match prepared.entries with
           | [entry] => .ok (.coreRuntime entry)
@@ -524,7 +532,7 @@ private theorem selectCoreBackend_success_backend
   cases linkedResult : SourceCoreDirectLinking.linkWithStagingFuel program
       (.complete plan) stagingFuel with
   | error error =>
-      cases prepared : SourceCoreBasicEntry.prepare program plan stagingFuel Core.Word.zero with
+      cases prepared : prepareCoreRuntime program plan stagingFuel Core.Word.zero with
       | error preparationError => simp [linkedResult, prepared] at selected
       | ok preparedProgram =>
           cases entries : preparedProgram.entries with

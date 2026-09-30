@@ -1550,7 +1550,7 @@ private def validateForItemMetadata : ForItemForm → Except RuntimeError Unit
 /-- Reconstruct every indirect-call endpoint from the callee and argument
 nodes.  The retained resolution metadata is useful to execution only after it
 has been checked against those authoritative children. -/
-private def validateIndirectCallMetadata (source : TypedSource)
+def validateIndirectCallMetadata (source : TypedSource)
     (node : ExpressionNode) (callee : ExpressionId)
     (arguments : List ExpressionId) (metadata : IndirectCallResolution) :
     Except RuntimeError Unit := do

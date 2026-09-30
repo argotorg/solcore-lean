@@ -193,11 +193,11 @@ private def testRetainedBackends (program : CheckedProgram) : IO Unit := do
       assertTrue (value == word 29) "explicit typed-source execution changed"
   | result => throw (IO.userError s!"explicit typed-source execution failed: {reprStr result}")
   let recursive ← compileNamed program "recurse"
-  assertTrue (recursive.backend == .typedSource) "unsupported recursive fragment lost its existing fallback"
-  match recursive.runTyped [.word (word 3)] execution with
-  | .ok (.typedSource (.done (.word value) _)) =>
-      assertTrue (value == word 5) "retained recursive fallback value changed"
-  | result => throw (IO.userError s!"retained recursive fallback failed: {reprStr result}")
+  assertTrue (recursive.backend == .core) "named recursion did not select Core"
+  match recursive.runCore [scalar 3] execution with
+  | .ok (.coreLanguageResult (.succeeded (.word value) _)) =>
+      assertTrue (value == word 5) "Core recursive value changed"
+  | result => throw (IO.userError s!"Core recursive execution failed: {reprStr result}")
 
 private def testPrimitiveIntegration (program : CheckedProgram) : IO Unit := do
   for preference in [BackendPreference.automatic, .core] do

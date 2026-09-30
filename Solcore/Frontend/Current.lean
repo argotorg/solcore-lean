@@ -15,6 +15,9 @@ import Solcore.Frontend.SourceCoreBasic
 import Solcore.Frontend.SourceCoreControl
 import Solcore.Frontend.SourceCorePrimitive
 import Solcore.Frontend.SourceCoreLoops
+import Solcore.Frontend.SourceCoreCalls
+import Solcore.Frontend.SourceCoreProgramFaultSites
+import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreFaultSites
 import Solcore.Frontend.SourceCoreBasicEntry
 import Solcore.Frontend.SourceTypedRuntime

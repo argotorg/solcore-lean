@@ -9,6 +9,8 @@ import Solcore.SourceSemantics.CoreLowering.BasicStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.BasicStatementMeaning
 import Solcore.SourceSemantics.CoreLowering.ControlExpressions
 import Solcore.SourceSemantics.CoreLowering.PrimitiveExpressions
+import Solcore.SourceSemantics.CoreLowering.GeneralHeap
+import Solcore.SourceSemantics.CoreLowering.GeneralExpressions
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that

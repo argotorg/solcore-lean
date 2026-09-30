@@ -219,6 +219,11 @@ private def expectTypedWord (label : String) (expected : Nat) :
   | .ok (.typedSource (.done (.word actual) _)) =>
       assertTrue (actual == word expected) s!"{label} returned the wrong Word"
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
+private def expectCoreLanguageWord (label : String) (expected : Nat) :
+    Except RunError ExecutionResult → IO Unit
+  | .ok (.coreLanguageResult (.succeeded (.word actual) _)) =>
+      assertTrue (actual == word expected) s!"{label} returned the wrong Word"
+  | result => throw (IO.userError s!"{label} returned {reprStr result}")
 private def expectTypedInteger (label : String) (expected : Int) :
     Except RunError ExecutionResult → IO Unit
   | .ok (.typedSource (.done (.integer actual) _)) =>
@@ -264,7 +269,7 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
-      recursive.backend = .typedSource ∧
+      recursive.backend = .core ∧
       typed.backend = .typedSource ∧
       polymorphicLocal.backend = .typedSource ∧
       nestedPolymorphicLocal.backend = .typedSource ∧
@@ -364,8 +369,11 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "direct Core execution did not retain its supplied store"
   | result => throw (IO.userError
       s!"direct Core execution changed its exact state: {reprStr result}")
-  expectTypedWord "automatic recursive typed root" 31 <|
-    recursive.runTyped [.word (word 3)] runtimeOptions
+  expectCoreLanguageWord "automatic recursive Core root" 31 <|
+    recursive.runCore [.word (word 3)] runtimeOptions
+  let explicitTypedRecursive ← compileNamedWithBackend checked "main.solc" "recurse" .typedSource
+  expectTypedWord "explicit recursive typed root" 31 <|
+    explicitTypedRecursive.runTyped [.word (word 3)] runtimeOptions
   expectTypedWord "imported alias typed root" 12 <|
     typed.runTyped [.product (.word (word 7)) (.word (word 8))] runtimeOptions
   match polymorphicLocal.runTyped [.bool true] runtimeOptions with
@@ -455,10 +463,10 @@ private def testProgramOrchestration : IO Unit := do
   match many.entries with
   | [first, second, third] =>
       assertTrue (decide (many.count = 3 ∧
-          many.backends = [.core, .typedSource, .core] ∧
-          many.usesMixedBackends = true ∧
+          many.backends = [.core, .core, .core] ∧
+          many.usesMixedBackends = false ∧
           first.key = third.key ∧ first.key ≠ second.key))
-        "multi-root order, duplicates, or mixed backend selection changed"
+        "multi-root order, duplicates, or Core backend selection changed"
   | entries => throw (IO.userError
       s!"multi-root compilation returned {entries.length} entries")
   match compileManyChecked checked
@@ -474,16 +482,16 @@ private def testProgramOrchestration : IO Unit := do
     | .ok compiled => pure compiled
     | .error error => throw (IO.userError
         s!"raw multi-root compilation failed: {reprStr error}")
-  assertTrue (rawMany.backends == [.core, .typedSource, .core] &&
-      rawMany.usesMixedBackends)
-    "raw compile-many did not preserve mixed per-root selection"
+  assertTrue (rawMany.backends == [.core, .core, .core] &&
+      !rawMany.usesMixedBackends)
+    "raw compile-many did not preserve Core per-root selection"
 
   let abi ← match compileStaticWord orchestrationWorkspace with
     | .ok compiled => pure compiled
     | .error error => throw (IO.userError
         s!"Static Word root compilation failed: {reprStr error}")
-  assertTrue (abi.count == 3 && abi.usesMixedBackends)
-    "Static Word discovery lost an exported root or mixed backend"
+  assertTrue (abi.count == 3 && !abi.usesMixedBackends)
+    "Static Word discovery lost an exported root or Core backend"
   let doubled ← abiRootNamed abi "doubled"
   let localRoot ← abiRootNamed abi "local"
   let recursive ← abiRootNamed abi "recursive"
@@ -492,7 +500,7 @@ private def testProgramOrchestration : IO Unit := do
       localRoot.entry.key.declaration.moduleId = api ∧
       recursive.entry.key.declaration.moduleId = provider ∧
       doubled.entry.backend = .core ∧ localRoot.entry.backend = .core ∧
-      recursive.entry.backend = .typedSource ∧
+      recursive.entry.backend = .core ∧
       (abi.roots.find? fun root =>
         root.metadata.name.text == "hidden").isNone ∧
       (abi.roots.find? fun root =>
@@ -507,8 +515,8 @@ private def testProgramOrchestration : IO Unit := do
     doubled.entry.runCore [.word (word 7)] runtimeOptions
   expectCoreWord "exported local ABI root" 8 <|
     localRoot.entry.runCore [.word (word 7)] runtimeOptions
-  expectTypedWord "exported recursive ABI root" 31 <|
-    recursive.entry.runTyped [.word (word 3)] runtimeOptions
+  expectCoreLanguageWord "exported recursive ABI root" 31 <|
+    recursive.entry.runCore [.word (word 3)] runtimeOptions
 
   let missingMain : Workspace.RawWorkspace := {
     entry := "missing.solc"
@@ -697,7 +705,10 @@ private def testBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
   let coreOptions := {
     compilerOptions with backendPreference := .core
   }
-  match compileChecked checked (Seed.named main "recurse") coreOptions with
+  let recursive ← compileNamedWithBackend checked "main.solc" "recurse" .core
+  expectCoreLanguageWord "forced recursive Core root" 31 <|
+    recursive.runCore [.word (word 3)] runtimeOptions
+  match compileChecked checked (Seed.named main "visibleAlias") coreOptions with
   | .error (.backendRejected (.core _)) => pure ()
   | .error error => throw (IO.userError
       s!"forced Core rejection changed category: {reprStr error}")

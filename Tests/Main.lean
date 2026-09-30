@@ -1030,6 +1030,11 @@ import Solcore.Test.SourceCoreControlExpressions
 import Solcore.Test.SourceCorePrimitive
 import Solcore.Test.SourceCorePrimitiveExpressions
 import Solcore.Test.SourceCoreLoops
+import Solcore.Test.SourceCompilerLoops
+import Solcore.Test.SourceCoreCalls
+import Solcore.Test.SourceCoreRecursiveEntry
+import Solcore.Test.SourceCoreGeneralHeap
+import Solcore.Test.SourceCoreGeneralExpressions
 import Solcore.Test.SourceCoreBasicEntry
 import Solcore.Test.SourceCompilerCoreCells
 import Solcore.Test.ContractLanguageResult
@@ -2416,6 +2421,9 @@ def run : IO Unit := do
   SourceCoreControl.run
   SourceCorePrimitive.run
   SourceCoreLoops.run
+  SourceCompilerLoops.run
+  SourceCoreCalls.run
+  SourceCoreRecursiveEntry.run
   CoreLocalLoop.run
   CoreTaggedFunction.run
   SourceCoreBasicEntry.run

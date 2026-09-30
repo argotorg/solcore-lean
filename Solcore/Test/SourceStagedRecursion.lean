@@ -270,23 +270,23 @@ private def testRuntimeRecursionUsesExecutionFuel : IO Unit := do
   match SourceCompiler.compile (workspace runtimeRecursionSource)
       (SourceCompiler.Seed.named moduleId "loop") compileOptions with
   | .ok compiled =>
-      assertTrue (decide (compiled.backend = .typedSource ∧
+      assertTrue (decide (compiled.backend = .core ∧
           compiled.specializationCount = 1))
-        "runtime recursion did not select one typed-source specialization"
+        "runtime recursion did not select one Core specialization"
       let runOptions : SourceCompiler.RunOptions := {
         inputValidationFuel := 64
         executionFuel := 8
       }
-      match compiled.runTyped [.word (word 1)] runOptions with
-      | .ok (.typedSource (.outOfFuel state)) =>
-          assertTrue (!state.heap.isEmpty)
+      match compiled.runCore [.word (word 1)] runOptions with
+      | .ok (.coreLanguageResult (.outOfFuel state)) =>
+          assertTrue (!state.store.isEmpty)
             "runtime recursion did not retain its allocated parameter cells"
       | result => throw (IO.userError
           s!"runtime recursion did not use execution fuel: {reprStr result}")
   | .error error => throw (IO.userError
       s!"runtime recursion was not compiled: {reprStr error}")
 
-/-- Exercise staged and typed-source runtime recursion through their
+/-- Exercise staged and Core runtime recursion through their
 independent public fuel boundaries. -/
 def testSourceStagedRecursion : IO Unit := do
   testIntegerRecursion
