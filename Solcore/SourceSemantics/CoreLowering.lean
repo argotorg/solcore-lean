@@ -24,6 +24,8 @@ import Solcore.SourceSemantics.CoreLowering.DataEquality
 import Solcore.SourceSemantics.CoreLowering.DataDefaults
 import Solcore.SourceSemantics.CoreLowering.ScalarExpressionReflection
 import Solcore.SourceSemantics.CoreLowering.LoopStatementBridge
+import Solcore.SourceSemantics.CoreLowering.LoopStatementReflectionBridge
+import Solcore.SourceSemantics.CoreLowering.DataPatternDecision
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
