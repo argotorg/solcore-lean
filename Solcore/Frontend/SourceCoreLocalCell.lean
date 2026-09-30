@@ -37,7 +37,7 @@ inductive Error where
   | coercionsPresent (id : ExpressionId)
   | typeProjection (error : SourceCoreElaboration.Error)
   | slotTypeMismatch (expected actual : Core.Ty)
-  deriving Repr
+  deriving Repr, DecidableEq
 
 /-- Compile a local occurrence without reading or evaluating a source heap. -/
 def lowerRead (source : TypedSource) (scope : Scope) (id : ExpressionId)

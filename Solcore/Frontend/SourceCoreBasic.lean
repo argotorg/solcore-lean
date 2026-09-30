@@ -43,7 +43,7 @@ inductive Error where
   | missingBinding (id : Resolved.LocalId)
   | nonTailExpression (id : StatementId)
   | missingReturn (resultType : Core.Ty)
-  deriving Repr
+  deriving Repr, DecidableEq
 
 def ensureType (site : SourceCoreElaboration.ErrorSite) (expected actual : Core.Ty) :
     Except Error Unit :=
