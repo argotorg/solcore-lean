@@ -10,6 +10,8 @@ import Solcore.SourceSemantics.CoreLowering.DataPayloadReadPaths
 import Solcore.SourceSemantics.CoreLowering.DataPayloadUpdatePaths
 import Solcore.SourceSemantics.CoreLowering.DataPayloadFaultPaths
 import Solcore.SourceSemantics.CoreLowering.DataPayloadWriteBack
+import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.GenericMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.DataPlacePathHelpers
 import Solcore.SourceSemantics.CoreLowering.GenericMatchMeaning
