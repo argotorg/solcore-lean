@@ -32,7 +32,7 @@ def lowerBinder (checked : Checked) (source : TypedSource) (scope : Scope)
   if binder.id.owner ≠ source.owner then throw (.ownerMismatch source.owner binder.id.owner)
   unless binder.scheme.quantified.isEmpty do throw (.polymorphicBinding binder.id)
   unless binder.schemeRequirements.isEmpty do throw (.bindingRequirementsPresent binder.id)
-  if binder.comptime then throw (.comptimeBinding binder.id)
+  if binder.comptime && !checked.catalog.callableContracts then throw (.comptimeBinding binder.id)
   if scope.any (fun entry => decide (entry.1 = binder.id)) then throw (.duplicateBinding binder.id)
   projectType checked (.binder binder.id) binder.scheme.body
 

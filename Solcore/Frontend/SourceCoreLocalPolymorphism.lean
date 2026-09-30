@@ -1,7 +1,7 @@
 import Solcore.Frontend.SourceCompilationPlan.LocalInstances
 import Solcore.Frontend.SourceCoreBasic
 import Solcore.Frontend.SourceCoreDataCatalog
-import Solcore.Core.TaggedFunction
+import Solcore.Core.CallableContract
 
 /-! Finite local-lambda instances use ordinary product bundles and optional
 cells. The catalog retains the complete cumulative substitution, including
@@ -153,16 +153,20 @@ inductive Error where
   | missingInstance (binder : Resolved.LocalId) (substitution : Substitution)
   | duplicateInstances (binder : Resolved.LocalId) (substitution : Substitution) (count : Nat)
   | invalidProjection (index : Nat)
+  | missingCallableContract (caller : Key) (initializer : ExpressionId) (context : Substitution)
   deriving Repr
 
 structure Instance where
   origin : SourceCompilationPlan.LocalLambdaCatalogEntry
   parameterType : Core.Ty
   resultType : Core.Ty
+  contractId : Option Core.Word := none
   deriving Repr
 
 def Instance.type (candidate : Instance) : Core.Ty :=
-  Core.TaggedFunction.functionType candidate.parameterType candidate.resultType
+  match candidate.contractId with
+  | none => Core.TaggedFunction.functionType candidate.parameterType candidate.resultType
+  | some _ => Core.CallableContract.functionType candidate.parameterType candidate.resultType
 
 /-- Apply the cumulative context to the full table. Immutable original
 occurrence metadata remains in `origin.source` for later scheme selection;
@@ -173,8 +177,11 @@ def Instance.source (candidate : Instance) : TypedSource :=
 /-- The body is compiled under the packed parameter followed by the original
 lexical reference environment. Every instance keeps anonymous source identity. -/
 def Instance.closure (candidate : Instance) (body : Core.Expr) : Core.Expr :=
-  Core.TaggedFunction.anonymous
+  let tagged := Core.TaggedFunction.anonymous
     (.lambda candidate.parameterType (Core.LanguageResult.resultType candidate.resultType) body)
+  match candidate.contractId with
+  | none => tagged
+  | some id => Core.CallableContract.wrap id tagged
 
 theorem Instance.closure_hasType {definitions : Core.DataEnvironment} {context : Core.Context}
     {candidate : Instance} {body : Core.Expr}
@@ -182,9 +189,12 @@ theorem Instance.closure_hasType {definitions : Core.DataEnvironment} {context :
     (resultWF : Core.Ty.WellFormed definitions candidate.resultType)
     (bodyTyped : Core.HasType (candidate.parameterType :: context) body
       (Core.LanguageResult.resultType candidate.resultType) definitions) :
-    Core.HasType context (candidate.closure body) candidate.type definitions :=
-  Core.TaggedFunction.anonymous_hasType
-    (.lambda parameterWF (Core.LanguageResult.resultType_wellFormed resultWF) bodyTyped)
+    Core.HasType context (candidate.closure body) candidate.type definitions := by
+  have tagged := Core.TaggedFunction.anonymous_hasType
+    (Core.HasType.lambda parameterWF (Core.LanguageResult.resultType_wellFormed resultWF) bodyTyped)
+  cases selected : candidate.contractId with
+  | none => simpa [Instance.closure, Instance.type, selected] using tagged
+  | some id => simpa [Instance.closure, Instance.type, selected] using Core.CallableContract.wrap_hasType id tagged
 
 structure Binding where
   caller : Key
@@ -197,6 +207,20 @@ structure Binding where
 structure Catalog where
   bindings : List Binding
   deriving Repr
+
+/-- Attach artifact-owned descriptors after inventorying all original and
+contextual origins. Every instance in the bundle retains its exact context. -/
+def Catalog.withCallableContracts (catalog : Catalog)
+    (idAt : Key → ExpressionId → Substitution → Option Core.Word) : Except Error Catalog := do
+  let bindings ← catalog.bindings.mapM fun binding => do
+    let instances ← binding.instances.mapM fun candidate => do
+      let contract ← match idAt candidate.origin.caller candidate.origin.initializer candidate.origin.substitution with
+        | some contract => pure contract
+        | none => throw (.missingCallableContract candidate.origin.caller
+            candidate.origin.initializer candidate.origin.substitution)
+      pure { candidate with contractId := some contract }
+    pure { binding with instances }
+  pure { bindings }
 
 /-- Candidate contexts must agree with every active outer-context metavariable.
 Equal function types alone never choose a nested candidate. -/
@@ -239,7 +263,7 @@ private def prepareInstance (checked : Checked) (entry : SourceCompilationPlan.L
     throw (.initializerMetadataMismatch entry.initializer)
   let parameterType ← (checked.project parameter).mapError Error.projection
   let resultType ← (checked.project result).mapError Error.projection
-  pure ⟨entry, parameterType.type, resultType.type⟩
+  pure { origin := entry, parameterType := parameterType.type, resultType := resultType.type }
 
 /-- Discover finite instances through the existing worklist. Unused direct
 generalized lambdas are retained as empty bundles. This does not broaden the

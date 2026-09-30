@@ -1,5 +1,5 @@
 import Solcore.Frontend.SourceCompilationPlan
-import Solcore.Core.TaggedFunction
+import Solcore.Core.CallableContract
 import Solcore.Core.Data
 
 /-! Closed source data identities and their ordinary Core definitions.
@@ -60,7 +60,14 @@ structure Entry where
 
 structure Catalog where
   entries : List Entry := []
+  callableContracts : Bool := false
   deriving Repr
+
+/-- Function representation is fixed for the entire catalog, including nominal
+and mapping payloads. Existing callers retain their tagged carrier by default. -/
+def Catalog.functionType (catalog : Catalog) (parameter result : Core.Ty) : Core.Ty :=
+  if catalog.callableContracts then Core.CallableContract.functionType parameter result
+  else Core.TaggedFunction.functionType parameter result
 
 def Catalog.definitions (catalog : Catalog) : Core.DataEnvironment :=
   catalog.entries.map fun entry => entry.definition.getD ⟨[]⟩
@@ -76,7 +83,7 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
   | .constructor (.builtin .integer) => pure .integer
   | .product left right => do pure (.product (← catalog.project left) (← catalog.project right))
   | .function parameter result => do
-      pure (Core.TaggedFunction.functionType (← catalog.project parameter) (← catalog.project result))
+      pure (catalog.functionType (← catalog.project parameter) (← catalog.project result))
   | .comptime inner => catalog.project inner
   | type => match catalog.identity? type with
       | some identity => pure (.namedData identity)
@@ -125,7 +132,7 @@ mutual
       | .function parameter result => do
           let (catalog, parameter) ← registerType signatures fuel catalog parameter
           let (catalog, result) ← registerType signatures fuel catalog result
-          pure (catalog, Core.TaggedFunction.functionType parameter result)
+          pure (catalog, catalog.functionType parameter result)
       | .proxy inner => do
           let (catalog, _) ← registerType signatures fuel catalog inner
           let (identity, catalog) := catalog.reserve type
@@ -175,8 +182,8 @@ structure Checked where
 escape this API, and the ordinary Core definition checker authenticates every
 recursive payload reference. -/
 def prepare (signatures : ProgramSignatures)
-    (fuel : Nat) (types : List Ty) : Except Error Checked := do
-  let (catalog, _) ← registerTypes signatures fuel {} types
+    (fuel : Nat) (types : List Ty) (callableContracts : Bool := false) : Except Error Checked := do
+  let (catalog, _) ← registerTypes signatures fuel { callableContracts } types
   for (entry, index) in catalog.entries.zipIdx do
     if entry.definition.isNone then throw (.unfinishedDefinition index)
   if accepted : catalog.definitions.isWellFormed = true then

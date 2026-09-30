@@ -50,5 +50,6 @@ import Solcore.Frontend.SourceCoreLocalEvidence
 import Solcore.Frontend.SourceCoreStageContracts
 import Solcore.Frontend.SourceCoreStageCodebook
 import Solcore.Frontend.SourceCoreCallableContracts
+import Solcore.Frontend.SourceCoreCallableFaultSites
 
 /-! Current whole-program source pipeline and preservation results. -/

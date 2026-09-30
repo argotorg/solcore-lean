@@ -7,6 +7,8 @@ import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreDataFaultSites
 import Solcore.Frontend.SourceCoreDataMatches
 import Solcore.Frontend.SourceCoreDataPlaceFaultSites
+import Solcore.Frontend.SourceCoreCallableContracts
+import Solcore.Frontend.SourceCoreCallableFaultSites
 
 /-! Closed function instances and catalog data share ordinary Core execution.
 Preparation authenticates the plan, compiles reachable closures once, and checks
@@ -29,6 +31,8 @@ inductive Error where
   | lowering (error : SourceCoreBasic.Error)
   | diagnostics (error : SourceCoreDataPlaceFaultSites.Error)
   | localInstances (error : SourceCoreLocalPolymorphism.Error)
+  | callableContracts (error : SourceCoreStageCodebook.Error)
+  | callableDiagnostics (error : SourceCoreCallableFaultSites.Error)
   | invalidFunctionType (key : Key)
   | resultMetadataMismatch (key : Key)
   | assumptionsUnsupported (key : Key)
@@ -57,7 +61,7 @@ private def prepareFunction (program : CheckedProgram) (checked : Checked) (spec
   let function := specialized.function
   discard <| (SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program specialized.key specialized.assumptions)
     |>.mapError Error.plan
-  if function.returnComptime then throw (.stagedResultUnsupported specialized.key)
+  if function.returnComptime && !checked.catalog.callableContracts then throw (.stagedResultUnsupported specialized.key)
   let (parameter, result) ← match function.type with
     | .function parameter result => pure (parameter, result)
     | _ => throw (.invalidFunctionType specialized.key)
@@ -132,6 +136,42 @@ private def contextualSource (program : CheckedProgram) (plan : Plan)
       else pure source
   | _ => pure source
 
+private structure CallableContext where
+  table : SourceCoreStageCodebook.Table
+  diagnostics : SourceCoreCallableFaultSites.Program
+
+private def callablePolicy (native : Option CallableContext) (active : TypeSystem.Substitution) :
+    SourceCoreFunctions.CallablePolicy :=
+  match native with
+  | none => {}
+  | some native => {
+      functionType := Core.CallableContract.functionType
+      allowStaged := true
+      decorateCallable := fun context _ node origin parameter result raw => do
+        let origin := match origin with
+          | .named key => SourceCoreStageCodebook.Origin.named key
+          | .lambda id => .lambda context.owner id active
+          | .builtin function => .builtin function
+        let descriptor ← (SourceCoreCallableContracts.descriptor native.table origin).mapError fun _ =>
+          SourceCoreBasic.Error.unsupportedExpression node.id node.form
+        pure (match raw with
+          | .inRight .word value => Core.LanguageResult.success (descriptor.wrap value)
+          | _ => Core.LanguageResult.bind (Core.CallableContract.functionType parameter result) raw
+              (Core.LanguageResult.success (descriptor.wrap (.var 0))))
+      callCallable := fun context _ node result callee arguments => do
+        match node.form with
+        | .call _ _ (.indirect _) =>
+            let site ← (SourceCoreCallableContracts.prepareCallsite native.table context.owner node.id
+              native.diagnostics.reasonAt).mapError fun _ =>
+                SourceCoreBasic.Error.unsupportedExpression node.id node.form
+            pure (site.lower native.diagnostics.unknown result callee arguments)
+        | .call _ _ (.builtinFunction function) =>
+            let descriptor ← (SourceCoreCallableContracts.descriptor native.table (.builtin function)).mapError fun _ =>
+              SourceCoreBasic.Error.unsupportedExpression node.id node.form
+            pure (Core.CallableContract.call [⟨descriptor.id, none, none⟩]
+              native.diagnostics.unknown result callee arguments)
+        | _ => throw (.unsupportedExpression node.id node.form) }
+
 /-- Contextual local instances re-enter the shared expression traversal with
 concrete metadata. Every closure captures the same lexical references; the
 bundle is constructed before the generalized binding's cell is allocated. -/
@@ -139,11 +179,13 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
     (signatures : ProgramSignatures) (locals : SourceCoreLocalPolymorphism.Catalog)
     (assignments : SourceCoreAssignmentFaultSites.Table)
     (diagnostics : SourceCoreDataPlaceFaultSites.Program) (context : SourceCoreFunctions.Context)
+    (native : Option CallableContext)
     (parent : Option SourceCoreLocalEvidence.Prepared) (skipInitializer : Option ExpressionId) :
     SourceCoreFunctions.ExpressionLowerer
   | 0, _, _, id, _ => .error (.traversalExhausted (.occurrence id.occurrence))
   | fuel + 1, source, scope, id, reasonAt => do
       let active := parent.map SourceCoreLocalEvidence.Prepared.substitution |>.getD []
+      let callables := callablePolicy native active
       let caller ← match parent with
         | some prepared => pure prepared.caller
         | none => (SourceCompilationPlan.exactSpecialization context.plan context.owner)
@@ -151,6 +193,7 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
       let bind := contextualBinder checked locals context.owner active
       let lowerBody := bodyLowerer checked signatures context.solvedRequirements assignments diagnostics context.owner bind
       let policy := { SourceCoreGeneralTypes.policy checked signatures with
+        callables
         lowerBinder := bind
         readExpression := fun source id => do
           let source ← contextualSource program context.plan locals context.owner parent source id
@@ -168,7 +211,7 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
               let prepared ← (SourceCoreLocalEvidence.prepare program current.plan candidate parent).mapError fun _ =>
                 SourceCoreLocalPolymorphism.Error.initializerMetadataMismatch id
               let childContext := { current with solvedRequirements := prepared.caller.function.solvedRequirements }
-              let lowered ← (lowerContextualExpression program checked signatures locals assignments diagnostics childContext
+              let lowered ← (lowerContextualExpression program checked signatures locals assignments diagnostics childContext native
                 (some prepared) (some id) (min budget fuel) prepared.source scope id reasonAt)
                 |>.mapError SourceCoreLocalPolymorphism.Error.metadata
               (SourceCoreBasic.ensureType (.occurrence id.occurrence) candidate.type lowered.type)
@@ -177,7 +220,7 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
               | .inRight .word closure => pure closure
               | _ => throw (.initializerMetadataMismatch id)).mapError (localError id node)
             return some lowered
-          let evidence ← SourceCoreEvidence.lowerWithCaller program checked caller current child budget source scope id reasonAt
+          let evidence ← SourceCoreEvidence.lowerWithCaller program checked caller current child budget source scope id reasonAt callables
           if let some lowered := evidence then return some lowered
           match node.form with
           | .reference _ (.local binder) =>
@@ -192,7 +235,8 @@ termination_by fuel => fuel
 
 private def compileClosure (program : CheckedProgram) (checked : Checked) (signatures : ProgramSignatures) (plan : Plan)
     (globals : List Signature) (diagnostics : SourceCoreDataPlaceFaultSites.Program)
-    (locals : SourceCoreLocalPolymorphism.Catalog) (fuel : Nat) (function : Function) : Except Error Core.Expr := do
+    (locals : SourceCoreLocalPolymorphism.Catalog) (native : Option CallableContext)
+    (fuel : Nat) (function : Function) : Except Error Core.Expr := do
   let source := function.specialized.function.typedBody
   let own ← match diagnostics.base.find? function.signature.key with
     | some own => pure own
@@ -208,7 +252,7 @@ private def compileClosure (program : CheckedProgram) (checked : Checked) (signa
   let lowerBody := bodyLowerer checked signatures function.specialized.function.solvedRequirements own.assignments
     diagnostics function.signature.key (contextualBinder checked locals function.signature.key [])
   let body ← (lowerBody
-    (lowerContextualExpression program checked signatures locals own.assignments diagnostics context none none)
+    (lowerContextualExpression program checked signatures locals own.assignments diagnostics context native none none)
     fuel source (function.inputs.reverse.map (fun (binder, type) => (binder.id, type))) statements
     function.signature.resultType (diagnostics.reasonAt function.signature.key)
     own.fellThroughReason own.table.escapedReason).mapError Error.lowering
@@ -249,7 +293,21 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
   | first :: _ =>
       let diagnostics ← (SourceCoreDataPlaceFaultSites.prepare checked program.signatures plan first).mapError
         (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.diagnostics)
-      let closures ← (functions.mapM (compileClosure program checked program.signatures plan globals diagnostics locals fuel)).mapError
+      let native ← if checked.catalog.callableContracts then do
+          let table ← (SourceCoreStageCodebook.prepare program plan checked).mapError
+            (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.callableContracts)
+          let callableDiagnostics ← (SourceCoreCallableFaultSites.prepare plan table diagnostics.rootTable).mapError
+            (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.callableDiagnostics)
+          pure (some { table, diagnostics := callableDiagnostics : CallableContext })
+        else pure none
+      let locals ← match native with
+        | none => pure locals
+        | some native => (locals.withCallableContracts (fun caller initializer active =>
+            native.table.idAt? (.lambda caller initializer active))).mapError (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.localInstances)
+      let diagnostics := match native with
+        | none => diagnostics
+        | some native => { diagnostics with rootTable := native.diagnostics.rootTable }
+      let closures ← (functions.mapM (compileClosure program checked program.signatures plan globals diagnostics locals native fuel)).mapError
         SourceCoreGeneralEntry.CompileError.lowering
       SourceCoreGeneralEntry.prepareValidated plan checked fuel (fun _ request =>
         assemble globals functions closures diagnostics request) true

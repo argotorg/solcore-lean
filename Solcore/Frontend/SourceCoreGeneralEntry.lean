@@ -120,7 +120,7 @@ private def prepareInputs {error : Type} (checked : Checked) (owner : Resolved.D
     if binder.id ∈ seen then throw (.duplicateInput binder.id)
     unless binder.scheme.quantified.isEmpty do throw (.polymorphicInput binder.id)
     unless binder.schemeRequirements.isEmpty do throw (.inputRequirements binder.id)
-    if binder.comptime then throw (.stagedInputUnsupported binder.id)
+    if binder.comptime && !checked.catalog.callableContracts then throw (.stagedInputUnsupported binder.id)
     let projection ← (projectType checked binder.scheme.body).mapError CompileError.catalog
     let inputs ← prepareInputs checked owner (binder.id :: seen) rest
     pure ({ id := binder.id, sourceType := binder.scheme.body, projection } :: inputs)
@@ -134,7 +134,7 @@ def compile {error : Type} (checked : Checked) (plan : Plan)
     (lowerBody : BodyLowerer checked error) (allowClosedAssumptions : Bool := false) :
     Except (CompileError error) (Entry checked) := do
   unless specialized.assumptions.isEmpty || allowClosedAssumptions do throw (.assumptionsUnsupported specialized.key)
-  if specialized.function.returnComptime then throw (.stagedResultUnsupported specialized.key)
+  if specialized.function.returnComptime && !checked.catalog.callableContracts then throw (.stagedResultUnsupported specialized.key)
   let sourceResultType ← match specialized.function.type with
     | .function _ result => pure result
     | _ => throw (.invalidFunctionType specialized.key)

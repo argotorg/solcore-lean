@@ -424,8 +424,8 @@ def Recipe.prepare (program : CheckedProgram) (plan : SourceSpecializationWorkli
   pure ⟨⟨checked, program.signatures⟩, prepared⟩
 
 def Recipe.prepareAutomatic (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
-    (compilationFuel : Nat) : Except SourceCorePlanCatalog.Error Recipe := do
-  let prepared ← SourceCorePlanCatalog.prepare program plan compilationFuel
+    (compilationFuel : Nat) (callableContracts : Bool := false) : Except SourceCorePlanCatalog.Error Recipe := do
+  let prepared ← SourceCorePlanCatalog.prepare program plan compilationFuel callableContracts
   pure ⟨⟨prepared.checked, program.signatures⟩, prepared.program⟩
 
 /-- An owned artifact uses a cached, authenticated recipe. -/
@@ -481,6 +481,8 @@ to use the original anonymous/named tag inside Core. -/
 def Session.functionIdentity? {artifact : Artifact} (session : Session artifact) (handle : Handle) :
     Option FunctionIdentity :=
   match resolve artifact.identity session.identity session.registry handle.sourceType handle with
+  | .ok (.pair (.pair (.inLeft .word .unit) (.closure ..)) (.word _)) => some .anonymous
+  | .ok (.pair (.pair (.inRight .unit (.word identity)) (.closure ..)) (.word _)) => some (.named identity)
   | .ok (.pair (.inLeft .word .unit) (.closure ..)) => some .anonymous
   | .ok (.pair (.inRight .unit (.word identity)) (.closure ..)) => some (.named identity)
   | _ => none

@@ -31,12 +31,13 @@ structure Prepared where
   program : SourceCoreGeneralEntry.PreparedProgram checked
   deriving Repr
 
-def prepare (program : CheckedProgram) (plan : Plan) (fuel : Nat) : Except Error Prepared := do
+def prepare (program : CheckedProgram) (plan : Plan) (fuel : Nat)
+    (callableContracts : Bool := false) : Except Error Prepared := do
   let executablePlan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError Error.plan
   let locals ← (SourceCompilationPlan.localLambdaCatalog executablePlan).mapError Error.localInstances
   let localTypes := locals.flatMap fun candidate => sourceTypes (candidate.source.applySubstitution candidate.substitution)
   let checked ← (SourceCoreDataCatalog.prepare program.signatures fuel
-    (planTypes executablePlan ++ localTypes.filter SourceCoreDataCatalog.closed).eraseDups).mapError Error.catalog
+    (planTypes executablePlan ++ localTypes.filter SourceCoreDataCatalog.closed).eraseDups callableContracts).mapError Error.catalog
   let prepared ← (SourceCoreGeneralFunctions.prepareWithCatalog program plan checked fuel).mapError Error.lowering
   pure ⟨checked, prepared⟩
 
