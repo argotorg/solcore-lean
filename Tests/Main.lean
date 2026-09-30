@@ -12,6 +12,7 @@ import Solcore.Test.SourceCoreFunctionCalls
 import Solcore.Test.SourceCoreContractedFunctions
 import Solcore.Test.SourceCoreDataExpressionSequence
 import Solcore.Test.SourceCoreDataPlaceKeyOrder
+import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCoreDataPayload
 import Solcore.Test.SourceCoreDataPayloadMapping
 import Solcore.Test.SourceCoreDataPayloadPaths
@@ -2522,6 +2523,7 @@ def run : IO Unit := do
   SourceCoreControlStatementMeaning.run
   SourceCoreDataCatalog.run
   SourceCoreDataEquality.run
+  SourceCoreMappingWithDefault.run
   SourceCoreGeneralEntry.run
   CoreIntegerAssignment.run
   SourceCoreIntegerAssignments.run
