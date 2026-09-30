@@ -105,10 +105,8 @@ theorem transition_preserves_host_state_type
           | @newCellApply _ _ payload =>
               let futureWorld := world ++ [elementType]
               have extension : WorldExtends world futureWorld := ⟨[elementType], rfl⟩
-              have futureStore : StoreHasTypes futureWorld (store.allocate initialValue).1 := by
-                simpa [futureWorld] using storeTyping.allocate payload
-                  (payload.valueHasType_rebase
-                    (payload.valueHasType_of_hostRuntimeValueHasType valueTyping))
+              have futureStore : HostStoreHasTypes futureWorld (store.allocate initialValue).1 definitions := by
+                simpa [futureWorld] using storeTyping.allocate valueTyping
               have fresh : futureWorld[(store.allocate initialValue).2]? = some elementType := by
                 simp [futureWorld, Store.allocate, ← storeTyping.length_eq]
               exact .ret futureStore (.cellRef fresh) (rest.weaken extension)
@@ -123,12 +121,10 @@ theorem transition_preserves_host_state_type
         | cons frame rest => cases frame with
           | loadCellApply _ => cases cell with
             | cellRef found =>
-                obtain ⟨stored, read, payload, typing⟩ := store.lookup found
+                obtain ⟨stored, read, typing⟩ := store.lookup found
                 rw [loaded] at read
                 cases read
-                exact .ret store
-                  (RuntimeValueHasType.toHost
-                    (payload.runtimeValueHasType typing definitions)) rest
+                exact .ret store typing rest
   | enterStoreCell =>
       cases stateTyping with
       | eval store env expr cont => cases expr with
@@ -144,10 +140,8 @@ theorem transition_preserves_host_state_type
       cases stateTyping with
       | ret store value cont => cases cont with
         | cons frame rest => cases frame with
-          | storeCellApply found payload =>
-              exact .ret (store.write found
-                (payload.valueHasType_rebase
-                  (payload.valueHasType_of_hostRuntimeValueHasType value)) written) .unit rest
+          | storeCellApply found _ =>
+              exact .ret (store.write found value written) .unit rest
   | enterConstruct =>
       cases stateTyping with
       | eval store env expr cont => cases expr with

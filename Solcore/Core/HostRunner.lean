@@ -474,7 +474,7 @@ def HasType
   match result with
   | .done value store =>
       ∃ world,
-        StoreHasTypes world store ∧
+        HostStoreHasTypes world store definitions ∧
           HostRuntimeValueHasType world value resultType definitions
   | .outOfFuel state => HostStateHasType state resultType definitions
   | .fault _ _ => False
@@ -486,7 +486,7 @@ def HasType
     {definitions : DataEnvironment} :
     HasType (.done value store) resultType definitions ↔
       ∃ world,
-        StoreHasTypes world store ∧
+        HostStoreHasTypes world store definitions ∧
           HostRuntimeValueHasType world value resultType definitions := by
   rfl
 
@@ -527,7 +527,7 @@ theorem HostStateHasType.final_components
     {value : Value} {store : Store} {resultType : Ty}
     (typing : HostStateHasType (State.final value store) resultType definitions) :
     ∃ world,
-      StoreHasTypes world store ∧
+      HostStoreHasTypes world store definitions ∧
         HostRuntimeValueHasType world value resultType definitions := by
   cases typing with
   | ret storeTyping valueTyping continuationTyping =>
@@ -564,7 +564,7 @@ theorem hostRun_done_hasType
     (stateTyping : HostStateHasType state resultType definitions)
     (result : hostRun fuel state = .done value store) :
     ∃ world,
-      StoreHasTypes world store ∧
+      HostStoreHasTypes world store definitions ∧
         HostRuntimeValueHasType world value resultType definitions := by
   have typing := hostRun_hasType fuel stateTyping
   rw [result] at typing

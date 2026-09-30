@@ -98,7 +98,7 @@ def HasType
   match outcome with
   | .done value store =>
       ∃ world,
-        Core.StoreHasTypes world store ∧
+        Core.HostStoreHasTypes world store definitions ∧
           Core.HostRuntimeValueHasType world value resultType definitions
   | .outOfFuel state =>
       Core.HostStateHasType state resultType definitions
@@ -113,7 +113,7 @@ def HasType
     {definitions : Core.DataEnvironment} :
     HasType (.done value store) resultType definitions ↔
       ∃ world,
-        Core.StoreHasTypes world store ∧
+        Core.HostStoreHasTypes world store definitions ∧
           Core.HostRuntimeValueHasType world value resultType definitions := by
   rfl
 
@@ -617,7 +617,7 @@ theorem hasType
       | done value store =>
           change ∃ spent, spent ≤ fuel ∧ _ at sound
           change ∃ world,
-            Core.StoreHasTypes world store ∧
+            Core.HostStoreHasTypes world store definitions ∧
               Core.HostRuntimeValueHasType
                 world value resultType definitions
           obtain ⟨spent, bound, path⟩ := sound

@@ -46,7 +46,7 @@ private theorem compileTimeCompletionRegression :
     ∃ fuel value store,
       checkedCellProgram.runStateful fuel = .done value store := by
   obtain ⟨required, _, store, value, _, _, completes⟩ :=
-    checkedCellProgram.runStateful_has_sufficient_fuel
+    checkedCellProgram.runStateful_has_sufficient_fuel (Evaluates.newCell .bool)
   exact ⟨required, value, store, completes required (Nat.le_refl required)⟩
 
 private theorem compileTimeNoFaultRegression
@@ -55,6 +55,26 @@ private theorem compileTimeNoFaultRegression
     (faultState : State) :
     checkedCellProgram.runStateful fuel ≠ .fault error faultState :=
   checkedCellProgram.runStateful_ne_fault fuel error faultState
+
+private theorem compileTimeBoundedSafetyRegression (fuel : Nat) :
+    (checkedCellProgram.runStateful fuel).HasType (.cell .bool) :=
+  checkedCellProgram.runStateful_has_type fuel
+
+/-- Exhaustion preserves the pending allocation rather than resetting entry. -/
+private theorem compileTimeCheckpointRegression :
+    StateHasType ⟨.ret (.bool true), [.newCellApply .bool], []⟩ (.cell .bool) := by
+  exact well_typed_runStateful_preserves_checkpoint_type
+    (initial_state_has_type (Program.check_full_sound cellProgram_checked).bodyHasType)
+    (fuel := 2) rfl
+
+private theorem compileTimeTypedResumeRegression (additional : Nat) :
+    (runStateful additional
+      ⟨.ret (.bool true), [.newCellApply .bool], []⟩).HasType (.cell .bool) ∧
+      runStateful additional ⟨.ret (.bool true), [.newCellApply .bool], []⟩ =
+        cellProgram.runStateful (2 + additional) :=
+  well_typed_runStateful_resume_has_type
+    (initial_state_has_type (Program.check_full_sound cellProgram_checked).bodyHasType)
+    (spent := 2) rfl additional
 
 def testCheckedCoreProgram : IO Unit := do
   match CheckedCoreProgram.ofProgram? cellProgram with

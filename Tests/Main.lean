@@ -1004,6 +1004,8 @@ import Solcore.Test.CoreBooleanConnectives
 import Solcore.Test.CoreBitwiseLogic
 import Solcore.Test.CoreByteSelection
 import Solcore.Test.CoreCells
+import Solcore.Test.CoreRuntimeStoreSafety
+import Solcore.Test.HostRuntimeStoreSafety
 import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
 import Solcore.Test.CoreCountLeadingZeros

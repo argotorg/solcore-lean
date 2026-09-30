@@ -360,12 +360,12 @@ theorem host_state_progress
           | loadCellApply _ =>
               cases valueTyping with
               | cellRef found =>
-                  obtain ⟨loaded, read, _, _⟩ := storeTyping.lookup found
+                  obtain ⟨loaded, read, _⟩ := storeTyping.lookup found
                   exact .inr (.inl ⟨_, .core (.applyLoadCell read)⟩)
           | storeCellValue _ _ _ =>
               cases valueTyping with
               | cellRef found =>
-                  obtain ⟨oldValue, read, _, _⟩ := storeTyping.lookup found
+                  obtain ⟨oldValue, read, _⟩ := storeTyping.lookup found
                   exact .inr (.inl ⟨_, .core (.beginStoreCellValue read)⟩)
           | storeCellApply found _ =>
               obtain ⟨updatedStore, written⟩ :=

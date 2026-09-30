@@ -187,14 +187,14 @@ inductive HostStateHasType :
   | eval {definitions : DataEnvironment} {world : StoreTyping} {expr : Expr}
       {environment : Environment} {context : Context} {continuation : List Frame}
       {store : Store} {controlType resultType : Ty} :
-      StoreHasTypes world store →
+      HostStoreHasTypes world store definitions →
       HostRuntimeEnvironmentHasTypes world environment context definitions →
       HasType context expr controlType definitions →
       HostContinuationHasType world continuation controlType resultType definitions →
       HostStateHasType ⟨.eval expr environment, continuation, store⟩ resultType definitions
   | ret {definitions : DataEnvironment} {world : StoreTyping} {value : Value}
       {continuation : List Frame} {store : Store} {controlType resultType : Ty} :
-      StoreHasTypes world store →
+      HostStoreHasTypes world store definitions →
       HostRuntimeValueHasType world value controlType definitions →
       HostContinuationHasType world continuation controlType resultType definitions →
       HostStateHasType ⟨.ret value, continuation, store⟩ resultType definitions
@@ -205,7 +205,7 @@ inductive HostSuspensionHasType :
   | intro {definitions : DataEnvironment} {world : StoreTyping}
       {request : HostRequest} {continuation : List Frame} {store : Store}
       {resultType : Ty} :
-      StoreHasTypes world store →
+      HostStoreHasTypes world store definitions →
       HostContinuationHasType world continuation request.responseType
         resultType definitions →
       HostSuspensionHasType ⟨request, continuation, store⟩ resultType definitions

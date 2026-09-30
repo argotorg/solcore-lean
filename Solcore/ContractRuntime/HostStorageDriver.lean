@@ -660,7 +660,7 @@ theorem runWithStorage_done_hasType
       (code.runWithStorage context inputs fuel).outcome =
         .done value store) :
     ∃ world,
-      Core.StoreHasTypes world store ∧
+      Core.HostStoreHasTypes world store code.program.dataDefinitions ∧
         Core.HostRuntimeValueHasType world value code.program.resultType
           code.program.dataDefinitions := by
   have typing := code.runWithStorage_hasType context inputs fuel

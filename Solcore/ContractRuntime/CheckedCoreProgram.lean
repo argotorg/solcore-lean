@@ -1,6 +1,7 @@
 import Solcore.Core.Typing
 import Solcore.Core.Machine
 import Solcore.Core.Safety
+import Solcore.Core.BoundedSafety
 import Solcore.ContractRuntime.CheckedHostCoreProgram
 
 /-! Checker-accepted closed Core programs retained by contract semantics. -/
@@ -67,17 +68,30 @@ namespace Solcore.ContractRuntime.CheckedCoreProgram
     ofProgram? program = none := by
   simp [ofProgram?, rejected]
 
-/-- Every retained non-recursive Core program completes above some fuel bound. -/
+/-- A known finite semantic execution has a sufficient fuel bound. Admission
+alone is not the premise of this completion guarantee. -/
 theorem runStateful_has_sufficient_fuel
-    (code : CheckedCoreProgram) :
+    (code : CheckedCoreProgram)
+    {value : Core.Value} {finalStore : Core.Store}
+    (evaluation : Core.Evaluates [] [] code.program.body value finalStore) :
     ∃ required storeTyping finalStore value,
       Core.StoreHasTypes storeTyping finalStore ∧
       Core.RuntimeValueHasType storeTyping value code.program.resultType
         code.program.dataDefinitions ∧
       ∀ fuel, required ≤ fuel →
         code.runStateful fuel = .done value finalStore := by
-  simpa [runStateful] using
-    Core.Program.checked_runStateful_has_sufficient_fuel code.checked
+  obtain ⟨world, _, storeTyped, valueTyped⟩ :=
+    Core.evaluation_preserves_type evaluation
+      (Core.Program.check_full_sound code.checked).bodyHasType .nil .nil
+  obtain ⟨required, completes⟩ :=
+    Core.evaluation_runStateful_complete_with_sufficient_fuel evaluation
+  exact ⟨required, world, finalStore, value, storeTyped, valueTyped, completes⟩
+
+/-- Every fuel budget returns a typed completion or a typed checkpoint. -/
+theorem runStateful_has_type (code : CheckedCoreProgram) (fuel : Nat) :
+    (code.runStateful fuel).HasType code.program.resultType
+      code.program.dataDefinitions :=
+  Core.Program.checked_runStateful_has_type code.checked fuel
 
 /-- Checker-accepted Core execution cannot produce a machine fault. -/
 theorem runStateful_ne_fault

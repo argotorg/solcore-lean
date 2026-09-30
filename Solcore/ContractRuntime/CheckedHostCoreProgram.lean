@@ -98,7 +98,7 @@ theorem runStateful_done_hasType
     {fuel : Nat} {value : Core.Value} {store : Core.Store}
     (result : code.runStateful fuel = .done value store) :
     ∃ world,
-      Core.StoreHasTypes world store ∧
+      Core.HostStoreHasTypes world store code.program.dataDefinitions ∧
         Core.HostRuntimeValueHasType world value code.program.resultType
           code.program.dataDefinitions := by
   apply Core.hostRun_done_hasType code.initialState_hasType

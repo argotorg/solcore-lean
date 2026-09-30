@@ -1,5 +1,5 @@
 import Solcore.Core.Host
-import Solcore.Core.Safety
+import Solcore.Core.RuntimeStoreSafety
 
 /-! Runtime value typing extended additively with fixed host capabilities. -/
 
@@ -306,8 +306,7 @@ theorem HostRuntimeEnvironmentHasTypes.weaken
   | cons valueTyping _ _ environmentIH =>
       exact .cons (valueTyping.weaken extension) environmentIH
 
-/-- Cell payload types cannot contain host capabilities, so their structural
-typing can be recovered before writing them to the Core-local store. -/
+/-- First-order cell payloads contain no host capabilities. -/
 theorem CellPayload.valueHasType_of_hostRuntimeValueHasType
     {elementType : Ty}
     (payload : CellPayload elementType)
@@ -326,5 +325,142 @@ theorem CellPayload.valueHasType_of_hostRuntimeValueHasType
       cases typing with
       | inLeft payloadTyping => exact .inLeft (leftIH payloadTyping)
       | inRight payloadTyping => exact .inRight (rightIH payloadTyping)
+
+/-- The Core-local store may hold closures that capture host capabilities.
+Cell references are checked against the world without recursively following them,
+so this relation also supports cycles through cells. -/
+structure HostStoreHasTypes
+    (world : StoreTyping) (store : Store)
+    (definitions : DataEnvironment := []) : Prop where
+  length_eq : world.length = store.length
+  lookup :
+    ∀ {location : Location} {elementType : Ty},
+      world[location]? = some elementType →
+      ∃ value,
+        store.read? location = some value ∧
+        HostRuntimeValueHasType world value elementType definitions
+
+namespace HostStoreHasTypes
+
+theorem nil {definitions : DataEnvironment} :
+    HostStoreHasTypes [] [] definitions where
+  length_eq := rfl
+  lookup := by simp
+
+theorem read
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : HostStoreHasTypes world store definitions)
+    {location : Location} {elementType : Ty}
+    (found : world[location]? = some elementType) :
+    ∃ value,
+      store.read? location = some value ∧
+      HostRuntimeValueHasType world value elementType definitions :=
+  typing.lookup found
+
+theorem location_lt
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : HostStoreHasTypes world store definitions)
+    {location : Location} {elementType : Ty}
+    (found : world[location]? = some elementType) :
+    location < store.length := by
+  have worldBound : location < world.length :=
+    (List.getElem?_eq_some_iff.mp found).1
+  simpa [← typing.length_eq] using worldBound
+
+theorem allocate
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : HostStoreHasTypes world store definitions)
+    {elementType : Ty} {value : Value}
+    (valueTyping : HostRuntimeValueHasType world value elementType definitions) :
+    HostStoreHasTypes (world ++ [elementType])
+      (store.allocate value).1 definitions := by
+  have extension : WorldExtends world (world ++ [elementType]) :=
+    ⟨[elementType], rfl⟩
+  constructor
+  · simp [typing.length_eq]
+  · intro location storedType foundType
+    by_cases old : location < world.length
+    · have oldType : world[location]? = some storedType := by
+        rw [List.getElem?_append_left (l₂ := [elementType]) old] at foundType
+        exact foundType
+      obtain ⟨oldValue, oldLookup, oldTyping⟩ := typing.lookup oldType
+      have storeOld : location < store.length := by
+        simpa [← typing.length_eq] using old
+      exact ⟨oldValue,
+        (Store.allocate_old_lookup store value storeOld).trans oldLookup,
+        oldTyping.weaken extension⟩
+    · have locationEq : location = world.length := by
+        have bound : location < (world ++ [elementType]).length :=
+          (List.getElem?_eq_some_iff.mp foundType).1
+        have upper : location ≤ world.length := by
+          apply Nat.lt_succ_iff.mp
+          simpa using bound
+        exact Nat.le_antisymm upper (Nat.le_of_not_gt old)
+      subst location
+      have storedTypeEq : storedType = elementType := by
+        have equality : some elementType = some storedType := by
+          simpa using foundType
+        exact (Option.some.inj equality).symm
+      subst storedType
+      exact ⟨value,
+        by simpa [← typing.length_eq] using
+          Store.allocate_fresh_lookup store value,
+        valueTyping.weaken extension⟩
+
+theorem write
+    {definitions : DataEnvironment}
+    {world : StoreTyping} {store updatedStore : Store}
+    (typing : HostStoreHasTypes world store definitions)
+    {location : Location} {elementType : Ty} {value : Value}
+    (found : world[location]? = some elementType)
+    (valueTyping : HostRuntimeValueHasType world value elementType definitions)
+    (written : store.write? location value = some updatedStore) :
+    HostStoreHasTypes world updatedStore definitions := by
+  constructor
+  · rw [Store.write?_preserves_length written]
+    exact typing.length_eq
+  · intro otherLocation otherType otherFound
+    obtain ⟨oldValue, oldLookup, oldTyping⟩ := typing.lookup otherFound
+    by_cases same : otherLocation = location
+    · subst otherLocation
+      have typeEq : elementType = otherType :=
+        Option.some.inj (found.symm.trans otherFound)
+      subst typeEq
+      exact ⟨value, Store.write?_reads_written written, valueTyping⟩
+    · exact ⟨oldValue,
+        (Store.write?_preserves_other written same).trans oldLookup,
+        oldTyping⟩
+
+theorem write_exists
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : HostStoreHasTypes world store definitions)
+    {location : Location} {elementType : Ty} {value : Value}
+    (found : world[location]? = some elementType) :
+    ∃ updatedStore, store.write? location value = some updatedStore :=
+  (Store.write?_success_iff store location value).2 (typing.location_lt found)
+
+end HostStoreHasTypes
+
+/-- Higher-order pure stores embed in the host machine with the same world. -/
+theorem RuntimeStoreHasTypes.toHost
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : RuntimeStoreHasTypes world store definitions) :
+    HostStoreHasTypes world store definitions where
+  length_eq := typing.length_eq
+  lookup := by
+    intro location elementType found
+    obtain ⟨value, lookup, valueTyping⟩ := typing.lookup found
+    exact ⟨value, lookup, valueTyping.toHost⟩
+
+/-- Pure stores can be used by the host machine without adding capabilities. -/
+theorem StoreHasTypes.toHost
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : StoreHasTypes world store) :
+    HostStoreHasTypes world store definitions where
+  length_eq := typing.length_eq
+  lookup := by
+    intro location elementType found
+    obtain ⟨value, lookup, payload, valueTyping⟩ := typing.lookup found
+    exact ⟨value, lookup, (payload.runtimeValueHasType valueTyping definitions).toHost⟩
 
 end Solcore.Core
