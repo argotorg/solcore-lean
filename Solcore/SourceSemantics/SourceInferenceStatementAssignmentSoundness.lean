@@ -461,6 +461,84 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
       | bitXor => exact finishNonEqual .bitXor success
       | bitOr => exact finishNonEqual .bitOr success
 
+/-- Once the actual place and RHS are typed in the completed statement
+source, executable assignment inference supplies every remaining premise of
+the declarative statement rule. -/
+theorem inferStatementFuel_success_assignValue_sound_of_typed_children
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression value : Syntax.Expr}
+    {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : Ty}
+    {initial allocated assignmentState : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {assignment : AssignmentResolution} {inferred : InferredExpression}
+    {outer : Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    (statementEq : statement.value =
+      .assignValue targetExpression operator value)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (assignmentSuccess : Detail.inferAssignedValueFuel fuel inferenceContext
+      targetExpression operator.value value allocated =
+        .ok (assignment, inferred, assignmentState))
+    (ready : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (Ty.productMany signature.parameterTypes)
+          (Ty.productMany signature.returnTypes))
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (placeTyped : SourcePlaceHasType
+      ((result.state.toTypedSource roots).applySubstitution outer) target
+      (assignment.target.applySubstitution outer)
+      (outer.apply assignment.target.type))
+    (valueTyped : ExpressionHasType
+      ((result.state.toTypedSource roots).applySubstitution outer) target
+      inferred.id (outer.apply inferred.type)) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    rw [allocationEq] at preserved
+    exact preserved
+  obtain ⟨actualAssignment, actualInferred, actualState, actualSuccess,
+      resultEq, _⟩ :=
+    inferStatementFuel_success_assignValue_facts statementEq allocationEq
+      success roots
+  rw [assignmentSuccess] at actualSuccess
+  obtain ⟨rfl, rfl, rfl⟩ := (Except.ok.inj actualSuccess).symm
+  have assignmentExtension : outer.SemanticallyExtends
+      assignmentState.inference.substitution := by
+    rw [resultEq] at outerExtension
+    simpa [Frontend.SourceInference.State.recordNode] using outerExtension
+  have assignmentTyped :=
+    inferAssignedValueFuel_success_sound_of_typed_result allocatedReady
+      signatureFormation functionsCanonical assignmentExtension placeTyped
+      valueTyped assignmentSuccess
+  exact inferStatementFuel_success_assignValue_sound_of_actual_child
+    statementEq allocationEq success invariant roots assignmentSuccess
+    assignmentTyped
+
 /-- The indexed-place branch is compositional in just its actual recursive
 base place and actual mapping-key expression.  This is the one-step rule
 needed by the closed place/expression induction. -/
