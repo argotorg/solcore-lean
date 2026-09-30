@@ -128,8 +128,8 @@ structure CheckedProgramStagesAnalyzed (checked : CheckedProgram) : Prop where
       .ok analysis
 
 /-- The successful stage traversal and the recursive source-checking proof
-jointly admit the checked program to the independent whole-program staging
-judgment.  No staging conclusion is inferred from static checking alone. -/
+jointly establish the independent whole-program staging judgment for the
+checked program. No staging conclusion follows from static checking alone. -/
 theorem programHasStages_ofCheckProgram_and_analysis
     {raw : Workspace.RawWorkspace} {fuel : Nat}
     {checked : CheckedProgram}
