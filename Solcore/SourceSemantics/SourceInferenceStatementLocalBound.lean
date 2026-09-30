@@ -236,8 +236,9 @@ theorem inferStatementFuel_success_matchWithDefault_localBindersBelow
 
 /-- Ordinary statement branches, including nested blocks and loops, restore
 the incoming visible binder stack.  Only `let` and `match` create a binder
-that remains in the statement result. -/
-private theorem inferStatementFuel_success_nonbinding_sameScope
+that remains in the statement result.  The recursive soundness dispatcher
+uses this to transport active-scheme isolation across nonbinding branches. -/
+theorem inferStatementFuel_success_nonbinding_sameScope
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement} {expectedReturn : Ty}
     {initial allocated : State} {id : StatementId}
