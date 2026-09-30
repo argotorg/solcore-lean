@@ -447,7 +447,12 @@ theorem selectedUnary_argumentTypingBasesValid_under_covered_retained_bounded
     {active : SourceSemantics.Context}
     {substitution : TypeSystem.Substitution}
     (fuel_lt : fuel < parentFuel)
+    (initialReady : initial.InferenceReady)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow initial.inference.next)
     (initialBelow : initial.NodesBelowNextOccurrence)
+    (initialInvariant : ActiveLocalContextInvariant initial substitution active)
+    (initialBindersBelow : initial.LocalBindersBelowNextLocal)
     (success : Detail.inferExprFuel fuel inferenceContext operand expected
       initial = .ok (inferred, final))
     (integerSubset : final.integerLiterals ⊆ evidenceState.integerLiterals)
@@ -477,7 +482,8 @@ theorem selectedUnary_argumentTypingBasesValid_under_covered_retained_bounded
     sourceExtension := TypingSourceExtends.refl _
     integerLiteralsSubset := integerSubset
     requirementsSubset
-  } retained childrenRetained covered) .nil
+  } initialReady expectedBelow initialInvariant initialBindersBelow retained
+    childrenRetained covered) .nil
 
 /-- The selected-binary operands form a source-ordered two-element argument
 spine.  The left base is weakened only through the ordinary pre-attachment
@@ -495,12 +501,20 @@ theorem selectedBinary_argumentTypingBasesValid_under_covered_retained_bounded
     {active : SourceSemantics.Context}
     {substitution : TypeSystem.Substitution}
     (fuel_lt : fuel < parentFuel)
+    (leftInitialReady : initial.InferenceReady)
+    (leftInitialInvariant : ActiveLocalContextInvariant initial substitution
+      active)
+    (leftInitialBindersBelow : initial.LocalBindersBelowNextLocal)
     (initialBelow : initial.NodesBelowNextOccurrence)
     (leftSuccess : Detail.inferExprFuel fuel inferenceContext left none
       initial = .ok (leftResult, leftState))
     (leftToRight : TypingSourceExtends (leftState.toTypedSource roots)
       (rightState.toTypedSource roots))
     (rightBelow : leftState.NodesBelowNextOccurrence)
+    (rightInitialReady : leftState.InferenceReady)
+    (rightInitialInvariant : ActiveLocalContextInvariant leftState substitution
+      active)
+    (rightInitialBindersBelow : leftState.LocalBindersBelowNextLocal)
     (rightSuccess : Detail.inferExprFuel fuel inferenceContext right none
       leftState = .ok (rightResult, rightState))
     (leftIntegerSubset :
@@ -542,7 +556,11 @@ theorem selectedBinary_argumentTypingBasesValid_under_covered_retained_bounded
     sourceExtension := leftToRight
     integerLiteralsSubset := leftIntegerSubset
     requirementsSubset := leftRequirementsSubset
-  } leftRetained leftChildrenRetained leftCovered
+  } leftInitialReady (by
+      intro expectedType member
+      simp at member)
+    leftInitialInvariant leftInitialBindersBelow leftRetained
+    leftChildrenRetained leftCovered
   have rightBase : ExpressionTypingBase (rightState.toTypedSource roots)
       semanticSource active substitution rightResult := childSound {
     fuel
@@ -557,7 +575,11 @@ theorem selectedBinary_argumentTypingBasesValid_under_covered_retained_bounded
     sourceExtension := TypingSourceExtends.refl _
     integerLiteralsSubset := rightIntegerSubset
     requirementsSubset := rightRequirementsSubset
-  } rightRetained rightChildrenRetained rightCovered
+  } rightInitialReady (by
+      intro expectedType member
+      simp at member)
+    rightInitialInvariant rightInitialBindersBelow rightRetained
+    rightChildrenRetained rightCovered
   exact .cons (leftBase.weakenNodeSource leftToRight.nodes_prefix)
     (.cons rightBase .nil)
 
@@ -605,6 +627,9 @@ theorem
     (expectedBelow : ∀ expectedType ∈ expected,
       expectedType.VariablesBelow initial.inference.next)
     (initialBelow : initial.NodesBelowNextOccurrence)
+    (initialInvariant : ActiveLocalContextInvariant initial
+      later.inference.substitution active)
+    (initialBindersBelow : initial.LocalBindersBelowNextLocal)
     (operandIntegerSubset :
       operandState.integerLiterals ⊆ evidenceState.integerLiterals)
     (operandRequirementsSubset :
@@ -741,7 +766,11 @@ theorem
     simpa only [entryIdEq] using argumentCovered entry entryMember
   have bases :=
     selectedUnary_argumentTypingBasesValid_under_covered_retained_bounded
-      fuel_lt initialBelow operandSuccess operandIntegerSubset
+      fuel_lt initialReady (by
+        intro expectedType member
+        simp at member)
+      initialBelow initialInvariant initialBindersBelow operandSuccess
+      operandIntegerSubset
       operandRequirementsSubset operandRetained operandChildrenRetained
       operandCovered childSound
   exact
@@ -809,6 +838,9 @@ theorem
     (expectedBelow : ∀ expectedType ∈ expected,
       expectedType.VariablesBelow initial.inference.next)
     (initialBelow : initial.NodesBelowNextOccurrence)
+    (initialInvariant : ActiveLocalContextInvariant initial
+      later.inference.substitution active)
+    (initialBindersBelow : initial.LocalBindersBelowNextLocal)
     (rightIntegerSubset :
       rightState.integerLiterals ⊆ evidenceState.integerLiterals)
     (rightRequirementsEvidenceSubset :
@@ -880,6 +912,12 @@ theorem
   have leftBelow : leftState.NodesBelowNextOccurrence :=
     (Detail.inferExprFuel_occurrenceBoundExtends leftSuccess
       ).nodesBelowNextOccurrence initialBelow
+  have leftInvariant : ActiveLocalContextInvariant leftState
+      later.inference.substitution active :=
+    initialInvariant.inferExprFuel leftSuccess
+  have leftBindersBelow : leftState.LocalBindersBelowNextLocal :=
+    Detail.inferExprFuel_preserves_localBindersBelowNextLocal
+      initialBindersBelow leftSuccess
   have rightProperties := Detail.inferExprFuel_inferenceProperties
     leftProperties.2.1 signatureFormation functionsCanonical (by simp)
       rightSuccess
@@ -1061,7 +1099,9 @@ theorem
       (childrenRetainedAtRight left (by simp))
   have bases :=
     selectedBinary_argumentTypingBasesValid_under_covered_retained_bounded
-      fuel_lt initialBelow leftSuccess leftToRight leftBelow rightSuccess
+      fuel_lt initialReady initialInvariant initialBindersBelow initialBelow
+      leftSuccess leftToRight leftBelow leftProperties.2.1 leftInvariant
+      leftBindersBelow rightSuccess
       leftIntegerSubset leftRequirementsSubset rightIntegerSubset
       rightRequirementsEvidenceSubset
       leftRetained
@@ -1147,6 +1187,8 @@ theorem
     (expectedBelow : ∀ expected ∈ expectedTypes,
       expected.VariablesBelow initial.inference.next)
     (initialBelow : initial.NodesBelowNextOccurrence)
+    (initialInvariant : ActiveLocalContextInvariant initial outer active)
+    (initialBindersBelow : initial.LocalBindersBelowNextLocal)
     (outerExtension : outer.SemanticallyExtends
       final.inference.substitution)
     (integerLiteralsSubset :
@@ -1222,6 +1264,13 @@ theorem
                   have headBelow : headState.NodesBelowNextOccurrence :=
                     (Detail.inferExprFuel_occurrenceBoundExtends headSuccess
                       ).nodesBelowNextOccurrence initialBelow
+                  have headInvariant : ActiveLocalContextInvariant headState
+                      outer active :=
+                    initialInvariant.inferExprFuel headSuccess
+                  have headBindersBelow :
+                      headState.LocalBindersBelowNextLocal :=
+                    Detail.inferExprFuel_preserves_localBindersBelowNextLocal
+                      initialBindersBelow headSuccess
                   have tailExpectedBelow : ∀ candidate ∈ expectedTypes,
                       candidate.VariablesBelow headState.inference.next := by
                     intro candidate member
@@ -1294,7 +1343,13 @@ theorem
                   have headCovered : TemplateScopeCovered evidenceSource active
                       (.expression head.id) :=
                     covered head (by simp)
-                  have headBase := childSound child headRetained
+                  have headBase := childSound child ready (by
+                      intro candidate member
+                      simp only [Option.mem_def] at member
+                      injection member with candidateEq
+                      subst candidate
+                      exact resolvedHeadBelow)
+                    initialInvariant initialBindersBelow headRetained
                     headChildrenRetained headCovered
                   have finalHeadBase : ExpressionTypingBase
                       (final.toTypedSource roots) semanticSource active outer
@@ -1333,8 +1388,9 @@ theorem
                     rw [← headExpectedEq]
                     exact headType
                   have tailTyping := induction
-                    headProperties.2.1 tailExpectedBelow headBelow outerExtension
-                    integerLiteralsSubset requirementsSubset
+                    headProperties.2.1 tailExpectedBelow headBelow headInvariant
+                    headBindersBelow outerExtension integerLiteralsSubset
+                    requirementsSubset
                     (retained := by
                       intro argument member
                       exact retained argument
@@ -1518,6 +1574,9 @@ theorem
     (expectedBelow : ∀ expectedType ∈ expected,
       expectedType.VariablesBelow initial.inference.next)
     (nodesBelow : initial.NodesBelowNextOccurrence)
+    (initialInvariant : ActiveLocalContextInvariant initial
+      later.inference.substitution active)
+    (initialBindersBelow : initial.LocalBindersBelowNextLocal)
     (substitutionExtends : later.inference.substitution.SemanticallyExtends
       resultState.inference.substitution)
     (requirementsSubset : resultState.requirements ⊆ later.requirements)
@@ -1586,6 +1645,10 @@ theorem
       (expectedAtArgumentInitial : ∀ expectedType ∈ expected,
         expectedType.VariablesBelow argumentInitial.inference.next)
       (nodesAtArgumentInitial : argumentInitial.NodesBelowNextOccurrence)
+      (argumentInitialInvariant : ActiveLocalContextInvariant argumentInitial
+        later.inference.substitution active)
+      (argumentInitialBindersBelow :
+        argumentInitial.LocalBindersBelowNextLocal)
       (argumentsSuccess : Detail.inferConstructorArgumentsFuel fuel
         inferenceContext arguments instantiation.payloadTypes argumentInitial =
           .ok (inferredArguments, argumentsState))
@@ -1646,7 +1709,8 @@ theorem
     have argumentsType :=
       inferConstructorArgumentsFuel_success_expressionsHaveTypes_under_covered_retained_bounded
         fuel_lt argumentInitialReady signatureFormation functionsCanonical
-        payloadAtArgumentInitial nodesAtArgumentInitial outerArguments
+        payloadAtArgumentInitial nodesAtArgumentInitial
+        argumentInitialInvariant argumentInitialBindersBelow outerArguments
         argumentsIntegerLiteralsSubset argumentsRequirementsSubset
         evidence.retained evidence.childrenRetained evidence.covered
         evidence.preserved childSound payloadAdmissible argumentsSuccess
@@ -1671,7 +1735,7 @@ theorem
             rcases argumentsPair with ⟨inferredArguments, argumentsState⟩
             simp only [argumentsResult] at success
             exact finish ready payloadBelow resultBelow expectedBelow nodesBelow
-              argumentsResult success
+              initialInvariant initialBindersBelow argumentsResult success
     | some expectedType =>
         cases unifyResult : Detail.unify initial instantiation.resultType
             expectedType with
@@ -1708,6 +1772,13 @@ theorem
                 argumentInitial.NodesBelowNextOccurrence :=
               (Detail.unify_occurrenceBoundExtends unifyResult
                 ).nodesBelowNextOccurrence nodesBelow
+            have argumentInitialInvariant : ActiveLocalContextInvariant
+                argumentInitial later.inference.substitution active :=
+              initialInvariant.unify unifyResult
+            have argumentInitialBindersBelow :
+                argumentInitial.LocalBindersBelowNextLocal :=
+              Detail.unify_preserves_localBindersBelowNextLocal
+                initialBindersBelow unifyResult
             cases argumentsResult : Detail.inferConstructorArgumentsFuel fuel
                 inferenceContext arguments instantiation.payloadTypes
                 argumentInitial with
@@ -1719,7 +1790,8 @@ theorem
                 simp only [argumentsResult] at success
                 exact finish argumentInitialReady payloadAtArgumentInitial
                   resultAtArgumentInitial expectedAtArgumentInitial
-                  nodesAtArgumentInitial argumentsResult success
+                  nodesAtArgumentInitial argumentInitialInvariant
+                  argumentInitialBindersBelow argumentsResult success
   · simp [arity, bind, Except.bind] at success
 
 end Solcore.SourceSemantics.SourceInferenceSoundness

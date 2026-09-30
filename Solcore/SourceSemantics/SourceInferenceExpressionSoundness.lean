@@ -126,6 +126,91 @@ theorem lambdaPrefixFacts_activeLocalContextInvariant
   | expectedPartsInferred _ parameterUnify =>
       exact invariant.unify parameterUnify
 
+/-- Lambda-prefix fitting never changes the stable-local allocator.  This is
+the executable side-condition needed by a recursive statement proof for the
+actual lambda body. -/
+theorem lambdaPrefixFacts_localBindersBelowNextLocal
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expected : Option TypeSystem.Ty}
+    {returnAnnotation : Option Syntax.TypeExpr}
+    {parameterTypes : List TypeSystem.Ty}
+    {parameterState resultState : Frontend.SourceInference.State}
+    {resultType : TypeSystem.Ty}
+    (facts : Detail.LambdaPrefixFacts inferenceContext expected
+      returnAnnotation parameterTypes parameterState resultType resultState)
+    (below : parameterState.LocalBindersBelowNextLocal) :
+    resultState.LocalBindersBelowNextLocal := by
+  cases facts with
+  | noExpectedPartsAnnotated => exact below
+  | noExpectedPartsFresh _ _ freshEq =>
+      have preserved :=
+        Frontend.SourceInference.State.fresh_preserves_localBindersBelowNextLocal
+          parameterState below
+      have finalEq : parameterState.fresh.2 = resultState :=
+        congrArg Prod.snd freshEq
+      rwa [finalEq] at preserved
+  | expectedPartsAnnotated _ parameterUnify =>
+      exact Detail.unify_preserves_localBindersBelowNextLocal below
+        parameterUnify
+  | expectedPartsInferred _ parameterUnify =>
+      exact Detail.unify_preserves_localBindersBelowNextLocal below
+        parameterUnify
+
+/-- Lambda-prefix fitting allocates no source occurrence, so an occurrence
+bound established after parameter binding is still available at the body
+entry. -/
+theorem lambdaPrefixFacts_nodesBelowNextOccurrence
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expected : Option TypeSystem.Ty}
+    {returnAnnotation : Option Syntax.TypeExpr}
+    {parameterTypes : List TypeSystem.Ty}
+    {parameterState resultState : Frontend.SourceInference.State}
+    {resultType : TypeSystem.Ty}
+    (facts : Detail.LambdaPrefixFacts inferenceContext expected
+      returnAnnotation parameterTypes parameterState resultType resultState)
+    (below : parameterState.NodesBelowNextOccurrence) :
+    resultState.NodesBelowNextOccurrence := by
+  cases facts with
+  | noExpectedPartsAnnotated => exact below
+  | noExpectedPartsFresh _ _ freshEq =>
+      have preserved :=
+        Frontend.SourceInference.State.fresh_preserves_nodesBelowNextOccurrence
+          parameterState below
+      have finalEq : parameterState.fresh.2 = resultState :=
+        congrArg Prod.snd freshEq
+      rwa [finalEq] at preserved
+  | expectedPartsAnnotated _ parameterUnify =>
+      exact (Detail.unify_occurrenceBoundExtends parameterUnify
+        ).nodesBelowNextOccurrence below
+  | expectedPartsInferred _ parameterUnify =>
+      exact (Detail.unify_occurrenceBoundExtends parameterUnify
+        ).nodesBelowNextOccurrence below
+
+/-- Lambda-prefix fitting preserves the declaration owner. -/
+private theorem lambdaPrefixFacts_owner_eq
+    {inferenceContext : Frontend.SourceInference.Context}
+    {expected : Option TypeSystem.Ty}
+    {returnAnnotation : Option Syntax.TypeExpr}
+    {parameterTypes : List TypeSystem.Ty}
+    {parameterState resultState : Frontend.SourceInference.State}
+    {resultType : TypeSystem.Ty}
+    (facts : Detail.LambdaPrefixFacts inferenceContext expected
+      returnAnnotation parameterTypes parameterState resultType resultState) :
+    resultState.owner = parameterState.owner := by
+  cases facts with
+  | noExpectedPartsAnnotated => rfl
+  | noExpectedPartsFresh _ _ freshEq =>
+      have finalEq : parameterState.fresh.2 = resultState :=
+        congrArg Prod.snd freshEq
+      rw [← finalEq]
+      rfl
+  | expectedPartsAnnotated _ parameterUnify =>
+      exact congrArg (fun header : Frontend.SourceInference.State.Header =>
+        header.owner) (Detail.unify_state_header parameterUnify)
+  | expectedPartsInferred _ parameterUnify =>
+      exact congrArg (fun header : Frontend.SourceInference.State.Header =>
+        header.owner) (Detail.unify_state_header parameterUnify)
+
 /-- Every result type selected by the executable lambda prefix is admissible
 after final substitution.  An annotation is justified by source-type
 formation, a fresh result by the residual-variable policy, and an inferred
@@ -351,15 +436,189 @@ theorem
       signaturesEq traitName solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
 
+/-- Parameter binding changes the lexical and inference portions of a state,
+but never its declaration header.  The frontend keeps this fact private to
+its large mutual preservation proof; the lambda bridge only needs the owner
+projection, so it is reproved locally from the executable traversal. -/
+private theorem bindLambdaParameters_owner_eq
+    {inferenceContext : Frontend.SourceInference.Context}
+    {parameters : List Syntax.LambdaParameter}
+    {index : Nat} {seen : List String}
+    {state : Frontend.SourceInference.State}
+    {result : List TypedBinder × List TypeSystem.Ty ×
+      Frontend.SourceInference.State}
+    (success : Detail.bindLambdaParameters inferenceContext parameters index
+      seen state = .ok result) :
+    result.2.2.owner = state.owner := by
+  induction parameters generalizing index seen state result with
+  | nil =>
+      simp only [Detail.bindLambdaParameters] at success
+      injection success with resultEq
+      subst result
+      rfl
+  | cons parameter rest induction =>
+      cases parameterValue : parameter.value with
+      | error =>
+          simp [Detail.bindLambdaParameters, parameterValue, bind,
+            Except.bind] at success
+      | inferred name =>
+          simp only [Detail.bindLambdaParameters, parameterValue] at success
+          simp only [bind, Except.bind] at success
+          repeat' first | split at success
+          all_goals try simp_all
+          all_goals
+            subst result
+            subst_vars
+            have tailOwner := induction _ _ _ (by assumption)
+            exact tailOwner.trans (by
+              simp_all [Frontend.SourceInference.State.fresh,
+                Frontend.SourceInference.State.allocateBinder])
+      | typed marker name sourceType =>
+          simp only [Detail.bindLambdaParameters, parameterValue] at success
+          cases typeResult : Detail.resolveSourceType inferenceContext
+              sourceType with
+          | error error =>
+              simp [typeResult, bind, Except.bind] at success
+          | ok type =>
+              simp only [typeResult, bind, Except.bind] at success
+              repeat' first | split at success
+              all_goals try simp_all
+              all_goals
+                subst result
+                subst_vars
+                have tailOwner := induction _ _ _ (by assumption)
+                exact tailOwner.trans (by
+                  simp_all [Frontend.SourceInference.State.allocateBinder])
+
+/-- The final expected-type fit preserves the complete input node prefix and
+then appends the lambda node. -/
+private theorem recordExpressionWithExpected_success_nodesPrefix
+    {inferenceContext : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {id : ExpressionId}
+    {type : TypeSystem.Ty} {form : ExpressionForm}
+    {requirements : List RequirementId}
+    {expected : Option TypeSystem.Ty}
+    {initial : Frontend.SourceInference.State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (success : Detail.recordExpressionWithExpected inferenceContext source id
+      type form requirements expected initial localSchemeInstantiationStart =
+        .ok result) :
+    initial.nodes <+: result.2.nodes := by
+  obtain ⟨fitted, fittedSuccess, _, resultStateEq⟩ :=
+    Detail.recordExpressionWithExpected_success_record success
+  have fittedPrefix : initial.nodes <+: fitted.state.nodes := by
+    rw [(Detail.withExpected_occurrenceState_eq fittedSuccess).1]
+    exact List.prefix_rfl
+  rw [resultStateEq]
+  exact fittedPrefix.trans
+    (Frontend.SourceInference.State.recordNode_nodesPrefix fitted.state _)
+
+private theorem addRequirementsWithIds_integerPatterns_eq
+    (state : Frontend.SourceInference.State)
+    (predicates : List ProgramPredicate) :
+    (state.addRequirementsWithIds predicates).2.integerPatterns =
+      state.integerPatterns := by
+  induction predicates generalizing state with
+  | nil => rfl
+  | cons predicate predicates induction =>
+      simp only [Frontend.SourceInference.State.addRequirementsWithIds]
+      exact (induction (state.addRequirementWithId predicate).2).trans rfl
+
+private theorem commitCoercionPlan_integerPatterns_eq
+    (state : Frontend.SourceInference.State)
+    (plan : List Detail.PlannedCoercionStep) :
+    (Detail.commitCoercionPlan state plan).2.integerPatterns =
+      state.integerPatterns := by
+  induction plan generalizing state with
+  | nil => rfl
+  | cons step rest induction =>
+      simp only [Detail.commitCoercionPlan]
+      exact (induction
+        ((state.addRequirementWithId step.predicate).2
+          |>.addRequirementsWithIds step.methodPredicates).2).trans
+        ((addRequirementsWithIds_integerPatterns_eq
+          (state.addRequirementWithId step.predicate).2
+          step.methodPredicates).trans rfl)
+
+/-- Expected-type fitting and recording do not change numeric-pattern
+origins.  This local public-facing projection mirrors the corresponding
+frontend preservation fact, which is intentionally private there. -/
+private theorem recordExpressionWithExpected_integerPatterns_eq
+    {inferenceContext : Frontend.SourceInference.Context}
+    {source : Syntax.Expr} {id : ExpressionId}
+    {type : TypeSystem.Ty} {form : ExpressionForm}
+    {requirements : List RequirementId}
+    {expected : Option TypeSystem.Ty}
+    {initial : Frontend.SourceInference.State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (success : Detail.recordExpressionWithExpected inferenceContext source id
+      type form requirements expected initial localSchemeInstantiationStart =
+        .ok result) :
+    result.2.integerPatterns = initial.integerPatterns := by
+  unfold Detail.recordExpressionWithExpected at success
+  cases fittedResult : Detail.withExpected inferenceContext initial { id, type }
+      expected with
+  | error error =>
+      simp [fittedResult, bind, Except.bind] at success
+  | ok fitted =>
+      simp only [fittedResult, bind, Except.bind] at success
+      change Except.ok (Detail.recordExpression source fitted.expression form
+        (requirements ++ Detail.coercionRequirements fitted.coercions)
+        fitted.coercions fitted.state localSchemeInstantiationStart) =
+          Except.ok result at success
+      injection success with resultEq
+      subst result
+      change fitted.state.integerPatterns = initial.integerPatterns
+      unfold Detail.withExpected at fittedResult
+      cases expected with
+      | none =>
+          injection fittedResult with fittedEq
+          subst fitted
+          rfl
+      | some expectedType =>
+          cases unification : initial.inference.unify type expectedType with
+          | ok inference =>
+              simp only [unification] at fittedResult
+              injection fittedResult with fittedEq
+              subst fitted
+              rfl
+          | error unificationError =>
+              cases unificationError with
+              | occursCheck metavariable failedType =>
+                  simp [unification] at fittedResult
+              | exhausted =>
+                  simp [unification] at fittedResult
+              | mismatch left right =>
+                  simp only [unification] at fittedResult
+                  cases planResult : Detail.coercionPlan? inferenceContext
+                      initial (initial.resolve type)
+                      (initial.resolve expectedType) with
+                  | error error =>
+                      simp [planResult, bind, Except.bind] at fittedResult
+                  | ok plan? =>
+                      cases plan? with
+                      | none =>
+                          simp [planResult, bind, Except.bind] at fittedResult
+                      | some plan =>
+                          simp only [planResult, bind, Except.bind] at fittedResult
+                          change Except.ok _ = Except.ok fitted at fittedResult
+                          injection fittedResult with fittedEq
+                          subst fitted
+                          exact commitCoercionPlan_integerPatterns_eq
+                            initial plan
+
 /-- The successful lambda branch of `inferExprFuel`, connected to the
 declarative lambda rule.
 
-The recursive statement premise is fuel-bounded in the same direction as the
-statement dispatcher: a caller proving soundness by fuel induction may use
-any statement theorem available at `childFuel ≤ fuel`; this branch invokes it
-at exactly `fuel`.  The final result admissibility supplied by whole-body
-finalization also closes the expected-function prefix; annotations and fresh
-results are handled directly by `lambdaPrefixFacts_resultTypeAdmissible_afterSubstitution`. -/
+The recursive statement premise is restricted to the actual body trace at
+the exact predecessor fuel.  The bridge supplies that trace's readiness,
+allocator bounds, local invariant, source extension, whole-result ledgers,
+and per-root scope coverage.  The final result admissibility supplied by
+whole-body finalization also closes the expected-function prefix; annotations
+and fresh results are handled directly by
+`lambdaPrefixFacts_resultTypeAdmissible_afterSubstitution`. -/
 theorem inferExprFuel_success_lambda_expressionTypingBase_scoped_of_retained
     {fuel : Nat}
     {inferenceContext : Frontend.SourceInference.Context}
@@ -367,7 +626,7 @@ theorem inferExprFuel_success_lambda_expressionTypingBase_scoped_of_retained
     {sourceParameters : Syntax.DelimitedList Syntax.LambdaParameter}
     {returnAnnotation : Option Syntax.TypeExpr} {body : Syntax.Block}
     {expected : Option TypeSystem.Ty}
-    {initial allocated later : Frontend.SourceInference.State}
+    {initial allocated later evidenceState : Frontend.SourceInference.State}
     {id : ExpressionId}
     {result : InferredExpression × Frontend.SourceInference.State}
     {roots : List NodeId}
@@ -392,11 +651,15 @@ theorem inferExprFuel_success_lambda_expressionTypingBase_scoped_of_retained
         (TypeSystem.Ty.productMany signature.returnTypes))
     (expectedBelow : ∀ expectedType ∈ expected,
       expectedType.VariablesBelow initial.inference.next)
+    (initialNodesBelow : initial.NodesBelowNextOccurrence)
     (resultProgress : result.2.InferenceProgress later)
     (allocatedInvariant : ActiveLocalContextInvariant allocated
       later.inference.substitution active)
     (allocatedBelow : allocated.LocalBindersBelowNextLocal)
     (sourceOwner : semanticSource.owner = allocated.owner)
+    (resultSourceExtension : TypingSourceExtends
+      ((result.2.toTypedSource roots).applySubstitution
+        later.inference.substitution) semanticSource)
     (canonical : SignatureParametersWellFormed
       inferenceContext.scope.genericOwner inferenceContext.typeParameters)
     (sourceBinders : TypeParameterBindersWellFormed sourceContext)
@@ -409,16 +672,32 @@ theorem inferExprFuel_success_lambda_expressionTypingBase_scoped_of_retained
     (finalResultAdmissible : TypeAdmissible active
       (later.inference.substitution.apply result.1.type))
     (bodySound :
-      ∀ {childFuel : Nat} {resultType : TypeSystem.Ty}
+      ∀ {resultType : TypeSystem.Ty}
         {childInitial : Frontend.SourceInference.State}
         {childResult : Detail.BlockResult}
         {childContext : SourceSemantics.Context},
-        childFuel ≤ fuel →
+        childInitial.InferenceReady →
+          resultType.VariablesBelow childInitial.inference.next →
+          childInitial.NodesBelowNextOccurrence →
+          childInitial.LocalBindersBelowNextLocal →
           ActiveLocalContextInvariant childInitial
             later.inference.substitution childContext →
-          Detail.inferStatementsFuel childFuel
+          Detail.inferStatementsFuel fuel
               { inferenceContext with loopDepth := 0 }
               body.value resultType childInitial = .ok childResult →
+          later.inference.substitution.SemanticallyExtends
+            childResult.state.inference.substitution →
+          TypingSourceExtends
+            ((childResult.state.toTypedSource roots).applySubstitution
+              later.inference.substitution) semanticSource →
+          childResult.state.integerPatterns ⊆
+            evidenceState.integerPatterns →
+          childResult.state.integerLiterals ⊆
+            evidenceState.integerLiterals →
+          childResult.state.requirements ⊆ evidenceState.requirements →
+          (∀ statement ∈ childResult.statements,
+            TemplateScopeCovered evidenceSource childContext
+              (.statement statement)) →
           ∃ finalContext bodyFacts,
             ActiveLocalContextInvariant childResult.state
                 later.inference.substitution finalContext ∧
@@ -428,6 +707,17 @@ theorem inferExprFuel_success_lambda_expressionTypingBase_scoped_of_retained
               } childContext childResult.statements finalContext bodyFacts ∧
               BlockResultMatchesFactsAfterSubstitution
                 later.inference.substitution childResult bodyFacts)
+    (integerPatternsToEvidence :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
+    (integerLiteralsToEvidence :
+      result.2.integerLiterals ⊆ evidenceState.integerLiterals)
+    (requirementsToEvidence :
+      result.2.requirements ⊆ evidenceState.requirements)
+    (directChildrenRetained : ∀ {child : NodeId},
+      DirectChild (result.2.toTypedSource roots)
+          (.expression result.1.id) child →
+        DirectChild evidenceSource (.expression result.1.id) child)
+    (evidenceClosed : OccurrenceGraphClosed evidenceSource)
     (requirementsSubset : result.2.requirements ⊆ later.requirements)
     (retained : ExpressionRequirementsRetainedAt
       (result.2.toTypedSource roots) evidenceSource result.1.id)
@@ -560,7 +850,7 @@ theorem inferExprFuel_success_lambda_expressionTypingBase_scoped_of_retained
       parametersSuccess canonical sourceBinders signaturesEq parametersEq
       ownerEq residual contextValid
   obtain ⟨lambdaContext, namesUnique, _, parametersExtend,
-      parameterInvariant, _⟩ :=
+      parameterInvariant, parameterBindersBelow⟩ :=
     bindLambdaParameters_success_monoBindersExtend_afterSubstitution
       parametersSuccess allocatedInvariant allocatedBelow
       parameterTypesAdmissible
@@ -574,13 +864,132 @@ theorem inferExprFuel_success_lambda_expressionTypingBase_scoped_of_retained
       later.inference.substitution lambdaContext :=
     lambdaPrefixFacts_activeLocalContextInvariant prefixFacts
       parameterInvariant
-  obtain ⟨bodyFinal, bodyFacts, _, bodyType, bodyAgreement⟩ :=
-    bodySound (Nat.le_refl fuel) resultInvariant bodySuccess
+  have allocatedNodesBelow : allocated.NodesBelowNextOccurrence := by
+    have preserved :=
+      Frontend.SourceInference.State.allocateExpressionId_preserves_nodesBelowNextOccurrence
+        initial initialNodesBelow
+    have finalEq : initial.allocateExpressionId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rwa [finalEq] at preserved
+  have parameterNodesBelow : parameterState.NodesBelowNextOccurrence :=
+    (Detail.bindLambdaParameters_occurrenceBoundExtends parametersSuccess
+      ).nodesBelowNextOccurrence allocatedNodesBelow
+  have resultNodesBelow : resultState.NodesBelowNextOccurrence :=
+    lambdaPrefixFacts_nodesBelowNextOccurrence prefixFacts parameterNodesBelow
+  have resultBindersBelow : resultState.LocalBindersBelowNextLocal :=
+    lambdaPrefixFacts_localBindersBelowNextLocal prefixFacts
+      parameterBindersBelow
+  have allocatedOwner : allocated.owner = initial.owner := by
+    have finalEq : initial.allocateExpressionId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← finalEq]
+    rfl
+  have parameterOwner : parameterState.owner = allocated.owner :=
+    bindLambdaParameters_owner_eq parametersSuccess
+  have prefixOwner : resultState.owner = parameterState.owner :=
+    lambdaPrefixFacts_owner_eq prefixFacts
+  have bodyOwner : bodyResult.state.owner = resultState.owner :=
+    Detail.inferStatementsFuel_preserves_owner bodySuccess
+  have bodyToResultRaw : TypingSourceExtends
+      (bodyResult.state.toTypedSource roots)
+      (result.2.toTypedSource roots) := by
+    constructor
+    · exact (Detail.inferExprFuel_preserves_owner success).trans
+        (allocatedOwner.symm.trans
+          (parameterOwner.symm.trans
+            (prefixOwner.symm.trans bodyOwner.symm)))
+    · have nodesPrefix :=
+        recordExpressionWithExpected_success_nodesPrefix recordSuccess
+      have unifyNodes := (Detail.unify_occurrenceState_eq unifySuccess).1
+      rw [restoredEq,
+        Frontend.SourceInference.State.restoreLexicalScope_nodes,
+        unifyNodes] at nodesPrefix
+      exact nodesPrefix
+  have bodySourceExtension : TypingSourceExtends
+      ((bodyResult.state.toTypedSource roots).applySubstitution
+        later.inference.substitution) semanticSource :=
+    (bodyToResultRaw.applySubstitution later.inference.substitution).trans
+      resultSourceExtension
   have laterExtendsUnified : later.inference.substitution.SemanticallyExtends
       unifiedState.inference.substitution := by
     have extendsRestored := restoredProgress.substitution_extends
     rw [restoredEq] at extendsRestored
     exact extendsRestored
+  have laterExtendsBody : later.inference.substitution.SemanticallyExtends
+      bodyResult.state.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans laterExtendsUnified
+      unifiedProgress.substitution_extends
+  have bodyIntegerPatternsToResult :
+      bodyResult.state.integerPatterns ⊆ result.2.integerPatterns := by
+    intro origin member
+    rw [recordExpressionWithExpected_integerPatterns_eq recordSuccess,
+      restoredEq]
+    change origin ∈ unifiedState.integerPatterns
+    rw [Detail.unify_integerPatterns unifySuccess]
+    exact member
+  have bodyIntegerLiteralsToResult :
+      bodyResult.state.integerLiterals ⊆ result.2.integerLiterals := by
+    intro origin member
+    rw [Detail.recordExpressionWithExpected_integerLiterals_eq recordSuccess,
+      restoredEq]
+    change origin ∈ unifiedState.integerLiterals
+    rw [Detail.unify_integerLiterals unifySuccess]
+    exact member
+  have bodyRequirementsToResult :
+      bodyResult.state.requirements ⊆ result.2.requirements := by
+    apply List.Subset.trans ?_
+      (Detail.recordExpressionWithExpected_requirements_subset recordSuccess)
+    rw [restoredEq]
+    change bodyResult.state.requirements ⊆ unifiedState.requirements
+    rw [Detail.unify_requirements_eq unifySuccess]
+    exact fun _ member => member
+  have bodyIntegerPatternsToEvidence :
+      bodyResult.state.integerPatterns ⊆ evidenceState.integerPatterns :=
+    List.Subset.trans bodyIntegerPatternsToResult integerPatternsToEvidence
+  have bodyIntegerLiteralsToEvidence :
+      bodyResult.state.integerLiterals ⊆ evidenceState.integerLiterals :=
+    List.Subset.trans bodyIntegerLiteralsToResult integerLiteralsToEvidence
+  have bodyRequirementsToEvidence :
+      bodyResult.state.requirements ⊆ evidenceState.requirements :=
+    List.Subset.trans bodyRequirementsToResult requirementsToEvidence
+  obtain ⟨coercions, recordedContains⟩ :=
+    recordExpressionWithExpected_success_containsExpression recordSuccess roots
+  let lambdaNode : ExpressionNode := {
+    id := result.1.id
+    span := expression.span
+    type := result.1.type
+    form := .lambda boundParameters (restoredState.resolve resultType)
+      bodyResult.statements
+    requirements := [] ++ Detail.coercionRequirements coercions
+    coercions
+  }
+  have containsLambda : ContainsExpression (result.2.toTypedSource roots)
+      result.1.id lambdaNode := by
+    simpa only [lambdaNode] using recordedContains
+  have bodyCovered : ∀ statement ∈ bodyResult.statements,
+      TemplateScopeCovered evidenceSource lambdaContext
+        (.statement statement) := by
+    intro statement member
+    have rawEdge : DirectChild (result.2.toTypedSource roots)
+        (.expression result.1.id) (.statement statement) := by
+      refine ⟨.expression lambdaNode, ?_, ?_⟩
+      · exact ⟨containsLambda.1,
+          congrArg NodeId.expression containsLambda.2⟩
+      · simpa [lambdaNode, nodeChildIds, Node.references,
+          ExpressionForm.references] using
+          (List.mem_map.mpr ⟨statement, member, rfl⟩ :
+            (.statement statement : NodeId) ∈
+              bodyResult.statements.map NodeId.statement)
+    apply TemplateScopeCovered.expressionStatementChild covered
+      evidenceClosed (directChildrenRetained rawEdge)
+    intro predicate predicateMember
+    rw [MonoBindersExtend.assumptions_eq parametersExtendSource]
+    exact predicateMember
+  obtain ⟨bodyFinal, bodyFacts, _, bodyType, bodyAgreement⟩ :=
+    bodySound prefixProperties.2.1 prefixProperties.2.2 resultNodesBelow
+      resultBindersBelow resultInvariant bodySuccess laterExtendsBody
+      bodySourceExtension bodyIntegerPatternsToEvidence
+      bodyIntegerLiteralsToEvidence bodyRequirementsToEvidence bodyCovered
   have unifiedTypesEq : later.inference.substitution.apply bodyResult.type =
       later.inference.substitution.apply resultType := by
     calc

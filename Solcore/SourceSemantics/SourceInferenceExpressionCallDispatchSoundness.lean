@@ -236,14 +236,19 @@ def CoveredRetainedExpressionChildTypingCallback
     (roots : List NodeId) : Prop :=
   ∀ child : ExpressionChildInferenceProvenance parentFuel inferenceContext
       ambientNodeSource evidenceState roots,
-    ExpressionRequirementsRetainedAt (child.final.toTypedSource roots)
-        evidenceSource child.inferred.id →
-      ExpressionDirectChildrenRetainedAt (child.final.toTypedSource roots)
+    child.initial.InferenceReady →
+      (∀ expectedType ∈ child.expected,
+        expectedType.VariablesBelow child.initial.inference.next) →
+      ActiveLocalContextInvariant child.initial substitution context →
+      child.initial.LocalBindersBelowNextLocal →
+      ExpressionRequirementsRetainedAt (child.final.toTypedSource roots)
           evidenceSource child.inferred.id →
-        TemplateScopeCovered evidenceSource context
-            (.expression child.inferred.id) →
-          ExpressionTypingBase (child.final.toTypedSource roots)
-            semanticSource context substitution child.inferred
+        ExpressionDirectChildrenRetainedAt (child.final.toTypedSource roots)
+            evidenceSource child.inferred.id →
+          TemplateScopeCovered evidenceSource context
+              (.expression child.inferred.id) →
+            ExpressionTypingBase (child.final.toTypedSource roots)
+              semanticSource context substitution child.inferred
 
 /-- Attachment retains the old requirements of every argument whenever the
 attachment row is known to carry exactly the source-ordered argument ids.
@@ -429,7 +434,17 @@ theorem
     {outer : TypeSystem.Substitution}
     (roots : List NodeId := [])
     (fuel_lt : fuel < parentFuel)
+    (initialReady : initial.InferenceReady)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
     (initialBelow : initial.NodesBelowNextOccurrence)
+    (initialInvariant : ActiveLocalContextInvariant initial outer target)
+    (initialBindersBelow : initial.LocalBindersBelowNextLocal)
     (integerLiteralsSubset :
       final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements)
@@ -519,6 +534,17 @@ theorem
                       (headState.toTypedSource roots) evidenceSource head.id :=
                     ExpressionRequirementsRetainedAt.monoBefore headToFinal
                       headRetainedAtFinal
+                  have headProperties := Detail.inferExprFuel_inferenceProperties
+                    initialReady signatureFormation functionsCanonical (by
+                      intro expectedType member
+                      simp at member) headSuccess
+                  have headInvariant : ActiveLocalContextInvariant headState
+                      outer target :=
+                    initialInvariant.inferExprFuel headSuccess
+                  have headBindersBelow :
+                      headState.LocalBindersBelowNextLocal :=
+                    Detail.inferExprFuel_preserves_localBindersBelowNextLocal
+                      initialBindersBelow headSuccess
                   have headChildrenRetainedAtFinal :
                       ExpressionDirectChildrenRetainedAt
                         (final.toTypedSource roots) evidenceSource head.id :=
@@ -532,7 +558,10 @@ theorem
                   have headCovered : TemplateScopeCovered evidenceSource
                       target (.expression head.id) :=
                     covered head (by simp)
-                  have headBase := childSound child headRetained
+                  have headBase := childSound child initialReady (by
+                      intro expectedType member
+                      simp at member)
+                    initialInvariant initialBindersBelow headRetained
                     headChildrenRetained headCovered
                   have finalHead : ExpressionTypingBase
                       (final.toTypedSource roots) semanticSource target outer
@@ -540,7 +569,10 @@ theorem
                     headBase.weakenNodeSource headToFinal.nodes_prefix
                   have tailBases := induction
                     (fuel_lt := Nat.lt_trans (Nat.lt_succ_self fuel) fuel_lt)
+                    (initialReady := headProperties.2.1)
                     (initialBelow := headBelow)
+                    (initialInvariant := headInvariant)
+                    (initialBindersBelow := headBindersBelow)
                     (integerLiteralsSubset := integerLiteralsSubset)
                     (requirementsSubset := requirementsSubset)
                     (retained := by
@@ -765,6 +797,10 @@ theorem
     (expectedBelow : ∀ expectedType ∈ expected,
       expectedType.VariablesBelow argumentInitial.inference.next)
     (nodesBelow : argumentInitial.NodesBelowNextOccurrence)
+    (argumentInitialInvariant : ActiveLocalContextInvariant argumentInitial
+      later.inference.substitution active)
+    (argumentInitialBindersBelow :
+      argumentInitial.LocalBindersBelowNextLocal)
     (argumentIntegerSubset :
       argumentState.integerLiterals ⊆ evidenceState.integerLiterals)
     (argumentRequirementsSubset :
@@ -907,7 +943,9 @@ theorem
     simpa only [entryIdEq] using argumentCovered entry entryMember
   have bases :=
     inferExprsFuel_success_argumentTypingBasesValid_under_covered_retained_bounded
-      (roots := roots) fuel_lt nodesBelow argumentIntegerSubset
+      (roots := roots) fuel_lt argumentInitialReady signatureFormation
+      functionsCanonical nodesBelow argumentInitialInvariant
+      argumentInitialBindersBelow argumentIntegerSubset
       argumentRequirementsSubset retainedAtArguments childrenRetainedAtArguments
       coveredArguments childSound argumentsSuccess
   exact
