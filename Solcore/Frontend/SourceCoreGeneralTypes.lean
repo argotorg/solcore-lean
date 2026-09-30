@@ -85,6 +85,12 @@ def leafLowerer (checked : Checked) (signatures : ProgramSignatures)
     match node.form with
     | .constructor _ _ | .member _ _ _ | .proxy _ | .index _ _ =>
         SourceCoreDataExpressions.lowerWithReasons fuel checked signatures child source scope id reasonAt
+    | .tuple elements =>
+        let (_, type) ← SourceCoreDataExpressions.readExpression checked source id
+        let lowered ← elements.mapM fun element => child fuel source scope element reasonAt
+        let packed := SourceCoreCalls.packArguments lowered
+        SourceCoreBasic.ensureType (.occurrence id.occurrence) type packed.type
+        pure ⟨type, packed.expression⟩
     | _ => SourceCoreBasic.lowerExpression fuel source scope id (reasonAt id)
 
 def policy (checked : Checked) (signatures : ProgramSignatures) : SourceCoreFunctions.Policy := {

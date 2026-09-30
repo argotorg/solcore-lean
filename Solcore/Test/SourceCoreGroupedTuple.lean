@@ -22,6 +22,8 @@ private def workspace : Workspace.RawWorkspace := {
     "function grouped(left: Word, right: Word) returns (Word) { match ((left, right)) { case ((x, y)) { return x; } default { return 99; } } }",
     "function deep(left: Word, right: Word) returns (Word) { match ((left, right)) { case ((((x, y)))) { return x; } default { return 99; } } }",
     "function nested(left: Word, right: Word) returns (Word) { match ((left, (true, right))) { case (((x, (flag, y)))) { return flag ? x + y : 0; } default { return 99; } } }",
+    "function three(left: Word, right: Word) returns (Word) { match ((left, true, right)) { case (((x, flag, y))) { return flag ? x + y : 0; } default { return 99; } } }",
+    "function tripleEffects(left: Word, right: Word) returns (Word) { let count: Word = 0; let next = lam() -> Word { count += 1; return count; }; match ((next(), next(), next())) { case (x, y, z) { return x + y + z + count; } default { return 99; } } }",
     "function unitValue(value: Unit) returns (Word) { match (value) { case ((())) { return 7; } default { return 99; } } }",
     "function chooseArm(left: Word, right: Word) returns (Word) { match ((left, right)) { case ((0, y)) { return y; } case (((x, y))) { return x; } default { return 99; } } }",
     "function effects(left: Word, right: Word) returns (Word) { let count: Word = 0;",
@@ -71,7 +73,7 @@ private def test (program : CheckedProgram) (name : String) (inputs : List Core.
   | .error error => throw (IO.userError s!"{name} tuple checkpoint input failed: {reprStr error}")
 
 def run : IO Unit := do
-  let program ← match checkProgram workspace with
+  let program ← match checkProgram workspace 4096 with
     | .ok program => pure program
     | .error error => throw (IO.userError s!"grouped tuple source rejected: {reprStr error}")
   let signature ← match program.signatures.functions.filter (·.name == "grouped") with
@@ -87,7 +89,7 @@ def run : IO Unit := do
             | _ => false
         | _ => false
     | _ => false) "regression did not retain the actual grouped tuple source"
-  for (name, expected) in [("plain", 7), ("grouped", 7), ("deep", 7), ("nested", 15), ("chooseArm", 7), ("effects", 8)] do
+  for (name, expected) in [("plain", 7), ("grouped", 7), ("deep", 7), ("nested", 15), ("three", 15), ("tripleEffects", 9), ("chooseArm", 7), ("effects", 8)] do
     test program name [.word (w 7), .word (w 8)] [.word (w 7), .word (w 8)] expected
   test program "chooseArm" [.word (w 0), .word (w 8)] [.word (w 0), .word (w 8)] 8
   test program "unitValue" [.unit] [.unit] 7
