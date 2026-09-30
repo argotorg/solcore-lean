@@ -1012,7 +1012,12 @@ import Solcore.Test.CoreGeneralCells
 import Solcore.Test.CoreRecursiveCells
 import Solcore.Test.CoreLanguageResult
 import Solcore.Test.CoreOptionalCells
+import Solcore.Test.CoreLocalSequence
 import Solcore.Test.SourceCoreLocalCell
+import Solcore.Test.SourceCoreBasic
+import Solcore.Test.SourceCoreBasicExpressions
+import Solcore.Test.SourceCoreBasicCorrespondence
+import Solcore.Test.SourceCoreBasicStatements
 import Solcore.Test.ContractLanguageResult
 import Solcore.Test.HostRuntimeStoreSafety
 import Solcore.Test.CoreComparisonFlags
@@ -2393,6 +2398,7 @@ def run : IO Unit := do
   CoreRecursiveCells.run
   CoreLanguageResult.run
   SourceCoreLocalCell.run
+  SourceCoreBasic.run
   ContractLanguageResult.test
   testCoreBooleanConnectives
   testCoreBitwiseLogic
