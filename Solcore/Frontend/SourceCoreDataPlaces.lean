@@ -74,7 +74,7 @@ def Step.resultType : Step → Core.Ty
 def project (checked : Checked) (site : SourceCoreElaboration.ErrorSite) (type : TypeSystem.Ty) :
     Except Error Core.Ty := SourceCoreGeneralTypes.projectType checked site type
 
-private def memberStep (checked : Checked) (signatures : ProgramSignatures)
+def memberStep (checked : Checked) (signatures : ProgramSignatures)
     (site : SourceCoreElaboration.ErrorSite) (root : Resolved.LocalId)
     (type : TypeSystem.Ty) (index : Nat) : Except Error (Step × TypeSystem.Ty) := do
   let type := SourceCoreDataCatalog.erase type
@@ -111,7 +111,7 @@ private def memberStep (checked : Checked) (signatures : ProgramSignatures)
     | none => throw (.projectedAssignment root)
   pure (.member identity index branches (← project checked site field), field)
 
-private def routeSteps (checked : Checked) (signatures : ProgramSignatures)
+def routeSteps (checked : Checked) (signatures : ProgramSignatures)
     (source : TypedSource) (site : SourceCoreElaboration.ErrorSite) (root : Resolved.LocalId) :
     TypeSystem.Ty → List PlaceProjection → Except Error (List Step × TypeSystem.Ty)
   | type, [] => pure ([], type)
