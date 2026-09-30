@@ -136,11 +136,15 @@ private def contextualSource (program : CheckedProgram) (plan : Plan)
       else pure source
   | _ => pure source
 
-private structure CallableContext where
+/-- Authenticated callable metadata shared by the generated representation
+and every indirect callsite in one prepared artifact. -/
+structure CallableContext where
   table : SourceCoreStageCodebook.Table
   diagnostics : SourceCoreCallableFaultSites.Program
 
-private def callablePolicy (native : Option CallableContext) (active : TypeSystem.Substitution) :
+/-- The callable representation used by the general compiler. Keeping this
+policy visible lets lowering proofs authenticate the actual emitted wrapper. -/
+def callablePolicy (native : Option CallableContext) (active : TypeSystem.Substitution) :
     SourceCoreFunctions.CallablePolicy :=
   match native with
   | none => {}
