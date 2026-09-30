@@ -43,6 +43,9 @@ import Solcore.Core.DirectWordComparisons
 import Solcore.Core.SignedComparison
 import Solcore.Core.ShortCircuit
 
+import Solcore.Core.LocalAssignment
+import Solcore.Core.WordMapping
+
 /-!
 Umbrella module for the Semantic Core syntax, declarative judgments, explicit
 local-store semantics, primitive algebra, CEK machine, executable runners,
