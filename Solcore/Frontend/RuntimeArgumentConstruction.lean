@@ -11,6 +11,7 @@ mutual
     | .unit => some ⟨.unit⟩
     | .bool _ => some ⟨.bool⟩
     | .word _ => some ⟨.word⟩
+    | .integer _ => some ⟨.integer⟩
     | .hostFunction _ | .constructed _ _ => none
     | .pair left right => do
         let leftTyped ← buildValue? left
@@ -52,7 +53,7 @@ private theorem environment_types {definitions : Core.DataEnvironment}
     environment.map Core.Value.type = context := by
   induction typed using Core.EnvironmentHasTypes.rec
       (motive_1 := fun _ _ _ _ => True) with
-  | unit | bool | word | pair | inLeft | inRight | closure | cellRef | constructed => trivial
+  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef | constructed => trivial
   | nil => rfl
   | cons head _ _ ih => simp only [List.map_cons, head.type_eq, ih]
 
@@ -63,7 +64,7 @@ private theorem buildValue?_complete {definitions : Core.DataEnvironment}
   induction typed using Core.ValueHasType.rec
       (motive_2 := fun environment _ definitions _ =>
         definitions = [] → (buildEnvironment? environment).isSome = true) with
-  | unit | bool | word | cellRef => intro _; simp only [buildValue?, Option.isSome_some]
+  | unit | bool | word | integer | cellRef => intro _; simp only [buildValue?, Option.isSome_some]
   | pair _ _ leftIH rightIH =>
       intro empty
       obtain ⟨left,leftChecked⟩ := Option.isSome_iff_exists.mp (leftIH empty)

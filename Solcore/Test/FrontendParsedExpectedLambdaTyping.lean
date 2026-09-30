@@ -43,7 +43,7 @@ private def meaning (source : Syntax.TypeExpr) : IO (Meaning source) := do
   | _ => throw (IO.userError "independent annotation profile")
 termination_by sizeOf source
 private def wellFormed : (t : Core.Ty) → Option (PLift (Core.Ty.WellFormed [] t))
-  | .unit => some ⟨.unit⟩ | .bool => some ⟨.bool⟩ | .word => some ⟨.word⟩
+  | .unit => some ⟨.unit⟩ | .bool => some ⟨.bool⟩ | .word => some ⟨.word⟩ | .integer => some ⟨.integer⟩
   | .product a b => do let p ← wellFormed a; let r ← wellFormed b; return ⟨.product p.down r.down⟩
   | .function a b => do let p ← wellFormed a; let r ← wellFormed b; return ⟨.function p.down r.down⟩
   | .sum a b => do let p ← wellFormed a; let r ← wellFormed b; return ⟨.sum p.down r.down⟩

@@ -24,11 +24,13 @@ def unaryOperand : UnaryOp → Target
   | .boolNot => .bool
   | .wordNot
   | .wordClz => .word
+  | .integerNot | .integerToWord | .wordToInteger => .word
 
 def unaryResult : UnaryOp → Target
   | .boolNot => .bool
   | .wordNot
   | .wordClz => .word
+  | .integerNot | .integerToWord | .wordToInteger => .word
 
 def binaryResult : BinaryOp → Target
   | .wordEq
@@ -50,6 +52,9 @@ def binaryResult : BinaryOp → Target
   | .wordSignExtend
   | .wordSdiv
   | .wordSmod => .word
+  | .integerEq | .integerLt => .bool
+  | .integerAdd | .integerSub | .integerMul | .integerDiv | .integerMod
+  | .integerAnd | .integerOr | .integerXor => .word
 
 end Target
 
@@ -70,12 +75,17 @@ def acceptsAt (localWordDepth : Nat) (target : Target) : Expr → Bool
         acceptsAt localWordDepth target thenBranch &&
         acceptsAt localWordDepth target elseBranch
   | .unary op operand =>
-      target == Target.unaryResult op &&
-        acceptsAt localWordDepth (Target.unaryOperand op) operand
+      match op with
+      | .integerNot | .integerToWord | .wordToInteger => false
+      | _ => target == Target.unaryResult op &&
+          acceptsAt localWordDepth (Target.unaryOperand op) operand
   | .binary op left right =>
-      target == Target.binaryResult op &&
-        acceptsAt localWordDepth .word left &&
-        acceptsAt localWordDepth .word right
+      match op with
+      | .integerAdd | .integerSub | .integerMul | .integerDiv | .integerMod
+      | .integerEq | .integerLt | .integerAnd | .integerOr | .integerXor => false
+      | _ => target == Target.binaryResult op &&
+          acceptsAt localWordDepth .word left &&
+          acceptsAt localWordDepth .word right
   | .ternary _ first second third =>
       target == .word &&
         acceptsAt localWordDepth .word first &&

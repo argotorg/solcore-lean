@@ -14,7 +14,7 @@ mutual
 
   /-- Sum of Word literal values, plus one for every true Boolean literal. -/
   def literalWeight : Expr → Nat
-    | .unit | .var _ => 0
+    | .unit | .var _ | .integer _ => 0
     | .bool value => if value then 1 else 0
     | .word value => value.val
     | .pair left right | .apply left right | .storeCell left right |

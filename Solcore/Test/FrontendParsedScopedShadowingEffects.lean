@@ -77,7 +77,7 @@ private def child (i : LocalTypeInputs) (e : Syntax.Expr) : IO (Static (Recursiv
       let x ← child i a; let y ← child i b; return ⟨.pair x.core y.core,.product x.type y.type,by rw [shape]; exact .pair x.evidence y.evidence⟩
   | ⟨_,.binary a ⟨_,.equal⟩ b⟩ =>
       let x ← child i a; let y ← child i b
-      if same : x.type=.word ∧ y.type=.word then return ⟨.binary .wordEq x.core y.core,.bool,by rw [shape]; exact .binary .equal (by simpa only [Core.BinaryOp.leftType,same.1] using x.evidence) (by simpa only [Core.BinaryOp.rightType,same.2] using y.evidence)⟩ else throw (IO.userError "old Word initializer operands")
+      if same : x.type=.word ∧ y.type=.word then return ⟨.binary .wordEq x.core y.core,.bool,by rw [shape]; exact .binary .equal (by simpa only [Core.BinaryOp.leftType,same.1] using x.evidence) (by simpa only [Core.BinaryOp.rightType,Core.BinaryOp.leftType,same.2] using y.evidence)⟩ else throw (IO.userError "old Word initializer operands")
   | _ => throw (IO.userError "static source child")
 termination_by sizeOf e
 private def body (i : LocalTypeInputs) (b : Syntax.Block) : IO (Static (RecursiveComputationReturnTreeElaborates types owner i b)) := do

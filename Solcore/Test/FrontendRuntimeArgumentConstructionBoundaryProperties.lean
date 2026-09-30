@@ -37,7 +37,7 @@ private theorem capturedLookup {definitions : Core.DataEnvironment} {captured : 
     {index : Nat} {value : Core.Value} (found : captured[index]? = some value) :
     ∃ type, Core.ValueHasType value type definitions := by
   induction typed using Core.EnvironmentHasTypes.rec (motive_1 := fun _ _ _ _ => True) generalizing index with
-  | unit | bool | word | pair | inLeft | inRight | closure | cellRef | constructed => trivial
+  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef | constructed => trivial
   | nil => simp at found
   | cons head _ _ ih => cases index with
     | zero => simp only [List.getElem?_cons_zero,Option.some.injEq] at found; subst value; exact ⟨_,head⟩

@@ -145,7 +145,7 @@ private theorem oldBinary {ctx : Resolved.Context} {span opSpan : Syntax.SourceS
     LocalComputationElaborates names ctx ⟨span,.binary left ⟨opSpan,sourceOp⟩ right⟩ (.binary op a.core b.core) op.resultType := by
   cases meaning <;> exact .pure (by constructor <;> first | exact a.resolution | exact b.resolution)
     (.binary a.lowered b.lowered) (.binary (by simpa only [Core.BinaryOp.leftType,leftType] using a.typing)
-      (by simpa only [Core.BinaryOp.rightType,rightType] using b.typing))
+      (by simpa only [Core.BinaryOp.rightType,Core.BinaryOp.leftType,rightType] using b.typing))
 private theorem oldCost {env : Resolved.Environment} {span opSpan : Syntax.SourceSpan}
     {left right : Syntax.Expr} {sourceOp : Syntax.BinaryOp} {op : Core.BinaryOp}
     {x y : Core.Word} {value : Core.Value} {store : Core.Store}

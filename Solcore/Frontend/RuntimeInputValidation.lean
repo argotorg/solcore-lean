@@ -10,7 +10,7 @@ namespace Solcore.Frontend
 
 mutual
   private def valueReferencesValid (world : Core.StoreTyping) : Core.Value → Bool
-    | .unit | .bool _ | .word _ => true
+    | .unit | .bool _ | .word _ | .integer _ => true
     | .hostFunction _ => false
     | .pair left right => valueReferencesValid world left && valueReferencesValid world right
     | .closure _ _ _ captured => environmentReferencesValid world captured
@@ -49,6 +49,7 @@ private theorem valueReferencesValid_iff
     | unit => intro _; exact .unit
     | bool => intro _; exact .bool
     | word => intro _; exact .word
+    | integer => intro _; exact .integer
     | pair _ _ leftIH rightIH =>
         intro checked
         simp only [valueReferencesValid, Bool.and_eq_true] at checked
@@ -69,7 +70,7 @@ private theorem valueReferencesValid_iff
     clear structural
     induction runtime using Core.RuntimeValueHasType.rec
         (motive_2 := fun environment _ _ _ => environmentReferencesValid world environment = true) with
-    | unit | bool | word => simp only [valueReferencesValid]
+    | unit | bool | word | integer => simp only [valueReferencesValid]
     | nil => simp only [environmentReferencesValid]
     | pair _ _ leftIH rightIH => simp only [valueReferencesValid, leftIH, rightIH, Bool.and_self]
     | inLeft _ ih | inRight _ ih | constructed _ _ ih => simpa only [valueReferencesValid] using ih
@@ -83,6 +84,7 @@ private theorem payload_tag_hasType {type : Core.Ty} (payload : Core.CellPayload
   | unit => cases value <;> simp_all [Core.Value.type, Core.HostFunction.functionType]; exact .unit
   | bool => cases value <;> simp_all [Core.Value.type, Core.HostFunction.functionType]; exact .bool
   | word => cases value <;> simp_all [Core.Value.type, Core.HostFunction.functionType]; exact .word
+  | integer => cases value <;> simp_all [Core.Value.type, Core.HostFunction.functionType]; exact .integer
   | product left right leftIH rightIH =>
       cases value <;> simp_all [Core.Value.type, Core.HostFunction.functionType]
       exact .pair (leftIH tag.1) (rightIH tag.2)

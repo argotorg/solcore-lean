@@ -72,7 +72,7 @@ private def statics (s : Syntax.Expr) : IO (Static s) := do
       check (span.contains left.span && span.contains os && span.contains right.span && decide (left.span.endByte≤os.startByte ∧ os.endByte≤right.span.startByte)) "original binary/order"
       let a ← statics left; let b ← statics right
       if same : a.type=.word ∧ b.type=.word then return ⟨.binary .wordAdd a.core b.core,.word,
-        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType,same.1] using a.evidence) (by simpa only [Core.BinaryOp.rightType,same.2] using b.evidence)⟩ else throw (IO.userError "static operands")
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType,same.1] using a.evidence) (by simpa only [Core.BinaryOp.rightType,Core.BinaryOp.leftType,same.2] using b.evidence)⟩ else throw (IO.userError "static operands")
   | ⟨span,.conditional condition q yes colon no⟩ =>
       check (span.contains condition.span && span.contains yes.span && span.contains no.span && span.contains q && span.contains colon &&
         decide (condition.span.endByte≤q.startByte ∧ q.endByte=q.startByte+1 ∧ q.endByte≤yes.span.startByte ∧ yes.span.endByte≤colon.startByte ∧ colon.endByte=colon.startByte+1 ∧ colon.endByte≤no.span.startByte)) "original conditional/order"

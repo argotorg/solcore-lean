@@ -61,6 +61,11 @@ example : accepts .bool zero = false := by
 example : accepts .word (.pair zero zero) = false := by
   decide
 
+example : accepts .word (.integer 0) = false := rfl
+example : accepts .word (.unary .integerToWord (.integer 0)) = false := rfl
+example : accepts .word (.unary .wordToInteger zero) = false := rfl
+example : accepts .bool (.binary .integerEq zero zero) = false := rfl
+
 example : literalProgram.check = true := by
   native_decide
 

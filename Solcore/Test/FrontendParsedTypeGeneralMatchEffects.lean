@@ -102,7 +102,7 @@ private def child (i : LocalTypeInputs) (e : Syntax.Expr) : IO (Σ t, Static (fu
   | ⟨_,.binary l ⟨opSpan,.equal⟩ r⟩ =>
       check (e.span.contains l.span && e.span.contains r.span && e.span.contains opSpan && decide (l.span.endByte≤opSpan.startByte ∧ opSpan.startByte<opSpan.endByte ∧ opSpan.endByte≤r.span.startByte)) "original equality children and operator order"
       let a ← child i l; let b ← child i r
-      if same : a.1=.word ∧ b.1=.word then return ⟨.bool,.binary .wordEq a.2.core b.2.core,by rw [shape]; exact .binary .equal (by simpa only [Core.BinaryOp.leftType,same.1] using a.2.evidence) (by simpa only [Core.BinaryOp.rightType,same.2] using b.2.evidence)⟩ else throw (IO.userError "equality Word operands")
+      if same : a.1=.word ∧ b.1=.word then return ⟨.bool,.binary .wordEq a.2.core b.2.core,by rw [shape]; exact .binary .equal (by simpa only [Core.BinaryOp.leftType,same.1] using a.2.evidence) (by simpa only [Core.BinaryOp.rightType,Core.BinaryOp.leftType,same.2] using b.2.evidence)⟩ else throw (IO.userError "equality Word operands")
   | ⟨_,.call f ⟨_,[a]⟩⟩ =>
       check (e.span.contains f.span && e.span.contains a.span && decide (f.span.endByte≤a.span.startByte)) "original callee/argument ranges"
       let l ← child i f; let r ← child i a

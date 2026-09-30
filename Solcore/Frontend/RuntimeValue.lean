@@ -20,6 +20,7 @@ inductive RuntimeValue where
   | unit
   | bool (value : Bool)
   | word (value : Core.Word)
+  | integer (value : Int)
   | hostFunction (function : Core.HostFunction)
   | pair (left right : RuntimeValue)
   | coreClosure (parameterType resultType : Core.Ty) (body : Core.Expr) (captured : List RuntimeValue)
@@ -37,6 +38,7 @@ def RuntimeValue.ofCore (value : Core.Value) : RuntimeValue :=
   | .unit => .unit
   | .bool value => .bool value
   | .word value => .word value
+  | .integer value => .integer value
   | .hostFunction function => .hostFunction function
   | .pair left right => .pair (ofCore left) (ofCore right)
   | .closure parameterType resultType body captured =>
@@ -59,6 +61,7 @@ def RuntimeValue.toCore? (value : RuntimeValue) : Option Core.Value :=
   | .unit => some .unit
   | .bool value => some (.bool value)
   | .word value => some (.word value)
+  | .integer value => some (.integer value)
   | .hostFunction function => some (.hostFunction function)
   | .pair left right => do return .pair (← toCore? left) (← toCore? right)
   | .coreClosure parameterType resultType body captured =>
@@ -93,6 +96,7 @@ def RuntimeValue.mapOwners (mapping : Resolved.DeclarationId → Resolved.Declar
   | .unit => .unit
   | .bool b => .bool b
   | .word w => .word w
+  | .integer value => .integer value
   | .hostFunction f => .hostFunction f
   | .pair left right => .pair (mapOwners mapping left) (mapOwners mapping right)
   | .coreClosure parameter result body captured =>
@@ -163,7 +167,7 @@ namespace RuntimeValue
 /-- Relabeling with the identity retains the complete original runtime value. -/
 theorem mapOwners_id (value : RuntimeValue) : value.mapOwners id = value := by
   cases value with
-  | unit | bool | word | hostFunction | cellRef => simp only [mapOwners]
+  | unit | bool | word | integer | hostFunction | cellRef => simp only [mapOwners]
   | pair left right => simp only [mapOwners,mapOwners_id left,mapOwners_id right]
   | inLeft ty payload | inRight ty payload | constructed ty payload =>
     simp only [mapOwners,mapOwners_id payload]
@@ -199,7 +203,7 @@ theorem mapOwners_comp (value : RuntimeValue)
     (first second : Resolved.DeclarationId → Resolved.DeclarationId) :
     (value.mapOwners first).mapOwners second = value.mapOwners (second ∘ first) := by
   cases value with
-  | unit | bool | word | hostFunction | cellRef => simp only [mapOwners]
+  | unit | bool | word | integer | hostFunction | cellRef => simp only [mapOwners]
   | pair left right =>
     simp only [mapOwners,mapOwners_comp left first second,mapOwners_comp right first second]
   | inLeft ty payload | inRight ty payload | constructed ty payload =>
@@ -230,7 +234,7 @@ decreasing_by
 theorem mapOwners_ofCore (mapping : Resolved.DeclarationId → Resolved.DeclarationId)
     (value : Core.Value) : (ofCore value).mapOwners mapping = ofCore value := by
   cases value with
-  | unit | bool | word | hostFunction | cellRef => simp only [ofCore,mapOwners]
+  | unit | bool | word | integer | hostFunction | cellRef => simp only [ofCore,mapOwners]
   | pair left right =>
     simp only [ofCore,mapOwners,mapOwners_ofCore mapping left,mapOwners_ofCore mapping right]
   | inLeft ty payload | inRight ty payload | constructed ty payload =>
@@ -265,7 +269,7 @@ private theorem project_mapped_list (mapping : Resolved.DeclarationId → Resolv
 theorem toCore?_mapOwners (mapping : Resolved.DeclarationId → Resolved.DeclarationId)
     (value : RuntimeValue) : (value.mapOwners mapping).toCore? = value.toCore? := by
   cases value with
-  | unit | bool | word | hostFunction | cellRef => simp only [mapOwners,toCore?]
+  | unit | bool | word | integer | hostFunction | cellRef => simp only [mapOwners,toCore?]
   | pair left right =>
     simp only [mapOwners,toCore?,toCore?_mapOwners mapping left,toCore?_mapOwners mapping right]
   | inLeft ty payload | inRight ty payload | constructed ty payload =>
@@ -347,7 +351,7 @@ private theorem project_embedded_list (values : List Core.Value)
 /-- Embedding and then projecting returns the identical original Core value. -/
 theorem toCore?_ofCore (value : Core.Value) : toCore? (ofCore value) = some value := by
   cases value with
-  | unit | bool | word | hostFunction | cellRef => simp only [ofCore, toCore?]
+  | unit | bool | word | integer | hostFunction | cellRef => simp only [ofCore, toCore?]
   | pair left right =>
       simp only [ofCore, toCore?, toCore?_ofCore left, toCore?_ofCore right,
         bind, Option.bind_some, pure]
@@ -384,7 +388,7 @@ private theorem project_list_reflect (values : List RuntimeValue)
 private theorem project_reflect (value : RuntimeValue) {core : Core.Value}
     (projected : toCore? value = some core) : value = ofCore core := by
   cases value with
-  | unit | bool | word | hostFunction | cellRef =>
+  | unit | bool | word | integer | hostFunction | cellRef =>
       simp only [toCore?, Option.some.injEq] at projected
       subst core
       simp only [ofCore]

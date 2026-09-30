@@ -75,8 +75,8 @@ private def child (i : LocalTypeInputs) (s : Syntax.Expr) : IO (Child i s) := do
   | ⟨_,.binary left ⟨_,.add⟩ right⟩ =>
       let a ← child i left; let b ← child i right
       if both : a.type=.word ∧ b.type=.word then return ⟨.binary .wordAdd a.core b.core,.word,
-        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.elaboration) (by simpa only [Core.BinaryOp.rightType, both.2] using b.elaboration),
-        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.typing) (by simpa only [Core.BinaryOp.rightType, both.2] using b.typing)⟩
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.elaboration) (by simpa only [Core.BinaryOp.rightType,Core.BinaryOp.leftType, both.2] using b.elaboration),
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.typing) (by simpa only [Core.BinaryOp.rightType,Core.BinaryOp.leftType, both.2] using b.typing)⟩
       else throw (IO.userError "Word operands")
   | _ => let a ← pureChild i s; return ⟨a.core,a.type,.pure a.resolution a.lowered a.typing,.pure (a.resolution.reflects_type a.typing)⟩
 termination_by sizeOf s

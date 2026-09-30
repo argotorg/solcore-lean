@@ -97,8 +97,8 @@ private def statics (ctx : Resolved.Context) (s : Syntax.Expr) : IO (Static ctx 
   | ⟨_,.binary left ⟨_,.add⟩ right⟩ =>
       let a ← statics ctx left; let b ← statics ctx right
       if both : a.type=.word ∧ b.type=.word then return ⟨.binary .wordAdd a.core b.core,.word,
-        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.elaboration) (by simpa only [Core.BinaryOp.rightType, both.2] using b.elaboration),
-        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.typing) (by simpa only [Core.BinaryOp.rightType, both.2] using b.typing)⟩
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.elaboration) (by simpa only [Core.BinaryOp.rightType,Core.BinaryOp.leftType, both.2] using b.elaboration),
+        by rw [shape]; exact .binary .add (by simpa only [Core.BinaryOp.leftType, both.1] using a.typing) (by simpa only [Core.BinaryOp.rightType,Core.BinaryOp.leftType, both.2] using b.typing)⟩
       else throw (IO.userError "migration Word operands")
   | ⟨_,.conditional guard _ yes _ no⟩ =>
       let g ← statics ctx guard; let a ← statics ctx yes; let b ← statics ctx no

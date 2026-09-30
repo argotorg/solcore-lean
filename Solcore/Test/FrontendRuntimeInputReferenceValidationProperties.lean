@@ -68,7 +68,7 @@ private theorem capturedLookup {definitions : Core.DataEnvironment} {world : Cor
     ∃ type, Core.RuntimeValueHasType world value type definitions := by
   induction typed using Core.RuntimeEnvironmentHasTypes.rec
       (motive_1 := fun _ _ _ _ => True) generalizing index with
-  | unit | bool | word | pair | inLeft | inRight | closure | cellRef | constructed => trivial
+  | unit | bool | word | integer | pair | inLeft | inRight | closure | cellRef | constructed => trivial
   | nil => simp at found
   | cons head _ _ ih =>
       cases index with
