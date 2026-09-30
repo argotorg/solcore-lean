@@ -229,4 +229,86 @@ theorem inferStatementFuel_letAnnotatedUninitialized_captureOrigins
   })
   simpa only [resultEq] using recorded
 
+/-- An expression statement changes no visible binder stack. -/
+theorem inferStatementFuel_expression_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {expression : Syntax.Expr}
+    {trailingSemicolon : Bool} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value =
+      .expression expression trailingSemicolon)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨inferred, expressionState, expressionSuccess, resultEq, _⟩ :=
+    inferStatementFuel_success_expression_facts statementEq allocationEq
+      success
+  have recorded := ((origins.allocateStatementId allocationEq).inferExprFuel
+    expressionSuccess).recordNode (.statement {
+      id, span := statement.span,
+      type := if trailingSemicolon then .unit else inferred.type,
+      form := .expression inferred.id trailingSemicolon
+    })
+  simpa only [resultEq] using recorded
+
+/-- A value assignment preserves the lexical stack through its exact place
+and right-hand-side traversal. -/
+theorem inferStatementFuel_assignValue_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression value : Syntax.Expr}
+    {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : Ty} {initial allocated : State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {wholeSource : TypedSource}
+    (statementEq : statement.value =
+      .assignValue targetExpression operator value)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨assignment, inferred, assignmentState, assignmentSuccess,
+      resultEq, _⟩ :=
+    inferStatementFuel_success_assignValue_facts statementEq allocationEq
+      success
+  have recorded :=
+    ((origins.allocateStatementId allocationEq).inferAssignedValueFuel
+      assignmentSuccess).recordNode (.statement {
+        id, span := statement.span, type := .unit,
+        form := .assignValue assignment operator.value inferred.id
+      })
+  simpa only [resultEq] using recorded
+
+/-- Bit-not assignment preserves the lexical stack through its exact place
+traversal and subsequent `Word` unification. -/
+theorem inferStatementFuel_assignBitNot_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
+    {operatorSpan : Syntax.SourceSpan} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value =
+      .assignBitNot targetExpression operatorSpan)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, _,
+      resultEq, _⟩ :=
+    inferStatementFuel_success_assignBitNot_facts statementEq allocationEq
+      success
+  have recorded :=
+    (((origins.allocateStatementId allocationEq).inferPlaceFuel
+      placeSuccess).unify unifySuccess).recordNode (.statement {
+        id, span := statement.span, type := .unit,
+        form := .assignBitNot {
+          target := { place with type := unified.resolve place.type }
+        }
+      })
+  simpa only [resultEq] using recorded
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
