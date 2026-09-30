@@ -544,7 +544,7 @@ private theorem commitCoercionPlan_integerPatterns_eq
 /-- Expected-type fitting and recording do not change numeric-pattern
 origins.  This local public-facing projection mirrors the corresponding
 frontend preservation fact, which is intentionally private there. -/
-private theorem recordExpressionWithExpected_integerPatterns_eq
+theorem recordExpressionWithExpected_integerPatterns_eq
     {inferenceContext : Frontend.SourceInference.Context}
     {source : Syntax.Expr} {id : ExpressionId}
     {type : TypeSystem.Ty} {form : ExpressionForm}

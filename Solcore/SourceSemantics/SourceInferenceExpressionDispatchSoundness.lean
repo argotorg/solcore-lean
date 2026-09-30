@@ -46,6 +46,8 @@ structure ExpressionChildInferenceProvenance
     initial = .ok (inferred, final)
   sourceExtension : TypingSourceExtends (final.toTypedSource roots)
     ambientNodeSource
+  integerPatternsSubset :
+    final.integerPatterns ⊆ evidenceState.integerPatterns
   integerLiteralsSubset :
     final.integerLiterals ⊆ evidenceState.integerLiterals
   requirementsSubset : final.requirements ⊆ evidenceState.requirements
@@ -178,6 +180,15 @@ private theorem fresh_eq_integerLiterals_eq
   rw [← finalEq]
   rfl
 
+private theorem fresh_eq_integerPatterns_eq
+    {initial final : Frontend.SourceInference.State}
+    {type : TypeSystem.Ty}
+    (success : initial.fresh = (type, final)) :
+    final.integerPatterns = initial.integerPatterns := by
+  have finalEq : initial.fresh.2 = final := congrArg Prod.snd success
+  rw [← finalEq]
+  rfl
+
 private theorem fresh_eq_requirements_eq
     {initial final : Frontend.SourceInference.State}
     {type : TypeSystem.Ty}
@@ -284,6 +295,8 @@ theorem
     (initialBelow : initial.NodesBelowNextOccurrence)
     (resultExtension : TypingSourceExtends (final.toTypedSource roots)
       ambientNodeSource)
+    (integerPatternsSubset :
+      final.integerPatterns ⊆ evidenceState.integerPatterns)
     (integerLiteralsSubset :
       final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements)
@@ -340,6 +353,12 @@ theorem
                     List.Subset.trans
                       (Detail.inferExprsFuel_integerLiterals_subset tailSuccess)
                       integerLiteralsSubset
+                  have headIntegerPatternsSubset :
+                      headState.integerPatterns ⊆
+                        evidenceState.integerPatterns :=
+                    List.Subset.trans
+                      (Detail.inferExprsFuel_integerPatterns_subset tailSuccess)
+                      integerPatternsSubset
                   have headRequirementsSubset :
                       headState.requirements ⊆ evidenceState.requirements :=
                     List.Subset.trans
@@ -356,6 +375,7 @@ theorem
                     initialNodesBelow := initialBelow
                     success := headSuccess
                     sourceExtension := headExtension
+                    integerPatternsSubset := headIntegerPatternsSubset
                     integerLiteralsSubset := headIntegerLiteralsSubset
                     requirementsSubset := headRequirementsSubset
                   }
@@ -367,6 +387,7 @@ theorem
                     (fuel_lt := Nat.lt_trans (Nat.lt_succ_self fuel) fuel_lt)
                     (initialBelow := headBelow)
                     (resultExtension := resultExtension)
+                    (integerPatternsSubset := integerPatternsSubset)
                     (integerLiteralsSubset := integerLiteralsSubset)
                     (requirementsSubset := requirementsSubset)
                     tailSuccess
@@ -391,6 +412,8 @@ theorem
     (initialBelow : initial.NodesBelowNextOccurrence)
     (resultExtension : TypingSourceExtends (final.toTypedSource roots)
       ambientNodeSource)
+    (integerPatternsSubset :
+      final.integerPatterns ⊆ evidenceState.integerPatterns)
     (integerLiteralsSubset :
       final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements)
@@ -451,6 +474,13 @@ theorem
                       (Detail.inferConstructorArgumentsFuel_integerLiterals_subset
                         tailSuccess)
                       integerLiteralsSubset
+                  have headIntegerPatternsSubset :
+                      headState.integerPatterns ⊆
+                        evidenceState.integerPatterns :=
+                    List.Subset.trans
+                      (Detail.inferConstructorArgumentsFuel_integerPatterns_subset
+                        tailSuccess)
+                      integerPatternsSubset
                   have headRequirementsSubset :
                       headState.requirements ⊆ evidenceState.requirements :=
                     List.Subset.trans
@@ -468,6 +498,7 @@ theorem
                     initialNodesBelow := initialBelow
                     success := headSuccess
                     sourceExtension := headExtension
+                    integerPatternsSubset := headIntegerPatternsSubset
                     integerLiteralsSubset := headIntegerLiteralsSubset
                     requirementsSubset := headRequirementsSubset
                   }
@@ -478,6 +509,7 @@ theorem
                   have tailBases := induction
                     (initialBelow := headBelow)
                     (resultExtension := resultExtension)
+                    (integerPatternsSubset := integerPatternsSubset)
                     (integerLiteralsSubset := integerLiteralsSubset)
                     (requirementsSubset := requirementsSubset)
                     tailSuccess
@@ -518,6 +550,8 @@ theorem
       final.inference.substitution)
     (resultExtension : TypingSourceExtends (final.toTypedSource roots)
       (evidenceState.toTypedSource roots))
+    (integerPatternsSubset :
+      final.integerPatterns ⊆ evidenceState.integerPatterns)
     (integerLiteralsSubset :
       final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements)
@@ -622,6 +656,13 @@ theorem
                       (Detail.inferConstructorArgumentsFuel_integerLiterals_subset
                         tailSuccess)
                       integerLiteralsSubset
+                  have headIntegerPatternsSubset :
+                      headState.integerPatterns ⊆
+                        evidenceState.integerPatterns :=
+                    List.Subset.trans
+                      (Detail.inferConstructorArgumentsFuel_integerPatterns_subset
+                        tailSuccess)
+                      integerPatternsSubset
                   have headRequirementsSubset :
                       headState.requirements ⊆
                         evidenceState.requirements :=
@@ -640,6 +681,7 @@ theorem
                     initialNodesBelow := initialBelow
                     success := headSuccess
                     sourceExtension := headToEvidence
+                    integerPatternsSubset := headIntegerPatternsSubset
                     integerLiteralsSubset := headIntegerLiteralsSubset
                     requirementsSubset := headRequirementsSubset
                   }
@@ -668,7 +710,8 @@ theorem
                     exact headType
                   have tailTyping := induction
                     headProperties.2.1 tailExpectedBelow headBelow
-                    outerExtension resultExtension integerLiteralsSubset
+                    outerExtension resultExtension integerPatternsSubset
+                    integerLiteralsSubset
                     requirementsSubset tailSuccess
                   exact .cons headExpected tailTyping
 
@@ -811,6 +854,8 @@ theorem
     (nodesBelow : initial.NodesBelowNextOccurrence)
     (parentExtension : TypingSourceExtends
       (resultState.toTypedSource roots) (evidenceState.toTypedSource roots))
+    (parentIntegerPatternsSubset :
+      resultState.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentIntegerLiteralsSubset :
       resultState.integerLiterals ⊆ evidenceState.integerLiterals)
     (parentRequirementsSubset :
@@ -946,6 +991,12 @@ theorem
       apply parentIntegerLiteralsSubset
       rw [Detail.recordExpressionWithExpected_integerLiterals_eq recordSuccess]
       exact member
+    have argumentsIntegerPatternsSubset :
+        argumentsState.integerPatterns ⊆ evidenceState.integerPatterns := by
+      intro origin member
+      apply parentIntegerPatternsSubset
+      rw [recordExpressionWithExpected_integerPatterns_eq recordSuccess]
+      exact member
     have argumentsRequirementsSubset :
         argumentsState.requirements ⊆ evidenceState.requirements :=
       List.Subset.trans
@@ -957,8 +1008,9 @@ theorem
       inferConstructorArgumentsFuel_success_expressionsHaveTypes_under_ambient_bounded
         resources fuel_lt argumentInitialReady signatureFormation
         functionsCanonical payloadAtArgumentInitial nodesAtArgumentInitial
-        outerArguments argumentsToEvidence argumentsIntegerLiteralsSubset
-        argumentsRequirementsSubset childSound sourceBinders signaturesEq
+        outerArguments argumentsToEvidence argumentsIntegerPatternsSubset
+        argumentsIntegerLiteralsSubset argumentsRequirementsSubset childSound
+        sourceBinders signaturesEq
         parametersEq ownerEq residual contextValid argumentsSuccess
     simpa only [← resources.substitution_eq] using
       (recordExpressionWithExpected_success_constructor_expressionTypingBase_scoped
@@ -1073,6 +1125,8 @@ theorem inferExprFuel_success_group_expressionTypingBase_under_ambient_bounded
     (initialBelow : initial.NodesBelowNextOccurrence)
     (parentExtension : TypingSourceExtends
       (result.2.toTypedSource roots) (evidenceState.toTypedSource roots))
+    (parentIntegerPatternsSubset :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentIntegerLiteralsSubset :
       result.2.integerLiterals ⊆ evidenceState.integerLiterals)
     (parentRequirementsSubset :
@@ -1145,6 +1199,12 @@ theorem inferExprFuel_success_group_expressionTypingBase_under_ambient_bounded
     apply parentIntegerLiteralsSubset
     rw [Detail.recordExpressionWithExpected_integerLiterals_eq recorded]
     exact member
+  have innerIntegerPatternsSubset :
+      innerState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    intro origin member
+    apply parentIntegerPatternsSubset
+    rw [recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact member
   have innerRequirementsSubset :
       innerState.requirements ⊆ evidenceState.requirements :=
     List.Subset.trans
@@ -1161,6 +1221,7 @@ theorem inferExprFuel_success_group_expressionTypingBase_under_ambient_bounded
     initialNodesBelow := allocatedBelow
     success := innerSuccess
     sourceExtension := innerToEvidence
+    integerPatternsSubset := innerIntegerPatternsSubset
     integerLiteralsSubset := innerIntegerLiteralsSubset
     requirementsSubset := innerRequirementsSubset
   }
@@ -1460,6 +1521,8 @@ theorem
       expectedType.VariablesBelow allocated.inference.next)
     (parentExtension : TypingSourceExtends
       (result.2.toTypedSource roots) (evidenceState.toTypedSource roots))
+    (parentIntegerPatternsSubset :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentIntegerLiteralsSubset :
       result.2.integerLiterals ⊆ evidenceState.integerLiterals)
     (parentRequirementsSubset :
@@ -1600,6 +1663,27 @@ theorem
     List.Subset.trans
       (Detail.inferExprFuel_integerLiterals_subset thenSuccess)
       thenIntegerLiteralsSubset
+  have unifiedIntegerPatternsSubset :
+      unifiedState.integerPatterns ⊆ result.2.integerPatterns := by
+    intro origin member
+    rw [recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact member
+  have elseIntegerPatternsSubset :
+      elseState.integerPatterns ⊆ result.2.integerPatterns := by
+    intro origin member
+    apply unifiedIntegerPatternsSubset
+    rw [(Detail.unify_integerPatternMetadata_eq unifySuccess).1]
+    exact member
+  have thenIntegerPatternsSubset :
+      thenState.integerPatterns ⊆ result.2.integerPatterns :=
+    List.Subset.trans
+      (Detail.inferExprFuel_integerPatterns_subset elseSuccess)
+      elseIntegerPatternsSubset
+  have conditionIntegerPatternsSubset :
+      conditionState.integerPatterns ⊆ result.2.integerPatterns :=
+    List.Subset.trans
+      (Detail.inferExprFuel_integerPatterns_subset thenSuccess)
+      thenIntegerPatternsSubset
   have unifiedRequirementsSubset :
       unifiedState.requirements ⊆ result.2.requirements :=
     Detail.recordExpressionWithExpected_requirements_subset recorded
@@ -1631,6 +1715,8 @@ theorem
     initialNodesBelow := allocatedBelow
     success := conditionSuccess
     sourceExtension := conditionToEvidence
+    integerPatternsSubset := List.Subset.trans
+      conditionIntegerPatternsSubset parentIntegerPatternsSubset
     integerLiteralsSubset := List.Subset.trans
       conditionIntegerLiteralsSubset parentIntegerLiteralsSubset
     requirementsSubset := List.Subset.trans conditionRequirementsSubset
@@ -1648,6 +1734,8 @@ theorem
     initialNodesBelow := conditionBelow
     success := thenSuccess
     sourceExtension := thenToEvidence
+    integerPatternsSubset := List.Subset.trans
+      thenIntegerPatternsSubset parentIntegerPatternsSubset
     integerLiteralsSubset := List.Subset.trans
       thenIntegerLiteralsSubset parentIntegerLiteralsSubset
     requirementsSubset := List.Subset.trans thenRequirementsSubset
@@ -1665,6 +1753,8 @@ theorem
     initialNodesBelow := thenBelow
     success := elseSuccess
     sourceExtension := elseToEvidence
+    integerPatternsSubset := List.Subset.trans
+      elseIntegerPatternsSubset parentIntegerPatternsSubset
     integerLiteralsSubset := List.Subset.trans
       elseIntegerLiteralsSubset parentIntegerLiteralsSubset
     requirementsSubset := List.Subset.trans elseRequirementsSubset
@@ -1879,6 +1969,8 @@ theorem inferExprFuel_success_index_expressionTypingBase_under_ambient_bounded
       expectedType.VariablesBelow allocated.inference.next)
     (parentExtension : TypingSourceExtends
       (result.2.toTypedSource roots) (evidenceState.toTypedSource roots))
+    (parentIntegerPatternsSubset :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentIntegerLiteralsSubset :
       result.2.integerLiterals ⊆ evidenceState.integerLiterals)
     (parentRequirementsSubset :
@@ -2014,6 +2106,34 @@ theorem inferExprFuel_success_index_expressionTypingBase_under_ambient_bounded
     apply keyIntegerLiteralsSubset
     rw [fresh_eq_integerLiterals_eq keyFresh]
     exact member
+  have indexIntegerPatternsSubset :
+      indexState.integerPatterns ⊆ result.2.integerPatterns := by
+    intro origin member
+    rw [recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact member
+  have mappingIntegerPatternsSubset :
+      mappingState.integerPatterns ⊆ result.2.integerPatterns :=
+    List.Subset.trans
+      (Detail.inferExprFuel_integerPatterns_subset indexSuccess)
+      indexIntegerPatternsSubset
+  have valueIntegerPatternsSubset :
+      valueState.integerPatterns ⊆ result.2.integerPatterns := by
+    intro origin member
+    apply mappingIntegerPatternsSubset
+    rw [(Detail.unify_integerPatternMetadata_eq mappingSuccess).1]
+    exact member
+  have keyIntegerPatternsSubset :
+      keyState.integerPatterns ⊆ result.2.integerPatterns := by
+    intro origin member
+    apply valueIntegerPatternsSubset
+    rw [fresh_eq_integerPatterns_eq valueFresh]
+    exact member
+  have baseIntegerPatternsSubset :
+      baseState.integerPatterns ⊆ result.2.integerPatterns := by
+    intro origin member
+    apply keyIntegerPatternsSubset
+    rw [fresh_eq_integerPatterns_eq keyFresh]
+    exact member
   have indexRequirementsSubset :
       indexState.requirements ⊆ result.2.requirements :=
     Detail.recordExpressionWithExpected_requirements_subset recorded
@@ -2052,6 +2172,8 @@ theorem inferExprFuel_success_index_expressionTypingBase_under_ambient_bounded
     initialNodesBelow := allocatedBelow
     success := baseSuccess
     sourceExtension := baseToEvidence
+    integerPatternsSubset := List.Subset.trans baseIntegerPatternsSubset
+      parentIntegerPatternsSubset
     integerLiteralsSubset := List.Subset.trans baseIntegerLiteralsSubset
       parentIntegerLiteralsSubset
     requirementsSubset := List.Subset.trans baseRequirementsSubset
@@ -2069,6 +2191,8 @@ theorem inferExprFuel_success_index_expressionTypingBase_under_ambient_bounded
     initialNodesBelow := mappingBelow
     success := indexSuccess
     sourceExtension := indexToEvidence
+    integerPatternsSubset := List.Subset.trans indexIntegerPatternsSubset
+      parentIntegerPatternsSubset
     integerLiteralsSubset := List.Subset.trans indexIntegerLiteralsSubset
       parentIntegerLiteralsSubset
     requirementsSubset := List.Subset.trans indexRequirementsSubset
@@ -2281,6 +2405,8 @@ theorem inferExprFuel_success_tuple_expressionTypingBase_under_ambient_bounded
     (initialBelow : initial.NodesBelowNextOccurrence)
     (parentExtension : TypingSourceExtends
       (result.2.toTypedSource roots) (evidenceState.toTypedSource roots))
+    (parentIntegerPatternsSubset :
+      result.2.integerPatterns ⊆ evidenceState.integerPatterns)
     (parentIntegerLiteralsSubset :
       result.2.integerLiterals ⊆ evidenceState.integerLiterals)
     (parentRequirementsSubset :
@@ -2356,6 +2482,12 @@ theorem inferExprFuel_success_tuple_expressionTypingBase_under_ambient_bounded
     apply parentIntegerLiteralsSubset
     rw [Detail.recordExpressionWithExpected_integerLiterals_eq recorded]
     exact member
+  have elementsIntegerPatternsSubset :
+      elementsState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    intro origin member
+    apply parentIntegerPatternsSubset
+    rw [recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact member
   have elementsRequirementsSubset :
       elementsState.requirements ⊆ evidenceState.requirements :=
     List.Subset.trans
@@ -2366,7 +2498,7 @@ theorem inferExprFuel_success_tuple_expressionTypingBase_under_ambient_bounded
       finalized.substitution inferredElements :=
     inferExprsFuel_success_argumentTypingBasesValid_under_ambient_bounded
       (roots := roots) (Nat.lt_succ_self fuel) allocatedBelow
-      elementsToEvidence elementsIntegerLiteralsSubset
+      elementsToEvidence elementsIntegerPatternsSubset elementsIntegerLiteralsSubset
       elementsRequirementsSubset childSound elementsSuccess
   have elementsType : ExpressionsHaveTypes finalized.typedSource active
       (inferredElements.map (·.id))

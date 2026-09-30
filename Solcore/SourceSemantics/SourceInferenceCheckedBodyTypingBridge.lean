@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.SourceProgramCheckingSoundness
+import Solcore.SourceSemantics.SourceInferenceUnannotatedLetCertificate
 
 /-!
 The final bridge from recursive statement-inference soundness to the
@@ -130,6 +131,7 @@ def InferStatementsFuelSoundness (fuel : Nat) : Prop :=
     SignatureParametersWellFormed inferenceContext.scope.genericOwner
       inferenceContext.typeParameters →
     ActiveLocalContextInvariant initial finalized.substitution semanticContext →
+    ActiveSchemeQuantifierIsolation initial →
     initial.InferenceReady →
     expectedReturn.VariablesBelow initial.inference.next →
     initial.LocalBindersBelowNextLocal →
@@ -234,6 +236,11 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
       exact inputExtension
     · apply ActiveLocalFormation.ofMonoBindersExtend
       exact inputExtension
+  have initialSchemeIsolation : ActiveSchemeQuantifierIsolation initial := by
+    apply activeSchemeQuantifierIsolation_initial_mono
+    intro entry member
+    rcases List.mem_map.mp member with ⟨parameter, _, rfl⟩
+    rfl
   have initialReady : initial.InferenceReady := by
     simpa only [initial] using State.InferenceReady.initial declaration.id
       ((signature.parameterNames.zip signature.parameterTypes).map
@@ -430,7 +437,8 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
     recursiveSound inferred finalResources signatureFormation functionsCanonical
       catalog (by simpa [ProgramTypeScope.ofDeclaration, declarationIdEq]
         using signatureParameters)
-      initialInvariant initialReady returnBelow initialBindersBelow initialBelow
+      initialInvariant initialSchemeIsolation initialReady returnBelow
+      initialBindersBelow initialBelow
       substitutionExtends
       rawSourceExtends
       (by simpa only [checkedEq] using sourceExtends)

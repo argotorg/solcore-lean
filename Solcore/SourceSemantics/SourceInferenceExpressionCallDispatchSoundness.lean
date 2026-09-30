@@ -318,6 +318,8 @@ theorem
     (roots : List NodeId := [])
     (fuel_lt : fuel < parentFuel)
     (initialBelow : initial.NodesBelowNextOccurrence)
+    (integerPatternsSubset :
+      final.integerPatterns ⊆ evidenceState.integerPatterns)
     (integerLiteralsSubset :
       final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements)
@@ -374,6 +376,12 @@ theorem
                     List.Subset.trans
                       (Detail.inferExprsFuel_integerLiterals_subset tailSuccess)
                       integerLiteralsSubset
+                  have headIntegerPatternsSubset :
+                      headState.integerPatterns ⊆
+                        evidenceState.integerPatterns :=
+                    List.Subset.trans
+                      (Detail.inferExprsFuel_integerPatterns_subset tailSuccess)
+                      integerPatternsSubset
                   have headRequirementsSubset :
                       headState.requirements ⊆ evidenceState.requirements :=
                     List.Subset.trans
@@ -392,6 +400,7 @@ theorem
                     initialNodesBelow := initialBelow
                     success := headSuccess
                     sourceExtension := headToFinal
+                    integerPatternsSubset := headIntegerPatternsSubset
                     integerLiteralsSubset := headIntegerLiteralsSubset
                     requirementsSubset := headRequirementsSubset
                   }
@@ -410,6 +419,7 @@ theorem
                   have tailBases := induction
                     (fuel_lt := Nat.lt_trans (Nat.lt_succ_self fuel) fuel_lt)
                     (initialBelow := headBelow)
+                    (integerPatternsSubset := integerPatternsSubset)
                     (integerLiteralsSubset := integerLiteralsSubset)
                     (requirementsSubset := requirementsSubset)
                     (retained := by
@@ -445,6 +455,8 @@ theorem
     (initialBelow : initial.NodesBelowNextOccurrence)
     (initialInvariant : ActiveLocalContextInvariant initial outer target)
     (initialBindersBelow : initial.LocalBindersBelowNextLocal)
+    (integerPatternsSubset :
+      final.integerPatterns ⊆ evidenceState.integerPatterns)
     (integerLiteralsSubset :
       final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements)
@@ -506,6 +518,12 @@ theorem
                     List.Subset.trans
                       (Detail.inferExprsFuel_integerLiterals_subset tailSuccess)
                       integerLiteralsSubset
+                  have headIntegerPatternsSubset :
+                      headState.integerPatterns ⊆
+                        evidenceState.integerPatterns :=
+                    List.Subset.trans
+                      (Detail.inferExprsFuel_integerPatterns_subset tailSuccess)
+                      integerPatternsSubset
                   have headRequirementsSubset :
                       headState.requirements ⊆ evidenceState.requirements :=
                     List.Subset.trans
@@ -524,6 +542,7 @@ theorem
                     initialNodesBelow := initialBelow
                     success := headSuccess
                     sourceExtension := headToFinal
+                    integerPatternsSubset := headIntegerPatternsSubset
                     integerLiteralsSubset := headIntegerLiteralsSubset
                     requirementsSubset := headRequirementsSubset
                   }
@@ -573,6 +592,7 @@ theorem
                     (initialBelow := headBelow)
                     (initialInvariant := headInvariant)
                     (initialBindersBelow := headBindersBelow)
+                    (integerPatternsSubset := integerPatternsSubset)
                     (integerLiteralsSubset := integerLiteralsSubset)
                     (requirementsSubset := requirementsSubset)
                     (retained := by
@@ -636,6 +656,8 @@ theorem
     (expectedBelow : ∀ expectedType ∈ expected,
       expectedType.VariablesBelow argumentInitial.inference.next)
     (nodesBelow : argumentInitial.NodesBelowNextOccurrence)
+    (argumentIntegerPatternsSubset :
+      argumentState.integerPatterns ⊆ evidenceState.integerPatterns)
     (argumentIntegerSubset :
       argumentState.integerLiterals ⊆ evidenceState.integerLiterals)
     (argumentRequirementsSubset :
@@ -736,9 +758,9 @@ theorem
     · exact requirementMember
   have bases :=
     inferExprsFuel_success_argumentTypingBasesValid_under_retained_bounded
-      (roots := roots) fuel_lt nodesBelow argumentIntegerSubset
-      argumentRequirementsSubset retainedAtArguments childSound
-      argumentsSuccess
+      (roots := roots) fuel_lt nodesBelow argumentIntegerPatternsSubset
+      argumentIntegerSubset argumentRequirementsSubset retainedAtArguments
+      childSound argumentsSuccess
   exact
     selectFunctionCandidateFrom_recordSelectedCall_success_expressionTypingBase_scoped_of_retained
       selectionSuccess recordEq candidatesSubset bases argumentIdsUnique
@@ -801,6 +823,8 @@ theorem
       later.inference.substitution active)
     (argumentInitialBindersBelow :
       argumentInitial.LocalBindersBelowNextLocal)
+    (argumentIntegerPatternsSubset :
+      argumentState.integerPatterns ⊆ evidenceState.integerPatterns)
     (argumentIntegerSubset :
       argumentState.integerLiterals ⊆ evidenceState.integerLiterals)
     (argumentRequirementsSubset :
@@ -945,9 +969,9 @@ theorem
     inferExprsFuel_success_argumentTypingBasesValid_under_covered_retained_bounded
       (roots := roots) fuel_lt argumentInitialReady signatureFormation
       functionsCanonical nodesBelow argumentInitialInvariant
-      argumentInitialBindersBelow argumentIntegerSubset
-      argumentRequirementsSubset retainedAtArguments childrenRetainedAtArguments
-      coveredArguments childSound argumentsSuccess
+      argumentInitialBindersBelow argumentIntegerPatternsSubset
+      argumentIntegerSubset argumentRequirementsSubset retainedAtArguments
+      childrenRetainedAtArguments coveredArguments childSound argumentsSuccess
   exact
     selectFunctionCandidateFrom_recordSelectedCall_success_expressionTypingBase_scoped_of_retained
       selectionSuccess recordEq candidatesSubset bases argumentIdsUnique

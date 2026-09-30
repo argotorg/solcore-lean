@@ -41,12 +41,16 @@ theorem inferExprsFuel_inferExprFuel_success_childrenHaveTypes_under_ambient_bou
       (argumentState.toTypedSource roots) (finalInput.toTypedSource roots))
     (calleeToFinalInput : TypingSourceExtends
       (calleeState.toTypedSource roots) (finalInput.toTypedSource roots))
+    (argumentIntegerPatternsSubset :
+      argumentState.integerPatterns ⊆ finalInput.integerPatterns)
     (argumentIntegerSubset :
       argumentState.integerLiterals ⊆ finalInput.integerLiterals)
     (argumentRequirementsSubset :
       argumentState.requirements ⊆ finalInput.requirements)
     (calleeIntegerSubset :
       calleeState.integerLiterals ⊆ finalInput.integerLiterals)
+    (calleeIntegerPatternsSubset :
+      calleeState.integerPatterns ⊆ finalInput.integerPatterns)
     (calleeRequirementsSubset :
       calleeState.requirements ⊆ finalInput.requirements)
     (childSound : ExpressionChildTypingCallback parentFuel inferenceContext
@@ -71,8 +75,8 @@ theorem inferExprsFuel_inferExprFuel_success_childrenHaveTypes_under_ambient_bou
   have argumentBases :=
     inferExprsFuel_success_argumentTypingBasesValid_under_ambient_bounded
       (roots := roots) fuel_lt initialBelow argumentToFinalInput
-      argumentIntegerSubset argumentRequirementsSubset childSound
-      argumentsSuccess
+      argumentIntegerPatternsSubset argumentIntegerSubset
+      argumentRequirementsSubset childSound argumentsSuccess
   have argumentsTyped :=
     resources.expressionsHaveTypes_of_argumentTypingBases_prefix
       argumentBases argumentToFinalInput binders signaturesEq parametersEq
@@ -92,6 +96,7 @@ theorem inferExprsFuel_inferExprFuel_success_childrenHaveTypes_under_ambient_bou
     initialNodesBelow := argumentStateBelow
     success := calleeSuccess
     sourceExtension := calleeToFinalInput
+    integerPatternsSubset := calleeIntegerPatternsSubset
     integerLiteralsSubset := calleeIntegerSubset
     requirementsSubset := calleeRequirementsSubset
   }
@@ -133,12 +138,16 @@ theorem inferExprsFuel_recordBuiltinFunctionCall_success_expressionTypingBase_un
       (argumentState.toTypedSource roots) (resultState.toTypedSource roots))
     (resultToEvidence : TypingSourceExtends
       (resultState.toTypedSource roots) (evidenceState.toTypedSource roots))
+    (argumentIntegerPatternsSubset :
+      argumentState.integerPatterns ⊆ resultState.integerPatterns)
     (argumentIntegerSubset :
       argumentState.integerLiterals ⊆ resultState.integerLiterals)
     (argumentRequirementsSubset :
       argumentState.requirements ⊆ resultState.requirements)
     (resultIntegerSubset :
       resultState.integerLiterals ⊆ evidenceState.integerLiterals)
+    (resultIntegerPatternsSubset :
+      resultState.integerPatterns ⊆ evidenceState.integerPatterns)
     (resultRequirementsSubset :
       resultState.requirements ⊆ evidenceState.requirements)
     (childSound : ExpressionChildTypingCallback parentFuel inferenceContext
@@ -165,6 +174,8 @@ theorem inferExprsFuel_recordBuiltinFunctionCall_success_expressionTypingBase_un
   have argumentBases :=
     inferExprsFuel_success_argumentTypingBasesValid_under_ambient_bounded
       (roots := roots) fuel_lt initialBelow argumentToEvidence
+      (List.Subset.trans argumentIntegerPatternsSubset
+        resultIntegerPatternsSubset)
       (List.Subset.trans argumentIntegerSubset resultIntegerSubset)
       (List.Subset.trans argumentRequirementsSubset resultRequirementsSubset)
       childSound
@@ -278,6 +289,7 @@ theorem
     inferExprsFuel_success_argumentTypingBasesValid_under_ambient_bounded
       (roots := roots) fuel_lt nodesBelow
       (TypingSourceExtends.refl _) (by intro _ member; exact member)
+      (by intro _ member; exact member)
       (by intro _ member; exact member) childSound argumentsSuccess
   have argumentIdsUnique :=
     Detail.inferExprsFuel_success_ids_nodup argumentsSuccess
@@ -367,12 +379,16 @@ theorem
       (argumentState.toTypedSource roots) (finalInput.toTypedSource roots))
     (calleeToFinalInput : TypingSourceExtends
       (calleeState.toTypedSource roots) (finalInput.toTypedSource roots))
+    (argumentIntegerPatternsSubset :
+      argumentState.integerPatterns ⊆ finalInput.integerPatterns)
     (argumentIntegerSubset :
       argumentState.integerLiterals ⊆ finalInput.integerLiterals)
     (argumentRequirementsSubset :
       argumentState.requirements ⊆ finalInput.requirements)
     (calleeIntegerSubset :
       calleeState.integerLiterals ⊆ finalInput.integerLiterals)
+    (calleeIntegerPatternsSubset :
+      calleeState.integerPatterns ⊆ finalInput.integerPatterns)
     (calleeRequirementsSubset :
       calleeState.requirements ⊆ finalInput.requirements)
     (childSound : ExpressionChildTypingCallback parentFuel inferenceContext
@@ -427,10 +443,10 @@ theorem
   obtain ⟨argumentTyping, calleeTyping⟩ :=
     inferExprsFuel_inferExprFuel_success_childrenHaveTypes_under_ambient_bounded
       fuel_lt argumentsSuccess calleeSuccess resources initialBelow
-      argumentToFinalInput calleeToFinalInput argumentIntegerSubset
-      argumentRequirementsSubset calleeIntegerSubset
-      calleeRequirementsSubset childSound binders signaturesEq parametersEq
-      ownerEq residual contextValid
+      argumentToFinalInput calleeToFinalInput argumentIntegerPatternsSubset
+      argumentIntegerSubset argumentRequirementsSubset calleeIntegerSubset
+      calleeIntegerPatternsSubset calleeRequirementsSubset childSound binders
+      signaturesEq parametersEq ownerEq residual contextValid
   have argumentTypingAtLater : ExpressionsHaveTypes ledgerSource active
       (arguments.map (·.id))
       (arguments.map fun argument =>

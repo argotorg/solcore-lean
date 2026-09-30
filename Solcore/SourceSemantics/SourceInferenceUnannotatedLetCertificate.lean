@@ -767,6 +767,23 @@ theorem rangeAvoidsVariablesOn_compose_of_newerRangeAvoids
       exact newerAvoids.apply_variables_outside_older_domain
         olderReplacement olderRangeOutside metavariable occurs
 
+/-- The result of resolving a type with a solved substitution never consults
+that substitution again.  Thus a second resolve needs no new relevance-range
+premise, even if unrelated entries contain protected variables. -/
+theorem rangeAvoidsVariablesOn_resolved_of_solved
+    {substitution : Substitution} {next : Nat}
+    (solved : substitution.SolvedBelow next)
+    (guarded : List TypeVarId) (type : Ty) :
+    substitution.RangeAvoidsVariablesOn guarded
+      (substitution.apply type) := by
+  intro candidate member replacement found _ _
+  have candidateDomain : candidate ∈ substitution.domain := by
+    exact List.mem_map.mpr ⟨(candidate, replacement),
+      Substitution.lookup?_eq_some_mem found, rfl⟩
+  exact False.elim
+    ((solved.apply_variables_outside_domain type candidate member)
+      candidateDomain)
+
 /-- Unification cannot reintroduce a protected old quantifier in its range
 when both normalized inputs already avoid it.  The checker composes its new
 solution with the old one; both parts preserve avoidance by the existing
@@ -846,6 +863,492 @@ its dummy range is never applied. -/
 def activeSchemeQuantifiers
     (state : Frontend.SourceInference.State) : List TypeVarId :=
   state.localBinders.flatMap fun binder => binder.scheme.quantified
+
+/-- A prior generalized variable is private to its scheme: no active lexical
+binder may expose it among its *unquantified* free variables.  This is the
+minimal lexical half of the old-quantifier non-escape invariant used by local
+identifier inference.  It is stronger than the allocator bound alone. -/
+def ActiveSchemeQuantifierIsolation
+    (state : Frontend.SourceInference.State) : Prop :=
+  ∀ binder, binder ∈ state.localBinders →
+    ∀ metavariable,
+      metavariable ∈ activeSchemeQuantifiers state →
+        metavariable ∉ binder.scheme.freeVariables
+
+theorem activeSchemeQuantifierIsolation_transport
+    {before after : Frontend.SourceInference.State}
+    (isolated : ActiveSchemeQuantifierIsolation before)
+    (bindersEq : after.localBinders = before.localBinders) :
+    ActiveSchemeQuantifierIsolation after := by
+  simpa [ActiveSchemeQuantifierIsolation, activeSchemeQuantifiers,
+    bindersEq] using isolated
+
+theorem activeSchemeQuantifierIsolation_lookupBinder
+    {state : Frontend.SourceInference.State}
+    {name : String} {binder : TypedBinder}
+    (isolated : ActiveSchemeQuantifierIsolation state)
+    (found : state.lookupBinder? name = some binder) :
+    ∀ metavariable,
+      metavariable ∈ binder.scheme.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers state := by
+  intro metavariable free quantified
+  exact isolated binder
+    (Frontend.SourceInference.State.lookupBinder?_eq_some_facts found).1
+    metavariable quantified free
+
+theorem activeSchemeQuantifierIsolation_allocateExpressionId
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    (isolated : ActiveSchemeQuantifierIsolation initial)
+    (allocationEq : initial.allocateExpressionId = (id, allocated)) :
+    ActiveSchemeQuantifierIsolation allocated := by
+  apply activeSchemeQuantifierIsolation_transport isolated
+  have projection := congrArg
+    (fun pair : ExpressionId × Frontend.SourceInference.State =>
+      pair.2.localBinders) allocationEq
+  change initial.localBinders = allocated.localBinders at projection
+  exact projection.symm
+
+theorem allocateExpressionId_inferenceNext_eq
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId}
+    (allocationEq : initial.allocateExpressionId = (id, allocated)) :
+    allocated.inference.next = initial.inference.next := by
+  have projection := congrArg
+    (fun pair : ExpressionId × Frontend.SourceInference.State =>
+      pair.2.inference.next) allocationEq
+  change initial.inference.next = allocated.inference.next at projection
+  exact projection.symm
+
+theorem activeSchemeQuantifierIsolation_allocateStatementId
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId}
+    (isolated : ActiveSchemeQuantifierIsolation initial)
+    (allocationEq : initial.allocateStatementId = (id, allocated)) :
+    ActiveSchemeQuantifierIsolation allocated := by
+  apply activeSchemeQuantifierIsolation_transport isolated
+  have projection := congrArg
+    (fun pair : StatementId × Frontend.SourceInference.State =>
+      pair.2.localBinders) allocationEq
+  change initial.localBinders = allocated.localBinders at projection
+  exact projection.symm
+
+/-- Entering a new binder preserves lexical quantifier isolation when its
+free variables avoid old quantifiers and its new quantifiers avoid every
+older binder's free variables.  The same-binder case is automatic from the
+definition of `Scheme.freeVariables`. -/
+theorem activeSchemeQuantifierIsolation_allocateBinder
+    (state : Frontend.SourceInference.State)
+    (name : String) (scheme : Scheme)
+    (span : Option Syntax.SourceSpan) (comptime : Bool)
+    (requirements : List LocalSchemeRequirement)
+    (isolated : ActiveSchemeQuantifierIsolation state)
+    (newFreeOutsideOld : ∀ metavariable,
+      metavariable ∈ scheme.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers state)
+    (newQuantifiedOutsideOld : ∀ metavariable,
+      metavariable ∈ scheme.quantified →
+        ∀ binder, binder ∈ state.localBinders →
+          metavariable ∉ binder.scheme.freeVariables) :
+    ActiveSchemeQuantifierIsolation
+      (state.allocateBinder name scheme span comptime requirements).2 := by
+  intro binder binderMember metavariable quantifiedMember
+  let freshBinder :=
+    (state.allocateBinder name scheme span comptime requirements).1
+  have binderCases : binder = freshBinder ∨
+      binder ∈ state.localBinders := by
+    simpa [freshBinder, Frontend.SourceInference.State.allocateBinder]
+      using binderMember
+  have quantifiedCases : metavariable ∈ scheme.quantified ∨
+      metavariable ∈ activeSchemeQuantifiers state := by
+    simpa [activeSchemeQuantifiers,
+      Frontend.SourceInference.State.allocateBinder] using quantifiedMember
+  rcases binderCases with rfl | oldBinder
+  · rcases quantifiedCases with newQuantified | oldQuantified
+    · intro free
+      have freeScheme : metavariable ∈ scheme.freeVariables := by
+        simpa [freshBinder, Frontend.SourceInference.State.allocateBinder]
+          using free
+      simp [Scheme.freeVariables, newQuantified] at freeScheme
+    · intro free
+      exact newFreeOutsideOld metavariable (by
+        simpa [freshBinder, Frontend.SourceInference.State.allocateBinder]
+          using free) oldQuantified
+  · rcases quantifiedCases with newQuantified | oldQuantified
+    · exact newQuantifiedOutsideOld metavariable newQuantified binder
+        oldBinder
+    · exact isolated binder oldBinder metavariable oldQuantified
+
+/-- A pattern binder is monomorphic.  Its allocation preserves isolation
+exactly when its resolved body avoids the quantifiers already active in the
+arm scope.  Monomorphic allocation by itself is not enough: an arbitrary
+expected pattern type could mention one of those old quantified variables. -/
+theorem activeSchemeQuantifierIsolation_allocateMonoBinder
+    (state : Frontend.SourceInference.State)
+    (name : String) (type : Ty)
+    (span : Option Syntax.SourceSpan)
+    (isolated : ActiveSchemeQuantifierIsolation state)
+    (typeAvoidsOld : ∀ metavariable,
+      metavariable ∈ type.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers state) :
+    ActiveSchemeQuantifierIsolation
+      (state.allocateBinder name (.mono type) span false []).2 := by
+  apply activeSchemeQuantifierIsolation_allocateBinder state name (.mono type)
+    span false [] isolated
+  · simpa [Scheme.freeVariables, Scheme.mono] using typeAvoidsOld
+  · intro metavariable quantified
+    simp [Scheme.mono] at quantified
+
+/-- The checker starts ordinary body inference with monomorphic parameters,
+so the lexical quantifier-isolation invariant is initially vacuous. -/
+theorem activeSchemeQuantifierIsolation_initial_mono
+    (owner : Resolved.DeclarationId) (locals : Environment)
+    (inputComptime : List Bool)
+    (monomorphic : ∀ entry, entry ∈ locals → entry.2.quantified = []) :
+    ActiveSchemeQuantifierIsolation
+      (Frontend.SourceInference.State.initial owner locals inputComptime) := by
+  intro _ _ metavariable quantified
+  rcases List.mem_flatMap.mp quantified with
+    ⟨binder, binderMember, rawQuantified⟩
+  rw [← Frontend.SourceInference.State.initial_inputs_eq_localBinders,
+    Frontend.SourceInference.State.initial_inputs_definition] at binderMember
+  obtain ⟨index, indexLt, binderEq⟩ :=
+    List.exists_of_mem_mapIdx binderMember
+  subst binder
+  have noQuantified : locals[index].2.quantified = [] :=
+    monomorphic locals[index] (List.getElem_mem indexLt)
+  simp [noQuantified] at rawQuantified
+
+/-- A scheme variable outside the outer substitution's domain remains free
+after applying that substitution to the scheme.  Restricting the substitution
+at quantified variables cannot remove an originally unquantified variable. -/
+theorem schemeFreeVariable_survives_outside_domain
+    (substitution : Substitution) (scheme : Scheme)
+    {metavariable : TypeVarId}
+    (free : metavariable ∈ scheme.freeVariables)
+    (absent : metavariable ∉ substitution.domain) :
+    metavariable ∈ (scheme.apply substitution).freeVariables := by
+  have bodyFree : metavariable ∈ scheme.body.freeVariables :=
+    (List.mem_filter.mp free).1
+  have notQuantified : metavariable ∉ scheme.quantified := by
+    have selected := (List.mem_filter.mp free).2
+    intro quantified
+    simp [quantified] at selected
+  have restrictedAbsent : metavariable ∉
+      (substitution.without scheme.quantified).domain := by
+    intro restrictedMember
+    rcases List.mem_map.mp restrictedMember with
+      ⟨entry, entryMember, keyEq⟩
+    exact absent (List.mem_map.mpr
+      ⟨entry, Substitution.mem_of_mem_without entryMember, keyEq⟩)
+  have appliedFree :=
+    FlexibleSubstitution.Substitution.mem_freeVariables_apply_of_not_mem_domain
+      (substitution.without scheme.quantified) restrictedAbsent bodyFree
+  apply List.mem_filter.mpr
+  exact ⟨by simpa [Scheme.apply] using appliedFree, by
+    simp [notQuantified]⟩
+
+/-- A variable selected for executable generalization cannot have been an
+unquantified free variable of any older lexical binder.  The crucial facts
+are that `generalizeValue` receives the already-substituted binder
+environment, and that the value type was resolved by a solved substitution.
+This is the new-quantifier/old-binder half of lexical isolation. -/
+theorem generalizeValue_quantified_outside_oldBinderFree
+    (state : Frontend.SourceInference.State)
+    (locals : Environment) (requirementStart : Nat) (valueType : Ty)
+    (localsEq : locals =
+      state.binderEnvironment.apply state.inference.substitution)
+    (valueOutsideDomain : ∀ metavariable,
+      metavariable ∈ valueType.freeVariables →
+        metavariable ∉ state.inference.substitution.domain) :
+    ∀ metavariable,
+      metavariable ∈
+        (Detail.generalizeValue state locals requirementStart valueType
+          ).scheme.quantified →
+        ∀ binder, binder ∈ state.localBinders →
+          metavariable ∉ binder.scheme.freeVariables := by
+  intro metavariable quantified binder binderMember binderFree
+  rw [Detail.generalizeValue_scheme_quantified] at quantified
+  obtain ⟨valueFree, selected⟩ := List.mem_filter.mp quantified
+  have notBlocked : metavariable ∉
+      Detail.generalizeValueBlockedVariables state locals
+        requirementStart := by
+    intro blocked
+    simp [blocked] at selected
+  have appliedFree : metavariable ∈
+      (binder.scheme.apply state.inference.substitution).freeVariables :=
+    schemeFreeVariable_survives_outside_domain
+      state.inference.substitution binder.scheme binderFree
+      (valueOutsideDomain metavariable valueFree)
+  have entryMember : (binder.name,
+      binder.scheme.apply state.inference.substitution) ∈ locals := by
+    rw [localsEq]
+    unfold Environment.apply
+    apply List.mem_map.mpr
+    refine ⟨(binder.name, binder.scheme), ?_, rfl⟩
+    unfold Frontend.SourceInference.State.binderEnvironment
+    exact List.mem_map.mpr ⟨binder, binderMember, rfl⟩
+  have blocked : metavariable ∈
+      Detail.generalizeValueBlockedVariables state locals
+        requirementStart := by
+    apply List.mem_append.mpr
+    apply Or.inl
+    exact (TypeSystem.Environment.mem_freeVariables_iff
+      metavariable locals).mpr
+      ⟨(binder.name,
+        binder.scheme.apply state.inference.substitution), entryMember,
+        appliedFree⟩
+  exact notBlocked blocked
+
+theorem generalizeValue_schemeFree_subset_valueType
+    (state : Frontend.SourceInference.State)
+    (locals : Environment) (requirementStart : Nat) (valueType : Ty) :
+    ∀ metavariable,
+      metavariable ∈
+        (Detail.generalizeValue state locals requirementStart valueType
+          ).scheme.freeVariables →
+        metavariable ∈ valueType.freeVariables := by
+  intro metavariable member
+  have bodyEq := Detail.generalizeValue_scheme_body state locals
+    requirementStart valueType
+  have bodyMember := (List.mem_filter.mp member).1
+  simpa [Scheme.freeVariables, bodyEq] using bodyMember
+
+/-- One actual `generalizeValue` binder installation preserves lexical
+quantifier isolation.  The statement/for-item recursion still has to prove
+that its inferred initializer value avoids the older active quantifiers;
+that is an expression-provenance obligation, not a finalizer consequence. -/
+theorem activeSchemeQuantifierIsolation_generalizeValue
+    (state : Frontend.SourceInference.State)
+    (locals : Environment) (requirementStart : Nat) (valueType : Ty)
+    (name : String) (span : Option Syntax.SourceSpan)
+    (comptime : Bool) (requirements : List LocalSchemeRequirement)
+    (isolated : ActiveSchemeQuantifierIsolation state)
+    (localsEq : locals =
+      state.binderEnvironment.apply state.inference.substitution)
+    (valueOutsideDomain : ∀ metavariable,
+      metavariable ∈ valueType.freeVariables →
+        metavariable ∉ state.inference.substitution.domain)
+    (valueOutsideOld : ∀ metavariable,
+      metavariable ∈ valueType.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers state) :
+    ActiveSchemeQuantifierIsolation
+      ((state.withLocals locals).allocateBinder name
+        (Detail.generalizeValue state locals requirementStart valueType
+          ).scheme span comptime requirements).2 := by
+  apply activeSchemeQuantifierIsolation_allocateBinder
+  · exact activeSchemeQuantifierIsolation_transport isolated rfl
+  · intro metavariable free
+    have valueFree := generalizeValue_schemeFree_subset_valueType state locals
+      requirementStart valueType metavariable free
+    simpa [activeSchemeQuantifiers,
+      Frontend.SourceInference.State.withLocals] using
+      (valueOutsideOld metavariable valueFree)
+  · intro metavariable quantified binder binderMember
+    have outside := generalizeValue_quantified_outside_oldBinderFree
+      state locals requirementStart valueType localsEq valueOutsideDomain
+      metavariable quantified binder
+    exact outside (by simpa [Frontend.SourceInference.State.withLocals]
+      using binderMember)
+
+/-- The executable initialized-`let` branch retains lexical quantifier
+isolation once its actual initializer result is known to avoid the caller's
+older quantifiers.  The child premise is tied to the successful recursive
+call, not to arbitrary inferred expressions. -/
+theorem inferStatementFuel_success_letUnannotatedInitialized_activeSchemeQuantifierIsolation
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {initializer : Syntax.Expr} {expectedReturn : Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .letDecl name none (some initializer))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) context statement
+      expectedReturn initial = .ok result)
+    (isolated : ActiveSchemeQuantifierIsolation initial)
+    (ready : initial.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (initializerIsolation : ∀ inferred initializerState,
+      Detail.inferExprFuel fuel context initializer none allocated =
+        .ok (inferred, initializerState) →
+      ∀ metavariable,
+        metavariable ∈
+          (initializerState.resolve inferred.type).freeVariables →
+            metavariable ∉ activeSchemeQuantifiers initial) :
+    ActiveSchemeQuantifierIsolation result.state := by
+  obtain ⟨inferred, initializerState, locals, valueType, generalized,
+      binding, initializerSuccess, localsEq, valueTypeEq, generalizedEq,
+      bindingEq, resultEq, _⟩ :=
+    inferStatementFuel_success_letUnannotatedInitialized_facts statementEq
+      allocationEq success []
+  have allocatedIsolated : ActiveSchemeQuantifierIsolation allocated :=
+    activeSchemeQuantifierIsolation_allocateStatementId isolated allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have nextReady :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    simpa only [allocationEq] using nextReady
+  have initializerProperties := Detail.inferExprFuel_inferenceProperties
+    allocatedReady validated canonical (by simp) initializerSuccess
+  have initializerIsolated : ActiveSchemeQuantifierIsolation
+      initializerState := by
+    apply activeSchemeQuantifierIsolation_transport allocatedIsolated
+    exact congrArg Frontend.SourceInference.LexicalScope.binders
+      (Detail.inferExprFuel_success_lexicalScope_eq initializerSuccess)
+  have valueOutsideDomain : ∀ metavariable,
+      metavariable ∈ valueType.freeVariables →
+        metavariable ∉ initializerState.inference.substitution.domain := by
+    intro metavariable member
+    rw [valueTypeEq] at member
+    exact initializerProperties.2.1.solved.apply_variables_outside_domain
+      inferred.type metavariable (by
+        simpa [Frontend.SourceInference.State.resolve,
+          TypeSystem.InferState.resolve] using member)
+  have allocatedBindersEq : allocated.localBinders = initial.localBinders := by
+    have projection := congrArg
+      (fun pair : StatementId × Frontend.SourceInference.State =>
+        pair.2.localBinders) allocationEq
+    change initial.localBinders = allocated.localBinders at projection
+    exact projection.symm
+  have valueOutsideOld : ∀ metavariable,
+      metavariable ∈ valueType.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initializerState := by
+    intro metavariable member
+    have outside := initializerIsolation inferred initializerState
+      initializerSuccess metavariable (by simpa [valueTypeEq] using member)
+    have expressionBindersEq : initializerState.localBinders =
+        allocated.localBinders := congrArg
+      Frontend.SourceInference.LexicalScope.binders
+        (Detail.inferExprFuel_success_lexicalScope_eq initializerSuccess)
+    simpa [activeSchemeQuantifiers, expressionBindersEq,
+      allocatedBindersEq] using outside
+  have bindingIsolated : ActiveSchemeQuantifierIsolation binding.2 := by
+    rw [← bindingEq, generalizedEq]
+    exact activeSchemeQuantifierIsolation_generalizeValue
+      initializerState locals allocated.nextRequirement valueType name.value
+      (some name.span) false
+      (Detail.generalizeValue initializerState locals
+        allocated.nextRequirement valueType).requirements
+      initializerIsolated localsEq valueOutsideDomain valueOutsideOld
+  rw [resultEq]
+  exact activeSchemeQuantifierIsolation_transport bindingIsolated rfl
+
+/-- Inversion of the actual unannotated initialized declaration in a `for`
+header.  The returned state is exactly the state after the new binder is
+allocated; no extra source node is recorded by this header item. -/
+theorem inferForItemFuel_success_letUnannotatedInitialized_facts
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {item : Syntax.ForItem} {name : Syntax.Identifier}
+    {initializer : Syntax.Expr}
+    {initial : Frontend.SourceInference.State}
+    {result : ForItemForm × Frontend.SourceInference.State}
+    (itemEq : item.value = .letDecl name none (some initializer))
+    (success : Detail.inferForItemFuel (fuel + 1) context item initial =
+      .ok result) :
+    ∃ inferred initializerState locals valueType generalized binding,
+      Detail.inferExprFuel fuel context initializer none initial =
+        .ok (inferred, initializerState) ∧
+      locals = initializerState.binderEnvironment.apply
+        initializerState.inference.substitution ∧
+      valueType = initializerState.resolve inferred.type ∧
+      generalized = Detail.generalizeValue initializerState locals
+        initial.nextRequirement valueType ∧
+      (initializerState.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements = binding ∧
+      result = (.letDecl binding.1 (some inferred.id), binding.2) := by
+  unfold Detail.inferForItemFuel at success
+  simp only [itemEq, bind, Except.bind] at success
+  cases initializerSuccess :
+      Detail.inferExprFuel fuel context initializer none initial with
+  | error error =>
+      simp [initializerSuccess] at success
+  | ok initializerPair =>
+      rcases initializerPair with ⟨inferred, initializerState⟩
+      simp only [initializerSuccess, pure, Pure.pure, Except.pure] at success
+      let locals := initializerState.binderEnvironment.apply
+        initializerState.inference.substitution
+      let valueType := initializerState.resolve inferred.type
+      let generalized := Detail.generalizeValue initializerState locals
+        initial.nextRequirement valueType
+      let binding :=
+        (initializerState.withLocals locals).allocateBinder name.value
+          generalized.scheme (some name.span) false
+          generalized.requirements
+      injection success with resultEq
+      rw [← resultEq]
+      exact ⟨inferred, initializerState, locals, valueType, generalized,
+        binding, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+/-- The corresponding `for`-header item preserves the same lexical
+isolation invariant, with its actual initializer as the only recursive
+expression premise. -/
+theorem inferForItemFuel_success_letUnannotatedInitialized_activeSchemeQuantifierIsolation
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {item : Syntax.ForItem} {name : Syntax.Identifier}
+    {initializer : Syntax.Expr}
+    {initial : Frontend.SourceInference.State}
+    {result : ForItemForm × Frontend.SourceInference.State}
+    (itemEq : item.value = .letDecl name none (some initializer))
+    (success : Detail.inferForItemFuel (fuel + 1) context item initial =
+      .ok result)
+    (isolated : ActiveSchemeQuantifierIsolation initial)
+    (ready : initial.InferenceReady)
+    (validated : ProgramSignatureFormationValidated context.signatures)
+    (canonical : ∀ signature ∈ context.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (initializerIsolation : ∀ inferred initializerState,
+      Detail.inferExprFuel fuel context initializer none initial =
+        .ok (inferred, initializerState) →
+      ∀ metavariable,
+        metavariable ∈
+          (initializerState.resolve inferred.type).freeVariables →
+            metavariable ∉ activeSchemeQuantifiers initial) :
+    ActiveSchemeQuantifierIsolation result.2 := by
+  obtain ⟨inferred, initializerState, locals, valueType, generalized,
+      binding, initializerSuccess, localsEq, valueTypeEq, generalizedEq,
+      bindingEq, resultEq⟩ :=
+    inferForItemFuel_success_letUnannotatedInitialized_facts itemEq success
+  have initializerProperties := Detail.inferExprFuel_inferenceProperties
+    ready validated canonical (by simp) initializerSuccess
+  have bindersEq : initializerState.localBinders = initial.localBinders :=
+    congrArg Frontend.SourceInference.LexicalScope.binders
+      (Detail.inferExprFuel_success_lexicalScope_eq initializerSuccess)
+  have initializerIsolated : ActiveSchemeQuantifierIsolation
+      initializerState :=
+    activeSchemeQuantifierIsolation_transport isolated bindersEq
+  have valueOutsideDomain : ∀ metavariable,
+      metavariable ∈ valueType.freeVariables →
+        metavariable ∉ initializerState.inference.substitution.domain := by
+    intro metavariable member
+    rw [valueTypeEq] at member
+    exact initializerProperties.2.1.solved.apply_variables_outside_domain
+      inferred.type metavariable (by
+        simpa [Frontend.SourceInference.State.resolve,
+          TypeSystem.InferState.resolve] using member)
+  have valueOutsideOld : ∀ metavariable,
+      metavariable ∈ valueType.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initializerState := by
+    intro metavariable member
+    have outside := initializerIsolation inferred initializerState
+      initializerSuccess metavariable (by simpa [valueTypeEq] using member)
+    simpa [activeSchemeQuantifiers, bindersEq] using outside
+  have bindingIsolated : ActiveSchemeQuantifierIsolation binding.2 := by
+    rw [← bindingEq, generalizedEq]
+    exact activeSchemeQuantifierIsolation_generalizeValue
+      initializerState locals initial.nextRequirement valueType name.value
+      (some name.span) false
+      (Detail.generalizeValue initializerState locals
+        initial.nextRequirement valueType).requirements
+      initializerIsolated localsEq valueOutsideDomain valueOutsideOld
+  rw [resultEq]
+  exact bindingIsolated
 
 def activeSchemeQuantifierGuard
     (state : Frontend.SourceInference.State) : Substitution :=
@@ -1262,6 +1765,47 @@ theorem inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked_on
   rw [typeEq]
   exact outerBlocked
 
+/-- The actual successful branch has a solved final inference substitution.
+Its second resolve is therefore idempotent, leaving only the first concrete
+instantiated-body range as a provenance premise. -/
+theorem inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked_on_solved
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {binder : TypedBinder}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : Detail.inferExprFuel (fuel + 1) context expression none
+      initial = .ok result)
+    (startLe : initial.inference.next ≤ allocated.inference.next)
+    (quantifiedUnique : binder.scheme.quantified.Nodup)
+    (binderFreeInLocals : binder.scheme.freeVariables ⊆ locals.freeVariables)
+    (solved : result.2.inference.Solved)
+    (rangeBlocked : InferenceRangeOldVariablesBlockedOn initial result.2
+      locals requirementStart
+      (binder.scheme.instantiateWithSubstitution
+        allocated.inference.next).body) :
+    OldVariablesBlockedAt initial result.2 locals requirementStart
+      result.1.type := by
+  apply inferExprFuel_success_localIdentifier_noExpected_oldVariablesBlocked_on
+    expressionEq allocationEq lookupEq success startLe quantifiedUnique
+    binderFreeInLocals rangeBlocked
+  intro candidate member replacement found _ _ _
+  have absent : candidate ∉ result.2.inference.substitution.domain := by
+    exact solved.apply_variables_outside_domain
+      (binder.scheme.instantiateWithSubstitution
+        allocated.inference.next).body candidate (by
+          simpa [Frontend.SourceInference.State.resolve,
+            TypeSystem.InferState.resolve] using member)
+  have present : candidate ∈ result.2.inference.substitution.domain := by
+    exact List.mem_map.mpr ⟨(candidate, replacement),
+      Substitution.lookup?_eq_some_mem found, rfl⟩
+  exact False.elim (absent present)
+
 /-- Compatibility wrapper for a whole-range invariant.  The useful actual
 branch contract above needs provenance only for two concrete resolve inputs,
 not for all entries of the substitution. -/
@@ -1377,6 +1921,92 @@ theorem inferExprFuel_success_localIdentifier_noExpected_avoidsActiveQuantifiers
           TypeSystem.InferState.resolve] using member)
   rw [typeEq]
   exact secondOutside
+
+/-- Solvedness discharges the local-reference branch's second range check:
+the first resolved type cannot consult any substitution entry again. -/
+theorem inferExprFuel_success_localIdentifier_noExpected_avoidsActiveQuantifiers_solved
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {binder : TypedBinder}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : Detail.inferExprFuel (fuel + 1) context expression none
+      initial = .ok result)
+    (bound : ActiveQuantifiersBelowNext initial)
+    (startLe : initial.inference.next ≤ allocated.inference.next)
+    (quantifiedUnique : binder.scheme.quantified.Nodup)
+    (binderFreeOutside : ∀ metavariable,
+      metavariable ∈ binder.scheme.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial)
+    (solved : result.2.inference.Solved)
+    (firstRange : result.2.inference.substitution.RangeAvoidsVariablesOn
+      (activeSchemeQuantifiers initial)
+      (binder.scheme.instantiateWithSubstitution
+        allocated.inference.next).body) :
+    ∀ metavariable,
+      metavariable ∈ result.1.type.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial := by
+  apply inferExprFuel_success_localIdentifier_noExpected_avoidsActiveQuantifiers
+    expressionEq allocationEq lookupEq success bound startLe
+    quantifiedUnique binderFreeOutside firstRange
+  simpa [Frontend.SourceInference.State.resolve,
+    TypeSystem.InferState.resolve] using
+    (rangeAvoidsVariablesOn_resolved_of_solved solved
+      (activeSchemeQuantifiers initial)
+      (binder.scheme.instantiateWithSubstitution
+        allocated.inference.next).body)
+
+/-- The lexical-isolation invariant supplies the local-reference scheme
+premise directly from the actual guarded lookup; occurrence allocation leaves
+both the binder stack and inference allocator unchanged. -/
+theorem inferExprFuel_success_localIdentifier_noExpected_avoidsActiveQuantifiers_of_isolation
+    {fuel : Nat} {context : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {binder : TypedBinder}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = some binder)
+    (success : Detail.inferExprFuel (fuel + 1) context expression none
+      initial = .ok result)
+    (bound : ActiveQuantifiersBelowNext initial)
+    (isolated : ActiveSchemeQuantifierIsolation initial)
+    (quantifiedUnique : binder.scheme.quantified.Nodup)
+    (solved : result.2.inference.Solved)
+    (firstRange : result.2.inference.substitution.RangeAvoidsVariablesOn
+      (activeSchemeQuantifiers initial)
+      (binder.scheme.instantiateWithSubstitution
+        allocated.inference.next).body) :
+    ∀ metavariable,
+      metavariable ∈ result.1.type.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial := by
+  have allocatedIsolated : ActiveSchemeQuantifierIsolation allocated :=
+    activeSchemeQuantifierIsolation_allocateExpressionId isolated allocationEq
+  have bindersEq : allocated.localBinders = initial.localBinders := by
+    have projection := congrArg
+      (fun pair : ExpressionId × Frontend.SourceInference.State =>
+        pair.2.localBinders) allocationEq
+    change initial.localBinders = allocated.localBinders at projection
+    exact projection.symm
+  have binderFreeOutside : ∀ metavariable,
+      metavariable ∈ binder.scheme.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial := by
+    intro metavariable free
+    have outside := activeSchemeQuantifierIsolation_lookupBinder
+      allocatedIsolated lookupEq metavariable free
+    simpa [activeSchemeQuantifiers, bindersEq] using outside
+  have startLe : initial.inference.next ≤ allocated.inference.next := by
+    rw [allocateExpressionId_inferenceNext_eq allocationEq]
+    exact Nat.le_refl _
+  exact inferExprFuel_success_localIdentifier_noExpected_avoidsActiveQuantifiers_solved
+    expressionEq allocationEq lookupEq success bound startLe
+    quantifiedUnique binderFreeOutside solved firstRange
 
 /-- The common no-expected recording tail leaves the inference solution
 unchanged and resolves the raw result type exactly once.  This is the small
@@ -1562,9 +2192,34 @@ theorem inferExprFuel_success_tuple_noExpected_avoidsActiveQuantifiers
       simpa [Frontend.SourceInference.State.resolve,
         TypeSystem.InferState.resolve] using member)
 
-/-- The state bound, executable/semantic local alignment, and the actual
-initializer's old-variable barrier imply precisely the prior-quantifier
-condition consumed by `generalizeValue`. -/
+/-- If the actual initializer value contains no older active scheme
+quantifier, freshness against every corresponding semantic lexical binder is
+immediate from executable/semantic local alignment. -/
+theorem priorQuantifiersBlockedAt_of_activeQuantifiersAvoided
+    {initial state : Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat} {valueType : Ty}
+    {target : SourceSemantics.Context} {outer : Substitution}
+    (aligned : LocalEnvironmentAligned initial outer target)
+    (avoids : ∀ metavariable,
+      metavariable ∈ valueType.freeVariables →
+        metavariable ∉ activeSchemeQuantifiers initial) :
+    PriorQuantifiersBlockedAt state locals requirementStart valueType
+      target := by
+  intro metavariable valueMember entry entryMember priorQuantified
+  have rawMember : entry ∈ closedBinderLocals outer initial.localBinders :=
+    aligned.locals_perm.mem_iff.mpr entryMember
+  rcases List.mem_map.mp rawMember with ⟨binder, binderMember, rfl⟩
+  have rawQuantified : metavariable ∈ binder.scheme.quantified := by
+    simpa [closedBinderLocals, TypedBinder.applySubstitution,
+      Scheme.apply] using priorQuantified
+  have activeQuantified : metavariable ∈
+      activeSchemeQuantifiers initial :=
+    List.mem_flatMap.mpr ⟨binder, binderMember, rawQuantified⟩
+  exact False.elim (avoids metavariable valueMember activeQuantified)
+
+/-- An alternative source of the same premise is old-variable provenance:
+every old variable in the initializer value is blocked by executable
+generalization. -/
 theorem priorQuantifiersBlockedAt_of_oldVariablesBlocked
     {initial state : Frontend.SourceInference.State}
     {locals : Environment} {requirementStart : Nat} {valueType : Ty}
@@ -1807,6 +2462,104 @@ theorem generalizeValue_binderFormation_finalAdmissible
             (noCapture.quantified_fresh metavariable
               (by simpa [schemeEq] using quantified)) occurs)
 
+/-- The formation argument only needs the binder and its qualified template
+sites to be present in the finalizer's raw source.  A `for`-header let is
+retained by its enclosing loop statement, not by a standalone let statement.
+The caller must derive these two exact ownership facts from that parent node;
+finalization alone does not invent an owner for an arbitrary binder. -/
+theorem generalizeValue_binderFormation_finalAdmissible_of_retained
+    {inferenceContext : Frontend.SourceInference.Context}
+    {finalType : Ty}
+    {evidenceState : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext finalType
+      evidenceState roots finalized)
+    {target : SourceSemantics.Context}
+    {binder : TypedBinder} {initializer : ExpressionId}
+    (binderRetained : binder ∈
+      (evidenceState.toTypedSource roots).initializedLetBinders)
+    (templatesRetained : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        ContainsLocalSchemeTemplate (evidenceState.toTypedSource roots) {
+          binder, initializer := .expression initializer, requirement })
+    (signaturesEq : target.signatures =
+      (finalizedRequirementContext inferenceContext finalized).signatures)
+    (assumptionsMono :
+      (finalizedRequirementContext inferenceContext finalized).assumptions ⊆
+        target.assumptions)
+    (solvedEq : target.solvedRequirements =
+      (finalizedRequirementContext inferenceContext finalized
+        ).solvedRequirements)
+    {state : Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat} {valueType : Ty}
+    (schemeEq : binder.scheme =
+      (Detail.generalizeValue state locals requirementStart valueType).scheme)
+    (requirementsEq : binder.schemeRequirements =
+      (Detail.generalizeValue state locals requirementStart valueType
+        ).requirements)
+    (predicates : ∀ requirement,
+      requirement ∈ (binder.applySubstitution finalized.substitution
+        ).schemeRequirements →
+        PredicateAdmissible
+          (localSchemeInitializerContext target
+            (binder.applySubstitution finalized.substitution))
+          requirement.predicate)
+    (bodyAdmissible : TypeAdmissible
+      (localSchemeInitializerContext target
+        (binder.applySubstitution finalized.substitution))
+      (binder.applySubstitution finalized.substitution).scheme.body) :
+    SchemeWellFormed target
+        (binder.applySubstitution finalized.substitution).scheme ∧
+      LocalSchemeRequirementsWellFormed target
+        (binder.applySubstitution finalized.substitution) := by
+  have noCapture := resources.local_no_capture binder binderRetained
+  have ledgerFinal := scopedRequirementLedgerWellFormed_weakenAssumptions
+    signaturesEq assumptionsMono solvedEq resources.ledger
+  have ledgerRaw : ScopedRequirementLedgerWellFormed target
+      ((evidenceState.toTypedSource roots).applySubstitution
+        finalized.substitution) := by
+    rw [← resources.source_eq]
+    exact ledgerFinal
+  have rawQuantifiedNodup : binder.scheme.quantified.Nodup := by
+    rw [schemeEq]
+    exact Detail.generalizeValue_scheme_quantified_nodup state locals
+      requirementStart valueType
+  have finalQuantifiedNodup :
+      (binder.applySubstitution finalized.substitution).scheme.quantified.Nodup := by
+    simpa using rawQuantifiedNodup
+  constructor
+  · exact StructuralSubstitution.SchemeWellFormed.ofLocalSchemeInitializerAdmissible
+      bodyAdmissible finalQuantifiedNodup
+  · apply ledgerRaw.localSchemeRequirementsWellFormed
+      (initializer := .expression initializer)
+    · intro requirement member
+      rw [FlexibleSubstitution.applyTypedBinder_schemeRequirements] at member
+      rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
+      exact FlexibleSubstitution.ContainsLocalSchemeTemplate.applySubstitution
+        finalized.substitution
+        (templatesRetained original originalMember)
+    · exact predicates
+    · intro requirement member
+      rw [FlexibleSubstitution.applyTypedBinder_schemeRequirements] at member
+      rcases List.mem_map.mp member with ⟨original, originalMember, rfl⟩
+      rw [requirementsEq] at originalMember
+      rcases Detail.generalizeValue_requirement_depends_on_quantified state
+          locals requirementStart valueType original originalMember with
+        ⟨metavariable, quantified, occurs⟩
+      refine ⟨metavariable, ?_, ?_⟩
+      · simpa [schemeEq] using quantified
+      · have restrictedEq : finalized.substitution.without
+            binder.scheme.quantified = finalized.substitution :=
+          FlexibleSubstitution.Substitution.without_eq_self_of_disjoint_domain
+            finalized.substitution binder.scheme.quantified
+            noCapture.quantified_fresh
+        simpa [LocalSchemeRequirement.applySubstitution, restrictedEq] using
+          (FlexibleSubstitution.Substitution.mem_predicateVariables_applySubstitution_of_not_mem_domain
+            finalized.substitution
+            (noCapture.quantified_fresh metavariable
+              (by simpa [schemeEq] using quantified)) occurs)
+
 /-- Inductive provenance contract for qualified predicate formation.  It is
 indexed by *actual generated ledger rows* selected as templates by this
 binder, rather than by arbitrary predicates or by the solver's entailment
@@ -1942,6 +2695,102 @@ theorem unannotatedInitializedLetCertificate_of_finalBarrier
   have formation := generalizeValue_binderFormation_finalAdmissible
     resources recorded rawExtension signaturesEq assumptionsMono solvedEq
     rawSchemeEq rawRequirementsEq
+    (by simpa [outerEq] using finalPredicates)
+    (by simpa [outerEq] using initializerType.type_admissible)
+  refine {
+    initializer_type := initializerType
+    requirements_well_formed := ?_
+    generalizes := finalGeneralizes
+    quantified_fresh := ?_
+  }
+  · simpa [outerEq] using formation.2
+  · intro metavariable quantified
+    exact ⟨FlexibleSubstitution.SchemeGeneralizesExcept.quantified_fresh
+        finalGeneralizes metavariable quantified,
+      generalizeValue_quantified_fresh_prior_of_blocked
+        (outer := outer) rawSchemeEq priorBlocked metavariable quantified⟩
+
+/-- The same residual-aware certificate for a binder retained through an
+enclosing node, notably a `for`-header item.  Exact raw ownership is an
+explicit premise: the finalizer checks only binders and templates actually
+present in its input source.  The barrier, generated-predicate formation,
+and prior-quantifier provenance still require their separate inductive
+arguments. -/
+theorem unannotatedInitializedLetCertificate_of_finalBarrier_retained
+    {inferenceContext : Frontend.SourceInference.Context}
+    {finalType : Ty}
+    {evidenceState : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources inferenceContext finalType
+      evidenceState roots finalized)
+    {source : TypedSource} {target : SourceSemantics.Context}
+    {outer : Substitution}
+    {state final : Frontend.SourceInference.State}
+    {locals : Environment} {requirementStart : Nat} {valueType : Ty}
+    {generalized : Detail.GeneralizedValue}
+    {name : Syntax.Identifier} {binder : TypedBinder}
+    {initializer : ExpressionId}
+    (outerEq : outer = finalized.substitution)
+    (generalizedEq : generalized = Detail.generalizeValue state locals
+      requirementStart valueType)
+    (allocated : (state.withLocals locals).allocateBinder name.value
+      generalized.scheme (some name.span) false generalized.requirements =
+        (binder, final))
+    (signaturesEq : target.signatures =
+      (finalizedRequirementContext inferenceContext finalized).signatures)
+    (assumptionsMono :
+      (finalizedRequirementContext inferenceContext finalized).assumptions ⊆
+        target.assumptions)
+    (solvedEq : target.solvedRequirements =
+      (finalizedRequirementContext inferenceContext finalized
+        ).solvedRequirements)
+    (binderRetained : binder ∈
+      (evidenceState.toTypedSource roots).initializedLetBinders)
+    (templatesRetained : ∀ requirement,
+      requirement ∈ binder.schemeRequirements →
+        ContainsLocalSchemeTemplate (evidenceState.toTypedSource roots) {
+          binder, initializer := .expression initializer, requirement })
+    (barrierTransport : GeneralizationBarrierTransport state locals
+      requirementStart valueType outer target
+      (localSchemeTemplateIds (binder.applySubstitution outer)))
+    (finalPredicates : ∀ requirement,
+      requirement ∈ (binder.applySubstitution outer).schemeRequirements →
+        PredicateAdmissible
+          (localSchemeInitializerContext target
+            (binder.applySubstitution outer)) requirement.predicate)
+    (priorBlocked : PriorQuantifiersBlockedAt state locals requirementStart
+      valueType target)
+    (initializerType : ExpressionHasType (source.applySubstitution outer)
+      (localSchemeInitializerContext target
+        (binder.applySubstitution outer)) initializer
+      (binder.applySubstitution outer).scheme.body) :
+    UnannotatedInitializedLetCertificate source target outer binder
+      initializer := by
+  have binderEq :
+      ((state.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements).1 = binder :=
+    congrArg Prod.fst allocated
+  have rawSchemeEq : binder.scheme =
+      (Detail.generalizeValue state locals requirementStart
+        valueType).scheme := by
+    rw [← binderEq, generalizedEq]
+    rfl
+  have rawRequirementsEq : binder.schemeRequirements =
+      (Detail.generalizeValue state locals requirementStart
+        valueType).requirements := by
+    rw [← binderEq, generalizedEq]
+    rfl
+  have noCapture := resources.local_no_capture binder binderRetained
+  have finalGeneralizes : SchemeGeneralizesExcept target
+      (localSchemeTemplateIds (binder.applySubstitution outer))
+      (binder.applySubstitution outer).scheme :=
+    (generalizeValue_finalGeneralizes_iff_barrierTransport rawSchemeEq
+      (outerEq ▸ noCapture)).mpr barrierTransport
+  have formation := generalizeValue_binderFormation_finalAdmissible_of_retained
+    resources binderRetained templatesRetained signaturesEq assumptionsMono
+    solvedEq rawSchemeEq rawRequirementsEq
     (by simpa [outerEq] using finalPredicates)
     (by simpa [outerEq] using initializerType.type_admissible)
   refine {
