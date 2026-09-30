@@ -28,6 +28,7 @@ import Solcore.Test.SourceCallStageGuards
 import Solcore.Test.SourceCallStageBoundary
 import Solcore.Test.SourceCoreRawMetadata
 import Solcore.Test.SourceCoreCompatibleValues
+import Solcore.Test.SourceCoreRepresentationProjection
 import Solcore.Test.SourceCompilerSourceBoundaryObservations
 import Solcore.Test.SourceCoreDataPayload
 import Solcore.Test.SourceCoreDataPayloadMapping
@@ -2544,6 +2545,7 @@ def run : IO Unit := do
   SourceCoreSourceCells.run
   SourceCoreRawMetadata.run
   SourceCoreCompatibleValues.run
+  SourceCoreRepresentationProjection.run
   SourceCompilerSourceBoundaryObservations.run
   SourceCoreGeneralEntry.run
   CoreIntegerAssignment.run

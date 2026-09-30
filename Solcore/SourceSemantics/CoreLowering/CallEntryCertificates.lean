@@ -111,10 +111,10 @@ theorem collectLambdas_preserves {plan : Plan} {limits : Limits} {firstId : Nat}
 /-- Public codebook preparation authenticates every retained entry. Contextual
 instances keep their actual sealed local-evidence receipt; no runtime closure
 or arbitrary type erasure is used to reconstruct its flags. -/
-theorem prepare_authenticates {program : CheckedProgram} {plan : Plan} {checked : SourceCoreDataCatalog.Checked}
+theorem prepareWithProjection_authenticates {program : CheckedProgram} {plan : Plan} {projectType : TypeSystem.Ty → Except SourceCoreLocalPolymorphism.Error Core.Ty}
     {limits : Limits} {firstId : Nat} {table : Table}
-    (accepted : prepare program plan checked limits firstId = .ok table) : AllAuthenticated plan table.entries := by
-  unfold prepare at accepted
+    (accepted : prepareWithProjection program plan projectType limits firstId = .ok table) : AllAuthenticated plan table.entries := by
+  unfold prepareWithProjection at accepted
   split at accepted
   · cases accepted
   · obtain ⟨state, originals, accepted⟩ := bind_ok accepted
@@ -164,6 +164,12 @@ theorem prepare_authenticates {program : CheckedProgram} {plan : Plan} {checked 
           · cases accepted
         · cases accepted
       · cases accepted
+
+/-- The strict wrapper retains the same artifact authentication guarantee. -/
+theorem prepare_authenticates {program : CheckedProgram} {plan : Plan} {checked : SourceCoreDataCatalog.Checked}
+    {limits : Limits} {firstId : Nat} {table : Table}
+    (accepted : prepare program plan checked limits firstId = .ok table) : AllAuthenticated plan table.entries :=
+  prepareWithProjection_authenticates accepted
 
 /-- A descriptor's selected entry retains the full original origin. -/
 theorem descriptor_entry {table : Table} {origin : Origin}

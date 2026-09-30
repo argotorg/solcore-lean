@@ -227,13 +227,13 @@ private theorem forIn_invariant {α β ε : Type} {items : List α} {initial fin
 /-- The complete public factory retains the actual successful decision pass
 and the original prepared sidecars. Local-instance discovery is not replaced
 or assumed to have evaluated any source body. -/
-theorem prepare_collects {program : CheckedProgram} {plan : Plan} {checked : SourceCoreDataCatalog.Checked}
+theorem prepareWithProjection_collects {program : CheckedProgram} {plan : Plan} {projectType : TypeSystem.Ty → Except SourceCoreLocalPolymorphism.Error Core.Ty}
     {limits : Limits} {firstId : Nat} {table : Table}
-    (accepted : prepare program plan checked limits firstId = .ok table) :
+    (accepted : prepareWithProjection program plan projectType limits firstId = .ok table) :
     ∃ sidecars, (∀ sidecar, sidecar ∈ sidecars →
       SourceCoreStageContracts.prepareSidecar plan sidecar.caller.key = .ok sidecar) ∧
       collectDecisions limits sidecars table.entries = .ok table.decisions := by
-  unfold prepare at accepted
+  unfold prepareWithProjection at accepted
   split at accepted
   · cases accepted
   · obtain ⟨state, originals, accepted⟩ := bind_ok accepted
@@ -274,6 +274,15 @@ theorem prepare_collects {program : CheckedProgram} {plan : Plan} {checked : Sou
         · cases accepted
       · cases accepted
 
+/-- The strict wrapper uses the same original sidecar and decision pass. -/
+theorem prepare_collects {program : CheckedProgram} {plan : Plan} {checked : SourceCoreDataCatalog.Checked}
+    {limits : Limits} {firstId : Nat} {table : Table}
+    (accepted : prepare program plan checked limits firstId = .ok table) :
+    ∃ sidecars, (∀ sidecar, sidecar ∈ sidecars →
+      SourceCoreStageContracts.prepareSidecar plan sidecar.caller.key = .ok sidecar) ∧
+      collectDecisions limits sidecars table.entries = .ok table.decisions :=
+  prepareWithProjection_collects accepted
+
 private theorem related_output {α β : Type} {relation : α → β → Prop} {inputs : List α} {outputs : List β}
     (related : ListRel relation inputs outputs) {output : β} (member : output ∈ outputs) :
     ∃ input, input ∈ inputs ∧ relation input output := by
@@ -304,15 +313,16 @@ private theorem request_sidecar {sidecars : List Sidecar} {entries : List Entry}
 /-- The public table factory suffices for the row ledger. The supplied caller
 receipt and call occurrence are source metadata; no selected guard, stage
 verdict, child execution, or prepared sidecar list is assumed. -/
-theorem rows_of_prepare {program : CheckedProgram} {plan : Plan} {checked : SourceCoreDataCatalog.Checked}
+theorem rows_of_prepareWithProjection {program : CheckedProgram} {plan : Plan}
+    {projectType : TypeSystem.Ty → Except SourceCoreLocalPolymorphism.Error Core.Ty}
     {limits : Limits} {firstId : Nat} {site : SourceCoreCallableContracts.Callsite} {sidecar : Sidecar}
     {node : ExpressionNode} {callee : ExpressionId} {arguments : List ExpressionId} {metadata : IndirectCallResolution}
-    (accepted : prepare program plan checked limits firstId = .ok site.table)
+    (accepted : prepareWithProjection program plan projectType limits firstId = .ok site.table)
     (caller : SourceCoreStageContracts.prepareSidecar plan site.caller = .ok sidecar)
     (contains : ContainsExpression sidecar.source site.call node)
     (form : node.form = .call callee arguments (.indirect metadata)) :
     CallableLedger.Rows sidecar site site.call arguments := by
-  obtain ⟨sidecars, prepared, collected⟩ := prepare_collects accepted
+  obtain ⟨sidecars, prepared, collected⟩ := prepareWithProjection_collects accepted
   have nonempty : ∃ row, row ∈ site.rows := by
     cases rows : site.rows with
     | nil => exact False.elim (site.present rows)
@@ -328,5 +338,16 @@ theorem rows_of_prepare {program : CheckedProgram} {plan : Plan} {checked : Sour
   have same := Except.ok.inj (actualCaller.symm.trans caller)
   have present : sidecar ∈ sidecars := same ▸ sidecarMember
   exact rows_of_collectDecisions collected present contains form (sidecar_of_accepted caller).2.symm rfl
+
+/-- The strict catalog remains a wrapper of the shared authenticated pass. -/
+theorem rows_of_prepare {program : CheckedProgram} {plan : Plan} {checked : SourceCoreDataCatalog.Checked}
+    {limits : Limits} {firstId : Nat} {site : SourceCoreCallableContracts.Callsite} {sidecar : Sidecar}
+    {node : ExpressionNode} {callee : ExpressionId} {arguments : List ExpressionId} {metadata : IndirectCallResolution}
+    (accepted : prepare program plan checked limits firstId = .ok site.table)
+    (caller : SourceCoreStageContracts.prepareSidecar plan site.caller = .ok sidecar)
+    (contains : ContainsExpression sidecar.source site.call node)
+    (form : node.form = .call callee arguments (.indirect metadata)) :
+    CallableLedger.Rows sidecar site site.call arguments :=
+  rows_of_prepareWithProjection accepted caller contains form
 
 end Solcore.SourceSemantics.CoreLowering.CallCodebookCertificates

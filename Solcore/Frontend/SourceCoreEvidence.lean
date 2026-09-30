@@ -18,10 +18,15 @@ abbrev Lowered := SourceCoreBasic.LoweredExpr
 abbrev Child := SourceCoreFunctions.ExpressionLowerer
 abbrev Key := SourceSpecialization.SpecializationKey
 
-private def project (checked : Checked) (node : ExpressionNode) (type : Ty) : Except Error Core.Ty :=
-  SourceCoreGeneralTypes.projectType checked (.occurrence node.id.occurrence) type
+/-- Representation profiles project source metadata while this traversal owns
+evidence authentication, call order and coercion code. Whole-entry checking
+certifies the chosen representation's actual definitions. -/
+abbrev Projector := SourceCoreElaboration.ErrorSite → Ty → Except Error Core.Ty
 
-private def signature (checked : Checked) (context : Context) (node : ExpressionNode) (key : Key)
+private def project (projectType : Projector) (node : ExpressionNode) (type : Ty) : Except Error Core.Ty :=
+  projectType (.occurrence node.id.occurrence) type
+
+private def signature (projectType : Projector) (context : Context) (node : ExpressionNode) (key : Key)
     (callables : SourceCoreFunctions.CallablePolicy) :
     Except Error (Nat × SourceCoreCalls.Signature) := do
   let actual ← (SourceCompilationPlan.exactSpecialization context.plan key).mapError SourceCoreBasic.Error.callPreparation
@@ -35,14 +40,14 @@ private def signature (checked : Checked) (context : Context) (node : Expression
     | [entry] => pure entry
     | [] => throw (.callPreparation (.missingSpecialization key))
     | entries => throw (.callPreparation (.duplicateSpecialization key entries.length))
-  SourceCoreBasic.ensureType (.occurrence node.id.occurrence) stored.parameterType (← project checked node parameter)
-  SourceCoreBasic.ensureType (.occurrence node.id.occurrence) stored.resultType (← project checked node result)
+  SourceCoreBasic.ensureType (.occurrence node.id.occurrence) stored.parameterType (← project projectType node parameter)
+  SourceCoreBasic.ensureType (.occurrence node.id.occurrence) stored.resultType (← project projectType node result)
   pure (index, stored)
 
-private def invoke (checked : Checked) (context : Context) (scope : Scope) (node : ExpressionNode)
+private def invoke (projectType : Projector) (context : Context) (scope : Scope) (node : ExpressionNode)
     (key : Key) (arguments : Lowered) (callables : SourceCoreFunctions.CallablePolicy) :
     Except Error Lowered := do
-  let (index, selected) ← signature checked context node key callables
+  let (index, selected) ← signature projectType context node key callables
   SourceCoreBasic.ensureType (.occurrence node.id.occurrence) selected.parameterType arguments.type
   pure ⟨selected.resultType, SourceCoreCalls.call selected
     (scope.length + context.administrativePrefix + index) arguments.expression context.internalReason⟩
@@ -52,21 +57,21 @@ private def methodKey (context : Context) (node : ExpressionNode)
   (SourceCompilationPlan.exactCallKey context.plan context.owner node.id method.specialized.key)
     |>.mapError SourceCoreBasic.Error.callPreparation
 
-private def applyCoercions (program : CheckedProgram) (checked : Checked) (context : Context)
+private def applyCoercions (program : CheckedProgram) (projectType : Projector) (context : Context)
     (caller : SourceSpecialization.SpecializedFunction) (available : SourceCompilationPlan.EvidenceEnvironment)
     (scope : Scope) (node : ExpressionNode) (callables : SourceCoreFunctions.CallablePolicy) :
     Lowered → List CoercionStep → Except Error Lowered
   | value, [] => pure value
   | value, step :: rest => do
-      SourceCoreBasic.ensureType (.occurrence node.id.occurrence) (← project checked node step.source) value.type
+      SourceCoreBasic.ensureType (.occurrence node.id.occurrence) (← project projectType node step.source) value.type
       let method ← (SourceCompilationPlan.checkedCoercionMethod program caller node available step)
         |>.mapError SourceCoreBasic.Error.callPreparation
       discard <| (SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step method)
         |>.mapError SourceCoreBasic.Error.callPreparation
       let key ← methodKey context node method
-      let result ← invoke checked context scope node key value callables
-      SourceCoreBasic.ensureType (.occurrence node.id.occurrence) (← project checked node step.target) result.type
-      applyCoercions program checked context caller available scope node callables result rest
+      let result ← invoke projectType context scope node key value callables
+      SourceCoreBasic.ensureType (.occurrence node.id.occurrence) (← project projectType node step.target) result.type
+      applyCoercions program projectType context caller available scope node callables result rest
 
 def withNode (source : TypedSource) (node : ExpressionNode) : TypedSource :=
   { source with nodes := source.nodes.map fun
@@ -76,7 +81,7 @@ def withNode (source : TypedSource) (node : ExpressionNode) : TypedSource :=
 /-- The prepared plan authenticates closed evidence and selected helper edges.
 Each special occurrence rechecks its ledger and endpoint types before emitting
 ordinary Core calls, including output coercions and indirect argument coercions. -/
-def lowerWithCaller (program : CheckedProgram) (checked : Checked)
+def lowerWithProjector (program : CheckedProgram) (projectType : Projector)
     (caller : SourceSpecialization.SpecializedFunction) (context : Context) (child : Child)
     (fuel : Nat) (source : TypedSource) (scope : Scope) (id : ExpressionId)
     (reasonAt : ExpressionId → Core.Word) (callables : SourceCoreFunctions.CallablePolicy := {}) :
@@ -114,7 +119,7 @@ def lowerWithCaller (program : CheckedProgram) (checked : Checked)
         if arguments.length ≠ selected.function.typedBody.inputs.length then
           throw (.callPreparation (.argumentArityMismatch selected.function.typedBody.inputs.length arguments.length))
         let arguments ← arguments.mapM fun argument => child fuel source scope argument reasonAt
-        invoke checked context scope raw key (SourceCoreCalls.packArguments arguments) callables
+        invoke projectType context scope raw key (SourceCoreCalls.packArguments arguments) callables
     | .reference _ (.declaration instantiation) => do
         let evidence ← (SourceCompilationPlan.exactDeclarationReferenceRuntimeEvidence caller node available instantiation)
           |>.mapError SourceCoreBasic.Error.callPreparation
@@ -123,7 +128,7 @@ def lowerWithCaller (program : CheckedProgram) (checked : Checked)
         let selected ← (SourceCompilationPlan.exactSpecialization context.plan key).mapError SourceCoreBasic.Error.callPreparation
         (SourceCompilationPlan.validateAuthenticatedRuntimeEvidence program.signatures key selected.assumptions evidence)
           |>.mapError SourceCoreBasic.Error.callPreparation
-        let (index, stored) ← signature checked context raw key callables
+        let (index, stored) ← signature projectType context raw key callables
         let identity ← match Core.Word.ofNat? (index + 1) with
           | some identity => pure identity
           | none => throw (.unsupportedExpression id node.form)
@@ -137,10 +142,10 @@ def lowerWithCaller (program : CheckedProgram) (checked : Checked)
           |>.mapError SourceCoreBasic.Error.callPreparation
         let callee ← child fuel source scope callee reasonAt
         let arguments ← arguments.mapM fun argument => child fuel source scope argument reasonAt
-        let packed ← applyCoercions program checked context caller available scope node callables
+        let packed ← applyCoercions program projectType context caller available scope node callables
           (SourceCoreCalls.packArguments arguments) metadata.argumentCoercions
-        let resultType ← project checked node node.rawType
-        let parameterType ← project checked node metadata.argumentTypeAfterCoercion
+        let resultType ← project projectType node node.rawType
+        let parameterType ← project projectType node metadata.argumentTypeAfterCoercion
         SourceCoreBasic.ensureType (.occurrence id.occurrence) parameterType packed.type
         SourceCoreBasic.ensureType (.occurrence id.occurrence)
           (callables.functionType parameterType resultType) callee.type
@@ -155,7 +160,7 @@ def lowerWithCaller (program : CheckedProgram) (checked : Checked)
             |>.mapError SourceCoreBasic.Error.callPreparation
           let key ← methodKey context raw selected.method
           let operand ← child fuel source scope operand reasonAt
-          invoke checked context scope raw key operand callables
+          invoke projectType context scope raw key operand callables
     | .binary left operator right => do
         if ordinary.isEmpty then child fuel (withNode source raw) scope id reasonAt
         else
@@ -165,12 +170,20 @@ def lowerWithCaller (program : CheckedProgram) (checked : Checked)
             |>.mapError SourceCoreBasic.Error.callPreparation
           let key ← methodKey context raw selected.method
           let arguments ← [left, right].mapM fun argument => child fuel source scope argument reasonAt
-          invoke checked context scope raw key (SourceCoreCalls.packArguments arguments) callables
+          invoke projectType context scope raw key (SourceCoreCalls.packArguments arguments) callables
     | _ => child fuel (withNode source raw) scope id reasonAt
-  SourceCoreBasic.ensureType (.occurrence id.occurrence) (← project checked node node.rawType) result.type
-  let result ← applyCoercions program checked context caller available scope node callables result node.coercions
-  SourceCoreBasic.ensureType (.occurrence id.occurrence) (← project checked node node.type) result.type
+  SourceCoreBasic.ensureType (.occurrence id.occurrence) (← project projectType node node.rawType) result.type
+  let result ← applyCoercions program projectType context caller available scope node callables result node.coercions
+  SourceCoreBasic.ensureType (.occurrence id.occurrence) (← project projectType node node.type) result.type
   pure (some result)
+
+/-- Compatibility entry using the strict catalog's own projection. -/
+def lowerWithCaller (program : CheckedProgram) (checked : Checked)
+    (caller : SourceSpecialization.SpecializedFunction) (context : Context) (child : Child)
+    (fuel : Nat) (source : TypedSource) (scope : Scope) (id : ExpressionId)
+    (reasonAt : ExpressionId → Core.Word) (callables : SourceCoreFunctions.CallablePolicy := {}) :
+    Except Error (Option Lowered) :=
+  lowerWithProjector program (SourceCoreGeneralTypes.projectType checked) caller context child fuel source scope id reasonAt callables
 
 /-- Ordinary occurrences use the exact authenticated plan caller. Contextual
 local lambdas supply an authenticated rebinding of the same caller ledger to

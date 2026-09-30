@@ -214,7 +214,8 @@ def collectDecisions (limits : Limits) (sidecars : List Sidecar) (entries : List
 /-- Construct once during artifact preparation. The IDs are positive words,
 never wrapping; the immutable table certifies unique origins, IDs, and lookup
 keys. The limits bound accepted origins and callsite/contract combinations. -/
-def prepare (program : CheckedProgram) (plan : Plan) (checked : SourceCoreDataCatalog.Checked)
+def prepareWithProjection (program : CheckedProgram) (plan : Plan)
+    (projectType : TypeSystem.Ty → Except SourceCoreLocalPolymorphism.Error Core.Ty)
     (limits : Limits := {}) (firstId : Nat := 1) : Except Error Table := do
   if firstId = 0 then throw .zeroFirstId
   let mut entries := []
@@ -227,7 +228,7 @@ def prepare (program : CheckedProgram) (plan : Plan) (checked : SourceCoreDataCa
     entries ← collectLambdas limits firstId sidecar none entries
   for function in BuiltinFunctionId.all do
     entries ← insert limits firstId entries (.builtin function) function.parameterTypes.length none
-  let locals ← (SourceCoreLocalPolymorphism.prepare checked plan).mapError Error.localInstances
+  let locals ← (SourceCoreLocalPolymorphism.prepareWithProjection projectType plan).mapError Error.localInstances
   let candidates := locals.bindings.flatMap (·.instances)
   if candidates.length > limits.maxContracts then throw (.contractBudgetExhausted limits.maxContracts)
   let contexts ← contextualReceipts program plan candidates.length [] candidates
@@ -243,5 +244,13 @@ def prepare (program : CheckedProgram) (plan : Plan) (checked : SourceCoreDataCa
     else throw (.ambiguousOrigin (entries.head?.map (·.origin) |>.getD (.builtin .integerAdd)))
   else throw .duplicateId
 
+
+/-- Strict-catalog compatibility entry. Both representations authenticate
+original contracts through the same inventory and decision construction. -/
+def prepare (program : CheckedProgram) (plan : Plan) (checked : SourceCoreDataCatalog.Checked)
+    (limits : Limits := {}) (firstId : Nat := 1) : Except Error Table :=
+  prepareWithProjection program plan (fun type => do
+    let projected ← (checked.project type).mapError SourceCoreLocalPolymorphism.Error.projection
+    pure projected.type) limits firstId
 
 end Solcore.Frontend.SourceCoreStageCodebook

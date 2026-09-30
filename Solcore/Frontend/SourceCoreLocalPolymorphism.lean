@@ -239,7 +239,7 @@ def Binding.atContext (binding : Binding) (active : Substitution) : List Instanc
 def Binding.bundleType (binding : Binding) (active : Substitution) : Core.Ty :=
   ProductBundle.type ((binding.atContext active).map (·.type))
 
-private def prepareInstance (checked : Checked) (entry : SourceCompilationPlan.LocalLambdaCatalogEntry) :
+private def prepareInstance (projectType : Ty → Except Error Core.Ty) (entry : SourceCompilationPlan.LocalLambdaCatalogEntry) :
     Except Error Instance := do
   let source := entry.source.applySubstitution entry.substitution
   if source.owner ≠ entry.caller.declaration then
@@ -261,17 +261,17 @@ private def prepareInstance (checked : Checked) (entry : SourceCompilationPlan.L
     | _ => throw (.initializerMetadataMismatch entry.initializer)
   if node.type ≠ expected || Ty.productMany (parameters.map (·.scheme.body)) ≠ parameter || returnType ≠ result then
     throw (.initializerMetadataMismatch entry.initializer)
-  let parameterType ← (checked.project parameter).mapError Error.projection
-  let resultType ← (checked.project result).mapError Error.projection
-  pure { origin := entry, parameterType := parameterType.type, resultType := resultType.type }
+  let parameterType ← projectType parameter
+  let resultType ← projectType result
+  pure { origin := entry, parameterType, resultType }
 
 /-- Discover finite instances through the existing worklist. Unused direct
 generalized lambdas are retained as empty bundles. This does not broaden the
 worklist's supported generalized initializer forms or evidence policy. -/
-def prepare (checked : Checked) (plan : SourceSpecializationWorklist.Plan) (contextFuel : Option Nat := none) :
+def prepareWithProjection (projectType : Ty → Except Error Core.Ty) (plan : SourceSpecializationWorklist.Plan) (contextFuel : Option Nat := none) :
     Except Error Catalog := do
   let entries ← (SourceCompilationPlan.localLambdaCatalog plan contextFuel).mapError Error.discovery
-  let instances ← entries.mapM (prepareInstance checked)
+  let instances ← entries.mapM (prepareInstance projectType)
   let mut bindings := []
   for specialized in plan.specializations do
     let source := specialized.function.typedBody
@@ -293,6 +293,15 @@ def prepare (checked : Checked) (plan : SourceSpecializationWorklist.Plan) (cont
               }]
       | _ => pure ()
   pure ⟨bindings⟩
+
+/-- The strict profile retains its existing metadata diagnostics and projected
+representation. Compatible profiles use their own checked projection through
+`prepareWithProjection`, sharing the same original instance discovery. -/
+def prepare (checked : Checked) (plan : SourceSpecializationWorklist.Plan) (contextFuel : Option Nat := none) :
+    Except Error Catalog :=
+  prepareWithProjection (fun type => do
+    let projected ← (checked.project type).mapError Error.projection
+    pure projected.type) plan contextFuel
 
 def Catalog.binding (catalog : Catalog) (caller : Key) (binder : Resolved.LocalId) : Except Error Binding :=
   match catalog.bindings.filter fun entry => decide (entry.caller = caller ∧ entry.binder.id = binder) with
