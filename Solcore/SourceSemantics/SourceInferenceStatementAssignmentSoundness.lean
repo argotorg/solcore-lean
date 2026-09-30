@@ -636,4 +636,134 @@ theorem inferPlaceFuel_success_index_sound_of_actual_children
                 PlaceResolution.applySubstitution, resolvedValueEq]
                 using indexed
 
+/-- Once a place has been inferred, the remaining RHS traversal cannot
+rewrite its already allocated nodes.  This exposes the intermediate place
+state used by an actual successful assignment together with its retained
+source and evidence ledgers. -/
+theorem inferAssignedValueFuel_success_place_state_provenance
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression value : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp}
+    {initial final : Frontend.SourceInference.State}
+    {assignment : AssignmentResolution}
+    {inferredValue : InferredExpression}
+    (success : Detail.inferAssignedValueFuel fuel inferenceContext
+      targetExpression operator value initial =
+        .ok (assignment, inferredValue, final))
+    (below : initial.NodesBelowNextOccurrence)
+    (roots : List NodeId := []) :
+    ∃ place placeState,
+      Detail.inferPlaceFuel fuel inferenceContext targetExpression initial =
+        .ok (place, placeState) ∧
+      placeState.NodesBelowNextOccurrence ∧
+      TypingSourceExtends (placeState.toTypedSource roots)
+        (final.toTypedSource roots) ∧
+      placeState.integerPatterns ⊆ final.integerPatterns ∧
+      placeState.requirements ⊆ final.requirements := by
+  unfold Detail.inferAssignedValueFuel at success
+  cases placeResult : Detail.inferPlaceFuel fuel inferenceContext
+      targetExpression initial with
+  | error error =>
+      simp [placeResult, bind, Except.bind] at success
+  | ok placePair =>
+      rcases placePair with ⟨place, placeState⟩
+      simp only [placeResult, bind, Except.bind, Prod.eta] at success
+      have placeBelow : placeState.NodesBelowNextOccurrence :=
+        (Detail.inferPlaceFuel_occurrenceBoundExtends
+          placeResult).nodesBelowNextOccurrence below
+      have finishNonEqual
+          (tailSuccess :
+            (do
+              let fittedState ← Detail.unify placeState place.type .word
+              let (inferredValue, finalState) ←
+                Detail.inferExprFuel fuel inferenceContext value (some .word)
+                  fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue, finalState)) =
+                .ok (assignment, inferredValue, final)) :
+          ∃ actualPlace actualState,
+            (Except.ok (place, placeState) : Except Frontend.SourceInference.Error
+              (PlaceResolution × Frontend.SourceInference.State)) =
+                .ok (actualPlace, actualState) ∧
+            actualState.NodesBelowNextOccurrence ∧
+            TypingSourceExtends (actualState.toTypedSource roots)
+              (final.toTypedSource roots) ∧
+            actualState.integerPatterns ⊆ final.integerPatterns ∧
+            actualState.requirements ⊆ final.requirements := by
+        cases unifyResult : Detail.unify placeState place.type .word with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+            simp only [unifyResult, bind, Except.bind] at tailSuccess
+            cases valueResult : Detail.inferExprFuel fuel inferenceContext
+                value (some .word) fittedState with
+            | error error =>
+                simp [valueResult] at tailSuccess
+            | ok valuePair =>
+                rcases valuePair with ⟨inferred, finalState⟩
+                simp only [valueResult, pure, Pure.pure, Except.pure]
+                  at tailSuccess
+                injection tailSuccess with resultEq
+                injection resultEq with assignmentEq valueStateEq
+                injection valueStateEq with inferredEq finalEq
+                subst assignment
+                subst inferredValue
+                subst final
+                have fittedBelow : fittedState.NodesBelowNextOccurrence :=
+                  (Detail.unify_occurrenceBoundExtends
+                    unifyResult).nodesBelowNextOccurrence placeBelow
+                have placeToFitted : TypingSourceExtends
+                    (placeState.toTypedSource roots)
+                    (fittedState.toTypedSource roots) := by
+                  constructor
+                  · have headerEq := Detail.unify_state_header unifyResult
+                    have ownerEq :=
+                      congrArg Frontend.SourceInference.State.Header.owner
+                        headerEq
+                    simpa [Frontend.SourceInference.State.toTypedSource,
+                      Frontend.SourceInference.State.header] using ownerEq
+                  · have nodesEq :=
+                      (Detail.unify_occurrenceState_eq unifyResult).1
+                    change placeState.nodes <+: fittedState.nodes
+                    rw [nodesEq]
+                    exact List.prefix_rfl
+                refine ⟨place, placeState, rfl, placeBelow,
+                  placeToFitted.trans
+                    (inferExprFuel_success_typingSourceExtends valueResult
+                      fittedBelow roots), ?_, ?_⟩
+                · rw [← Detail.unify_integerPatterns unifyResult]
+                  exact Detail.inferExprFuel_integerPatterns_subset valueResult
+                · exact (Detail.unify_requirements_subset unifyResult).trans
+                    (Detail.inferExprFuel_requirements_subset valueResult)
+      cases operator with
+      | equal =>
+          simp only [pure, Pure.pure, Except.pure] at success
+          cases valueResult : Detail.inferExprFuel fuel inferenceContext value
+              (some (placeState.resolve place.type)) placeState with
+          | error error =>
+              simp [valueResult] at success
+          | ok valuePair =>
+              rcases valuePair with ⟨inferred, finalState⟩
+              simp only [valueResult] at success
+              injection success with resultEq
+              injection resultEq with assignmentEq valueStateEq
+              injection valueStateEq with inferredEq finalEq
+              subst assignment
+              subst inferredValue
+              subst final
+              exact ⟨place, placeState, rfl, placeBelow,
+                inferExprFuel_success_typingSourceExtends valueResult
+                  placeBelow roots,
+                Detail.inferExprFuel_integerPatterns_subset valueResult,
+                Detail.inferExprFuel_requirements_subset valueResult⟩
+      | add => exact finishNonEqual success
+      | subtract => exact finishNonEqual success
+      | multiply => exact finishNonEqual success
+      | divide => exact finishNonEqual success
+      | modulo => exact finishNonEqual success
+      | bitAnd => exact finishNonEqual success
+      | bitXor => exact finishNonEqual success
+      | bitOr => exact finishNonEqual success
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
