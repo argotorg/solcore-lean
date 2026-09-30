@@ -1064,6 +1064,10 @@ import Solcore.Test.SourceCompilerIntegers
 import Solcore.Test.SourceCoreDataExpressions
 import Solcore.Test.SourceCoreDataMatches
 import Solcore.Test.SourceCoreGeneralFunctions
+import Solcore.Test.SourceCoreDataValues
+import Solcore.Test.SourceCoreLoopStatementReflection
+import Solcore.Test.SourceCoreDataPlaces
+import Solcore.Test.SourceCoreDataPatternProofs
 import Solcore.Test.SourceCoreLoopStatementCertificates
 import Solcore.Test.SourceCoreLoopStatementMeaning
 import Solcore.Test.SourceCoreLoopFiniteComposition
@@ -2481,6 +2485,9 @@ def run : IO Unit := do
   SourceCoreDataExpressions.run
   SourceCoreDataMatches.run
   SourceCoreGeneralFunctions.run
+  SourceCoreDataValues.run
+  SourceCoreLoopStatementReflection.run
+  SourceCoreDataPlaces.run
   SourceCoreLoopStatementMeaning.run
   SourceCoreLoopFiniteComposition.run
   CoreLocalLoop.run

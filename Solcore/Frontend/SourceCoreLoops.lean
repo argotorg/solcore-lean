@@ -36,8 +36,14 @@ structure Policy where
   assignValue : Option (ExpressionLowerer → Nat → TypedSource → Scope → SourceCoreElaboration.ErrorSite →
     AssignmentResolution → Syntax.ValueAssignOp → ExpressionId → Core.Ty → Core.Expr →
     (ExpressionId → Core.Word) → Except Error Core.Expr) := none
+  assignEqual : Option (ExpressionLowerer → Nat → TypedSource → Scope → SourceCoreElaboration.ErrorSite →
+    AssignmentResolution → ExpressionId → Core.Ty → Core.Expr →
+    (ExpressionId → Core.Word) → Except Error Core.Expr) := none
   assignBitNot : Option (TypedSource → Scope → SourceCoreElaboration.ErrorSite →
     AssignmentResolution → Core.Ty → Core.Expr → Except Error Core.Expr) := none
+  assignBitNotWithExpression : Option (ExpressionLowerer → Nat → TypedSource → Scope →
+    SourceCoreElaboration.ErrorSite → AssignmentResolution → Core.Ty → Core.Expr →
+    (ExpressionId → Core.Word) → Except Error Core.Expr) := none
   lowerMatch : Option (ExpressionLowerer → FlowLowerer → Nat → TypedSource → Scope → StatementId →
     MatchResolution → Core.Ty → (ExpressionId → Core.Word) → Core.Word → Except Error Core.Expr) := none
 
@@ -46,7 +52,15 @@ private def assignValue (policy : Policy) (fuel : Nat) (source : TypedSource) (s
     (operator : Syntax.ValueAssignOp) (rhs : ExpressionId) (outputType : Core.Ty)
     (next : Core.Expr) (reasonAt : ExpressionId → Core.Word) : Except Error Core.Expr := do
   match operator, policy.assignValue with
-  | .equal, _ | _, none =>
+  | .equal, _ =>
+      match policy.assignEqual with
+      | some callback => callback policy.lowerExpression fuel source scope site assignment rhs outputType next reasonAt
+      | none =>
+        let (index, payloadType) ← policy.lowerAssignment source scope assignment operator
+        let rhs ← policy.lowerExpression fuel source scope rhs reasonAt
+        SourceCoreBasic.ensureType (.binder assignment.target.root) payloadType rhs.type
+        pure (Core.LocalSequence.assign outputType (.var index) rhs.expression next)
+  | _, none =>
       let (index, payloadType) ← policy.lowerAssignment source scope assignment operator
       let rhs ← policy.lowerExpression fuel source scope rhs reasonAt
       SourceCoreBasic.ensureType (.binder assignment.target.root) payloadType rhs.type
@@ -57,7 +71,7 @@ private def assignValue (policy : Policy) (fuel : Nat) (source : TypedSource) (s
 /-- Header items have no statement identity. They use the same authenticated
 binder/expression/assignment checks and thread newly allocated lexical cells.
 Only the supplied continuation determines whether that scope persists. -/
-private def lowerForItems (policy : Policy) (parentSite : SourceCoreElaboration.ErrorSite) : Nat → TypedSource → Scope →
+def lowerForItems (policy : Policy) (parentSite : SourceCoreElaboration.ErrorSite) : Nat → TypedSource → Scope →
     List ForItemForm → Core.Ty → (ExpressionId → Core.Word) → (Scope → Except Error Core.Expr) →
     Except Error Core.Expr
   | _, _, scope, [], _, _, next => next scope
@@ -83,9 +97,13 @@ private def lowerForItems (policy : Policy) (parentSite : SourceCoreElaboration.
           let body ← lowerForItems policy parentSite fuel source scope rest resultType reasonAt next
           assignValue policy fuel source scope parentSite assignment operator rhs controlType body reasonAt
       | .assignBitNot assignment =>
-          match policy.assignBitNot with
-          | none => .error (.unsupportedForItem item)
+          match policy.assignBitNotWithExpression with
           | some callback =>
+              let body ← lowerForItems policy parentSite fuel source scope rest resultType reasonAt next
+              callback policy.lowerExpression fuel source scope parentSite assignment controlType body reasonAt
+          | none => match policy.assignBitNot with
+            | none => .error (.unsupportedForItem item)
+            | some callback =>
               let body ← lowerForItems policy parentSite fuel source scope rest resultType reasonAt next
               callback source scope parentSite assignment controlType body
 
@@ -118,9 +136,13 @@ def lowerFlowStatementsWithPolicy (policy : Policy) : Nat → TypedSource → Sc
           assignValue policy fuel source scope site assignment operator value controlType body reasonAt
       | .assignBitNot assignment =>
           SourceCoreBasic.ensureType site .unit type
-          match policy.assignBitNot with
-          | none => .error (.unsupportedStatement id node.form)
+          match policy.assignBitNotWithExpression with
           | some callback =>
+              let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason
+              callback policy.lowerExpression fuel source scope site assignment controlType body reasonAt
+          | none => match policy.assignBitNot with
+            | none => .error (.unsupportedStatement id node.form)
+            | some callback =>
               let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason
               callback source scope site assignment controlType body
       | .returnStmt none =>

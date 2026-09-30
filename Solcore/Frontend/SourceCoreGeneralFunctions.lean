@@ -3,11 +3,12 @@ import Solcore.Frontend.SourceCoreGeneralTypes
 import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreDataFaultSites
 import Solcore.Frontend.SourceCoreDataMatches
+import Solcore.Frontend.SourceCoreDataPlaceFaultSites
 
 /-! Monomorphic functions and closed catalog data share ordinary Core execution.
 Preparation authenticates the plan, compiles reachable closures once, and checks
 each assembled entry against the actual recursive data definitions. This slice
-supports monomorphic local bindings and assignments to entire local cells. -/
+supports monomorphic local bindings and structural place assignments. -/
 
 set_option autoImplicit false
 
@@ -23,7 +24,7 @@ inductive Error where
   | plan (error : SourceCompilationPlan.Error)
   | catalog (error : SourceCoreDataCatalog.Error)
   | lowering (error : SourceCoreBasic.Error)
-  | diagnostics (error : SourceCoreDataFaultSites.Error)
+  | diagnostics (error : SourceCoreDataPlaceFaultSites.Error)
   | invalidFunctionType (key : Key)
   | resultMetadataMismatch (key : Key)
   | assumptionsUnsupported (key : Key)
@@ -63,20 +64,38 @@ private def prepareFunction (checked : Checked) (specialized : SourceSpecializat
   pure { specialized, inputs, signature := { key := specialized.key, parameterType, resultType } }
 
 def bodyLowerer (checked : Checked) (signatures : ProgramSignatures)
-    (solvedRequirements : List SolvedRequirement) (assignments : SourceCoreAssignmentFaultSites.Table) :
+    (solvedRequirements : List SolvedRequirement) (assignments : SourceCoreAssignmentFaultSites.Table)
+    (diagnostics : SourceCoreDataPlaceFaultSites.Program) (owner : Key) :
     SourceCoreFunctions.BodyLowerer :=
   fun expression fuel source scope statements result reasonAt fellThrough escaped =>
-    SourceCoreLoops.lowerStatementsWithPolicy (SourceCoreAssignmentPolicy.attach {
+    SourceCoreLoops.lowerStatementsWithPolicy {
       lowerExpression := expression
       readStatement := SourceCoreGeneralTypes.readStatement checked
       lowerBinder := SourceCoreGeneralTypes.lowerBinder checked
       lowerAssignment := SourceCoreGeneralTypes.lowerAssignment checked
       lowerMatch := some (SourceCoreDataMatches.lowerWithReasons
         { checked, signatures, solvedRequirements })
-    } assignments) fuel source scope statements result reasonAt fellThrough escaped
+      assignEqual := some fun expression fuel source scope site assignment rhs output next reasonAt =>
+        SourceCoreDataPlaces.lower checked signatures expression fuel source scope site assignment .equal
+          (some rhs) output next reasonAt
+          (diagnostics.placeReason owner site assignment.target.root none) Core.Word.zero
+          (fun type => diagnostics.placeReason owner site assignment.target.root (some type))
+      assignValue := some fun expression fuel source scope site assignment operator rhs output next reasonAt =>
+        SourceCoreDataPlaces.lower checked signatures expression fuel source scope site assignment operator
+          (some rhs) output next reasonAt
+          (diagnostics.placeReason owner site assignment.target.root none)
+          (assignments.reasonAt site assignment.target.root (.value operator))
+          (fun type => diagnostics.placeReason owner site assignment.target.root (some type))
+      assignBitNotWithExpression := some fun expression fuel source scope site assignment output next reasonAt =>
+        SourceCoreDataPlaces.lower checked signatures expression fuel source scope site assignment .equal
+          none output next reasonAt
+          (diagnostics.placeReason owner site assignment.target.root none)
+          (assignments.reasonAt site assignment.target.root .bitNot)
+          (fun type => diagnostics.placeReason owner site assignment.target.root (some type))
+    } fuel source scope statements result reasonAt fellThrough escaped
 
 private def compileClosure (checked : Checked) (signatures : ProgramSignatures) (plan : Plan)
-    (globals : List Signature) (diagnostics : SourceCoreDataFaultSites.Program)
+    (globals : List Signature) (diagnostics : SourceCoreDataPlaceFaultSites.Program)
     (fuel : Nat) (function : Function) : Except Error Core.Expr := do
   let source := function.specialized.function.typedBody
   let own ← match diagnostics.base.find? function.signature.key with
@@ -91,6 +110,7 @@ private def compileClosure (checked : Checked) (signatures : ProgramSignatures) 
     internalReason := Core.Word.zero
   }
   let lowerBody := bodyLowerer checked signatures function.specialized.function.solvedRequirements own.assignments
+    diagnostics function.signature.key
   let policy := SourceCoreGeneralTypes.policy checked signatures
   let body ← (lowerBody
     (fun budget source scope id reasonAt =>
@@ -102,7 +122,7 @@ private def compileClosure (checked : Checked) (signatures : ProgramSignatures) 
     (SourceCoreFunctions.bindParameters function.inputs function.signature.resultType body))
 
 private def assemble (globals : List Signature) (functions : List Function) (closures : List Core.Expr)
-    (diagnostics : SourceCoreDataFaultSites.Program) {checked : Checked}
+    (diagnostics : SourceCoreDataPlaceFaultSites.Program) {checked : Checked}
     (request : SourceCoreGeneralEntry.BodyRequest checked) : Except Error SourceCoreGeneralEntry.LoweredBody := do
   let (function, index) ← match functions.zipIdx.find? (fun entry => decide (entry.1.signature.key = request.specialized.key)) with
     | some found => pure found
@@ -131,7 +151,7 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
   match plan.seedKeys with
   | [] => pure { plan, entries := [] }
   | first :: _ =>
-      let diagnostics ← (SourceCoreDataFaultSites.prepare plan first).mapError
+      let diagnostics ← (SourceCoreDataPlaceFaultSites.prepare checked program.signatures plan first).mapError
         (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.diagnostics)
       let closures ← (functions.mapM (compileClosure checked program.signatures plan globals diagnostics fuel)).mapError
         SourceCoreGeneralEntry.CompileError.lowering
