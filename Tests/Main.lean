@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreDataPlacePathFaults
 import Solcore.Test.SourceCoreGenericMatchPreservation
 import Solcore.Test.SourceCoreDataPlacePaths
 import Solcore.Test.SourceCoreGenericMatch
@@ -2527,6 +2528,7 @@ def run : IO Unit := do
   SourceCoreLocalPolymorphicExecution.run
   SourceCoreDataPlaceMappingProofs.run
   SourceCoreDataPlacePaths.run
+  SourceCoreDataPlacePathFaults.run
   SourceCoreForLoopStatementCertificates.run
   SourceCoreLoopStatementMeaning.run
   SourceCoreLoopFiniteComposition.run
