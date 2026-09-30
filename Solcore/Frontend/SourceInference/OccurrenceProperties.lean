@@ -3534,6 +3534,30 @@ theorem inferForItemsFuel_occurrenceBoundExtends
   inference_occurrenceBoundExtends.2.2.2.2.2.1 fuel context items state
     result success
 
+/-- Expose the match-case component of the mutual occurrence theorem so
+soundness proofs can follow a checked explicit arm into a default body. -/
+theorem inferMatchCasesFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context}
+    {scrutineeType expectedReturn : Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : State} {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    state.OccurrenceBoundExtends result.state :=
+  inference_occurrenceBoundExtends.2.2.2.2.2.2.2.2.2.2 fuel context
+    scrutineeType expectedReturn outerScope cases state result success
+
+/-- Expose expression-list occurrence preservation for the synthetic tuple
+constructed when a `match` has multiple scrutinees. -/
+theorem inferExprsFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context}
+    {expressions : List Syntax.Expr} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferExprsFuel fuel context expressions state = .ok result) :
+    state.OccurrenceBoundExtends result.2 :=
+  inference_occurrenceBoundExtends.2.2.2.2.2.2.2.2.2.1 fuel context
+    expressions state result success
+
 /-! ## Anchored node-prefix preservation
 
 Selected-call fitting is the only traversal step that may rewrite already
