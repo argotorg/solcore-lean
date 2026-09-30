@@ -11,6 +11,7 @@ import Solcore.Test.SourceCoreFunctionArguments
 import Solcore.Test.SourceCoreFunctionCalls
 import Solcore.Test.SourceCoreContractedFunctions
 import Solcore.Test.SourceCoreDataExpressionSequence
+import Solcore.Test.SourceCoreDataPlaceKeyOrder
 import Solcore.Test.SourceCoreDataPayload
 import Solcore.Test.SourceCoreDataPayloadMapping
 import Solcore.Test.SourceCoreDataPayloadPaths
