@@ -2,6 +2,7 @@ import Solcore.Test.SourceCoreDataPlacePathFaults
 import Solcore.Test.SourceCoreDataPlaceWriteBack
 import Solcore.Test.SourceCoreStageContracts
 import Solcore.Test.SourceCoreStageCodebook
+import Solcore.Test.CoreCallableContract
 import Solcore.Test.SourceTypedClosureCaptureBoundary
 import Solcore.Test.SourceCoreGenericMatchPreservation
 import Solcore.Test.SourceCoreDataPlacePaths
@@ -2531,6 +2532,7 @@ def run : IO Unit := do
   SourceCoreLocalEvidence.run
   SourceCoreStageContracts.run
   SourceCoreStageCodebook.run
+  CoreCallableContract.run
   SourceTypedClosureCaptureBoundary.run
   SourceCoreLocalPolymorphicExecution.run
   SourceCoreDataPlaceMappingProofs.run
