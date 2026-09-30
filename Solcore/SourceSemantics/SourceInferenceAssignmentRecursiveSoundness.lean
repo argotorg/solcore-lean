@@ -189,4 +189,147 @@ theorem inferAssignedValueFuel_children_invariants
       | bitXor => exact finishNonEqual success
       | bitOr => exact finishNonEqual success
 
+/-- The actual inferred place and RHS are typed in one enclosing statement
+source.  The place is inferred before the RHS; its recorded type is finally
+resolved, but final semantic substitution makes that update observationally
+identical to the original place type. -/
+theorem inferAssignedValueFuel_children_scopedSound
+    {fuel : Nat}
+    {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {targetExpression value : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp}
+    {initial assignmentState parentState evidenceState : State}
+    {assignment : AssignmentResolution} {inferred : InferredExpression}
+    {roots : List NodeId} {finalized : Frontend.SourceInference.Result}
+    {semanticContext : SourceSemantics.Context}
+    (success : Detail.inferAssignedValueFuel fuel inferenceContext
+      targetExpression operator value initial =
+        .ok (assignment, inferred, assignmentState))
+    (resources : FinalInferenceResources wholeContext wholeReturn
+      evidenceState roots finalized)
+    (signaturesEq : inferenceContext.signatures = wholeContext.signatures)
+    (ownerEq : inferenceContext.scope.genericOwner =
+      wholeContext.scope.genericOwner)
+    (parametersEq : inferenceContext.typeParameters =
+      wholeContext.typeParameters)
+    (assumptionsEq : inferenceContext.assumptions = wholeContext.assumptions)
+    (signatureFormation : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (Ty.productMany signature.parameterTypes)
+        (Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed inferenceContext.signatures)
+    (signatureParameters : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters)
+    (initialInvariant : RecursiveExpressionInvariant wholeContext finalized
+      initial semanticContext)
+    (assignmentSubstitutionExtension :
+      finalized.substitution.SemanticallyExtends
+        assignmentState.inference.substitution)
+    (assignmentToParent : TypingSourceExtends
+      (assignmentState.toTypedSource roots)
+      (parentState.toTypedSource roots))
+    (parentToEvidence : TypingSourceExtends
+      (parentState.toTypedSource roots)
+      (evidenceState.toTypedSource roots))
+    (parentToFinal : TypingSourceExtends
+      ((parentState.toTypedSource roots).applySubstitution
+        finalized.substitution) finalized.typedSource)
+    (assignmentPatternsSubset : assignmentState.integerPatterns ⊆
+      evidenceState.integerPatterns)
+    (assignmentLiteralsSubset : assignmentState.integerLiterals ⊆
+      evidenceState.integerLiterals)
+    (assignmentRequirementsSubset : assignmentState.requirements ⊆
+      evidenceState.requirements)
+    (keysCovered : ∀ key, .expression key ∈ assignment.references →
+      TemplateScopeCovered finalized.typedSource semanticContext
+        (.expression key))
+    (rhsCovered : TemplateScopeCovered finalized.typedSource semanticContext
+      (.expression inferred.id))
+    (placeSound : InferPlaceFuelScopedSoundness fuel)
+    (expressionSound : InferExprFuelScopedSoundness fuel) :
+    SourcePlaceHasType
+        ((parentState.toTypedSource roots).applySubstitution
+          finalized.substitution)
+        semanticContext
+        (assignment.target.applySubstitution finalized.substitution)
+        (finalized.substitution.apply assignment.target.type) ∧
+      ExpressionHasType
+        ((parentState.toTypedSource roots).applySubstitution
+          finalized.substitution)
+        semanticContext inferred.id
+        (finalized.substitution.apply inferred.type) := by
+  obtain ⟨place, placeState, expected, valueInitial, placeSuccess,
+      placeInvariant, valueSuccess, valueInvariant, expectedBelow,
+      referencesEq, targetEq⟩ :=
+    inferAssignedValueFuel_children_invariants success signatureFormation
+      functionsCanonical initialInvariant assignmentSubstitutionExtension
+  obtain ⟨actualPlace, actualPlaceState, actualPlaceSuccess, _,
+      placeToAssignment, placeLiteralsSubset, placePatternsSubset,
+      placeRequirementsSubset⟩ :=
+    inferAssignedValueFuel_success_place_state_provenance success
+      initialInvariant.nodesBelow roots
+  rw [placeSuccess] at actualPlaceSuccess
+  obtain ⟨rfl, rfl⟩ := (Except.ok.inj actualPlaceSuccess).symm
+  have placeToParent : TypingSourceExtends
+      (placeState.toTypedSource roots) (parentState.toTypedSource roots) :=
+    placeToAssignment.trans assignmentToParent
+  have placeKeysCovered : ∀ key,
+      .expression key ∈ place.references →
+        TemplateScopeCovered finalized.typedSource semanticContext
+          (.expression key) := by
+    intro key member
+    exact keysCovered key (by simpa [AssignmentResolution.references,
+      referencesEq] using member)
+  have placeTyped : SourcePlaceHasType
+      ((parentState.toTypedSource roots).applySubstitution
+        finalized.substitution)
+      semanticContext (place.applySubstitution finalized.substitution)
+      (finalized.substitution.apply place.type) :=
+    placeSound placeSuccess resources signaturesEq ownerEq parametersEq
+      assumptionsEq signatureFormation functionsCanonical catalog
+      signatureParameters initialInvariant placeInvariant.substitutionExtension
+      placeToParent parentToEvidence
+      (List.Subset.trans placePatternsSubset assignmentPatternsSubset)
+      (List.Subset.trans placeLiteralsSubset assignmentLiteralsSubset)
+      (List.Subset.trans placeRequirementsSubset
+        assignmentRequirementsSubset) placeKeysCovered
+  have targetTypeEq : finalized.substitution.apply assignment.target.type =
+      finalized.substitution.apply place.type := by
+    rw [targetEq]
+    simpa [State.resolve, InferState.resolve] using
+      assignmentSubstitutionExtension place.type
+  have targetSubstEq :
+      assignment.target.applySubstitution finalized.substitution =
+        place.applySubstitution finalized.substitution := by
+    rw [targetEq]
+    have storedEq : finalized.substitution.apply
+        (assignmentState.resolve place.type) =
+        finalized.substitution.apply place.type := by
+      simpa [State.resolve, InferState.resolve] using
+        assignmentSubstitutionExtension place.type
+    simpa [PlaceResolution.applySubstitution] using
+      congrArg (fun type => ({ place with type := type } : PlaceResolution))
+        storedEq
+  have valueTyped : ExpressionHasType
+      ((parentState.toTypedSource roots).applySubstitution
+        finalized.substitution)
+      semanticContext inferred.id
+      (finalized.substitution.apply inferred.type) :=
+    expressionSound valueSuccess resources assignmentSubstitutionExtension
+      signaturesEq ownerEq parametersEq assumptionsEq signatureFormation
+      functionsCanonical catalog signatureParameters valueInvariant
+      (by intro candidate member
+          simp only [Option.mem_def] at member
+          cases member
+          exact expectedBelow)
+      (assignmentToParent.applySubstitution finalized.substitution)
+      parentToFinal (assignmentToParent.trans parentToEvidence)
+      assignmentPatternsSubset assignmentLiteralsSubset
+      assignmentRequirementsSubset rhsCovered
+  exact ⟨by simpa only [targetSubstEq, targetTypeEq] using placeTyped,
+    valueTyped⟩
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
