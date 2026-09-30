@@ -1,5 +1,6 @@
 import Solcore.Test.SourceCoreDataPlacePathFaults
 import Solcore.Test.SourceCoreDataPlaceWriteBack
+import Solcore.Test.SourceCoreStageContracts
 import Solcore.Test.SourceCoreGenericMatchPreservation
 import Solcore.Test.SourceCoreDataPlacePaths
 import Solcore.Test.SourceCoreGenericMatch
@@ -2526,6 +2527,7 @@ def run : IO Unit := do
   SourceCoreEvidence.run
   SourceCoreLocalPolymorphism.run
   SourceCoreLocalEvidence.run
+  SourceCoreStageContracts.run
   SourceCoreLocalPolymorphicExecution.run
   SourceCoreDataPlaceMappingProofs.run
   SourceCoreDataPlacePaths.run
