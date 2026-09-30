@@ -1813,570 +1813,6 @@ theorem inferMatchCasesFuel_success_sound_of_bounded_statements
         headSuccess headExtension headIntegerSubset headRequirementSubset)
     childSuccess
 
-theorem inferStatementFuel_success_matchWithoutDefault_bounded_sound
-    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
-    {statement : Syntax.Statement}
-    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
-    {arms : Syntax.MatchArms} {expectedReturn : TypeSystem.Ty}
-    {initial allocated : Frontend.SourceInference.State}
-    {id : StatementId} {result : Detail.StatementResult}
-    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
-    {evidenceState : Frontend.SourceInference.State}
-    (statementEq : statement.value = .matchWith scrutinees arms)
-    (defaultEq : arms.value.defaultBody = none)
-    (allocationEq : initial.allocateStatementId = (id, allocated))
-    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
-      expectedReturn initial = .ok result)
-    (signatureFormation :
-      ProgramSignatureFormationValidated inferenceContext.signatures)
-    (functionsCanonical : ∀ signature ∈
-      inferenceContext.signatures.functions,
-      signature.scheme.body = .function
-        (TypeSystem.Ty.productMany signature.parameterTypes)
-        (TypeSystem.Ty.productMany signature.returnTypes))
-    (catalog : SignatureCatalogWellFormed target.signatures)
-    (signatures_eq : target.signatures = inferenceContext.signatures)
-    (ready : initial.InferenceReady)
-    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
-    (below : initial.LocalBindersBelowNextLocal)
-    (invariant : ActiveLocalContextInvariant initial outer target)
-    (outerExtension : outer.SemanticallyExtends
-      result.state.inference.substitution)
-    (roots : List NodeId := [])
-    (initialBelow : initial.NodesBelowNextOccurrence)
-    (semanticOwner : target.currentDeclaration = some
-      ((result.state.toTypedSource roots).applySubstitution outer).owner)
-    (evidence : IntegerPatternEvidenceAt
-      ((result.state.toTypedSource roots).applySubstitution outer) target outer
-      evidenceState (.statement result.id))
-    (integerPatternsSubset :
-      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
-    (requirementsSubset :
-      result.state.requirements ⊆ evidenceState.requirements)
-    (statementSound :
-      ∀ {childFuel : Nat}
-        {input : Frontend.SourceInference.State}
-        {inputContext : SourceSemantics.Context}
-        {childStatement : Syntax.Statement}
-        {head : Detail.StatementResult},
-        childFuel < fuel →
-        ActiveLocalContextInvariant input outer inputContext →
-        Detail.inferStatementFuel childFuel inferenceContext childStatement
-          expectedReturn input = .ok head →
-        TypingSourceExtends
-          ((head.state.toTypedSource roots).applySubstitution outer)
-          ((result.state.toTypedSource roots).applySubstitution outer) →
-        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
-        head.state.requirements ⊆ evidenceState.requirements →
-        ∃ outputContext facts,
-          ActiveLocalContextInvariant head.state outer outputContext ∧
-          StatementHasType
-            ((head.state.toTypedSource roots).applySubstitution outer) {
-              returnType := outer.apply expectedReturn
-              loopDepth := inferenceContext.loopDepth
-            } inputContext head.id outputContext facts ∧
-          StatementResultMatchesFactsAfterSubstitution outer head facts)
-    (casesPresent : arms.value.cases ≠ [])
-    (scrutineeSound :
-      ∀ {scrutinee : InferredExpression}
-        {scrutineeState : Frontend.SourceInference.State},
-        inferMatchScrutineesFuel fuel inferenceContext statement.span
-            scrutinees.elements.toList allocated =
-              .ok (scrutinee, scrutineeState) →
-          ExpressionHasType
-            ((result.state.toTypedSource roots).applySubstitution outer)
-            target scrutinee.id (outer.apply scrutinee.type)) :
-    ∃ facts,
-      ActiveLocalContextInvariant result.state outer target ∧
-      StatementHasType
-        ((result.state.toTypedSource roots).applySubstitution outer) {
-          returnType := outer.apply expectedReturn
-          loopDepth := inferenceContext.loopDepth
-        } target result.id target facts ∧
-      StatementResultMatchesFactsAfterSubstitution outer result facts := by
-  have allocatedInvariant :
-      ActiveLocalContextInvariant allocated outer target :=
-    invariant.allocateStatementId allocationEq
-  have allocatedReady : allocated.InferenceReady := by
-    have retained :=
-      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
-    have allocatedEq : initial.allocateStatementId.2 = allocated :=
-      congrArg Prod.snd allocationEq
-    rw [allocatedEq] at retained
-    exact retained
-  have allocatedReturnBelow :
-      expectedReturn.VariablesBelow allocated.inference.next := by
-    have allocatedEq : initial.allocateStatementId.2 = allocated :=
-      congrArg Prod.snd allocationEq
-    rw [← allocatedEq]
-    exact returnBelow
-  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
-    have retained :=
-      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
-        initial below
-    have allocatedEq : initial.allocateStatementId.2 = allocated :=
-      congrArg Prod.snd allocationEq
-    rw [allocatedEq] at retained
-    exact retained
-  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
-      scrutineeSuccess, hiddenAllocation, casesSuccess,
-      guardPassed, resultEq, contains⟩ :=
-    inferStatementFuel_success_matchWithoutDefault_facts statementEq defaultEq
-      allocationEq success roots
-  have scrutineeProperties := inferMatchScrutineesFuel_inferenceProperties
-    allocatedReady signatureFormation functionsCanonical scrutineeSuccess
-  have scrutineeInvariant :
-      ActiveLocalContextInvariant scrutineeState outer target :=
-    allocatedInvariant.inferMatchScrutineesFuel scrutineeSuccess
-  have scrutineeLocalBelow :
-      scrutineeState.LocalBindersBelowNextLocal :=
-    inferMatchScrutineesFuel_preserves_localBindersBelowNextLocal
-      allocatedBelow scrutineeSuccess
-  have hiddenInvariant : ActiveLocalContextInvariant hiddenState outer target :=
-    scrutineeInvariant.allocateHiddenLocal hiddenAllocation
-  have hiddenReady : hiddenState.InferenceReady := by
-    have retained :=
-      Frontend.SourceInference.State.InferenceReady.allocateHiddenLocal
-        scrutineeProperties.2.1
-    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    rw [hiddenEq] at retained
-    exact retained
-  have hiddenScrutineeBelow :
-      scrutinee.type.VariablesBelow hiddenState.inference.next := by
-    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    rw [← hiddenEq]
-    exact scrutineeProperties.2.2
-  have hiddenReturnBelow :
-      expectedReturn.VariablesBelow hiddenState.inference.next := by
-    have atScrutinee :=
-      allocatedReturnBelow.weaken scrutineeProperties.1.next_le
-    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    rw [← hiddenEq]
-    exact atScrutinee
-  have hiddenBelow : hiddenState.LocalBindersBelowNextLocal := by
-    have retained :=
-      Frontend.SourceInference.State.allocateHiddenLocal_preserves_localBindersBelowNextLocal
-        scrutineeState scrutineeLocalBelow
-    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    rw [hiddenEq] at retained
-    exact retained
-  have checkedInvariant : ActiveLocalContextInvariant checked.state outer
-      target := hiddenInvariant.inferMatchCasesFuel casesSuccess
-  have scrutineeTyping := scrutineeSound scrutineeSuccess
-  have checkedIntegerPatternsSubset :
-      checked.state.integerPatterns ⊆ result.state.integerPatterns := by
-    rw [resultEq]
-    intro origin member
-    exact member
-  have checkedRequirementsSubset :
-      checked.state.requirements ⊆ result.state.requirements := by
-    rw [resultEq]
-    exact Frontend.SourceInference.State.recordNode_requirements_subset
-      checked.state _
-  have checkedRequirementsOccur : ∀ matchCase,
-      matchCase ∈ checked.cases →
-      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
-        PrimaryRequirementOccursAt
-          ((result.state.toTypedSource roots).applySubstitution outer)
-          (.statement result.id) requirement := by
-    intro matchCase caseMember requirement requirementMember
-    rw [FlexibleSubstitution.primaryRequirementOccursAt_applySubstitution]
-    exact contains.matchCasePatternRequirementOccursAt rfl caseMember
-      requirementMember
-  have allocatedNodesBelow : allocated.NodesBelowNextOccurrence := by
-    have bound :=
-      Frontend.SourceInference.State.allocateStatementId_preserves_nodesBelowNextOccurrence
-        initial initialBelow
-    have eq : initial.allocateStatementId.2 = allocated :=
-      congrArg Prod.snd allocationEq
-    simpa [eq] using bound
-  have scrutineeNodesBelow :
-      scrutineeState.NodesBelowNextOccurrence :=
-    inferMatchScrutineesFuel_success_nodesBelow scrutineeSuccess
-      allocatedNodesBelow
-  have hiddenNodesBelow : hiddenState.NodesBelowNextOccurrence := by
-    have bound :=
-      Frontend.SourceInference.State.allocateHiddenLocal_preserves_nodesBelowNextOccurrence
-        scrutineeState scrutineeNodesBelow
-    have eq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    simpa [eq] using bound
-  have checkedToResult : TypingSourceExtends
-      ((checked.state.toTypedSource roots).applySubstitution outer)
-      ((result.state.toTypedSource roots).applySubstitution outer) := by
-    have raw : TypingSourceExtends
-        (checked.state.toTypedSource roots)
-        (result.state.toTypedSource roots) := by
-      rw [resultEq]
-      refine ⟨rfl, ?_⟩
-      simp only [Frontend.SourceInference.State.toTypedSource,
-        Frontend.SourceInference.State.recordNode]
-      exact List.prefix_append _ _
-    exact raw.applySubstitution outer
-  subst result
-  have checkedExtension : outer.SemanticallyExtends
-      checked.state.inference.substitution := by
-    change outer.SemanticallyExtends
-      checked.state.inference.substitution at outerExtension
-    exact outerExtension
-  have checkedOwner : checked.state.owner = hiddenState.owner :=
-    Detail.inferMatchCasesFuel_preserves_owner casesSuccess
-  obtain ⟨caseFacts, casesTyping, allReturnEq⟩ :=
-    inferMatchCasesFuel_success_sound_of_bounded_statements
-      signatureFormation functionsCanonical catalog signatures_eq evidence
-      hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow
-      hiddenNodesBelow (by
-        simpa [Frontend.SourceInference.State.toTypedSource,
-          Frontend.SourceInference.State.recordNode,
-          TypedSource.applySubstitution] using checkedOwner)
-      semanticOwner scrutineeTyping.type_admissible hiddenInvariant rfl
-      checkedExtension checkedToResult
-      (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
-      (List.Subset.trans checkedRequirementsSubset requirementsSubset)
-      checkedRequirementsOccur statementSound casesSuccess
-  have exhaustive :=
-    matchExhaustiveWithoutDefault_of_guard catalog signatures_eq casesSuccess
-      casesTyping scrutineeTyping.type_admissible checkedExtension guardPassed
-  have checkedCasesPresent : checked.cases ≠ [] := by
-    intro checkedCasesEq
-    have lengthEq := Detail.inferMatchCasesFuel_success_cases_length
-      casesSuccess
-    rw [checkedCasesEq] at lengthEq
-    apply casesPresent
-    simpa using lengthEq.symm
-  have caseFactsPresent : caseFacts ≠ [] :=
-    matchCasesHaveType_facts_ne_nil_of_cases_ne_nil casesTyping (by
-      simpa using checkedCasesPresent)
-  obtain ⟨summary, merged⟩ :=
-    mergeBodyControls_withoutDefault_eq_some_of_ne_nil caseFacts
-      caseFactsPresent
-  refine ⟨{
-      type := if allBodiesSawReturn caseFacts then
-        outer.apply expectedReturn
-      else
-        .unit
-      hasValue := allBodiesSawReturn caseFacts
-      sawReturn := allBodiesSawReturn caseFacts
-      control := summary.eraseValue
-    }, checkedInvariant.recordNode _, ?_, ?_⟩
-  · exact matchWithoutDefaultStatementHasType_afterSubstitution contains
-      scrutineeTyping casesTyping exhaustive allReturnEq merged
-      checkedExtension
-  · exact StatementResultMatchesFactsAfterSubstitution.matchWithoutDefault
-      allReturnEq checkedExtension id _
-
-
-theorem inferStatementFuel_success_matchWithDefault_bounded_sound
-    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
-    {statement : Syntax.Statement}
-    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
-    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
-    {expectedReturn : TypeSystem.Ty}
-    {initial allocated : Frontend.SourceInference.State}
-    {id : StatementId} {result : Detail.StatementResult}
-    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
-    {evidenceState : Frontend.SourceInference.State}
-    (statementEq : statement.value = .matchWith scrutinees arms)
-    (defaultEq : arms.value.defaultBody = some defaultBody)
-    (allocationEq : initial.allocateStatementId = (id, allocated))
-    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
-      expectedReturn initial = .ok result)
-    (signatureFormation :
-      ProgramSignatureFormationValidated inferenceContext.signatures)
-    (functionsCanonical : ∀ signature ∈
-      inferenceContext.signatures.functions,
-      signature.scheme.body = .function
-        (TypeSystem.Ty.productMany signature.parameterTypes)
-        (TypeSystem.Ty.productMany signature.returnTypes))
-    (catalog : SignatureCatalogWellFormed target.signatures)
-    (signatures_eq : target.signatures = inferenceContext.signatures)
-    (ready : initial.InferenceReady)
-    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
-    (below : initial.LocalBindersBelowNextLocal)
-    (invariant : ActiveLocalContextInvariant initial outer target)
-    (outerExtension : outer.SemanticallyExtends
-      result.state.inference.substitution)
-    (roots : List NodeId := [])
-    (initialBelow : initial.NodesBelowNextOccurrence)
-    (semanticOwner : target.currentDeclaration = some
-      ((result.state.toTypedSource roots).applySubstitution outer).owner)
-    (evidence : IntegerPatternEvidenceAt
-      ((result.state.toTypedSource roots).applySubstitution outer) target outer
-      evidenceState (.statement result.id))
-    (integerPatternsSubset :
-      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
-    (requirementsSubset :
-      result.state.requirements ⊆ evidenceState.requirements)
-    (scrutineeSound :
-      ∀ {scrutinee : InferredExpression}
-        {scrutineeState : Frontend.SourceInference.State},
-        inferMatchScrutineesFuel fuel inferenceContext statement.span
-            scrutinees.elements.toList allocated =
-              .ok (scrutinee, scrutineeState) →
-          ExpressionHasType
-            ((result.state.toTypedSource roots).applySubstitution outer)
-            target scrutinee.id (outer.apply scrutinee.type))
-    (statementSound :
-      ∀ {childFuel : Nat}
-        {input : Frontend.SourceInference.State}
-        {inputContext : SourceSemantics.Context}
-        {childStatement : Syntax.Statement}
-        {head : Detail.StatementResult},
-        childFuel < fuel →
-        ActiveLocalContextInvariant input outer inputContext →
-        Detail.inferStatementFuel childFuel inferenceContext childStatement
-          expectedReturn input = .ok head →
-        TypingSourceExtends
-          ((head.state.toTypedSource roots).applySubstitution outer)
-          ((result.state.toTypedSource roots).applySubstitution outer) →
-        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
-        head.state.requirements ⊆ evidenceState.requirements →
-        ∃ outputContext facts,
-          ActiveLocalContextInvariant head.state outer outputContext ∧
-          StatementHasType
-            ((head.state.toTypedSource roots).applySubstitution outer) {
-              returnType := outer.apply expectedReturn
-              loopDepth := inferenceContext.loopDepth
-            } inputContext head.id outputContext facts ∧
-          StatementResultMatchesFactsAfterSubstitution outer head facts) :
-    ∃ facts,
-      ActiveLocalContextInvariant result.state outer target ∧
-      StatementHasType
-        ((result.state.toTypedSource roots).applySubstitution outer) {
-          returnType := outer.apply expectedReturn
-          loopDepth := inferenceContext.loopDepth
-        } target result.id target facts ∧
-      StatementResultMatchesFactsAfterSubstitution outer result facts := by
-  have allocatedInvariant :
-      ActiveLocalContextInvariant allocated outer target :=
-    invariant.allocateStatementId allocationEq
-  have allocatedReady : allocated.InferenceReady := by
-    have retained :=
-      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
-    have allocatedEq : initial.allocateStatementId.2 = allocated :=
-      congrArg Prod.snd allocationEq
-    rw [allocatedEq] at retained
-    exact retained
-  have allocatedReturnBelow :
-      expectedReturn.VariablesBelow allocated.inference.next := by
-    have allocatedEq : initial.allocateStatementId.2 = allocated :=
-      congrArg Prod.snd allocationEq
-    rw [← allocatedEq]
-    exact returnBelow
-  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
-    have retained :=
-      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
-        initial below
-    have allocatedEq : initial.allocateStatementId.2 = allocated :=
-      congrArg Prod.snd allocationEq
-    rw [allocatedEq] at retained
-    exact retained
-  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
-      defaultResult, scrutineeSuccess, hiddenAllocation, casesSuccess,
-      defaultSuccess, _guardPassed, resultEq, contains⟩ :=
-    inferStatementFuel_success_matchWithDefault_facts statementEq defaultEq
-      allocationEq success roots
-  have scrutineeProperties := inferMatchScrutineesFuel_inferenceProperties
-    allocatedReady signatureFormation functionsCanonical scrutineeSuccess
-  have scrutineeInvariant :
-      ActiveLocalContextInvariant scrutineeState outer target :=
-    allocatedInvariant.inferMatchScrutineesFuel scrutineeSuccess
-  have scrutineeLocalBelow :
-      scrutineeState.LocalBindersBelowNextLocal :=
-    inferMatchScrutineesFuel_preserves_localBindersBelowNextLocal
-      allocatedBelow scrutineeSuccess
-  have hiddenInvariant : ActiveLocalContextInvariant hiddenState outer target :=
-    scrutineeInvariant.allocateHiddenLocal hiddenAllocation
-  have hiddenReady : hiddenState.InferenceReady := by
-    have retained :=
-      Frontend.SourceInference.State.InferenceReady.allocateHiddenLocal
-        scrutineeProperties.2.1
-    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    rw [hiddenEq] at retained
-    exact retained
-  have hiddenScrutineeBelow :
-      scrutinee.type.VariablesBelow hiddenState.inference.next := by
-    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    rw [← hiddenEq]
-    exact scrutineeProperties.2.2
-  have hiddenReturnBelow :
-      expectedReturn.VariablesBelow hiddenState.inference.next := by
-    have atScrutinee :=
-      allocatedReturnBelow.weaken scrutineeProperties.1.next_le
-    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    rw [← hiddenEq]
-    exact atScrutinee
-  have hiddenBelow : hiddenState.LocalBindersBelowNextLocal := by
-    have retained :=
-      Frontend.SourceInference.State.allocateHiddenLocal_preserves_localBindersBelowNextLocal
-        scrutineeState scrutineeLocalBelow
-    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    rw [hiddenEq] at retained
-    exact retained
-  have checkedProperties := Detail.inferMatchCasesFuel_inferenceProperties
-    hiddenReady signatureFormation functionsCanonical hiddenScrutineeBelow
-      hiddenReturnBelow rfl casesSuccess
-  have checkedInvariant : ActiveLocalContextInvariant checked.state outer
-      target := hiddenInvariant.inferMatchCasesFuel casesSuccess
-  have checkedReturnBelow :=
-    hiddenReturnBelow.weaken checkedProperties.1.next_le
-  have defaultProperties := Detail.inferStatementsFuel_inferenceProperties
-    checkedProperties.2.1 signatureFormation functionsCanonical
-      checkedReturnBelow defaultSuccess
-  have scrutineeTyping := scrutineeSound scrutineeSuccess
-  have checkedIntegerPatternsSubset :
-      checked.state.integerPatterns ⊆ result.state.integerPatterns := by
-    rw [resultEq]
-    have throughDefault : checked.state.integerPatterns ⊆
-        defaultResult.state.integerPatterns :=
-      Detail.inferStatementsFuel_integerPatterns_subset defaultSuccess
-    have throughRestore : defaultResult.state.integerPatterns ⊆
-        (defaultResult.state.restoreLexicalScope
-          hiddenState.lexicalScope).integerPatterns := by
-      intro origin member
-      exact member
-    apply List.Subset.trans throughDefault
-    apply List.Subset.trans throughRestore
-    intro origin member
-    exact member
-  have checkedRequirementsSubset :
-      checked.state.requirements ⊆ result.state.requirements := by
-    rw [resultEq]
-    exact List.Subset.trans
-      (Detail.inferStatementsFuel_requirements_subset defaultSuccess)
-      (List.Subset.trans
-        (Frontend.SourceInference.State.restoreLexicalScope_requirements_subset
-          defaultResult.state hiddenState.lexicalScope)
-        (Frontend.SourceInference.State.recordNode_requirements_subset
-          (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope)
-          _))
-  have checkedRequirementsOccur : ∀ matchCase,
-      matchCase ∈ checked.cases →
-      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
-        PrimaryRequirementOccursAt
-          ((result.state.toTypedSource roots).applySubstitution outer)
-          (.statement result.id) requirement := by
-    intro matchCase caseMember requirement requirementMember
-    rw [FlexibleSubstitution.primaryRequirementOccursAt_applySubstitution]
-    exact contains.matchCasePatternRequirementOccursAt rfl caseMember
-      requirementMember
-  have allocatedNodesBelow : allocated.NodesBelowNextOccurrence := by
-    have bound :=
-      Frontend.SourceInference.State.allocateStatementId_preserves_nodesBelowNextOccurrence
-        initial initialBelow
-    have eq : initial.allocateStatementId.2 = allocated :=
-      congrArg Prod.snd allocationEq
-    simpa [eq] using bound
-  have scrutineeNodesBelow :
-      scrutineeState.NodesBelowNextOccurrence :=
-    inferMatchScrutineesFuel_success_nodesBelow scrutineeSuccess
-      allocatedNodesBelow
-  have hiddenNodesBelow : hiddenState.NodesBelowNextOccurrence := by
-    have bound :=
-      Frontend.SourceInference.State.allocateHiddenLocal_preserves_nodesBelowNextOccurrence
-        scrutineeState scrutineeNodesBelow
-    have eq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
-      congrArg Prod.snd hiddenAllocation
-    simpa [eq] using bound
-  have checkedNodesBelow : checked.state.NodesBelowNextOccurrence :=
-    (Detail.inferMatchCasesFuel_occurrenceBoundExtends casesSuccess
-      ).nodesBelowNextOccurrence hiddenNodesBelow
-  have defaultToResultRaw : TypingSourceExtends
-      (defaultResult.state.toTypedSource roots)
-      (result.state.toTypedSource roots) := by
-    rw [resultEq]
-    exact (child_provenance_through_restore_record
-      defaultResult.state hiddenState.lexicalScope _ roots).1
-  have defaultToResult : TypingSourceExtends
-      ((defaultResult.state.toTypedSource roots).applySubstitution outer)
-      ((result.state.toTypedSource roots).applySubstitution outer) :=
-    defaultToResultRaw.applySubstitution outer
-  have checkedToDefault : TypingSourceExtends
-      (checked.state.toTypedSource roots)
-      (defaultResult.state.toTypedSource roots) :=
-    inferStatementsFuel_success_typingSourceExtends defaultSuccess
-      checkedNodesBelow roots
-  have checkedToResult : TypingSourceExtends
-      ((checked.state.toTypedSource roots).applySubstitution outer)
-      ((result.state.toTypedSource roots).applySubstitution outer) :=
-    (TypingSourceExtends.trans checkedToDefault defaultToResultRaw
-      ).applySubstitution outer
-  have defaultIntegerPatternsSubset :
-      defaultResult.state.integerPatterns ⊆
-        evidenceState.integerPatterns := by
-    apply List.Subset.trans ?_ integerPatternsSubset
-    rw [resultEq]
-    exact (child_provenance_through_restore_record
-      defaultResult.state hiddenState.lexicalScope _ roots).2.1
-  have defaultRequirementsSubset :
-      defaultResult.state.requirements ⊆
-        evidenceState.requirements := by
-    apply List.Subset.trans ?_ requirementsSubset
-    rw [resultEq]
-    exact (child_provenance_through_restore_record
-      defaultResult.state hiddenState.lexicalScope _ roots).2.2
-  subst result
-  have defaultExtension : outer.SemanticallyExtends
-      defaultResult.state.inference.substitution := by
-    change outer.SemanticallyExtends
-      defaultResult.state.inference.substitution at outerExtension
-    exact outerExtension
-  have checkedExtension : outer.SemanticallyExtends
-      checked.state.inference.substitution :=
-    TypeSystem.Substitution.SemanticallyExtends.trans defaultExtension
-      defaultProperties.1.substitution_extends
-  have checkedOwner : checked.state.owner = hiddenState.owner :=
-    Detail.inferMatchCasesFuel_preserves_owner casesSuccess
-  have defaultOwner : defaultResult.state.owner = checked.state.owner :=
-    Detail.inferStatementsFuel_preserves_owner defaultSuccess
-  obtain ⟨caseFacts, casesTyping, caseReturnEq⟩ :=
-    inferMatchCasesFuel_success_sound_of_bounded_statements
-      signatureFormation functionsCanonical catalog signatures_eq evidence
-      hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow
-      hiddenNodesBelow (by
-        simpa [Frontend.SourceInference.State.toTypedSource,
-          Frontend.SourceInference.State.restoreLexicalScope,
-          Frontend.SourceInference.State.recordNode,
-          TypedSource.applySubstitution] using
-            defaultOwner.trans checkedOwner)
-      semanticOwner scrutineeTyping.type_admissible hiddenInvariant rfl
-      checkedExtension checkedToResult
-      (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
-      (List.Subset.trans checkedRequirementsSubset requirementsSubset)
-      checkedRequirementsOccur statementSound casesSuccess
-  obtain ⟨defaultFinal, defaultFacts, _defaultInvariant, defaultTyping,
-      defaultAgreement⟩ :=
-    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded
-      (fun state context => ActiveLocalContextInvariant state outer context)
-      (roots := roots) checkedInvariant checkedNodesBelow defaultToResult
-      defaultIntegerPatternsSubset defaultRequirementsSubset
-      statementSound defaultSuccess
-  obtain ⟨summary, merged⟩ :=
-    mergeBodyControls_withDefault_eq_some caseFacts defaultFacts
-  refine ⟨{
-      type := if allBodiesSawReturn caseFacts && defaultFacts.sawReturn then
-        outer.apply expectedReturn
-      else
-        .unit
-      hasValue := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
-      sawReturn := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
-      control := summary.eraseValue
-    }, hiddenInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
-  · exact matchWithDefaultStatementHasType_afterSubstitution contains
-      scrutineeTyping casesTyping defaultTyping caseReturnEq defaultAgreement
-      merged defaultExtension
-  · exact StatementResultMatchesFactsAfterSubstitution.matchWithDefault
-      caseReturnEq defaultAgreement defaultExtension id _
-
-
 /-- The actual child of an expression statement remains in the parent source. -/
 theorem inferStatementFuel_success_expression_child_provenance
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
@@ -2765,11 +2201,197 @@ theorem forItemsHaveType_assumptions_eq
           exact (induction tail).trans
             (forItemHasType_assumptions_eq head)
 
+/-- Pattern binders extend only the lexical tables of an arm context. -/
+theorem BindersExtend.assumptions_eq
+    {owner : Resolved.DeclarationId}
+    {before after : SourceSemantics.Context}
+    {binders : List TypedBinder}
+    (extension : BindersExtend owner before binders after) :
+    after.assumptions = before.assumptions := by
+  induction extension with
+  | nil => rfl
+  | cons head _ induction =>
+      exact induction.trans head.context_fields.2.2.2.1
+
 /-- Fuel-indexed sequencing with occurrence coverage at every retained
 statement root.  The typing source can be a local completed prefix (as in a
 lambda body) while scope evidence is checked against the whole final source.
 Successful head typing leaves assumptions unchanged, so coverage is valid for
 the recursive tail context too. -/
+theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_with_extra
+    (invariant : Frontend.SourceInference.State →
+      SourceSemantics.Context → Prop)
+    (extra : Frontend.SourceInference.State → Prop)
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    {evidenceState : Frontend.SourceInference.State}
+    {ambientSource coverageSource : TypedSource}
+    {control : ControlContext}
+    {substitution : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (roots : List NodeId := [])
+    (initialInvariant : invariant state semanticContext)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution substitution)
+      ambientSource)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (extraResult : extra result.state)
+    (extraHead : ∀ {childFuel : Nat} {tail : Detail.BlockResult}
+        {childState : Frontend.SourceInference.State}
+        {remaining : List Syntax.Statement},
+      Detail.inferStatementsFuel childFuel inferenceContext remaining
+        expectedReturn childState = .ok tail →
+      extra tail.state → extra childState)
+    (coveredStatements : ∀ id, id ∈ result.statements →
+      TemplateScopeCovered coverageSource semanticContext (.statement id))
+    (statementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {statement : Syntax.Statement} {head : Detail.StatementResult},
+        childFuel < fuel →
+        invariant input inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext statement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution substitution)
+          ambientSource →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        extra head.state →
+        TemplateScopeCovered coverageSource inputContext (.statement head.id) →
+        ∃ outputContext facts,
+          invariant head.state outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution substitution)
+            control inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution substitution head facts)
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn state = .ok result) :
+    ∃ finalContext facts,
+      invariant result.state finalContext ∧
+      StatementsHaveType ambientSource control semanticContext
+        result.statements finalContext facts ∧
+      BlockResultMatchesFactsAfterSubstitution substitution result facts := by
+  induction fuel generalizing statements state semanticContext result with
+  | zero =>
+      simp [Detail.inferStatementsFuel] at success
+  | succ fuel induction =>
+      cases statements with
+      | nil =>
+          have resultEq := inferStatementsFuel_success_nil_facts success
+          subst result
+          exact ⟨semanticContext, .empty, initialInvariant,
+            .nil control semanticContext,
+            BlockResultMatchesFactsAfterSubstitution.empty substitution state⟩
+      | cons statement rest =>
+          cases rest with
+          | nil =>
+              obtain ⟨head, headSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_singleton_facts success
+              subst result
+              have headCovered : TemplateScopeCovered coverageSource
+                  semanticContext (.statement head.id) :=
+                coveredStatements head.id (by simp)
+              obtain ⟨finalContext, headFacts, finalInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound (Nat.lt_succ_self fuel) initialInvariant
+                  headSuccess resultExtension integerPatternsSubset
+                  requirementsSubset extraResult headCovered
+              have headTypingAmbient :=
+                StatementHasType.weakenSource resultExtension headTyping
+              exact ⟨finalContext, .singleton headFacts, finalInvariant,
+                .singleton headTypingAmbient,
+                BlockResultMatchesFactsAfterSubstitution.singleton headMatches⟩
+          | cons next rest =>
+              obtain ⟨head, tail, headSuccess, tailSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_cons_facts success
+              subst result
+              have headBelow : head.state.NodesBelowNextOccurrence :=
+                (Detail.inferStatementFuel_occurrenceBoundExtends headSuccess
+                  ).nodesBelowNextOccurrence initialBelow
+              have headToTail : TypingSourceExtends
+                  ((head.state.toTypedSource roots).applySubstitution
+                    substitution)
+                  ((tail.state.toTypedSource roots).applySubstitution
+                    substitution) :=
+                (inferStatementsFuel_success_typingSourceExtends tailSuccess
+                  headBelow roots).applySubstitution substitution
+              have headExtension : TypingSourceExtends
+                  ((head.state.toTypedSource roots).applySubstitution
+                    substitution)
+                  ambientSource :=
+                TypingSourceExtends.trans headToTail resultExtension
+              have headIntegerPatternsSubset :
+                  head.state.integerPatterns ⊆
+                    evidenceState.integerPatterns :=
+                List.Subset.trans
+                  (Detail.inferStatementsFuel_integerPatterns_subset
+                    tailSuccess)
+                  integerPatternsSubset
+              have headRequirementsSubset :
+                  head.state.requirements ⊆ evidenceState.requirements :=
+                List.Subset.trans
+                  (Detail.inferStatementsFuel_requirements_subset tailSuccess)
+                  requirementsSubset
+              have headExtra : extra head.state :=
+                extraHead tailSuccess extraResult
+              have headCovered : TemplateScopeCovered coverageSource
+                  semanticContext (.statement head.id) :=
+                coveredStatements head.id (by simp)
+              obtain ⟨middleContext, headFacts, middleInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound (Nat.lt_succ_self fuel) initialInvariant
+                  headSuccess headExtension headIntegerPatternsSubset
+                  headRequirementsSubset headExtra headCovered
+              have headTypingAmbient :=
+                StatementHasType.weakenSource headExtension headTyping
+              have middleAssumptionsEq :
+                  middleContext.assumptions = semanticContext.assumptions :=
+                statementHasType_assumptions_eq headTypingAmbient
+              have tailCovered : ∀ id, id ∈ tail.statements →
+                  TemplateScopeCovered coverageSource middleContext
+                    (.statement id) := by
+                intro id member owner scopes
+                change owner.requirement.predicate ∈
+                  middleContext.assumptions
+                rw [middleAssumptionsEq]
+                exact coveredStatements id (by simp [member]) owner scopes
+              obtain ⟨finalContext, tailFacts, finalInvariant, tailTyping,
+                  tailMatches⟩ :=
+                induction (statements := next :: rest)
+                  (state := head.state) (result := tail)
+                  (semanticContext := middleContext)
+                  middleInvariant headBelow resultExtension
+                  integerPatternsSubset requirementsSubset extraResult
+                  tailCovered
+                  (fun childBound childInvariant childSuccess childExtension
+                    childIntegerPatternsSubset childRequirementsSubset
+                    childExtra childCovered =>
+                    statementSound (Nat.lt_trans childBound
+                      (Nat.lt_succ_self fuel)) childInvariant childSuccess
+                      childExtension childIntegerPatternsSubset
+                      childRequirementsSubset childExtra childCovered)
+                  tailSuccess
+              obtain ⟨tailHead, tailRest, tailStatementsEq⟩ :=
+                inferStatementsFuel_success_statements_eq_cons tailSuccess
+              have sequenceTyping : StatementsHaveType ambientSource control
+                  semanticContext (head.id :: tail.statements) finalContext
+                  (.cons headFacts tailFacts) := by
+                rw [tailStatementsEq]
+                exact .cons headTypingAmbient
+                  (by simpa [tailStatementsEq] using tailTyping)
+              exact ⟨finalContext, .cons headFacts tailFacts, finalInvariant,
+                sequenceTyping,
+                BlockResultMatchesFactsAfterSubstitution.cons headMatches
+                  tailMatches⟩
+
+/-- Coverage-aware sequencing without an additional ledger. -/
 theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
     (invariant : Frontend.SourceInference.State →
       SourceSemantics.Context → Prop)
@@ -2820,116 +2442,88 @@ theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_sco
       invariant result.state finalContext ∧
       StatementsHaveType ambientSource control semanticContext
         result.statements finalContext facts ∧
-      BlockResultMatchesFactsAfterSubstitution substitution result facts := by
-  induction fuel generalizing statements state semanticContext result with
-  | zero =>
-      simp [Detail.inferStatementsFuel] at success
-  | succ fuel induction =>
-      cases statements with
-      | nil =>
-          have resultEq := inferStatementsFuel_success_nil_facts success
-          subst result
-          exact ⟨semanticContext, .empty, initialInvariant,
-            .nil control semanticContext,
-            BlockResultMatchesFactsAfterSubstitution.empty substitution state⟩
-      | cons statement rest =>
-          cases rest with
-          | nil =>
-              obtain ⟨head, headSuccess, resultEq⟩ :=
-                inferStatementsFuel_success_singleton_facts success
-              subst result
-              have headCovered : TemplateScopeCovered coverageSource
-                  semanticContext (.statement head.id) :=
-                coveredStatements head.id (by simp)
-              obtain ⟨finalContext, headFacts, finalInvariant, headTyping,
-                  headMatches⟩ :=
-                statementSound (Nat.lt_succ_self fuel) initialInvariant
-                  headSuccess resultExtension integerPatternsSubset
-                  requirementsSubset headCovered
-              have headTypingAmbient :=
-                StatementHasType.weakenSource resultExtension headTyping
-              exact ⟨finalContext, .singleton headFacts, finalInvariant,
-                .singleton headTypingAmbient,
-                BlockResultMatchesFactsAfterSubstitution.singleton headMatches⟩
-          | cons next rest =>
-              obtain ⟨head, tail, headSuccess, tailSuccess, resultEq⟩ :=
-                inferStatementsFuel_success_cons_facts success
-              subst result
-              have headBelow : head.state.NodesBelowNextOccurrence :=
-                (Detail.inferStatementFuel_occurrenceBoundExtends headSuccess
-                  ).nodesBelowNextOccurrence initialBelow
-              have headToTail : TypingSourceExtends
-                  ((head.state.toTypedSource roots).applySubstitution
-                    substitution)
-                  ((tail.state.toTypedSource roots).applySubstitution
-                    substitution) :=
-                (inferStatementsFuel_success_typingSourceExtends tailSuccess
-                  headBelow roots).applySubstitution substitution
-              have headExtension : TypingSourceExtends
-                  ((head.state.toTypedSource roots).applySubstitution
-                    substitution)
-                  ambientSource :=
-                TypingSourceExtends.trans headToTail resultExtension
-              have headIntegerPatternsSubset :
-                  head.state.integerPatterns ⊆
-                    evidenceState.integerPatterns :=
-                List.Subset.trans
-                  (Detail.inferStatementsFuel_integerPatterns_subset
-                    tailSuccess)
-                  integerPatternsSubset
-              have headRequirementsSubset :
-                  head.state.requirements ⊆ evidenceState.requirements :=
-                List.Subset.trans
-                  (Detail.inferStatementsFuel_requirements_subset tailSuccess)
-                  requirementsSubset
-              have headCovered : TemplateScopeCovered coverageSource
-                  semanticContext (.statement head.id) :=
-                coveredStatements head.id (by simp)
-              obtain ⟨middleContext, headFacts, middleInvariant, headTyping,
-                  headMatches⟩ :=
-                statementSound (Nat.lt_succ_self fuel) initialInvariant
-                  headSuccess headExtension headIntegerPatternsSubset
-                  headRequirementsSubset headCovered
-              have headTypingAmbient :=
-                StatementHasType.weakenSource headExtension headTyping
-              have middleAssumptionsEq :
-                  middleContext.assumptions = semanticContext.assumptions :=
-                statementHasType_assumptions_eq headTypingAmbient
-              have tailCovered : ∀ id, id ∈ tail.statements →
-                  TemplateScopeCovered coverageSource middleContext
-                    (.statement id) := by
-                intro id member owner scopes
-                change owner.requirement.predicate ∈
-                  middleContext.assumptions
-                rw [middleAssumptionsEq]
-                exact coveredStatements id (by simp [member]) owner scopes
-              obtain ⟨finalContext, tailFacts, finalInvariant, tailTyping,
-                  tailMatches⟩ :=
-                induction (statements := next :: rest)
-                  (state := head.state) (result := tail)
-                  (semanticContext := middleContext)
-                  middleInvariant headBelow resultExtension
-                  integerPatternsSubset requirementsSubset tailCovered
-                  (fun childBound childInvariant childSuccess childExtension
-                    childIntegerPatternsSubset childRequirementsSubset
-                    childCovered =>
-                    statementSound (Nat.lt_trans childBound
-                      (Nat.lt_succ_self fuel)) childInvariant childSuccess
-                      childExtension childIntegerPatternsSubset
-                      childRequirementsSubset childCovered)
-                  tailSuccess
-              obtain ⟨tailHead, tailRest, tailStatementsEq⟩ :=
-                inferStatementsFuel_success_statements_eq_cons tailSuccess
-              have sequenceTyping : StatementsHaveType ambientSource control
-                  semanticContext (head.id :: tail.statements) finalContext
-                  (.cons headFacts tailFacts) := by
-                rw [tailStatementsEq]
-                exact .cons headTypingAmbient
-                  (by simpa [tailStatementsEq] using tailTyping)
-              exact ⟨finalContext, .cons headFacts tailFacts, finalInvariant,
-                sequenceTyping,
-                BlockResultMatchesFactsAfterSubstitution.cons headMatches
-                  tailMatches⟩
+      BlockResultMatchesFactsAfterSubstitution substitution result facts :=
+  inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_with_extra
+    invariant (fun _ => True) (roots := roots) initialInvariant initialBelow
+    resultExtension integerPatternsSubset requirementsSubset trivial
+    (fun _ _ => trivial) coveredStatements
+    (fun bound inv childSuccess extension integerSubset requirementSubset _
+      covered =>
+      statementSound bound inv childSuccess extension integerSubset
+        requirementSubset covered)
+    success
+
+/-- The literal ledger is another monotone child resource.  This variant
+threads it to each actual statement step so expression soundness can use the
+whole-final integer literal evidence. -/
+theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
+    (invariant : Frontend.SourceInference.State →
+      SourceSemantics.Context → Prop)
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    {evidenceState : Frontend.SourceInference.State}
+    {ambientSource coverageSource : TypedSource}
+    {control : ControlContext}
+    {substitution : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (roots : List NodeId := [])
+    (initialInvariant : invariant state semanticContext)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution substitution)
+      ambientSource)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (integerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (coveredStatements : ∀ id, id ∈ result.statements →
+      TemplateScopeCovered coverageSource semanticContext (.statement id))
+    (statementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {statement : Syntax.Statement} {head : Detail.StatementResult},
+        childFuel < fuel →
+        invariant input inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext statement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution substitution)
+          ambientSource →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext (.statement head.id) →
+        ∃ outputContext facts,
+          invariant head.state outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution substitution)
+            control inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution substitution head facts)
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn state = .ok result) :
+    ∃ finalContext facts,
+      invariant result.state finalContext ∧
+      StatementsHaveType ambientSource control semanticContext
+        result.statements finalContext facts ∧
+      BlockResultMatchesFactsAfterSubstitution substitution result facts :=
+  inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_with_extra
+    invariant (fun s => s.integerLiterals ⊆ evidenceState.integerLiterals)
+    (roots := roots) initialInvariant initialBelow resultExtension
+    integerPatternsSubset requirementsSubset integerLiteralsSubset
+    (fun tailSuccess tailSubset =>
+      List.Subset.trans
+        (Detail.inferStatementsFuel_integerLiterals_subset tailSuccess)
+        tailSubset)
+    coveredStatements
+    (fun bound inv childSuccess extension integerSubset requirementSubset
+      literalSubset covered =>
+      statementSound bound inv childSuccess extension integerSubset
+        literalSubset requirementSubset covered)
+    success
 
 /-- Same-source specialization used by whole-function finalization. -/
 theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped
@@ -3175,6 +2769,8 @@ theorem inferStatementFuel_success_block_sound_bounded_scoped
       coverageSource)
     (resultIntegerPatternsSubset :
       result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultIntegerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
     (resultRequirementsSubset :
       result.state.requirements ⊆ evidenceState.requirements)
     (childStatementSound :
@@ -3190,6 +2786,7 @@ theorem inferStatementFuel_success_block_sound_bounded_scoped
           ((head.state.toTypedSource roots).applySubstitution outer)
           ((result.state.toTypedSource roots).applySubstitution outer) →
         head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
         head.state.requirements ⊆ evidenceState.requirements →
         TemplateScopeCovered coverageSource inputContext
           (.statement head.id) →
@@ -3205,7 +2802,7 @@ theorem inferStatementFuel_success_block_sound_bounded_scoped
         ((result.state.toTypedSource roots).applySubstitution outer)
         control target result.id target facts ∧
       StatementResultMatchesFactsAfterSubstitution outer result facts := by
-  obtain ⟨bodyResult, bodySuccess, _, parentNode⟩ :=
+  obtain ⟨bodyResult, bodySuccess, resultEq, parentNode⟩ :=
     inferStatementFuel_success_block_facts statementEq allocationEq success
       roots
   obtain ⟨bodyResult', bodySuccess', allocatedBelow, bodyExtension,
@@ -3218,6 +2815,12 @@ theorem inferStatementFuel_success_block_sound_bounded_scoped
   subst bodyResult'
   have allocatedInvariant : ActiveLocalContextInvariant allocated outer target :=
     invariant.allocateStatementId allocationEq
+  have bodyIntegerLiteralsSubset :
+      bodyResult.state.integerLiterals ⊆ result.state.integerLiterals := by
+    rw [resultEq]
+    intro literal member
+    simpa [Frontend.SourceInference.State.restoreLexicalScope,
+      Frontend.SourceInference.State.recordNode] using member
   have bodyCovered : ∀ child, child ∈ bodyResult.statements →
       TemplateScopeCovered coverageSource target (.statement child) := by
     intro child member
@@ -3243,12 +2846,14 @@ theorem inferStatementFuel_success_block_sound_bounded_scoped
     exact TemplateScopeCovered.statementChild parentCovered closed coveredEdge
       (fun _ membership => membership)
   have bodyTyping :=
-    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
       (fun state context => ActiveLocalContextInvariant state outer context)
       (roots := roots) allocatedInvariant allocatedBelow
       (bodyExtension.applySubstitution outer)
       (List.Subset.trans bodyIntegerPatternsSubset
         resultIntegerPatternsSubset)
+      (List.Subset.trans bodyIntegerLiteralsSubset
+        resultIntegerLiteralsSubset)
       (List.Subset.trans bodyRequirementsSubset resultRequirementsSubset)
       bodyCovered childStatementSound bodySuccess
   apply inferStatementFuel_success_block_sound statementEq allocationEq
@@ -3298,6 +2903,8 @@ theorem inferStatementFuel_success_ifWithoutElse_sound_bounded_scoped
       coverageSource)
     (resultIntegerPatternsSubset :
       result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultIntegerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
     (resultRequirementsSubset :
       result.state.requirements ⊆ evidenceState.requirements)
     (conditionSound :
@@ -3321,6 +2928,7 @@ theorem inferStatementFuel_success_ifWithoutElse_sound_bounded_scoped
           ((head.state.toTypedSource roots).applySubstitution outer)
           ((result.state.toTypedSource roots).applySubstitution outer) →
         head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
         head.state.requirements ⊆ evidenceState.requirements →
         TemplateScopeCovered coverageSource inputContext
           (.statement head.id) →
@@ -3391,6 +2999,12 @@ theorem inferStatementFuel_success_ifWithoutElse_sound_bounded_scoped
     rw [thenSuccess] at actualThenSuccess
     exact (Except.ok.inj actualThenSuccess).symm
   subst actualThenResult
+  have thenIntegerLiteralsSubset :
+      thenResult.state.integerLiterals ⊆ result.state.integerLiterals := by
+    rw [resultEq]
+    intro literal member
+    simpa [Frontend.SourceInference.State.restoreLexicalScope,
+      Frontend.SourceInference.State.recordNode] using member
   have thenCovered : ∀ child, child ∈ thenResult.statements →
       TemplateScopeCovered coverageSource target (.statement child) := by
     intro child member
@@ -3402,12 +3016,14 @@ theorem inferStatementFuel_success_ifWithoutElse_sound_bounded_scoped
       contains childReference resultExtension parentCovered closed
       (fun _ membership => membership)
   have thenTyping :=
-    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
       (fun state context => ActiveLocalContextInvariant state outer context)
       (roots := roots) conditionInvariant conditionBelow
       (thenSourceExtension.applySubstitution outer)
       (List.Subset.trans thenIntegerPatternsSubset
         resultIntegerPatternsSubset)
+      (List.Subset.trans thenIntegerLiteralsSubset
+        resultIntegerLiteralsSubset)
       (List.Subset.trans thenRequirementsSubset resultRequirementsSubset)
       thenCovered childStatementSound thenSuccess
   obtain ⟨thenFinal, thenFacts, _thenInvariant, thenBodyTyping,
@@ -3473,6 +3089,8 @@ theorem inferStatementFuel_success_whileLoop_sound_bounded_scoped
       coverageSource)
     (resultIntegerPatternsSubset :
       result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultIntegerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
     (resultRequirementsSubset :
       result.state.requirements ⊆ evidenceState.requirements)
     (conditionSound :
@@ -3498,6 +3116,7 @@ theorem inferStatementFuel_success_whileLoop_sound_bounded_scoped
           ((head.state.toTypedSource roots).applySubstitution outer)
           ((result.state.toTypedSource roots).applySubstitution outer) →
         head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
         head.state.requirements ⊆ evidenceState.requirements →
         TemplateScopeCovered coverageSource inputContext
           (.statement head.id) →
@@ -3574,6 +3193,12 @@ theorem inferStatementFuel_success_whileLoop_sound_bounded_scoped
     rw [bodySuccess] at actualBodySuccess
     exact (Except.ok.inj actualBodySuccess).symm
   subst actualBodyResult
+  have bodyIntegerLiteralsSubset :
+      bodyResult.state.integerLiterals ⊆ result.state.integerLiterals := by
+    rw [resultEq]
+    intro literal member
+    simpa [Frontend.SourceInference.State.restoreLexicalScope,
+      Frontend.SourceInference.State.recordNode] using member
   have bodyCovered : ∀ child, child ∈ bodyResult.statements →
       TemplateScopeCovered coverageSource target (.statement child) := by
     intro child member
@@ -3586,12 +3211,14 @@ theorem inferStatementFuel_success_whileLoop_sound_bounded_scoped
       (fun _ membership => membership)
   obtain ⟨bodyFinal, bodyFacts, _bodyInvariant, bodyTyping,
       bodyAgreement⟩ :=
-    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
       (fun state context => ActiveLocalContextInvariant state outer context)
       (roots := roots) conditionInvariant conditionBelow
       (bodySourceExtension.applySubstitution outer)
       (List.Subset.trans bodyIntegerPatternsSubset
         resultIntegerPatternsSubset)
+      (List.Subset.trans bodyIntegerLiteralsSubset
+        resultIntegerLiteralsSubset)
       (List.Subset.trans bodyRequirementsSubset resultRequirementsSubset)
       bodyCovered childStatementSound bodySuccess
   subst result
@@ -3657,6 +3284,8 @@ theorem inferStatementFuel_success_ifWithElse_sound_bounded_scoped
       coverageSource)
     (resultIntegerPatternsSubset :
       result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultIntegerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
     (resultRequirementsSubset :
       result.state.requirements ⊆ evidenceState.requirements)
     (conditionSound :
@@ -3680,6 +3309,7 @@ theorem inferStatementFuel_success_ifWithElse_sound_bounded_scoped
           ((head.state.toTypedSource roots).applySubstitution outer)
           ((result.state.toTypedSource roots).applySubstitution outer) →
         head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
         head.state.requirements ⊆ evidenceState.requirements →
         TemplateScopeCovered coverageSource inputContext
           (.statement head.id) →
@@ -3756,6 +3386,20 @@ theorem inferStatementFuel_success_ifWithElse_sound_bounded_scoped
     rw [elseSuccess] at actualElseSuccess
     exact (Except.ok.inj actualElseSuccess).symm
   subst actualElseResult
+  have elseIntegerLiteralsSubset :
+      elseResult.state.integerLiterals ⊆ result.state.integerLiterals := by
+    rw [resultEq]
+    intro literal member
+    simpa [Frontend.SourceInference.State.restoreLexicalScope,
+      Frontend.SourceInference.State.recordNode] using member
+  have thenIntegerLiteralsSubset :
+      thenResult.state.integerLiterals ⊆ result.state.integerLiterals := by
+    have throughElse :
+        thenResult.state.integerLiterals ⊆
+          elseResult.state.integerLiterals := by
+      simpa [Frontend.SourceInference.State.restoreLexicalScope] using
+        (Detail.inferStatementsFuel_integerLiterals_subset elseSuccess)
+    exact List.Subset.trans throughElse elseIntegerLiteralsSubset
   have thenCovered : ∀ child, child ∈ thenResult.statements →
       TemplateScopeCovered coverageSource target (.statement child) := by
     intro child member
@@ -3768,12 +3412,14 @@ theorem inferStatementFuel_success_ifWithElse_sound_bounded_scoped
       (fun _ membership => membership)
   obtain ⟨thenFinal, thenFacts, _thenInvariant, thenTyping,
       thenAgreement⟩ :=
-    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
       (fun state context => ActiveLocalContextInvariant state outer context)
       (roots := roots) conditionInvariant conditionBelow
       (thenSourceExtension.applySubstitution outer)
       (List.Subset.trans thenIntegerPatternsSubset
         resultIntegerPatternsSubset)
+      (List.Subset.trans thenIntegerLiteralsSubset
+        resultIntegerLiteralsSubset)
       (List.Subset.trans thenRequirementsSubset resultRequirementsSubset)
       thenCovered childStatementSound thenSuccess
   have restoredProperties :=
@@ -3801,12 +3447,14 @@ theorem inferStatementFuel_success_ifWithElse_sound_bounded_scoped
       (fun _ membership => membership)
   obtain ⟨elseFinal, elseFacts, _elseInvariant, elseTyping,
       elseAgreement⟩ :=
-    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
       (fun state context => ActiveLocalContextInvariant state outer context)
       (roots := roots) elseInputInvariant elseInputBelow
       (elseSourceExtension.applySubstitution outer)
       (List.Subset.trans elseIntegerPatternsSubset
         resultIntegerPatternsSubset)
+      (List.Subset.trans elseIntegerLiteralsSubset
+        resultIntegerLiteralsSubset)
       (List.Subset.trans elseRequirementsSubset resultRequirementsSubset)
       elseCovered childStatementSound elseSuccess
   subst result
@@ -3871,6 +3519,8 @@ theorem inferStatementFuel_success_forLoop_sound_bounded_scoped
       coverageSource)
     (resultIntegerPatternsSubset :
       result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultIntegerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
     (resultRequirementsSubset :
       result.state.requirements ⊆ evidenceState.requirements)
     (initializerSound :
@@ -3947,6 +3597,7 @@ theorem inferStatementFuel_success_forLoop_sound_bounded_scoped
           ((head.state.toTypedSource roots).applySubstitution outer)
           ((result.state.toTypedSource roots).applySubstitution outer) →
         head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
         head.state.requirements ⊆ evidenceState.requirements →
         TemplateScopeCovered coverageSource inputContext
           (.statement head.id) →
@@ -4001,6 +3652,20 @@ theorem inferStatementFuel_success_forLoop_sound_bounded_scoped
     rw [postSuccess] at actualPostSuccess
     exact (Except.ok.inj actualPostSuccess).symm
   subst actualPostResult
+  have postIntegerLiteralsSubset :
+      postResult.state.integerLiterals ⊆ result.state.integerLiterals := by
+    rw [resultEq]
+    intro literal member
+    simpa [Frontend.SourceInference.State.restoreLexicalScope,
+      Frontend.SourceInference.State.recordNode] using member
+  have bodyIntegerLiteralsSubset :
+      bodyResult.state.integerLiterals ⊆ result.state.integerLiterals := by
+    have throughPost :
+        bodyResult.state.integerLiterals ⊆
+          postResult.state.integerLiterals := by
+      simpa [Frontend.SourceInference.State.restoreLexicalScope] using
+        (Detail.inferForItemsFuel_integerLiterals_subset postSuccess)
+    exact List.Subset.trans throughPost postIntegerLiteralsSubset
   obtain ⟨loopContext, initializerInvariant, initializerTypingLocal⟩ :=
     initializerSound initializerSuccess
   have initializerTyping := ForItemsHaveType.weakenSource
@@ -4036,12 +3701,14 @@ theorem inferStatementFuel_success_forLoop_sound_bounded_scoped
           exact predicateMember)
   obtain ⟨bodyFinal, bodyFacts, _bodyInvariant, bodyTyping,
       _bodyAgreement⟩ :=
-    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
       (fun state context => ActiveLocalContextInvariant state outer context)
       (roots := roots) conditionInvariant bodyProvenance.initialBelow
       (bodyProvenance.sourceExtension.applySubstitution outer)
       (List.Subset.trans bodyProvenance.integerPatternsSubset
         resultIntegerPatternsSubset)
+      (List.Subset.trans bodyIntegerLiteralsSubset
+        resultIntegerLiteralsSubset)
       (List.Subset.trans bodyProvenance.requirementsSubset
         resultRequirementsSubset)
       bodyCovered childStatementSound bodySuccess
@@ -4065,5 +3732,831 @@ theorem inferStatementFuel_success_forLoop_sound_bounded_scoped
       initializerTyping conditionTyping bodyTyping postTyping
   · exact StatementResultMatchesFactsAfterSubstitution.forLoop outer
       bodyFacts id _
+
+/-- Explicit arms use actual case membership and pattern-binder provenance
+to carry parent coverage into each inferred body.  The body typing source is
+the completed match-local source; coverage and integer evidence may come from
+the whole finalized declaration. -/
+theorem inferMatchCasesFuel_success_sound_of_bounded_statements_scoped
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {outerScope : Frontend.SourceInference.LexicalScope}
+    {cases : List Syntax.MatchCase}
+    {state : Frontend.SourceInference.State}
+    {result : Detail.MatchCasesResult}
+    {source coverageSource : TypedSource} {control : ControlContext}
+    {outer : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {roots : List NodeId}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (ready : state.InferenceReady)
+    (scrutineeBelow :
+      scrutineeType.VariablesBelow state.inference.next)
+    (returnBelow : expectedReturn.VariablesBelow state.inference.next)
+    (below : state.LocalBindersBelowNextLocal)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (ownerEq : source.owner = state.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (scrutineeAdmissible :
+      TypeAdmissible semanticContext (outer.apply scrutineeType))
+    (initialInvariant :
+      ActiveLocalContextInvariant state outer semanticContext)
+    (scopeEq : state.lexicalScope = outerScope)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (resultSourceExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer) source)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (integerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (requirementsOccur : ∀ matchCase,
+      matchCase ∈ result.cases →
+      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+        PrimaryRequirementOccursAt source occurrence requirement)
+    (coveredCases : ∀ matchCase, matchCase ∈ result.cases →
+      ∀ child, child ∈ matchCase.body →
+        TemplateScopeCovered coverageSource semanticContext
+          (.statement child))
+    (statementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {statement : Syntax.Statement} {head : Detail.StatementResult},
+        childFuel < fuel →
+        ActiveLocalContextInvariant input outer inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext statement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution outer) source →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext
+          (.statement head.id) →
+        ∃ outputContext facts,
+          ActiveLocalContextInvariant head.state outer outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution outer)
+            control inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution outer head facts)
+    (success : Detail.inferMatchCasesFuel fuel inferenceContext scrutineeType
+      expectedReturn outerScope cases state = .ok result) :
+    ∃ caseFacts,
+      MatchCasesHaveType source control semanticContext
+        (outer.apply scrutineeType)
+        (result.cases.map (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+      allBodiesSawReturn caseFacts = result.allReturn := by
+  apply inferMatchCasesFuel_success_sound_at_bounded_with_extra
+    (extra := fun armContext bodyResult =>
+      ∀ child, child ∈ bodyResult.statements →
+        TemplateScopeCovered coverageSource armContext (.statement child))
+    validated functionsCanonical catalog semanticSignaturesEq evidence ready
+    scrutineeBelow returnBelow below initialBelow ownerEq semanticOwner
+    scrutineeAdmissible initialInvariant scopeEq outerExtension
+    resultSourceExtension integerPatternsSubset requirementsSubset
+    requirementsOccur ?_ ?_ success
+  · intro arm pattern bodyResult binders armContext caseMember
+      binderExtension child childMember owner scopes
+    have assumptionsEq := BindersExtend.assumptions_eq binderExtension
+    change owner.requirement.predicate ∈ armContext.assumptions
+    rw [assumptionsEq]
+    exact coveredCases _ caseMember child childMember owner scopes
+  · intro childFuel statements childInitial childResult childContext
+      childBound childInvariant childSuccess childBelow childExtension
+      childIntegerSubset childLiteralToResult childRequirementSubset
+      childCovered
+    exact
+      inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
+        (fun s c => ActiveLocalContextInvariant s outer c)
+        (roots := roots) childInvariant childBelow childExtension
+        childIntegerSubset
+        (List.Subset.trans childLiteralToResult integerLiteralsSubset)
+        childRequirementSubset childCovered
+        (fun headBound headInvariant headSuccess headExtension
+          headIntegerSubset headLiteralSubset headRequirementSubset
+          headCovered =>
+          statementSound (Nat.lt_trans headBound childBound) headInvariant
+            headSuccess headExtension headIntegerSubset headLiteralSubset
+            headRequirementSubset headCovered)
+        childSuccess
+
+theorem inferStatementFuel_success_matchWithoutDefault_bounded_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    {coverageSource : TypedSource}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (semanticOwner : target.currentDeclaration = some
+      ((result.state.toTypedSource roots).applySubstitution outer).owner)
+    (evidence : IntegerPatternEvidenceAt
+      ((result.state.toTypedSource roots).applySubstitution outer) target outer
+      evidenceState (.statement result.id))
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (integerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (statementSound :
+      ∀ {childFuel : Nat}
+        {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {childStatement : Syntax.Statement}
+        {head : Detail.StatementResult},
+        childFuel < fuel →
+        ActiveLocalContextInvariant input outer inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext childStatement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution outer)
+          ((result.state.toTypedSource roots).applySubstitution outer) →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext
+          (.statement head.id) →
+        ∃ outputContext facts,
+          ActiveLocalContextInvariant head.state outer outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution outer) {
+              returnType := outer.apply expectedReturn
+              loopDepth := inferenceContext.loopDepth
+            } inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution outer head facts)
+    (scrutineeSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState : Frontend.SourceInference.State},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type)) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have retained :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [allocatedEq] at retained
+    exact retained
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← allocatedEq]
+    exact returnBelow
+  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+    have retained :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+        initial below
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [allocatedEq] at retained
+    exact retained
+  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
+      scrutineeSuccess, hiddenAllocation, casesSuccess,
+      guardPassed, resultEq, contains⟩ :=
+    inferStatementFuel_success_matchWithoutDefault_facts statementEq defaultEq
+      allocationEq success roots
+  have casesPresent : arms.value.cases ≠ [] := by
+    intro emptyArms
+    have checkedNil : checked.cases = [] := by
+      have lengthEq := Detail.inferMatchCasesFuel_success_cases_length
+        casesSuccess
+      rw [emptyArms] at lengthEq
+      simpa using lengthEq
+    have wildcardFalse : checked.hasWildcard = false := by
+      cases wildcardEq : checked.hasWildcard with
+      | false => rfl
+      | true =>
+          obtain ⟨arm, armMember, _⟩ :=
+            Detail.inferMatchCasesFuel_success_hasWildcard_member
+              casesSuccess wildcardEq
+          simp [checkedNil] at armMember
+    have nominalFalse : Detail.exhaustsNominalConstructors
+        inferenceContext checked.state scrutinee.type checked.cases = false := by
+      simp [checkedNil, Detail.exhaustsNominalConstructors]
+    simp [wildcardFalse, nominalFalse] at guardPassed
+  have scrutineeProperties := inferMatchScrutineesFuel_inferenceProperties
+    allocatedReady signatureFormation functionsCanonical scrutineeSuccess
+  have scrutineeInvariant :
+      ActiveLocalContextInvariant scrutineeState outer target :=
+    allocatedInvariant.inferMatchScrutineesFuel scrutineeSuccess
+  have scrutineeLocalBelow :
+      scrutineeState.LocalBindersBelowNextLocal :=
+    inferMatchScrutineesFuel_preserves_localBindersBelowNextLocal
+      allocatedBelow scrutineeSuccess
+  have hiddenInvariant : ActiveLocalContextInvariant hiddenState outer target :=
+    scrutineeInvariant.allocateHiddenLocal hiddenAllocation
+  have hiddenReady : hiddenState.InferenceReady := by
+    have retained :=
+      Frontend.SourceInference.State.InferenceReady.allocateHiddenLocal
+        scrutineeProperties.2.1
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [hiddenEq] at retained
+    exact retained
+  have hiddenScrutineeBelow :
+      scrutinee.type.VariablesBelow hiddenState.inference.next := by
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [← hiddenEq]
+    exact scrutineeProperties.2.2
+  have hiddenReturnBelow :
+      expectedReturn.VariablesBelow hiddenState.inference.next := by
+    have atScrutinee :=
+      allocatedReturnBelow.weaken scrutineeProperties.1.next_le
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [← hiddenEq]
+    exact atScrutinee
+  have hiddenBelow : hiddenState.LocalBindersBelowNextLocal := by
+    have retained :=
+      Frontend.SourceInference.State.allocateHiddenLocal_preserves_localBindersBelowNextLocal
+        scrutineeState scrutineeLocalBelow
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [hiddenEq] at retained
+    exact retained
+  have checkedInvariant : ActiveLocalContextInvariant checked.state outer
+      target := hiddenInvariant.inferMatchCasesFuel casesSuccess
+  have scrutineeTyping := scrutineeSound scrutineeSuccess
+  have checkedIntegerPatternsSubset :
+      checked.state.integerPatterns ⊆ result.state.integerPatterns := by
+    rw [resultEq]
+    intro origin member
+    exact member
+  have checkedIntegerLiteralsSubset :
+      checked.state.integerLiterals ⊆ result.state.integerLiterals := by
+    rw [resultEq]
+    intro origin member
+    simpa [Frontend.SourceInference.State.recordNode] using member
+  have checkedRequirementsSubset :
+      checked.state.requirements ⊆ result.state.requirements := by
+    rw [resultEq]
+    exact Frontend.SourceInference.State.recordNode_requirements_subset
+      checked.state _
+  have checkedRequirementsOccur : ∀ matchCase,
+      matchCase ∈ checked.cases →
+      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+        PrimaryRequirementOccursAt
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          (.statement result.id) requirement := by
+    intro matchCase caseMember requirement requirementMember
+    rw [FlexibleSubstitution.primaryRequirementOccursAt_applySubstitution]
+    exact contains.matchCasePatternRequirementOccursAt rfl caseMember
+      requirementMember
+  have checkedCasesCovered : ∀ matchCase,
+      matchCase ∈ checked.cases →
+      ∀ child, child ∈ matchCase.body →
+        TemplateScopeCovered coverageSource target (.statement child) := by
+    intro matchCase caseMember child childMember
+    have reference : (.statement child : NodeId) ∈
+        (StatementForm.matchWith {
+          scrutinee := scrutinee.id
+          hiddenScrutinee
+          cases := checked.cases
+          defaultBody := none
+          requirements := checked.cases.flatMap fun arm =>
+            arm.pattern.requirements
+        }).references := by
+      simp only [StatementForm.references, MatchResolution.references]
+      apply List.mem_append_left
+      apply List.mem_append_right
+      exact List.mem_flatMap.mpr ⟨matchCase, caseMember,
+        by simpa [TypedMatchCase.references] using
+          (List.mem_map.mpr ⟨child, childMember, rfl⟩ :
+            NodeId.statement child ∈ matchCase.body.map NodeId.statement)⟩
+    exact TemplateScopeCovered.statementChild_of_recorded_reference
+      contains reference resultExtension parentCovered closed
+      (fun _ member => member)
+  have allocatedNodesBelow : allocated.NodesBelowNextOccurrence := by
+    have bound :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_nodesBelowNextOccurrence
+        initial initialBelow
+    have eq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    simpa [eq] using bound
+  have scrutineeNodesBelow :
+      scrutineeState.NodesBelowNextOccurrence :=
+    inferMatchScrutineesFuel_success_nodesBelow scrutineeSuccess
+      allocatedNodesBelow
+  have hiddenNodesBelow : hiddenState.NodesBelowNextOccurrence := by
+    have bound :=
+      Frontend.SourceInference.State.allocateHiddenLocal_preserves_nodesBelowNextOccurrence
+        scrutineeState scrutineeNodesBelow
+    have eq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    simpa [eq] using bound
+  have checkedToResult : TypingSourceExtends
+      ((checked.state.toTypedSource roots).applySubstitution outer)
+      ((result.state.toTypedSource roots).applySubstitution outer) := by
+    have raw : TypingSourceExtends
+        (checked.state.toTypedSource roots)
+        (result.state.toTypedSource roots) := by
+      rw [resultEq]
+      refine ⟨rfl, ?_⟩
+      simp only [Frontend.SourceInference.State.toTypedSource,
+        Frontend.SourceInference.State.recordNode]
+      exact List.prefix_append _ _
+    exact raw.applySubstitution outer
+  subst result
+  have checkedExtension : outer.SemanticallyExtends
+      checked.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      checked.state.inference.substitution at outerExtension
+    exact outerExtension
+  have checkedOwner : checked.state.owner = hiddenState.owner :=
+    Detail.inferMatchCasesFuel_preserves_owner casesSuccess
+  obtain ⟨caseFacts, casesTyping, allReturnEq⟩ :=
+    inferMatchCasesFuel_success_sound_of_bounded_statements_scoped
+      signatureFormation functionsCanonical catalog signatures_eq evidence
+      hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow
+      hiddenNodesBelow (by
+        simpa [Frontend.SourceInference.State.toTypedSource,
+          Frontend.SourceInference.State.recordNode,
+          TypedSource.applySubstitution] using checkedOwner)
+      semanticOwner scrutineeTyping.type_admissible hiddenInvariant rfl
+      checkedExtension checkedToResult
+      (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
+      (List.Subset.trans checkedIntegerLiteralsSubset integerLiteralsSubset)
+      (List.Subset.trans checkedRequirementsSubset requirementsSubset)
+      checkedRequirementsOccur checkedCasesCovered statementSound casesSuccess
+  have exhaustive :=
+    matchExhaustiveWithoutDefault_of_guard catalog signatures_eq casesSuccess
+      casesTyping scrutineeTyping.type_admissible checkedExtension guardPassed
+  have checkedCasesPresent : checked.cases ≠ [] := by
+    intro checkedCasesEq
+    have lengthEq := Detail.inferMatchCasesFuel_success_cases_length
+      casesSuccess
+    rw [checkedCasesEq] at lengthEq
+    apply casesPresent
+    simpa using lengthEq.symm
+  have caseFactsPresent : caseFacts ≠ [] :=
+    matchCasesHaveType_facts_ne_nil_of_cases_ne_nil casesTyping (by
+      simpa using checkedCasesPresent)
+  obtain ⟨summary, merged⟩ :=
+    mergeBodyControls_withoutDefault_eq_some_of_ne_nil caseFacts
+      caseFactsPresent
+  refine ⟨{
+      type := if allBodiesSawReturn caseFacts then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts
+      sawReturn := allBodiesSawReturn caseFacts
+      control := summary.eraseValue
+    }, checkedInvariant.recordNode _, ?_, ?_⟩
+  · exact matchWithoutDefaultStatementHasType_afterSubstitution contains
+      scrutineeTyping casesTyping exhaustive allReturnEq merged
+      checkedExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.matchWithoutDefault
+      allReturnEq checkedExtension id _
+
+
+theorem inferStatementFuel_success_matchWithDefault_bounded_sound
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    {coverageSource : TypedSource}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = some defaultBody)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (semanticOwner : target.currentDeclaration = some
+      ((result.state.toTypedSource roots).applySubstitution outer).owner)
+    (evidence : IntegerPatternEvidenceAt
+      ((result.state.toTypedSource roots).applySubstitution outer) target outer
+      evidenceState (.statement result.id))
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (integerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (scrutineeSound :
+      ∀ {scrutinee : InferredExpression}
+        {scrutineeState : Frontend.SourceInference.State},
+        inferMatchScrutineesFuel fuel inferenceContext statement.span
+            scrutinees.elements.toList allocated =
+              .ok (scrutinee, scrutineeState) →
+          ExpressionHasType
+            ((result.state.toTypedSource roots).applySubstitution outer)
+            target scrutinee.id (outer.apply scrutinee.type))
+    (statementSound :
+      ∀ {childFuel : Nat}
+        {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {childStatement : Syntax.Statement}
+        {head : Detail.StatementResult},
+        childFuel < fuel →
+        ActiveLocalContextInvariant input outer inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext childStatement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution outer)
+          ((result.state.toTypedSource roots).applySubstitution outer) →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.integerLiterals ⊆ evidenceState.integerLiterals →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext
+          (.statement head.id) →
+        ∃ outputContext facts,
+          ActiveLocalContextInvariant head.state outer outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution outer) {
+              returnType := outer.apply expectedReturn
+              loopDepth := inferenceContext.loopDepth
+            } inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution outer head facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant :
+      ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have retained :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [allocatedEq] at retained
+    exact retained
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← allocatedEq]
+    exact returnBelow
+  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+    have retained :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+        initial below
+    have allocatedEq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [allocatedEq] at retained
+    exact retained
+  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
+      defaultResult, scrutineeSuccess, hiddenAllocation, casesSuccess,
+      defaultSuccess, _guardPassed, resultEq, contains⟩ :=
+    inferStatementFuel_success_matchWithDefault_facts statementEq defaultEq
+      allocationEq success roots
+  have scrutineeProperties := inferMatchScrutineesFuel_inferenceProperties
+    allocatedReady signatureFormation functionsCanonical scrutineeSuccess
+  have scrutineeInvariant :
+      ActiveLocalContextInvariant scrutineeState outer target :=
+    allocatedInvariant.inferMatchScrutineesFuel scrutineeSuccess
+  have scrutineeLocalBelow :
+      scrutineeState.LocalBindersBelowNextLocal :=
+    inferMatchScrutineesFuel_preserves_localBindersBelowNextLocal
+      allocatedBelow scrutineeSuccess
+  have hiddenInvariant : ActiveLocalContextInvariant hiddenState outer target :=
+    scrutineeInvariant.allocateHiddenLocal hiddenAllocation
+  have hiddenReady : hiddenState.InferenceReady := by
+    have retained :=
+      Frontend.SourceInference.State.InferenceReady.allocateHiddenLocal
+        scrutineeProperties.2.1
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [hiddenEq] at retained
+    exact retained
+  have hiddenScrutineeBelow :
+      scrutinee.type.VariablesBelow hiddenState.inference.next := by
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [← hiddenEq]
+    exact scrutineeProperties.2.2
+  have hiddenReturnBelow :
+      expectedReturn.VariablesBelow hiddenState.inference.next := by
+    have atScrutinee :=
+      allocatedReturnBelow.weaken scrutineeProperties.1.next_le
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [← hiddenEq]
+    exact atScrutinee
+  have hiddenBelow : hiddenState.LocalBindersBelowNextLocal := by
+    have retained :=
+      Frontend.SourceInference.State.allocateHiddenLocal_preserves_localBindersBelowNextLocal
+        scrutineeState scrutineeLocalBelow
+    have hiddenEq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    rw [hiddenEq] at retained
+    exact retained
+  have checkedProperties := Detail.inferMatchCasesFuel_inferenceProperties
+    hiddenReady signatureFormation functionsCanonical hiddenScrutineeBelow
+      hiddenReturnBelow rfl casesSuccess
+  have checkedInvariant : ActiveLocalContextInvariant checked.state outer
+      target := hiddenInvariant.inferMatchCasesFuel casesSuccess
+  have checkedReturnBelow :=
+    hiddenReturnBelow.weaken checkedProperties.1.next_le
+  have defaultProperties := Detail.inferStatementsFuel_inferenceProperties
+    checkedProperties.2.1 signatureFormation functionsCanonical
+      checkedReturnBelow defaultSuccess
+  have scrutineeTyping := scrutineeSound scrutineeSuccess
+  have checkedIntegerPatternsSubset :
+      checked.state.integerPatterns ⊆ result.state.integerPatterns := by
+    rw [resultEq]
+    have throughDefault : checked.state.integerPatterns ⊆
+        defaultResult.state.integerPatterns :=
+      Detail.inferStatementsFuel_integerPatterns_subset defaultSuccess
+    have throughRestore : defaultResult.state.integerPatterns ⊆
+        (defaultResult.state.restoreLexicalScope
+          hiddenState.lexicalScope).integerPatterns := by
+      intro origin member
+      exact member
+    apply List.Subset.trans throughDefault
+    apply List.Subset.trans throughRestore
+    intro origin member
+    exact member
+  have checkedIntegerLiteralsSubset :
+      checked.state.integerLiterals ⊆ result.state.integerLiterals := by
+    rw [resultEq]
+    have throughDefault : checked.state.integerLiterals ⊆
+        defaultResult.state.integerLiterals :=
+      Detail.inferStatementsFuel_integerLiterals_subset defaultSuccess
+    have throughRestore : defaultResult.state.integerLiterals ⊆
+        (defaultResult.state.restoreLexicalScope
+          hiddenState.lexicalScope).integerLiterals := by
+      intro origin member
+      exact member
+    apply List.Subset.trans throughDefault
+    apply List.Subset.trans throughRestore
+    intro origin member
+    simpa [Frontend.SourceInference.State.recordNode] using member
+  have checkedRequirementsSubset :
+      checked.state.requirements ⊆ result.state.requirements := by
+    rw [resultEq]
+    exact List.Subset.trans
+      (Detail.inferStatementsFuel_requirements_subset defaultSuccess)
+      (List.Subset.trans
+        (Frontend.SourceInference.State.restoreLexicalScope_requirements_subset
+          defaultResult.state hiddenState.lexicalScope)
+        (Frontend.SourceInference.State.recordNode_requirements_subset
+          (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope)
+          _))
+  have checkedRequirementsOccur : ∀ matchCase,
+      matchCase ∈ checked.cases →
+      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+        PrimaryRequirementOccursAt
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          (.statement result.id) requirement := by
+    intro matchCase caseMember requirement requirementMember
+    rw [FlexibleSubstitution.primaryRequirementOccursAt_applySubstitution]
+    exact contains.matchCasePatternRequirementOccursAt rfl caseMember
+      requirementMember
+  have checkedCasesCovered : ∀ matchCase,
+      matchCase ∈ checked.cases →
+      ∀ child, child ∈ matchCase.body →
+        TemplateScopeCovered coverageSource target (.statement child) := by
+    intro matchCase caseMember child childMember
+    have reference : (.statement child : NodeId) ∈
+        (StatementForm.matchWith {
+          scrutinee := scrutinee.id
+          hiddenScrutinee
+          cases := checked.cases
+          defaultBody := some defaultResult.statements
+          requirements := checked.cases.flatMap fun arm =>
+            arm.pattern.requirements
+        }).references := by
+      simp only [StatementForm.references, MatchResolution.references]
+      apply List.mem_append_left
+      apply List.mem_append_right
+      exact List.mem_flatMap.mpr ⟨matchCase, caseMember,
+        by simpa [TypedMatchCase.references] using
+          (List.mem_map.mpr ⟨child, childMember, rfl⟩ :
+            NodeId.statement child ∈ matchCase.body.map NodeId.statement)⟩
+    exact TemplateScopeCovered.statementChild_of_recorded_reference
+      contains reference resultExtension parentCovered closed
+      (fun _ member => member)
+  have defaultCovered : ∀ child, child ∈ defaultResult.statements →
+      TemplateScopeCovered coverageSource target (.statement child) := by
+    intro child childMember
+    have reference : (.statement child : NodeId) ∈
+        (StatementForm.matchWith {
+          scrutinee := scrutinee.id
+          hiddenScrutinee
+          cases := checked.cases
+          defaultBody := some defaultResult.statements
+          requirements := checked.cases.flatMap fun arm =>
+            arm.pattern.requirements
+        }).references := by
+      simp only [StatementForm.references, MatchResolution.references]
+      apply List.mem_append_right
+      simpa using
+        (List.mem_map.mpr ⟨child, childMember, rfl⟩ :
+          NodeId.statement child ∈
+            defaultResult.statements.map NodeId.statement)
+    exact TemplateScopeCovered.statementChild_of_recorded_reference
+      contains reference resultExtension parentCovered closed
+      (fun _ member => member)
+  have allocatedNodesBelow : allocated.NodesBelowNextOccurrence := by
+    have bound :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_nodesBelowNextOccurrence
+        initial initialBelow
+    have eq : initial.allocateStatementId.2 = allocated :=
+      congrArg Prod.snd allocationEq
+    simpa [eq] using bound
+  have scrutineeNodesBelow :
+      scrutineeState.NodesBelowNextOccurrence :=
+    inferMatchScrutineesFuel_success_nodesBelow scrutineeSuccess
+      allocatedNodesBelow
+  have hiddenNodesBelow : hiddenState.NodesBelowNextOccurrence := by
+    have bound :=
+      Frontend.SourceInference.State.allocateHiddenLocal_preserves_nodesBelowNextOccurrence
+        scrutineeState scrutineeNodesBelow
+    have eq : scrutineeState.allocateHiddenLocal.2 = hiddenState :=
+      congrArg Prod.snd hiddenAllocation
+    simpa [eq] using bound
+  have checkedNodesBelow : checked.state.NodesBelowNextOccurrence :=
+    (Detail.inferMatchCasesFuel_occurrenceBoundExtends casesSuccess
+      ).nodesBelowNextOccurrence hiddenNodesBelow
+  have defaultToResultRaw : TypingSourceExtends
+      (defaultResult.state.toTypedSource roots)
+      (result.state.toTypedSource roots) := by
+    rw [resultEq]
+    exact (child_provenance_through_restore_record
+      defaultResult.state hiddenState.lexicalScope _ roots).1
+  have defaultToResult : TypingSourceExtends
+      ((defaultResult.state.toTypedSource roots).applySubstitution outer)
+      ((result.state.toTypedSource roots).applySubstitution outer) :=
+    defaultToResultRaw.applySubstitution outer
+  have checkedToDefault : TypingSourceExtends
+      (checked.state.toTypedSource roots)
+      (defaultResult.state.toTypedSource roots) :=
+    inferStatementsFuel_success_typingSourceExtends defaultSuccess
+      checkedNodesBelow roots
+  have checkedToResult : TypingSourceExtends
+      ((checked.state.toTypedSource roots).applySubstitution outer)
+      ((result.state.toTypedSource roots).applySubstitution outer) :=
+    (TypingSourceExtends.trans checkedToDefault defaultToResultRaw
+      ).applySubstitution outer
+  have defaultIntegerPatternsSubset :
+      defaultResult.state.integerPatterns ⊆
+        evidenceState.integerPatterns := by
+    apply List.Subset.trans ?_ integerPatternsSubset
+    rw [resultEq]
+    exact (child_provenance_through_restore_record
+      defaultResult.state hiddenState.lexicalScope _ roots).2.1
+  have defaultIntegerLiteralsSubset :
+      defaultResult.state.integerLiterals ⊆
+        evidenceState.integerLiterals := by
+    apply List.Subset.trans ?_ integerLiteralsSubset
+    rw [resultEq]
+    intro origin member
+    simpa [Frontend.SourceInference.State.restoreLexicalScope,
+      Frontend.SourceInference.State.recordNode] using member
+  have defaultRequirementsSubset :
+      defaultResult.state.requirements ⊆
+        evidenceState.requirements := by
+    apply List.Subset.trans ?_ requirementsSubset
+    rw [resultEq]
+    exact (child_provenance_through_restore_record
+      defaultResult.state hiddenState.lexicalScope _ roots).2.2
+  subst result
+  have defaultExtension : outer.SemanticallyExtends
+      defaultResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      defaultResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  have checkedExtension : outer.SemanticallyExtends
+      checked.state.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans defaultExtension
+      defaultProperties.1.substitution_extends
+  have checkedOwner : checked.state.owner = hiddenState.owner :=
+    Detail.inferMatchCasesFuel_preserves_owner casesSuccess
+  have defaultOwner : defaultResult.state.owner = checked.state.owner :=
+    Detail.inferStatementsFuel_preserves_owner defaultSuccess
+  obtain ⟨caseFacts, casesTyping, caseReturnEq⟩ :=
+    inferMatchCasesFuel_success_sound_of_bounded_statements_scoped
+      signatureFormation functionsCanonical catalog signatures_eq evidence
+      hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow
+      hiddenNodesBelow (by
+        simpa [Frontend.SourceInference.State.toTypedSource,
+          Frontend.SourceInference.State.restoreLexicalScope,
+          Frontend.SourceInference.State.recordNode,
+          TypedSource.applySubstitution] using
+            defaultOwner.trans checkedOwner)
+      semanticOwner scrutineeTyping.type_admissible hiddenInvariant rfl
+      checkedExtension checkedToResult
+      (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
+      (List.Subset.trans checkedIntegerLiteralsSubset integerLiteralsSubset)
+      (List.Subset.trans checkedRequirementsSubset requirementsSubset)
+      checkedRequirementsOccur checkedCasesCovered statementSound casesSuccess
+  obtain ⟨defaultFinal, defaultFacts, _defaultInvariant, defaultTyping,
+      defaultAgreement⟩ :=
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
+      (fun state context => ActiveLocalContextInvariant state outer context)
+      (roots := roots) checkedInvariant checkedNodesBelow defaultToResult
+      defaultIntegerPatternsSubset defaultIntegerLiteralsSubset
+      defaultRequirementsSubset defaultCovered statementSound defaultSuccess
+  obtain ⟨summary, merged⟩ :=
+    mergeBodyControls_withDefault_eq_some caseFacts defaultFacts
+  refine ⟨{
+      type := if allBodiesSawReturn caseFacts && defaultFacts.sawReturn then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      sawReturn := allBodiesSawReturn caseFacts && defaultFacts.sawReturn
+      control := summary.eraseValue
+    }, hiddenInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact matchWithDefaultStatementHasType_afterSubstitution contains
+      scrutineeTyping casesTyping defaultTyping caseReturnEq defaultAgreement
+      merged defaultExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.matchWithDefault
+      caseReturnEq defaultAgreement defaultExtension id _
+
 
 end Solcore.SourceSemantics.SourceInferenceStatementsSoundness
