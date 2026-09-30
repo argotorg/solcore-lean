@@ -1013,11 +1013,19 @@ import Solcore.Test.CoreRecursiveCells
 import Solcore.Test.CoreLanguageResult
 import Solcore.Test.CoreOptionalCells
 import Solcore.Test.CoreLocalSequence
+import Solcore.Test.CoreLocalControl
+import Solcore.Test.CoreFirstOrderWeakening
 import Solcore.Test.SourceCoreLocalCell
 import Solcore.Test.SourceCoreBasic
 import Solcore.Test.SourceCoreBasicExpressions
 import Solcore.Test.SourceCoreBasicCorrespondence
 import Solcore.Test.SourceCoreBasicStatements
+import Solcore.Test.SourceCoreBasicExpressionCertificates
+import Solcore.Test.SourceCoreBasicStatementCertificates
+import Solcore.Test.SourceCoreBasicStatementMeaning
+import Solcore.Test.SourceCoreControl
+import Solcore.Test.SourceCoreBasicEntry
+import Solcore.Test.SourceCompilerCoreCells
 import Solcore.Test.ContractLanguageResult
 import Solcore.Test.HostRuntimeStoreSafety
 import Solcore.Test.CoreComparisonFlags
@@ -2399,6 +2407,9 @@ def run : IO Unit := do
   CoreLanguageResult.run
   SourceCoreLocalCell.run
   SourceCoreBasic.run
+  SourceCoreControl.run
+  SourceCoreBasicEntry.run
+  SourceCompilerCoreCells.run
   ContractLanguageResult.test
   testCoreBooleanConnectives
   testCoreBitwiseLogic

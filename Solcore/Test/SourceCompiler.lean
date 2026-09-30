@@ -737,6 +737,7 @@ private def typedRejection (checked : CheckedProgram) (name : String) :
 private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := do
   let constrained ← compileNamed checked "blocked.solc" "constrained"
   let staged ← compileNamed checked "blocked.solc" "staged"
+  let stagedTyped ← compileNamedWithBackend checked "blocked.solc" "staged" .typedSource
   let stagedType ← compileNamed checked "blocked.solc" "stagedType"
   let integerResult ← compileNamed checked "blocked.solc" "integerResult"
   let nestedStaged ← compileNamed checked "blocked.solc" "nestedStaged"
@@ -752,7 +753,8 @@ private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := 
     compileNamed checked "blocked.solc" "markedEffectsEntry"
   assertTrue (decide (
       constrained.backend = .typedSource ∧
-      staged.backend = .typedSource ∧
+      staged.backend = .core ∧
+      stagedTyped.backend = .typedSource ∧
       stagedType.backend = .typedSource ∧
       integerResult.backend = .typedSource ∧
       nestedStaged.backend = .typedSource ∧
@@ -763,7 +765,7 @@ private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := 
       integerBitNot.backend = .typedSource ∧
       markedEffects.backend = .typedSource ∧
       markedEffectsEntry.backend = .typedSource))
-    "staged capability cases did not select the typed-source backend"
+    "staged capability cases selected an unexpected backend"
   assertTrue (decide (
       constrained.inputTypes = [.word] ∧ constrained.resultType = .word ∧
       staged.inputTypes = [.word] ∧ staged.resultType = .word ∧
@@ -790,8 +792,13 @@ private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := 
     "staged capability cases lost their source signature metadata"
   expectTypedWord "ground constrained public root" 19 <|
     constrained.runTyped [.word (word 19)] runtimeOptions
-  expectTypedWord "marked public input" 23 <|
-    staged.runTyped [.word (word 23)] runtimeOptions
+  match staged.runCore [.word (word 23)] runtimeOptions with
+  | .ok (.coreLanguageResult (.succeeded (.word actual) [.inRight .unit (.word stored)])) =>
+      assertTrue (actual == word 23 && stored == word 23)
+        "marked public Core input lost its exact value or input cell"
+  | result => throw (IO.userError s!"marked public input did not use prepared Core: {reprStr result}")
+  expectTypedWord "explicit typed-source marked public input" 23 <|
+    stagedTyped.runTyped [.word (word 23)] runtimeOptions
   expectTypedWord "structural comptime input" 1 <|
     stagedType.runTyped [.word (word 29)] runtimeOptions
   expectTypedInteger "integer result" 1 <|

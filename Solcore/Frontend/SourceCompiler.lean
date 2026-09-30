@@ -3,6 +3,7 @@ import Solcore.Frontend.SourceCompilationPlan
 import Solcore.Frontend.SourceTypedRuntimeDeepSafety
 import Solcore.Core.Safety
 import Solcore.Frontend.SourceCoreDirectLinking
+import Solcore.Frontend.SourceCoreBasicEntry
 import Solcore.Frontend.ProgramInterfaces
 import Solcore.Abi.StaticWord
 
@@ -13,12 +14,15 @@ Single-root compilation resolves a ground root and discovers its finite
 specialization plan.  The whole-program facade can also discover conventional
 `main` and exported Static Word ABI roots, or compile an ordered explicit root
 set after checking the workspace once.  Automatic selection prefers direct
-Core and otherwise uses the source-typed runtime.  Clients may instead request
+Core, then ordinary optional-cell Core, and otherwise uses the source-typed
+runtime. Clients may instead request
 an exact backend. Resulting artifacts can be run repeatedly without repeating
 checking or specialization.
 
-Core stores/values and source-typed heaps/values are intentionally separate
-invocation carriers. This boundary does not guess a conversion between them.
+Core stores/values and source-typed heaps/values use distinct invocation carriers.
+The ordinary Core route validates scalar/product inputs and allocates parameter
+cells in source order. Its decoded language results retain typed checkpoints
+and source diagnostic metadata without introducing a third backend.
 -/
 
 set_option autoImplicit false
@@ -37,8 +41,8 @@ inductive Backend where
   deriving Repr, BEq, DecidableEq
 
 /-- Backend policy for one compilation. Automatic selection deliberately keeps
-the direct Core path first but otherwise chooses the broader typed-source
-runtime. -/
+the direct Core path first, tries ordinary Core lowering next, then chooses the
+broader typed-source runtime while its remaining features migrate. -/
 inductive BackendPreference where
   | automatic
   | core
@@ -129,11 +133,13 @@ inductive CompileError where
 constructor. -/
 private inductive Executable where
   | core (entry : SourceCoreDirectLinking.LinkedEntry)
+  | coreRuntime (entry : SourceCoreBasicEntry.Entry)
   | typedSource
   deriving Repr
 
 private def Executable.backend : Executable → Backend
   | .core _ => .core
+  | .coreRuntime _ => .core
   | .typedSource => .typedSource
 
 private def Executable.HasPublicResultProjection
@@ -142,6 +148,10 @@ private def Executable.HasPublicResultProjection
       SourceCoreElaboration.lowerType
         (.declaration root.declaration) root.function.inferredBodyType =
           .ok entry.elaborated.returnType
+  | .coreRuntime entry =>
+      SourceCoreElaboration.lowerType
+        (.declaration root.declaration) root.function.inferredBodyType =
+          .ok entry.resultType
   | .typedSource => True
 
 /-- A checked, canonically specialized, reusable single-root artifact.  The
@@ -170,7 +180,16 @@ def resultType (compiled : CompiledEntry) : Ty :=
 def backend (compiled : CompiledEntry) : Backend :=
   match compiled.executable with
   | .core _ => .core
+  | .coreRuntime _ => .core
   | .typedSource => .typedSource
+
+/-- Recover the classification, source occurrence and span assigned by the
+ordinary Core compiler. The returned word remains separate from machine faults. -/
+def coreFailureDiagnostic? (compiled : CompiledEntry) (reason : Core.Word) :
+    Option SourceCoreFaultSites.Diagnostic :=
+  match compiled.executable with
+  | .coreRuntime entry => entry.failureDiagnostic? reason
+  | .core _ | .typedSource => none
 
 /-- Number of reachable canonical specializations retained by this artifact. -/
 def specializationCount (compiled : CompiledEntry) : Nat :=
@@ -216,7 +235,7 @@ def TypedDeepResult (compiled : CompiledEntry)
   | .typedSource =>
       SourceTypedRuntime.PreparedDeepResult compiled.program compiled.plan
         compiled.root.function.inferredBodyType value finalState
-  | .core _ => False
+  | .core _ | .coreRuntime _ => False
 
 /-- Full typed-source boundary certificate for one normal execution.  It keeps
 the deeply safe initial heap and arguments, the deeply safe final heap and
@@ -231,7 +250,7 @@ def TypedDeepExecution (compiled : CompiledEntry)
       SourceTypedRuntime.PreparedDeepExecution compiled.program compiled.plan
         (compiled.root.function.typedBody.inputs.map (·.scheme.body))
         compiled.root.function.inferredBodyType arguments initial value finalState
-  | .core _ => False
+  | .core _ | .coreRuntime _ => False
 
 /-- The selected backend's result projection agrees with the public source
 result type.  Compilation checks this separately from runtime result typing:
@@ -244,7 +263,7 @@ public source result type rather than only the linker's private return type. -/
 def CoreResultHasPublicType (compiled : CompiledEntry)
     (value : Core.Value) (finalStore : Core.Store) : Prop :=
   match compiled.executable with
-  | .core _ =>
+  | .core _ | .coreRuntime _ =>
       ∃ publicType,
         SourceCoreElaboration.lowerType
           (.declaration compiled.root.declaration) compiled.resultType =
@@ -253,6 +272,14 @@ def CoreResultHasPublicType (compiled : CompiledEntry)
           Core.RuntimeStoreHasTypes finalWorld finalStore ∧
             Core.RuntimeValueHasType finalWorld value publicType
   | .typedSource => False
+
+/-- The public projection covers successful values, failed stores and typed
+exhaustion checkpoints from the ordinary Core result envelope. -/
+def CoreLanguageResultHasPublicType (compiled : CompiledEntry)
+    (observation : Core.LanguageResult.Observation) : Prop :=
+  ∃ publicType,
+    SourceCoreElaboration.lowerType (.declaration compiled.root.declaration)
+      compiled.resultType = .ok publicType ∧ observation.HasType publicType
 
 end CompiledEntry
 
@@ -292,11 +319,13 @@ remain in `ExecutionResult`. -/
 inductive RunError where
   | invocationKindMismatch (backend : Backend) (actual : InvocationKind)
   | coreInputTypesMismatch (expected actual : List Core.Ty)
+  | coreRuntimeInput (error : SourceCoreBasicEntry.Error)
   deriving Repr, DecidableEq
 
 /-- Lossless result carrier for all selected backends. -/
 inductive ExecutionResult where
   | core (result : Core.StatefulRunResult)
+  | coreLanguageResult (observation : Core.LanguageResult.Observation)
   | typedSource (result : SourceTypedRuntime.RunResult)
   deriving Repr
 
@@ -313,11 +342,12 @@ def PreservationPrecondition (compiled : CompiledEntry) : Invocation → Prop
             Core.RuntimeEnvironmentHasTypes world arguments
                 entry.elaborated.inputs.values ∧
               Core.StoreHasTypes world store
+      | .coreRuntime _ => True
       | .typedSource => False
   | .typedValues _ _ =>
       match compiled.executable with
       | .typedSource => compiled.HasCanonicalRoot
-      | .core _ => False
+      | .core _ | .coreRuntime _ => False
 
 /-- Backend-native typing for every successful result carrier. Direct Core and
 typed source include their final store/heap and deeply typed values;
@@ -331,6 +361,7 @@ def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult �
             Core.RuntimeStoreHasTypes finalWorld finalStore ∧
               Core.RuntimeValueHasType finalWorld value
                 entry.elaborated.returnType
+      | .coreRuntime _ => False
       | .typedSource => False
   | .core (.outOfFuel _) | .core (.fault _ _) => True
   | .typedSource (.done value finalState) =>
@@ -338,8 +369,12 @@ def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult �
       | .typedSource =>
           SourceTypedRuntime.PreparedDeepResult compiled.program compiled.plan
             compiled.root.function.inferredBodyType value finalState
-      | .core _ => False
+      | .core _ | .coreRuntime _ => False
   | .typedSource (.outOfFuel _) | .typedSource (.fault _ _) => True
+  | .coreLanguageResult observation =>
+      match compiled.executable with
+      | .coreRuntime entry => observation.HasType entry.resultType
+      | .core _ | .typedSource => False
 
 /-- Execute a reusable artifact in its selected runtime domain. -/
 def run (compiled : CompiledEntry) (invocation : Invocation)
@@ -351,6 +386,10 @@ def run (compiled : CompiledEntry) (invocation : Invocation)
       | some result => .ok (.core result)
       | none => .error (.coreInputTypesMismatch
           entry.elaborated.inputs.values (arguments.map Core.Value.type))
+  | .coreRuntime entry, .coreValues arguments store =>
+      (entry.run arguments options.executionFuel store).map
+        (fun result => .coreLanguageResult result.observation)
+        |>.mapError RunError.coreRuntimeInput
   | .typedSource, .typedValues arguments state =>
       .ok (.typedSource (SourceTypedRuntime.runDeepCertifiedWithValidationFuel
         compiled.program compiled.plan compiled.root.key arguments
@@ -441,7 +480,13 @@ private def selectCoreBackend (program : CheckedProgram)
       match linked.entries with
       | [entry] => .ok (.core entry)
       | entries => .error (.backendEntryCountMismatch .core entries.length)
-  | .error error => .error (.backendRejected (.core error))
+  | .error error =>
+      match SourceCoreBasicEntry.prepare program plan stagingFuel Core.Word.zero with
+      | .ok prepared =>
+          match prepared.entries with
+          | [entry] => .ok (.coreRuntime entry)
+          | entries => .error (.backendEntryCountMismatch .core entries.length)
+      | .error _ => .error (.backendRejected (.core error))
 
 private def selectTypedSourceBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) :
@@ -478,7 +523,19 @@ private theorem selectCoreBackend_success_backend
   unfold selectCoreBackend at selected
   cases linkedResult : SourceCoreDirectLinking.linkWithStagingFuel program
       (.complete plan) stagingFuel with
-  | error error => simp [linkedResult] at selected
+  | error error =>
+      cases prepared : SourceCoreBasicEntry.prepare program plan stagingFuel Core.Word.zero with
+      | error preparationError => simp [linkedResult, prepared] at selected
+      | ok preparedProgram =>
+          cases entries : preparedProgram.entries with
+          | nil => simp [linkedResult, prepared, entries] at selected
+          | cons entry rest =>
+              cases rest with
+              | nil =>
+                  simp [linkedResult, prepared, entries] at selected
+                  cases selected
+                  rfl
+              | cons another tail => simp [linkedResult, prepared, entries] at selected
   | ok linked =>
       cases entries : linked.entries with
       | nil => simp [linkedResult, entries] at selected
@@ -551,27 +608,29 @@ private theorem selectBackend_automatic_typed_source
     (selected : selectBackend program plan stagingFuel .automatic =
       .ok .typedSource) :
     selectTypedSourceBackend program plan = .ok .typedSource := by
-  cases direct : SourceCoreDirectLinking.linkWithStagingFuel program
-      (.complete plan) stagingFuel with
+  cases selectedCore : selectCoreBackend program plan stagingFuel with
+  | ok executable =>
+      have equal : executable = .typedSource := by
+        simpa [selectBackend, selectedCore] using selected
+      have backend := selectCoreBackend_success_backend program plan stagingFuel executable selectedCore
+      rw [equal] at backend
+      cases backend
   | error error =>
-      cases validated : SourceCompilationPlan.validateExecutablePlanEvidence
-          program plan with
-      | ok value =>
-          cases value
-          simp [selectTypedSourceBackend, validated]
-      | error typedError =>
-          simp [selectBackend, selectCoreBackend, direct,
-            selectTypedSourceBackend, validated] at selected
-  | ok linked =>
-      cases entries : linked.entries with
-      | nil =>
-          simp [selectBackend, selectCoreBackend, direct, entries] at selected
-      | cons entry rest =>
-          cases rest with
-          | nil =>
-              simp [selectBackend, selectCoreBackend, direct, entries] at selected
-          | cons another tail =>
-              simp [selectBackend, selectCoreBackend, direct, entries] at selected
+      cases error <;> simp [selectBackend, selectedCore] at selected
+      rename_i rejection
+      cases rejection with
+      | typedSource error => cases selected
+      | core error =>
+          cases selectedTyped : selectTypedSourceBackend program plan with
+          | ok executable =>
+              simp only [selectedTyped] at selected
+              cases selected
+              rfl
+          | error error =>
+              rw [selectedTyped] at selected
+              cases error <;> simp at selected
+              rename_i rejection
+              cases rejection <;> simp at selected
 
 private theorem selectBackend_typed_plan
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
@@ -606,6 +665,14 @@ private def validatePublicResultType
       else
         throw (.publicCoreResultMismatch projected
           entry.elaborated.returnType)
+  | .coreRuntime entry =>
+      let projected ← (SourceCoreElaboration.lowerType
+          (.declaration root.declaration) root.function.inferredBodyType)
+        |>.mapError CompileError.publicCoreResultProjection
+      if projected = entry.resultType then
+        pure ()
+      else
+        throw (.publicCoreResultMismatch projected entry.resultType)
   | .typedSource => pure ()
 
 private theorem validatePublicResultType_correct
@@ -623,6 +690,18 @@ private theorem validatePublicResultType_correct
             bind, Except.bind] at accepted
       | ok projected =>
           by_cases same : projected = entry.elaborated.returnType
+          · exact congrArg Except.ok same
+          · simp [validatePublicResultType, projection, same,
+              Except.mapError, bind, Except.bind] at accepted
+  | coreRuntime entry =>
+      simp only [Executable.HasPublicResultProjection]
+      cases projection : SourceCoreElaboration.lowerType
+          (.declaration root.declaration) root.function.inferredBodyType with
+      | error error =>
+          simp [validatePublicResultType, projection, Except.mapError,
+            bind, Except.bind] at accepted
+      | ok projected =>
+          by_cases same : projected = entry.resultType
           · exact congrArg Except.ok same
           · simp [validatePublicResultType, projection, same,
               Except.mapError, bind, Except.bind] at accepted
@@ -885,7 +964,7 @@ theorem compileChecked_hasValidatedTypedPlan
                               rw [publicResult] at compiledOk
                               cases compiledOk
                               cases executable with
-                              | core entry =>
+                              | core entry | coreRuntime entry =>
                                   simp [CompiledEntry.backend] at typedBackend
                               | typedSource =>
                                   exact selectBackend_typed_plan program plan
@@ -1887,6 +1966,10 @@ theorem CompiledEntry.run_core_done_preserves_type
                 options.executionFuel store environmentTyped storeTyped exactRun
           | outOfFuel state => cases ran
           | fault error state => cases ran
+  | coreRuntime entry =>
+      cases result : entry.run arguments options.executionFuel store with
+      | error error => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
+      | ok result => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
 
@@ -1921,6 +2004,11 @@ theorem CompiledEntry.run_core_never_faults
               cases ran
               exact entry.run?_never_faults arguments options.executionFuel
                 store environmentTyped storeTyped error faultState exactRun
+  | coreRuntime entry =>
+      intro ran
+      cases result : entry.run arguments options.executionFuel store with
+      | error error => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
+      | ok result => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
 
@@ -1941,7 +2029,7 @@ theorem CompiledEntry.run_typedSource_done_preserves_type
   cases compiled
   rename_i program plan root executable
   cases executable with
-  | core entry =>
+  | core entry | coreRuntime entry =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
@@ -1977,7 +2065,7 @@ theorem CompiledEntry.runTyped_done_has_public_resultType
   cases compiled
   rename_i program plan root executable
   cases executable with
-  | core entry =>
+  | core entry | coreRuntime entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simp only [CompiledEntry.SuccessfulResultHasNativeType] at native
@@ -2001,7 +2089,7 @@ theorem CompiledEntry.runTyped_done_has_public_deepExecution
   cases compiled
   rename_i program plan root executable
   cases executable with
-  | core entry =>
+  | core entry | coreRuntime entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
@@ -2058,7 +2146,7 @@ theorem CompiledEntry.runTyped_done_has_public_deepResult
   cases compiled
   rename_i program plan root executable
   cases executable with
-  | core entry =>
+  | core entry | coreRuntime entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
   | typedSource =>
       simpa [CompiledEntry.TypedDeepResult,
@@ -2091,8 +2179,72 @@ theorem CompiledEntry.run_core_done_has_public_resultType
         CompiledEntry.resultType]
       exact ⟨entry.elaborated.returnType, projection, finalWorld,
         storeTyped, valueTyped⟩
+  | coreRuntime entry =>
+      cases result : entry.run arguments options.executionFuel store with
+      | error error => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
+      | ok result => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
   | typedSource =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
+
+/-- The optional-cell entry checks complete input values and supplies typed
+completion, language failure and exhaustion without an extra caller premise. -/
+theorem CompiledEntry.run_coreLanguageResult_hasType
+    (compiled : CompiledEntry) (arguments : List Core.Value)
+    (store : Core.Store) (options : RunOptions)
+    (observation : Core.LanguageResult.Observation)
+    (ran : compiled.run (.coreValues arguments store) options =
+      .ok (.coreLanguageResult observation)) :
+    compiled.SuccessfulResultHasNativeType (.coreLanguageResult observation) := by
+  cases compiled
+  rename_i program plan root executable
+  cases executable with
+  | core entry =>
+      cases result : entry.run? arguments options.executionFuel store <;>
+        simp [CompiledEntry.run, result] at ran
+  | typedSource => simp [CompiledEntry.run, Invocation.kind] at ran
+  | coreRuntime entry =>
+      cases accepted : entry.run arguments options.executionFuel store with
+      | error error => simp [CompiledEntry.run, accepted, Except.mapError, Except.map] at ran
+      | ok result =>
+          simp [CompiledEntry.run, accepted, Except.mapError, Except.map] at ran
+          cases ran
+          exact result.typed
+
+/-- All finite ordinary Core outcomes retain the public source type projection. -/
+theorem CompiledEntry.run_coreLanguageResult_has_public_resultType
+    (compiled : CompiledEntry) (arguments : List Core.Value)
+    (store : Core.Store) (options : RunOptions)
+    (observation : Core.LanguageResult.Observation)
+    (projection : compiled.HasPublicResultProjection)
+    (ran : compiled.run (.coreValues arguments store) options =
+      .ok (.coreLanguageResult observation)) :
+    compiled.CoreLanguageResultHasPublicType observation := by
+  have typed := compiled.run_coreLanguageResult_hasType arguments store options observation ran
+  cases compiled
+  rename_i program plan root executable
+  cases executable with
+  | core entry => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
+  | typedSource => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
+  | coreRuntime entry => exact ⟨entry.resultType, projection, typed⟩
+
+/-- A successful optional-cell result has the public source result projection. -/
+theorem CompiledEntry.run_coreLanguageResult_done_has_public_resultType
+    (compiled : CompiledEntry) (arguments : List Core.Value)
+    (store : Core.Store) (options : RunOptions)
+    {value : Core.Value} {finalStore : Core.Store}
+    (projection : compiled.HasPublicResultProjection)
+    (ran : compiled.run (.coreValues arguments store) options =
+      .ok (.coreLanguageResult (.succeeded value finalStore))) :
+    compiled.CoreResultHasPublicType value finalStore := by
+  have typed := compiled.run_coreLanguageResult_hasType arguments store options
+    (.succeeded value finalStore) ran
+  cases compiled
+  rename_i program plan root executable
+  cases executable with
+  | core entry => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
+  | typedSource => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
+  | coreRuntime entry =>
+      exact ⟨entry.resultType, projection, typed⟩
 
 /-- Whole-compiler successful-result preservation. One theorem covers both
 selected runtimes without erasing their native value/store domains.
@@ -2132,6 +2284,9 @@ theorem CompiledEntry.run_preserves_successful_result_native_type
               | core entry =>
                   simp only [CompiledEntry.run] at ran
                   split at ran <;> cases ran
+              | coreRuntime entry =>
+                  cases result : entry.run arguments options.executionFuel store <;>
+                    simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
               | typedSource =>
                   simp [CompiledEntry.run, Invocation.kind] at ran
           | typedValues arguments initial =>
@@ -2141,6 +2296,14 @@ theorem CompiledEntry.run_preserves_successful_result_native_type
           simp [CompiledEntry.SuccessfulResultHasNativeType]
       | fault error state =>
           simp [CompiledEntry.SuccessfulResultHasNativeType]
+  | coreLanguageResult observation =>
+      cases invocation with
+      | coreValues arguments store =>
+          exact compiled.run_coreLanguageResult_hasType arguments store options observation ran
+      | typedValues arguments state =>
+          cases compiled
+          rename_i program plan root executable
+          cases executable <;> simp [CompiledEntry.run, Invocation.kind] at ran
 
 /-- A typed-source artifact rejects Core-domain inputs before either runtime
 starts.  In particular, execution fuel cannot turn this boundary failure into
@@ -2181,27 +2344,34 @@ theorem CompiledEntry.runTyped_ok_of_typedSource (compiled : CompiledEntry)
   cases executable <;> simp_all [CompiledEntry.backend, CompiledEntry.runTyped,
     CompiledEntry.run]
 
-/-- After a Core-domain invocation reaches the direct backend, the only
-facade-level rejection is the explicit input-type mismatch.  Every runtime
-outcome remains in the Core result carrier. -/
+/-- Core-domain execution retains either its direct result, its decoded
+language result, or its explicit input-boundary rejection. -/
 theorem CompiledEntry.runCore_outcome_of_core (compiled : CompiledEntry)
     (arguments : List Core.Value) (options : RunOptions) (store : Core.Store)
     (hbackend : compiled.backend = .core) :
-    (∃ result, compiled.runCore arguments options store =
-        .ok (.core result)) ∨
-      (∃ expected actual, compiled.runCore arguments options store =
-        .error (.coreInputTypesMismatch expected actual)) := by
+    (∃ result, compiled.runCore arguments options store = .ok (.core result)) ∨
+      (∃ observation, compiled.runCore arguments options store =
+        .ok (.coreLanguageResult observation)) ∨
+      (∃ error, compiled.runCore arguments options store = .error error) := by
   cases compiled
   rename_i program plan root executable
-  cases executable <;> simp_all [CompiledEntry.backend]
-  rename_i entry
-  simp only [CompiledEntry.runCore, CompiledEntry.run]
-  cases hresult : entry.run? arguments options.executionFuel store with
-  | none =>
-      exact Or.inr ⟨entry.elaborated.inputs.values,
-        arguments.map Core.Value.type, by simp⟩
-  | some result =>
-      exact Or.inl ⟨result, by simp⟩
+  cases executable with
+  | typedSource => simp [CompiledEntry.backend] at hbackend
+  | core entry =>
+      cases exactRun : entry.run? arguments options.executionFuel store with
+      | none =>
+          exact .inr (.inr ⟨.coreInputTypesMismatch entry.elaborated.inputs.values
+            (arguments.map Core.Value.type), by simp [CompiledEntry.runCore, CompiledEntry.run, exactRun]⟩)
+      | some result =>
+          exact .inl ⟨result, by simp [CompiledEntry.runCore, CompiledEntry.run, exactRun]⟩
+  | coreRuntime entry =>
+      cases accepted : entry.run arguments options.executionFuel store with
+      | error error =>
+          exact .inr (.inr ⟨.coreRuntimeInput error, by simp [CompiledEntry.runCore, CompiledEntry.run,
+            accepted, Except.mapError, Except.map]⟩)
+      | ok result =>
+          exact .inr (.inl ⟨result.observation, by simp [CompiledEntry.runCore,
+            CompiledEntry.run, accepted, Except.mapError, Except.map]⟩)
 
 theorem run_of_compiled (raw : Workspace.RawWorkspace) (seed : Seed)
     (invocation : Invocation) (limits : Limits) (compiled : CompiledEntry)
