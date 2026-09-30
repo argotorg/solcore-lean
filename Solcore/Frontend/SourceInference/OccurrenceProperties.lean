@@ -3534,6 +3534,16 @@ theorem inferForItemsFuel_occurrenceBoundExtends
   inference_occurrenceBoundExtends.2.2.2.2.2.1 fuel context items state
     result success
 
+/-- Expose the single-for-item component used by the source-ordered
+initializer/post-item proof. -/
+theorem inferForItemFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context} {item : Syntax.ForItem}
+    {state : State} {result : ForItemForm × State}
+    (success : inferForItemFuel fuel context item state = .ok result) :
+    state.OccurrenceBoundExtends result.2 :=
+  inference_occurrenceBoundExtends.2.2.2.2.2.2.1 fuel context item state
+    result success
+
 /-- Expose the match-case component of the mutual occurrence theorem so
 soundness proofs can follow a checked explicit arm into a default body. -/
 theorem inferMatchCasesFuel_occurrenceBoundExtends
