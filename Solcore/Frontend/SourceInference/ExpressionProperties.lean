@@ -13236,6 +13236,17 @@ private theorem programDataConstructorId_contains_iff_mem
       simp only [List.contains_cons, List.mem_cons]
       rw [Bool.or_eq_true, programDataConstructorId_beq_iff_eq, induction]
 
+/-- Empty arm lists cannot establish nominal exhaustiveness, even for an
+uninhabited data type with no constructors. -/
+theorem exhaustsNominalConstructors_eq_true_cases_nonempty
+    {context : Context} {state : State} {scrutineeType : Ty}
+    {cases : List TypedMatchCase}
+    (accepted : exhaustsNominalConstructors context state scrutineeType
+      cases = true) : cases ≠ [] := by
+  intro casesNil
+  subst cases
+  simp [exhaustsNominalConstructors] at accepted
+
 /-- A positive nominal-coverage check exposes the cataloged data type, the
 exact resolved scrutinee spine, and one irrefutable constructor-pattern arm
 for every constructor in the declaration. -/
@@ -13253,7 +13264,14 @@ theorem exhaustsNominalConstructors_eq_true_facts
             .constructor instantiation instructions ∧
           instantiation.constructor = constructor.id ∧
           constructorArgumentsIrrefutable instantiation instructions = true := by
+  have casesNonempty :=
+    exhaustsNominalConstructors_eq_true_cases_nonempty accepted
   unfold exhaustsNominalConstructors at accepted
+  have notEmpty : cases.isEmpty = false := by
+    cases cases with
+    | nil => contradiction
+    | cons _ _ => rfl
+  simp only [notEmpty, Bool.false_eq_true, ↓reduceIte] at accepted
   cases parts : nominalTypeParts? (state.resolve scrutineeType) with
   | none => simp [parts] at accepted
   | some pair =>

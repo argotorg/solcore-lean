@@ -1531,6 +1531,7 @@ def typedPatternIsCatchall (pattern : TypedMatchPattern) : Bool :=
 
 def exhaustsNominalConstructors (context : Context) (state : State)
     (scrutineeType : Ty) (cases : List TypedMatchCase) : Bool :=
+  if cases.isEmpty then false else
   match nominalTypeParts? (state.resolve scrutineeType) with
   | none => false
   | some (declaration, _) =>
