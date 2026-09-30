@@ -28,6 +28,7 @@ theorem inferPlaceFuel_success_index_key_childProvenance
     (below : initial.NodesBelowNextOccurrence)
     (roots : List NodeId := [])
     (sourceExtension : TypingSourceExtends (final.toTypedSource roots) ambient)
+    (patternsSubset : final.integerPatterns ⊆ evidenceState.integerPatterns)
     (literalsSubset : final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements) :
     ∃ child : ExpressionChildInferenceProvenance (fuel + 1)
@@ -48,6 +49,7 @@ theorem inferPlaceFuel_success_index_key_childProvenance
     initialNodesBelow := keyBelow
     success := keySuccess
     sourceExtension := sourceExtension
+    integerPatternsSubset := patternsSubset
     integerLiteralsSubset := literalsSubset
     requirementsSubset := requirementsSubset
   }, rfl, rfl, keyMember⟩
@@ -68,6 +70,7 @@ theorem inferAssignedValueFuel_success_value_childProvenance
     (below : initial.NodesBelowNextOccurrence)
     (roots : List NodeId := [])
     (sourceExtension : TypingSourceExtends (final.toTypedSource roots) ambient)
+    (patternsSubset : final.integerPatterns ⊆ evidenceState.integerPatterns)
     (literalsSubset : final.integerLiterals ⊆ evidenceState.integerLiterals)
     (requirementsSubset : final.requirements ⊆ evidenceState.requirements) :
     ∃ child : ExpressionChildInferenceProvenance (fuel + 1)
@@ -87,6 +90,7 @@ theorem inferAssignedValueFuel_success_value_childProvenance
     initialNodesBelow := valueBelow
     success := valueSuccess
     sourceExtension := sourceExtension
+    integerPatternsSubset := patternsSubset
     integerLiteralsSubset := literalsSubset
     requirementsSubset := requirementsSubset
   }, rfl, rfl, rfl⟩
