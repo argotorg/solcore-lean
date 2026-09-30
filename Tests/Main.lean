@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreGenericMatch
 import Solcore.Test.SourceCoreGenericHeap
 import Solcore
 import Solcore.Test.TypeSystemPublicBoundary
