@@ -40,5 +40,7 @@ import Solcore.Frontend.SourceCoreScalar
 import Solcore.Frontend.SourceCoreInteger
 import Solcore.Frontend.SourceCoreGeneralEntry
 import Solcore.Frontend.SourceCoreGeneralFunctions
+import Solcore.Frontend.SourceCorePlanCatalog
+import Solcore.Frontend.SourceCoreDataValues
 
 /-! Current whole-program source pipeline and preservation results. -/
