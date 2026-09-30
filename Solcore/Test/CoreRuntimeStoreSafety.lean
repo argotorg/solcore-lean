@@ -1,4 +1,5 @@
 import Solcore.Core.RuntimeStoreSafety
+import Solcore.Core.BoundedSafety
 
 /-! Higher-order store invariants do not traverse cyclic captured references. -/
 
@@ -29,6 +30,38 @@ private theorem cyclicStore_typed :
         subst type
         exact ⟨selfClosure, rfl, selfClosure_typed⟩
     | succ location => simp at found
+
+private def callState : State :=
+  .initial (.apply (.var 0) .unit) [selfClosure] [selfClosure]
+
+/-- The pure machine now uses the general world-indexed store invariant. -/
+private theorem callState_typed : StateHasType callState .unit :=
+  .eval cyclicStore_typed (.cons selfClosure_typed .nil)
+    (.apply (.var rfl) .unit) .nil
+
+example (fuel : Nat) (fault : MachineFault) (state : State) :
+    runStateful fuel callState ≠ .fault fault state :=
+  well_typed_runStateful_never_faults callState_typed
+
+example : runStateful 6 callState = .done .unit [selfClosure] := by
+  rfl
+
+private def allocationState : State :=
+  .initial (.newCell .bool (.bool true)) [] [selfClosure]
+
+private theorem allocationState_typed : StateHasType allocationState (.cell .bool) :=
+  .eval cyclicStore_typed .nil (.newCell .bool .bool) .nil
+
+example : runStateful 3 allocationState =
+    .done (.cellRef .bool 1) [selfClosure, .bool true] := by
+  rfl
+
+example (fuel : Nat) (checkpoint : State)
+    (exhausted : runStateful fuel allocationState = .outOfFuel checkpoint) :
+    ∃ future, WorldExtends [functionType] future ∧
+      RuntimeStoreHasTypes future checkpoint.store :=
+  well_typed_runStateful_preserves_checkpoint_world
+    allocationState_typed cyclicStore_typed exhausted
 
 example :
     ∃ value, Store.read? [selfClosure] 0 = some value ∧

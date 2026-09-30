@@ -465,6 +465,130 @@ theorem RuntimeEnvironmentHasTypes.weaken
     intro _ _ _ _ _ _ _ valueIH environmentIH
     exact .cons valueIH environmentIH
 
+
+/-- Every location is typed against the same world. References are checked by
+world lookup rather than by recursively following the store. -/
+structure RuntimeStoreHasTypes
+    (world : StoreTyping) (store : Store)
+    (definitions : DataEnvironment := []) : Prop where
+  length_eq : world.length = store.length
+  lookup :
+    ∀ {location : Location} {elementType : Ty},
+      world[location]? = some elementType →
+      ∃ value,
+        store.read? location = some value ∧
+        RuntimeValueHasType world value elementType definitions
+
+namespace RuntimeStoreHasTypes
+
+theorem nil (definitions : DataEnvironment := []) :
+    RuntimeStoreHasTypes [] [] definitions where
+  length_eq := rfl
+  lookup := by simp
+
+theorem read
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : RuntimeStoreHasTypes world store definitions)
+    {location : Location} {elementType : Ty}
+    (found : world[location]? = some elementType) :
+    ∃ value,
+      store.read? location = some value ∧
+      RuntimeValueHasType world value elementType definitions :=
+  typing.lookup found
+
+theorem location_lt
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : RuntimeStoreHasTypes world store definitions)
+    {location : Location} {elementType : Ty}
+    (found : world[location]? = some elementType) :
+    location < store.length := by
+  have bound := (List.getElem?_eq_some_iff.mp found).1
+  simpa [← typing.length_eq] using bound
+
+/-- A fixed store determines its world without traversing referenced cells. -/
+theorem world_eq
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : RuntimeStoreHasTypes world store definitions) :
+    world = store.map Value.type := by
+  apply List.ext_getElem (by simpa using typing.length_eq)
+  intro index worldBound storeBound
+  obtain ⟨value, found, valueTyped⟩ := typing.lookup
+    (List.getElem?_eq_getElem worldBound)
+  have read : store[index]? = some value := found
+  have inBounds : index < store.length := by simpa using storeBound
+  have valueEq : store[index] = value :=
+    Option.some.inj ((List.getElem?_eq_getElem inBounds).symm.trans read)
+  simpa [valueEq] using valueTyped.type_eq.symm
+
+theorem allocate
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : RuntimeStoreHasTypes world store definitions)
+    {elementType : Ty} {value : Value}
+    (valueTyping : RuntimeValueHasType world value elementType definitions) :
+    RuntimeStoreHasTypes (world ++ [elementType])
+      (store.allocate value).1 definitions := by
+  have extension : WorldExtends world (world ++ [elementType]) :=
+    ⟨[elementType], rfl⟩
+  constructor
+  · simp [typing.length_eq]
+  · intro location storedType foundType
+    by_cases old : location < world.length
+    · have oldType : world[location]? = some storedType := by
+        rw [List.getElem?_append_left (l₂ := [elementType]) old] at foundType
+        exact foundType
+      obtain ⟨oldValue, oldLookup, oldTyping⟩ := typing.lookup oldType
+      have storeOld : location < store.length := by
+        simpa [← typing.length_eq] using old
+      exact ⟨oldValue,
+        (Store.allocate_old_lookup store value storeOld).trans oldLookup,
+        oldTyping.weaken extension⟩
+    · have locationEq : location = world.length := by
+        have bound := (List.getElem?_eq_some_iff.mp foundType).1
+        have upper : location ≤ world.length := by
+          apply Nat.lt_succ_iff.mp
+          simpa using bound
+        exact Nat.le_antisymm upper (Nat.le_of_not_gt old)
+      subst location
+      have storedTypeEq : storedType = elementType := by
+        exact (Option.some.inj (by simpa using foundType)).symm
+      subst storedType
+      exact ⟨value,
+        by simpa [← typing.length_eq] using Store.allocate_fresh_lookup store value,
+        valueTyping.weaken extension⟩
+
+theorem write
+    {definitions : DataEnvironment} {world : StoreTyping}
+    {store updatedStore : Store}
+    (typing : RuntimeStoreHasTypes world store definitions)
+    {location : Location} {elementType : Ty} {value : Value}
+    (found : world[location]? = some elementType)
+    (valueTyping : RuntimeValueHasType world value elementType definitions)
+    (written : store.write? location value = some updatedStore) :
+    RuntimeStoreHasTypes world updatedStore definitions := by
+  constructor
+  · rw [Store.write?_preserves_length written]
+    exact typing.length_eq
+  · intro otherLocation otherType otherFound
+    obtain ⟨oldValue, oldLookup, oldTyping⟩ := typing.lookup otherFound
+    by_cases same : otherLocation = location
+    · subst otherLocation
+      have typeEq := Option.some.inj (found.symm.trans otherFound)
+      subst otherType
+      exact ⟨value, Store.write?_reads_written written, valueTyping⟩
+    · exact ⟨oldValue,
+        (Store.write?_preserves_other written same).trans oldLookup, oldTyping⟩
+
+theorem write_exists
+    {definitions : DataEnvironment} {world : StoreTyping} {store : Store}
+    (typing : RuntimeStoreHasTypes world store definitions)
+    {location : Location} {elementType : Ty} {value : Value}
+    (found : world[location]? = some elementType) :
+    ∃ updatedStore, store.write? location value = some updatedStore :=
+  (Store.write?_success_iff store location value).2 (typing.location_lt found)
+
+end RuntimeStoreHasTypes
+
+
 structure StoreHasTypes (world : StoreTyping) (store : Store) : Prop where
   length_eq : world.length = store.length
   lookup :
@@ -612,6 +736,19 @@ theorem CellPayload.runtimeValueHasType
       cases typing with
       | inLeft payloadTyping => exact .inLeft (leftIH payloadTyping)
       | inRight payloadTyping => exact .inRight (rightIH payloadTyping)
+
+/-- Existing first-order stores embed without changing their locations. -/
+theorem StoreHasTypes.toRuntime
+    {world : StoreTyping} {store : Store}
+    (typing : StoreHasTypes world store)
+    (definitions : DataEnvironment := []) :
+    RuntimeStoreHasTypes world store definitions where
+  length_eq := typing.length_eq
+  lookup := by
+    intro location elementType found
+    obtain ⟨value, read, payload, valueTyping⟩ := typing.lookup found
+    exact ⟨value, read, payload.runtimeValueHasType valueTyping definitions⟩
+
 
 theorem unary_apply_result_has_runtime_type
     {world : StoreTyping} {op : UnaryOp} {operand result : Value}
@@ -2173,7 +2310,7 @@ inductive StateHasType :
       {world : StoreTyping} {expr : Expr} {environment : Environment}
       {context : Context} {continuation : List Frame} {store : Store}
       {controlType resultType : Ty} :
-      StoreHasTypes world store →
+      RuntimeStoreHasTypes world store definitions →
       RuntimeEnvironmentHasTypes world environment context definitions →
       HasType context expr controlType definitions →
       ContinuationHasType world continuation controlType resultType definitions →
@@ -2183,7 +2320,7 @@ inductive StateHasType :
       {definitions : DataEnvironment}
       {world : StoreTyping} {value : Value} {continuation : List Frame}
       {store : Store} {controlType resultType : Ty} :
-      StoreHasTypes world store →
+      RuntimeStoreHasTypes world store definitions →
       RuntimeValueHasType world value controlType definitions →
       ContinuationHasType world continuation controlType resultType definitions →
       StateHasType ⟨.ret value, continuation, store⟩ resultType definitions
@@ -2350,10 +2487,9 @@ theorem transition_preserves_state_type
                   have extension : WorldExtends world futureWorld :=
                     ⟨[elementType], rfl⟩
                   have futureStoreTyping :
-                      StoreHasTypes futureWorld (store.allocate initialValue).1 := by
+                      RuntimeStoreHasTypes futureWorld (store.allocate initialValue).1 definitions := by
                     simpa [futureWorld] using
-                      storeTyping.allocate payload
-                        (payload.valueHasType_rebase valueTyping.erase)
+                      storeTyping.allocate valueTyping
                   have fresh :
                       futureWorld[(store.allocate initialValue).2]? =
                         some elementType := by
@@ -2376,13 +2512,12 @@ theorem transition_preserves_state_type
               | loadCellApply _ =>
                   cases cellTyping with
                   | cellRef found =>
-                      obtain ⟨stored, storedRead, storedPayload, storedTyping⟩ :=
+                      obtain ⟨stored, storedRead, storedTyping⟩ :=
                         storeTyping.lookup found
                       rw [loaded] at storedRead
                       cases storedRead
                       exact .ret storeTyping
-                        (storedPayload.runtimeValueHasType
-                          (definitions := definitions) storedTyping)
+                        storedTyping
                         restTyping
   | enterStoreCell =>
       cases stateTyping with
@@ -2412,8 +2547,7 @@ theorem transition_preserves_state_type
               cases frameTyping with
               | storeCellApply found payload =>
                   exact .ret
-                    (storeTyping.write found
-                      (payload.valueHasType_rebase valueTyping.erase) written)
+                    (storeTyping.write found valueTyping written)
                     .unit restTyping
   | enterConstruct =>
       cases stateTyping with
@@ -2714,12 +2848,12 @@ theorem state_progress
           | loadCellApply _ =>
               cases valueTyping with
               | cellRef found =>
-                  obtain ⟨loaded, read, _, _⟩ := storeTyping.lookup found
+                  obtain ⟨loaded, read, _⟩ := storeTyping.lookup found
                   exact .inr ⟨_, .applyLoadCell read⟩
           | storeCellValue _ _ _ =>
               cases valueTyping with
               | cellRef found =>
-                  obtain ⟨oldValue, read, _, _⟩ := storeTyping.lookup found
+                  obtain ⟨oldValue, read, _⟩ := storeTyping.lookup found
                   exact .inr ⟨_, .beginStoreCellValue read⟩
           | storeCellApply found _ =>
               obtain ⟨updatedStore, written⟩ :=
@@ -2785,7 +2919,7 @@ theorem initial_state_has_type
     {definitions : DataEnvironment} {expr : Expr} {type : Ty}
     (typing : HasType [] expr type definitions) :
     StateHasType (State.initial expr) type definitions :=
-  .eval .nil .nil typing .nil
+  .eval (RuntimeStoreHasTypes.nil definitions) .nil typing .nil
 
 theorem well_typed_runStateful_never_faults
     {definitions : DataEnvironment}
@@ -2813,7 +2947,7 @@ theorem well_typed_runStateful_preserves_result_type
     (stateTyping : StateHasType state resultType definitions)
     (result : runStateful fuel state = .done value finalStore) :
     ∃ finalWorld,
-      StoreHasTypes finalWorld finalStore ∧
+      RuntimeStoreHasTypes finalWorld finalStore definitions ∧
       RuntimeValueHasType finalWorld value resultType definitions := by
   obtain ⟨steps, _, path⟩ := runStateful_sound result
   have finalTyping := path.preserve_state_type stateTyping
@@ -2829,7 +2963,7 @@ theorem well_typed_run_stateful_preserves_result_type
     (stateTyping : StateHasType state resultType definitions)
     (result : runStateful fuel state = .done value finalStore) :
     ∃ finalWorld,
-      StoreHasTypes finalWorld finalStore ∧
+      RuntimeStoreHasTypes finalWorld finalStore definitions ∧
       RuntimeValueHasType finalWorld value resultType definitions :=
   well_typed_runStateful_preserves_result_type stateTyping result
 
@@ -2895,8 +3029,9 @@ theorem Program.checked_runStateful_preserves_result_type
       RuntimeValueHasType finalWorld value program.resultType
         program.dataDefinitions := by
   let wellTyped := Program.check_full_sound checked
-  exact well_typed_runStateful_preserves_result_type
-    (initial_state_has_type wellTyped.bodyHasType) result
+  obtain ⟨world, _, storeTyped, valueTyped⟩ := evaluation_preserves_type
+    (runStateful_evaluation_sound result) wellTyped.bodyHasType .nil .nil
+  exact ⟨world, storeTyped, valueTyped⟩
 
 theorem Program.checked_run_stateful_preserves_result_type
     {program : Program} {fuel : Nat} {value : Value} {finalStore : Store}

@@ -1889,13 +1889,10 @@ theorem LinkedEntry.run?_done_preserves_type
     unfold LinkedEntry.run? at ran
     simp only [typesEqual, ↓reduceIte] at ran
     simpa using ran
-  have initialTyped : Core.StateHasType
-      (Core.State.initial entry.elaborated.core inputs store)
-      entry.elaborated.returnType :=
-    .eval storeTyped environmentTyped
-      (Core.infer_sound entry.elaborated.coreTypeChecked) .nil
-  exact Core.well_typed_runStateful_preserves_result_type
-    initialTyped coreRan
+  obtain ⟨finalWorld, _, finalTyped, valueTyped⟩ :=
+    Core.evaluation_preserves_type (Core.runStateful_evaluation_sound coreRan)
+      (Core.infer_sound entry.elaborated.coreTypeChecked) environmentTyped storeTyped
+  exact ⟨finalWorld, finalTyped, valueTyped⟩
 
 /-- Deeply typed caller values and store also exclude every Core machine fault
 on the direct backend, at every finite fuel budget. -/
@@ -1913,7 +1910,7 @@ theorem LinkedEntry.run?_never_faults
   have initialTyped : Core.StateHasType
       (Core.State.initial entry.elaborated.core inputs store)
       entry.elaborated.returnType :=
-    .eval storeTyped environmentTyped
+    .eval storeTyped.toRuntime environmentTyped
       (Core.infer_sound entry.elaborated.coreTypeChecked) .nil
   intro faulted
   have coreFaulted : Core.runStateful fuel

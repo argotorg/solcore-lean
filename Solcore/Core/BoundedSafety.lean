@@ -7,6 +7,68 @@ set_option autoImplicit false
 
 namespace Solcore.Core
 
+/-- Every typed transition retains the current world or allocates a fresh
+location at its end. World equality is recovered from the actual shared store. -/
+theorem transition_preserves_store_world
+    {definitions : DataEnvironment} {state next : State} {type : Ty}
+    {world : StoreTyping}
+    (typing : StateHasType state type definitions)
+    (stored : RuntimeStoreHasTypes world state.store definitions)
+    (transition : Transition state next) :
+    ∃ future, WorldExtends world future ∧
+      RuntimeStoreHasTypes future next.store definitions := by
+  cases transition <;> try exact ⟨world, .refl world, stored⟩
+  case applyNewCell =>
+    cases typing with
+    | @ret _ actualWorld _ _ _ _ _ actualStored valueTyped continuationTyped =>
+        have same : actualWorld = world :=
+          actualStored.world_eq.trans stored.world_eq.symm
+        subst actualWorld
+        cases continuationTyped with
+        | cons frame _ =>
+            cases frame with
+            | newCellApply _ =>
+                exact ⟨_, ⟨[_], rfl⟩, stored.allocate valueTyped⟩
+  case applyStoreCell =>
+    rename_i written
+    cases typing with
+    | @ret _ actualWorld _ _ _ _ _ actualStored valueTyped continuationTyped =>
+        have same : actualWorld = world :=
+          actualStored.world_eq.trans stored.world_eq.symm
+        subst actualWorld
+        cases continuationTyped with
+        | cons frame _ =>
+            cases frame with
+            | storeCellApply found _ =>
+                exact ⟨world, .refl world, stored.write found valueTyped written⟩
+
+theorem Steps.preserve_store_world
+    {definitions : DataEnvironment} {start finish : State} {type : Ty}
+    {world : StoreTyping} {steps : Nat}
+    (path : Steps steps start finish)
+    (typing : StateHasType start type definitions)
+    (stored : RuntimeStoreHasTypes world start.store definitions) :
+    ∃ future, WorldExtends world future ∧
+      RuntimeStoreHasTypes future finish.store definitions := by
+  induction path generalizing world with
+  | refl => exact ⟨world, .refl world, stored⟩
+  | cons transition tail ih =>
+      obtain ⟨middle, extension, middleStored⟩ :=
+        transition_preserves_store_world typing stored transition
+      obtain ⟨future, further, finalStored⟩ :=
+        ih (transition_preserves_state_type typing transition) middleStored
+      exact ⟨future, extension.trans further, finalStored⟩
+
+theorem well_typed_runStateful_preserves_checkpoint_world
+    {definitions : DataEnvironment} {fuel : Nat} {start checkpoint : State}
+    {type : Ty} {world : StoreTyping}
+    (typing : StateHasType start type definitions)
+    (stored : RuntimeStoreHasTypes world start.store definitions)
+    (exhausted : runStateful fuel start = .outOfFuel checkpoint) :
+    ∃ future, WorldExtends world future ∧
+      RuntimeStoreHasTypes future checkpoint.store definitions :=
+  (runStateful_outOfFuel_sound exhausted).1.preserve_store_world typing stored
+
 /-- Completion has a typed value and store; exhaustion retains a typed state.
 An internal machine fault is not an admissible typed outcome. -/
 def StatefulRunResult.HasType
@@ -15,7 +77,7 @@ def StatefulRunResult.HasType
   match result with
   | .done value store =>
       ∃ world,
-        StoreHasTypes world store ∧ RuntimeValueHasType world value type definitions
+        RuntimeStoreHasTypes world store definitions ∧ RuntimeValueHasType world value type definitions
   | .outOfFuel checkpoint => StateHasType checkpoint type definitions
   | .fault _ _ => False
 

@@ -3482,7 +3482,7 @@ theorem ComputationReturnTreeElaborates.runtime_checkpoint_safety
           ∀ additional error faultState,
             Core.runStateful additional checkpoint ≠ .fault error faultState := by
   have initial : Core.StateHasType ⟨.eval core environment, continuation, store⟩ resultType :=
-    .eval storeTyped environmentTyped (elaboration.core_hasType childCoreType) continuationTyped
+    .eval storeTyped.toRuntime environmentTyped (elaboration.core_hasType childCoreType) continuationTyped
   refine ⟨initial, fun _ _ _ => Core.well_typed_runStateful_never_faults initial, ?_⟩
   intro spent checkpoint exhausted
   have saved := (Core.runStateful_outOfFuel_sound exhausted).1.preserve_state_type initial
@@ -3704,9 +3704,11 @@ private theorem world_types {world : Core.StoreTyping} {store : Core.Store}
             ⟨Nat.succ.inj typed.length_eq,fun {index _} found => typed.lookup (location := index+1) found⟩
           simp only [List.map_cons,← headTyped.type_eq,ih tail]
 
-private theorem world_unique {left right : Core.StoreTyping} {store : Core.Store}
-    (first : Core.StoreHasTypes left store) (second : Core.StoreHasTypes right store) : left = right :=
-  (world_types first).trans (world_types second).symm
+private theorem world_unique {definitions : Core.DataEnvironment}
+    {left right : Core.StoreTyping} {store : Core.Store}
+    (first : Core.RuntimeStoreHasTypes left store definitions)
+    (second : Core.StoreHasTypes right store) : left = right :=
+  first.world_eq.trans (world_types second).symm
 
 private theorem transition_world {definitions : Core.DataEnvironment} {state next : Core.State}
     {resultType : Core.Ty} {world : Core.StoreTyping}

@@ -317,7 +317,7 @@ theorem LocalFunctionApplicationElaborates.runtime_state_hasType
     (continuationTyped : Core.ContinuationHasType world continuation type resultType) :
     Core.StateHasType
       ⟨.eval core (Resolved.LocalScope.values environment), continuation, store⟩ resultType :=
-  .eval storeTyped environmentTyped elaboration.core_hasType continuationTyped
+  .eval storeTyped.toRuntime environmentTyped elaboration.core_hasType continuationTyped
 
 theorem LocalFunctionApplicationElaborates.runtime_run_never_faults
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
