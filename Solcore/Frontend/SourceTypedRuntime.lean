@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceRuntimeValues
+import Solcore.Frontend.SourceRuntimeValidation
 import Solcore.Frontend.SourceCompilationPlan
 
 /-!
@@ -53,51 +53,12 @@ private def lookupLocation? (environment : Environment)
     (id : Resolved.LocalId) : Option Location :=
   (environment.find? fun entry => decide (entry.1 = id)).map Prod.snd
 
-private def findSpecialization? (plan : Plan) (key : Key) :
-    Option SourceSpecialization.SpecializedFunction :=
-  plan.specializations.find? fun specialized => decide (specialized.key = key)
-
 private def resultType? (function : CheckedFunction) : Option Ty :=
   match function.type with
   | .function _ result => some result
   | _ => none
 
-mutual
 
-  def valueTypes? (plan : Plan) : List Value → Option (List Ty)
-    | [] => some []
-    | value :: values => do
-        let type ← Value.type? plan value
-        let types ← valueTypes? plan values
-        pure (type :: types)
-
-  def Value.type? (plan : Plan) : Value → Option Ty
-    | .unit => some .unit
-    | .bool _ => some .bool
-    | .word _ => some .word
-    | .integer _ => some .integer
-    | .product left right => do
-        pure (.product (← left.type? plan) (← right.type? plan))
-    | .proxy inner => some (.proxy (runtimeType inner))
-    | .constructed instantiation arguments => do
-        let actual ← valueTypes? plan arguments
-        if actual = instantiation.payloadTypes.map runtimeType then
-          some (runtimeType instantiation.resultType)
-        else
-          none
-    | .mapping keyType valueType _ =>
-        some (.mapping (runtimeType keyType) (runtimeType valueType))
-    | .closure parameters resultType _ _ _ _ _ =>
-        some (runtimeType
-          (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType))
-    | .instantiated substitution _ principal =>
-        (runtimeType ∘ substitution.apply) <$> principal.type? plan
-    | .global key _ => do
-        let specialized ← findSpecialization? plan key
-        pure (runtimeType specialized.function.type)
-    | .builtin function => some (runtimeType function.type)
-
-end
 
 namespace Cell
 
@@ -336,12 +297,6 @@ inductive FlowOutcome where
   | returned (value : Value) (state : RuntimeState)
   | breaking (environment : Environment) (state : RuntimeState)
   | continuing (environment : Environment) (state : RuntimeState)
-  | outOfFuel (state : RuntimeState)
-  | fault (error : RuntimeError) (state : RuntimeState)
-  deriving Repr
-
-inductive RunResult where
-  | done (value : Value) (state : RuntimeState)
   | outOfFuel (state : RuntimeState)
   | fault (error : RuntimeError) (state : RuntimeState)
   deriving Repr
@@ -1943,152 +1898,6 @@ mutual
 
 end
 
-/-- Exactly one catalog entry with this data identity. -/
-private def exactDataType? (signatures : ProgramSignatures)
-    (id : Resolved.DeclarationId) : Option ProgramDataSignature :=
-  match signatures.dataTypes.filter fun dataType => decide (dataType.id = id) with
-  | [dataType] => some dataType
-  | _ => none
-
-/-- Exactly one catalog constructor with this identity. -/
-private def exactConstructor? (dataType : ProgramDataSignature)
-    (id : ProgramDataConstructorId) : Option ProgramDataConstructorSignature :=
-  match dataType.constructors.filter fun constructor =>
-      decide (constructor.id = id) with
-  | [constructor] => some constructor
-  | _ => none
-
-/-- Reconstruct constructor metadata from the authoritative signature catalog.
-Self-consistent but forged `DataConstructorInstantiation` values do not pass. -/
-def validConstructorInstantiation (signatures : ProgramSignatures)
-    (instantiation : DataConstructorInstantiation) : Bool :=
-  match exactDataType? signatures instantiation.constructor.dataType with
-  | none => false
-  | some dataType =>
-      match exactConstructor? dataType instantiation.constructor with
-      | none => false
-      | some constructor =>
-          let parameters := instantiation.parameterSubstitution.map Prod.fst
-          if parameters != dataType.parameters then
-            false
-          else
-            match dataType.parameters.mapM
-                instantiation.parameterSubstitution.lookup? with
-            | none => false
-            | some arguments =>
-                let expectedPayload := constructor.payloadTypes.map
-                  instantiation.parameterSubstitution.apply
-                let expectedResult := Ty.nominal dataType.id arguments
-                instantiation.payloadTypes = expectedPayload &&
-                  instantiation.resultType = expectedResult
-
-/-- Exact outcome of bounded recursive runtime-input validation. -/
-inductive TypeValidation where
-  | valid
-  | invalid
-  | unsupportedStaged
-  | outOfFuel
-  deriving Repr, BEq, DecidableEq
-
-private def combineValidation (first second : TypeValidation) : TypeValidation :=
-  match first with
-  | .valid => second
-  | .invalid => .invalid
-  | .unsupportedStaged => .unsupportedStaged
-  | .outOfFuel => .outOfFuel
-
-mutual
-
-  private def valuesValidateFuel (fuel : Nat)
-      (signatures : ProgramSignatures) (plan : Plan) :
-      List Ty → List Value → TypeValidation
-    | [], [] => .valid
-    | expected :: expectedRest, actual :: actualRest =>
-        combineValidation
-          (Value.validateTypeFuel fuel signatures plan expected actual)
-          (valuesValidateFuel fuel signatures plan expectedRest actualRest)
-    | _, _ => .invalid
-
-  private def mappingEntriesValidateFuel (fuel : Nat)
-      (signatures : ProgramSignatures) (plan : Plan)
-      (keyType valueType : Ty) : List (Value × Value) → TypeValidation
-    | [] => .valid
-    | entry :: rest =>
-        combineValidation
-          (Value.validateTypeFuel fuel signatures plan keyType entry.1)
-          (combineValidation
-            (Value.validateTypeFuel fuel signatures plan valueType entry.2)
-            (mappingEntriesValidateFuel fuel signatures plan keyType valueType
-              rest))
-
-  /-- Bounded deep validation which distinguishes malformed input from budget
-  exhaustion. -/
-  def Value.validateTypeFuel :
-      Nat → ProgramSignatures → Plan → Ty → Value → TypeValidation
-    | 0, _, _, _, _ => .outOfFuel
-    | fuel + 1, signatures, plan, expected, actual =>
-        match runtimeType expected, actual with
-        | .constructor (.builtin .unit), .unit => .valid
-        | .constructor (.builtin .bool), .bool _ => .valid
-        | .constructor (.builtin .word), .word _ => .valid
-        | .constructor (.builtin .integer), .integer _ => .valid
-        | .product leftType rightType, .product left right =>
-            combineValidation
-              (Value.validateTypeFuel fuel signatures plan leftType left)
-              (Value.validateTypeFuel fuel signatures plan rightType right)
-        | .proxy inner, .proxy actualInner =>
-            if inner = runtimeType actualInner then .valid else .invalid
-        | .mapping keyType valueType, .mapping actualKey actualValue entries =>
-            if decide (keyType = runtimeType actualKey) &&
-                decide (valueType = runtimeType actualValue) then
-              mappingEntriesValidateFuel fuel signatures plan keyType valueType
-                entries
-            else
-              .invalid
-        | _, .constructed instantiation arguments =>
-            if decide (runtimeType expected =
-                runtimeType instantiation.resultType) &&
-                validConstructorInstantiation signatures instantiation then
-              valuesValidateFuel fuel signatures plan
-                instantiation.payloadTypes arguments
-            else
-              .invalid
-        | .function _ _, .global key evidence =>
-            match exactSpecialization plan key with
-            | .ok specialized =>
-                if runtimeType specialized.function.type =
-                    runtimeType expected then
-                  match validateAuthenticatedRuntimeEvidence signatures key
-                      specialized.assumptions evidence with
-                  | .ok () => .valid
-                  | .error _ => .invalid
-                else .invalid
-            | .error _ => .invalid
-        | .function _ _, .builtin function =>
-            if runtimeType function.type = runtimeType expected then
-              .valid
-            else
-              .invalid
-        | _, _ => .invalid
-
-end
-
-/-- Boolean compatibility projection of exact bounded validation. -/
-def Value.hasTypeFuel (fuel : Nat) (signatures : ProgramSignatures)
-    (plan : Plan) (expected : Ty) (value : Value) : Bool :=
-  Value.validateTypeFuel fuel signatures plan expected value == .valid
-
-namespace Value
-
-/-- Deep validation against source types and the authoritative nominal catalog.
-The explicit budget also bounds recursively nested constructor and mapping
-inputs. -/
-def hasType (signatures : ProgramSignatures) (plan : Plan) (fuel : Nat)
-    (expected : Ty) (value : Value) : Bool :=
-  Value.hasTypeFuel fuel signatures plan expected value
-
-end Value
-
 /-- Step-indexed *structural heap* typing of a runtime value.  At depth zero
 no structure is inspected; each successor step validates the outer type and
 one layer of products, mappings, nominal payloads, and captured closure
@@ -2487,17 +2296,6 @@ def HasDeepTypes (state : RuntimeState)
   ∀ fuel, state.HasDeepTypesFuel fuel signatures plan
 
 end RuntimeState
-
-private def validateInputs (signatures : ProgramSignatures) (plan : Plan)
-    (fuel : Nat) : List Ty → List Value → Option RuntimeError
-  | [], [] => none
-  | expected :: expectedRest, actual :: actualRest =>
-      match actual.validateTypeFuel fuel signatures plan expected with
-      | .valid => validateInputs signatures plan fuel expectedRest actualRest
-      | .invalid => some (.typeMismatch expected (actual.type? plan))
-      | .unsupportedStaged => some (.unsupportedStagedInput expected)
-      | .outOfFuel => some (.inputValidationFuelExhausted expected fuel)
-  | expected, actual => some (.argumentArityMismatch expected.length actual.length)
 
 /-- Execute a plan whose inputs and embedded nominal metadata have already
 been trusted by the caller.  Public boundaries should normally use `run`. -/

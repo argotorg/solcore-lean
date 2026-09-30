@@ -106,4 +106,52 @@ def allocate (state : RuntimeState) (type : Ty) (value : Option Value) :
 
 end RuntimeState
 
+
+private def findSpecialization? (plan : Plan) (key : Key) :
+    Option SourceSpecialization.SpecializedFunction :=
+  plan.specializations.find? fun specialized => decide (specialized.key = key)
+
+mutual
+
+  def valueTypes? (plan : Plan) : List Value → Option (List Ty)
+    | [] => some []
+    | value :: values => do
+        let type ← Value.type? plan value
+        let types ← valueTypes? plan values
+        pure (type :: types)
+
+  def Value.type? (plan : Plan) : Value → Option Ty
+    | .unit => some .unit
+    | .bool _ => some .bool
+    | .word _ => some .word
+    | .integer _ => some .integer
+    | .product left right => do
+        pure (.product (← left.type? plan) (← right.type? plan))
+    | .proxy inner => some (.proxy (runtimeType inner))
+    | .constructed instantiation arguments => do
+        let actual ← valueTypes? plan arguments
+        if actual = instantiation.payloadTypes.map runtimeType then
+          some (runtimeType instantiation.resultType)
+        else
+          none
+    | .mapping keyType valueType _ =>
+        some (.mapping (runtimeType keyType) (runtimeType valueType))
+    | .closure parameters resultType _ _ _ _ _ =>
+        some (runtimeType
+          (.function (Ty.productMany (parameters.map (·.scheme.body))) resultType))
+    | .instantiated substitution _ principal =>
+        (runtimeType ∘ substitution.apply) <$> principal.type? plan
+    | .global key _ => do
+        let specialized ← findSpecialization? plan key
+        pure (runtimeType specialized.function.type)
+    | .builtin function => some (runtimeType function.type)
+
+end
+
+inductive RunResult where
+  | done (value : Value) (state : RuntimeState)
+  | outOfFuel (state : RuntimeState)
+  | fault (error : RuntimeError) (state : RuntimeState)
+  deriving Repr
+
 end Solcore.Frontend.SourceTypedRuntime
