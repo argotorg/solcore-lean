@@ -869,4 +869,80 @@ theorem inferPlaceFuel_success_index_base_state_provenance
                 exact Detail.inferExprFuel_requirements_subset keyResult
                   inUnified
 
+/-- The key used by a successful indexed place is exactly the expression
+inference performed by that branch, and its occurrence is retained as a
+direct place reference. -/
+theorem inferPlaceFuel_success_index_key_provenance
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression base key : Syntax.Expr}
+    {brackets : Syntax.SourceSpan}
+    {initial final : Frontend.SourceInference.State}
+    {place : PlaceResolution}
+    (targetEq : targetExpression.value = .index base brackets key)
+    (success : Detail.inferPlaceFuel (fuel + 1) inferenceContext
+      targetExpression initial = .ok (place, final))
+    (below : initial.NodesBelowNextOccurrence)
+    (roots : List NodeId := []) :
+    ∃ expected keyInitial inferredKey,
+      Detail.inferExprFuel fuel inferenceContext key (some expected)
+        keyInitial = .ok (inferredKey, final) ∧
+      keyInitial.NodesBelowNextOccurrence ∧
+      .expression inferredKey.id ∈ place.references ∧
+      TypingSourceExtends (keyInitial.toTypedSource roots)
+        (final.toTypedSource roots) ∧
+      keyInitial.integerPatterns ⊆ final.integerPatterns ∧
+      keyInitial.requirements ⊆ final.requirements := by
+  unfold Detail.inferPlaceFuel at success
+  simp only [targetEq, bind, Except.bind] at success
+  cases baseResult : Detail.inferPlaceFuel fuel inferenceContext base
+      initial with
+  | error error =>
+      simp [baseResult] at success
+  | ok basePair =>
+      rcases basePair with ⟨basePlace, baseState⟩
+      simp only [baseResult] at success
+      let keyAllocation := baseState.fresh
+      let valueAllocation := keyAllocation.2.fresh
+      cases unifyResult : Detail.unify valueAllocation.2 basePlace.type
+          (.mapping keyAllocation.1 valueAllocation.1) with
+      | error error =>
+          simp [keyAllocation, valueAllocation, unifyResult] at success
+      | ok unifiedState =>
+          simp only [keyAllocation, valueAllocation, unifyResult] at success
+          cases keyResult : Detail.inferExprFuel fuel inferenceContext key
+              (some (unifiedState.resolve keyAllocation.1)) unifiedState with
+          | error error =>
+              simp [keyAllocation, keyResult] at success
+          | ok keyPair =>
+              rcases keyPair with ⟨inferredKey, keyState⟩
+              simp only [keyAllocation, keyResult, pure, Pure.pure,
+                Except.pure] at success
+              injection success with resultEq
+              injection resultEq with placeEq finalEq
+              subst place
+              subst final
+              have baseBelow : baseState.NodesBelowNextOccurrence :=
+                (Detail.inferPlaceFuel_occurrenceBoundExtends
+                  baseResult).nodesBelowNextOccurrence below
+              have keyAllocatedBelow :
+                  keyAllocation.2.NodesBelowNextOccurrence :=
+                (Frontend.SourceInference.State.OccurrenceBoundExtends.fresh
+                  baseState).nodesBelowNextOccurrence baseBelow
+              have valueAllocatedBelow :
+                  valueAllocation.2.NodesBelowNextOccurrence :=
+                (Frontend.SourceInference.State.OccurrenceBoundExtends.fresh
+                  keyAllocation.2).nodesBelowNextOccurrence
+                    keyAllocatedBelow
+              have unifiedBelow : unifiedState.NodesBelowNextOccurrence :=
+                (Detail.unify_occurrenceBoundExtends
+                  unifyResult).nodesBelowNextOccurrence valueAllocatedBelow
+              refine ⟨unifiedState.resolve keyAllocation.1, unifiedState,
+                inferredKey, keyResult, unifiedBelow, ?_,
+                inferExprFuel_success_typingSourceExtends keyResult
+                  unifiedBelow roots,
+                Detail.inferExprFuel_integerPatterns_subset keyResult,
+                Detail.inferExprFuel_requirements_subset keyResult⟩
+              simp [PlaceResolution.references,
+                PlaceProjection.references]
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
