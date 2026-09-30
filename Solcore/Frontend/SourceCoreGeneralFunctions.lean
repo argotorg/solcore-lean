@@ -1,15 +1,16 @@
 import Solcore.Frontend.SourceCoreGeneralEntry
 import Solcore.Frontend.SourceCoreGeneralTypes
 import Solcore.Frontend.SourceCoreEvidence
+import Solcore.Frontend.SourceCoreLocalPolymorphism
 import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreDataFaultSites
 import Solcore.Frontend.SourceCoreDataMatches
 import Solcore.Frontend.SourceCoreDataPlaceFaultSites
 
-/-! Monomorphic functions and closed catalog data share ordinary Core execution.
+/-! Closed function instances and catalog data share ordinary Core execution.
 Preparation authenticates the plan, compiles reachable closures once, and checks
 each assembled entry against the actual recursive data definitions. This slice
-supports monomorphic local bindings and structural place assignments. -/
+supports finite contextual local-lambda bundles and structural place assignments. -/
 
 set_option autoImplicit false
 
@@ -26,6 +27,7 @@ inductive Error where
   | catalog (error : SourceCoreDataCatalog.Error)
   | lowering (error : SourceCoreBasic.Error)
   | diagnostics (error : SourceCoreDataPlaceFaultSites.Error)
+  | localInstances (error : SourceCoreLocalPolymorphism.Error)
   | invalidFunctionType (key : Key)
   | resultMetadataMismatch (key : Key)
   | assumptionsUnsupported (key : Key)
@@ -33,7 +35,7 @@ inductive Error where
   | missingGlobal (key : Key)
   | missingDiagnostics (key : Key)
   | expectedStatementRoot (id : ExpressionId)
-  deriving Repr, DecidableEq
+  deriving Repr
 
 structure Function where
   specialized : SourceSpecialization.SpecializedFunction
@@ -67,13 +69,14 @@ private def prepareFunction (program : CheckedProgram) (checked : Checked) (spec
 
 def bodyLowerer (checked : Checked) (signatures : ProgramSignatures)
     (solvedRequirements : List SolvedRequirement) (assignments : SourceCoreAssignmentFaultSites.Table)
-    (diagnostics : SourceCoreDataPlaceFaultSites.Program) (owner : Key) :
-    SourceCoreFunctions.BodyLowerer :=
+    (diagnostics : SourceCoreDataPlaceFaultSites.Program) (owner : Key)
+    (lowerBinder : TypedSource → SourceCoreBasic.Scope → TypedBinder → Except SourceCoreBasic.Error Core.Ty :=
+      SourceCoreGeneralTypes.lowerBinder checked) : SourceCoreFunctions.BodyLowerer :=
   fun expression fuel source scope statements result reasonAt fellThrough escaped =>
     SourceCoreLoops.lowerStatementsWithPolicy {
       lowerExpression := expression
       readStatement := SourceCoreGeneralTypes.readStatement checked
-      lowerBinder := SourceCoreGeneralTypes.lowerBinder checked
+      lowerBinder := lowerBinder
       lowerAssignment := SourceCoreGeneralTypes.lowerAssignment checked
       lowerMatch := some (SourceCoreDataMatches.lowerWithReasons
         { checked, signatures, solvedRequirements })
@@ -96,9 +99,69 @@ def bodyLowerer (checked : Checked) (signatures : ProgramSignatures)
           (fun type => diagnostics.placeReason owner site assignment.target.root (some type))
     } fuel source scope statements result reasonAt fellThrough escaped
 
+private def localError (id : ExpressionId) (node : ExpressionNode)
+    (error : SourceCoreLocalPolymorphism.Error) : SourceCoreBasic.Error :=
+  match error with
+  | .metadata error => error
+  | _ => .unsupportedExpression id node.form
+
+private def contextualBinder (checked : Checked) (locals : SourceCoreLocalPolymorphism.Catalog)
+    (owner : Key) (active : TypeSystem.Substitution) (source : TypedSource)
+    (scope : SourceCoreBasic.Scope) (binder : TypedBinder) : Except SourceCoreBasic.Error Core.Ty :=
+  if binder.scheme.quantified.isEmpty then SourceCoreGeneralTypes.lowerBinder checked source scope binder
+  else (SourceCoreLocalPolymorphism.lowerBinder locals owner active source scope binder).mapError fun
+    | .metadata error => error
+    | _ => .polymorphicBinding binder.id
+
+/-- Contextual local instances re-enter the shared expression traversal with
+concrete metadata. Every closure captures the same lexical references; the
+bundle is constructed before the generalized binding's cell is allocated. -/
+private def lowerContextualExpression (program : CheckedProgram) (checked : Checked)
+    (signatures : ProgramSignatures) (locals : SourceCoreLocalPolymorphism.Catalog)
+    (assignments : SourceCoreAssignmentFaultSites.Table)
+    (diagnostics : SourceCoreDataPlaceFaultSites.Program) (context : SourceCoreFunctions.Context)
+    (active : TypeSystem.Substitution) (skipInitializer : Option ExpressionId) :
+    SourceCoreFunctions.ExpressionLowerer
+  | 0, _, _, id, _ => .error (.traversalExhausted (.occurrence id.occurrence))
+  | fuel + 1, source, scope, id, reasonAt => do
+      let bind := contextualBinder checked locals context.owner active
+      let lowerBody := bodyLowerer checked signatures context.solvedRequirements assignments diagnostics context.owner bind
+      let policy := { SourceCoreGeneralTypes.policy checked signatures with
+        lowerBinder := bind
+        lowerSpecial? := some fun current child budget source scope id reasonAt => do
+          let node ← match source.lookupExpression? id with
+            | some node => pure node
+            | none => throw (.missingExpression id)
+          let initialized := locals.bindings.find? fun binding =>
+            decide (binding.caller = current.owner ∧ binding.initializer = id)
+          if let some initialized := initialized.filter (fun _ => skipInitializer ≠ some id) then
+            let binding ← (locals.binding current.owner initialized.binder.id).mapError (localError id node)
+            let lowered ← (SourceCoreLocalPolymorphism.lowerInitializer binding active fun candidate => do
+              let lowered ← (lowerContextualExpression program checked signatures locals assignments diagnostics current
+                candidate.origin.substitution (some id) (min budget fuel) candidate.source scope id reasonAt)
+                |>.mapError SourceCoreLocalPolymorphism.Error.metadata
+              (SourceCoreBasic.ensureType (.occurrence id.occurrence) candidate.type lowered.type)
+                |>.mapError SourceCoreLocalPolymorphism.Error.metadata
+              match lowered.expression with
+              | .inRight .word closure => pure closure
+              | _ => throw (.initializerMetadataMismatch id)).mapError (localError id node)
+            return some lowered
+          let evidence ← SourceCoreEvidence.lower program checked current child budget source scope id reasonAt
+          if let some lowered := evidence then return some lowered
+          match node.form with
+          | .reference _ (.local binder) =>
+              if locals.bindings.any (fun binding => decide (binding.caller = current.owner ∧ binding.binder.id = binder)) then
+                let lowered ← (SourceCoreLocalPolymorphism.lowerRead locals current.owner active source scope id (reasonAt id))
+                  |>.mapError (localError id node)
+                return some lowered
+              else return none
+          | _ => return none }
+      SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1) context source scope id reasonAt
+termination_by fuel => fuel
+
 private def compileClosure (program : CheckedProgram) (checked : Checked) (signatures : ProgramSignatures) (plan : Plan)
     (globals : List Signature) (diagnostics : SourceCoreDataPlaceFaultSites.Program)
-    (fuel : Nat) (function : Function) : Except Error Core.Expr := do
+    (locals : SourceCoreLocalPolymorphism.Catalog) (fuel : Nat) (function : Function) : Except Error Core.Expr := do
   let source := function.specialized.function.typedBody
   let own ← match diagnostics.base.find? function.signature.key with
     | some own => pure own
@@ -112,12 +175,9 @@ private def compileClosure (program : CheckedProgram) (checked : Checked) (signa
     internalReason := Core.Word.zero
   }
   let lowerBody := bodyLowerer checked signatures function.specialized.function.solvedRequirements own.assignments
-    diagnostics function.signature.key
-  let policy := { SourceCoreGeneralTypes.policy checked signatures with
-    lowerSpecial? := some (SourceCoreEvidence.lower program checked) }
+    diagnostics function.signature.key (contextualBinder checked locals function.signature.key [])
   let body ← (lowerBody
-    (fun budget source scope id reasonAt =>
-      SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody budget context source scope id reasonAt)
+    (lowerContextualExpression program checked signatures locals own.assignments diagnostics context [] none)
     fuel source (function.inputs.reverse.map (fun (binder, type) => (binder.id, type))) statements
     function.signature.resultType (diagnostics.reasonAt function.signature.key)
     own.fellThroughReason own.table.escapedReason).mapError Error.lowering
@@ -148,6 +208,8 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
     Except (SourceCoreGeneralEntry.CompileError Error) (SourceCoreGeneralEntry.PreparedProgram checked) := do
   let plan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError
     (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.plan)
+  let locals ← (SourceCoreLocalPolymorphism.prepare checked plan).mapError
+    (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.localInstances)
   let functions ← (plan.specializations.reverse.mapM (prepareFunction program checked)).mapError
     SourceCoreGeneralEntry.CompileError.lowering
   let globals := functions.map (·.signature)
@@ -156,7 +218,7 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
   | first :: _ =>
       let diagnostics ← (SourceCoreDataPlaceFaultSites.prepare checked program.signatures plan first).mapError
         (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.diagnostics)
-      let closures ← (functions.mapM (compileClosure program checked program.signatures plan globals diagnostics fuel)).mapError
+      let closures ← (functions.mapM (compileClosure program checked program.signatures plan globals diagnostics locals fuel)).mapError
         SourceCoreGeneralEntry.CompileError.lowering
       SourceCoreGeneralEntry.prepareValidated plan checked fuel (fun _ request =>
         assemble globals functions closures diagnostics request) true

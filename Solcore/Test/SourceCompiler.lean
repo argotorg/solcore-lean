@@ -257,12 +257,16 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let recursive ← compileNamed checked "main.solc" "recurse"
   let general ← compileNamed checked "main.solc" "visibleAlias"
   let typed ← compileNamedWithBackend checked "main.solc" "visibleAlias" .typedSource
-  let polymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
+  let corePolymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
+  let polymorphicLocal ← compileNamedWithBackend checked "main.solc" "polymorphicLocal" .typedSource
+  let coreNestedPolymorphicLocal ← compileNamed checked "main.solc" "nestedPolymorphicLocal"
   let nestedPolymorphicLocal ←
-    compileNamed checked "main.solc" "nestedPolymorphicLocal"
+    compileNamedWithBackend checked "main.solc" "nestedPolymorphicLocal" .typedSource
+  let coreRecursiveContextPolymorphicLocal ← compileNamed checked "main.solc" "recursiveContextPolymorphicLocal"
   let recursiveContextPolymorphicLocal ←
-    compileNamed checked "main.solc" "recursiveContextPolymorphicLocal"
-  let localProof ← compileNamed checked "main.solc" "localProof"
+    compileNamedWithBackend checked "main.solc" "recursiveContextPolymorphicLocal" .typedSource
+  let coreLocalProof ← compileNamed checked "main.solc" "localProof"
+  let localProof ← compileNamedWithBackend checked "main.solc" "localProof" .typedSource
   let coreEvidence ← compileNamed checked "main.solc" "typedEvidence"
   let typedEvidence ← compileNamedWithBackend checked "main.solc" "typedEvidence" .typedSource
   let coreCoercion ← compileNamed checked "main.solc" "typedCoercion"
@@ -276,9 +280,13 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       recursive.backend = .core ∧
       general.backend = .core ∧
       typed.backend = .typedSource ∧
+      corePolymorphicLocal.backend = .core ∧
+      coreNestedPolymorphicLocal.backend = .core ∧
+      coreRecursiveContextPolymorphicLocal.backend = .core ∧
       polymorphicLocal.backend = .typedSource ∧
       nestedPolymorphicLocal.backend = .typedSource ∧
       recursiveContextPolymorphicLocal.backend = .typedSource ∧
+      coreLocalProof.backend = .core ∧
       localProof.backend = .typedSource ∧
       coreEvidence.backend = .core ∧
       coreCoercion.backend = .core ∧
@@ -286,7 +294,7 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       typedEvidence.backend = .typedSource ∧
       typedCoercion.backend = .typedSource ∧
       functionFromCoercion.backend = .typedSource))
-    "automatic backend precedence changed"
+    s!"automatic backend precedence changed: {reprStr [direct.backend, recursive.backend, general.backend, typed.backend, corePolymorphicLocal.backend, coreNestedPolymorphicLocal.backend, coreRecursiveContextPolymorphicLocal.backend, localProof.backend, coreEvidence.backend, coreCoercion.backend, coreFunctionFromCoercion.backend]}"
   assertTrue (decide (
       direct.key.declaration.moduleId = main ∧
       recursive.key.declaration.moduleId = main ∧
@@ -727,9 +735,13 @@ private def testBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
   | .error error => throw (IO.userError
       s!"forced nominal Core compilation failed: {reprStr error}")
   match compileChecked checked (Seed.named main "polymorphicLocal") coreOptions with
-  | .error (.backendRejected (.core _)) => pure ()
-  | .error error => throw (IO.userError s!"forced polymorphic Core rejection changed category: {reprStr error}")
-  | .ok compiled => throw (IO.userError s!"unmigrated local polymorphism selected {reprStr compiled.backend}")
+  | .error error => throw (IO.userError s!"forced polymorphic Core failed: {reprStr error}")
+  | .ok compiled =>
+      assertTrue (compiled.backend == .core) "local polymorphism did not select Core"
+      match compiled.runCore [.bool true] runtimeOptions with
+      | .ok (.coreLanguageResult (.succeeded (.pair (.word value) (.bool flag)) _)) =>
+          assertTrue (value == word 11 && flag) "forced polymorphic Core result changed"
+      | result => throw (IO.userError s!"forced polymorphic Core run failed: {reprStr result}")
   match compileChecked checked (Seed.named blocked "blocked") compilerOptions with
   | .error (.noBackend [
       .core directError,

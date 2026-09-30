@@ -22,6 +22,7 @@ def planTypes (plan : Plan) : List TypeSystem.Ty :=
 inductive Error where
   | plan (error : SourceCompilationPlan.Error)
   | catalog (error : SourceCoreDataCatalog.Error)
+  | localInstances (error : SourceSpecializationWorklist.Error)
   | lowering (error : SourceCoreGeneralEntry.CompileError SourceCoreGeneralFunctions.Error)
   deriving Repr
 
@@ -32,7 +33,10 @@ structure Prepared where
 
 def prepare (program : CheckedProgram) (plan : Plan) (fuel : Nat) : Except Error Prepared := do
   let executablePlan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError Error.plan
-  let checked ← (SourceCoreDataCatalog.prepare program.signatures fuel (planTypes executablePlan)).mapError Error.catalog
+  let locals ← (SourceCompilationPlan.localLambdaCatalog executablePlan).mapError Error.localInstances
+  let localTypes := locals.flatMap fun candidate => sourceTypes (candidate.source.applySubstitution candidate.substitution)
+  let checked ← (SourceCoreDataCatalog.prepare program.signatures fuel
+    (planTypes executablePlan ++ localTypes.filter SourceCoreDataCatalog.closed).eraseDups).mapError Error.catalog
   let prepared ← (SourceCoreGeneralFunctions.prepareWithCatalog program plan checked fuel).mapError Error.lowering
   pure ⟨checked, prepared⟩
 
