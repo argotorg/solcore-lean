@@ -34,6 +34,8 @@ import Solcore.SourceSemantics.CoreLowering.DataPlaceMemberCertificates
 import Solcore.SourceSemantics.CoreLowering.ForLoopStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.ForPostMeaning
 import Solcore.SourceSemantics.CoreLowering.ForStatementCorrespondence
+import Solcore.SourceSemantics.CoreLowering.DataEqualityInitialization
+import Solcore.SourceSemantics.CoreLowering.DataEqualityInitializationStore
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
