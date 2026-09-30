@@ -24,6 +24,9 @@ import Solcore.SourceSemantics.CoreLowering.DataPlaceContinuation
 import Solcore.SourceSemantics.CoreLowering.DataPlaceGetterTyping
 import Solcore.SourceSemantics.CoreLowering.DataPlaceRouteCertificates
 import Solcore.SourceSemantics.CoreLowering.DataPlaceLayoutCertificates
+import Solcore.SourceSemantics.CoreLowering.DataPayloadRuntimeTypes
+import Solcore.SourceSemantics.CoreLowering.DataPlaceReadTotality
+import Solcore.SourceSemantics.CoreLowering.DataPlaceReadReflection
 import Solcore.SourceSemantics.CoreLowering.GenericMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.DataPlacePathHelpers
 import Solcore.SourceSemantics.CoreLowering.GenericMatchMeaning

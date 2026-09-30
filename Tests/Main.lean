@@ -16,6 +16,7 @@ import Solcore.Test.SourceCoreDataPlaceModifier
 import Solcore.Test.SourceCoreDataPlaceAssignmentMeaning
 import Solcore.Test.SourceCoreDataPlaceContinuation
 import Solcore.Test.SourceCoreDataPlaceLayout
+import Solcore.Test.SourceCoreDataPlaceReadReflection
 import Solcore.Test.SourceCoreDataPlaceCatalogBoundary
 import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCoreHeapMarkers
