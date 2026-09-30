@@ -2698,4 +2698,1372 @@ theorem inferStatementFuel_success_letAnnotatedInitialized_sound_local
     (provenance.sourceExtension.applySubstitution outer)
     (localInitializerSound actualResolution actualSuccess)
 
+/-- Statement typing only changes lexical tables; generalized initializer
+assumptions are scoped inside the initializer and do not escape the statement. -/
+theorem statementHasType_assumptions_eq
+    {source : TypedSource} {control : ControlContext}
+    {before after : SourceSemantics.Context}
+    {id : StatementId} {facts : StatementFacts}
+    (typing : StatementHasType source control before id after facts) :
+    after.assumptions = before.assumptions := by
+  cases typing <;> try rfl
+  all_goals
+    have fields := BinderExtends.context_fields
+      (by assumption : BinderExtends source.owner before _ after)
+    exact fields.2.2.2.1
+
+/-- Sequencing preserves the same ambient assumption row. -/
+theorem statementsHaveType_assumptions_eq
+    {source : TypedSource} {control : ControlContext}
+    {before after : SourceSemantics.Context}
+    {ids : List StatementId} {facts : BodyFacts}
+    (typing : StatementsHaveType source control before ids after facts) :
+    after.assumptions = before.assumptions := by
+  induction ids generalizing before after facts with
+  | nil =>
+      cases typing
+      rfl
+  | cons head tail induction =>
+      cases tail with
+      | nil =>
+          cases typing with
+          | singleton headTyping =>
+              exact statementHasType_assumptions_eq headTyping
+      | cons next rest =>
+          cases typing with
+          | cons headTyping tailTyping =>
+              exact (induction tailTyping).trans
+                (statementHasType_assumptions_eq headTyping)
+
+/-- Restricted `for` items only change lexical tables as well. -/
+theorem forItemHasType_assumptions_eq
+    {source : TypedSource} {control : ControlContext}
+    {before after : SourceSemantics.Context}
+    {item : ForItemForm}
+    (typing : ForItemHasType source control before item after) :
+    after.assumptions = before.assumptions := by
+  cases typing <;> try rfl
+  all_goals
+    have fields := BinderExtends.context_fields
+      (by assumption : BinderExtends source.owner before _ after)
+    exact fields.2.2.2.1
+
+/-- A source-ordered `for` header keeps ambient assumptions unchanged. -/
+theorem forItemsHaveType_assumptions_eq
+    {source : TypedSource} {control : ControlContext}
+    {before after : SourceSemantics.Context}
+    {items : List ForItemForm}
+    (typing : ForItemsHaveType source control before items after) :
+    after.assumptions = before.assumptions := by
+  induction items generalizing before after with
+  | nil =>
+      cases typing
+      rfl
+  | cons item rest induction =>
+      cases typing with
+      | cons head tail =>
+          exact (induction tail).trans
+            (forItemHasType_assumptions_eq head)
+
+/-- Fuel-indexed sequencing with occurrence coverage at every retained
+statement root.  The typing source can be a local completed prefix (as in a
+lambda body) while scope evidence is checked against the whole final source.
+Successful head typing leaves assumptions unchanged, so coverage is valid for
+the recursive tail context too. -/
+theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+    (invariant : Frontend.SourceInference.State →
+      SourceSemantics.Context → Prop)
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    {evidenceState : Frontend.SourceInference.State}
+    {ambientSource coverageSource : TypedSource}
+    {control : ControlContext}
+    {substitution : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (roots : List NodeId := [])
+    (initialInvariant : invariant state semanticContext)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution substitution)
+      ambientSource)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (coveredStatements : ∀ id, id ∈ result.statements →
+      TemplateScopeCovered coverageSource semanticContext (.statement id))
+    (statementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {statement : Syntax.Statement} {head : Detail.StatementResult},
+        childFuel < fuel →
+        invariant input inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext statement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution substitution)
+          ambientSource →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext (.statement head.id) →
+        ∃ outputContext facts,
+          invariant head.state outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution substitution)
+            control inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution substitution head facts)
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn state = .ok result) :
+    ∃ finalContext facts,
+      invariant result.state finalContext ∧
+      StatementsHaveType ambientSource control semanticContext
+        result.statements finalContext facts ∧
+      BlockResultMatchesFactsAfterSubstitution substitution result facts := by
+  induction fuel generalizing statements state semanticContext result with
+  | zero =>
+      simp [Detail.inferStatementsFuel] at success
+  | succ fuel induction =>
+      cases statements with
+      | nil =>
+          have resultEq := inferStatementsFuel_success_nil_facts success
+          subst result
+          exact ⟨semanticContext, .empty, initialInvariant,
+            .nil control semanticContext,
+            BlockResultMatchesFactsAfterSubstitution.empty substitution state⟩
+      | cons statement rest =>
+          cases rest with
+          | nil =>
+              obtain ⟨head, headSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_singleton_facts success
+              subst result
+              have headCovered : TemplateScopeCovered coverageSource
+                  semanticContext (.statement head.id) :=
+                coveredStatements head.id (by simp)
+              obtain ⟨finalContext, headFacts, finalInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound (Nat.lt_succ_self fuel) initialInvariant
+                  headSuccess resultExtension integerPatternsSubset
+                  requirementsSubset headCovered
+              have headTypingAmbient :=
+                StatementHasType.weakenSource resultExtension headTyping
+              exact ⟨finalContext, .singleton headFacts, finalInvariant,
+                .singleton headTypingAmbient,
+                BlockResultMatchesFactsAfterSubstitution.singleton headMatches⟩
+          | cons next rest =>
+              obtain ⟨head, tail, headSuccess, tailSuccess, resultEq⟩ :=
+                inferStatementsFuel_success_cons_facts success
+              subst result
+              have headBelow : head.state.NodesBelowNextOccurrence :=
+                (Detail.inferStatementFuel_occurrenceBoundExtends headSuccess
+                  ).nodesBelowNextOccurrence initialBelow
+              have headToTail : TypingSourceExtends
+                  ((head.state.toTypedSource roots).applySubstitution
+                    substitution)
+                  ((tail.state.toTypedSource roots).applySubstitution
+                    substitution) :=
+                (inferStatementsFuel_success_typingSourceExtends tailSuccess
+                  headBelow roots).applySubstitution substitution
+              have headExtension : TypingSourceExtends
+                  ((head.state.toTypedSource roots).applySubstitution
+                    substitution)
+                  ambientSource :=
+                TypingSourceExtends.trans headToTail resultExtension
+              have headIntegerPatternsSubset :
+                  head.state.integerPatterns ⊆
+                    evidenceState.integerPatterns :=
+                List.Subset.trans
+                  (Detail.inferStatementsFuel_integerPatterns_subset
+                    tailSuccess)
+                  integerPatternsSubset
+              have headRequirementsSubset :
+                  head.state.requirements ⊆ evidenceState.requirements :=
+                List.Subset.trans
+                  (Detail.inferStatementsFuel_requirements_subset tailSuccess)
+                  requirementsSubset
+              have headCovered : TemplateScopeCovered coverageSource
+                  semanticContext (.statement head.id) :=
+                coveredStatements head.id (by simp)
+              obtain ⟨middleContext, headFacts, middleInvariant, headTyping,
+                  headMatches⟩ :=
+                statementSound (Nat.lt_succ_self fuel) initialInvariant
+                  headSuccess headExtension headIntegerPatternsSubset
+                  headRequirementsSubset headCovered
+              have headTypingAmbient :=
+                StatementHasType.weakenSource headExtension headTyping
+              have middleAssumptionsEq :
+                  middleContext.assumptions = semanticContext.assumptions :=
+                statementHasType_assumptions_eq headTypingAmbient
+              have tailCovered : ∀ id, id ∈ tail.statements →
+                  TemplateScopeCovered coverageSource middleContext
+                    (.statement id) := by
+                intro id member owner scopes
+                change owner.requirement.predicate ∈
+                  middleContext.assumptions
+                rw [middleAssumptionsEq]
+                exact coveredStatements id (by simp [member]) owner scopes
+              obtain ⟨finalContext, tailFacts, finalInvariant, tailTyping,
+                  tailMatches⟩ :=
+                induction (statements := next :: rest)
+                  (state := head.state) (result := tail)
+                  (semanticContext := middleContext)
+                  middleInvariant headBelow resultExtension
+                  integerPatternsSubset requirementsSubset tailCovered
+                  (fun childBound childInvariant childSuccess childExtension
+                    childIntegerPatternsSubset childRequirementsSubset
+                    childCovered =>
+                    statementSound (Nat.lt_trans childBound
+                      (Nat.lt_succ_self fuel)) childInvariant childSuccess
+                      childExtension childIntegerPatternsSubset
+                      childRequirementsSubset childCovered)
+                  tailSuccess
+              obtain ⟨tailHead, tailRest, tailStatementsEq⟩ :=
+                inferStatementsFuel_success_statements_eq_cons tailSuccess
+              have sequenceTyping : StatementsHaveType ambientSource control
+                  semanticContext (head.id :: tail.statements) finalContext
+                  (.cons headFacts tailFacts) := by
+                rw [tailStatementsEq]
+                exact .cons headTypingAmbient
+                  (by simpa [tailStatementsEq] using tailTyping)
+              exact ⟨finalContext, .cons headFacts tailFacts, finalInvariant,
+                sequenceTyping,
+                BlockResultMatchesFactsAfterSubstitution.cons headMatches
+                  tailMatches⟩
+
+/-- Same-source specialization used by whole-function finalization. -/
+theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped
+    (invariant : Frontend.SourceInference.State →
+      SourceSemantics.Context → Prop)
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statements : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State} {result : Detail.BlockResult}
+    {evidenceState : Frontend.SourceInference.State}
+    {ambientSource : TypedSource} {control : ControlContext}
+    {substitution : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    (roots : List NodeId := [])
+    (initialInvariant : invariant state semanticContext)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution substitution)
+      ambientSource)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (coveredStatements : ∀ id, id ∈ result.statements →
+      TemplateScopeCovered ambientSource semanticContext (.statement id))
+    (statementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {statement : Syntax.Statement} {head : Detail.StatementResult},
+        childFuel < fuel →
+        invariant input inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext statement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution substitution)
+          ambientSource →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered ambientSource inputContext (.statement head.id) →
+        ∃ outputContext facts,
+          invariant head.state outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution substitution)
+            control inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution substitution head facts)
+    (success : Detail.inferStatementsFuel fuel inferenceContext statements
+      expectedReturn state = .ok result) :
+    ∃ finalContext facts,
+      invariant result.state finalContext ∧
+      StatementsHaveType ambientSource control semanticContext
+        result.statements finalContext facts ∧
+      BlockResultMatchesFactsAfterSubstitution substitution result facts :=
+  inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+    invariant (roots := roots) initialInvariant initialBelow resultExtension
+    integerPatternsSubset requirementsSubset coveredStatements statementSound
+    success
+
+
+/-- Finalization-wide integer-pattern validity can be consumed at a local
+statement source prefix once coverage is known in the finalized graph. -/
+theorem integerPatternEvidenceAt_local_of_finalResources
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {evidenceState : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    {active : SourceSemantics.Context} {occurrence : NodeId}
+    {localState : Frontend.SourceInference.State}
+    (resources : FinalInferenceResources inferenceContext type evidenceState
+      roots finalized)
+    (signaturesEq : active.signatures =
+      (finalizedRequirementContext inferenceContext finalized).signatures)
+    (requirementsEq : active.solvedRequirements =
+      (finalizedRequirementContext inferenceContext finalized).solvedRequirements)
+    (assumptionsMono :
+      (finalizedRequirementContext inferenceContext finalized).assumptions ⊆
+        active.assumptions)
+    (covered : TemplateScopeCovered finalized.typedSource active occurrence)
+    (localExtension : TypingSourceExtends
+      ((localState.toTypedSource roots).applySubstitution
+        finalized.substitution) finalized.typedSource) :
+    IntegerPatternEvidenceAt
+      ((localState.toTypedSource roots).applySubstitution
+        finalized.substitution) active finalized.substitution evidenceState
+      occurrence :=
+  (resources.integerPatternEvidenceAt signaturesEq requirementsEq
+    assumptionsMono covered).restrictSource localExtension
+
+/-- Every initialized `for`-item binder starts at an expression occurrence. -/
+private theorem forItemInitializedLetBinding_initializer_expression
+    {item : ForItemForm} {binding : InitializedLetBinding}
+    (member : binding ∈ forItemInitializedLetBindings item) :
+    ∃ id, binding.initializer = .expression id := by
+  cases item with
+  | letDecl binder initializer =>
+      cases initializer with
+      | none => simp [forItemInitializedLetBindings] at member
+      | some id =>
+          have equal : binding = {
+              binder := binder, initializer := .expression id } := by
+            simpa [forItemInitializedLetBindings] using member
+          subst binding
+          exact ⟨id, rfl⟩
+  | expression _ => simp [forItemInitializedLetBindings] at member
+  | assignValue _ _ _ => simp [forItemInitializedLetBindings] at member
+  | assignBitNot _ => simp [forItemInitializedLetBindings] at member
+
+/-- Every qualified local-scheme template is rooted at an expression, even
+when its binder occurs in a `for` header rather than an ordinary let. -/
+theorem LocalSchemeTemplateOwner.initializer_expression
+    {source : TypedSource} {owner : LocalSchemeTemplateOwner}
+    (contains : ContainsLocalSchemeTemplate source owner) :
+    ∃ id, owner.initializer = .expression id := by
+  have bindingMember := owner.binding_mem contains
+  unfold initializedLetBindings at bindingMember
+  rcases List.mem_flatMap.mp bindingMember with
+    ⟨node, _, formMember⟩
+  cases node with
+  | expression _ => simp at formMember
+  | statement node =>
+      change { binder := owner.binder, initializer := owner.initializer } ∈
+        statementInitializedLetBindings node.form at formMember
+      cases form : node.form with
+      | letDecl binder initializer =>
+          cases initializer with
+          | none =>
+              simp [statementInitializedLetBindings, form] at formMember
+          | some id =>
+              have equal : (⟨owner.binder, owner.initializer⟩ :
+                  InitializedLetBinding) = {
+                    binder := binder, initializer := .expression id } := by
+                simpa [statementInitializedLetBindings, form] using formMember
+              exact ⟨id, congrArg InitializedLetBinding.initializer equal⟩
+      | forLoop initializer condition post body =>
+          simp only [statementInitializedLetBindings, form] at formMember
+          rcases List.mem_append.mp formMember with initializerMember |
+            postMember
+          · rcases List.mem_flatMap.mp initializerMember with
+              ⟨item, _, itemMember⟩
+            exact forItemInitializedLetBinding_initializer_expression
+              itemMember
+          · rcases List.mem_flatMap.mp postMember with
+              ⟨item, _, itemMember⟩
+            exact forItemInitializedLetBinding_initializer_expression
+              itemMember
+      | returnStmt _ => simp [statementInitializedLetBindings, form] at formMember
+      | expression _ _ => simp [statementInitializedLetBindings, form] at formMember
+      | assignValue _ _ _ => simp [statementInitializedLetBindings, form] at formMember
+      | assignBitNot _ => simp [statementInitializedLetBindings, form] at formMember
+      | ifThen _ _ _ => simp [statementInitializedLetBindings, form] at formMember
+      | block _ => simp [statementInitializedLetBindings, form] at formMember
+      | matchWith _ => simp [statementInitializedLetBindings, form] at formMember
+      | whileLoop _ _ => simp [statementInitializedLetBindings, form] at formMember
+      | breakStmt => simp [statementInitializedLetBindings, form] at formMember
+      | continueStmt => simp [statementInitializedLetBindings, form] at formMember
+
+/-- A statement child cannot introduce the initializer scope of a local
+scheme: those scopes always start at expression occurrences. -/
+theorem TemplateScopeCovered.statementChild
+    {source : TypedSource} {parentContext childContext : Context}
+    {parent child : StatementId}
+    (parentCovered : TemplateScopeCovered source parentContext
+      (.statement parent))
+    (closed : OccurrenceGraphClosed source)
+    (edge : DirectChild source (.statement parent) (.statement child))
+    (assumptionsMono : parentContext.assumptions ⊆
+      childContext.assumptions) :
+    TemplateScopeCovered source childContext (.statement child) := by
+  apply TemplateScopeCovered.child parentCovered closed.childHasUniqueParent
+    edge assumptionsMono
+  intro owner contains initializerEq
+  obtain ⟨id, idEq⟩ :=
+    LocalSchemeTemplateOwner.initializer_expression contains
+  rw [idEq] at initializerEq
+  cases initializerEq
+
+/-- Append-only typed-source growth preserves each concrete occurrence edge. -/
+theorem DirectChild.ofTypingSourceExtends
+    {before after : TypedSource} {parent child : NodeId}
+    (extension : TypingSourceExtends before after)
+    (edge : DirectChild before parent child) :
+    DirectChild after parent child := by
+  rcases edge with ⟨node, contains, childMember⟩
+  exact ⟨node, ContainsNode.of_nodes_prefix extension.nodes_prefix
+    contains, childMember⟩
+
+/-- A retained statement reference gives final-source scope coverage for its
+actual statement child, without a premise about unrelated inferred nodes. -/
+theorem TemplateScopeCovered.statementChild_of_recorded_reference
+    {rawSource coverageSource : TypedSource}
+    {outer : TypeSystem.Substitution}
+    {parentNode : StatementNode} {parent child : StatementId}
+    {parentContext childContext : Context}
+    (contains : ContainsStatement rawSource parent parentNode)
+    (member : .statement child ∈ parentNode.form.references)
+    (sourceExtension : TypingSourceExtends
+      (rawSource.applySubstitution outer) coverageSource)
+    (parentCovered : TemplateScopeCovered coverageSource parentContext
+      (.statement parent))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (assumptionsMono : parentContext.assumptions ⊆
+      childContext.assumptions) :
+    TemplateScopeCovered coverageSource childContext (.statement child) := by
+  have rawEdge : DirectChild rawSource (.statement parent)
+      (.statement child) := by
+    refine ⟨.statement parentNode, ?_, ?_⟩
+    · exact ⟨contains.1, congrArg NodeId.statement contains.2⟩
+    · simpa [nodeChildIds, Node.references] using member
+  have finalEdge : DirectChild coverageSource (.statement parent)
+      (.statement child) :=
+    DirectChild.ofTypingSourceExtends sourceExtension
+      (FlexibleSubstitution.directChild_applySubstitution outer rawEdge)
+  exact TemplateScopeCovered.statementChild parentCovered closed finalEdge
+    assumptionsMono
+
+/-- The block branch obtains coverage of its *actual* body roots from the
+recorded parent node in the final graph.  Recursive statement typing happens
+in the block's local completed source, while template-scope evidence remains
+anchored to the whole finalized source. -/
+theorem inferStatementFuel_success_block_sound_bounded_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {body : List Syntax.Statement}
+    {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    {coverageSource : TypedSource}
+    (statementEq : statement.value = .block body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (roots : List NodeId := [])
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (resultIntegerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultRequirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (childStatementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {childStatement : Syntax.Statement}
+        {head : Detail.StatementResult},
+        childFuel < fuel →
+        ActiveLocalContextInvariant input outer inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext childStatement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution outer)
+          ((result.state.toTypedSource roots).applySubstitution outer) →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext
+          (.statement head.id) →
+        ∃ outputContext facts,
+          ActiveLocalContextInvariant head.state outer outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution outer)
+            control inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution outer head facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  obtain ⟨bodyResult, bodySuccess, _, parentNode⟩ :=
+    inferStatementFuel_success_block_facts statementEq allocationEq success
+      roots
+  obtain ⟨bodyResult', bodySuccess', allocatedBelow, bodyExtension,
+      bodyIntegerPatternsSubset, bodyRequirementsSubset⟩ :=
+    inferStatementFuel_success_block_child_provenance statementEq allocationEq
+      success initialBelow roots
+  have bodyResultEq : bodyResult' = bodyResult := by
+    rw [bodySuccess] at bodySuccess'
+    exact (Except.ok.inj bodySuccess').symm
+  subst bodyResult'
+  have allocatedInvariant : ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have bodyCovered : ∀ child, child ∈ bodyResult.statements →
+      TemplateScopeCovered coverageSource target (.statement child) := by
+    intro child member
+    have childEdge : DirectChild (result.state.toTypedSource roots)
+        (.statement result.id) (.statement child) := by
+      refine ⟨.statement {
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .block bodyResult.statements
+      }, ?_, ?_⟩
+      · refine ⟨parentNode.1, ?_⟩
+        exact congrArg NodeId.statement parentNode.2
+      · simpa [nodeChildIds, Node.references,
+          StatementForm.references] using
+          (List.mem_map.mpr ⟨child, member, rfl⟩ :
+            NodeId.statement child ∈
+              bodyResult.statements.map NodeId.statement)
+    have coveredEdge : DirectChild coverageSource (.statement result.id)
+        (.statement child) :=
+      DirectChild.ofTypingSourceExtends resultExtension
+        (FlexibleSubstitution.directChild_applySubstitution outer childEdge)
+    exact TemplateScopeCovered.statementChild parentCovered closed coveredEdge
+      (fun _ membership => membership)
+  have bodyTyping :=
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+      (fun state context => ActiveLocalContextInvariant state outer context)
+      (roots := roots) allocatedInvariant allocatedBelow
+      (bodyExtension.applySubstitution outer)
+      (List.Subset.trans bodyIntegerPatternsSubset
+        resultIntegerPatternsSubset)
+      (List.Subset.trans bodyRequirementsSubset resultRequirementsSubset)
+      bodyCovered childStatementSound bodySuccess
+  apply inferStatementFuel_success_block_sound statementEq allocationEq
+    success invariant roots
+  intro actualBody actualSuccess
+  have actualEq : actualBody = bodyResult := by
+    rw [bodySuccess] at actualSuccess
+    exact (Except.ok.inj actualSuccess).symm
+  subst actualBody
+  exact bodyTyping
+
+/-- A conditional's actual then-body roots inherit whole-source template
+coverage from the recorded conditional node.  The semantic derivation stays
+in the conditional's completed local source. -/
+theorem inferStatementFuel_success_ifWithoutElse_sound_bounded_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {thenBody : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    {coverageSource : TypedSource}
+    (statementEq : statement.value = .ifThen condition thenBody none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈ inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (resultIntegerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultRequirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (conditionSound :
+      ∀ {inferredCondition : InferredExpression}
+        {conditionState : Frontend.SourceInference.State},
+        Detail.inferExprFuel fuel inferenceContext condition (some .bool)
+          allocated = .ok (inferredCondition, conditionState) →
+        ExpressionHasType
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          target inferredCondition.id (outer.apply inferredCondition.type))
+    (childStatementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {childStatement : Syntax.Statement}
+        {head : Detail.StatementResult},
+        childFuel < fuel →
+        ActiveLocalContextInvariant input outer inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext childStatement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution outer)
+          ((result.state.toTypedSource roots).applySubstitution outer) →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext
+          (.statement head.id) →
+        ∃ outputContext facts,
+          ActiveLocalContextInvariant head.state outer outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution outer) {
+              returnType := outer.apply expectedReturn
+              loopDepth := inferenceContext.loopDepth
+            } inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution outer head facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant : ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    simpa [finalEq] using preserved
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← finalEq]
+    exact returnBelow
+  obtain ⟨inferredCondition, conditionState, thenResult, conditionSuccess,
+      thenSuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_ifWithoutElse_facts statementEq allocationEq
+      success roots
+  have conditionProperties :=
+    Detail.inferExprFuel_inferenceProperties allocatedReady signatureFormation
+      functionsCanonical (by
+        intro expected member
+        simp only [Option.mem_def] at member
+        injection member with expectedEq
+        subst expected
+        simp [TypeSystem.Ty.bool]) conditionSuccess
+  have conditionInvariant :
+      ActiveLocalContextInvariant conditionState outer target :=
+    allocatedInvariant.inferExprFuel conditionSuccess
+  have conditionTyping := conditionSound conditionSuccess
+  have conditionReturnBelow :
+      expectedReturn.VariablesBelow conditionState.inference.next :=
+    allocatedReturnBelow.weaken conditionProperties.1.next_le
+  have thenProperties :=
+    Detail.inferStatementsFuel_inferenceProperties conditionProperties.2.1
+      signatureFormation functionsCanonical conditionReturnBelow thenSuccess
+  obtain ⟨actualConditionState, actualThenResult,
+      ⟨actualCondition, actualConditionSuccess⟩, actualThenSuccess,
+      conditionBelow, thenSourceExtension, thenIntegerPatternsSubset,
+      thenRequirementsSubset⟩ :=
+    inferStatementFuel_success_ifWithoutElse_child_provenance statementEq
+      allocationEq success initialBelow roots
+  have conditionStateEq : actualConditionState = conditionState := by
+    rw [conditionSuccess] at actualConditionSuccess
+    exact (congrArg Prod.snd
+      (Except.ok.inj actualConditionSuccess)).symm
+  subst actualConditionState
+  have thenResultEq : actualThenResult = thenResult := by
+    rw [thenSuccess] at actualThenSuccess
+    exact (Except.ok.inj actualThenSuccess).symm
+  subst actualThenResult
+  have thenCovered : ∀ child, child ∈ thenResult.statements →
+      TemplateScopeCovered coverageSource target (.statement child) := by
+    intro child member
+    have childReference : (.statement child : NodeId) ∈
+        (StatementForm.ifThen inferredCondition.id thenResult.statements
+          none).references := by
+      simp [StatementForm.references, member]
+    exact TemplateScopeCovered.statementChild_of_recorded_reference
+      contains childReference resultExtension parentCovered closed
+      (fun _ membership => membership)
+  have thenTyping :=
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+      (fun state context => ActiveLocalContextInvariant state outer context)
+      (roots := roots) conditionInvariant conditionBelow
+      (thenSourceExtension.applySubstitution outer)
+      (List.Subset.trans thenIntegerPatternsSubset
+        resultIntegerPatternsSubset)
+      (List.Subset.trans thenRequirementsSubset resultRequirementsSubset)
+      thenCovered childStatementSound thenSuccess
+  obtain ⟨thenFinal, thenFacts, _thenInvariant, thenBodyTyping,
+      thenAgreement⟩ := thenTyping
+  subst result
+  have thenExtension : outer.SemanticallyExtends
+      thenResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      thenResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  have conditionExtension : outer.SemanticallyExtends
+      conditionState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans thenExtension
+      thenProperties.1.substitution_extends
+  have conditionEq : outer.apply inferredCondition.type = .bool := by
+    simpa using Detail.inferExprFuel_expected_type_apply_eq conditionSuccess
+      conditionExtension
+  refine ⟨{
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := thenFacts.control.branches (.ordinary .unit)
+    }, conditionInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact ifWithoutElseStatementHasType_afterSubstitution contains
+      conditionTyping conditionEq thenBodyTyping
+  · exact StatementResultMatchesFactsAfterSubstitution.ifWithoutElse outer
+      thenFacts id _
+
+/-- A loop body receives whole-source coverage from its actual recorded
+parent while retaining loop-local statement typing. -/
+theorem inferStatementFuel_success_whileLoop_sound_bounded_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    {coverageSource : TypedSource}
+    (statementEq : statement.value = .whileLoop condition body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈ inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (resultIntegerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultRequirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (conditionSound :
+      ∀ {inferredCondition : InferredExpression}
+        {conditionState : Frontend.SourceInference.State},
+        Detail.inferExprFuel fuel inferenceContext condition (some .bool)
+          allocated = .ok (inferredCondition, conditionState) →
+        ExpressionHasType
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          target inferredCondition.id (outer.apply inferredCondition.type))
+    (childStatementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {childStatement : Syntax.Statement}
+        {head : Detail.StatementResult},
+        childFuel < fuel →
+        ActiveLocalContextInvariant input outer inputContext →
+        Detail.inferStatementFuel childFuel
+          { inferenceContext with
+            loopDepth := inferenceContext.loopDepth + 1 }
+          childStatement expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution outer)
+          ((result.state.toTypedSource roots).applySubstitution outer) →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext
+          (.statement head.id) →
+        ∃ outputContext facts,
+          ActiveLocalContextInvariant head.state outer outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution outer)
+            (({
+              returnType := outer.apply expectedReturn
+              loopDepth := inferenceContext.loopDepth
+            } : ControlContext).enterLoop)
+            inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution outer head facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant : ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    simpa [finalEq] using preserved
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← finalEq]
+    exact returnBelow
+  obtain ⟨inferredCondition, conditionState, bodyResult, conditionSuccess,
+      bodySuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_whileLoop_facts statementEq allocationEq
+      success roots
+  have conditionProperties :=
+    Detail.inferExprFuel_inferenceProperties allocatedReady signatureFormation
+      functionsCanonical (by
+        intro expected member
+        simp only [Option.mem_def] at member
+        injection member with expectedEq
+        subst expected
+        simp [TypeSystem.Ty.bool]) conditionSuccess
+  have conditionInvariant :
+      ActiveLocalContextInvariant conditionState outer target :=
+    allocatedInvariant.inferExprFuel conditionSuccess
+  have conditionTyping := conditionSound conditionSuccess
+  have conditionReturnBelow :
+      expectedReturn.VariablesBelow conditionState.inference.next :=
+    allocatedReturnBelow.weaken conditionProperties.1.next_le
+  have bodyProperties :=
+    Detail.inferStatementsFuel_inferenceProperties
+      (context := {
+        inferenceContext with
+        loopDepth := inferenceContext.loopDepth + 1
+      }) conditionProperties.2.1 signatureFormation functionsCanonical
+      conditionReturnBelow bodySuccess
+  obtain ⟨actualConditionState, actualBodyResult,
+      ⟨actualCondition, actualConditionSuccess⟩, actualBodySuccess,
+      conditionBelow, bodySourceExtension, bodyIntegerPatternsSubset,
+      bodyRequirementsSubset⟩ :=
+    inferStatementFuel_success_whileLoop_child_provenance statementEq
+      allocationEq success initialBelow roots
+  have conditionStateEq : actualConditionState = conditionState := by
+    rw [conditionSuccess] at actualConditionSuccess
+    exact (congrArg Prod.snd
+      (Except.ok.inj actualConditionSuccess)).symm
+  subst actualConditionState
+  have bodyResultEq : actualBodyResult = bodyResult := by
+    rw [bodySuccess] at actualBodySuccess
+    exact (Except.ok.inj actualBodySuccess).symm
+  subst actualBodyResult
+  have bodyCovered : ∀ child, child ∈ bodyResult.statements →
+      TemplateScopeCovered coverageSource target (.statement child) := by
+    intro child member
+    have childReference : (.statement child : NodeId) ∈
+        (StatementForm.whileLoop inferredCondition.id
+          bodyResult.statements).references := by
+      simp [StatementForm.references, member]
+    exact TemplateScopeCovered.statementChild_of_recorded_reference
+      contains childReference resultExtension parentCovered closed
+      (fun _ membership => membership)
+  obtain ⟨bodyFinal, bodyFacts, _bodyInvariant, bodyTyping,
+      bodyAgreement⟩ :=
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+      (fun state context => ActiveLocalContextInvariant state outer context)
+      (roots := roots) conditionInvariant conditionBelow
+      (bodySourceExtension.applySubstitution outer)
+      (List.Subset.trans bodyIntegerPatternsSubset
+        resultIntegerPatternsSubset)
+      (List.Subset.trans bodyRequirementsSubset resultRequirementsSubset)
+      bodyCovered childStatementSound bodySuccess
+  subst result
+  have bodyExtension : outer.SemanticallyExtends
+      bodyResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      bodyResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  have conditionExtension : outer.SemanticallyExtends
+      conditionState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans bodyExtension
+      bodyProperties.1.substitution_extends
+  have conditionEq : outer.apply inferredCondition.type = .bool := by
+    simpa using Detail.inferExprFuel_expected_type_apply_eq conditionSuccess
+      conditionExtension
+  refine ⟨{
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .loop bodyFacts.control
+    }, conditionInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact whileLoopStatementHasType_afterSubstitution contains conditionTyping
+      conditionEq bodyTyping
+  · exact StatementResultMatchesFactsAfterSubstitution.whileLoop outer
+      bodyFacts id _
+
+/-- Both actual branches of an `if/else` inherit coverage through their
+recorded parent edges, while each branch is typed in the common completed
+conditional source. -/
+theorem inferStatementFuel_success_ifWithElse_sound_bounded_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {thenBody elseBody : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    {coverageSource : TypedSource}
+    (statementEq : statement.value =
+      .ifThen condition thenBody (some elseBody))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (signatureFormation :
+      Frontend.ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈ inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (ready : initial.InferenceReady)
+    (returnBelow : expectedReturn.VariablesBelow initial.inference.next)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (resultIntegerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultRequirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (conditionSound :
+      ∀ {inferredCondition : InferredExpression}
+        {conditionState : Frontend.SourceInference.State},
+        Detail.inferExprFuel fuel inferenceContext condition (some .bool)
+          allocated = .ok (inferredCondition, conditionState) →
+        ExpressionHasType
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          target inferredCondition.id (outer.apply inferredCondition.type))
+    (childStatementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {childStatement : Syntax.Statement}
+        {head : Detail.StatementResult},
+        childFuel < fuel →
+        ActiveLocalContextInvariant input outer inputContext →
+        Detail.inferStatementFuel childFuel inferenceContext childStatement
+          expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution outer)
+          ((result.state.toTypedSource roots).applySubstitution outer) →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext
+          (.statement head.id) →
+        ∃ outputContext facts,
+          ActiveLocalContextInvariant head.state outer outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution outer) {
+              returnType := outer.apply expectedReturn
+              loopDepth := inferenceContext.loopDepth
+            } inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution outer head facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant : ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  have allocatedReady : allocated.InferenceReady := by
+    have preserved :=
+      Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    simpa [finalEq] using preserved
+  have allocatedReturnBelow :
+      expectedReturn.VariablesBelow allocated.inference.next := by
+    have finalEq : (initial.allocateStatementId).2 = allocated :=
+      congrArg Prod.snd allocationEq
+    rw [← finalEq]
+    exact returnBelow
+  obtain ⟨inferredCondition, conditionState, thenResult, elseResult,
+      conditionSuccess, thenSuccess, elseSuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_ifWithElse_facts statementEq allocationEq
+      success roots
+  have conditionProperties :=
+    Detail.inferExprFuel_inferenceProperties allocatedReady signatureFormation
+      functionsCanonical (by
+        intro expected member
+        simp only [Option.mem_def] at member
+        injection member with expectedEq
+        subst expected
+        simp [TypeSystem.Ty.bool]) conditionSuccess
+  have conditionInvariant :
+      ActiveLocalContextInvariant conditionState outer target :=
+    allocatedInvariant.inferExprFuel conditionSuccess
+  have conditionTyping := conditionSound conditionSuccess
+  have conditionReturnBelow :
+      expectedReturn.VariablesBelow conditionState.inference.next :=
+    allocatedReturnBelow.weaken conditionProperties.1.next_le
+  have thenProperties :=
+    Detail.inferStatementsFuel_inferenceProperties conditionProperties.2.1
+      signatureFormation functionsCanonical conditionReturnBelow thenSuccess
+  obtain ⟨actualConditionState, actualThenResult, actualElseResult,
+      ⟨actualCondition, actualConditionSuccess⟩, actualThenSuccess,
+      actualElseSuccess, conditionBelow, elseInputBelow,
+      thenSourceExtension, elseSourceExtension,
+      thenIntegerPatternsSubset, elseIntegerPatternsSubset,
+      thenRequirementsSubset, elseRequirementsSubset⟩ :=
+    inferStatementFuel_success_ifWithElse_child_provenance statementEq
+      allocationEq success initialBelow roots
+  have conditionStateEq : actualConditionState = conditionState := by
+    rw [conditionSuccess] at actualConditionSuccess
+    exact (congrArg Prod.snd
+      (Except.ok.inj actualConditionSuccess)).symm
+  subst actualConditionState
+  have thenResultEq : actualThenResult = thenResult := by
+    rw [thenSuccess] at actualThenSuccess
+    exact (Except.ok.inj actualThenSuccess).symm
+  subst actualThenResult
+  have elseResultEq : actualElseResult = elseResult := by
+    rw [elseSuccess] at actualElseSuccess
+    exact (Except.ok.inj actualElseSuccess).symm
+  subst actualElseResult
+  have thenCovered : ∀ child, child ∈ thenResult.statements →
+      TemplateScopeCovered coverageSource target (.statement child) := by
+    intro child member
+    have childReference : (.statement child : NodeId) ∈
+        (StatementForm.ifThen inferredCondition.id thenResult.statements
+          (some elseResult.statements)).references := by
+      simp [StatementForm.references, member]
+    exact TemplateScopeCovered.statementChild_of_recorded_reference
+      contains childReference resultExtension parentCovered closed
+      (fun _ membership => membership)
+  obtain ⟨thenFinal, thenFacts, _thenInvariant, thenTyping,
+      thenAgreement⟩ :=
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+      (fun state context => ActiveLocalContextInvariant state outer context)
+      (roots := roots) conditionInvariant conditionBelow
+      (thenSourceExtension.applySubstitution outer)
+      (List.Subset.trans thenIntegerPatternsSubset
+        resultIntegerPatternsSubset)
+      (List.Subset.trans thenRequirementsSubset resultRequirementsSubset)
+      thenCovered childStatementSound thenSuccess
+  have restoredProperties :=
+    Frontend.SourceInference.State.restoreLexicalScope_inferenceProperties
+      conditionProperties.2.1 thenProperties.1
+  have elseInputInvariant : ActiveLocalContextInvariant
+      (thenResult.state.restoreLexicalScope conditionState.lexicalScope) outer
+      target := conditionInvariant.restoreLexicalScope
+  have elseReturnBelow : expectedReturn.VariablesBelow
+      (thenResult.state.restoreLexicalScope
+        conditionState.lexicalScope).inference.next :=
+    conditionReturnBelow.weaken restoredProperties.1.next_le
+  have elseProperties :=
+    Detail.inferStatementsFuel_inferenceProperties restoredProperties.2
+      signatureFormation functionsCanonical elseReturnBelow elseSuccess
+  have elseCovered : ∀ child, child ∈ elseResult.statements →
+      TemplateScopeCovered coverageSource target (.statement child) := by
+    intro child member
+    have childReference : (.statement child : NodeId) ∈
+        (StatementForm.ifThen inferredCondition.id thenResult.statements
+          (some elseResult.statements)).references := by
+      simp [StatementForm.references, member]
+    exact TemplateScopeCovered.statementChild_of_recorded_reference
+      contains childReference resultExtension parentCovered closed
+      (fun _ membership => membership)
+  obtain ⟨elseFinal, elseFacts, _elseInvariant, elseTyping,
+      elseAgreement⟩ :=
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+      (fun state context => ActiveLocalContextInvariant state outer context)
+      (roots := roots) elseInputInvariant elseInputBelow
+      (elseSourceExtension.applySubstitution outer)
+      (List.Subset.trans elseIntegerPatternsSubset
+        resultIntegerPatternsSubset)
+      (List.Subset.trans elseRequirementsSubset resultRequirementsSubset)
+      elseCovered childStatementSound elseSuccess
+  subst result
+  have elseExtension : outer.SemanticallyExtends
+      elseResult.state.inference.substitution := by
+    change outer.SemanticallyExtends
+      elseResult.state.inference.substitution at outerExtension
+    exact outerExtension
+  have restoredExtension : outer.SemanticallyExtends
+      (thenResult.state.restoreLexicalScope
+        conditionState.lexicalScope).inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans elseExtension
+      elseProperties.1.substitution_extends
+  have conditionExtension : outer.SemanticallyExtends
+      conditionState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans restoredExtension
+      restoredProperties.1.substitution_extends
+  have conditionEq : outer.apply inferredCondition.type = .bool := by
+    simpa using Detail.inferExprFuel_expected_type_apply_eq conditionSuccess
+      conditionExtension
+  refine ⟨{
+      type := if thenFacts.sawReturn && elseFacts.sawReturn then
+        outer.apply expectedReturn
+      else
+        .unit
+      hasValue := thenFacts.sawReturn && elseFacts.sawReturn
+      sawReturn := thenFacts.sawReturn && elseFacts.sawReturn
+      control := thenFacts.control.branches elseFacts.control
+    }, conditionInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact ifWithElseStatementHasType_afterSubstitution contains
+      conditionTyping conditionEq thenTyping elseTyping thenAgreement
+      elseAgreement elseExtension
+  · exact StatementResultMatchesFactsAfterSubstitution.ifWithElse
+      thenAgreement elseAgreement elseExtension id _
+
+/-- The `for` body is typed under its initializer-extended lexical context;
+its roots inherit final-source coverage from the retained loop node. -/
+theorem inferStatementFuel_success_forLoop_sound_bounded_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {headerSpan : Syntax.SourceSpan}
+    {initializer post : List Syntax.ForItem} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : TypeSystem.Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : TypeSystem.Substitution} {target : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State}
+    {coverageSource : TypedSource}
+    (statementEq : statement.value =
+      .forLoop headerSpan initializer condition post body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (roots : List NodeId := [])
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (resultIntegerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultRequirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (initializerSound :
+      ∀ {initializerResult : Detail.InferredForItems},
+        Detail.inferForItemsFuel fuel inferenceContext initializer allocated =
+          .ok initializerResult →
+        ∃ loopContext,
+          ActiveLocalContextInvariant initializerResult.state outer
+            loopContext ∧
+          ForItemsHaveType
+            ((initializerResult.state.toTypedSource roots
+              ).applySubstitution outer) {
+              returnType := outer.apply expectedReturn
+              loopDepth := inferenceContext.loopDepth
+            } target
+              (initializerResult.items.map
+                (ForItemForm.applySubstitution outer)) loopContext)
+    (conditionSound :
+      ∀ {initializerResult : Detail.InferredForItems}
+        {conditionState : Frontend.SourceInference.State}
+        {inferredCondition : InferredExpression}
+        {loopContext : SourceSemantics.Context},
+        Detail.inferForItemsFuel fuel inferenceContext initializer allocated =
+          .ok initializerResult →
+        ActiveLocalContextInvariant initializerResult.state outer
+          loopContext →
+        Detail.inferExprFuel fuel inferenceContext condition (some .bool)
+          initializerResult.state = .ok (inferredCondition, conditionState) →
+        ExpressionHasType
+          ((conditionState.toTypedSource roots).applySubstitution outer)
+          loopContext inferredCondition.id .bool)
+    (postSound :
+      ∀ {initializerResult : Detail.InferredForItems}
+        {conditionState : Frontend.SourceInference.State}
+        {bodyResult : Detail.BlockResult}
+        {postResult : Detail.InferredForItems}
+        {loopContext : SourceSemantics.Context},
+        Detail.inferForItemsFuel fuel inferenceContext initializer allocated =
+          .ok initializerResult →
+        Detail.inferStatementsFuel fuel
+          { inferenceContext with
+            loopDepth := inferenceContext.loopDepth + 1 }
+          body.value expectedReturn conditionState = .ok bodyResult →
+        ActiveLocalContextInvariant
+          (bodyResult.state.restoreLexicalScope
+            initializerResult.state.lexicalScope) outer loopContext →
+        Detail.inferForItemsFuel fuel
+          { inferenceContext with
+            loopDepth := inferenceContext.loopDepth + 1 }
+          post (bodyResult.state.restoreLexicalScope
+            initializerResult.state.lexicalScope) = .ok postResult →
+        ∃ postContext,
+          ActiveLocalContextInvariant postResult.state outer postContext ∧
+          ForItemsHaveType
+            ((postResult.state.toTypedSource roots).applySubstitution outer)
+            (({
+              returnType := outer.apply expectedReturn
+              loopDepth := inferenceContext.loopDepth
+            } : ControlContext).enterLoop) loopContext
+              (postResult.items.map (ForItemForm.applySubstitution outer))
+              postContext)
+    (childStatementSound :
+      ∀ {childFuel : Nat} {input : Frontend.SourceInference.State}
+        {inputContext : SourceSemantics.Context}
+        {childStatement : Syntax.Statement}
+        {head : Detail.StatementResult},
+        childFuel < fuel →
+        ActiveLocalContextInvariant input outer inputContext →
+        Detail.inferStatementFuel childFuel
+          { inferenceContext with
+            loopDepth := inferenceContext.loopDepth + 1 }
+          childStatement expectedReturn input = .ok head →
+        TypingSourceExtends
+          ((head.state.toTypedSource roots).applySubstitution outer)
+          ((result.state.toTypedSource roots).applySubstitution outer) →
+        head.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        head.state.requirements ⊆ evidenceState.requirements →
+        TemplateScopeCovered coverageSource inputContext
+          (.statement head.id) →
+        ∃ outputContext facts,
+          ActiveLocalContextInvariant head.state outer outputContext ∧
+          StatementHasType
+            ((head.state.toTypedSource roots).applySubstitution outer)
+            (({
+              returnType := outer.apply expectedReturn
+              loopDepth := inferenceContext.loopDepth
+            } : ControlContext).enterLoop)
+            inputContext head.id outputContext facts ∧
+          StatementResultMatchesFactsAfterSubstitution outer head facts) :
+    ∃ facts,
+      ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer) {
+          returnType := outer.apply expectedReturn
+          loopDepth := inferenceContext.loopDepth
+        } target result.id target facts ∧
+      StatementResultMatchesFactsAfterSubstitution outer result facts := by
+  have allocatedInvariant : ActiveLocalContextInvariant allocated outer target :=
+    invariant.allocateStatementId allocationEq
+  obtain ⟨initializerResult, inferredCondition, conditionState, bodyResult,
+      postResult, initializerSuccess, conditionSuccess, bodySuccess,
+      postSuccess, resultEq, contains⟩ :=
+    inferStatementFuel_success_forLoop_facts statementEq allocationEq success
+      roots
+  obtain ⟨actualInitializerResult, actualCondition,
+      actualConditionState, actualBodyResult, actualPostResult,
+      actualInitializerSuccess, actualConditionSuccess, actualBodySuccess,
+      actualPostSuccess, initializerProvenance, bodyProvenance,
+      postProvenance⟩ :=
+    inferStatementFuel_success_forLoop_child_provenance statementEq
+      allocationEq success initialBelow roots
+  have initializerResultEq : actualInitializerResult = initializerResult := by
+    rw [initializerSuccess] at actualInitializerSuccess
+    exact (Except.ok.inj actualInitializerSuccess).symm
+  subst actualInitializerResult
+  have conditionPairEq : (actualCondition, actualConditionState) =
+      (inferredCondition, conditionState) := by
+    rw [conditionSuccess] at actualConditionSuccess
+    exact (Except.ok.inj actualConditionSuccess).symm
+  have conditionStateEq : actualConditionState = conditionState :=
+    congrArg Prod.snd conditionPairEq
+  subst actualConditionState
+  have bodyResultEq : actualBodyResult = bodyResult := by
+    rw [bodySuccess] at actualBodySuccess
+    exact (Except.ok.inj actualBodySuccess).symm
+  subst actualBodyResult
+  have postResultEq : actualPostResult = postResult := by
+    rw [postSuccess] at actualPostSuccess
+    exact (Except.ok.inj actualPostSuccess).symm
+  subst actualPostResult
+  obtain ⟨loopContext, initializerInvariant, initializerTypingLocal⟩ :=
+    initializerSound initializerSuccess
+  have initializerTyping := ForItemsHaveType.weakenSource
+    (initializerProvenance.sourceExtension.applySubstitution outer)
+    initializerTypingLocal
+  have loopAssumptionsEq : loopContext.assumptions = target.assumptions :=
+    forItemsHaveType_assumptions_eq initializerTyping
+  have conditionInvariant :
+      ActiveLocalContextInvariant conditionState outer loopContext :=
+    initializerInvariant.inferExprFuel conditionSuccess
+  have conditionTypingLocal := conditionSound initializerSuccess
+    initializerInvariant conditionSuccess
+  have conditionToBody : TypingSourceExtends
+      (conditionState.toTypedSource roots)
+      (bodyResult.state.toTypedSource roots) :=
+    inferStatementsFuel_success_typingSourceExtends bodySuccess
+      bodyProvenance.initialBelow roots
+  have conditionToParent := TypingSourceExtends.trans conditionToBody
+    bodyProvenance.sourceExtension
+  have conditionTyping := ExpressionHasType.weakenSource
+    (conditionToParent.applySubstitution outer) conditionTypingLocal
+  have bodyCovered : ∀ child, child ∈ bodyResult.statements →
+      TemplateScopeCovered coverageSource loopContext (.statement child) := by
+    intro child member
+    have childReference : (.statement child : NodeId) ∈
+        (StatementForm.forLoop initializerResult.items inferredCondition.id
+          postResult.items bodyResult.statements).references := by
+      simp [StatementForm.references, member]
+    exact TemplateScopeCovered.statementChild_of_recorded_reference
+      contains childReference resultExtension parentCovered closed
+      (by intro predicate predicateMember
+          rw [loopAssumptionsEq]
+          exact predicateMember)
+  obtain ⟨bodyFinal, bodyFacts, _bodyInvariant, bodyTyping,
+      _bodyAgreement⟩ :=
+    inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence
+      (fun state context => ActiveLocalContextInvariant state outer context)
+      (roots := roots) conditionInvariant bodyProvenance.initialBelow
+      (bodyProvenance.sourceExtension.applySubstitution outer)
+      (List.Subset.trans bodyProvenance.integerPatternsSubset
+        resultIntegerPatternsSubset)
+      (List.Subset.trans bodyProvenance.requirementsSubset
+        resultRequirementsSubset)
+      bodyCovered childStatementSound bodySuccess
+  have postInputInvariant : ActiveLocalContextInvariant
+      (bodyResult.state.restoreLexicalScope
+        initializerResult.state.lexicalScope) outer loopContext :=
+    initializerInvariant.restoreLexicalScope
+  obtain ⟨postContext, _postInvariant, postTypingLocal⟩ :=
+    postSound initializerSuccess bodySuccess postInputInvariant postSuccess
+  have postTyping := ForItemsHaveType.weakenSource
+    (postProvenance.sourceExtension.applySubstitution outer)
+    postTypingLocal
+  subst result
+  refine ⟨{
+      type := .unit
+      hasValue := false
+      sawReturn := false
+      control := .loop bodyFacts.control
+    }, allocatedInvariant.restoreLexicalScope_recordNode _, ?_, ?_⟩
+  · exact forLoopStatementHasType_afterSubstitution contains
+      initializerTyping conditionTyping bodyTyping postTyping
+  · exact StatementResultMatchesFactsAfterSubstitution.forLoop outer
+      bodyFacts id _
+
 end Solcore.SourceSemantics.SourceInferenceStatementsSoundness
