@@ -1,6 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.DataPlaceFaultTree
 import Solcore.SourceSemantics.CoreLowering.DataPlaceWriteBack
 import Solcore.SourceSemantics.CoreLowering.FunctionValues
+import Solcore.SourceSemantics.CoreLowering.DataPayloadEncoding
+import Solcore.SourceSemantics.CoreLowering.DataPayloadDefaults
+import Solcore.SourceSemantics.CoreLowering.DataPayloadEquality
 import Solcore.SourceSemantics.CoreLowering.GenericMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.DataPlacePathHelpers
 import Solcore.SourceSemantics.CoreLowering.GenericMatchMeaning

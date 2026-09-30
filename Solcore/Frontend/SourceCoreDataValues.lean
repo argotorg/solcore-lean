@@ -134,7 +134,7 @@ private def rawError (error : SourceCoreGeneralEntry.ValueError) : Error :=
   | .externalHostUnsupported => ⟨path, .externalHostUnsupported⟩
   | _ => ⟨path, .rawValue error⟩
 
-private def namedIdentity (context : Context) (type : Ty) : Except Error Core.DataTypeId := do
+def namedIdentity (context : Context) (type : Ty) : Except Error Core.DataTypeId := do
   match ← context.checked.catalog.project type |>.mapError catalogError with
   | .namedData identity => pure identity
   | actual => throw ⟨[], .coreShapeMismatch (.namedData ⟨0⟩) actual⟩
