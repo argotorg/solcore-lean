@@ -1063,6 +1063,7 @@ import Solcore.Test.SourceCoreIntegerFunctionEntry
 import Solcore.Test.SourceCompilerIntegers
 import Solcore.Test.SourceCoreDataExpressions
 import Solcore.Test.SourceCoreDataMatches
+import Solcore.Test.SourceCoreGroupedTuple
 import Solcore.Test.SourceCoreGeneralFunctions
 import Solcore.Test.SourceCoreDataValues
 import Solcore.Test.SourceCoreLoopStatementReflection
@@ -2489,6 +2490,7 @@ def run : IO Unit := do
   SourceCompilerIntegers.run
   SourceCoreDataExpressions.run
   SourceCoreDataMatches.run
+  SourceCoreGroupedTuple.run
   SourceCoreGeneralFunctions.run
   SourceCoreDataValues.run
   SourceCoreLoopStatementReflection.run

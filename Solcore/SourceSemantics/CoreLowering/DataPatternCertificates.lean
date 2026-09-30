@@ -383,10 +383,7 @@ theorem rootInstructions_sound (compilation : Compilation) (context : Context)
                 constructorMember.2, same⟩
             · simp [same, Functor.map, Except.map] at accepted
   | group span inner ih =>
-    cases resolution with
-    | tuple => simp [rootInstructions] at accepted
-    | wildcard | integerLiteral | binder | constructor =>
-      obtain ⟨arity, instructionsEq, represents⟩ := ih _ _ accepted
-      exact ⟨arity, instructionsEq, .group represents⟩
+    obtain ⟨arity, instructionsEq, represents⟩ := ih _ _ accepted
+    exact ⟨arity, instructionsEq, .group represents⟩
 
 end Solcore.SourceSemantics.CoreLowering.DataPatternCertificates

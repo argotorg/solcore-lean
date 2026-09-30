@@ -714,6 +714,14 @@ mutual
 
 end
 
+/-- Parentheses preserve the retained tuple arity at any grouping depth. -/
+private def tuplePatternArity : MatchPatternSource → Nat
+  | .tuple _ count => count
+  | .group _ inner => tuplePatternArity inner
+  | _ => 0
+
+/-- A prefix instruction may consume one instruction frame and one sequence
+frame. Twice the instruction count bounds these nested traversals. -/
 private def matchPattern (pattern : TypedMatchPattern)
     (value : Value) : PatternResult :=
   match pattern.resolution with
@@ -726,7 +734,7 @@ private def matchPattern (pattern : TypedMatchPattern)
       | .constructed actual arguments =>
           if decide (actual = instantiation) &&
               arguments.length = instantiation.payloadTypes.length then
-            match matchInstructionsFuel (instructions.length + 1)
+            match matchInstructionsFuel (2 * instructions.length + 1)
                 arguments instructions with
             | some result =>
                 if result.rest.isEmpty then .matched result.bindings
@@ -736,13 +744,11 @@ private def matchPattern (pattern : TypedMatchPattern)
             .noMatch
       | _ => .noMatch
   | .tuple instructions =>
-      let elementCount := match pattern.source with
-        | .tuple _ count => count
-        | _ => 0
+      let elementCount := tuplePatternArity pattern.source
       match unpackValues elementCount value with
       | none => .noMatch
       | some elements =>
-          match matchInstructionsFuel (instructions.length + 1)
+          match matchInstructionsFuel (2 * instructions.length + 1)
               elements instructions with
           | some result =>
               if result.rest.isEmpty then .matched result.bindings

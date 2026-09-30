@@ -191,10 +191,57 @@ example : ∃ values, BindingsRep catalog tupleCompiled.pattern.bindings sourceB
 example : Core.runStateful 1000 (.initial (.apply tupleCompiled.pattern.matcher (.var 0)) [tupleCore] sentinel) =
     .done (.inRight .unit (.pair (.integer 7) (.integer (-3)))) sentinel := by cbv
 
-/-- The current compiler deliberately rejects grouped root tuples until the
-legacy runtime/source arity discrepancy is resolved. -/
-example : compilePattern compilation 20 source [] site span tupleType
-    { tuplePattern with source := .group span tuplePattern.source } =
-      .error (.callPreparation .invalidPatternMetadata) := by cbv
+/-- Repeated root groups preserve the arity of the nested tuple pattern. -/
+private def groupedTuplePattern : TypedMatchPattern :=
+  { tuplePattern with source := .group span (.group span tuplePattern.source) }
+private def groupedTupleCompiled : CertifiedPattern catalog.definitions :=
+  match compilePattern compilation 20 source [] site span tupleType groupedTuplePattern with
+  | .ok result => result
+  | .error _ => fallback
+private theorem groupedTupleAccepted :
+    compilePattern compilation 20 source [] site span tupleType groupedTuplePattern = .ok groupedTupleCompiled := by cbv
+
+/-- The static certificate comes from the actual compiler, including the root
+instruction arity and both nested child certificates. -/
+example : DataPatternCertificates.Certificate compilation source [] site span tupleType groupedTuplePattern
+    groupedTupleCompiled.pattern :=
+  DataPatternCertificates.certificate_of_compilePattern compilation 20 source [] site span tupleType
+    groupedTuplePattern groupedTupleCompiled groupedTupleAccepted
+
+private theorem groupedTupleSourceMatches :
+    Dynamic.PatternMatches context groupedTuplePattern tupleSource sourceBindings := by
+  cases tupleSourceMatches with
+  | intro spelling matched => exact .intro (.group (.group spelling)) matched
+
+private theorem tupleTypedRepresents : TypedValueRep catalog signatures tupleType tupleSource tupleCore :=
+  .product (leafTyped 7) (.product (.bool _) (.integer _))
+
+/-- Independent source matching determines the finite Core result with the
+same binder order and the original store, for arbitrary surrounding state. -/
+example (environment : Core.Environment) (store : Core.Store) :
+    ∃ values, BindingsRep catalog groupedTupleCompiled.pattern.bindings sourceBindings values ∧
+      (∃ required, ∀ fuel, required ≤ fuel →
+        Core.runStateful fuel (.initial (.apply groupedTupleCompiled.pattern.matcher (.var 0))
+          (tupleCore :: environment) store) = .done (.inRight .unit (packValues values)) store) ∧
+      (∀ fuel outcome finalStore,
+        Core.runStateful fuel (.initial (.apply groupedTupleCompiled.pattern.matcher (.var 0))
+          (tupleCore :: environment) store) = .done outcome finalStore →
+        outcome = .inRight .unit (packValues values) ∧ finalStore = store) :=
+  compilePattern_success_run compilation 20 source [] site span tupleType groupedTuplePattern groupedTupleCompiled
+    groupedTupleAccepted context rfl tupleRepresents groupedTupleSourceMatches environment store
+
+example (environment : Core.Environment) (store : Core.Store) :
+    ∃ outcome, OutcomeRep catalog context groupedTuplePattern groupedTupleCompiled.pattern tupleSource outcome ∧
+      (∃ required, ∀ fuel, required ≤ fuel →
+        Core.runStateful fuel (.initial (.apply groupedTupleCompiled.pattern.matcher (.var 0))
+          (tupleCore :: environment) store) = .done outcome store) ∧
+      (∀ fuel actual finalStore,
+        Core.runStateful fuel (.initial (.apply groupedTupleCompiled.pattern.matcher (.var 0))
+          (tupleCore :: environment) store) = .done actual finalStore → actual = outcome ∧ finalStore = store) :=
+  compilePattern_run_preserves compilation 20 source [] site span tupleType groupedTuplePattern groupedTupleCompiled
+    groupedTupleAccepted context contextValid tupleTypedRepresents environment store
+
+example : Core.runStateful 1000 (.initial (.apply groupedTupleCompiled.pattern.matcher (.var 0))
+    [tupleCore] sentinel) = .done (.inRight .unit (.pair (.integer 7) (.integer (-3)))) sentinel := by cbv
 
 end Tests.SourceCoreDataPatternProofs

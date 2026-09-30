@@ -211,9 +211,17 @@ private def metadataTests (program : CheckedProgram) (checked : Checked) : IO Un
     | .error error => throw (IO.userError s!"tuple root failed: {reprStr error}")
   let [tupleArm] := tupleResolution.cases | throw (IO.userError "tuple arm missing")
   let tupleContext : SourceCoreDataMatches.Context := ⟨checked, program.signatures, tupleFunction.solvedRequirements⟩
-  assertTrue (rejected (SourceCoreDataMatches.compilePattern tupleContext 100 tupleFunction.typedBody []
-    tupleId tupleNode.span tupleArm.pattern.type {tupleArm.pattern with source := .group tupleNode.span tupleArm.pattern.source}))
-    "grouped root tuple crossed documented source-runtime mismatch boundary"
+  let plain ← match SourceCoreDataMatches.compilePattern tupleContext 100 tupleFunction.typedBody []
+      tupleId tupleNode.span tupleArm.pattern.type tupleArm.pattern with
+    | .ok compiled => pure compiled
+    | .error error => throw (IO.userError s!"plain tuple pattern failed: {reprStr error}")
+  let grouped ← match SourceCoreDataMatches.compilePattern tupleContext 100 tupleFunction.typedBody []
+      tupleId tupleNode.span tupleArm.pattern.type
+      {tupleArm.pattern with source := .group tupleNode.span (.group tupleNode.span tupleArm.pattern.source)} with
+    | .ok compiled => pure compiled
+    | .error error => throw (IO.userError s!"grouped tuple pattern failed: {reprStr error}")
+  assertTrue (grouped.pattern.matcher == plain.pattern.matcher && grouped.pattern.bindings == plain.pattern.bindings)
+    "tuple grouping changed its generated matcher or binder order"
 
 example {context : SourceCoreDataMatches.Context} {environment : Core.Context} {type : Ty}
     (compiled : SourceCoreDataMatches.Certified context environment type) :

@@ -6,8 +6,7 @@ attempts are pure: their successful result is a packed binder-value bundle.
 Only a fully matched arm allocates the source binders. The scrutinee's hidden
 source cell is allocated once, before testing the first arm. The callback owns
 nested statement control and the surrounding compiler checks the full body.
-Grouped root tuples are explicitly outside this profile because the current
-source runtime does not unwrap their retained source group when finding arity. -/
+Groups are transparent at the root and within tuple and constructor patterns. -/
 
 set_option autoImplicit false
 
@@ -175,10 +174,7 @@ def rootInstructions (context : Context) : MatchPatternSource → MatchPatternRe
       unless constructor.name = name do throw invalid
       pure (.constructor instantiation count :: instructions)
   | .tuple _ count, .tuple instructions => pure (.tuple count :: instructions)
-  | .group _ inner, resolution =>
-      match resolution with
-      | .tuple _ => throw invalid
-      | _ => rootInstructions context inner resolution
+  | .group _ inner, resolution => rootInstructions context inner resolution
   | _, _ => throw invalid
 
 structure CertifiedPattern (definitions : Core.DataEnvironment) where
