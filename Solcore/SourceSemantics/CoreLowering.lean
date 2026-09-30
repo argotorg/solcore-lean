@@ -29,6 +29,8 @@ import Solcore.SourceSemantics.CoreLowering.DataPatternDecision
 import Solcore.SourceSemantics.CoreLowering.DataPatternEncoding
 import Solcore.SourceSemantics.CoreLowering.DataPatternParametricLeaves
 import Solcore.SourceSemantics.CoreLowering.DataPlaceMembers
+import Solcore.SourceSemantics.CoreLowering.DataPlaceCertificates
+import Solcore.SourceSemantics.CoreLowering.DataPlaceMemberCertificates
 import Solcore.SourceSemantics.CoreLowering.ForLoopStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.ForPostMeaning
 

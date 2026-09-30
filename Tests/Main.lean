@@ -1068,6 +1068,7 @@ import Solcore.Test.SourceCoreGeneralFunctions
 import Solcore.Test.SourceCoreDataValues
 import Solcore.Test.SourceCoreLoopStatementReflection
 import Solcore.Test.SourceCoreDataPlaces
+import Solcore.Test.SourceCoreDataPlaceProofs
 import Solcore.Test.SourceCoreDataPatternProofs
 import Solcore.Test.SourceCoreDataPatternEncoding
 import Solcore.Test.SourceCoreLoopBranchReflection
