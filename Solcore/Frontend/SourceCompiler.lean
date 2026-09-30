@@ -5,6 +5,7 @@ import Solcore.Core.Safety
 import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceCoreBasicEntry
 import Solcore.Frontend.SourceCoreRecursiveEntry
+import Solcore.Frontend.SourceCoreFunctionEntry
 import Solcore.Frontend.ProgramInterfaces
 import Solcore.Abi.StaticWord
 
@@ -476,7 +477,10 @@ private def prepareCoreRuntime (program : CheckedProgram)
     Except SourceCoreRecursiveEntry.Error SourceCoreBasicEntry.PreparedProgram :=
   match SourceCoreBasicEntry.prepare program plan compilationFuel reason with
   | .ok prepared => .ok prepared
-  | .error _ => SourceCoreRecursiveEntry.prepare program plan compilationFuel reason
+  | .error _ =>
+      match SourceCoreRecursiveEntry.prepare program plan compilationFuel reason with
+      | .ok prepared => .ok prepared
+      | .error _ => SourceCoreFunctionEntry.prepare program plan compilationFuel reason
 
 private def selectCoreBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat) :

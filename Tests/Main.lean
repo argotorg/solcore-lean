@@ -1035,6 +1035,17 @@ import Solcore.Test.SourceCoreCalls
 import Solcore.Test.SourceCoreRecursiveEntry
 import Solcore.Test.SourceCoreGeneralHeap
 import Solcore.Test.SourceCoreGeneralExpressions
+import Solcore.Test.SourceCoreGeneralStatements
+import Solcore.Test.SourceCoreFunctions
+import Solcore.Test.SourceCoreFunctionEntry
+import Solcore.Test.CoreLocalAssignment
+import Solcore.Test.SourceCoreAssignments
+import Solcore.Test.SourceCoreAssignmentFaultSites
+import Solcore.Test.SourceCoreAssignmentEntries
+import Solcore.Test.SourceCompilerAssignments
+import Solcore.Test.SourceCompilerFunctions
+import Solcore.Test.SourceCoreBasicStatementTreeCertificates
+import Solcore.Test.CoreWordMapping
 import Solcore.Test.SourceCoreBasicEntry
 import Solcore.Test.SourceCompilerCoreCells
 import Solcore.Test.ContractLanguageResult
@@ -2424,6 +2435,15 @@ def run : IO Unit := do
   SourceCompilerLoops.run
   SourceCoreCalls.run
   SourceCoreRecursiveEntry.run
+  SourceCoreFunctions.run
+  SourceCoreFunctionEntry.run
+  CoreLocalAssignment.run
+  SourceCoreAssignments.run
+  SourceCoreAssignmentFaultSites.run
+  SourceCoreAssignmentEntries.run
+  SourceCompilerAssignments.run
+  SourceCompilerFunctions.run
+  CoreWordMapping.run
   CoreLocalLoop.run
   CoreTaggedFunction.run
   SourceCoreBasicEntry.run

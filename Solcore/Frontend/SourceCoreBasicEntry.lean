@@ -2,6 +2,8 @@ import Solcore.Frontend.SourceCoreControl
 import Solcore.Frontend.SourceCorePrimitive
 import Solcore.Frontend.SourceCoreLoops
 import Solcore.Frontend.SourceCoreFaultSites
+import Solcore.Frontend.SourceCoreRuntimeFaultSites
+import Solcore.Frontend.SourceCoreAssignmentPolicy
 import Solcore.Frontend.SourceCompilationPlan
 
 /-! Prepared scalar/product seed entries. Plan validation and Core compilation
@@ -58,6 +60,7 @@ inductive Error where
   | preparation (error : SourceCompilationPlan.Error)
   | lowering (error : SourceCoreBasic.Error)
   | faultSites (error : SourceCoreFaultSites.Error)
+  | assignmentFaultSites (error : SourceCoreAssignmentFaultSites.Error)
   | invalidFunctionType (key : Key)
   | resultMetadataMismatch (key : Key)
   | stagedResultUnsupported (key : Key)
@@ -102,14 +105,19 @@ private def compileEntry (compilationFuel : Nat)
     | .error error => .error (.lowering (.typeProjection error))
   let resultType := result.val
   let source := function.typedBody
-  let faultSites ← (SourceCoreFaultSites.prepare source sourceResultType).mapError Error.faultSites
+  let sites ← (SourceCoreRuntimeFaultSites.prepare source sourceResultType).mapError fun
+    | .sites error => Error.faultSites error
+    | .assignments error => Error.assignmentFaultSites error
+  let faultSites := sites.table
   let inputs ← lowerInputs source [] source.inputs
   let statements ← source.roots.mapM fun
     | .statement id => pure id
     | .expression id => .error (.expectedStatementRoot id)
-  let body ← (SourceCoreLoops.lowerStatementsWithExpression
-    (fun fuel source scope id reasonAt => SourceCorePrimitive.lowerExpressionWithReasons
-      fuel ⟨function.solvedRequirements⟩ source scope id reasonAt)
+  let policy := SourceCoreAssignmentPolicy.attach {
+    lowerExpression := fun fuel source scope id reasonAt => SourceCorePrimitive.lowerExpressionWithReasons
+      fuel ⟨function.solvedRequirements⟩ source scope id reasonAt
+  } sites.assignments
+  let body ← (SourceCoreLoops.lowerStatementsWithPolicy policy
     compilationFuel source (inputScope inputs) statements resultType faultSites.reasonAt
     Core.Word.zero faultSites.escapedReason).mapError Error.lowering
   if checked : Core.infer? (inputContext inputs) body = some (Core.LanguageResult.resultType resultType) then
@@ -123,7 +131,7 @@ private def compileEntry (compilationFuel : Nat)
 /-- Authenticate the complete input plan and selected evidence before compiling
 its seeds. Calls and other constructs outside SourceCoreControl remain errors.
 The legacy reason argument is retained for callers; prepared entries assign a
-distinct diagnostic reason to each local-read occurrence. -/
+distinct diagnostic reason to each local-read and assignment site. -/
 def prepare (program : CheckedProgram) (plan : Plan) (compilationFuel : Nat)
     (_reason : Core.Word) : Except Error PreparedProgram := do
   let executablePlan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError Error.preparation

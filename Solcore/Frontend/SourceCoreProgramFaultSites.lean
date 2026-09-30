@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceCoreFaultSites
+import Solcore.Frontend.SourceCoreAssignmentFaultSites
 import Solcore.Frontend.SourceCompilationPlan
 
 /-! Program-wide, nonwrapping failure identities. Each specialization keeps its
@@ -17,6 +17,7 @@ abbrev Plan := SourceSpecializationWorklist.Plan
 structure Function where
   key : Key
   table : SourceCoreFaultSites.Table
+  assignments : SourceCoreAssignmentFaultSites.Table
   fellThroughReason : Core.Word
   deriving Repr
 
@@ -27,6 +28,7 @@ structure Program where
 
 inductive Error where
   | sites (error : SourceCoreFaultSites.Error)
+  | assignments (error : SourceCoreAssignmentFaultSites.Error)
   | plan (error : SourceCompilationPlan.Error)
   | invalidFunctionType (key : Key)
   deriving Repr, DecidableEq
@@ -46,12 +48,18 @@ private def collect : Nat → List SourceSpecialization.SpecializedFunction → 
       let reads ← baseSites.reads.zipIdx.mapM fun (site, index) => do
         let token ← reason (next + index)
         pure { site with reason := token }
-      let fellThroughReason ← reason (next + reads.length)
-      let escapedReason ← reason (next + reads.length + 1)
-      let remaining ← collect (next + reads.length + 2) rest
+      let assignments ← (SourceCoreAssignmentFaultSites.prepare specialized.function.typedBody
+        (next + reads.length)).mapError Error.assignments
+      let fellThroughReason ← reason (next + reads.length + assignments.length)
+      let escapedReason ← reason (next + reads.length + assignments.length + 1)
+      let remaining ← collect (next + reads.length + assignments.length + 2) rest
       let function : Function := {
         key := specialized.key
-        table := { baseSites with reads := reads, escapedReason := escapedReason }
+        table := { baseSites with
+          reads := reads
+          escapedReason := escapedReason
+          additional := assignments.diagnostics }
+        assignments
         fellThroughReason := fellThroughReason
       }
       pure (function :: remaining)
@@ -67,7 +75,7 @@ def prepare (plan : Plan) (root : Key) : Except Error Program := do
     | some function => pure function
     | none => .error (.plan (.missingSpecialization root))
   let reads := functions.flatMap (·.table.reads)
-  let additional := functions.flatMap fun function => [
+  let additional := functions.flatMap fun function => function.assignments.diagnostics ++ [
     (function.fellThroughReason, {
       error := SourceTypedRuntime.RuntimeError.functionFellThrough function.table.resultType
       site := SourceCoreElaboration.ErrorSite.declaration function.table.owner

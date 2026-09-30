@@ -113,9 +113,11 @@ private def compileClosure (plan : Plan) (globals : List Signature)
     solvedRequirements := function.specialized.function.solvedRequirements
     internalReason := Core.Word.zero
   }
-  let body ← (SourceCoreLoops.lowerStatementsWithExpression
-    (fun fuel source scope id reasonAt =>
-      SourceCoreCalls.lowerExpressionWithReasons fuel context source scope id reasonAt)
+  let policy := SourceCoreAssignmentPolicy.attach {
+    lowerExpression := fun fuel source scope id reasonAt =>
+      SourceCoreCalls.lowerExpressionWithReasons fuel context source scope id reasonAt
+  } ownSites.assignments
+  let body ← (SourceCoreLoops.lowerStatementsWithPolicy policy
     compilationFuel source (SourceCoreBasicEntry.inputScope function.inputs) statements
     function.signature.resultType ownSites.table.reasonAt ownSites.fellThroughReason
     ownSites.table.escapedReason).mapError Error.lowering

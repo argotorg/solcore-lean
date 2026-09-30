@@ -31,7 +31,7 @@ structure Table where
   resultType : TypeSystem.Ty
   reads : List ReadSite
   escapedReason : Core.Word
-  /-- Other functions' boundary faults in a prepared program. -/
+  /-- Assignment diagnostics and other functions' boundary faults. -/
   additional : List (Core.Word × Diagnostic) := []
   deriving Repr, DecidableEq
 

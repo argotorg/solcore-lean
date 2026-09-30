@@ -18,6 +18,9 @@ import Solcore.Frontend.SourceCoreLoops
 import Solcore.Frontend.SourceCoreCalls
 import Solcore.Frontend.SourceCoreProgramFaultSites
 import Solcore.Frontend.SourceCoreRecursiveEntry
+import Solcore.Frontend.SourceCoreFunctionTypes
+import Solcore.Frontend.SourceCoreFunctions
+import Solcore.Frontend.SourceCoreFunctionEntry
 import Solcore.Frontend.SourceCoreFaultSites
 import Solcore.Frontend.SourceCoreBasicEntry
 import Solcore.Frontend.SourceTypedRuntime
@@ -25,5 +28,10 @@ import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceTypedStaticSafetyProperties
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceCompiler
+
+import Solcore.Frontend.SourceCoreAssignments
+import Solcore.Frontend.SourceCoreAssignmentFaultSites
+import Solcore.Frontend.SourceCoreRuntimeFaultSites
+import Solcore.Frontend.SourceCoreAssignmentPolicy
 
 /-! Current whole-program source pipeline and preservation results. -/

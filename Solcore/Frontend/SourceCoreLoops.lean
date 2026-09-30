@@ -8,7 +8,8 @@ the outer continuation. Body/post local scopes are discharged each iteration.
 The generated recursive closure adds administrative heap cells; full source
 heap correspondence for those cells is pending. Entry consumers must check the
 generated Core type before execution. No source evaluator is imported.
-Assignment retains the existing bare, equal-assignment profile. -/
+Assignment callbacks can supply a broader bare Word profile; the default
+retains ordinary equal assignment. -/
 
 set_option autoImplicit false
 
@@ -30,11 +31,29 @@ structure Policy where
     SourceCoreBasic.lowerBinder
   lowerAssignment : TypedSource → Scope → AssignmentResolution → Syntax.ValueAssignOp →
     Except Error (Nat × Core.Ty) := SourceCoreBasic.lowerAssignment
+  assignValue : Option (ExpressionLowerer → Nat → TypedSource → Scope → SourceCoreElaboration.ErrorSite →
+    AssignmentResolution → Syntax.ValueAssignOp → ExpressionId → Core.Ty → Core.Expr →
+    (ExpressionId → Core.Word) → Except Error Core.Expr) := none
+  assignBitNot : Option (TypedSource → Scope → SourceCoreElaboration.ErrorSite →
+    AssignmentResolution → Core.Ty → Core.Expr → Except Error Core.Expr) := none
+
+private def assignValue (policy : Policy) (fuel : Nat) (source : TypedSource) (scope : Scope)
+    (site : SourceCoreElaboration.ErrorSite) (assignment : AssignmentResolution)
+    (operator : Syntax.ValueAssignOp) (rhs : ExpressionId) (outputType : Core.Ty)
+    (next : Core.Expr) (reasonAt : ExpressionId → Core.Word) : Except Error Core.Expr := do
+  match operator, policy.assignValue with
+  | .equal, _ | _, none =>
+      let (index, payloadType) ← policy.lowerAssignment source scope assignment operator
+      let rhs ← policy.lowerExpression fuel source scope rhs reasonAt
+      SourceCoreBasic.ensureType (.binder assignment.target.root) payloadType rhs.type
+      pure (Core.LocalSequence.assign outputType (.var index) rhs.expression next)
+  | _, some callback =>
+      callback policy.lowerExpression fuel source scope site assignment operator rhs outputType next reasonAt
 
 /-- Header items have no statement identity. They use the same authenticated
 binder/expression/assignment checks and thread newly allocated lexical cells.
 Only the supplied continuation determines whether that scope persists. -/
-private def lowerForItems (policy : Policy) : Nat → TypedSource → Scope →
+private def lowerForItems (policy : Policy) (parentSite : SourceCoreElaboration.ErrorSite) : Nat → TypedSource → Scope →
     List ForItemForm → Core.Ty → (ExpressionId → Core.Word) → (Scope → Except Error Core.Expr) →
     Except Error Core.Expr
   | _, _, scope, [], _, _, next => next scope
@@ -44,7 +63,7 @@ private def lowerForItems (policy : Policy) : Nat → TypedSource → Scope →
       match item with
       | .letDecl binder initializer =>
           let payloadType ← policy.lowerBinder source scope binder
-          let body ← lowerForItems policy fuel source ((binder.id, payloadType) :: scope)
+          let body ← lowerForItems policy parentSite fuel source ((binder.id, payloadType) :: scope)
             rest resultType reasonAt next
           match initializer with
           | none => pure (Core.LocalSequence.letUninitialized payloadType body)
@@ -54,15 +73,17 @@ private def lowerForItems (policy : Policy) : Nat → TypedSource → Scope →
               pure (Core.LocalSequence.letInitialized controlType payloadType initializer.expression body)
       | .expression expression =>
           let expression ← policy.lowerExpression fuel source scope expression reasonAt
-          let body ← lowerForItems policy fuel source scope rest resultType reasonAt next
+          let body ← lowerForItems policy parentSite fuel source scope rest resultType reasonAt next
           pure (Core.LocalSequence.discard controlType expression.expression body)
       | .assignValue assignment operator rhs =>
-          let (index, payloadType) ← policy.lowerAssignment source scope assignment operator
-          let rhs ← policy.lowerExpression fuel source scope rhs reasonAt
-          SourceCoreBasic.ensureType (.binder assignment.target.root) payloadType rhs.type
-          let body ← lowerForItems policy fuel source scope rest resultType reasonAt next
-          pure (Core.LocalSequence.assign controlType (.var index) rhs.expression body)
-      | .assignBitNot _ => .error (.unsupportedForItem item)
+          let body ← lowerForItems policy parentSite fuel source scope rest resultType reasonAt next
+          assignValue policy fuel source scope parentSite assignment operator rhs controlType body reasonAt
+      | .assignBitNot assignment =>
+          match policy.assignBitNot with
+          | none => .error (.unsupportedForItem item)
+          | some callback =>
+              let body ← lowerForItems policy parentSite fuel source scope rest resultType reasonAt next
+              callback source scope parentSite assignment controlType body
 
 def lowerFlowStatementsWithPolicy (policy : Policy) : Nat → TypedSource → Scope →
     List StatementId → Core.Ty → (ExpressionId → Core.Word) → Bool → Core.Word → Except Error Core.Expr
@@ -89,11 +110,15 @@ def lowerFlowStatementsWithPolicy (policy : Policy) : Nat → TypedSource → Sc
               pure (Core.LocalSequence.letInitialized controlType payloadType initializer.expression body)
       | .assignValue assignment operator value =>
           SourceCoreBasic.ensureType site .unit type
-          let (index, payloadType) ← policy.lowerAssignment source scope assignment operator
-          let value ← policy.lowerExpression fuel source scope value reasonAt
-          SourceCoreBasic.ensureType site payloadType value.type
           let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason
-          pure (Core.LocalSequence.assign controlType (.var index) value.expression body)
+          assignValue policy fuel source scope site assignment operator value controlType body reasonAt
+      | .assignBitNot assignment =>
+          SourceCoreBasic.ensureType site .unit type
+          match policy.assignBitNot with
+          | none => .error (.unsupportedStatement id node.form)
+          | some callback =>
+              let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason
+              callback source scope site assignment controlType body
       | .returnStmt none =>
           SourceCoreBasic.ensureType site resultType type
           SourceCoreBasic.ensureType site .unit type
@@ -138,11 +163,11 @@ def lowerFlowStatementsWithPolicy (policy : Policy) : Nat → TypedSource → Sc
             (Core.LocalLoop.whileLoop resultType condition.expression loopBody selfReason) body)
       | .forLoop initializer condition post statements =>
           SourceCoreBasic.ensureType site .unit type
-          let loop ← lowerForItems policy fuel source scope initializer resultType reasonAt fun loopScope => do
+          let loop ← lowerForItems policy site fuel source scope initializer resultType reasonAt fun loopScope => do
             let condition ← policy.lowerExpression fuel source loopScope condition reasonAt
             SourceCoreBasic.ensureType site .bool condition.type
             let loopBody ← lowerFlowStatementsWithPolicy policy fuel source loopScope statements resultType reasonAt false selfReason
-            let post ← lowerForItems policy fuel source loopScope post resultType reasonAt
+            let post ← lowerForItems policy site fuel source loopScope post resultType reasonAt
               (fun _ => pure (Core.LocalLoop.fallthrough resultType))
             pure (Core.LocalLoop.iterate resultType condition.expression loopBody post selfReason)
           let body ← lowerFlowStatementsWithPolicy policy fuel source scope rest resultType reasonAt tailReturns selfReason
