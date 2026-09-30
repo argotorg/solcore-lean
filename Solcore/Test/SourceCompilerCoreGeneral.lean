@@ -129,7 +129,9 @@ def run : IO Unit := do
     assertTrue ((← runData proxy []) == .proxy leafMetadata.resultType) "public proxy lost raw inner identity"
     let function ← compile program "makeAdder" preference
     match function.runCore [scalar 10] { executionFuel := 65536 } with
-    | .ok (.coreLanguageResult (.succeeded (.pair (.inLeft .word .unit) (.closure ..)) _)) => pure ()
+    | .ok (.coreLanguageResult (.succeeded
+        (.pair (.pair (.inLeft .word .unit) (.closure ..)) (.word contract)) _)) =>
+        assertTrue (contract != Core.Word.zero) "public callable lost its authenticated contract descriptor"
     | other => throw (IO.userError s!"public function-returning Core result changed: {reprStr other}")
     for name in ["missing", "absent"] do
       let failed ← compile program name preference

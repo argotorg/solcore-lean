@@ -16,8 +16,7 @@ open Solcore.SourceSemantics.CoreLowering.DataEquality
 private def sourceType (declaration : Resolved.DeclarationId) : TypeSystem.Ty :=
   .constructor (.declaration declaration)
 private def catalog (declaration : Resolved.DeclarationId) : SourceCoreDataCatalog.Catalog :=
-  ⟨[{ sourceType := sourceType declaration,
-      definition := some ⟨[.unit, .namedData ⟨0⟩]⟩ }]⟩
+  { entries := [{ sourceType := sourceType declaration, definition := some ⟨[.unit, .namedData ⟨0⟩]⟩ }] }
 private def type : Core.Ty := .namedData ⟨0⟩
 private def parameter : Core.Ty := .product type type
 private def helper : Expr := .matchData ⟨0⟩ .bool (.first (.var 0)) [
