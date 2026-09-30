@@ -102,6 +102,10 @@ inductive SemanticFault where
   | unsupportedPolymorphicBinder (id : Resolved.LocalId)
   | missingDeclaration (id : Resolved.DeclarationId)
   | typeMismatch (expected actual : Ty)
+  /-- The requested mapping entry is absent and its value type has no
+  canonical default. The typed-source runtime observes this reason as
+  `RuntimeError.typeMismatch valueType none`. -/
+  | missingMappingDefault (valueType : Ty)
   | notCallable
   | argumentArityMismatch (expected actual : Nat)
   | invalidUnaryOperand (operator : Syntax.UnaryOp)

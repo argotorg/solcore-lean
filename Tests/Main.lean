@@ -5,6 +5,8 @@ import Solcore.Test.SourceSemanticsSubstitution
 import Solcore.Test.SourceSemanticsProgram
 import Solcore.Test.SourceSemanticsScopedRequirements
 import Solcore.Test.SourceSemanticsFault
+import Solcore.Test.SourceMappingDefaultFault
+import Solcore.SourceSemantics.CoreLowering
 import Solcore.Test.SourceSemanticsLocalSchemes
 import Solcore.Test.SourceSemanticsGeneralizedClosure
 import Solcore.Test.SourceSemanticsGeneralizedClosureTyping

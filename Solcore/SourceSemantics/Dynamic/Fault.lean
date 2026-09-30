@@ -1445,6 +1445,20 @@ mutual
         ExpressionFormFaults program context evidence source environment before
           (.index base index) requirements coercions
           (.typeMismatch keyType actual) after
+    | indexDefaultUnavailable
+        {context evidence source environment before middle after base index
+          requirements coercions keyType valueType entries key}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base (.mapping keyType valueType entries) middle)
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index key after)
+        (key_type : ValueRuntimeType key keyType)
+        (absent : MappingAbsent key entries)
+        (not_defaultable : ¬ Defaultable valueType) :
+        ExpressionFormFaults program context evidence source environment before
+          (.index base index) requirements coercions
+          (.missingMappingDefault valueType) after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :
