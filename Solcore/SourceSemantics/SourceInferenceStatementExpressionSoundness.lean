@@ -50,6 +50,8 @@ theorem inferStatementFuel_expression_child_resources
     ∃ inferred childState,
       Detail.inferExprFuel fuel inferenceContext expression none allocated =
         .ok (inferred, childState) ∧
+      childState.inference.substitution =
+        result.state.inference.substitution ∧
       allocated.NodesBelowNextOccurrence ∧
       TypingSourceExtends
         ((childState.toTypedSource roots).applySubstitution outer)
@@ -91,7 +93,7 @@ theorem inferStatementFuel_expression_child_resources
         statementInitializedLetBindings]
     · simp [StatementNode.applySubstitution, StatementForm.applySubstitution,
         StatementForm.references]
-  refine ⟨inferred, childState, childSuccess, provenance.initialBelow,
+  refine ⟨inferred, childState, childSuccess, ?_, provenance.initialBelow,
     provenance.sourceExtension.applySubstitution outer |>.trans
       resultSemanticExtension,
     provenance.sourceExtension.trans rawEvidenceExtension,
@@ -99,6 +101,7 @@ theorem inferStatementFuel_expression_child_resources
     ?_,
     List.Subset.trans provenance.requirementsSubset resultRequirementsSubset,
     childCovered⟩
+  · simp [resultEq, State.recordNode]
   simpa [resultEq, State.recordNode] using resultLiteralsSubset
 
 /-- The value-return child's actual inference trace supplies the same
@@ -136,6 +139,8 @@ theorem inferStatementFuel_returnValue_child_resources
     ∃ inferred childState,
       Detail.inferExprFuel fuel inferenceContext value (some expectedReturn)
         allocated = .ok (inferred, childState) ∧
+      childState.inference.substitution =
+        result.state.inference.substitution ∧
       allocated.NodesBelowNextOccurrence ∧
       TypingSourceExtends
         ((childState.toTypedSource roots).applySubstitution outer)
@@ -177,7 +182,7 @@ theorem inferStatementFuel_returnValue_child_resources
         statementInitializedLetBindings]
     · simp [StatementNode.applySubstitution, StatementForm.applySubstitution,
         StatementForm.references]
-  refine ⟨inferred, childState, childSuccess, provenance.initialBelow,
+  refine ⟨inferred, childState, childSuccess, ?_, provenance.initialBelow,
     provenance.sourceExtension.applySubstitution outer |>.trans
       resultSemanticExtension,
     provenance.sourceExtension.trans rawEvidenceExtension,
@@ -185,6 +190,7 @@ theorem inferStatementFuel_returnValue_child_resources
     ?_,
     List.Subset.trans provenance.requirementsSubset resultRequirementsSubset,
     childCovered⟩
+  · simp [resultEq, State.recordNode]
   simpa [resultEq, State.recordNode] using resultLiteralsSubset
 
 /-- The actual expression child is typed by the scoped expression theorem in
@@ -226,6 +232,8 @@ theorem inferStatementFuel_expression_scopedBranch
       inferenceContext.scope.genericOwner inferenceContext.typeParameters)
     (initialInvariant : RecursiveStatementInvariant wholeContext
       expectedReturn finalized initial semanticContext)
+    (resultSubstitutionExtension : finalized.substitution.SemanticallyExtends
+      result.state.inference.substitution)
     (resultSemanticExtension : TypingSourceExtends
       ((result.state.toTypedSource roots).applySubstitution
         finalized.substitution) semanticSource)
@@ -256,7 +264,8 @@ theorem inferStatementFuel_expression_scopedBranch
   let parentSource :=
     (result.state.toTypedSource roots).applySubstitution
       finalized.substitution
-  obtain ⟨inferred, childState, childSuccess, _allocatedBelow,
+  obtain ⟨inferred, childState, childSuccess, childSubstitutionEq,
+      _allocatedBelow,
       childParentExtension, rawChildEvidenceExtension,
       childPatternsSubset, childLiteralsSubset, childRequirementsSubset,
       childCovered⟩ :=
@@ -270,9 +279,14 @@ theorem inferStatementFuel_expression_scopedBranch
       allocated semanticContext :=
     RecursiveExpressionInvariant.ofStatement
       (initialInvariant.allocateStatementId allocationEq)
+  have childSubstitutionExtension : finalized.substitution.SemanticallyExtends
+      childState.inference.substitution := by
+    rw [childSubstitutionEq]
+    exact resultSubstitutionExtension
   have typed : ExpressionHasType parentSource semanticContext inferred.id
       (finalized.substitution.apply inferred.type) :=
-    expressionSound childSuccess resources signaturesEq ownerEq parametersEq
+    expressionSound childSuccess resources childSubstitutionExtension
+      signaturesEq ownerEq parametersEq
       assumptionsEq signatureFormation functionsCanonical catalog
       signatureParameters allocatedInvariant (by simp) childParentExtension
       (resultSemanticExtension.trans semanticCoverageExtension)
@@ -358,7 +372,8 @@ theorem inferStatementFuel_returnValue_scopedBranch
   let parentSource :=
     (result.state.toTypedSource roots).applySubstitution
       finalized.substitution
-  obtain ⟨inferred, childState, childSuccess, _allocatedBelow,
+  obtain ⟨inferred, childState, childSuccess, childSubstitutionEq,
+      _allocatedBelow,
       childParentExtension, rawChildEvidenceExtension,
       childPatternsSubset, childLiteralsSubset, childRequirementsSubset,
       childCovered⟩ :=
@@ -377,9 +392,14 @@ theorem inferStatementFuel_returnValue_scopedBranch
     simp only [Option.mem_def] at member
     cases member
     exact allocatedInvariant.returnBelow
+  have childSubstitutionExtension : finalized.substitution.SemanticallyExtends
+      childState.inference.substitution := by
+    rw [childSubstitutionEq]
+    exact resultSubstitutionExtension
   have typed : ExpressionHasType parentSource semanticContext inferred.id
       (finalized.substitution.apply inferred.type) :=
-    expressionSound childSuccess resources signaturesEq ownerEq parametersEq
+    expressionSound childSuccess resources childSubstitutionExtension
+      signaturesEq ownerEq parametersEq
       assumptionsEq signatureFormation functionsCanonical catalog
       signatureParameters
       (RecursiveExpressionInvariant.ofStatement allocatedInvariant)
