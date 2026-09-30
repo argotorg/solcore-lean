@@ -57,6 +57,7 @@ import Solcore.ContractRuntime.FrameContinuationContextFromCheckpointedWorkingPa
 import Solcore.ContractRuntime.CoreContractEntryProfile
 import Solcore.ContractRuntime.CoreContractEntryProfileProperties
 import Solcore.ContractRuntime.TopLevelExecution
+import Solcore.ContractRuntime.CoreLanguageResult
 import Solcore.ContractRuntime.TopLevelStorageDelta
 import Solcore.ContractRuntime.ContractCallFailure
 import Solcore.ContractRuntime.ContractWordCallInput
