@@ -140,6 +140,7 @@ def InferStatementsFuelSoundness (fuel : Nat) : Prop :=
       ((result.state.toTypedSource roots).applySubstitution
         finalized.substitution) finalized.typedSource →
     result.state.integerPatterns ⊆ evidenceState.integerPatterns →
+    result.state.integerLiterals ⊆ evidenceState.integerLiterals →
     result.state.requirements ⊆ evidenceState.requirements →
     semanticContext.signatures =
       (finalizedRequirementContext inferenceContext finalized).signatures →
@@ -287,6 +288,11 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
     rw [Detail.unify_integerPatterns unified]
     intro pattern member
     exact member
+  have literalsSubset : body.state.integerLiterals ⊆
+      finalState.integerLiterals := by
+    rw [Detail.unify_integerLiterals unified]
+    intro literal member
+    exact member
   have requirementsSubset : body.state.requirements ⊆
       finalState.requirements := by
     rw [Detail.unify_requirements_eq unified]
@@ -417,7 +423,8 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
       initialInvariant initialReady returnBelow initialBindersBelow initialBelow
       substitutionExtends
       (by simpa only [checkedEq] using sourceExtends)
-      patternsSubset requirementsSubset activeSignaturesEq activeParametersEq
+      patternsSubset literalsSubset requirementsSubset activeSignaturesEq
+      activeParametersEq
       (by simpa [ProgramTypeScope.ofDeclaration] using activeDeclarationEq)
       activeResidual
       activeRequirementsEq assumptionsMono rootCoverage
