@@ -318,6 +318,19 @@ private def addStatic : (registry : Registry) → List Metadata → Except Error
       let inserted ← registry.intern metadata.type metadata
       addStatic inserted.registry rest
 
+private theorem addStatic_signatures {before after : Registry} {metadata : List Metadata}
+    (accepted : addStatic before metadata = .ok after) : after.signatures = before.signatures := by
+  induction metadata generalizing before after with
+  | nil => cases accepted; rfl
+  | cons head tail ih =>
+      simp only [addStatic] at accepted
+      cases inserted : before.intern head.type head with
+      | error error => simp [inserted, bind, Except.bind] at accepted
+      | ok receipt =>
+          have continued : addStatic receipt.registry tail = .ok after := by
+            simpa [inserted, bind, Except.bind] using accepted
+          exact (ih continued).trans receipt.preserves.signatures
+
 /-- Preparation interns static metadata in discovery order, then seals that
 prefix. Dynamic input extensions preserve this prefix and its IDs. -/
 def prepare (signatures : ProgramSignatures) (staticMetadata : List Metadata)
@@ -325,6 +338,17 @@ def prepare (signatures : ProgramSignatures) (staticMetadata : List Metadata)
   let registry ← addStatic (empty signatures limits) staticMetadata
   pure (.mk registry.signatures registry.limits registry.entries registry.length
     registry.authenticated registry.unique (Nat.le_refl _))
+
+theorem prepare_signatures {signatures : ProgramSignatures} {metadata : List Metadata}
+    {limits : Limits} {registry : Registry}
+    (accepted : prepare signatures metadata limits = .ok registry) : registry.signatures = signatures := by
+  unfold prepare at accepted
+  cases collected : addStatic (empty signatures limits) metadata with
+  | error error => simp [collected, bind, Except.bind] at accepted
+  | ok prepared =>
+      simp only [collected, bind, Except.bind, pure, Except.pure] at accepted
+      cases accepted
+      exact addStatic_signatures collected
 
 private theorem lookup_same_metadata {values : List Metadata} (unique : values.Nodup)
     {left right : Nat} {metadata : Metadata}

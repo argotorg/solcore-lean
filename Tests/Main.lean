@@ -23,6 +23,7 @@ import Solcore.Test.SourceCallableLedger
 import Solcore.Test.SourceCallStageGuards
 import Solcore.Test.SourceCallStageBoundary
 import Solcore.Test.SourceCoreRawMetadata
+import Solcore.Test.SourceCoreCompatibleValues
 import Solcore.Test.SourceCompilerSourceBoundaryObservations
 import Solcore.Test.SourceCoreDataPayload
 import Solcore.Test.SourceCoreDataPayloadMapping
@@ -2537,6 +2538,7 @@ def run : IO Unit := do
   SourceCoreMappingWithDefault.run
   SourceCoreHeapMarkers.run
   SourceCoreRawMetadata.run
+  SourceCoreCompatibleValues.run
   SourceCompilerSourceBoundaryObservations.run
   SourceCoreGeneralEntry.run
   CoreIntegerAssignment.run
