@@ -50,11 +50,10 @@ theorem HasType.closed_evaluates {expr : Expr} {type : Core.Ty}
     (typing : HasType [] expr type) :
     ∃ value, Evaluates [] [] expr value [] ∧ Core.ValueHasType value type := by
   obtain ⟨core, lowered, coreTyped⟩ := typing.lowers
-  obtain ⟨world, finalStore, value, _, coreEvaluation, valueTyped⟩ :=
-    Core.closed_well_typed_evaluates coreTyped (by simp [Core.DataEnvironment.WellFormed])
+  obtain ⟨value, coreEvaluation, valueTyped⟩ :=
+    lowered.localFragment.runtime_evaluates coreTyped
+      (Core.RuntimeEnvironmentHasTypes.nil (world := [])) []
   have evaluation := Evaluates.ofCore (environment := []) lowered coreEvaluation
-  have storeEq := evaluation.store_eq
-  subst finalStore
   exact ⟨value, evaluation, valueTyped.erase⟩
 
 /-- Typed closed expressions elaborate and return the same value at every

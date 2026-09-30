@@ -87,6 +87,7 @@ import Solcore.Test.CoreLocalFragmentExactInsertionProperties
 import Solcore.Test.CoreLocalFragmentExactInsertionBoundary
 import Solcore.Test.CoreLocalFragmentPairProperties
 import Solcore.Test.CoreLocalFragmentPairBoundary
+import Solcore.Test.CoreLocalFragmentTermination
 import Solcore.Test.CoreLocalRightWordLessProperties
 import Solcore.Test.CoreLocalRightWordLessBoundary
 import Solcore.Test.ResolvedWordLessProperties
