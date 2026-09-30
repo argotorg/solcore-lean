@@ -126,6 +126,24 @@ private theorem initializedLetBinding_initializer_mem_statementChildIds
 
 namespace InitializedLetBinding
 
+/-- Recover the exact statement table node which owns an initialized local
+binding, rather than just its occurrence identity. -/
+theorem owningStatement
+    {source : TypedSource} {binding : InitializedLetBinding}
+    (member : binding ∈ initializedLetBindings source) :
+    ∃ node : StatementNode,
+      ContainsStatement source node.id node ∧
+      binding ∈ statementInitializedLetBindings node.form ∧
+      DirectChild source (.statement node.id) binding.initializer := by
+  unfold initializedLetBindings at member
+  rcases List.mem_flatMap.mp member with ⟨node, nodeMem, bindingMem⟩
+  cases node with
+  | expression _ => simp at bindingMem
+  | statement node =>
+      refine ⟨node, ⟨nodeMem, rfl⟩, bindingMem,
+        .statement node, ⟨nodeMem, rfl⟩, ?_⟩
+      exact initializedLetBinding_initializer_mem_statementChildIds bindingMem
+
 /-- Every retained initialized binding contributes its initializer as a
 direct child of the statement occurrence which owns the binding. -/
 theorem directStatementChild
@@ -422,6 +440,43 @@ theorem child
   · exact newRootCovered owner scopes.1 isNewRoot
   · exact assumptions_mono (parentCovered owner
       (owner.scopes_parent_of_scopes_child uniqueParent edge scopes isNewRoot))
+
+/-- A statement with no initialized local binding cannot start a fresh
+qualified-template scope at one of its expression children.  Every other
+enclosing template assumption is inherited from the parent statement. -/
+theorem statementExpressionChild_of_noBindings
+    {source : TypedSource} {context : Context}
+    {parent : StatementId} {child : ExpressionId}
+    {node : StatementNode}
+    (parentCovered :
+      TemplateScopeCovered source context (.statement parent))
+    (closed : OccurrenceGraphClosed source)
+    (contains : ContainsStatement source parent node)
+    (noBindings : statementInitializedLetBindings node.form = [])
+    (edge : DirectChild source (.statement parent) (.expression child)) :
+    TemplateScopeCovered source context (.expression child) := by
+  apply TemplateScopeCovered.child parentCovered
+    closed.childHasUniqueParent edge (fun _ member => member)
+  intro owner ownerContains initializerEq
+  obtain ⟨ownerNode, ownerContains, bindingMem, ownerEdge⟩ :=
+    InitializedLetBinding.owningStatement
+      (owner.binding_mem ownerContains)
+  have ownerEdge' :
+      DirectChild source (.statement ownerNode.id) (.expression child) := by
+    simpa [initializerEq] using ownerEdge
+  have parentEq : ownerNode.id = parent := by
+    have nodesEq := closed.childHasUniqueParent ownerEdge' edge
+    cases nodesEq
+    rfl
+  have nodeEq : ownerNode = node := by
+    have ownerLookup := lookupStatement?_complete
+      closed.wellFormed.nodeOccurrencesUnique ownerContains
+    have parentLookup := lookupStatement?_complete
+      closed.wellFormed.nodeOccurrencesUnique contains
+    rw [parentEq, parentLookup] at ownerLookup
+    exact Option.some.inj ownerLookup.symm
+  subst ownerNode
+  simp [noBindings] at bindingMem
 
 /-- Coverage propagates between expression occurrences in the same context.
 An expression child cannot start a local-scheme initializer: every such
