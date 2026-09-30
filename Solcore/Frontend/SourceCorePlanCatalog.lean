@@ -31,8 +31,8 @@ structure Prepared where
   deriving Repr
 
 def prepare (program : CheckedProgram) (plan : Plan) (fuel : Nat) : Except Error Prepared := do
-  let plan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError Error.plan
-  let checked ← (SourceCoreDataCatalog.prepare program.signatures fuel (planTypes plan)).mapError Error.catalog
+  let executablePlan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError Error.plan
+  let checked ← (SourceCoreDataCatalog.prepare program.signatures fuel (planTypes executablePlan)).mapError Error.catalog
   let prepared ← (SourceCoreGeneralFunctions.prepareWithCatalog program plan checked fuel).mapError Error.lowering
   pure ⟨checked, prepared⟩
 

@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceCoreGeneralEntry
 import Solcore.Frontend.SourceCoreGeneralTypes
+import Solcore.Frontend.SourceCoreEvidence
 import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreDataFaultSites
 import Solcore.Frontend.SourceCoreDataMatches
@@ -48,10 +49,11 @@ private def prepareInputs (checked : Checked) (source : TypedSource) :
       let remaining ← prepareInputs checked source ((binder.id, type) :: scope) rest
       pure ((binder, type) :: remaining)
 
-private def prepareFunction (checked : Checked) (specialized : SourceSpecialization.SpecializedFunction) :
+private def prepareFunction (program : CheckedProgram) (checked : Checked) (specialized : SourceSpecialization.SpecializedFunction) :
     Except Error Function := do
   let function := specialized.function
-  unless specialized.assumptions.isEmpty do throw (.assumptionsUnsupported specialized.key)
+  discard <| (SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program specialized.key specialized.assumptions)
+    |>.mapError Error.plan
   if function.returnComptime then throw (.stagedResultUnsupported specialized.key)
   let (parameter, result) ← match function.type with
     | .function parameter result => pure (parameter, result)
@@ -94,7 +96,7 @@ def bodyLowerer (checked : Checked) (signatures : ProgramSignatures)
           (fun type => diagnostics.placeReason owner site assignment.target.root (some type))
     } fuel source scope statements result reasonAt fellThrough escaped
 
-private def compileClosure (checked : Checked) (signatures : ProgramSignatures) (plan : Plan)
+private def compileClosure (program : CheckedProgram) (checked : Checked) (signatures : ProgramSignatures) (plan : Plan)
     (globals : List Signature) (diagnostics : SourceCoreDataPlaceFaultSites.Program)
     (fuel : Nat) (function : Function) : Except Error Core.Expr := do
   let source := function.specialized.function.typedBody
@@ -111,7 +113,8 @@ private def compileClosure (checked : Checked) (signatures : ProgramSignatures) 
   }
   let lowerBody := bodyLowerer checked signatures function.specialized.function.solvedRequirements own.assignments
     diagnostics function.signature.key
-  let policy := SourceCoreGeneralTypes.policy checked signatures
+  let policy := { SourceCoreGeneralTypes.policy checked signatures with
+    lowerSpecial? := some (SourceCoreEvidence.lower program checked) }
   let body ← (lowerBody
     (fun budget source scope id reasonAt =>
       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody budget context source scope id reasonAt)
@@ -145,7 +148,7 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
     Except (SourceCoreGeneralEntry.CompileError Error) (SourceCoreGeneralEntry.PreparedProgram checked) := do
   let plan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError
     (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.plan)
-  let functions ← (plan.specializations.reverse.mapM (prepareFunction checked)).mapError
+  let functions ← (plan.specializations.reverse.mapM (prepareFunction program checked)).mapError
     SourceCoreGeneralEntry.CompileError.lowering
   let globals := functions.map (·.signature)
   match plan.seedKeys with
@@ -153,9 +156,9 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
   | first :: _ =>
       let diagnostics ← (SourceCoreDataPlaceFaultSites.prepare checked program.signatures plan first).mapError
         (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.diagnostics)
-      let closures ← (functions.mapM (compileClosure checked program.signatures plan globals diagnostics fuel)).mapError
+      let closures ← (functions.mapM (compileClosure program checked program.signatures plan globals diagnostics fuel)).mapError
         SourceCoreGeneralEntry.CompileError.lowering
-      SourceCoreGeneralEntry.prepare program plan checked fuel (fun _ request =>
-        assemble globals functions closures diagnostics request)
+      SourceCoreGeneralEntry.prepareValidated plan checked fuel (fun _ request =>
+        assemble globals functions closures diagnostics request) true
 
 end Solcore.Frontend.SourceCoreGeneralFunctions

@@ -131,8 +131,9 @@ The returned entry retains both source projection and complete body typing.
 direct users are responsible for source-plan authenticity. -/
 def compile {error : Type} (checked : Checked) (plan : Plan)
     (specialized : SourceSpecialization.SpecializedFunction) (compilationFuel : Nat)
-    (lowerBody : BodyLowerer checked error) : Except (CompileError error) (Entry checked) := do
-  unless specialized.assumptions.isEmpty do throw (.assumptionsUnsupported specialized.key)
+    (lowerBody : BodyLowerer checked error) (allowClosedAssumptions : Bool := false) :
+    Except (CompileError error) (Entry checked) := do
+  unless specialized.assumptions.isEmpty || allowClosedAssumptions do throw (.assumptionsUnsupported specialized.key)
   if specialized.function.returnComptime then throw (.stagedResultUnsupported specialized.key)
   let sourceResultType ← match specialized.function.type with
     | .function _ result => pure result
@@ -157,14 +158,21 @@ structure PreparedProgram (checked : Checked) where
   entries : List (Entry checked)
   deriving Repr
 
-def prepare {error : Type} (program : CheckedProgram) (plan : Plan) (checked : Checked)
-    (compilationFuel : Nat) (lowerBody : BodyLowerer checked error) :
+/-- Assemble an already authenticated executable plan. The caller owns source
+plan provenance; every native body is still checked under the actual catalog. -/
+def prepareValidated {error : Type} (plan : Plan) (checked : Checked)
+    (compilationFuel : Nat) (lowerBody : BodyLowerer checked error) (allowClosedAssumptions : Bool := false) :
     Except (CompileError error) (PreparedProgram checked) := do
-  let plan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError CompileError.plan
   let entries ← plan.seedKeys.mapM fun key => do
     let specialized ← (SourceCompilationPlan.exactSpecialization plan key).mapError CompileError.plan
-    compile checked plan specialized compilationFuel lowerBody
+    compile checked plan specialized compilationFuel lowerBody allowClosedAssumptions
   pure { plan, entries }
+
+def prepare {error : Type} (program : CheckedProgram) (plan : Plan) (checked : Checked)
+    (compilationFuel : Nat) (lowerBody : BodyLowerer checked error) (allowClosedAssumptions : Bool := false) :
+    Except (CompileError error) (PreparedProgram checked) := do
+  let plan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError CompileError.plan
+  prepareValidated plan checked compilationFuel lowerBody allowClosedAssumptions
 
 def PreparedProgram.findEntry? {checked : Checked} (program : PreparedProgram checked) (key : Key) :
     Option (Entry checked) := program.entries.find? fun entry => decide (entry.key = key)

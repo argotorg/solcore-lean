@@ -42,6 +42,10 @@ structure Policy where
     SourceCoreFunctionTypes.lowerBinder
   lowerRead : TypedSource → Scope → ExpressionId → Core.Word → Except Error Core.Expr :=
     SourceCoreFunctionTypes.lowerRead
+  /-- Profiles may authenticate evidence and lower retained coercion paths
+  before ordinary traversal. The supplied child compiler shares this policy. -/
+  lowerSpecial? : Option (Context → ExpressionLowerer → Nat → TypedSource → Scope →
+    ExpressionId → (ExpressionId → Core.Word) → Except Error (Option LoweredExpr)) := none
   leafLowerer : ExpressionLowerer → Nat → TypedSource → Scope → ExpressionId →
       (ExpressionId → Core.Word) → Except Error LoweredExpr :=
     fun _ fuel source scope id reasonAt => SourceCoreBasic.lowerExpression fuel source scope id (reasonAt id)
@@ -139,6 +143,14 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
       let node ← match source.lookupExpression? id with
         | some node => pure node
         | none => .error (.missingExpression id)
+      let special ← match policy.lowerSpecial? with
+        | none => pure none
+        | some lower =>
+            lower context
+              (fun budget childSource childScope childId childReasonAt =>
+                lowerExpressionWithPolicy policy lowerBody (min budget fuel) context childSource childScope childId childReasonAt)
+              (fuel + 1) source scope id reasonAt
+      if let some lowered := special then return lowered
       match node.form with
       | .integerLiteral literal resolution =>
           if node.type = TypeSystem.Ty.integer then

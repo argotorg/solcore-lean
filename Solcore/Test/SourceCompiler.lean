@@ -263,10 +263,13 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let recursiveContextPolymorphicLocal ←
     compileNamed checked "main.solc" "recursiveContextPolymorphicLocal"
   let localProof ← compileNamed checked "main.solc" "localProof"
-  let typedEvidence ← compileNamed checked "main.solc" "typedEvidence"
-  let typedCoercion ← compileNamed checked "main.solc" "typedCoercion"
+  let coreEvidence ← compileNamed checked "main.solc" "typedEvidence"
+  let typedEvidence ← compileNamedWithBackend checked "main.solc" "typedEvidence" .typedSource
+  let coreCoercion ← compileNamed checked "main.solc" "typedCoercion"
+  let typedCoercion ← compileNamedWithBackend checked "main.solc" "typedCoercion" .typedSource
+  let coreFunctionFromCoercion ← compileNamed checked "main.solc" "functionFromCoercion"
   let functionFromCoercion ←
-    compileNamed checked "main.solc" "functionFromCoercion"
+    compileNamedWithBackend checked "main.solc" "functionFromCoercion" .typedSource
   let main ← moduleId "main.solc"
   assertTrue (decide (
       direct.backend = .core ∧
@@ -277,6 +280,9 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
       nestedPolymorphicLocal.backend = .typedSource ∧
       recursiveContextPolymorphicLocal.backend = .typedSource ∧
       localProof.backend = .typedSource ∧
+      coreEvidence.backend = .core ∧
+      coreCoercion.backend = .core ∧
+      coreFunctionFromCoercion.backend = .core ∧
       typedEvidence.backend = .typedSource ∧
       typedCoercion.backend = .typedSource ∧
       functionFromCoercion.backend = .typedSource))
@@ -756,7 +762,8 @@ private def typedRejection (checked : CheckedProgram) (name : String) :
       s!"`{name}` bypassed staging through {reprStr compiled.backend}")
 
 private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := do
-  let constrained ← compileNamed checked "blocked.solc" "constrained"
+  let coreConstrained ← compileNamed checked "blocked.solc" "constrained"
+  let constrained ← compileNamedWithBackend checked "blocked.solc" "constrained" .typedSource
   let staged ← compileNamed checked "blocked.solc" "staged"
   let stagedTyped ← compileNamedWithBackend checked "blocked.solc" "staged" .typedSource
   let stagedType ← compileNamed checked "blocked.solc" "stagedType"
@@ -773,6 +780,7 @@ private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := 
   let markedEffectsEntry ←
     compileNamed checked "blocked.solc" "markedEffectsEntry"
   assertTrue (decide (
+      coreConstrained.backend = .core ∧
       constrained.backend = .typedSource ∧
       staged.backend = .core ∧
       stagedTyped.backend = .typedSource ∧
