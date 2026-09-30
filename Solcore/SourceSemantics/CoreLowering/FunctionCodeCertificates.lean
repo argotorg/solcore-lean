@@ -94,7 +94,8 @@ structure LambdaCertificate (bodyCertificate : BodyCertificate)
 
 /-- Static extraction is relative to the chosen metadata policy and body
 compiler.  Their certificates are kept explicit, and no child evaluation is
-assumed. A special-expression hook must be absent for this ordinary branch. -/
+assumed. This certificate uses the default tagged callable representation and
+an absent special-expression hook. -/
 theorem lambda_of_accepted
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy}
     {lowerBody : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -103,6 +104,7 @@ theorem lambda_of_accepted
     {parameters : List TypedBinder} {resultType : TypeSystem.Ty} {statements : List StatementId}
     {reportedType : Core.Ty} {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
     (ordinary : policy.lowerSpecial? = none)
+    (defaultCallables : policy.callables = {})
     (found : source.lookupExpression? id = some node)
     (read : policy.readExpression source id = .ok (node, reportedType))
     (form : node.form = .lambda parameters resultType statements)
@@ -137,21 +139,28 @@ theorem lambda_of_accepted
                 | ok pair =>
                   obtain ⟨loweredParameters, bodyScope⟩ := pair
                   simp only [parameterProjection, resultProjection, compiledParameters] at accepted
-                  change Except.map (fun body =>
-                    (⟨reportedType, Core.LanguageResult.success (Core.TaggedFunction.anonymous
-                      (.lambda parameterCore (Core.LanguageResult.resultType resultCore)
-                        (SourceCoreFunctions.bindParameters loweredParameters resultCore
-                          (body.weakenAt loweredParameters.length))))⟩ : SourceCoreBasic.LoweredExpr))
-                    (lowerBody (children policy lowerBody fuel context) fuel source bodyScope statements resultCore
-                      reasonAt context.internalReason context.internalReason) = .ok lowered at accepted
-
                   cases compiledBody : lowerBody (children policy lowerBody fuel context) fuel source bodyScope
                       statements resultCore reasonAt context.internalReason context.internalReason with
-                  | error error => simp [compiledBody, Except.map] at accepted
+                  | error error =>
+                    change lowerBody (fun budget childSource childScope childId childReasonAt =>
+                      SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (min budget fuel) context
+                        childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
+                          reasonAt context.internalReason context.internalReason = _ at compiledBody
+                    simp [compiledBody] at accepted
                   | ok bodyCode =>
-                    rw [compiledBody] at accepted
-                    cases accepted
-                    exact ⟨⟨parameter, parameterCore, resultCore, loweredParameters, bodyScope, bodyCode,
+                    change lowerBody (fun budget childSource childScope childId childReasonAt =>
+                      SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (min budget fuel) context
+                        childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
+                          reasonAt context.internalReason context.internalReason = _ at compiledBody
+                    simp only [compiledBody, defaultCallables] at accepted
+                    cases checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
+                        (Core.TaggedFunction.functionType parameterCore resultCore) with
+                    | error error => simp [checked] at accepted
+                    | ok doneUnit =>
+                      cases doneUnit
+                      simp only [checked, pure, Except.pure] at accepted
+                      cases accepted
+                      exact ⟨⟨parameter, parameterCore, resultCore, loweredParameters, bodyScope, bodyCode,
                       found, read, form, type, bundle, parameterProjection, resultProjection,
                       Parameters.of_accepted compiledParameters, extractBody _ _ _ _ compiledBody, rfl⟩⟩
           · simp [bundle, resultSame, throw] at accepted
@@ -170,6 +179,7 @@ theorem lambda_of_accepted_metadata
     {parameters : List TypedBinder} {resultType : TypeSystem.Ty} {statements : List StatementId}
     {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
     (ordinary : policy.lowerSpecial? = none)
+    (defaultCallables : policy.callables = {})
     (found : source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters resultType statements)
     (readSound : ∀ selected type, policy.readExpression source id = .ok (selected, type) →
@@ -193,7 +203,7 @@ theorem lambda_of_accepted_metadata
     obtain ⟨selected, type⟩ := pair
     have same := Option.some.inj ((readSound selected type read).symm.trans found)
     subst selected
-    exact ⟨type, lambda_of_accepted ordinary found read form extractBody accepted⟩
+    exact ⟨type, lambda_of_accepted ordinary defaultCallables found read form extractBody accepted⟩
 
 def LambdaCertificate.rawBody
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy} {source : TypedSource}

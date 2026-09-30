@@ -29,11 +29,34 @@ use the function-value binder, assignment, and statement type projection. -/
 abbrev BodyLowerer := ExpressionLowerer → Nat → TypedSource → Scope → List StatementId →
   Core.Ty → (ExpressionId → Core.Word) → Core.Word → Core.Word → Except Error Core.Expr
 
+/-- The profile authenticates this origin against its owned inventory. A
+contextual profile captures the complete local substitution separately. -/
+inductive CallableOrigin where
+  | named (key : Key)
+  | lambda (id : ExpressionId)
+  | builtin (function : BuiltinFunctionId)
+  deriving Repr
+
+/-- Shared expression/evidence traversal uses one callable representation.
+Decoration receives a language result containing the raw tagged function;
+the call hook owns the guard protocol before arguments and application.
+Prepared source metadata remains authoritative when staged markers are allowed. -/
+structure CallablePolicy where
+  functionType : Core.Ty → Core.Ty → Core.Ty := Core.TaggedFunction.functionType
+  decorateCallable : Context → TypedSource → ExpressionNode → CallableOrigin →
+      Core.Ty → Core.Ty → Core.Expr → Except Error Core.Expr :=
+    fun _ _ _ _ _ _ expression => pure expression
+  callCallable : Context → TypedSource → ExpressionNode → Core.Ty → Core.Expr → Core.Expr →
+      Except Error Core.Expr :=
+    fun _ _ _ result callee arguments => pure (Core.TaggedFunction.call result callee arguments)
+  allowStaged : Bool := false
+
 /-- A representation profile supplies authenticated metadata projections and
 additional data leaves. The recursive traversal and call order remain shared.
 The leaf callback receives the same recursive expression compiler, so nominal
 payloads can contain calls and closures without a second evaluator. -/
 structure Policy where
+  callables : CallablePolicy := {}
   projectType : SourceCoreElaboration.ErrorSite → TypeSystem.Ty → Except Error Core.Ty :=
     SourceCoreFunctionTypes.projectType
   readExpression : TypedSource → ExpressionId → Except Error (ExpressionNode × Core.Ty) :=
@@ -66,7 +89,8 @@ private def selectedSignature (policy : Policy) (context : Context) (source : Ty
     else SourceCompilationPlan.exactCallKey context.plan context.owner node.id target).mapError SourceCoreBasic.Error.callPreparation
   let specialized ← (SourceCompilationPlan.exactSpecialization context.plan key).mapError SourceCoreBasic.Error.callPreparation
   unless specialized.assumptions.isEmpty do throw (.callPreparation (.unresolvedAssumptions key specialized.assumptions))
-  if specialized.function.returnComptime || specialized.function.typedBody.inputs.any (·.comptime) then
+  if !policy.callables.allowStaged &&
+      (specialized.function.returnComptime || specialized.function.typedBody.inputs.any (·.comptime)) then
     throw (.unsupportedExpression node.id node.form)
   let (parameter, result) ← match specialized.function.type with
     | .function parameter result => pure (parameter, result)
@@ -119,7 +143,7 @@ def lambdaParameters (policy : Policy) (source : TypedSource) : Scope → List T
       let (remaining, scope) ← lambdaParameters policy source ((parameter.id, type) :: scope) parameters
       pure ((parameter, type) :: remaining, scope)
 
-private def builtinReference (context : Context) (node : ExpressionNode)
+private def builtinReference (callables : CallablePolicy) (context : Context) (source : TypedSource) (node : ExpressionNode)
     (name : String) (function : BuiltinFunctionId) : Except Error LoweredExpr := do
   if name ≠ function.spelling || node.type ≠ function.type then
     throw (.unsupportedExpression node.id node.form)
@@ -129,10 +153,12 @@ private def builtinReference (context : Context) (node : ExpressionNode)
   let identity ← match Core.Word.ofNat? (context.globals.length + index + 1) with
     | some identity => pure identity
     | none => throw (.unsupportedExpression node.id node.form)
-  pure ⟨Core.TaggedFunction.functionType (SourceCoreInteger.builtinParameter function)
-    (SourceCoreInteger.builtinResult function),
-    Core.LanguageResult.success (Core.TaggedFunction.identified identity
-      (SourceCoreInteger.builtinClosure function))⟩
+  let parameter := SourceCoreInteger.builtinParameter function
+  let result := SourceCoreInteger.builtinResult function
+  let expression ← callables.decorateCallable context source node (.builtin function) parameter result
+    (Core.LanguageResult.success (Core.TaggedFunction.identified identity
+      (SourceCoreInteger.builtinClosure function)))
+  pure ⟨callables.functionType parameter result, expression⟩
 
 /-- All recursive expression budgets are bounded by the current remaining
 budget, including callbacks from the separately supplied statement traversal. -/
@@ -170,28 +196,32 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
               let read ← policy.lowerRead source scope id (reasonAt id)
               pure ⟨type, read⟩
           | .reference name (.builtinFunction function) =>
-              let lowered ← builtinReference context node name function
+              let lowered ← builtinReference policy.callables context source node name function
               SourceCoreBasic.ensureType site type lowered.type
               pure lowered
           | .call callee arguments (.builtinFunction function) =>
               (SourceCoreElaboration.validateBuiltinFunctionCall source node callee arguments function)
                 |>.mapError SourceCoreBasic.Error.literalEvidence
               let (calleeNode, _) ← policy.readExpression source callee
-              let callee ← builtinReference context calleeNode function.spelling function
+              let callee ← builtinReference policy.callables context source calleeNode function.spelling function
               let lowered ← arguments.mapM fun argument =>
                 lowerExpressionWithPolicy policy lowerBody fuel context source scope argument reasonAt
               let packed := SourceCoreCalls.packArguments lowered
               SourceCoreBasic.ensureType site (SourceCoreInteger.builtinParameter function) packed.type
               SourceCoreBasic.ensureType site (SourceCoreInteger.builtinResult function) type
-              pure ⟨type, Core.TaggedFunction.call type callee.expression packed.expression⟩
+              let expression ← policy.callables.callCallable context source node type callee.expression packed.expression
+              pure ⟨type, expression⟩
           | .reference _ (.declaration instantiation) =>
               let (index, signature) ← selectedSignature policy context source node instantiation true
-              SourceCoreBasic.ensureType site type (Core.TaggedFunction.functionType signature.parameterType signature.resultType)
+              SourceCoreBasic.ensureType site type (policy.callables.functionType signature.parameterType signature.resultType)
               let identity ← match Core.Word.ofNat? (index + 1) with
                 | some identity => pure identity
                 | none => .error (.unsupportedExpression id node.form)
-              pure ⟨type, namedReference signature (scope.length + context.administrativePrefix + index)
-                identity context.internalReason⟩
+              let expression ← policy.callables.decorateCallable context source node (.named signature.key)
+                signature.parameterType signature.resultType
+                (namedReference signature (scope.length + context.administrativePrefix + index)
+                  identity context.internalReason)
+              pure ⟨type, expression⟩
           | .call callee arguments (.declaration instantiation) =>
               if callee.occurrence.owner ≠ source.owner then throw (.ownerMismatch source.owner callee.occurrence.owner)
               discard <| policy.readExpression source callee
@@ -222,8 +252,9 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                 lowerExpressionWithPolicy policy lowerBody fuel context source scope argument reasonAt
               let packed := SourceCoreCalls.packArguments lowered
               SourceCoreBasic.ensureType site parameterType packed.type
-              SourceCoreBasic.ensureType site (Core.TaggedFunction.functionType parameterType resultType) callee.type
-              pure ⟨type, Core.TaggedFunction.call resultType callee.expression packed.expression⟩
+              SourceCoreBasic.ensureType site (policy.callables.functionType parameterType resultType) callee.type
+              let expression ← policy.callables.callCallable context source node resultType callee.expression packed.expression
+              pure ⟨type, expression⟩
           | .lambda parameters returnType statements =>
               let (parameterType, resultType) ← match node.type with
                 | .function parameter result => pure (parameter, result)
@@ -239,8 +270,11 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                   lowerExpressionWithPolicy policy lowerBody (min budget fuel) context childSource childScope childId childReasonAt)
                 fuel source bodyScope statements resultCore reasonAt context.internalReason context.internalReason
               let rawBody := bindParameters parameters resultCore (body.weakenAt parameters.length)
-              pure ⟨type, Core.LanguageResult.success (Core.TaggedFunction.anonymous
-                (.lambda parameterCore (Core.LanguageResult.resultType resultCore) rawBody))⟩
+              SourceCoreBasic.ensureType site type (policy.callables.functionType parameterCore resultCore)
+              let expression ← policy.callables.decorateCallable context source node (.lambda id) parameterCore resultCore
+                (Core.LanguageResult.success (Core.TaggedFunction.anonymous
+                  (.lambda parameterCore (Core.LanguageResult.resultType resultCore) rawBody)))
+              pure ⟨type, expression⟩
           | .unary operator operand =>
               let operand ← lowerExpressionWithPolicy policy lowerBody fuel context source scope operand reasonAt
               let coreOperator := if operator = .bitNot && operand.type = .integer then
