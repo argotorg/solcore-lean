@@ -14,6 +14,15 @@ open Frontend Frontend.SourceInference TypeSystem
 
 namespace RecursiveLedgerInvariant
 
+/-- Checker bodies start from an empty canonical ledger and have no pending
+qualified-template owner to materialize. -/
+theorem initial (owner : Resolved.DeclarationId)
+    (locals : TypeSystem.Environment := [])
+    (comptime : List Bool := []) :
+    RecursiveLedgerInvariant (State.initial owner locals comptime) [] :=
+  ⟨State.initial_requirementsWellFormed owner locals comptime,
+    TemplateTracking.initial owner locals comptime⟩
+
 theorem unify {state next : State} {left right : Ty}
     {pending : List RequirementId}
     (tracked : RecursiveLedgerInvariant state pending)
