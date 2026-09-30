@@ -16,6 +16,8 @@ import Solcore.Test.SourceCoreDataPlaceModifier
 import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCallStageGuards
 import Solcore.Test.SourceCallStageBoundary
+import Solcore.Test.SourceCoreRawMetadata
+import Solcore.Test.SourceCompilerSourceBoundaryObservations
 import Solcore.Test.SourceCoreDataPayload
 import Solcore.Test.SourceCoreDataPayloadMapping
 import Solcore.Test.SourceCoreDataPayloadPaths
@@ -2527,6 +2529,8 @@ def run : IO Unit := do
   SourceCoreDataCatalog.run
   SourceCoreDataEquality.run
   SourceCoreMappingWithDefault.run
+  SourceCoreRawMetadata.run
+  SourceCompilerSourceBoundaryObservations.run
   SourceCoreGeneralEntry.run
   CoreIntegerAssignment.run
   SourceCoreIntegerAssignments.run
