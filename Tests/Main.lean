@@ -14,6 +14,7 @@ import Solcore.Test.SourceCoreDataExpressionSequence
 import Solcore.Test.SourceCoreDataPlaceKeyOrder
 import Solcore.Test.SourceCoreDataPlaceModifier
 import Solcore.Test.SourceCoreMappingWithDefault
+import Solcore.Test.SourceCoreHeapMarkers
 import Solcore.Test.SourceCallStageGuards
 import Solcore.Test.SourceCallStageBoundary
 import Solcore.Test.SourceCoreRawMetadata
@@ -2529,6 +2530,7 @@ def run : IO Unit := do
   SourceCoreDataCatalog.run
   SourceCoreDataEquality.run
   SourceCoreMappingWithDefault.run
+  SourceCoreHeapMarkers.run
   SourceCoreRawMetadata.run
   SourceCompilerSourceBoundaryObservations.run
   SourceCoreGeneralEntry.run
