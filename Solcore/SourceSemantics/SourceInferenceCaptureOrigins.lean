@@ -404,4 +404,153 @@ theorem inferStatementFuel_continue_captureOrigins
     })
   simpa only [resultEq] using recorded
 
+/-- A block restores the lexical scope with which it entered its statement
+sequence, so bindings declared inside the block cannot escape. -/
+theorem inferStatementFuel_block_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {body : List Syntax.Statement}
+    {expectedReturn : Ty} {initial allocated : State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {wholeSource : TypedSource}
+    (statementEq : statement.value = .block body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨bodyResult, _, resultEq, _⟩ :=
+    inferStatementFuel_success_block_facts statementEq allocationEq success
+  have recorded : ActiveBinderCaptureOrigins
+      ((bodyResult.state.restoreLexicalScope allocated.lexicalScope).recordNode
+        (.statement {
+          id, span := statement.span, type := bodyResult.type,
+          form := .block bodyResult.statements
+        })) wholeSource :=
+    (origins.allocateStatementId allocationEq).restoreLexicalScope_recordNode
+      _
+  simpa only [resultEq] using recorded
+
+/-- The no-else branch restores the condition state's binder stack. -/
+theorem inferStatementFuel_ifWithoutElse_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {thenBody : Syntax.Block} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value = .ifThen condition thenBody none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨inferredCondition, conditionState, thenResult,
+      conditionSuccess, _, resultEq, _⟩ :=
+    inferStatementFuel_success_ifWithoutElse_facts statementEq allocationEq
+      success
+  have conditionOrigins : ActiveBinderCaptureOrigins conditionState
+      wholeSource :=
+    (origins.allocateStatementId allocationEq).inferExprFuel conditionSuccess
+  have recorded : ActiveBinderCaptureOrigins
+      ((thenResult.state.restoreLexicalScope conditionState.lexicalScope
+        ).recordNode (.statement {
+          id, span := statement.span, type := .unit,
+          form := .ifThen inferredCondition.id thenResult.statements none
+        })) wholeSource :=
+    conditionOrigins.restoreLexicalScope_recordNode _
+  simpa only [resultEq] using recorded
+
+/-- Both arms of an `if` are lexically scoped; after the else arm, the
+condition state's original binder stack is restored. -/
+theorem inferStatementFuel_ifWithElse_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {thenBody elseBody : Syntax.Block} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value =
+      .ifThen condition thenBody (some elseBody))
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨inferredCondition, conditionState, thenResult, elseResult,
+      conditionSuccess, _, _, resultEq, _⟩ :=
+    inferStatementFuel_success_ifWithElse_facts statementEq allocationEq
+      success
+  have conditionOrigins : ActiveBinderCaptureOrigins conditionState
+      wholeSource :=
+    (origins.allocateStatementId allocationEq).inferExprFuel conditionSuccess
+  have recorded : ActiveBinderCaptureOrigins
+      ((elseResult.state.restoreLexicalScope conditionState.lexicalScope
+        ).recordNode (.statement {
+          id, span := statement.span,
+          type := if thenResult.sawReturn && elseResult.sawReturn then
+            elseResult.state.resolve expectedReturn else .unit,
+          form := .ifThen inferredCondition.id thenResult.statements
+            (some elseResult.statements)
+        })) wholeSource :=
+    conditionOrigins.restoreLexicalScope_recordNode _
+  simpa only [resultEq] using recorded
+
+/-- A `while` body cannot leak binders beyond its enclosing condition. -/
+theorem inferStatementFuel_whileLoop_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value = .whileLoop condition body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨inferredCondition, conditionState, bodyResult,
+      conditionSuccess, _, resultEq, _⟩ :=
+    inferStatementFuel_success_whileLoop_facts statementEq allocationEq
+      success
+  have conditionOrigins : ActiveBinderCaptureOrigins conditionState
+      wholeSource :=
+    (origins.allocateStatementId allocationEq).inferExprFuel conditionSuccess
+  have recorded : ActiveBinderCaptureOrigins
+      ((bodyResult.state.restoreLexicalScope conditionState.lexicalScope
+        ).recordNode (.statement {
+          id, span := statement.span, type := .unit,
+          form := .whileLoop inferredCondition.id bodyResult.statements
+        })) wholeSource :=
+    conditionOrigins.restoreLexicalScope_recordNode _
+  simpa only [resultEq] using recorded
+
+/-- `for`-header and body locals are discarded at the loop boundary.  Their
+internal use still needs the item-level origin lemmas, but the outward state
+recovers precisely the original allocated statement scope. -/
+theorem inferStatementFuel_forLoop_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {headerSpan : Syntax.SourceSpan}
+    {initializer post : List Syntax.ForItem} {condition : Syntax.Expr}
+    {body : Syntax.Block} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value =
+      .forLoop headerSpan initializer condition post body)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨initializerResult, inferredCondition, conditionState, bodyResult,
+      postResult, _, _, _, _, resultEq, _⟩ :=
+    inferStatementFuel_success_forLoop_facts statementEq allocationEq success
+  have recorded : ActiveBinderCaptureOrigins
+      ((postResult.state.restoreLexicalScope allocated.lexicalScope
+        ).recordNode (.statement {
+          id, span := statement.span, type := .unit,
+          form := .forLoop initializerResult.items inferredCondition.id
+            postResult.items bodyResult.statements
+        })) wholeSource :=
+    (origins.allocateStatementId allocationEq).restoreLexicalScope_recordNode
+      _
+  simpa only [resultEq] using recorded
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
