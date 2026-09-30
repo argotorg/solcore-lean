@@ -77,12 +77,29 @@ theorem Represents.runtime_hasType
     exact .pair (.inLeft .unit) (.closure layout.actualTyped
       (code.artifact.rawBody_hasType code.outputTyped |>.rename (layout.types.lift _)))
 
+private theorem catalog_plain {catalog : SourceCoreDataCatalog.Catalog} {sourceParameter sourceResult : TypeSystem.Ty}
+    {parameter result : Core.Ty}
+    (projected : catalog.project (.function sourceParameter sourceResult) =
+      .ok (Core.TaggedFunction.functionType parameter result)) : catalog.callableContracts = false := by
+  cases first : catalog.project sourceParameter with
+  | error error => simp [SourceCoreDataCatalog.Catalog.project, first, bind, Except.bind] at projected
+  | ok parameterType =>
+    cases second : catalog.project sourceResult with
+    | error error => simp [SourceCoreDataCatalog.Catalog.project, first, second, bind, Except.bind] at projected
+    | ok resultType =>
+      cases profile : catalog.callableContracts with
+      | false => rfl
+      | true =>
+        simp [SourceCoreDataCatalog.Catalog.project, first, second, SourceCoreDataCatalog.Catalog.functionType,
+          profile, Core.TaggedFunction.functionType, Core.CallableContract.functionType, Core.TaggedFunction.identityType,
+          bind, Except.bind] at projected
+
 theorem Represents.observation
     (related : Represents catalog program bodyCertificate policy mapping world type source core payload)
     (signatures : ProgramSignatures) (identities : Dynamic.Value → Core.Word → Prop) :
     DataEqualityValues.Observation catalog signatures identities payload source core := by
   cases related with
-  | closure layout code => exact .anonymous _ _ _ _
+  | closure layout code => exact .anonymous _ _ _ _ (catalog_plain code.projection)
 
 theorem Represents.extend
     (related : Represents catalog program bodyCertificate policy mapping world type source core payload)

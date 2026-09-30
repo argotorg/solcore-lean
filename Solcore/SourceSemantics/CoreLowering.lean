@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.DataPlaceFaultTree
 import Solcore.SourceSemantics.CoreLowering.DataPlaceWriteBack
 import Solcore.SourceSemantics.CoreLowering.FunctionValues
 import Solcore.SourceSemantics.CoreLowering.FunctionArguments
+import Solcore.SourceSemantics.CoreLowering.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.DataPayloadEncoding
 import Solcore.SourceSemantics.CoreLowering.DataPayloadDefaults
 import Solcore.SourceSemantics.CoreLowering.DataPayloadEquality
