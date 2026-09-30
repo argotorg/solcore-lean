@@ -167,4 +167,66 @@ theorem inferStatementFuel_letAnnotatedInitialized_captureOrigins
       (by simpa only [resultEq] using resultToEvidence)
   simpa only [resultEq] using bindingOrigins
 
+/-- A source annotation resolves to a rigid type.  Consequently an
+uninitialized annotated declaration enters a monomorphic binder, which needs
+no initialized-let origin in the final evidence source. -/
+theorem inferStatementFuel_letAnnotatedUninitialized_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {name : Syntax.Identifier}
+    {sourceType : Syntax.TypeExpr} {expectedReturn : Ty}
+    {initial allocated evidenceState : State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {roots : List NodeId}
+    (statementEq : statement.value = .letDecl name (some sourceType) none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (initialOrigins : ActiveBinderCaptureOrigins initial
+      (evidenceState.toTypedSource roots)) :
+    ActiveBinderCaptureOrigins result.state
+      (evidenceState.toTypedSource roots) := by
+  obtain ⟨resolvedType, locals, valueType, generalized,
+      ⟨binder, bindingState⟩, resolution, _, valueTypeEq,
+      generalizedEq, bindingEq, resultEq, _⟩ :=
+    inferStatementFuel_success_letAnnotatedUninitialized_facts statementEq
+      allocationEq success roots
+  have resolvedClosed : resolvedType.freeVariables = [] := by
+    cases variablesEq : resolvedType.freeVariables with
+    | nil => rfl
+    | cons metavariable rest =>
+        have impossible : metavariable.index < 0 :=
+          (Detail.resolveSourceType_success_variablesBelow resolution 0)
+            metavariable (by simp [variablesEq])
+        exact False.elim ((Nat.not_lt_zero _) impossible)
+  have resolvedByState : allocated.resolve resolvedType = resolvedType := by
+    simpa [State.resolve, InferState.resolve] using
+      (Detail.resolveSourceType_success_apply_eq_self
+        allocated.inference.substitution resolution)
+  have valueClosed : valueType.freeVariables = [] := by
+    rw [valueTypeEq, resolvedByState]
+    exact resolvedClosed
+  have generalizedMono : generalized.scheme.quantified = [] := by
+    rw [generalizedEq, Detail.generalizeValue_scheme_quantified, valueClosed]
+    rfl
+  have binderEq :
+      ((allocated.withLocals locals).allocateBinder name.value
+        generalized.scheme (some name.span) false
+        generalized.requirements).1 = binder :=
+    congrArg Prod.fst bindingEq
+  have binderMono : binder.scheme.quantified = [] := by
+    rw [← binderEq]
+    exact generalizedMono
+  have allocatedOrigins : ActiveBinderCaptureOrigins allocated
+      (evidenceState.toTypedSource roots) :=
+    initialOrigins.allocateStatementId allocationEq
+  have entered : ActiveBinderCaptureOrigins bindingState
+      (evidenceState.toTypedSource roots) :=
+    (allocatedOrigins.withLocals locals).allocateBinder bindingEq
+      (.inl binderMono)
+  have recorded := entered.recordNode (.statement {
+    id, span := statement.span, type := .unit,
+    form := .letDecl binder none
+  })
+  simpa only [resultEq] using recorded
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
