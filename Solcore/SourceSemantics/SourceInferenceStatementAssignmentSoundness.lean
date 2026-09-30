@@ -547,6 +547,276 @@ theorem inferStatementFuel_success_assignValue_sound_of_typed_children
     statementEq allocationEq success invariant roots assignmentSuccess
     assignmentTyped
 
+/-- The assignment statement's final rule consumes only its *actual*
+delegated traversal.  Its recorded parent covers every indexed key and the
+RHS in the whole finalized graph; the callback receives the corresponding
+source/evidence prefix facts rather than an assumption about unrelated
+expression calls. -/
+theorem inferStatementFuel_success_assignValue_bounded_scoped
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression value : Syntax.Expr}
+    {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : Ty}
+    {initial allocated evidenceState : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context} {coverageSource : TypedSource}
+    (statementEq : statement.value =
+      .assignValue targetExpression operator value)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (ready : initial.InferenceReady)
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (Ty.productMany signature.parameterTypes)
+          (Ty.productMany signature.returnTypes))
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (resultIntegerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultIntegerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
+    (resultRequirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (actualChildrenSound :
+      ∀ {assignment : AssignmentResolution}
+        {inferred : InferredExpression}
+        {assignmentState : Frontend.SourceInference.State},
+        Detail.inferAssignedValueFuel fuel inferenceContext targetExpression
+          operator.value value allocated =
+            .ok (assignment, inferred, assignmentState) →
+        TypingSourceExtends
+          ((assignmentState.toTypedSource roots).applySubstitution outer)
+          coverageSource →
+        assignmentState.integerPatterns ⊆ evidenceState.integerPatterns →
+        assignmentState.integerLiterals ⊆ evidenceState.integerLiterals →
+        assignmentState.requirements ⊆ evidenceState.requirements →
+        (∀ key, .expression key ∈ assignment.references →
+          TemplateScopeCovered coverageSource target (.expression key)) →
+        TemplateScopeCovered coverageSource target
+          (.expression inferred.id) →
+        SourcePlaceHasType
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          target (assignment.target.applySubstitution outer)
+          (outer.apply assignment.target.type) ∧
+        ExpressionHasType
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          target inferred.id (outer.apply inferred.type)) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+  obtain ⟨assignment, inferred, assignmentState, assignmentSuccess,
+      resultEq, containsRaw⟩ :=
+    inferStatementFuel_success_assignValue_facts statementEq allocationEq
+      success roots
+  obtain ⟨assignment', inferred', assignmentState', assignmentSuccess',
+      _, assignmentToResult, literalsToResult, patternsToResult,
+      requirementsToResult⟩ :=
+    inferStatementFuel_success_assignValue_child_provenance statementEq
+      allocationEq success initialBelow roots
+  rw [assignmentSuccess] at assignmentSuccess'
+  obtain ⟨rfl, rfl, rfl⟩ := (Except.ok.inj assignmentSuccess').symm
+  have assignmentExtension : TypingSourceExtends
+      ((assignmentState.toTypedSource roots).applySubstitution outer)
+      coverageSource :=
+    assignmentToResult.trans resultExtension
+  have patternsSubset :
+      assignmentState.integerPatterns ⊆ evidenceState.integerPatterns :=
+    List.Subset.trans patternsToResult resultIntegerPatternsSubset
+  have literalsSubset :
+      assignmentState.integerLiterals ⊆ evidenceState.integerLiterals :=
+    List.Subset.trans literalsToResult resultIntegerLiteralsSubset
+  have requirementsSubset :
+      assignmentState.requirements ⊆ evidenceState.requirements :=
+    List.Subset.trans requirementsToResult resultRequirementsSubset
+  have containsFinal : ContainsStatement coverageSource result.id
+      (({
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .assignValue assignment operator.value inferred.id
+      } : StatementNode).applySubstitution outer) :=
+    resultExtension.containsStatement
+      (FlexibleSubstitution.ContainsStatement.applySubstitution outer
+        containsRaw)
+  have keysCovered : ∀ key,
+      .expression key ∈ assignment.references →
+        TemplateScopeCovered coverageSource target (.expression key) := by
+    intro key member
+    apply TemplateScopeCovered.statementExpressionChild_of_noBindings_and_reference
+      parentCovered closed containsFinal
+    · simp [StatementNode.applySubstitution,
+        StatementForm.applySubstitution, statementInitializedLetBindings]
+    · have appended : .expression key ∈
+          assignment.references ++ [.expression inferred.id] :=
+        List.mem_append.mpr (Or.inl member)
+      simpa [StatementNode.applySubstitution,
+        StatementForm.applySubstitution, StatementForm.references,
+        AssignmentResolution.references,
+        AssignmentResolution.applySubstitution,
+        PlaceResolution.applySubstitution, PlaceResolution.references]
+        using appended
+  have rhsCovered : TemplateScopeCovered coverageSource target
+      (.expression inferred.id) := by
+    apply TemplateScopeCovered.statementExpressionChild_of_noBindings_and_reference
+      parentCovered closed containsFinal
+    · simp [StatementNode.applySubstitution,
+        StatementForm.applySubstitution, statementInitializedLetBindings]
+    · simp [StatementNode.applySubstitution,
+        StatementForm.applySubstitution, StatementForm.references]
+  obtain ⟨placeTyped, valueTyped⟩ :=
+    actualChildrenSound assignmentSuccess assignmentExtension patternsSubset
+      literalsSubset requirementsSubset keysCovered rhsCovered
+  exact inferStatementFuel_success_assignValue_sound_of_typed_children
+    statementEq allocationEq success assignmentSuccess ready
+    signatureFormation functionsCanonical invariant outerExtension roots
+    placeTyped valueTyped
+
+/-- Bit-not assignment has only the actual place traversal as a recursive
+child.  Its indexed keys inherit the final graph's template scope from the
+recorded statement, and all child evidence rows remain in the final ledger. -/
+theorem inferStatementFuel_success_assignBitNot_bounded_scoped
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
+    {operatorSpan : Syntax.SourceSpan} {expectedReturn : Ty}
+    {initial allocated evidenceState : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {outer : Substitution} {control : ControlContext}
+    {target : SourceSemantics.Context} {coverageSource : TypedSource}
+    (statementEq : statement.value =
+      .assignBitNot targetExpression operatorSpan)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (initialBelow : initial.NodesBelowNextOccurrence)
+    (invariant : ActiveLocalContextInvariant initial outer target)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (roots : List NodeId := [])
+    (parentCovered : TemplateScopeCovered coverageSource target
+      (.statement result.id))
+    (closed : OccurrenceGraphClosed coverageSource)
+    (resultExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer)
+      coverageSource)
+    (resultIntegerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (resultIntegerLiteralsSubset :
+      result.state.integerLiterals ⊆ evidenceState.integerLiterals)
+    (resultRequirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (actualPlaceSound :
+      ∀ {place : PlaceResolution}
+        {placeState : Frontend.SourceInference.State},
+        Detail.inferPlaceFuel fuel inferenceContext targetExpression allocated =
+          .ok (place, placeState) →
+        TypingSourceExtends
+          ((placeState.toTypedSource roots).applySubstitution outer)
+          coverageSource →
+        placeState.integerPatterns ⊆ evidenceState.integerPatterns →
+        placeState.integerLiterals ⊆ evidenceState.integerLiterals →
+        placeState.requirements ⊆ evidenceState.requirements →
+        (∀ key, .expression key ∈ place.references →
+          TemplateScopeCovered coverageSource target (.expression key)) →
+        SourcePlaceHasType
+          ((result.state.toTypedSource roots).applySubstitution outer)
+          target (place.applySubstitution outer) (outer.apply place.type)) :
+    ActiveLocalContextInvariant result.state outer target ∧
+      StatementHasType
+        ((result.state.toTypedSource roots).applySubstitution outer)
+        control target result.id target {
+          type := .unit
+          hasValue := false
+          sawReturn := false
+          control := .ordinary .unit
+        } ∧
+      StatementResultMatchesFactsAfterSubstitution outer result {
+        type := .unit
+        hasValue := false
+        sawReturn := false
+        control := .ordinary .unit
+      } := by
+  obtain ⟨place, placeState, unified, placeSuccess, _, _, resultEq,
+      containsRaw⟩ :=
+    inferStatementFuel_success_assignBitNot_facts statementEq allocationEq
+      success roots
+  obtain ⟨place', placeState', unified', placeSuccess', _, _,
+      placeToResult, literalsToResult, patternsToResult,
+      requirementsToResult⟩ :=
+    inferStatementFuel_success_assignBitNot_child_provenance statementEq
+      allocationEq success initialBelow roots
+  rw [placeSuccess] at placeSuccess'
+  obtain ⟨rfl, rfl⟩ := (Except.ok.inj placeSuccess').symm
+  have placeExtension : TypingSourceExtends
+      ((placeState.toTypedSource roots).applySubstitution outer)
+      coverageSource :=
+    placeToResult.trans resultExtension
+  have patternsSubset :
+      placeState.integerPatterns ⊆ evidenceState.integerPatterns :=
+    List.Subset.trans patternsToResult resultIntegerPatternsSubset
+  have literalsSubset :
+      placeState.integerLiterals ⊆ evidenceState.integerLiterals :=
+    List.Subset.trans literalsToResult resultIntegerLiteralsSubset
+  have requirementsSubset :
+      placeState.requirements ⊆ evidenceState.requirements :=
+    List.Subset.trans requirementsToResult resultRequirementsSubset
+  have containsFinal : ContainsStatement coverageSource result.id
+      (({
+        id := result.id
+        span := statement.span
+        type := result.type
+        form := .assignBitNot {
+          target := { place with type := unified.resolve place.type }
+        }
+      } : StatementNode).applySubstitution outer) :=
+    resultExtension.containsStatement
+      (FlexibleSubstitution.ContainsStatement.applySubstitution outer
+        containsRaw)
+  have keysCovered : ∀ key,
+      .expression key ∈ place.references →
+        TemplateScopeCovered coverageSource target (.expression key) := by
+    intro key member
+    apply TemplateScopeCovered.statementExpressionChild_of_noBindings_and_reference
+      parentCovered closed containsFinal
+    · simp [StatementNode.applySubstitution,
+        StatementForm.applySubstitution, statementInitializedLetBindings]
+    · simpa [StatementNode.applySubstitution,
+        StatementForm.applySubstitution, StatementForm.references,
+        AssignmentResolution.references,
+        AssignmentResolution.applySubstitution,
+        PlaceResolution.applySubstitution, PlaceResolution.references]
+        using member
+  have placeTyped := actualPlaceSound placeSuccess placeExtension
+    patternsSubset literalsSubset requirementsSubset keysCovered
+  exact inferStatementFuel_success_assignBitNot_sound_of_actual_child
+    statementEq allocationEq success invariant outerExtension roots
+    placeSuccess placeTyped
+
 /-- The indexed-place branch is compositional in just its actual recursive
 base place and actual mapping-key expression.  This is the one-step rule
 needed by the closed place/expression induction. -/
