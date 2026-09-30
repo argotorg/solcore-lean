@@ -478,6 +478,28 @@ theorem statementExpressionChild_of_noBindings
   subst ownerNode
   simp [noBindings] at bindingMem
 
+/-- The same transport in the form in which statement branch inversions
+usually expose a child: membership in the node's canonical reference list. -/
+theorem statementExpressionChild_of_noBindings_and_reference
+    {source : TypedSource} {context : Context}
+    {parent : StatementId} {child : ExpressionId}
+    {node : StatementNode}
+    (parentCovered :
+      TemplateScopeCovered source context (.statement parent))
+    (closed : OccurrenceGraphClosed source)
+    (contains : ContainsStatement source parent node)
+    (noBindings : statementInitializedLetBindings node.form = [])
+    (member : .expression child ∈ node.form.references) :
+    TemplateScopeCovered source context (.expression child) := by
+  apply statementExpressionChild_of_noBindings parentCovered closed contains
+    noBindings
+  refine ⟨.statement node, ?_, ?_⟩
+  · change Node.statement node ∈ source.nodes ∧
+      (Node.statement node).id = .statement parent
+    refine ⟨contains.1, ?_⟩
+    simpa [Node.id] using congrArg NodeId.statement contains.2
+  · simpa [nodeChildIds, Node.references] using member
+
 /-- Coverage propagates between expression occurrences in the same context.
 An expression child cannot start a local-scheme initializer: every such
 initializer already has a statement parent, contradicting unique incoming
