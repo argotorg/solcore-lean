@@ -3524,6 +3524,16 @@ theorem inferStatementFuel_occurrenceBoundExtends
   inference_occurrenceBoundExtends.2.2.2.2.1 fuel context statement
     expectedReturn state result success
 
+/-- Expose the for-item-list component of the mutual occurrence theorem for
+source-soundness proofs of `for` initializer and post-item traversals. -/
+theorem inferForItemsFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context} {items : List Syntax.ForItem}
+    {state : State} {result : InferredForItems}
+    (success : inferForItemsFuel fuel context items state = .ok result) :
+    state.OccurrenceBoundExtends result.state :=
+  inference_occurrenceBoundExtends.2.2.2.2.2.1 fuel context items state
+    result success
+
 /-! ## Anchored node-prefix preservation
 
 Selected-call fitting is the only traversal step that may rewrite already
