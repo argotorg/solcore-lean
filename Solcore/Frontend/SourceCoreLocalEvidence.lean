@@ -119,7 +119,7 @@ def Reference.normalized (reference : Reference) : ExpressionNode :=
 @[simp] theorem Reference.normalized_form (reference : Reference) :
     reference.normalized.form = reference.original.form := rfl
 
-private def exactCaller (plan : SourceSpecializationWorklist.Plan) (binding : Binding) :
+def exactCaller (plan : SourceSpecializationWorklist.Plan) (binding : Binding) :
     Except Error SourceSpecialization.SpecializedFunction := do
   let caller ← (SourceCompilationPlan.exactSpecialization plan binding.caller).mapError Error.plan
   if caller.function.typedBody ≠ binding.source then throw (.originMismatch binding.caller)
@@ -157,7 +157,7 @@ private def validateWitnesses (program : CheckedProgram) (caller : SourceSpecial
     (SourceCompilationPlan.validateAuthenticatedRuntimeEvidence program.signatures caller.key
       [witness.predicate] [witness.evidence]).mapError Error.plan
 
-private def contextualCaller (caller : SourceSpecialization.SpecializedFunction)
+def contextualCaller (caller : SourceSpecialization.SpecializedFunction)
     (substitution : Substitution) (witnesses : List Witness) : SourceSpecialization.SpecializedFunction :=
   { caller with function := { caller.function with
       typedBody := caller.function.typedBody.applySubstitution substitution

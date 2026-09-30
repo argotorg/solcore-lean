@@ -68,7 +68,7 @@ private def applyCoercions (program : CheckedProgram) (checked : Checked) (conte
       SourceCoreBasic.ensureType (.occurrence node.id.occurrence) (← project checked node step.target) result.type
       applyCoercions program checked context caller available scope node callables result rest
 
-private def withNode (source : TypedSource) (node : ExpressionNode) : TypedSource :=
+def withNode (source : TypedSource) (node : ExpressionNode) : TypedSource :=
   { source with nodes := source.nodes.map fun
       | .expression old => if old.id = node.id then .expression node else .expression old
       | .statement old => .statement old }
