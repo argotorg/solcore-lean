@@ -817,6 +817,71 @@ theorem inferStatementFuel_success_assignBitNot_bounded_scoped
     statementEq allocationEq success invariant outerExtension roots
     placeSuccess placeTyped
 
+/-- The assignment branch does not introduce a visible binder; the actual
+place/RHS traversal preserves the declaration-local binder cutoff. -/
+theorem inferStatementFuel_success_assignValue_localBindersBelow
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression value : Syntax.Expr}
+    {operator : Syntax.Located Syntax.ValueAssignOp}
+    {expectedReturn : Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .assignValue targetExpression operator value)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (below : initial.LocalBindersBelowNextLocal) :
+    result.state.LocalBindersBelowNextLocal := by
+  obtain ⟨assignment, inferred, assignmentState, assignmentSuccess,
+      resultEq, _⟩ :=
+    inferStatementFuel_success_assignValue_facts statementEq allocationEq
+      success
+  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+    have preserved :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+        initial below
+    simpa only [allocationEq] using preserved
+  have assignmentBelow : assignmentState.LocalBindersBelowNextLocal :=
+    Detail.inferAssignedValueFuel_preserves_localBindersBelowNextLocal
+      allocatedBelow assignmentSuccess
+  rw [resultEq]
+  exact Frontend.SourceInference.State.recordNode_preserves_localBindersBelowNextLocal
+    assignmentState _ assignmentBelow
+
+/-- Bit-not assignment has the same stable-binder guarantee, including its
+forced `Word` unification after place inference. -/
+theorem inferStatementFuel_success_assignBitNot_localBindersBelow
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
+    {operatorSpan : Syntax.SourceSpan} {expectedReturn : Ty}
+    {initial allocated : Frontend.SourceInference.State}
+    {id : StatementId} {result : Detail.StatementResult}
+    (statementEq : statement.value =
+      .assignBitNot targetExpression operatorSpan)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext statement
+      expectedReturn initial = .ok result)
+    (below : initial.LocalBindersBelowNextLocal) :
+    result.state.LocalBindersBelowNextLocal := by
+  obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, _,
+      resultEq, _⟩ :=
+    inferStatementFuel_success_assignBitNot_facts statementEq allocationEq
+      success
+  have allocatedBelow : allocated.LocalBindersBelowNextLocal := by
+    have preserved :=
+      Frontend.SourceInference.State.allocateStatementId_preserves_localBindersBelowNextLocal
+        initial below
+    simpa only [allocationEq] using preserved
+  have placeBelow : placeState.LocalBindersBelowNextLocal :=
+    Detail.inferPlaceFuel_preserves_localBindersBelowNextLocal allocatedBelow
+      placeSuccess
+  have unifiedBelow : unified.LocalBindersBelowNextLocal :=
+    Detail.unify_preserves_localBindersBelowNextLocal placeBelow unifySuccess
+  rw [resultEq]
+  exact Frontend.SourceInference.State.recordNode_preserves_localBindersBelowNextLocal
+    unified _ unifiedBelow
+
 /-- The indexed-place branch is compositional in just its actual recursive
 base place and actual mapping-key expression.  This is the one-step rule
 needed by the closed place/expression induction. -/

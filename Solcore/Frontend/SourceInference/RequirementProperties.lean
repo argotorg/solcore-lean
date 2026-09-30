@@ -3847,6 +3847,19 @@ theorem inferExprFuel_integerPatterns_subset
   exact inferFuel_preserves_integerPatterns_internal.1 fuel context expression
     expected state result success
 
+/-- Constructor-argument inference retains every numeric-pattern origin
+already present in its input state.  The expression soundness proof uses this
+when forwarding the complete final evidence ledger to each actual argument. -/
+theorem inferConstructorArgumentsFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {sources : List Syntax.Expr}
+    {expected : List Ty} {state : State}
+    {result : List InferredExpression × State}
+    (success : inferConstructorArgumentsFuel fuel context sources expected
+      state = .ok result) :
+    state.integerPatterns ⊆ result.2.integerPatterns := by
+  exact inferFuel_preserves_integerPatterns_internal.2.2.1 fuel context sources
+    expected state result success
+
 /-- Whole-block inference retains every numeric-pattern origin already present
 in its input state. -/
 theorem inferStatementsFuel_integerPatterns_subset

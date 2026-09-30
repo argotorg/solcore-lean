@@ -2545,7 +2545,7 @@ private theorem allocateStatementId_success_header
     next.header = state.header :=
   pair_success_state_header (State.allocateStatementId_header state) success
 
-private theorem allocateStatementId_success_lexicalScope
+theorem allocateStatementId_success_lexicalScope
     {state next : State} {id : StatementId}
     (success : state.allocateStatementId = (id, next)) :
     next.lexicalScope = state.lexicalScope :=
@@ -3024,7 +3024,7 @@ the declaration owner and original input binders. -/
       subst next
       rfl
 
-@[simp] private theorem unify_preserves_lexicalScope
+@[simp] theorem unify_preserves_lexicalScope
     {state next : State} {left right : Ty}
     (success : unify state left right = .ok next) :
     next.lexicalScope = state.lexicalScope := by
@@ -14505,6 +14505,31 @@ theorem inferStatementsFuel_nextLocal_le
   inferFuel_advances_nextLocal_internal.2.2.2.1
     fuel context statements expectedReturn state result success
 
+/-- A successful statement never moves the declaration-local binder allocator
+backwards, including through nested blocks, loops, and matches. -/
+theorem inferStatementFuel_nextLocal_le
+    {fuel : Nat} {context : Context} {statement : Syntax.Statement}
+    {expectedReturn : Ty} {state : State} {result : StatementResult}
+    (success : inferStatementFuel fuel context statement expectedReturn state =
+      .ok result) :
+    state.nextLocal ≤ result.state.nextLocal :=
+  inferFuel_advances_nextLocal_internal.2.2.2.2.1
+    fuel context statement expectedReturn state result success
+
+/-- Match-arm inference never moves the shared declaration-local allocator
+backwards, even when individual arms introduce temporary binders. -/
+theorem inferMatchCasesFuel_nextLocal_le
+    {fuel : Nat} {context : Context}
+    {scrutineeType expectedReturn : Ty} {outerScope : LexicalScope}
+    {cases : List Syntax.MatchCase} {state : State}
+    {result : MatchCasesResult}
+    (success : inferMatchCasesFuel fuel context scrutineeType expectedReturn
+      outerScope cases state = .ok result) :
+    state.nextLocal ≤ result.state.nextLocal :=
+  inferFuel_advances_nextLocal_internal.2.2.2.2.2.2.2.2.2.2
+    fuel context scrutineeType expectedReturn outerScope cases state result
+    success
+
 /-- Successful source-ordered expression-list inference monotonically
 advances the shared declaration-local identity cutoff. -/
 theorem inferExprsFuel_nextLocal_le
@@ -14566,7 +14591,7 @@ theorem inferForItemFuel_nextLocal_le
   inferFuel_advances_nextLocal_internal.2.2.2.2.2.2.1
     fuel context item state result success
 
-private theorem inferPlaceFuel_preserves_localBindersBelowNextLocal
+theorem inferPlaceFuel_preserves_localBindersBelowNextLocal
     {fuel : Nat} {context : Context} {target : Syntax.Expr}
     {state : State} {result : PlaceResolution × State}
     (below : state.LocalBindersBelowNextLocal)
@@ -14579,7 +14604,7 @@ private theorem inferPlaceFuel_preserves_localBindersBelowNextLocal
   exact congrArg LexicalScope.binders
     (inferPlaceFuel_success_lexicalScope_eq success)
 
-private theorem inferAssignedValueFuel_preserves_localBindersBelowNextLocal
+theorem inferAssignedValueFuel_preserves_localBindersBelowNextLocal
     {fuel : Nat} {context : Context} {target value : Syntax.Expr}
     {operator : Syntax.ValueAssignOp} {state : State}
     {result : AssignmentResolution × InferredExpression × State}
