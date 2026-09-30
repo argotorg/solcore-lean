@@ -52,6 +52,43 @@ private theorem statementRoots_injective
           subst other
           simp [induction restEq]
 
+private theorem monoBindersExtend_solvedRequirements_eq
+    {owner : Resolved.DeclarationId}
+    {base final : SourceSemantics.Context}
+    {binders : List TypedBinder} {types : List Ty}
+    (extension : MonoBindersExtend owner base binders types final) :
+    final.solvedRequirements = base.solvedRequirements := by
+  induction extension with
+  | nil => rfl
+  | cons _ head _ induction =>
+      exact induction.trans head.context_fields.2.2.2.2
+
+private theorem monoBindersExtend_signatures_eq
+    {owner : Resolved.DeclarationId}
+    {base final : SourceSemantics.Context}
+    {binders : List TypedBinder} {types : List Ty}
+    (extension : MonoBindersExtend owner base binders types final) :
+    final.signatures = base.signatures := by
+  induction extension with
+  | nil => rfl
+  | cons _ head _ induction =>
+      exact induction.trans head.context_fields.1
+
+private theorem monoBindersExtend_scope_fields
+    {owner : Resolved.DeclarationId}
+    {base final : SourceSemantics.Context}
+    {binders : List TypedBinder} {types : List Ty}
+    (extension : MonoBindersExtend owner base binders types final) :
+    final.typeParameters = base.typeParameters ∧
+      final.currentDeclaration = base.currentDeclaration ∧
+        final.residualTypeVariables = base.residualTypeVariables := by
+  induction extension with
+  | nil => exact ⟨rfl, rfl, rfl⟩
+  | cons _ head _ induction =>
+      exact ⟨induction.1.trans head.context_fields.2.2.1,
+        induction.2.1.trans head.context_fields.2.1,
+        induction.2.2.trans head.residualTypeVariables_eq⟩
+
 /-- Return-type unification changes neither the owner, inputs, nor occurrence
 nodes of the source carrier. -/
 private theorem unify_toTypedSource_eq
@@ -68,32 +105,65 @@ private theorem unify_toTypedSource_eq
   have nodesEq := (Detail.unify_occurrenceState_eq success).1
   simp [State.toTypedSource, ownerEq, inputsEq, nodesEq]
 
-/-- The exact recursive theorem needed at the final checker boundary.  Unlike
-a hypothesis about arbitrary inferred children, it requires the concrete
-successful call and the standard initial, source, and evidence invariants. -/
+/-- The scoped recursive theorem needed at the final checker boundary.
+Unlike a hypothesis about arbitrary inferred children, it requires the
+concrete successful call, its actual finalization resources, and coverage of
+each returned statement root.  The latter is necessary for requirement
+evidence in nested match/operator branches. -/
 def InferStatementsFuelSoundness (fuel : Nat) : Prop :=
   ∀ {inferenceContext : Frontend.SourceInference.Context}
     {statements : List Syntax.Statement} {expectedReturn : Ty}
     {initial : State} {result : Detail.BlockResult}
-    {outer : Substitution} {ambientSource : TypedSource}
     {evidenceState : State} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
     {semanticContext : SourceSemantics.Context},
     Detail.inferStatementsFuel fuel inferenceContext statements expectedReturn
       initial = .ok result →
-    ActiveLocalContextInvariant initial outer semanticContext →
+    FinalInferenceResources inferenceContext expectedReturn evidenceState roots
+      finalized →
+    ProgramSignatureFormationValidated inferenceContext.signatures →
+    (∀ candidate ∈ inferenceContext.signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes)) →
+    SignatureCatalogWellFormed inferenceContext.signatures →
+    SignatureParametersWellFormed inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters →
+    ActiveLocalContextInvariant initial finalized.substitution semanticContext →
+    initial.InferenceReady →
+    expectedReturn.VariablesBelow initial.inference.next →
+    initial.LocalBindersBelowNextLocal →
     initial.NodesBelowNextOccurrence →
+    finalized.substitution.SemanticallyExtends
+      result.state.inference.substitution →
     TypingSourceExtends
-      ((result.state.toTypedSource roots).applySubstitution outer)
-      ambientSource →
+      ((result.state.toTypedSource roots).applySubstitution
+        finalized.substitution) finalized.typedSource →
     result.state.integerPatterns ⊆ evidenceState.integerPatterns →
     result.state.requirements ⊆ evidenceState.requirements →
+    semanticContext.signatures =
+      (finalizedRequirementContext inferenceContext finalized).signatures →
+    semanticContext.typeParameters = inferenceContext.typeParameters →
+    semanticContext.currentDeclaration =
+      some inferenceContext.scope.genericOwner →
+    semanticContext.residualTypeVariables = true →
+    semanticContext.solvedRequirements =
+      (finalizedRequirementContext inferenceContext finalized
+        ).solvedRequirements →
+    (finalizedRequirementContext inferenceContext finalized).assumptions ⊆
+      semanticContext.assumptions →
+    (∀ statement ∈ result.statements,
+      TemplateScopeCovered finalized.typedSource semanticContext
+        (.statement statement)) →
     ∃ finalContext facts,
-      ActiveLocalContextInvariant result.state outer finalContext ∧
-      StatementsHaveType ambientSource
-        { returnType := outer.apply expectedReturn
+      ActiveLocalContextInvariant result.state finalized.substitution
+        finalContext ∧
+      StatementsHaveType finalized.typedSource
+        { returnType := finalized.substitution.apply expectedReturn
           loopDepth := inferenceContext.loopDepth }
         semanticContext result.statements finalContext facts ∧
-      BlockResultMatchesFactsAfterSubstitution outer result facts
+      BlockResultMatchesFactsAfterSubstitution finalized.substitution result
+        facts
 
 /-- Once recursive statement inference has its closed soundness theorem, a
 successful body check satisfies the statement-only checker proposition with
@@ -105,6 +175,18 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
     {fuel : Nat}
     {checked : CheckedFunction}
     (header : CheckedBodyHeaderWellFormed signatures signature checked)
+    (predicatesFixed :
+      signature.scheme.predicates.map
+        (TypedTraitResolution.applySubstitution checked.substitution) =
+          signature.scheme.predicates)
+    (signatureFormation : ProgramSignatureFormationValidated signatures)
+    (functionsCanonical : ∀ candidate ∈ signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes))
+    (catalog : SignatureCatalogWellFormed signatures)
+    (signatureParameters : SignatureParametersWellFormed signature.id
+      signature.scheme.parameters)
     (success : checkFunctionBody environment signatures signature fuel =
       .ok checked)
     (recursiveSound : InferStatementsFuelSoundness fuel) :
@@ -148,11 +230,43 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
       exact inputExtension
     · apply ActiveLocalFormation.ofMonoBindersExtend
       exact inputExtension
+  have initialReady : initial.InferenceReady := by
+    simpa only [initial] using State.InferenceReady.initial declaration.id
+      ((signature.parameterNames.zip signature.parameterTypes).map
+        fun parameter => (parameter.1, Scheme.mono parameter.2))
+      signature.parameterComptime
+  have returnBelow : (Ty.productMany signature.returnTypes).VariablesBelow
+      initial.inference.next := by
+    apply Ty.variablesBelow_productMany
+    intro returnType member
+    have closed := StructuralSubstitution.TypeWellFormed.freeVariables_eq_nil
+      (header.return_types returnType member)
+    intro metavariable free
+    rw [closed] at free
+    simp at free
+  have initialBindersBelow : initial.LocalBindersBelowNextLocal := by
+    simpa only [initial] using State.initial_localBindersBelowNextLocal
+      declaration.id
+      ((signature.parameterNames.zip signature.parameterTypes).map
+        fun parameter => (parameter.1, Scheme.mono parameter.2))
+      signature.parameterComptime
   have initialBelow : initial.NodesBelowNextOccurrence :=
     State.initial_nodesBelowNextOccurrence declaration.id
       ((signature.parameterNames.zip signature.parameterTypes).map
         fun parameter => (parameter.1, Scheme.mono parameter.2))
       signature.parameterComptime
+  have bodyProperties := Detail.inferStatementsFuel_inferenceProperties
+    initialReady signatureFormation functionsCanonical returnBelow inferred
+  have returnBelowBody :
+      (Ty.productMany signature.returnTypes).VariablesBelow
+        body.state.inference.next :=
+    returnBelow.weaken bodyProperties.1.next_le
+  have unifyProgress : body.state.InferenceProgress finalState :=
+    Detail.unify_inferenceProgress bodyProperties.2.1.solved
+      bodyProperties.2.2 returnBelowBody unified
+  have unifiedReady : finalState.InferenceReady :=
+    Detail.unify_preserves_inferenceReady bodyProperties.2.1
+      bodyProperties.2.2 returnBelowBody unified
   have sourceEq :
       (body.state.toTypedSource (body.statements.map NodeId.statement)).applySubstitution
         result.substitution = result.typedSource := by
@@ -178,9 +292,135 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
     rw [Detail.unify_requirements_eq unified]
     intro requirement member
     exact member
+  let finalResources : FinalInferenceResources
+      {
+        environment
+        signatures
+        scope := .ofDeclaration declaration
+        typeParameters := signature.scheme.parameters
+        assumptions := signature.scheme.predicates
+      }
+      (Ty.productMany signature.returnTypes) finalState
+      (body.statements.map NodeId.statement) result :=
+    FinalInferenceResources.ofFinalize finalized
+  have substitutionExtends : result.substitution.SemanticallyExtends
+      body.state.inference.substitution := by
+    rw [finalResources.substitution_eq]
+    exact (unifyProgress.trans
+      (finalResources.progress_of_ready unifiedReady)).substitution_extends
+  have activeSignaturesEq : canonicalContext.signatures =
+      (finalizedRequirementContext
+        {
+          environment
+          signatures
+          scope := .ofDeclaration declaration
+          typeParameters := signature.scheme.parameters
+          assumptions := signature.scheme.predicates
+        } result).signatures := by
+    calc
+      canonicalContext.signatures =
+          (checkedBodyContext signatures signature checked).signatures :=
+        monoBindersExtend_signatures_eq canonicalExtension
+      _ = _ := by
+        simp [checkedBodyContext, finalizedRequirementContext,
+          declarationContext, Context.withResidualTypeVariables,
+          Context.withSolvedRequirements, Context.withAssumptions,
+          Context.forDeclaration]
+  have scopeFields := monoBindersExtend_scope_fields canonicalExtension
+  have activeParametersEq : canonicalContext.typeParameters =
+      signature.scheme.parameters := by
+    calc
+      canonicalContext.typeParameters =
+          (checkedBodyContext signatures signature checked).typeParameters :=
+        scopeFields.1
+      _ = signature.scheme.parameters := by
+        simp [checkedBodyContext, declarationContext,
+          Context.withResidualTypeVariables, Context.withSolvedRequirements,
+          Context.withAssumptions, Context.forDeclaration]
+  have activeDeclarationEq : canonicalContext.currentDeclaration =
+      some declaration.id := by
+    calc
+      canonicalContext.currentDeclaration =
+          (checkedBodyContext signatures signature checked
+            ).currentDeclaration := scopeFields.2.1
+      _ = some declaration.id := by
+        simp [checkedBodyContext, declarationContext,
+          Context.withResidualTypeVariables, Context.withSolvedRequirements,
+          Context.withAssumptions, Context.forDeclaration,
+          declarationIdEq]
+  have activeResidual : canonicalContext.residualTypeVariables = true := by
+    calc
+      canonicalContext.residualTypeVariables =
+          (checkedBodyContext signatures signature checked
+            ).residualTypeVariables := scopeFields.2.2
+      _ = true := by
+        simp [checkedBodyContext, declarationContext,
+          Context.withResidualTypeVariables]
+  have activeRequirementsEq : canonicalContext.solvedRequirements =
+      (finalizedRequirementContext
+        {
+          environment
+          signatures
+          scope := .ofDeclaration declaration
+          typeParameters := signature.scheme.parameters
+          assumptions := signature.scheme.predicates
+        } result).solvedRequirements := by
+    calc
+      canonicalContext.solvedRequirements =
+          (checkedBodyContext signatures signature checked
+            ).solvedRequirements :=
+        monoBindersExtend_solvedRequirements_eq canonicalExtension
+      _ = _ := by
+        simp [checkedBodyContext, finalizedRequirementContext,
+          declarationContext, checkedEq, Context.withResidualTypeVariables,
+          Context.withSolvedRequirements, Context.withAssumptions,
+          Context.forDeclaration]
+  have assumptionsMono :
+      (finalizedRequirementContext
+        {
+          environment
+          signatures
+          scope := .ofDeclaration declaration
+          typeParameters := signature.scheme.parameters
+          assumptions := signature.scheme.predicates
+        } result).assumptions ⊆ canonicalContext.assumptions := by
+    have canonicalAssumptions :=
+      MonoBindersExtend.assumptions_eq canonicalExtension
+    have predicatesFixedResult :
+        signature.scheme.predicates.map
+          (TypedTraitResolution.applySubstitution result.substitution) =
+            signature.scheme.predicates := by
+      simpa only [checkedEq] using predicatesFixed
+    intro predicate member
+    rw [canonicalAssumptions]
+    have substitutedMember : predicate ∈
+        signature.scheme.predicates.map
+          (TypedTraitResolution.applySubstitution result.substitution) := by
+      simpa [finalizedRequirementContext, Context.withSolvedRequirements,
+        Context.withAssumptions] using member
+    rw [predicatesFixedResult] at substitutedMember
+    simpa [checkedBodyContext, declarationContext,
+      Context.withResidualTypeVariables, Context.withSolvedRequirements,
+      Context.withAssumptions, Context.forDeclaration] using
+      substitutedMember
+  have rootCoverage : ∀ statement ∈ body.statements,
+      TemplateScopeCovered result.typedSource canonicalContext
+        (.statement statement) := by
+    intro statement member
+    apply TemplateScopeCovered.root finalResources.graph_closed.rootsHaveNoParent
+    rw [finalize_statementRoots finalized]
+    exact List.mem_map_of_mem member
   obtain ⟨finalContext, facts, _, typed, matching⟩ :=
-    recursiveSound inferred initialInvariant initialBelow sourceExtends
-      patternsSubset requirementsSubset
+    recursiveSound inferred finalResources signatureFormation functionsCanonical
+      catalog (by simpa [ProgramTypeScope.ofDeclaration, declarationIdEq]
+        using signatureParameters)
+      initialInvariant initialReady returnBelow initialBindersBelow initialBelow
+      substitutionExtends
+      (by simpa only [checkedEq] using sourceExtends)
+      patternsSubset requirementsSubset activeSignaturesEq activeParametersEq
+      (by simpa [ProgramTypeScope.ofDeclaration] using activeDeclarationEq)
+      activeResidual
+      activeRequirementsEq assumptionsMono rootCoverage
   have expectedFixed : result.substitution.apply
       (Ty.productMany signature.returnTypes) =
         Ty.productMany signature.returnTypes := by
@@ -212,7 +452,81 @@ theorem checkedBodyStatementsHaveType_of_inferStatementsFuel_sound
   have typedChecked : StatementsHaveType checked.typedBody
       { returnType := Ty.productMany signature.returnTypes }
       canonicalContext body.statements finalContext facts := by
-    simpa only [expectedFixed] using typed
+    simpa only [checkedEq, expectedFixed] using typed
   exact typedChecked
+
+/-- For an ordinary function, all global and rigid-parameter premises of the
+recursive bridge come from the successful raw-workspace checker.  The body
+header, closed predicates, and recursive theorem remain the separate semantic
+inputs to this final assembly step. -/
+theorem checkedBodyStatementsHaveType_ofCheckProgram_function
+    {raw : Workspace.RawWorkspace} {fuel : Nat}
+    {program : CheckedProgram}
+    {signature : ProgramFunctionSignature} {function : CheckedFunction}
+    (programSuccess : Frontend.checkProgram raw fuel = .ok program)
+    (member : signature ∈ program.signatures.functions)
+    (header : CheckedBodyHeaderWellFormed program.signatures signature
+      function)
+    (predicatesFixed :
+      signature.scheme.predicates.map
+        (TypedTraitResolution.applySubstitution function.substitution) =
+          signature.scheme.predicates)
+    (bodySuccess : checkFunctionBody program.environment program.signatures
+      signature fuel = .ok function)
+    (recursiveSound : InferStatementsFuelSoundness fuel) :
+    CheckedBodyStatementsHaveType program.signatures signature function := by
+  apply checkedBodyStatementsHaveType_of_inferStatementsFuel_sound header
+    predicatesFixed
+  · exact Frontend.checkProgram_success_signature_formation programSuccess
+  · intro candidate candidateMember
+    exact (Frontend.checkProgram_success_function_signature_shape
+      programSuccess candidateMember).2
+  · exact SignatureCatalogWellFormed.ofCheckProgram programSuccess
+  · exact (Frontend.checkProgram_success_signature_parameters_wellFormed
+      programSuccess).functions signature member
+  · exact bodySuccess
+  · exact recursiveSound
+
+/-- The synthetic function signature used for an implementation method has
+the implementation's canonical rigid parameter row.  Its other global
+premises are the same raw-checker facts as for ordinary functions. -/
+theorem checkedBodyStatementsHaveType_ofCheckProgram_method
+    {raw : Workspace.RawWorkspace} {fuel : Nat}
+    {program : CheckedProgram}
+    {implementation : ProgramImplementationSignature}
+    {trait : ProgramTraitSignature}
+    {method : ProgramImplMethodSignature} {function : CheckedFunction}
+    (programSuccess : Frontend.checkProgram raw fuel = .ok program)
+    (implementationMember :
+      implementation ∈ program.signatures.implementations)
+    (header : CheckedBodyHeaderWellFormed program.signatures
+      (implementation.functionSignatureOfMethodWithTrait trait method)
+      function)
+    (predicatesFixed :
+      (implementation.functionSignatureOfMethodWithTrait trait method
+        ).scheme.predicates.map
+        (TypedTraitResolution.applySubstitution function.substitution) =
+      (implementation.functionSignatureOfMethodWithTrait trait method
+        ).scheme.predicates)
+    (bodySuccess : checkFunctionBody program.environment program.signatures
+      (implementation.functionSignatureOfMethodWithTrait trait method) fuel =
+        .ok function)
+    (recursiveSound : InferStatementsFuelSoundness fuel) :
+    CheckedBodyStatementsHaveType program.signatures
+      (implementation.functionSignatureOfMethodWithTrait trait method)
+      function := by
+  apply checkedBodyStatementsHaveType_of_inferStatementsFuel_sound header
+    predicatesFixed
+  · exact Frontend.checkProgram_success_signature_formation programSuccess
+  · intro candidate candidateMember
+    exact (Frontend.checkProgram_success_function_signature_shape
+      programSuccess candidateMember).2
+  · exact SignatureCatalogWellFormed.ofCheckProgram programSuccess
+  · simpa [ProgramImplementationSignature.functionSignatureOfMethodWithTrait,
+      ProgramImplementationSignature.functionSignatureOfMethod] using
+      (Frontend.checkProgram_success_signature_parameters_wellFormed
+        programSuccess).implementations implementation implementationMember
+  · exact bodySuccess
+  · exact recursiveSound
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
