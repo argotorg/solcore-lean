@@ -14999,6 +14999,44 @@ theorem inferExprFuel_state_header
   congrArg (fun header : State.Header => header.inputs)
     (inferExprFuel_state_header success)
 
+/-- Place inference retains the declaration owner and function inputs. -/
+theorem inferPlaceFuel_state_header
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    result.2.header = state.header :=
+  inferStatementsFuel_preserves_header_internal.2.2.2.2.2.2.2.1
+    fuel context target state result success
+
+@[simp] theorem inferPlaceFuel_preserves_owner
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    result.2.owner = state.owner :=
+  congrArg State.Header.owner (inferPlaceFuel_state_header success)
+
+/-- Assigned-value inference retains the declaration owner and inputs. -/
+theorem inferAssignedValueFuel_state_header
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr}
+    {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result) :
+    result.2.2.header = state.header :=
+  inferStatementsFuel_preserves_header_internal.2.2.2.2.2.2.2.2.1
+    fuel context target operator value state result success
+
+@[simp] theorem inferAssignedValueFuel_preserves_owner
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr}
+    {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result) :
+    result.2.2.owner = state.owner :=
+  congrArg State.Header.owner (inferAssignedValueFuel_state_header success)
+
 /-- Successful constructor-application inference preserves the declaration
 owner and original input binders. -/
 theorem inferConstructorApplicationFuel_state_header

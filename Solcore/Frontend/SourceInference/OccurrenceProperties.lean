@@ -3558,6 +3558,28 @@ theorem inferExprsFuel_occurrenceBoundExtends
   inference_occurrenceBoundExtends.2.2.2.2.2.2.2.2.2.1 fuel context
     expressions state result success
 
+/-- Place inference preserves the occurrence-allocation bound through each
+mapping-key expression and nested place projection. -/
+theorem inferPlaceFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    state.OccurrenceBoundExtends result.2 :=
+  inference_occurrenceBoundExtends.2.2.2.2.2.2.2.1 fuel context target
+    state result success
+
+/-- Assigned-value inference preserves the bound across its place and RHS. -/
+theorem inferAssignedValueFuel_occurrenceBoundExtends
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr}
+    {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value
+      state = .ok result) :
+    state.OccurrenceBoundExtends result.2.2 :=
+  inference_occurrenceBoundExtends.2.2.2.2.2.2.2.2.1 fuel context target
+    operator value state result success
+
 /-! ## Anchored node-prefix preservation
 
 Selected-call fitting is the only traversal step that may rewrite already

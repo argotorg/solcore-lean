@@ -3913,6 +3913,29 @@ theorem inferMatchCasesFuel_integerPatterns_subset
   exact inferFuel_preserves_integerPatterns_internal.2.2.2.2.2.2.2.2.2.2 fuel
     context scrutineeType expectedReturn outerScope cases state result success
 
+/-- Place inference retains numeric-pattern origins while visiting mapping
+keys. -/
+theorem inferPlaceFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {state : State} {result : PlaceResolution × State}
+    (success : inferPlaceFuel fuel context target state = .ok result) :
+    state.integerPatterns ⊆ result.2.integerPatterns :=
+  inferFuel_preserves_integerPatterns_internal.2.2.2.2.2.2.2.1 fuel
+    context target state result success
+
+/-- Assigned-value inference retains numeric-pattern origins across place and
+RHS evaluation. -/
+theorem inferAssignedValueFuel_integerPatterns_subset
+    {fuel : Nat} {context : Context} {target : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp} {value : Syntax.Expr}
+    {state : State}
+    {result : AssignmentResolution × InferredExpression × State}
+    (success : inferAssignedValueFuel fuel context target operator value state =
+      .ok result) :
+    state.integerPatterns ⊆ result.2.2.integerPatterns :=
+  inferFuel_preserves_integerPatterns_internal.2.2.2.2.2.2.2.2.1 fuel
+    context target operator value state result success
+
 private theorem unify_integerLiterals_eq
     {before after : State} {left right : Ty}
     (success : unify before left right = .ok after) :
