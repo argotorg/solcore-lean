@@ -75,14 +75,15 @@ theorem runStateful_has_sufficient_fuel
     {value : Core.Value} {finalStore : Core.Store}
     (evaluation : Core.Evaluates [] [] code.program.body value finalStore) :
     ∃ required storeTyping finalStore value,
-      Core.StoreHasTypes storeTyping finalStore ∧
+      Core.RuntimeStoreHasTypes storeTyping finalStore code.program.dataDefinitions ∧
       Core.RuntimeValueHasType storeTyping value code.program.resultType
         code.program.dataDefinitions ∧
       ∀ fuel, required ≤ fuel →
         code.runStateful fuel = .done value finalStore := by
   obtain ⟨world, _, storeTyped, valueTyped⟩ :=
     Core.evaluation_preserves_type evaluation
-      (Core.Program.check_full_sound code.checked).bodyHasType .nil .nil
+      (Core.Program.check_full_sound code.checked).bodyHasType .nil
+      (Core.RuntimeStoreHasTypes.nil code.program.dataDefinitions)
   obtain ⟨required, completes⟩ :=
     Core.evaluation_runStateful_complete_with_sufficient_fuel evaluation
   exact ⟨required, world, finalStore, value, storeTyped, valueTyped, completes⟩

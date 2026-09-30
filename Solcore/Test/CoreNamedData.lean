@@ -186,16 +186,16 @@ private def testDefinitionAndAnnotationValidity : IO Unit := do
   let functionPayloadDefinitions : DataEnvironment := [
     { constructorPayloadTypes := [.function .unit .unit] }
   ]
-  let unusedInvalidTable : Program := {
+  let unusedTable : Program := {
     resultType := .bool
     body := .bool true
     dataDefinitions := functionPayloadDefinitions
   }
-  assertTrue (!functionPayloadDefinitions.isWellFormed)
-    "function-valued constructor payloads must be rejected recursively"
-  assertTrue (!unusedInvalidTable.check)
-    "the complete definition table must be checked even when it is unused"
-  assertTrue (unusedInvalidTable.run 1 == .done (.bool true))
+  assertTrue functionPayloadDefinitions.isWellFormed
+    "function-valued constructor payloads must use ordinary type well-formedness"
+  assertTrue unusedTable.check
+    "an unused function-valued definition must remain admissible"
+  assertTrue (unusedTable.run 1 == .done (.bool true))
     "the raw compatibility runner must execute only the body and remain unchecked"
 
   let unknownAnnotation : Program := {
@@ -208,15 +208,15 @@ private def testDefinitionAndAnnotationValidity : IO Unit := do
   assertTrue (!unknownAnnotation.check)
     "unknown named types in otherwise unused annotations must be rejected"
 
-  let nestedInvalidDefinitions : DataEnvironment := [
+  let nestedFunctionDefinitions : DataEnvironment := [
     {
       constructorPayloadTypes := [
         .product .unit (.sum .bool (.function .unit .unit))
       ]
     }
   ]
-  assertTrue (!nestedInvalidDefinitions.isWellFormed)
-    "function types nested below products and sums must invalidate the table"
+  assertTrue nestedFunctionDefinitions.isWellFormed
+    "well-formed functions nested below products and sums must be admitted"
 
   let unknownReferenceDefinitions : DataEnvironment := [
     { constructorPayloadTypes := [.namedData (dataType 4)] }
@@ -227,8 +227,8 @@ private def testDefinitionAndAnnotationValidity : IO Unit := do
   let namedCellContentsDefinitions : DataEnvironment := [
     { constructorPayloadTypes := [.cell (.namedData (dataType 0))] }
   ]
-  assertTrue (!namedCellContentsDefinitions.isWellFormed)
-    "a constructor may carry a cell reference only when its element is a cell payload"
+  assertTrue namedCellContentsDefinitions.isWellFormed
+    "constructor references may point to recursively named data values"
 
 private def testDetailedCheckingAgreement : IO Unit := do
   let validExpression : Expr :=
@@ -276,7 +276,7 @@ private def testDetailedCheckingAgreement : IO Unit := do
     resultType := .unit
     body := .unit
     dataDefinitions := [
-      { constructorPayloadTypes := [.function .unit .unit] }
+      { constructorPayloadTypes := [.function (.namedData (dataType 9)) .unit] }
     ]
   }
   for (name, program) in [
@@ -289,7 +289,7 @@ private def testDetailedCheckingAgreement : IO Unit := do
 
 private def testDetailedNamedDataErrors : IO Unit := do
   let invalidDefinitions : DataEnvironment := [
-    { constructorPayloadTypes := [.function .unit .unit] }
+    { constructorPayloadTypes := [.function (.namedData (dataType 9)) .unit] }
   ]
   let invalidTable : Program := {
     resultType := .namedData (dataType 8)
@@ -300,14 +300,14 @@ private def testDetailedNamedDataErrors : IO Unit := do
     "invalid definition table priority"
     invalidTable
     []
-    (.invalidDefinitionPayload 0 0 (.function .unit .unit))
+    (.invalidDefinitionPayload 0 0 (.function (.namedData (dataType 9)) .unit))
 
   let nestedInvalidType : Ty :=
-    .product .unit (.sum .bool (.function .unit .unit))
+    .product .unit (.sum .bool (.function (.namedData (dataType 9)) .unit))
   let multipleInvalidDefinitions : DataEnvironment := [
     { constructorPayloadTypes := [.unit] },
     { constructorPayloadTypes := [.bool, nestedInvalidType] },
-    { constructorPayloadTypes := [.function .word .word] }
+    { constructorPayloadTypes := [.function .word (.namedData (dataType 9))] }
   ]
   let firstInvalidDefinition : Program := {
     resultType := .namedData (dataType 8)
@@ -564,8 +564,12 @@ private def testEffectsAndCellReferences : IO Unit := do
         (.construct (constructor 0 0) (.newCell .bool (.bool true)))
     dataDefinitions := cellDefinitions
   }
-  assertTrue (!storedNamedData.check)
-    "named-data values must remain inadmissible as cell contents"
+  assertTrue storedNamedData.check
+    "named-data values must be admitted as general cell contents"
+  assertTrue (storedNamedData.runStateful 20 ==
+      .done (.cellRef (.namedData (dataType 0)) 1)
+        [.bool true, .constructed (constructor 0 0) (.cellRef .bool 0)])
+    "storing named data must retain the constructor and captured cell identity"
 
   let orderedEffects : Program := {
     resultType := .cell .bool
@@ -587,6 +591,40 @@ private def testEffectsAndCellReferences : IO Unit := do
     (orderedEffects.runStateful 40 ==
       .done (.cellRef .bool 1) [.unit, .bool true])
     "scrutinee effects must precede the selected branch and unselected effects must not run"
+
+private def testGeneralConstructorPayloads : IO Unit := do
+  let functionProgram : Program := {
+    resultType := .bool
+    dataDefinitions := [{ constructorPayloadTypes := [.function .bool .bool] }]
+    body :=
+      .matchData (dataType 0) .bool
+        (.construct (constructor 0 0)
+          (.lambda .bool .bool (.unary .boolNot (.var 0))))
+        [.apply (.var 0) (.bool false)]
+  }
+  assertTrue functionProgram.check
+    "constructors must admit closures and expose them to a typed match branch"
+  assertTrue (functionProgram.checkDetailed.toOption == some .bool)
+    "detailed checking must admit a function-valued constructor payload"
+  assertTrue (functionProgram.run 30 == .done (.bool true))
+    "a closure extracted from named data must remain callable"
+
+  let nestedCellProgram : Program := {
+    resultType := .bool
+    dataDefinitions := [{ constructorPayloadTypes := [.cell (.cell .bool)] }]
+    body :=
+      .matchData (dataType 0) .bool
+        (.construct (constructor 0 0)
+          (.newCell (.cell .bool) (.newCell .bool (.bool false))))
+        [.letE
+          (.storeCell (.loadCell (.var 0)) (.bool true))
+          (.loadCell (.loadCell (.var 1)))]
+  }
+  assertTrue nestedCellProgram.check
+    "constructor payloads must allow nested cell references"
+  assertTrue (nestedCellProgram.runStateful 40 ==
+      .done (.bool true) [.bool true, .cellRef .bool 0])
+    "matching a stored reference must preserve the shared mutable target"
 
 private def testUncheckedMachineFaults : IO Unit := do
   let nonData : State :=
@@ -642,6 +680,7 @@ def testCoreNamedData : IO Unit := do
   testDetailedCheckingAgreement
   testDetailedNamedDataErrors
   testEffectsAndCellReferences
+  testGeneralConstructorPayloads
   testUncheckedMachineFaults
   testNamedDataWeakening
 

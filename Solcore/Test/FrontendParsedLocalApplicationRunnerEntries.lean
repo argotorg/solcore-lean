@@ -217,10 +217,10 @@ private def execute (argument : TypedRuntimeArgument) (output : Core.Ty) (body :
     have _ := LocalInputs.runApplication?_done_iff_typed_evaluation.mp ⟨cost, completed⟩
     have _ := LocalInputs.runApplication?_done_iff_typed_evaluation.mpr ⟨typing, costed.erase⟩
     have _ := LocalInputs.runApplication?_runtime_done_sound runtimeTyped storeTyped completed
-    have agreement : ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.StoreHasTypes finalWorld t ∧
+    have agreement : ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.RuntimeStoreHasTypes finalWorld t ∧
         Core.RuntimeValueHasType finalWorld value output := by
       obtain ⟨future, final, v, count, extension, typedStore, typedValue, evaluated, _⟩ :=
-        LocalInputs.runApplication?_runtime_has_exact_cost typing runtimeTyped storeTyped
+        LocalInputs.runApplication?_runtime_has_exact_cost typing runtimeTyped storeTyped ⟨value, t, costed.erase⟩
       obtain ⟨rfl, rfl, _⟩ := costed.deterministic evaluated
       exact ⟨future, extension, typedStore, typedValue⟩
     have _ := agreement
@@ -266,10 +266,10 @@ def frontendParsedLocalApplicationRunnerEntryTests : IO Unit := do
       simpa only [Core.Store.allocate, List.nil_append, w] using
         (Core.StoreHasTypes.nil.allocate Core.CellPayload.word (Core.ValueHasType.word (value := Core.Word.ofNatModulo current)))
     execute ⟨.unit, .unit, .unit⟩ .word (.loadCell (.var 1)) [.cellRef .word 0] [.word] [w current] [w current] (w current) 3
-      .unit (.closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word)) st
+      .unit (.closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl))) st
       (fun _ => .cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl)))
     execute ⟨.word, w 9, .word⟩ (.cell .word) (.newCell .word (.var 0)) [] [.word] [w current] [w current, w 9] (.cellRef .word 1) 3
-      .word (.closure .nil (.newCell (.var rfl) .word)) st
+      .word (.closure .nil (.newCell (.var rfl))) st
       (fun _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
   for type in [Core.Ty.namedData ⟨99⟩, .product (.namedData ⟨4⟩) (.namedData ⟨8⟩)] do
     let a : TypedRuntimeArgument := ⟨.function type type, .closure type type (.var 0) [], .closure .nil (.var rfl)⟩

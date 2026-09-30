@@ -873,15 +873,17 @@ theorem wordLt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordLt right)
       (.bool (decide (rightValue > leftValue))) finalStore := by
   obtain ⟨intermediateWorld, extension, intermediateStoreTyping, _⟩ :=
     evaluation_preserves_type leftEvaluation leftTyping
-      environmentTyping storeTyping
+      environmentTyping (storeTyping.toRuntime definitions)
   have shiftedRightEvaluation :=
     rightEvaluation.weakenAt_zero_word rightTyping
-      (environmentTyping.weaken extension) intermediateStoreTyping
+      (environmentTyping.weaken extension) intermediateStoreTyping finalStoreTyping
       (.word leftValue)
   rw [Expr.wordLt_expansion]
   apply Evaluates.letE leftEvaluation
@@ -909,14 +911,16 @@ theorem wordGe
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordGe right)
       (.bool (!(decide (rightValue > leftValue)))) finalStore := by
   change Evaluates environment initialStore
     (.unary .boolNot (left.wordLt right)) _ finalStore
   exact .unary
     (leftEvaluation.wordLt rightEvaluation leftTyping rightTyping
-      environmentTyping storeTyping) rfl
+      environmentTyping storeTyping finalStoreTyping) rfl
 
 theorem wordLt_lt
     {definitions : DataEnvironment}
@@ -932,11 +936,13 @@ theorem wordLt_lt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordLt right)
       (.bool true) finalStore := by
   simpa [less] using leftEvaluation.wordLt rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping
 
 theorem wordLt_not_lt
     {definitions : DataEnvironment}
@@ -952,11 +958,13 @@ theorem wordLt_not_lt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordLt right)
       (.bool false) finalStore := by
   simpa [notLess] using leftEvaluation.wordLt rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping
 
 theorem wordGe_lt
     {definitions : DataEnvironment}
@@ -972,11 +980,13 @@ theorem wordGe_lt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordGe right)
       (.bool false) finalStore := by
   simpa [less] using leftEvaluation.wordGe rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping
 
 theorem wordGe_not_lt
     {definitions : DataEnvironment}
@@ -992,11 +1002,13 @@ theorem wordGe_not_lt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordGe right)
       (.bool true) finalStore := by
   simpa [notLess] using leftEvaluation.wordGe rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping
 
 end Evaluates
 
@@ -1025,15 +1037,17 @@ theorem wordSlt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSlt right)
       (.bool (rightValue.signedGt leftValue)) finalStore := by
   obtain ⟨intermediateWorld, extension, intermediateStoreTyping, _⟩ :=
     evaluation_preserves_type leftEvaluation leftTyping
-      environmentTyping storeTyping
+      environmentTyping (storeTyping.toRuntime definitions)
   have shiftedRightEvaluation :=
     rightEvaluation.weakenAt_zero_word rightTyping
-      (environmentTyping.weaken extension) intermediateStoreTyping
+      (environmentTyping.weaken extension) intermediateStoreTyping finalStoreTyping
       (.word leftValue)
   rw [Expr.wordSlt_expansion]
   apply Evaluates.letE leftEvaluation
@@ -1063,13 +1077,15 @@ theorem wordSlt_both_nonnegative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSlt right)
       (.bool (decide (rightValue > leftValue))) finalStore := by
   simpa only [Word.signedGt_both_nonnegative
     rightValue leftValue rightNonnegative leftNonnegative] using
     leftEvaluation.wordSlt rightEvaluation leftTyping rightTyping
-      environmentTyping storeTyping
+      environmentTyping storeTyping finalStoreTyping
 
 theorem wordSlt_both_negative
     {definitions : DataEnvironment}
@@ -1086,13 +1102,15 @@ theorem wordSlt_both_negative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSlt right)
       (.bool (decide (rightValue > leftValue))) finalStore := by
   simpa only [Word.signedGt_both_negative
     rightValue leftValue rightNegative leftNegative] using
     leftEvaluation.wordSlt rightEvaluation leftTyping rightTyping
-      environmentTyping storeTyping
+      environmentTyping storeTyping finalStoreTyping
 
 theorem wordSlt_nonnegative_negative
     {definitions : DataEnvironment}
@@ -1109,13 +1127,15 @@ theorem wordSlt_nonnegative_negative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSlt right)
       (.bool false) finalStore := by
   simpa only [Word.signedGt_negative_nonnegative
     rightValue leftValue rightNegative leftNonnegative] using
     leftEvaluation.wordSlt rightEvaluation leftTyping rightTyping
-      environmentTyping storeTyping
+      environmentTyping storeTyping finalStoreTyping
 
 theorem wordSlt_negative_nonnegative
     {definitions : DataEnvironment}
@@ -1132,13 +1152,15 @@ theorem wordSlt_negative_nonnegative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSlt right)
       (.bool true) finalStore := by
   simpa only [Word.signedGt_nonnegative_negative
     rightValue leftValue rightNonnegative leftNegative] using
     leftEvaluation.wordSlt rightEvaluation leftTyping rightTyping
-      environmentTyping storeTyping
+      environmentTyping storeTyping finalStoreTyping
 
 end Evaluates
 
@@ -1232,11 +1254,13 @@ theorem wordSge
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSge right)
       (.bool (!(rightValue.signedGt leftValue))) finalStore :=
   .unary (leftEvaluation.wordSlt rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping) rfl
+    environmentTyping storeTyping finalStoreTyping) rfl
 
 theorem wordSge_both_nonnegative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1252,12 +1276,14 @@ theorem wordSge_both_nonnegative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSge right)
       (.bool (!(decide (rightValue > leftValue)))) finalStore :=
   .unary (Evaluates.wordSlt_both_nonnegative
     leftNonnegative rightNonnegative leftEvaluation rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping) rfl
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping) rfl
 
 theorem wordSge_both_negative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1273,12 +1299,14 @@ theorem wordSge_both_negative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSge right)
       (.bool (!(decide (rightValue > leftValue)))) finalStore :=
   .unary (Evaluates.wordSlt_both_negative
     leftNegative rightNegative leftEvaluation rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping) rfl
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping) rfl
 
 theorem wordSge_nonnegative_negative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1294,12 +1322,14 @@ theorem wordSge_nonnegative_negative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSge right)
       (.bool true) finalStore :=
   .unary (Evaluates.wordSlt_nonnegative_negative
     leftNonnegative rightNegative leftEvaluation rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping) rfl
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping) rfl
 
 theorem wordSge_negative_nonnegative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1315,12 +1345,14 @@ theorem wordSge_negative_nonnegative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSge right)
       (.bool false) finalStore :=
   .unary (Evaluates.wordSlt_negative_nonnegative
     leftNegative rightNonnegative leftEvaluation rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping) rfl
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping) rfl
 
 end Evaluates
 end Solcore.Core
@@ -1416,12 +1448,14 @@ theorem wordSltFlag
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSltFlag right)
       (.word (if rightValue.signedGt leftValue then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
   (leftEvaluation.wordSlt rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord
+    environmentTyping storeTyping finalStoreTyping).boolToWord
 
 theorem wordSltFlag_both_nonnegative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1437,13 +1471,15 @@ theorem wordSltFlag_both_nonnegative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSltFlag right)
       (.word (if decide (rightValue > leftValue) then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
   (Evaluates.wordSlt_both_nonnegative leftNonnegative rightNonnegative
     leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord
+    environmentTyping storeTyping finalStoreTyping).boolToWord
 
 theorem wordSltFlag_both_negative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1459,13 +1495,15 @@ theorem wordSltFlag_both_negative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSltFlag right)
       (.word (if decide (rightValue > leftValue) then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
   (Evaluates.wordSlt_both_negative leftNegative rightNegative
     leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord
+    environmentTyping storeTyping finalStoreTyping).boolToWord
 
 theorem wordSltFlag_nonnegative_negative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1481,12 +1519,14 @@ theorem wordSltFlag_nonnegative_negative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSltFlag right)
       (.word Word.zero) finalStore :=
   (Evaluates.wordSlt_nonnegative_negative leftNonnegative rightNegative
     leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord_false
+    environmentTyping storeTyping finalStoreTyping).boolToWord_false
 
 theorem wordSltFlag_negative_nonnegative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1502,12 +1542,14 @@ theorem wordSltFlag_negative_nonnegative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSltFlag right)
       (.word (Word.ofNatModulo 1)) finalStore :=
   (Evaluates.wordSlt_negative_nonnegative leftNegative rightNonnegative
     leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord_true
+    environmentTyping storeTyping finalStoreTyping).boolToWord_true
 
 end Evaluates
 end Solcore.Core
@@ -1605,12 +1647,14 @@ theorem wordLtFlag
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordLtFlag right)
       (.word (if decide (rightValue > leftValue) then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
   (leftEvaluation.wordLt rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord
+    environmentTyping storeTyping finalStoreTyping).boolToWord
 
 theorem wordLtFlag_lt
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1625,11 +1669,13 @@ theorem wordLtFlag_lt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordLtFlag right)
       (.word (Word.ofNatModulo 1)) finalStore :=
   (Evaluates.wordLt_lt less leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord_true
+    environmentTyping storeTyping finalStoreTyping).boolToWord_true
 
 theorem wordLtFlag_not_lt
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1644,11 +1690,13 @@ theorem wordLtFlag_not_lt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordLtFlag right)
       (.word Word.zero) finalStore :=
   (Evaluates.wordLt_not_lt notLess leftEvaluation rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping).boolToWord_false
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping).boolToWord_false
 
 theorem wordGeFlag
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1662,12 +1710,14 @@ theorem wordGeFlag
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordGeFlag right)
       (.word (if !(decide (rightValue > leftValue)) then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
   (leftEvaluation.wordGe rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord
+    environmentTyping storeTyping finalStoreTyping).boolToWord
 
 theorem wordGeFlag_lt
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1682,11 +1732,13 @@ theorem wordGeFlag_lt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordGeFlag right)
       (.word Word.zero) finalStore :=
   (Evaluates.wordGe_lt less leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord_false
+    environmentTyping storeTyping finalStoreTyping).boolToWord_false
 
 theorem wordGeFlag_not_lt
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1701,11 +1753,13 @@ theorem wordGeFlag_not_lt
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordGeFlag right)
       (.word (Word.ofNatModulo 1)) finalStore :=
   (Evaluates.wordGe_not_lt notLess leftEvaluation rightEvaluation
-    leftTyping rightTyping environmentTyping storeTyping).boolToWord_true
+    leftTyping rightTyping environmentTyping storeTyping finalStoreTyping).boolToWord_true
 
 end Evaluates
 end Solcore.Core
@@ -1801,12 +1855,14 @@ theorem wordSgeFlag
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSgeFlag right)
       (.word (if !(rightValue.signedGt leftValue) then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
   (leftEvaluation.wordSge rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord
+    environmentTyping storeTyping finalStoreTyping).boolToWord
 
 theorem wordSgeFlag_both_nonnegative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1822,13 +1878,15 @@ theorem wordSgeFlag_both_nonnegative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSgeFlag right)
       (.word (if !(decide (rightValue > leftValue)) then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
   (Evaluates.wordSge_both_nonnegative leftNonnegative rightNonnegative
     leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord
+    environmentTyping storeTyping finalStoreTyping).boolToWord
 
 theorem wordSgeFlag_both_negative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1844,13 +1902,15 @@ theorem wordSgeFlag_both_negative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSgeFlag right)
       (.word (if !(decide (rightValue > leftValue)) then
         Word.ofNatModulo 1 else Word.zero)) finalStore :=
   (Evaluates.wordSge_both_negative leftNegative rightNegative
     leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord
+    environmentTyping storeTyping finalStoreTyping).boolToWord
 
 theorem wordSgeFlag_nonnegative_negative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1866,12 +1926,14 @@ theorem wordSgeFlag_nonnegative_negative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSgeFlag right)
       (.word (Word.ofNatModulo 1)) finalStore :=
   (Evaluates.wordSge_nonnegative_negative leftNonnegative rightNegative
     leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord_true
+    environmentTyping storeTyping finalStoreTyping).boolToWord_true
 
 theorem wordSgeFlag_negative_nonnegative
     {definitions : DataEnvironment} {environment : Environment} {context : Context}
@@ -1887,12 +1949,14 @@ theorem wordSgeFlag_negative_nonnegative
     (rightTyping : HasType context right .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore) :
+    (storeTyping : StoreHasTypes world initialStore)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore) :
     Evaluates environment initialStore (left.wordSgeFlag right)
       (.word Word.zero) finalStore :=
   (Evaluates.wordSge_negative_nonnegative leftNegative rightNonnegative
     leftEvaluation rightEvaluation leftTyping rightTyping
-    environmentTyping storeTyping).boolToWord_false
+    environmentTyping storeTyping finalStoreTyping).boolToWord_false
 
 end Evaluates
 end Solcore.Core

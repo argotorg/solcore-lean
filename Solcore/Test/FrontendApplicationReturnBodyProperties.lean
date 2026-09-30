@@ -159,21 +159,21 @@ theorem body_and_child_have_the_identical_genuine_checkpoint_and_resumption (n a
   · exact ((inputs n).runApplicationReturnBody?_return _ span span (call span span) store).trans (LocalInputs.runApplication?_resume stopped additional)
 
 private def reader : Core.Value := .closure .unit .word (.loadCell (.var 1)) [.cellRef .word 0]
-private theorem readerTyped : Core.ValueHasType reader (.function .unit .word) := .closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)
+private theorem readerTyped : Core.ValueHasType reader (.function .unit .word) := .closure (.cons .cellRef .nil) (.loadCell (.var rfl))
 private def readerInputs : LocalInputs := bundle .unit .word reader .unit readerTyped .unit
 private def w (n : Nat) : Core.Value := .word (Core.Word.ofNatModulo n)
 private theorem readerCost (v : Core.Value) : LocalFunctionApplicationEvaluatesWithCost readerInputs.names readerInputs.environment [v] (call span span) v [v] 8 :=
   callCost .unit .word (.loadCell (.var 1)) [.cellRef .word 0] .unit v readerTyped .unit [v] [v] 3
     (.cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl)))
 private theorem readerRuntime : Core.RuntimeEnvironmentHasTypes [.word] readerInputs.environment.values readerInputs.context.values := by
-  have f : Core.RuntimeValueHasType [.word] reader (.function .unit .word) := .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word)
+  have f : Core.RuntimeValueHasType [.word] reader (.function .unit .word) := .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl))
   exact .cons .unit (.cons f (.cons f (.cons .bool .nil)))
 theorem runtime_world_laws_transport_through_full_result_equality (n fuel : Nat) (error : Core.MachineFault) (fault : Core.State) :
     readerInputs.runApplicationReturnBody? 8 body [w n] = some (.word, .done (w n) [w n]) ∧
-    (∃ world, Core.WorldExtends [.word] world ∧ Core.StoreHasTypes world [w n] ∧ Core.RuntimeValueHasType world (w n) .word) ∧
+    (∃ world, Core.WorldExtends [.word] world ∧ Core.RuntimeStoreHasTypes world [w n] ∧ Core.RuntimeValueHasType world (w n) .word) ∧
     readerInputs.runApplicationReturnBody? fuel body [w n] ≠ some (.word, .fault error fault) := by
   have st : Core.StoreHasTypes [.word] [w n] := Core.StoreHasTypes.nil.allocate .word .word
-  obtain ⟨_, final, v, cost, _, _, _, actual, thresholds⟩ := LocalInputs.runApplication?_runtime_has_exact_cost (inputs := readerInputs) (child .unit .word span span).hasType readerRuntime st
+  obtain ⟨_, final, v, cost, _, _, _, actual, thresholds⟩ := LocalInputs.runApplication?_runtime_has_exact_cost (inputs := readerInputs) (child .unit .word span span).hasType readerRuntime st ⟨w n, [w n], (readerCost (w n)).erase⟩
   obtain ⟨rfl, rfl, rfl⟩ := actual.deterministic (readerCost (w n))
   have done := (thresholds 8).1.mpr (Nat.le_refl _)
   exact ⟨(readerInputs.runApplicationReturnBody?_return 8 span span (call span span) [w n]).trans done,
@@ -190,13 +190,13 @@ theorem missing_cells_and_wrong_payloads_are_not_hidden_by_return :
     exact (LocalInputs.runApplication?_done_iff_of_cost (inputs := readerInputs) (child .unit .word span span).hasType (readerCost (.bool true))).mpr (Nat.le_refl 8)
 
 private def allocator : Core.Value := .closure .word (.cell .word) (.newCell .word (.var 0)) []
-private def allocatorInputs : LocalInputs := bundle .word (.cell .word) allocator (w 7) (.closure .nil (.newCell (.var rfl) .word)) .word
+private def allocatorInputs : LocalInputs := bundle .word (.cell .word) allocator (w 7) (.closure .nil (.newCell (.var rfl))) .word
 theorem return_keeps_the_actual_allocation_effect (store : Core.Store) :
     LocalApplicationReturnBodyEvaluatesWithCost allocatorInputs.names allocatorInputs.environment store body (.cellRef .word store.length) (store ++ [w 7]) 8 ∧
     allocatorInputs.runApplicationReturnBody? 8 body store = some (.cell .word, .done (.cellRef .word store.length) (store ++ [w 7])) := by
   have actual : LocalFunctionApplicationEvaluatesWithCost allocatorInputs.names allocatorInputs.environment store (call span span)
       (.cellRef .word store.length) (store ++ [w 7]) 8 :=
-    callCost .word (.cell .word) (.newCell .word (.var 0)) [] (w 7) (.cellRef .word store.length) (.closure .nil (.newCell (.var rfl) .word)) .word store (store ++ [w 7]) 3
+    callCost .word (.cell .word) (.newCell .word (.var 0)) [] (w 7) (.cellRef .word store.length) (.closure .nil (.newCell (.var rfl))) .word store (store ++ [w 7]) 3
       (.cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
   refine ⟨.application actual, ?_⟩
   rw [runBody]

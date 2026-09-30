@@ -50,7 +50,7 @@ private def allocationState : State :=
   .initial (.newCell .bool (.bool true)) [] [selfClosure]
 
 private theorem allocationState_typed : StateHasType allocationState (.cell .bool) :=
-  .eval cyclicStore_typed .nil (.newCell .bool .bool) .nil
+  .eval cyclicStore_typed .nil (.newCell .bool) .nil
 
 example : runStateful 3 allocationState =
     .done (.cellRef .bool 1) [selfClosure, .bool true] := by

@@ -95,11 +95,11 @@ theorem observed_completion_reflects_independent_typed_cost (n : Nat) (store : C
     ((one_actual_cost_gives_both_all_fuel_boundaries n (3 * n + 6) store).1.mpr (Nat.le_refl _))
 
 theorem runtime_existence_does_not_replace_the_actual_cost (n : Nat) :
-    ∃ future, Core.WorldExtends [] future ∧ Core.StoreHasTypes future [] ∧ Core.RuntimeValueHasType future .unit .unit ∧
+    ∃ future, Core.WorldExtends [] future ∧ Core.RuntimeStoreHasTypes future [] ∧ Core.RuntimeValueHasType future .unit .unit ∧
       ∀ fuel, ((inputs n).runApplication? fuel (source span span) [] = some (.unit, .done .unit []) ↔ 3 * n + 6 ≤ fuel) ∧
         ((∃ cp, (inputs n).runApplication? fuel (source span span) [] = some (.unit, .outOfFuel cp)) ↔ fuel < 3 * n + 6) := by
   obtain ⟨future, final, value, cost, ext, st, vt, evaluation, thresholds⟩ :=
-    LocalInputs.runApplication?_runtime_has_exact_cost (exact n span span).hasType (runtimeInputs n) Core.StoreHasTypes.nil
+    LocalInputs.runApplication?_runtime_has_exact_cost (exact n span span).hasType (runtimeInputs n) Core.StoreHasTypes.nil ⟨.unit, [], (counted n [] span span).erase⟩
   obtain ⟨rfl, rfl, rfl⟩ := evaluation.deterministic (counted n [] span span)
   exact ⟨future, ext, st, vt, thresholds⟩
 
@@ -125,13 +125,13 @@ theorem genuine_delayed_checkpoint_retains_type_and_every_resumed_result (n addi
 private def w (n : Nat) : Core.Value := .word (Core.Word.ofNatModulo n)
 private def reader : Core.Value := .closure .unit .word (.loadCell (.var 1)) [.cellRef .word 0]
 private theorem readerTyped : Core.ValueHasType reader (.function .unit .word) :=
-  .closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)
+  .closure (.cons .cellRef .nil) (.loadCell (.var rfl))
 private def readerInputs : LocalInputs := bundle .unit .word reader .unit readerTyped .unit
 private theorem readerExact : LocalFunctionApplicationElaborates readerInputs.names readerInputs.context (source span span) core .word :=
   elaborated .unit .word reader .unit readerTyped .unit span span
 private theorem readerRuntime : Core.RuntimeEnvironmentHasTypes [.word] readerInputs.environment.values readerInputs.context.values := by
   have f : Core.RuntimeValueHasType [.word] reader (.function .unit .word) :=
-    .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word)
+    .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl))
   exact .cons .unit (.cons f (.cons f (.cons .bool .nil)))
 private theorem storeTyped (n : Nat) : Core.StoreHasTypes [.word] [w n] := Core.StoreHasTypes.nil.allocate .word .word
 private theorem readerCost (value : Core.Value) : LocalFunctionApplicationEvaluatesWithCost readerInputs.names readerInputs.environment
@@ -144,7 +144,7 @@ private def readerCheckpoint (store : Core.Store) : Core.State :=
 theorem valid_reader_has_runtime_typed_soundness_and_all_fuel_safety
     (n fuel : Nat) (type : Core.Ty) (error : Core.MachineFault) (fault : Core.State) :
     readerInputs.runApplication? 8 (source span span) [w n] = some (.word, .done (w n) [w n]) ∧
-    (∃ future, Core.WorldExtends [.word] future ∧ Core.StoreHasTypes future [w n] ∧ Core.RuntimeValueHasType future (w n) .word) ∧
+    (∃ future, Core.WorldExtends [.word] future ∧ Core.RuntimeStoreHasTypes future [w n] ∧ Core.RuntimeValueHasType future (w n) .word) ∧
     readerInputs.runApplication? fuel (source span span) [w n] ≠ some (type, .fault error fault) := by
   have done := (LocalInputs.runApplication?_done_iff_of_cost readerExact.hasType (readerCost (w n))).mpr (Nat.le_refl 8)
   exact ⟨done, (LocalInputs.runApplication?_runtime_done_sound readerRuntime (storeTyped n) done).2,

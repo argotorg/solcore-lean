@@ -241,9 +241,9 @@ private def verify (sourceText : String) (f g x : TypedRuntimeArgument) (output 
     let fault := Core.StatefulRunResult.fault (.invalidCellLocation 0) ⟨.ret (.cellRef .word 0),[.loadCellApply],[]⟩
     check (decide (Core.runStateful 3 (.initial core env [])=.outOfFuel cp ∧ Core.runStateful 12 (.initial core env [])=fault ∧
       Core.runStateful 9 cp=fault)) "same original typed rows do not ensure allocated store"
-private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
+private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private def delay : Nat → Core.Expr | 0 => .var 0 | n+1 => .letE (.var 0) (delay n)
 private theorem delayTyped (n : Nat) (ctx : Core.Context) (found : ctx[0]?=some .word) : Core.HasType ctx (delay n) .word := by
   induction n generalizing ctx with | zero => exact .var found | succ n ih => exact .letE (.var found) (ih _ rfl)
@@ -258,14 +258,14 @@ def frontendParsedRecursiveComputationEntryTests : IO Unit := do
     for expression in ["f(g(x))","((f))(((g(x))))","((f(g(x))))"] do
       verify expression reader writer x .word nested [w old] [w 14] (w 14) 22
     verify "f(g(x))" writer reader x .word nested [w old] [w old] (w old) 22
-    let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl) .word)⟩
-    let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word,.closure (.cell .word) .word (.loadCell (.var 0)) [],.closure .nil (.loadCell (.var rfl) .word)⟩
+    let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl))⟩
+    let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word,.closure (.cell .word) .word (.loadCell (.var 0)) [],.closure .nil (.loadCell (.var rfl))⟩
     verify "f(g(x))" load alloc x .word nested [w old] [w old,w 14] (w 14) 15
     let maker : TypedRuntimeArgument := ⟨.function .word reader.type,.closure .word reader.type (.var 1) [reader.value],.closure (.cons reader.valueTyped .nil) (.var rfl)⟩
     verify "(f(x))(g(x))" maker writer x .word computed [w old] [w 14] (w 14) 27
     let effectMaker : TypedRuntimeArgument := ⟨.function .word reader.type,
       .closure .word reader.type (.letE (.storeCell (.var 1) (.var 2)) (.var 4)) [.cellRef .word 0,w 7,reader.value],
-      .closure (.cons .cellRef (.cons .word (.cons reader.valueTyped .nil))) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.var rfl))⟩
+      .closure (.cons .cellRef (.cons .word (.cons reader.valueTyped .nil))) (.letE (.storeCell (.var rfl) (.var rfl)) (.var rfl))⟩
     verify "((f(x)))((g(x)))" effectMaker writer x .word computed [w old] [w 14] (w 14) 34
     let env := [x.value,writer.value,effectMaker.value]
     check (decide (Core.runStateful 14 (.initial computed env [w old])=.outOfFuel ⟨.ret reader.value,[.applyArgument (.apply (.var 1) (.var 0)) env],[w 7]⟩ ∧

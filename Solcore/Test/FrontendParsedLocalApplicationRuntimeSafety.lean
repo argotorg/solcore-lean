@@ -143,9 +143,9 @@ private def counted (environment : Resolved.Environment) (s : Core.Store) (sourc
 private theorem storeTyped (n : Nat) : Core.StoreHasTypes [.word] [w n] :=
   Core.StoreHasTypes.nil.allocate .word .word
 private theorem readerTyped : Core.RuntimeValueHasType [.word] reader (.function .word .word) :=
-  .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word)
+  .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl))
 private theorem writerTyped : Core.RuntimeValueHasType [.word] writer (.function .word .word) :=
-  .closure (.cons (.cellRef rfl) .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))
+  .closure (.cons (.cellRef rfl) .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))
 private def verify (text : String) (output : Core.Ty) (f g : Core.Value) (x : Nat) (c : Bool)
     (expected : Core.Expr) (value : Core.Value) (cost : Nat) (s final : Core.Store)
     (world : Core.StoreTyping) (et : Core.RuntimeEnvironmentHasTypes world (env f g x c).values (ctx output).values)
@@ -161,10 +161,10 @@ private def verify (text : String) (output : Core.Ty) (f g : Core.Value) (x : Na
         simpa only [exactRaw.1,exactRaw.2.1,exactRaw.2.2] using actual.evidence
       have aligned : (env f g x c).ids = (ctx output).ids := rfl
       have _ := evaluation.erase.preserves_runtime_type elaboration aligned et st
-      have _ := elaboration.hasType.runtime_evaluates aligned et st
-      have identified : ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.StoreHasTypes finalWorld final ∧
+      have _ := elaboration.hasType.runtime_evaluates aligned et st ⟨value, final, evaluation.erase⟩
+      have identified : ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.RuntimeStoreHasTypes finalWorld final ∧
           Core.RuntimeValueHasType finalWorld value output := by
-        obtain ⟨fw,fs,v,n,ext,typed,vt,e,_,_⟩ := elaboration.runtime_typed_execution aligned et st
+        obtain ⟨fw,fs,v,n,ext,typed,vt,e,_,_⟩ := elaboration.runtime_typed_execution aligned et st ⟨value, final, evaluation.erase⟩
         obtain ⟨rfl,rfl,rfl⟩ := e.deterministic evaluation
         exact ⟨fw,ext,typed,vt⟩
       let path := evaluation.toSteps elaboration aligned
@@ -222,7 +222,7 @@ private def selected : IO Unit := do
             .outOfFuel ⟨.eval (.loadCell (.var 2)) [.unit,w x,.cellRef .word 0],[],[w x]⟩)) "post-let reread did not retain original reference"
 private def allocation : IO Unit := do
   for old in [23,91] do
-    have ft : Core.RuntimeValueHasType [.word] allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl) .word)
+    have ft : Core.RuntimeValueHasType [.word] allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl))
     have et : Core.RuntimeEnvironmentHasTypes [.word] (env allocator allocator 14 true).values (ctx (.cell .word)).values :=
       .cons .word (.cons ft (.cons .bool (.cons ft .nil)))
     have _ : Core.StoreHasTypes [.word,.word] [w old,w 14] := (storeTyped old).allocate .word .word

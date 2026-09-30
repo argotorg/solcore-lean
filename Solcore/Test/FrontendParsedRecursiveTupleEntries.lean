@@ -211,9 +211,9 @@ private def verify (source : Syntax.FunctionDecl) (f g x y : TypedRuntimeArgumen
       | .fault _ _ => throw (IO.userError "independent successful path faulted")
     return prepared
   else throw (IO.userError "independent exact Core/type")
-private def reader (location : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word location],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
+private def reader (location : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word location],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer (location : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word location],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private def arg (value : Nat) : TypedRuntimeArgument := ⟨.word,w value,.word⟩
 private def captured (a : TypedRuntimeArgument) : TypedRuntimeArgument :=
   ⟨.function .word a.type,.closure .word a.type (.var 1) [a.value],.closure (.cons a.valueTyped .nil) (.var rfl)⟩

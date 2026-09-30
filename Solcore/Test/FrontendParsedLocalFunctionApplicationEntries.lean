@@ -248,7 +248,7 @@ private def unitAndProduct : IO Unit := do
         (fun _ => .cons (.var rfl) .refl))
 private def storeBoundaries : IO Unit := do
   let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word, .closure (.cell .word) .word (.loadCell (.var 0)) [],
-    .closure .nil (.loadCell (.var rfl) .word)⟩
+    .closure .nil (.loadCell (.var rfl))⟩
   let env ← actualCase (table (.cell .word) .word) content (.apply (.var 1) (.var 0)) .word ["f", "x"] [load, ⟨.cell .word, .cellRef .word 0, .cellRef⟩]
   check (decide (Core.runStateful 7 (.initial (.apply (.var 1) (.var 0)) env []) =
     .fault (.invalidCellLocation 0) ⟨.ret (.cellRef .word 0), [.loadCellApply], []⟩)) "structural typing falsely guaranteed allocated cells"
@@ -256,7 +256,7 @@ private def storeBoundaries : IO Unit := do
     (callPath [] (fun _ => .cons (.var rfl) .refl) (fun _ => .cons (.var rfl) .refl)
       (fun _ => .cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl))))
   let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word), .closure .word (.cell .word) (.newCell .word (.var 0)) [],
-    .closure .nil (.newCell (.var rfl) .word)⟩
+    .closure .nil (.newCell (.var rfl))⟩
   let _ ← actualCase (table .word (.cell .word)) content (.apply (.var 1) (.var 0)) (.cell .word) ["f", "x"] [alloc, ⟨.word, w 9, .word⟩]
   for s in [[], [w 91]] do
     runPath (.apply (.var 1) (.var 0)) [w 9, alloc.value] s (s ++ [w 9]) (.cellRef .word s.length) 8

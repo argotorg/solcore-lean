@@ -255,9 +255,9 @@ private def verify (body : String) (f g x : TypedRuntimeArgument) (output : Core
     let fault := Core.StatefulRunResult.fault (.invalidCellLocation 0) ⟨.ret (.cellRef .word 0),[.loadCellApply,.letBody (.var 0) env],[]⟩
     check (decide (Core.runStateful 4 (.initial core env [])=.outOfFuel cp ∧
       Core.runStateful 13 (.initial core env [])=fault ∧ Core.runStateful 9 cp=fault)) "typed rows preserve full missing-store checkpoint/fault"
-private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
+private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private def delay : Nat → Core.Expr | 0 => .var 0 | n+1 => .letE (.var 0) (delay n)
 private theorem delayTyped (n : Nat) (ctx : Core.Context) (found : ctx[0]?=some .word) : Core.HasType ctx (delay n) .word := by
   induction n generalizing ctx with | zero => exact .var found | succ n ih => exact .letE (.var found) (ih _ rfl)
@@ -273,11 +273,11 @@ def frontendParsedRecursiveComputationBodyEffectsTests : IO Unit := do
     verify "f(g(x));{f(g(x));return x;}" reader writer x .word (.letE (nested 2 1 0) (.letE (nested 3 2 1) (.var 2))) [w old] [w 14] (w 14) 49
     check (decide (Core.runStateful 24 (.initial (.letE (nested 2 1 0) (.letE (nested 3 2 1) (.var 2))) [x.value,writer.value,reader.value] [w old])=
       .outOfFuel ⟨.eval (.letE (nested 3 2 1) (.var 2)) [w 14,x.value,writer.value,reader.value],[],[w 14]⟩)) "actual hidden slot retains captured reader and updated store"
-    let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl) .word)⟩
-    let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word,.closure (.cell .word) .word (.loadCell (.var 0)) [],.closure .nil (.loadCell (.var rfl) .word)⟩
+    let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl))⟩
+    let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word,.closure (.cell .word) .word (.loadCell (.var 0)) [],.closure .nil (.loadCell (.var rfl))⟩
     verify "let r=f(g(x));return r;" load alloc x .word (.letE (nested 2 1 0) (.var 0)) [w old] [w old,w 14] (w 14) 18
     for choice in [false,true] do
-      let guard : TypedRuntimeArgument := ⟨.function .word .bool,.closure .word .bool (.letE (.storeCell (.var 1) (.var 0)) (.bool choice)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) .bool)⟩
+      let guard : TypedRuntimeArgument := ⟨.function .word .bool,.closure .word .bool (.letE (.storeCell (.var 1) (.var 0)) (.bool choice)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) .bool)⟩
       verify "if(f(g(x))){g(x);return x;}else{return x;}" guard identity x .word (.ifE (nested 2 1 0) (.letE (.apply (.var 1) (.var 0)) (.var 1)) (.var 0)) [w old] [w 14] (w 14) (if choice then 29 else 21)
     let maker : TypedRuntimeArgument := ⟨.function .word reader.type,.closure .word reader.type (.var 1) [reader.value],.closure (.cons reader.valueTyped .nil) (.var rfl)⟩
     verify "let h=f(x);return h(g(x));" maker writer x .word (.letE (.apply (.var 2) (.var 0)) (nested 0 2 1)) [w old] [w 14] (w 14) 30

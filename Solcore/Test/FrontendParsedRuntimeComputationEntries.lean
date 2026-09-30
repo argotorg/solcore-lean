@@ -253,9 +253,9 @@ private def verify (body : String) (f g x : TypedRuntimeArgument) (output : Core
           check (decide (fuel<cost ∧ Core.runStateful (cost-fuel) cp=.done value final ∧ runRuntimeComputationFunction? types owner source args (fuel+2) s=some (output,Core.runStateful 2 cp))) "entry retains genuine residual/full resume"
       | .fault _ _ => throw (IO.userError "independent successful path faulted")
   else throw (IO.userError "independent exact Core/type")
-private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
+private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private def delay : Nat → Core.Expr | 0 => .var 0 | n+1 => .letE (.var 0) (delay n)
 private theorem delayTyped (n : Nat) (ctx : Core.Context) (found : ctx[0]?=some .word) : Core.HasType ctx (delay n) .word := by
   induction n generalizing ctx with | zero => exact .var found | succ n ih => exact .letE (.var found) (ih _ rfl)
@@ -267,12 +267,12 @@ def frontendParsedRuntimeComputationEntryTests : IO Unit := do
     verify "f(x);return g(x);" writer reader x .word (.letE (app 2 0) (app 2 1)) [w old] [w 14] (w 14) 25
     verify "f(x);{g(x);return x;}" writer reader x .word (.letE (app 2 0) (.letE (app 2 1) (.var 2))) [w old] [w 14] (w 14) 28
     verify "f(x);return g;" writer reader x reader.type (.letE (app 2 0) (.var 2)) [w old] [w 14] reader.value 18
-    let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl) .word)⟩
-    let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word,.closure (.cell .word) .word (.loadCell (.var 0)) [],.closure .nil (.loadCell (.var rfl) .word)⟩
+    let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl))⟩
+    let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word,.closure (.cell .word) .word (.loadCell (.var 0)) [],.closure .nil (.loadCell (.var rfl))⟩
     for annotation in ["",":Cell"] do
       verify ("let p"++annotation++"=f(x);return g(p);") alloc load x .word (.letE (app 2 0) (app 2 0)) [w old] [w old,w 14] (w 14) 18
     for choice in [false,true] do
-      let guard : TypedRuntimeArgument := ⟨.function .word .bool,.closure .word .bool (.letE (.storeCell (.var 1) (.var 0)) (.bool choice)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) .bool)⟩
+      let guard : TypedRuntimeArgument := ⟨.function .word .bool,.closure .word .bool (.letE (.storeCell (.var 1) (.var 0)) (.bool choice)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) .bool)⟩
       verify "if(f(x)){return g(x);}else{return x;}" guard reader x .word (.ifE (app 2 0) (app 1 0) (.var 0)) [w old] [w 14] (w 14) (if choice then 23 else 16)
     let maker : TypedRuntimeArgument := ⟨.function .word reader.type,.closure .word reader.type (.var 1) [reader.value],.closure (.cons reader.valueTyped .nil) (.var rfl)⟩
     verify "let h=f(x);return h(x);" maker reader x .word (.letE (app 2 0) (app 0 1)) [w old] [w old] (w old) 16

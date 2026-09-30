@@ -226,9 +226,13 @@ private def verify (invoke : Bool) (l r location : Nat) (s final : Core.Store) (
             check (decide (fuel<cost ∧ Core.runStateful extra cp=Core.runStateful (fuel+extra) (.initial (core invoke) env s) ∧ Core.runStateful (cost-fuel) cp=.done value final)) "every genuine checkpoint and full resume"
     if validated : validateRuntimeInputs [.word,.word] args s=true then
       have runtime := validateRuntimeInputs_iff.mp validated
+      have finitePath : Core.Steps manual.cost
+          (.initial p.1.core p.1.inputs.environment.values s) (.final manual.value manual.final) := by
+        rw [p.2.down.2.1]
+        exact literal []
       have safe := p.2.down.1.runtime_typed_execution (F := RecursiveLocalComputationFragment) (ChildEval := RecursiveLocalComputationEvaluates) (ChildCost := RecursiveLocalComputationEvaluatesWithCost)
-        RecursiveLocalComputationElaborates.core_hasType RecursiveLocalComputationElaborates.core_fragment RecursiveLocalComputationFragment.weakenAt RecursiveLocalComputationFragment.evaluates_insert_iff RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation elaborateRecursiveLocalComputation?_iff runtime.1 runtime.2
-      have agreement : ∃ future, Core.WorldExtends [.word,.word] future ∧ Core.StoreHasTypes future manual.final ∧ Core.RuntimeValueHasType future manual.value (output invoke) ∧ RecursiveComputationReturnTreeEvaluatesWithCost owner i.names i.environment s source.value.body manual.value manual.final manual.cost ∧
+        RecursiveLocalComputationElaborates.core_hasType RecursiveLocalComputationElaborates.core_fragment RecursiveLocalComputationFragment.weakenAt RecursiveLocalComputationFragment.evaluates_insert_iff RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation elaborateRecursiveLocalComputation?_iff runtime.1 runtime.2 ⟨manual.value, manual.final, Core.steps_from_initial_sound finitePath⟩
+      have agreement : ∃ future, Core.WorldExtends [.word,.word] future ∧ Core.RuntimeStoreHasTypes future manual.final ∧ Core.RuntimeValueHasType future manual.value (output invoke) ∧ RecursiveComputationReturnTreeEvaluatesWithCost owner i.names i.environment s source.value.body manual.value manual.final manual.cost ∧
           ∀ fuel, (Core.runStateful fuel (.initial (core invoke) env s)=.done manual.value manual.final ↔ manual.cost≤fuel) ∧ ((∃ cp, Core.runStateful fuel (.initial (core invoke) env s)=.outOfFuel cp) ↔ fuel<manual.cost) := by
         obtain ⟨future,t,v,n,extension,stored,typed,sourceCost,paths,thresholds,_⟩ := safe.2
         have closed : Core.Steps manual.cost (.initial p.1.core p.1.inputs.environment.values s) (.final manual.value manual.final) := by rw [p.2.down.2.1]; exact literal []
@@ -241,7 +245,7 @@ private def verify (invoke : Bool) (l r location : Nat) (s final : Core.Store) (
         match stopped : Core.runStateful spent (.initial (core invoke) env s) with
         | .outOfFuel cp =>
             have saved := original.runtime_checkpoint_world_extension RecursiveLocalComputationElaborates.core_hasType actual runtime.2 Core.ContinuationHasType.nil stopped
-            have future : ∃ savedWorld finalWorld, Core.WorldExtends [.word,.word] savedWorld ∧ Core.StoreHasTypes savedWorld cp.store ∧ Core.WorldExtends savedWorld finalWorld ∧ Core.StoreHasTypes finalWorld manual.final := by
+            have future : ∃ savedWorld finalWorld, Core.WorldExtends [.word,.word] savedWorld ∧ Core.RuntimeStoreHasTypes savedWorld cp.store ∧ Core.WorldExtends savedWorld finalWorld ∧ Core.RuntimeStoreHasTypes finalWorld manual.final := by
               obtain ⟨savedWorld,ext,storeTyped,resumed⟩ := saved
               obtain ⟨future,growth,finalTyped⟩ := resumed ((literal []).residual_of_outOfFuel stopped).2
               exact ⟨savedWorld,future,ext,storeTyped,growth,finalTyped⟩

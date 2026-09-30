@@ -91,7 +91,7 @@ theorem same_world_safety_identifies_the_independent_actual_path
     (ft : Core.RuntimeValueHasType world (.closure a b body captured) (.function a b))
     (xt : Core.RuntimeValueHasType world x a) (st : Core.StoreHasTypes world store)
     (path : ∀ k, Core.Steps cost ⟨.eval body (x::captured),k,store⟩ ⟨.ret value,k,final⟩) :
-    ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future final ∧
+    ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future final ∧
       Core.RuntimeValueHasType future value b ∧
       RecursiveComputationReturnTreeEvaluatesWithCost owner (inputs a b).names
         (environment (.closure a b body captured) x) store source value final (cost+11) ∧
@@ -110,6 +110,7 @@ theorem same_world_safety_identifies_the_independent_actual_path
       RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost
       RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
       (elaborated a b) rfl (environmentTyped ft xt) st
+      ⟨value, final, Core.steps_from_initial_sound (manual a b body captured x value store final cost path [])⟩
   obtain ⟨rfl,rfl,rfl⟩ := (paths []).final_unique (manual a b body captured x value store final cost path [])
   exact ⟨future,ext,stored,typed,raw,paths,thresholds⟩
 
@@ -142,7 +143,7 @@ theorem arbitrary_well_typed_delays_keep_literal_captures_and_source_cost
     (xt : Core.RuntimeValueHasType world x a) (vt : Core.RuntimeValueHasType world value b)
     (ct : Core.RuntimeEnvironmentHasTypes world captured context) (st : Core.StoreHasTypes world store) (n : Nat) :
     Core.RuntimeEnvironmentHasTypes world (environment (closure a b n value captured) x).values (inputs a b).context.values ∧
-    ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future store ∧
+    ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future store ∧
       Core.RuntimeValueHasType future value b ∧
       RecursiveComputationReturnTreeEvaluatesWithCost owner (inputs a b).names
         (environment (closure a b n value captured) x) store source value store (3*n+12) := by
@@ -227,13 +228,13 @@ theorem allocation_extends_the_world_of_the_original_body {world : Core.StoreTyp
     RecursiveComputationReturnTreeEvaluatesWithCost owner (inputs .word (.cell .word)).names
       (environment (.closure .word (.cell .word) (.newCell .word (.var 0)) []) (.word word))
         store source (.cellRef .word store.length) (store++[.word word]) 14 ∧
-    ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future (store++[.word word]) ∧
+    ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future (store++[.word word]) ∧
       Core.RuntimeValueHasType future (.cellRef .word store.length) (.cell .word) := by
   have path (k) : Core.Steps 3 ⟨.eval (.newCell .word (.var 0)) [.word word],k,store⟩
       ⟨.ret (.cellRef .word store.length),k,store++[.word word]⟩ :=
     .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl))
   obtain ⟨future,ext,stored,typed,raw,_⟩ := same_world_safety_identifies_the_independent_actual_path
-    (Core.RuntimeValueHasType.closure .nil (.newCell (.var rfl) .word)) Core.RuntimeValueHasType.word st path
+    (Core.RuntimeValueHasType.closure .nil (.newCell (.var rfl))) Core.RuntimeValueHasType.word st path
   refine ⟨⟨[.word],rfl⟩,st.allocate .word .word,.cellRef ?_,raw,future,ext,stored,typed⟩
   simp [←st.length_eq]
 

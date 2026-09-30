@@ -2,7 +2,7 @@ import Solcore.Core.Check
 import Solcore.Core.Machine
 import Solcore.Core.Safety
 
-/-! Executable regressions for first-order local cells and explicit stores. -/
+/-! Executable regressions for general local cells and explicit stores. -/
 
 set_option autoImplicit false
 
@@ -234,43 +234,52 @@ private def testFaultOrder : IO Unit := do
       throw (IO.userError
         s!"dangling load returned an unexpected result: {reprStr result}")
 
-private def testDetailedCellErrors : IO Unit := do
-  let invalidPayload : Program := {
-    resultType := .cell (.function .unit .unit)
+private def testGeneralPayloads : IO Unit := do
+  let functionPayload : Program := {
+    resultType := .bool
     body :=
-      .newCell
-        (.function .unit .unit)
-        (.lambda .unit .unit (.var 0))
+      .letE
+        (.newCell (.function .unit .bool) (.lambda .unit .bool (.bool false)))
+        (.letE
+          (.storeCell (.var 0) (.lambda .unit .bool (.bool true)))
+          (.apply (.loadCell (.var 1)) .unit))
   }
-  assertCheckError
-    "function cell payload"
-    invalidPayload
-    []
-    (.invalidCellPayload (.function .unit .unit))
+  assertTrue functionPayload.check
+    "function cells must admit allocation, replacement, loading, and invocation"
+  assertTrue (functionPayload.checkDetailed.toOption == some .bool)
+    "detailed checking must admit the same function cell program"
+  assertTrue (functionPayload.run 40 == .done (.bool true))
+    "loading a replaced function cell must call its current closure"
 
   let nestedFunctionPayload : Program := {
-    resultType := .cell (.product .unit (.function .unit .unit))
+    resultType := .unit
     body :=
-      .newCell
-        (.product .unit (.function .unit .unit))
-        (.pair .unit (.lambda .unit .unit (.var 0)))
+      .apply
+        (.second (.loadCell
+          (.newCell (.product .unit (.function .unit .unit))
+            (.pair .unit (.lambda .unit .unit (.var 0))))))
+        .unit
   }
-  assertCheckError
-    "nested function cell payload"
-    nestedFunctionPayload
-    []
-    (.invalidCellPayload (.product .unit (.function .unit .unit)))
+  assertTrue nestedFunctionPayload.check
+    "products containing functions must be admitted as cell contents"
+  assertTrue (nestedFunctionPayload.run 40 == .done .unit)
+    "a function inside a stored product must retain its callable value"
 
   let nestedCellPayload : Program := {
-    resultType := .cell (.cell .unit)
-    body := .newCell (.cell .unit) (.newCell .unit .unit)
+    resultType := .bool
+    body :=
+      .letE (.newCell (.cell .bool) (.newCell .bool (.bool false)))
+        (.letE
+          (.storeCell (.loadCell (.var 0)) (.bool true))
+          (.loadCell (.loadCell (.var 1))))
   }
-  assertCheckError
-    "nested cell payload"
-    nestedCellPayload
-    []
-    (.invalidCellPayload (.cell .unit))
+  assertTrue nestedCellPayload.check
+    "cells containing references must pass the general checker"
+  assertTrue (nestedCellPayload.runStateful 40 ==
+      .done (.bool true) [.bool true, .cellRef .bool 0])
+    "loading a stored reference must preserve its original cell identity"
 
+private def testDetailedCellErrors : IO Unit := do
   let wrongInitializer : Program := {
     resultType := .cell .bool
     body := .newCell .bool .unit
@@ -303,6 +312,18 @@ private def testDetailedCellErrors : IO Unit := do
     [.letBody, .storeCellValue]
     (.cellValueTypeMismatch .bool .unit)
 
+  let wrongFunctionValue : Program := {
+    resultType := .unit
+    body :=
+      .letE (.newCell (.function .unit .unit) (.lambda .unit .unit (.var 0)))
+        (.storeCell (.var 0) (.lambda .bool .bool (.var 0)))
+  }
+  assertCheckError
+    "wrong function-valued cell write"
+    wrongFunctionValue
+    [.letBody, .storeCellValue]
+    (.cellValueTypeMismatch (.function .unit .unit) (.function .bool .bool))
+
 private def testCellWeakening : IO Unit := do
   let expression : Expr :=
     .storeCell
@@ -315,12 +336,13 @@ private def testCellWeakening : IO Unit := do
   assertTrue (expression.weakenAt 0 == expected)
     "weakening must traverse every cell-operation operand"
 
-/-- Cover typed first-order cells, explicit-store order and identity, closure
+/-- Cover general typed cells, explicit-store order and identity, closure
 sharing, detailed diagnostics, faults, and exact fuel. -/
 def testCoreCells : IO Unit := do
   testAllocationAndExactFuel
   testLoadStoreAndAliases
   testCompositePayloads
+  testGeneralPayloads
   testClosureSharedCell
   testStoreEffectOrder
   testFaultOrder

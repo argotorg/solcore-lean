@@ -37,7 +37,7 @@ theorem left_allocation_is_nonlocal_but_ordinary_word_typing_is_recovered
     HasType (.word :: tail) (allocating allocated left) .word definitions ∧
     HasType (.word :: tail) (.var 0) .word definitions := by
   have leftTyped : HasType (.word :: tail) (allocating allocated left) .word definitions :=
-    .letE (.newCell .word .word) .word
+    .letE (.newCell .word) .word
   have typed := leftTyped.wordLt (show HasType (.word :: tail) (.var 0) .word definitions from .var rfl)
   have originalOperands := typed.wordLt_inv_local_right .var
   refine ⟨?_, typed, originalOperands.2.1, originalOperands.2.2⟩
@@ -120,9 +120,8 @@ theorem exact_fuel_and_resumption_keep_the_allocated_store_and_pending_right_env
   exact ⟨path.runStateful_done_iff, path.runStateful_outOfFuel_iff, (path.residual_of_outOfFuel checkpoint).2,
     runStateful_resume checkpoint fuel, path.resumed_done_iff checkpoint⟩
 
-/-- This is deliberately raw, untyped allocation: function values are not
-legal typed cell payloads. It witnesses the need for a local right operand in
-the new untyped bridge, not an admitted typed frontend program. -/
+/-- An admitted function cell can retain different captures after insertion.
+Scalar result typing alone does not give literal final-store equality. -/
 private def capturingRight (right : Word) : Expr :=
   .letE (.newCell (.function .unit .unit) (.lambda .unit .unit (.var 0))) (.word right)
 private def originalCapture : Value := .closure .unit .unit (.var 0) []
@@ -131,7 +130,7 @@ private def shiftedCapture (left : Word) : Value := .closure .unit .unit (.var 0
 theorem a_word_returning_right_operand_can_store_distinct_captures_after_insertion
     (left right : Word) (store : Store) :
     ¬Expr.LocalFragment (capturingRight right) ∧
-    (∀ type, ¬HasType [] (capturingRight right) type) ∧
+    HasType [] (capturingRight right) .word ∧
     Evaluates [] store (capturingRight right) (.word right) (store ++ [originalCapture]) ∧
     Evaluates [.word left] store ((capturingRight right).weakenAt 0) (.word right)
       (store ++ [shiftedCapture left]) ∧
@@ -140,11 +139,7 @@ theorem a_word_returning_right_operand_can_store_distinct_captures_after_inserti
   · intro fragment
     cases fragment with
     | letE allocation _ => cases allocation
-  · intro type typing
-    cases typing with
-    | letE allocation _ =>
-        cases allocation with
-        | newCell _ payload => cases payload
+  · exact .letE (.newCell (.lambda .unit .unit (.var rfl))) .word
   · simp only [capturingRight, Expr.weakenAt]
     exact .letE (.newCell .lambda) .word
   · intro same

@@ -35,7 +35,7 @@ private theorem elaborated : RecursiveComputationReturnTreeElaborates [] owner i
 private theorem bareElaborated : RecursiveComputationReturnTreeElaborates [] owner .empty bare .unit .unit := .bare
 private theorem readerTyped {world : Core.StoreTyping} {location : Nat}
     (allocated : world[location]?=some .word) : Core.RuntimeValueHasType world (reader location) (.function .unit .word) :=
-  .closure (.cons (.cellRef allocated) .nil) (.loadCell (.var rfl) .word)
+  .closure (.cons (.cellRef allocated) .nil) (.loadCell (.var rfl))
 private theorem actualTyped : Core.RuntimeEnvironmentHasTypes [.word] actual inputs.context.values :=
   .cons .unit (.cons (readerTyped rfl) .nil)
 private theorem wordStore (n : Nat) : Core.StoreHasTypes [.word] [w n] :=
@@ -133,7 +133,7 @@ theorem structural_capture_700_cannot_discharge_any_short_runtime_world :
       ¬ Core.RuntimeValueHasType world (.cellRef .word 700) (.cell .word)) ∧
     Core.runStateful 8 (.initial pairCore [.unit,reader 700] []) =
       .fault (.invalidCellLocation 700) ⟨.ret (.cellRef .word 700),[.loadCellApply,.pairRight call [.unit,reader 700]],[]⟩ := by
-  refine ⟨.cellRef,.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word),?_,rfl⟩
+  refine ⟨.cellRef,.closure (.cons .cellRef .nil) (.loadCell (.var rfl)),?_,rfl⟩
   intro world short typed
   cases typed with
   | cellRef found => have bound := (List.getElem?_eq_some_iff.mp found).1; omega

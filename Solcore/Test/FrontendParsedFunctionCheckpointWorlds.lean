@@ -28,8 +28,8 @@ private def core : Core.Expr := .letE (.apply (.var 2) (.var 0)) first
 private def caller : Core.Expr := .letE (.storeCell (.var 1) (.word (Core.Word.ofNatModulo 7))) (.loadCell (.var 1))
 private def pending : List Core.Frame := [.newCellApply .word,.letBody caller [.cellRef .word 0],.pairApply (.bool true)]
 private theorem pendingTyped : Core.ContinuationHasType [.word,.word] pending .word (.product .bool .word) :=
-  .cons (.newCellApply .word) (.cons (.letBody (.cons (.cellRef rfl) .nil)
-    (.letE (.storeCell (.var rfl) .word .word) (.loadCell (.var rfl) .word))) (.cons (.pairApply .bool) .nil))
+  .cons .newCellApply (.cons (.letBody (.cons (.cellRef rfl) .nil)
+    (.letE (.storeCell (.var rfl) .word) (.loadCell (.var rfl)))) (.cons (.pairApply .bool) .nil))
 private def parsed : IO Syntax.FunctionDecl := do
   let text := "function checkpoint(f:function(Word) returns(Word),g:function(Word) returns(Word),x:Word) returns(Word){let x:Word=f(x);g(x);let x=f(x);return x;}"
   let file : Syntax.SourceFile := ⟨⟨.main,"function-checkpoint-worlds.sol"⟩,text⟩
@@ -176,18 +176,8 @@ private def arguments (f g : Core.Value) : IO (List TypedRuntimeArgument) :=
     | some a => have _ := buildRuntimeArgument?_iff.mp built; check (decide (a.value=v ∧ a.type=v.type)) "literal supplied values and captures"; return a
     | none => throw (IO.userError "structural actual argument")
 private theorem storeWorld {world : Core.StoreTyping} {store : Core.Store}
-    (typed : Core.StoreHasTypes world store) : world=store.map Core.Value.type := by
-  induction world generalizing store with
-  | nil => have empty : store=[] := List.length_eq_zero_iff.mp typed.length_eq.symm; subst store; rfl
-  | cons type types ih =>
-      cases store with
-      | nil => have impossible := typed.length_eq; cases impossible
-      | cons value values =>
-          obtain ⟨head,found,_,headTyped⟩ := typed.lookup (location := 0) rfl
-          have same : head=value := (Option.some.inj found).symm
-          subst head
-          have tail : Core.StoreHasTypes types values := ⟨Nat.succ.inj typed.length_eq,fun {index _} found => typed.lookup (location := index+1) found⟩
-          simp only [List.map_cons,← headTyped.type_eq,ih tail]
+    (typed : Core.RuntimeStoreHasTypes world store) : world=store.map Core.Value.type :=
+  typed.world_eq
 private def verify (l m a r : Nat) : IO Unit := do
   let f := allocator l m; let g := writer m; let s := [w 41,w 99]; let env : Core.Environment := [w 14,g,f]
   let allocated := s++[w 14]; let written := if m=0 then [w a,w 99,w 14] else [w 41,w a,w 14]
@@ -227,8 +217,8 @@ private def verify (l m a r : Nat) : IO Unit := do
         | .outOfFuel cp =>
             have _ := exactSafe.2.2 exhausted
             have saved := p.evidence.runtime_checkpoint_world_extension RecursiveLocalComputationElaborates.core_hasType runtime.1 runtime.2 pendingTyped (by simpa only [ev] using exhausted)
-            have terminal : ∃ savedWorld future, Core.WorldExtends [.word,.word] savedWorld ∧ Core.StoreHasTypes savedWorld cp.store ∧
-                Core.WorldExtends savedWorld future ∧ Core.StoreHasTypes future finalStore ∧ future[0]?=some .word := by
+            have terminal : ∃ savedWorld future, Core.WorldExtends [.word,.word] savedWorld ∧ Core.RuntimeStoreHasTypes savedWorld cp.store ∧
+                Core.WorldExtends savedWorld future ∧ Core.RuntimeStoreHasTypes future finalStore ∧ future[0]?=some .word := by
               obtain ⟨savedWorld,ext,stored,further⟩ := saved
               obtain ⟨future,growth,typed⟩ := further (whole.residual_of_outOfFuel exhausted).2
               exact ⟨savedWorld,future,ext,stored,growth,typed,(ext.trans growth).lookup rfl⟩
@@ -239,7 +229,7 @@ private def verify (l m a r : Nat) : IO Unit := do
               check (decide (Core.runStateful more cp=Core.runStateful (fuel+more) start)) "full resumption, not re-preparation"
               match again : Core.runStateful more cp with
               | .outOfFuel next =>
-                  have chain : ∃ savedWorld future, Core.WorldExtends [.word,.word] savedWorld ∧ Core.StoreHasTypes savedWorld cp.store ∧ Core.WorldExtends savedWorld future ∧ Core.StoreHasTypes future next.store := by
+                  have chain : ∃ savedWorld future, Core.WorldExtends [.word,.word] savedWorld ∧ Core.RuntimeStoreHasTypes savedWorld cp.store ∧ Core.WorldExtends savedWorld future ∧ Core.RuntimeStoreHasTypes future next.store := by
                     obtain ⟨savedWorld,ext,stored,further⟩ := saved
                     obtain ⟨future,growth,typed⟩ := further (Core.runStateful_outOfFuel_sound again).1
                     exact ⟨savedWorld,future,ext,stored,growth,typed⟩
@@ -254,15 +244,15 @@ private def verify (l m a r : Nat) : IO Unit := do
       let cpD : Core.State := ⟨.ret .unit,[.letBody (.loadCell (.var 1)) [.cellRef .word 4,.cellRef .word 0],.pairApply (.bool true)],finalStore⟩
       for (spent,cp) in [(10,cpA),(31,cpW),(46,cpB),(56,⟨.ret (w r),pending,bodyStore⟩),(57,cpC),(64,cpD)] do
         if exhausted : Core.runStateful spent start=.outOfFuel cp then
-          have actualWorld : Core.WorldExtends [.word,.word] (cp.store.map Core.Value.type) ∧ Core.StoreHasTypes (cp.store.map Core.Value.type) cp.store := by
+          have actualWorld : Core.WorldExtends [.word,.word] (cp.store.map Core.Value.type) ∧ Core.RuntimeStoreHasTypes (cp.store.map Core.Value.type) cp.store := by
             obtain ⟨world,ext,typed,_⟩ := p.evidence.runtime_checkpoint_world_extension RecursiveLocalComputationElaborates.core_hasType runtime.1 runtime.2 pendingTyped (by simpa only [ev] using exhausted)
             simpa only [storeWorld typed] using And.intro ext typed
           have _ := actualWorld
           check (decide (Core.runStateful (69-spent) cp=.done (.pair (.bool true) (w r)) finalStore)) "literal original captures, discard slot and caller frames"
         else throw (IO.userError "literal checkpoint")
       if links : Core.runStateful 10 start=.outOfFuel cpA ∧ Core.runStateful 21 cpA=.outOfFuel cpW ∧ Core.runStateful 15 cpW=.outOfFuel cpB ∧ Core.runStateful 11 cpB=.outOfFuel cpC ∧ Core.runStateful 7 cpC=.outOfFuel cpD then
-        have worlds : Core.WorldExtends [.word,.word] [.word,.word,.word] ∧ Core.StoreHasTypes [.word,.word,.word] cpA.store ∧ Core.StoreHasTypes [.word,.word,.word] cpW.store ∧
-            Core.StoreHasTypes [.word,.word,.word,.word] cpB.store ∧ Core.WorldExtends [.word,.word,.word] [.word,.word,.word,.word,.word] ∧ Core.StoreHasTypes [.word,.word,.word,.word,.word] cpC.store ∧ Core.StoreHasTypes [.word,.word,.word,.word,.word] cpD.store := by
+        have worlds : Core.WorldExtends [.word,.word] [.word,.word,.word] ∧ Core.RuntimeStoreHasTypes [.word,.word,.word] cpA.store ∧ Core.RuntimeStoreHasTypes [.word,.word,.word] cpW.store ∧
+            Core.RuntimeStoreHasTypes [.word,.word,.word,.word] cpB.store ∧ Core.WorldExtends [.word,.word,.word] [.word,.word,.word,.word,.word] ∧ Core.RuntimeStoreHasTypes [.word,.word,.word,.word,.word] cpC.store ∧ Core.RuntimeStoreHasTypes [.word,.word,.word,.word,.word] cpD.store := by
           obtain ⟨world,ext,stored,further⟩ := p.evidence.runtime_checkpoint_world_extension RecursiveLocalComputationElaborates.core_hasType runtime.1 runtime.2 pendingTyped (by simpa only [ev] using links.1)
           have initialWorld : world=[.word,.word,.word] := storeWorld stored
           subst world

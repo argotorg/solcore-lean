@@ -30,11 +30,11 @@ private def env (x : Nat) (choice swap : Bool) : Resolved.Environment :=
 private theorem envTyped (x : Nat) (choice swap : Bool) :
     Core.RuntimeEnvironmentHasTypes [.word] (env x choice swap).values inputs.context.values := by
   have r : Core.RuntimeValueHasType [.word] reader (.function .word .word) :=
-    .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word)
+    .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl))
   have g : Core.RuntimeValueHasType [.word] writer (.function .word .word) :=
-    .closure (.cons (.cellRef rfl) .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))
+    .closure (.cons (.cellRef rfl) .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))
   have a : Core.RuntimeValueHasType [.word] allocator (.function .word (.cell .word)) :=
-    .closure .nil (.newCell (.var rfl) .word)
+    .closure .nil (.newCell (.var rfl))
   cases swap
   · exact .cons .word (.cons r (.cons g (.cons a (.cons .bool (.cons .bool .nil)))))
   · exact .cons .word (.cons g (.cons r (.cons a (.cons .bool (.cons .bool .nil)))))
@@ -208,7 +208,7 @@ private def verify (text : String) (x old : Nat) (choice swap : Bool) : IO Unit 
     check (decide (elaborateRecursiveComputationReturnTree? types owner inputs source=some (fixed,.word) ∧
       inputs.names.lookup? "f"=some foreign ∧ (inputs.bindFresh owner "r" .word).names.lookup? "r"=some (id 31) ∧
       ((inputs.bindFresh owner "r" .word).bindFresh owner "p" (.cell .word)).names.lookup? "p"=some (id 32))) "exact checker, first match and owner-filtered freshness"
-    have identified : ∃ fw, Core.WorldExtends [.word] fw ∧ Core.StoreHasTypes fw manual.final ∧ Core.RuntimeValueHasType fw manual.value .word ∧
+    have identified : ∃ fw, Core.WorldExtends [.word] fw ∧ Core.RuntimeStoreHasTypes fw manual.final ∧ Core.RuntimeValueHasType fw manual.value .word ∧
         RecursiveComputationReturnTreeEvaluatesWithCost owner inputs.names e s source manual.value manual.final manual.cost := by
       obtain ⟨fw,fs,v,n,extension,storeTyped,valueTyped,originalCost,paths,_⟩ :=
         ComputationReturnTreeElaborates.runtime_typed_execution (F := RecursiveLocalComputationFragment)
@@ -218,6 +218,7 @@ private def verify (text : String) (x old : Nat) (choice swap : Bool) : IO Unit 
           RecursiveLocalComputationFragment.weakenAt RecursiveLocalComputationFragment.evaluates_insert_iff
           RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost
           RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation elaboration ids et st
+          ⟨manual.value, manual.final, Core.steps_from_initial_sound (manual.evidence [])⟩
       obtain ⟨rfl,rfl,rfl⟩ := (paths []).final_unique (manual.evidence [])
       exact ⟨fw,extension,storeTyped,valueTyped,originalCost⟩
     have counted := ComputationReturnTreeEvaluatesWithCost.toStepsWithContinuation (F := RecursiveLocalComputationFragment)

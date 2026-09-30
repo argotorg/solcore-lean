@@ -56,7 +56,7 @@ example : Evaluates [] [] (Expr.wordNeFlag (.word zero) (.word one))
 example : Evaluates [] [] (Expr.wordLtFlag (.word zero) (.word one))
     (.word one) [] :=
   Evaluates.wordLtFlag_lt (definitions := [])
-    (by decide) .word .word .word .word .nil .nil
+    (by decide) .word .word .word .word .nil .nil .nil
 
 example : Evaluates [] [] (Expr.wordLeFlag (.word one) (.word zero))
     (.word zero) [] :=
@@ -65,7 +65,7 @@ example : Evaluates [] [] (Expr.wordLeFlag (.word one) (.word zero))
 example : Evaluates [] [] (Expr.wordGeFlag (.word one) (.word zero))
     (.word one) [] :=
   Evaluates.wordGeFlag_not_lt (definitions := [])
-    (by decide) .word .word .word .word .nil .nil
+    (by decide) .word .word .word .word .nil .nil .nil
 
 private def wordProgram (body : Expr) : Program := {
   resultType := .word

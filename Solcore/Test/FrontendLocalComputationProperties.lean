@@ -179,7 +179,7 @@ theorem a_checked_word_result_does_not_validate_the_actual_store :
     Core.runStateful 7 (.initial (core true) readerEnv.values []) =
       .fault (.invalidCellLocation 0) ⟨.ret (.cellRef .word 0), [.loadCellApply], []⟩ := by
   refine ⟨elaborateLocalComputation?_iff.mpr (provenance true .unit .word span),
-    .cons .unit (.cons (.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)) (.cons .unit (.cons .unit .nil))), ?_, rfl, ?_, rfl⟩
+    .cons .unit (.cons (.closure (.cons .cellRef .nil) (.loadCell (.var rfl))) (.cons .unit (.cons .unit .nil))), ?_, rfl, ?_, rfl⟩
   · exact .application (.call (functionCost := 1) (argumentCost := 1) (bodyCost := 3)
       (.identifier .head (.tail (by decide) .head)) (.identifier (.tail (by decide) .head) .head)
       (.cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl))))

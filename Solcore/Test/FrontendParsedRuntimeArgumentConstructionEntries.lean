@@ -152,14 +152,18 @@ private def positive (source : Syntax.FunctionDecl) (rf rx : Core.Value) (output
   have envEq : p.1.inputs.environment.values=[rx,rf] := by rw [p.2.down.2.2.2,x.2.down,f.2.down]
   if validated : validateRuntimeInputs world [f.1,x.1] s=true then
     have runtime := validateRuntimeInputs_iff.mp validated
+    have finitePath : Core.Steps manual.cost
+        (.initial p.1.core p.1.inputs.environment.values s) (.final manual.value manual.final) := by
+      rw [p.2.down.2.1,envEq]
+      exact manual.evidence []
     have safe := ComputationFunctionPrepares.runtime_typed_execution (F := RecursiveLocalComputationFragment)
       (ChildElab := RecursiveLocalComputationElaborates) (ChildEval := RecursiveLocalComputationEvaluates) (ChildCost := RecursiveLocalComputationEvaluatesWithCost)
       RecursiveLocalComputationElaborates.core_hasType RecursiveLocalComputationElaborates.core_fragment
       RecursiveLocalComputationFragment.weakenAt RecursiveLocalComputationFragment.evaluates_insert_iff
       RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost
       RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
-      elaborateRecursiveLocalComputation?_iff p.2.down.1 runtime.1 runtime.2
-    have agreement : ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future manual.final ∧
+      elaborateRecursiveLocalComputation?_iff p.2.down.1 runtime.1 runtime.2 ⟨manual.value, manual.final, Core.steps_from_initial_sound finitePath⟩
+    have agreement : ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future manual.final ∧
         Core.RuntimeValueHasType future manual.value output ∧ RecursiveComputationReturnTreeEvaluatesWithCost owner p.1.inputs.names p.1.inputs.environment s source.value.body manual.value manual.final manual.cost ∧
         (∀ k, Core.Steps manual.cost ⟨.eval core [rx,rf],k,s⟩ ⟨.ret manual.value,k,manual.final⟩) ∧
         (∀ fuel, (Core.runStateful fuel (.initial core [rx,rf] s)=.done manual.value manual.final ↔ manual.cost≤fuel) ∧
@@ -172,7 +176,7 @@ private def positive (source : Syntax.FunctionDecl) (rf rx : Core.Value) (output
       · simpa only [p.2.down.2.1,envEq] using paths
       · simpa only [p.2.down.2.1,envEq] using thresholds
     if grows : s.length < manual.final.length then
-      have extension : ∃ future, Core.WorldExtends world future ∧ world.length < future.length ∧ Core.StoreHasTypes future manual.final := by
+      have extension : ∃ future, Core.WorldExtends world future ∧ world.length < future.length ∧ Core.RuntimeStoreHasTypes future manual.final := by
         obtain ⟨future,ext,st,_,_⟩ := agreement
         exact ⟨future,ext,by simpa only [runtime.2.length_eq,st.length_eq] using grows,st⟩
       have _ := extension

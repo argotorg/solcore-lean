@@ -96,13 +96,13 @@ theorem transition_preserves_host_state_type
   | enterNewCell =>
       cases stateTyping with
       | eval store env expr cont => cases expr with
-        | newCell initializer payload =>
-            exact .eval store env initializer (.cons (.newCellApply payload) cont)
+        | newCell initializer =>
+            exact .eval store env initializer (.cons .newCellApply cont)
   | @applyNewCell elementType initialValue continuation store =>
       cases stateTyping with
       | @ret _ world _ _ _ _ _ storeTyping valueTyping cont => cases cont with
         | cons frame rest => cases frame with
-          | @newCellApply _ _ payload =>
+          | newCellApply =>
               let futureWorld := world ++ [elementType]
               have extension : WorldExtends world futureWorld := ⟨[elementType], rfl⟩
               have futureStore : HostStoreHasTypes futureWorld (store.allocate initialValue).1 definitions := by
@@ -113,13 +113,13 @@ theorem transition_preserves_host_state_type
   | enterLoadCell =>
       cases stateTyping with
       | eval store env expr cont => cases expr with
-        | loadCell reference payload =>
-            exact .eval store env reference (.cons (.loadCellApply payload) cont)
+        | loadCell reference =>
+            exact .eval store env reference (.cons .loadCellApply cont)
   | applyLoadCell loaded =>
       cases stateTyping with
       | ret store cell cont => cases cont with
         | cons frame rest => cases frame with
-          | loadCellApply _ => cases cell with
+          | loadCellApply => cases cell with
             | cellRef found =>
                 obtain ⟨stored, read, typing⟩ := store.lookup found
                 rw [loaded] at read
@@ -128,19 +128,19 @@ theorem transition_preserves_host_state_type
   | enterStoreCell =>
       cases stateTyping with
       | eval store env expr cont => cases expr with
-        | storeCell reference value payload =>
-            exact .eval store env reference (.cons (.storeCellValue env value payload) cont)
+        | storeCell reference value =>
+            exact .eval store env reference (.cons (.storeCellValue env value) cont)
   | beginStoreCellValue _ =>
       cases stateTyping with
       | ret store cell cont => cases cont with
         | cons frame rest => cases frame with
-          | storeCellValue env value payload => cases cell with
-            | cellRef found => exact .eval store env value (.cons (.storeCellApply found payload) rest)
+          | storeCellValue env value => cases cell with
+            | cellRef found => exact .eval store env value (.cons (.storeCellApply found) rest)
   | applyStoreCell written =>
       cases stateTyping with
       | ret store value cont => cases cont with
         | cons frame rest => cases frame with
-          | storeCellApply found _ =>
+          | storeCellApply found =>
               exact .ret (store.write found value written) .unit rest
   | enterConstruct =>
       cases stateTyping with

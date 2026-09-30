@@ -41,23 +41,23 @@ example (left right : Expr) (cutoff : Nat) :
 example : Evaluates [] [] (Expr.wordSlt (.word zero) (.word one))
     (.bool (one.signedGt zero)) [] :=
   Evaluates.wordSlt (definitions := [])
-    .word .word .word .word .nil .nil
+    .word .word .word .word .nil .nil .nil
 example : Evaluates [] [] (Expr.wordSlt (.word zero) (.word one))
     (.bool true) [] :=
   Evaluates.wordSlt_both_nonnegative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] [] (Expr.wordSlt (.word highBit) (.word Word.maximum))
     (.bool true) [] :=
   Evaluates.wordSlt_both_negative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] [] (Expr.wordSlt (.word zero) (.word Word.maximum))
     (.bool false) [] :=
   Evaluates.wordSlt_nonnegative_negative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] [] (Expr.wordSlt (.word Word.maximum) (.word zero))
     (.bool true) [] :=
   Evaluates.wordSlt_negative_nonnegative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 
 private def boolProgram (body : Expr) : Program := {
   resultType := .bool

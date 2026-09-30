@@ -164,85 +164,43 @@ theorem isWellFormed_iff
 
 end Ty
 
-inductive ConstructorPayload (definitions : DataEnvironment) : Ty → Prop where
-  | unit : ConstructorPayload definitions .unit
-  | bool : ConstructorPayload definitions .bool
-  | word : ConstructorPayload definitions .word
-  | product {left right : Ty} :
-      ConstructorPayload definitions left →
-      ConstructorPayload definitions right →
-      ConstructorPayload definitions (.product left right)
-  | sum {left right : Ty} :
-      ConstructorPayload definitions left →
-      ConstructorPayload definitions right →
-      ConstructorPayload definitions (.sum left right)
-  | cell {elementType : Ty} :
-      CellPayload elementType →
-      ConstructorPayload definitions (.cell elementType)
-  | namedData {dataType : DataTypeId} {definition : DataDefinition} :
-      definitions[dataType.index]? = some definition →
-      ConstructorPayload definitions (.namedData dataType)
+/-- Constructor payloads use the same well-formed types as ordinary values,
+including functions and references. Runtime typing checks stored values in
+one shared world; data declarations impose no separate payload restriction. -/
+abbrev ConstructorPayload (definitions : DataEnvironment) (type : Ty) : Prop :=
+  Ty.WellFormed definitions type
+
+namespace ConstructorPayload
+
+export Ty.WellFormed (unit bool word product function sum cell namedData)
+
+end ConstructorPayload
 
 namespace Ty
 
-def isConstructorPayload (definitions : DataEnvironment) : Ty → Bool
-  | .unit
-  | .bool
-  | .word => true
-  | .product left right
-  | .sum left right =>
-      left.isConstructorPayload definitions &&
-        right.isConstructorPayload definitions
-  | .function _ _ => false
-  | .cell elementType => elementType.isCellPayload
-  | .namedData dataType => (definitions[dataType.index]?).isSome
+def isConstructorPayload (definitions : DataEnvironment) (type : Ty) : Bool :=
+  type.isWellFormed definitions
 
 theorem isConstructorPayload_sound
     {definitions : DataEnvironment}
     {type : Ty}
     (accepted : type.isConstructorPayload definitions = true) :
-    ConstructorPayload definitions type := by
-  induction type with
-  | unit => exact .unit
-  | bool => exact .bool
-  | word => exact .word
-  | product left right leftIH rightIH =>
-      simp [isConstructorPayload] at accepted
-      exact .product (leftIH accepted.1) (rightIH accepted.2)
-  | function parameter result parameterIH resultIH =>
-      simp [isConstructorPayload] at accepted
-  | sum left right leftIH rightIH =>
-      simp [isConstructorPayload] at accepted
-      exact .sum (leftIH accepted.1) (rightIH accepted.2)
-  | cell elementType elementIH =>
-      exact .cell (Ty.isCellPayload_sound accepted)
-  | namedData dataType =>
-      obtain ⟨definition, lookup⟩ := Option.isSome_iff_exists.mp accepted
-      exact .namedData lookup
+    ConstructorPayload definitions type :=
+  isWellFormed_sound accepted
 
 theorem isConstructorPayload_complete
     {definitions : DataEnvironment}
     {type : Ty}
     (payload : ConstructorPayload definitions type) :
-    type.isConstructorPayload definitions = true := by
-  induction payload with
-  | unit
-  | bool
-  | word => rfl
-  | product leftPayload rightPayload leftIH rightIH
-  | sum leftPayload rightPayload leftIH rightIH =>
-      simp [isConstructorPayload, leftIH, rightIH]
-  | cell payload =>
-      exact Ty.isCellPayload_complete payload
-  | namedData lookup =>
-      exact Option.isSome_iff_exists.mpr ⟨_, lookup⟩
+    type.isConstructorPayload definitions = true :=
+  isWellFormed_complete payload
 
 theorem isConstructorPayload_iff
     {definitions : DataEnvironment}
     {type : Ty} :
     type.isConstructorPayload definitions = true ↔
       ConstructorPayload definitions type :=
-  ⟨isConstructorPayload_sound, isConstructorPayload_complete⟩
+  isWellFormed_iff
 
 end Ty
 
@@ -270,19 +228,8 @@ theorem wellFormed
     {definitions : DataEnvironment}
     {type : Ty}
     (payload : ConstructorPayload definitions type) :
-    Ty.WellFormed definitions type := by
-  induction payload with
-  | unit => exact .unit
-  | bool => exact .bool
-  | word => exact .word
-  | product leftPayload rightPayload leftIH rightIH =>
-      exact .product leftIH rightIH
-  | sum leftPayload rightPayload leftIH rightIH =>
-      exact .sum leftIH rightIH
-  | cell payload =>
-      exact .cell payload.wellFormed
-  | namedData lookup =>
-      exact .namedData lookup
+    Ty.WellFormed definitions type :=
+  payload
 
 end ConstructorPayload
 

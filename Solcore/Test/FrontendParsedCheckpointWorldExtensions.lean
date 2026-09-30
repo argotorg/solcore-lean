@@ -174,21 +174,8 @@ private theorem runtimeArguments {world : Core.StoreTyping} (args : List TypedRu
   | nil => exact .nil
   | cons a rest ih => exact .cons (typed a (by simp)) (ih (fun v member => typed v (by simp [member])))
 private theorem storeWorld {world : Core.StoreTyping} {store : Core.Store}
-    (typed : Core.StoreHasTypes world store) : world=store.map Core.Value.type := by
-  induction world generalizing store with
-  | nil =>
-      have empty : store=[] := List.length_eq_zero_iff.mp typed.length_eq.symm
-      subst store; rfl
-  | cons type types ih =>
-      cases store with
-      | nil => have impossible := typed.length_eq; cases impossible
-      | cons value values =>
-          obtain ⟨head,found,_,headTyped⟩ := typed.lookup (location := 0) rfl
-          have same : head=value := (Option.some.inj found).symm
-          subst head
-          have tail : Core.StoreHasTypes types values :=
-            ⟨Nat.succ.inj typed.length_eq,fun {index _} found => typed.lookup (location := index+1) found⟩
-          simp only [List.map_cons,←headTyped.type_eq,ih tail]
+    (typed : Core.RuntimeStoreHasTypes world store) : world=store.map Core.Value.type :=
+  typed.world_eq
 private def verify (source : Syntax.FunctionDecl) : IO Unit := do
   let manual ← path 80 core env [w 23]
   check (decide (manual.cost=74 ∧ manual.value=w 14 ∧ manual.final=finalStore)) "independent literal raw path and effects"
@@ -223,12 +210,12 @@ private def verify (source : Syntax.FunctionDecl) : IO Unit := do
           have saved := original.runtime_checkpoint_world_extension RecursiveLocalComputationElaborates.core_hasType actual runtime.2 typedK exhausted
           have _ := safe.2.2 exhausted
           have _ := wholePath.residual_of_outOfFuel exhausted
-          have oldReference : ∃ savedWorld, Core.WorldExtends [.word] savedWorld ∧ Core.StoreHasTypes savedWorld cp.store ∧ savedWorld[0]?=some .word := by
+          have oldReference : ∃ savedWorld, Core.WorldExtends [.word] savedWorld ∧ Core.RuntimeStoreHasTypes savedWorld cp.store ∧ savedWorld[0]?=some .word := by
             obtain ⟨savedWorld,extension,stored,_⟩ := saved
             exact ⟨savedWorld,extension,stored,extension.lookup rfl⟩
           have _ := oldReference
-          have terminal : ∃ savedWorld future, Core.WorldExtends [.word] savedWorld ∧ Core.StoreHasTypes savedWorld cp.store ∧
-              Core.WorldExtends savedWorld future ∧ Core.StoreHasTypes future manual.final := by
+          have terminal : ∃ savedWorld future, Core.WorldExtends [.word] savedWorld ∧ Core.RuntimeStoreHasTypes savedWorld cp.store ∧
+              Core.WorldExtends savedWorld future ∧ Core.RuntimeStoreHasTypes future manual.final := by
             obtain ⟨savedWorld,extension,stored,resumed⟩ := saved
             obtain ⟨future,growth,finalTyped⟩ := resumed (wholePath.residual_of_outOfFuel exhausted).2
             exact ⟨savedWorld,future,extension,stored,growth,finalTyped⟩
@@ -238,8 +225,8 @@ private def verify (source : Syntax.FunctionDecl) : IO Unit := do
             check (decide (Core.runStateful extra cp=Core.runStateful (fuel+extra) start)) "full original/resumed state equality"
             match again : Core.runStateful extra cp with
             | .outOfFuel next =>
-                have chain : ∃ saved future, Core.WorldExtends [.word] saved ∧ Core.StoreHasTypes saved cp.store ∧
-                    Core.WorldExtends saved future ∧ Core.StoreHasTypes future next.store ∧ future[0]?=some .word := by
+                have chain : ∃ saved future, Core.WorldExtends [.word] saved ∧ Core.RuntimeStoreHasTypes saved cp.store ∧
+                    Core.WorldExtends saved future ∧ Core.RuntimeStoreHasTypes future next.store ∧ future[0]?=some .word := by
                   obtain ⟨savedWorld,extension,stored,resumed⟩ := saved
                   obtain ⟨future,growth,nextTyped⟩ := resumed (Core.runStateful_outOfFuel_sound again).1
                   exact ⟨savedWorld,future,extension,stored,growth,nextTyped,(extension.trans growth).lookup rfl⟩
@@ -251,16 +238,16 @@ private def verify (source : Syntax.FunctionDecl) : IO Unit := do
     let second : Core.State := ⟨.ret (.cellRef .word 2),.letBody finalCall (w 14::.cellRef .word 1::env)::pending,finalStore⟩
     for (spent,cp) in [(21,first),(38,written),(60,second)] do
       if genuine : Core.runStateful spent start=.outOfFuel cp then
-        have identified : Core.WorldExtends [.word] (cp.store.map Core.Value.type) ∧ Core.StoreHasTypes (cp.store.map Core.Value.type) cp.store := by
+        have identified : Core.WorldExtends [.word] (cp.store.map Core.Value.type) ∧ Core.RuntimeStoreHasTypes (cp.store.map Core.Value.type) cp.store := by
           obtain ⟨world,ext,stored,_⟩ := original.runtime_checkpoint_world_extension RecursiveLocalComputationElaborates.core_hasType actual runtime.2 typedK genuine
           simpa only [storeWorld stored] using And.intro ext stored
         have _ := identified
         check (decide (Core.runStateful (75-spent) cp=.done result finalStore)) "allocation/write/allocation preserve actual saved binders/captures"
       else throw (IO.userError "literal checkpoint mismatch")
     if chain : Core.runStateful 21 start=.outOfFuel first ∧ Core.runStateful 17 first=.outOfFuel written ∧ Core.runStateful 22 written=.outOfFuel second then
-      have exactWorlds : Core.WorldExtends [.word] [.word,.word] ∧ Core.StoreHasTypes [.word,.word] first.store ∧
-          Core.StoreHasTypes [.word,.word] written.store ∧ Core.WorldExtends [.word,.word] [.word,.word,.word] ∧
-          Core.StoreHasTypes [.word,.word,.word] second.store := by
+      have exactWorlds : Core.WorldExtends [.word] [.word,.word] ∧ Core.RuntimeStoreHasTypes [.word,.word] first.store ∧
+          Core.RuntimeStoreHasTypes [.word,.word] written.store ∧ Core.WorldExtends [.word,.word] [.word,.word,.word] ∧
+          Core.RuntimeStoreHasTypes [.word,.word,.word] second.store := by
         obtain ⟨saved,ext,stored,further⟩ := original.runtime_checkpoint_world_extension RecursiveLocalComputationElaborates.core_hasType actual runtime.2 typedK chain.1
         have writePath := (Core.runStateful_outOfFuel_sound chain.2.1).1
         obtain ⟨afterWrite,_,writeTyped⟩ := further writePath

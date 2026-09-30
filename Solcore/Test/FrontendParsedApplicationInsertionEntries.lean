@@ -244,13 +244,13 @@ def frontendParsedApplicationInsertionEntryTests : IO Unit := do
       (.closure .nil (delayedTyped n .word [])) (delayedPath n (w 14) [] [])
   for current in [3,17] do
     execute ⟨.word,w 14,.word⟩ .word (.loadCell (.var 1)) [.cellRef .word 0] [w current] [w current] (w current) 3
-      (.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word))
+      (.closure (.cons .cellRef .nil) (.loadCell (.var rfl)))
       (fun _ => .cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl)))
     execute ⟨.word,w 14,.word⟩ (.cell .word) (.newCell .word (.var 0)) [] [w current] [w current,w 14] (.cellRef .word 1) 3
-      (.closure .nil (.newCell (.var rfl) .word)) (fun _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
+      (.closure .nil (.newCell (.var rfl))) (fun _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
     execute ⟨.word,w 14,.word⟩ .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0]
       [w current] [w 14] (w 14) 10
-      (.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word)))
+      (.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl))))
       (fun _ => .cons .enterLet (.cons .enterStoreCell (.cons (.var rfl) (.cons (.beginStoreCellValue rfl)
         (.cons (.var rfl) (.cons (.applyStoreCell rfl) (.cons .bindLet (.cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl))))))))))
   for type in [Core.Ty.namedData ⟨99⟩,.product (.namedData ⟨4⟩) (.namedData ⟨8⟩)] do

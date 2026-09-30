@@ -37,14 +37,14 @@ private def unitArg : TypedRuntimeArgument := ⟨.unit,.unit,.unit⟩
 private def wordArg (word : Core.Word) : TypedRuntimeArgument := ⟨.word,.word word,.word⟩
 private def pending (arg : TypedRuntimeArgument) : List Core.Frame := [.newCellApply arg.type,.pairApply (.bool false)]
 private theorem pendingTyped {world : Core.StoreTyping} {arg : TypedRuntimeArgument}
-    (payload : Core.CellPayload arg.type) :
+    (_payload : Core.CellPayload arg.type) :
     Core.ContinuationHasType world (pending arg) arg.type (.product .bool (.cell arg.type)) :=
-  .cons (.newCellApply payload) (.cons (.pairApply .bool) .nil)
+  .cons (.newCellApply) (.cons (.pairApply .bool) .nil)
 private theorem stopped (arg : TypedRuntimeArgument) (store : Core.Store) :
     Core.runStateful 1 (start arg (pending arg) store) = .outOfFuel (saved arg (pending arg) store) := rfl
 
 theorem literal_arguments_and_a_different_caller_result_type_remain_safe
-    (arg : TypedRuntimeArgument) (payload : Core.CellPayload arg.type)
+    (arg : TypedRuntimeArgument) (_payload : Core.CellPayload arg.type)
     {world : Core.StoreTyping} {store : Core.Store}
     (typed : Core.RuntimeValueHasType world arg.value arg.type) (stored : Core.StoreHasTypes world store) :
     RecursiveComputationFunctionPrepares (types arg.type) owner entry [arg] (prepared arg) ∧
@@ -56,19 +56,19 @@ theorem literal_arguments_and_a_different_caller_result_type_remain_safe
     Core.runStateful 2 (saved arg (pending arg) store) =
       .done (.pair (.bool false) (.cellRef arg.type store.length)) (store++[arg.value]) := by
   have safety := (preparation arg).runtime_checkpoint_safety RecursiveLocalComputationElaborates.core_hasType
-    (argumentsTyped typed) stored (pendingTyped payload)
+    (argumentsTyped typed) stored (pendingTyped _payload)
   exact ⟨preparation arg,safety.1,safety.2.1,(safety.2.2 (stopped arg store)).1,
     (safety.2.2 (stopped arg store)).2,Core.runStateful_resume (stopped arg store),rfl⟩
 
 theorem actual_caller_allocation_extends_the_original_world_and_keeps_old_references
-    (arg : TypedRuntimeArgument) (payload : Core.CellPayload arg.type)
+    (arg : TypedRuntimeArgument) (_payload : Core.CellPayload arg.type)
     {world : Core.StoreTyping} {store : Core.Store}
     (typed : Core.RuntimeValueHasType world arg.value arg.type) (stored : Core.StoreHasTypes world store) :
-    ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future (store++[arg.value]) ∧
+    ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future (store++[arg.value]) ∧
       world.length < future.length ∧
       ∀ {location : Nat} {type : Core.Ty}, world[location]?=some type → future[location]?=some type := by
   obtain ⟨_,extension,_,further⟩ := (preparation arg).runtime_checkpoint_world_extension
-    RecursiveLocalComputationElaborates.core_hasType (argumentsTyped typed) stored (pendingTyped payload) (stopped arg store)
+    RecursiveLocalComputationElaborates.core_hasType (argumentsTyped typed) stored (pendingTyped _payload) (stopped arg store)
   have path : Core.Steps 1 (saved arg (pending arg) store)
       ⟨.ret (.cellRef arg.type store.length),[.pairApply (.bool false)],store++[arg.value]⟩ := .cons .applyNewCell .refl
   obtain ⟨future,more,finalTyped⟩ := further path
@@ -86,7 +86,7 @@ theorem structurally_prepared_references_need_not_be_allocated (location : Nat) 
     (¬ Core.RuntimeValueHasType [] (cellArg location).value (cellArg location).type) ∧
     Core.runStateful 1 (start (cellArg location) [.loadCellApply] []) =
       .fault (.invalidCellLocation location) (saved (cellArg location) [.loadCellApply] []) := by
-  refine ⟨preparation (cellArg location),.cons (.loadCellApply .word) .nil,.nil,?_,?_⟩
+  refine ⟨preparation (cellArg location),.cons .loadCellApply .nil,.nil,?_,?_⟩
   · intro typed; cases typed with | cellRef found => simp at found
   · simp [start,saved,prepared,cellArg,LocalInputs.environment,LocalInputs.bindFresh,LocalInputs.empty,
       Resolved.LocalScope.values,Core.runStateful,Core.advance,Core.Store.read?]
@@ -107,7 +107,7 @@ theorem arguments_and_store_must_use_the_same_world (bit : Bool) :
     Core.runStateful 2 (start (cellArg 0) [.loadCellApply,.unaryApply .wordNot] [.bool bit]) =
       .fault (.invalidUnaryOperand .wordNot (.bool bit)) ⟨.ret (.bool bit),[.unaryApply .wordNot],[.bool bit]⟩ := by
   refine ⟨preparation (cellArg 0),.cellRef rfl,Core.StoreHasTypes.nil.allocate .bool .bool,
-    .cons (.loadCellApply .word) (.cons .unaryApply .nil),?_,rfl⟩
+    .cons .loadCellApply (.cons .unaryApply .nil),?_,rfl⟩
   intro typed
   obtain ⟨value,found,_,valueTyped⟩ := typed.lookup (location := 0) rfl
   have same : value=.bool bit := (Option.some.inj found).symm
@@ -128,12 +128,12 @@ private def foreign : Core.State := ⟨.ret (.word (Core.Word.ofNatModulo 0)),[.
 theorem an_independently_typed_state_is_not_a_genuine_prepared_checkpoint (word : Core.Word) :
     Core.StateHasType foreign (.cell .word) ∧
     ∀ fuel, Core.runStateful fuel (start (wordArg word) (pending (wordArg word)) [.word word]) ≠ .outOfFuel foreign := by
-  refine ⟨.ret (Core.StoreHasTypes.nil.allocate .unit .unit) .word (.cons (.newCellApply .word) .nil),?_⟩
+  refine ⟨.ret ((Core.StoreHasTypes.nil.allocate .unit .unit).toRuntime) .word (.cons .newCellApply .nil),?_⟩
   intro fuel exhausted
   obtain ⟨future,extension,stored,_⟩ := (preparation (wordArg word)).runtime_checkpoint_world_extension
     RecursiveLocalComputationElaborates.core_hasType (world := [.word]) (argumentsTyped .word)
     (Core.StoreHasTypes.nil.allocate .word .word) (pendingTyped .word) exhausted
-  obtain ⟨value,found,_,typed⟩ := stored.lookup (extension.lookup (location := 0) (type := .word) rfl)
+  obtain ⟨value,found,typed⟩ := stored.lookup (extension.lookup (location := 0) (type := .word) rfl)
   change some Core.Value.unit=some value at found
   cases found; cases typed
 

@@ -1877,7 +1877,7 @@ theorem LinkedEntry.run?_done_preserves_type
     {value : Core.Value} {finalStore : Core.Store}
     (ran : entry.run? inputs fuel store = some (.done value finalStore)) :
     ∃ finalWorld,
-      Core.StoreHasTypes finalWorld finalStore ∧
+      Core.RuntimeStoreHasTypes finalWorld finalStore ∧
       Core.RuntimeValueHasType finalWorld value
         entry.elaborated.returnType := by
   have typesEqual : inputs.map Core.Value.type =
@@ -1891,7 +1891,7 @@ theorem LinkedEntry.run?_done_preserves_type
     simpa using ran
   obtain ⟨finalWorld, _, finalTyped, valueTyped⟩ :=
     Core.evaluation_preserves_type (Core.runStateful_evaluation_sound coreRan)
-      (Core.infer_sound entry.elaborated.coreTypeChecked) environmentTyped storeTyped
+      (Core.infer_sound entry.elaborated.coreTypeChecked) environmentTyped storeTyped.toRuntime
   exact ⟨finalWorld, finalTyped, valueTyped⟩
 
 /-- Deeply typed caller values and store also exclude every Core machine fault

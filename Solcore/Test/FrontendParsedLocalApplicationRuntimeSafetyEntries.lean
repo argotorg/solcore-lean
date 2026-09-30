@@ -197,11 +197,11 @@ private def execute (argument : TypedRuntimeArgument) (output : Core.Ty) (body :
       rw [rows.down.1]
       exact .cons .enterApply (.cons (.var rfl) (.cons .beginArgument (.cons (.var rfl) (.cons .invokeClosure (bodyPath continuation)))))
     have _ := raw.preserves_runtime_type elaboration actual.inputs.sameIds runtimeTyped storeTyped
-    have _ := elaboration.hasType.runtime_evaluates actual.inputs.sameIds runtimeTyped storeTyped
-    have agreement : ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.StoreHasTypes finalWorld t ∧
+    have _ := elaboration.hasType.runtime_evaluates actual.inputs.sameIds runtimeTyped storeTyped ⟨value, t, raw⟩
+    have agreement : ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.RuntimeStoreHasTypes finalWorld t ∧
         Core.RuntimeValueHasType finalWorld value output ∧ finalWorld.length = t.length := by
       obtain ⟨future, final, v, count, extension, typedStore, typedValue, evaluation, _⟩ :=
-        elaboration.runtime_typed_execution actual.inputs.sameIds runtimeTyped storeTyped
+        elaboration.runtime_typed_execution actual.inputs.sameIds runtimeTyped storeTyped ⟨value, t, raw⟩
       obtain ⟨rfl, rfl, _⟩ := costed.deterministic evaluation
       exact ⟨future, extension, typedStore, typedValue, typedStore.length_eq⟩
     have _ := agreement
@@ -242,19 +242,19 @@ open LocalApplicationRuntimeSafetyEntries
 def frontendParsedLocalApplicationRuntimeSafetyEntryTests : IO Unit := do
   for x in [9, 14] do
     execute ⟨.word, w x, .word⟩ (.cell .word) (.newCell .word (.var 0)) [] [] [] [w x] (.cellRef .word 0) 3
-      .word (.closure .nil (.newCell (.var rfl) .word)) .nil (.newCell (.var rfl))
+      .word (.closure .nil (.newCell (.var rfl))) .nil (.newCell (.var rfl))
       (fun _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
-      [.loadCellApply] .word (.cons (.loadCellApply .word) .nil) 1 (w x) (.cons (.applyLoadCell rfl) .refl)
+      [.loadCellApply] .word (.cons .loadCellApply .nil) 1 (w x) (.cons (.applyLoadCell rfl) .refl)
   for current in [3, 17] do
     have storeTyped : Core.StoreHasTypes [.word] [w current] := by
       simpa only [Core.Store.allocate, List.nil_append, w] using
         (Core.StoreHasTypes.nil.allocate Core.CellPayload.word (Core.ValueHasType.word (value := Core.Word.ofNatModulo current)))
     execute ⟨.unit, .unit, .unit⟩ (.cell .word) (.newCell .word (.loadCell (.var 1))) [.cellRef .word 0]
       [.word] [w current] [w current, w current] (.cellRef .word 1) 5
-      .unit (.closure (.cons (.cellRef rfl) .nil) (.newCell (.loadCell (.var rfl) .word) .word)) storeTyped
+      .unit (.closure (.cons (.cellRef rfl) .nil) (.newCell (.loadCell (.var rfl)))) storeTyped
       (.newCell (.loadCell (.var rfl) rfl))
       (fun _ => .cons .enterNewCell (.cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) (.cons .applyNewCell .refl)))))
-      [.loadCellApply] .word (.cons (.loadCellApply .word) .nil) 1 (w current) (.cons (.applyLoadCell rfl) .refl)
+      [.loadCellApply] .word (.cons .loadCellApply .nil) 1 (w current) (.cons (.applyLoadCell rfl) .refl)
   for type in [Core.Ty.namedData ⟨99⟩, .product (.namedData ⟨4⟩) (.namedData ⟨8⟩)] do
     let argument : TypedRuntimeArgument := ⟨.function type type, .closure type type (.var 0) [], .closure .nil (.var rfl)⟩
     execute argument argument.type (.var 0) [] [] [] [] argument.value 1

@@ -68,7 +68,7 @@ example :
     Evaluates [.bool true, .word one] []
       (identityApplication.weakenAt 0) (.word one) [] :=
   identityApplicationEvaluation.weakenAt_zero_word identityApplicationTyping
-    (.cons .word .nil) StoreHasTypes.nil (.bool true)
+    (.cons .word .nil) RuntimeStoreHasTypes.nil StoreHasTypes.nil (.bool true)
 
 private def cellRoundTrip : Expr :=
   .letE
@@ -106,7 +106,7 @@ example :
     Evaluates [.bool false] [] (cellRoundTrip.weakenAt 0)
       (.word one) [.word one] :=
   cellRoundTripEvaluation.weakenAt_zero_word cellRoundTripTyping
-    .nil StoreHasTypes.nil (.bool false)
+    .nil RuntimeStoreHasTypes.nil (StoreHasTypes.nil.allocate .word .word) (.bool false)
 
 private def dataType : DataTypeId := ⟨0⟩
 private def constructor : ConstructorId := ⟨dataType, 0⟩
@@ -143,7 +143,7 @@ example :
     Evaluates [.bool true, .word two] [] ((Expr.var 0).weakenAt 0)
       (.word two) [] :=
   freeWordEvaluation.weakenAt_zero_word freeWordTyping
-    (.cons .word .nil) StoreHasTypes.nil (.bool true)
+    (.cons .word .nil) RuntimeStoreHasTypes.nil StoreHasTypes.nil (.bool true)
 
 example :
     HasType [.bool, .word]

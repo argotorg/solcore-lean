@@ -246,10 +246,10 @@ private def effects : IO Unit := do
     verify "f((x,y))" (.product .word .word) (.product .word .word) .word (identity (.product .word .word)) (identity (.product .word .word))
       (w 14) true (.apply (.var 1) (.pair (.var 0) (.var 4))) (.pair (w 14) (w 9)) 10 s s
     let allocator : Core.Value := .closure .word (.cell .word) (.newCell .word (.var 0)) []
-    have _ : Core.ValueHasType allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl) .word)
+    have _ : Core.ValueHasType allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl))
     verify "f(x)" .word (.cell .word) .word allocator allocator (w 14) true (.apply (.var 1) (.var 0)) (.cellRef .word s.length) 8 s (s ++ [w 14])
   let reader : Core.Value := .closure (.cell .word) .word (.loadCell (.var 0)) []
-  have rt : Core.ValueHasType reader (.function (.cell .word) .word) := .closure .nil (.loadCell (.var rfl) .word)
+  have rt : Core.ValueHasType reader (.function (.cell .word) .word) := .closure .nil (.loadCell (.var rfl))
   have _ : Core.EnvironmentHasTypes (env reader reader (.cellRef .word 0) true).values (ctx (.cell .word) .word (.cell .word)).values :=
     .cons .cellRef (.cons rt (.cons .bool (.cons rt (.cons .word .nil))))
   verify "f(x)" (.cell .word) .word (.cell .word) reader reader (.cellRef .word 0) true (.apply (.var 1) (.var 0)) (w 23) 8 [w 23] [w 23]

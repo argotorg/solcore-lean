@@ -208,9 +208,9 @@ private def rawBody (table : LocalNameTable) (env : Resolved.Environment) (s : C
       | ⟨_,[⟨_,.returnStmt (some child)⟩]⟩ => let r ← rawChild table env sc.final child; return ⟨r.value,r.final,sc.cost+r.cost+2+7*c.1.2,by rw [shape]; exact .wordMatch sc.evidence c.2.down (by rw [selected]; exact .expression r.evidence)⟩
       | _ => throw (IO.userError "selected return")
   | _ => throw (IO.userError "raw body")
-private def allocator : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.newCell .word (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.newCell (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
-private def reader (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word l],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
-private def writer (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word l],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+private def allocator : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.newCell .word (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.newCell (.var rfl)) (.loadCell (.var rfl)))⟩
+private def reader (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word l],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
+private def writer (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word l],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private def arguments (location : Nat := 2) : List TypedRuntimeArgument := [allocator,writer location,reader 1,⟨.word,w 14,.word⟩]
 private def positive (mode : Nat) (s final : Core.Store) (value : Core.Value) (cost : Nat) (location : Nat := 2) : IO Unit := do
   let source ← parsed (sourceBody mode)
@@ -231,11 +231,15 @@ private def positive (mode : Nat) (s final : Core.Store) (value : Core.Value) (c
   check (validateRuntimeInputs world args s == (s.all (fun v => v.type==.word) && location != 700)) "same-world validation also inspects unused captured references"
   if validated : validateRuntimeInputs world args s=true then
     have runtime := validateRuntimeInputs_iff.mp validated
+    have finitePath : Core.Steps manual.cost
+        (.initial p.1.core p.1.inputs.environment.values s) (.final manual.value manual.final) := by
+      rw [p.2.down.2.1]
+      exact manual.evidence []
     have safe := ComputationFunctionPrepares.runtime_typed_execution (F := RecursiveLocalComputationFragment)
       (ChildElab := RecursiveLocalComputationElaborates) (ChildEval := RecursiveLocalComputationEvaluates) (ChildCost := RecursiveLocalComputationEvaluatesWithCost)
       RecursiveLocalComputationElaborates.core_hasType RecursiveLocalComputationElaborates.core_fragment RecursiveLocalComputationFragment.weakenAt RecursiveLocalComputationFragment.evaluates_insert_iff
-      RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation elaborateRecursiveLocalComputation?_iff p.2.down.1 runtime.1 runtime.2
-    have actualWorld : ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future manual.final ∧ RecursiveComputationReturnTreeEvaluatesWithCost owner i.names i.environment s source.value.body manual.value manual.final manual.cost := by
+      RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation elaborateRecursiveLocalComputation?_iff p.2.down.1 runtime.1 runtime.2 ⟨manual.value, manual.final, Core.steps_from_initial_sound finitePath⟩
+    have actualWorld : ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future manual.final ∧ RecursiveComputationReturnTreeEvaluatesWithCost owner i.names i.environment s source.value.body manual.value manual.final manual.cost := by
       obtain ⟨future,t,v,n,ext,st,_,r,paths,_,_⟩ := safe.2
       have fixedPath : Core.Steps manual.cost (.initial p.1.core env s) (.final manual.value manual.final) := by rw [p.2.down.2.1]; exact manual.evidence []
       obtain ⟨rfl,rfl,rfl⟩ := (paths []).final_unique fixedPath

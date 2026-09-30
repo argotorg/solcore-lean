@@ -181,14 +181,15 @@ private def verify (source : Syntax.FunctionDecl) (args : List TypedRuntimeArgum
       RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost
       RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
       elaborateRecursiveLocalComputation?_iff preparation typed stored
-    have agreement : ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future manual.final ∧
+      ⟨manual.value, manual.final, Core.steps_from_initial_sound (manual.evidence [])⟩
+    have agreement : ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future manual.final ∧
         Core.RuntimeValueHasType future manual.value output ∧ RecursiveComputationReturnTreeEvaluatesWithCost owner inputs.names inputs.environment s source.value.body manual.value manual.final manual.cost := by
       obtain ⟨future,final,value,cost,ext,st,vt,raw,paths,_⟩ := safe.2
       obtain ⟨rfl,rfl,rfl⟩ := (paths []).final_unique (manual.evidence [])
       exact ⟨future,ext,st,vt,raw⟩
     if grows : s.length < manual.final.length then
       have allocationExtends : ∃ future, Core.WorldExtends world future ∧
-          world.length < future.length ∧ Core.StoreHasTypes future manual.final := by
+          world.length < future.length ∧ Core.RuntimeStoreHasTypes future manual.final := by
         obtain ⟨future,ext,st,_,_⟩ := agreement
         exact ⟨future,ext,by simpa only [stored.length_eq,st.length_eq] using grows,st⟩
       have _ := allocationExtends
@@ -228,17 +229,17 @@ private def verify (source : Syntax.FunctionDecl) (args : List TypedRuntimeArgum
       | .fault _ _ => throw (IO.userError "world/store typed execution faulted")
     return prepared
   else throw (IO.userError "independent exact Core/type")
-private def reader (location : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word location],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
+private def reader (location : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word location],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
-private def allocator : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl) .word)⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
+private def allocator : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl))⟩
 private def arg (n : Nat) : TypedRuntimeArgument := ⟨.word,w n,.word⟩
 private def choice (b : Bool) : TypedRuntimeArgument := ⟨.bool,.bool b,.bool⟩
 private theorem readerTyped {world : Core.StoreTyping} {location : Nat} (found : world[location]?=some .word) :
-    Core.RuntimeValueHasType world (reader location).value (reader location).type := .closure (.cons (.cellRef found) .nil) (.loadCell (.var rfl) .word)
+    Core.RuntimeValueHasType world (reader location).value (reader location).type := .closure (.cons (.cellRef found) .nil) (.loadCell (.var rfl))
 private theorem writerTyped {world : Core.StoreTyping} (found : world[0]?=some .word) :
     Core.RuntimeValueHasType world writer.value writer.type :=
-  .closure (.cons (.cellRef found) .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))
+  .closure (.cons (.cellRef found) .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))
 private theorem wordStore (n : Nat) : Core.StoreHasTypes [.word] [w n] :=
   Core.StoreHasTypes.nil.allocate .word .word
 private theorem argumentsTyped {world : Core.StoreTyping} {f g : TypedRuntimeArgument}
@@ -273,6 +274,6 @@ def frontendParsedComputationRuntimeSafetyEntryTests : IO Unit := do
         (argumentsTyped (readerTyped rfl) (writerTyped rfl) 11 14 c) ((wordStore 23).allocate .word .word)
       discard <| verify source [allocator,writer,arg 11,arg 14,choice c] (.cell .word) core [.word] [w 23]
         (if c then [w 14,w 11] else [w 14,w 11,w 14]) (.cellRef .word (if c then 1 else 2)) (if c then 31 else 38)
-        (argumentsTyped (.closure .nil (.newCell (.var rfl) .word)) (writerTyped rfl) 11 14 c) (wordStore 23)
+        (argumentsTyped (.closure .nil (.newCell (.var rfl))) (writerTyped rfl) 11 14 c) (wordStore 23)
 
 end Tests

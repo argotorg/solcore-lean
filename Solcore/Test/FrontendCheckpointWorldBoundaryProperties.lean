@@ -21,7 +21,7 @@ private def saved (store : Core.Store) : Core.State := ⟨.ret .unit,pending,sto
 private def allocated (store : Core.Store) : Core.State :=
   ⟨.ret (.cellRef .unit store.length),[.loadCellApply],store++[.unit]⟩
 private theorem pendingTyped (world : Core.StoreTyping) : Core.ContinuationHasType world pending .unit .unit :=
-  .cons (.newCellApply .unit) (.cons (.loadCellApply .unit) .nil)
+  .cons .newCellApply (.cons .loadCellApply .nil)
 private theorem stopped (store : Core.Store) : Core.runStateful 1 (started store) = .outOfFuel (saved store) := rfl
 private theorem allocatedPath (store : Core.Store) : Core.Steps 1 (saved store) (allocated store) :=
   .cons .applyNewCell .refl
@@ -38,9 +38,9 @@ theorem original_bare_body_has_an_actual_pending_allocation_checkpoint (store : 
 theorem extending_worlds_retain_every_old_reference_across_actual_resume_paths
     (world : Core.StoreTyping) (store : Core.Store) (typed : Core.StoreHasTypes world store) :
     ∃ checkpointWorld, Core.WorldExtends world checkpointWorld ∧
-      Core.StoreHasTypes checkpointWorld (saved store).store ∧
+      Core.RuntimeStoreHasTypes checkpointWorld (saved store).store ∧
       ∀ {steps next}, Core.Steps steps (saved store) next →
-        ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future next.store ∧
+        ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future next.store ∧
           ∀ {location : Nat} {type : Core.Ty}, world[location]? = some type → future[location]? = some type := by
   obtain ⟨checkpointWorld,extension,stored,further⟩ :=
     elaboration.runtime_checkpoint_world_extension childType
@@ -53,7 +53,7 @@ theorem extending_worlds_retain_every_old_reference_across_actual_resume_paths
 
 theorem allocation_grows_the_world_without_changing_old_cell_types
     (world : Core.StoreTyping) (store : Core.Store) (typed : Core.StoreHasTypes world store) :
-    ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future (store++[.unit]) ∧
+    ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future (store++[.unit]) ∧
       world.length < future.length ∧
       ∀ {location : Nat} {type : Core.Ty}, world[location]? = some type → future[location]? = some type := by
   obtain ⟨_,_,_,further⟩ := extending_worlds_retain_every_old_reference_across_actual_resume_paths world store typed
@@ -69,7 +69,7 @@ theorem old_checkpoint_safety_and_new_world_extension_apply_to_the_same_saved_st
     (world : Core.StoreTyping) (store : Core.Store) (typed : Core.StoreHasTypes world store) :
     Core.StateHasType (saved store) .unit ∧
       (∀ fuel error faultState, Core.runStateful fuel (saved store) ≠ .fault error faultState) ∧
-      ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future (saved store).store := by
+      ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future (saved store).store := by
   have old := elaboration.runtime_checkpoint_safety childType
     (world := world) (environment := []) (store := store)
     Core.RuntimeEnvironmentHasTypes.nil typed (pendingTyped world)
@@ -118,9 +118,9 @@ theorem a_typed_source_and_store_cannot_replace_the_pending_frame_premise
       cases continuation with | cons frame _ => cases frame
 
 theorem no_alternative_world_can_hide_the_changed_type_of_the_original_cell :
-    ∀ world, Core.StoreHasTypes world [.unit] → ¬ Core.WorldExtends [.word] world := by
+    ∀ world, Core.RuntimeStoreHasTypes world [.unit] → ¬ Core.WorldExtends [.word] world := by
   intro world typed extension
-  obtain ⟨value,found,_,valueTyped⟩ := typed.lookup (extension.lookup (location := 0) (type := .word) rfl)
+  obtain ⟨value,found,valueTyped⟩ := typed.lookup (extension.lookup (location := 0) (type := .word) rfl)
   change some Core.Value.unit = some value at found
   cases found
   cases valueTyped
@@ -129,7 +129,7 @@ theorem an_unrelated_typed_state_is_not_a_genuine_checkpoint (word : Core.Word) 
     Core.StateHasType foreignSaved (.cell .unit) ∧
     Core.runStateful 0 foreignSaved = .outOfFuel foreignSaved ∧
     (∀ fuel, Core.runStateful fuel (started [.word word]) ≠ .outOfFuel foreignSaved) := by
-  refine ⟨.ret (Core.StoreHasTypes.nil.allocate .unit .unit) .unit (.cons (.newCellApply .unit) .nil),rfl,?_⟩
+  refine ⟨.ret ((Core.StoreHasTypes.nil.allocate .unit .unit).toRuntime) .unit (.cons .newCellApply .nil),rfl,?_⟩
   intro fuel exhausted
   obtain ⟨future,extension,typed,_⟩ :=
     elaboration.runtime_checkpoint_world_extension childType

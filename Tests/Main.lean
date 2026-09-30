@@ -1008,6 +1008,8 @@ import Solcore.Test.CoreBitwiseLogic
 import Solcore.Test.CoreByteSelection
 import Solcore.Test.CoreCells
 import Solcore.Test.CoreRuntimeStoreSafety
+import Solcore.Test.CoreGeneralCells
+import Solcore.Test.CoreRecursiveCells
 import Solcore.Test.HostRuntimeStoreSafety
 import Solcore.Test.CoreComparisonFlags
 import Solcore.Test.CoreConversions
@@ -2384,6 +2386,7 @@ def run : IO Unit := do
   testCoreHostMachine
   testCoreSums
   testCoreCells
+  CoreRecursiveCells.run
   testCoreBooleanConnectives
   testCoreBitwiseLogic
   testCoreByteSelection

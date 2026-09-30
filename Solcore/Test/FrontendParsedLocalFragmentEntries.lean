@@ -260,7 +260,7 @@ def frontendParsedLocalFragmentEntryTests : IO Unit := do
       "function f(x:T,x:T) returns(T){return x;}",
       "function f(x:T) returns(Bool){return x;}", "function f<T>(x:T) returns(T){return x;}"] do
     check ((compileRuntimeFunction? (table .word) owner (← parsed text)).isNone) "whole guard or unchanged statement boundary disappeared"
-  have _ : Core.HasType [.cell .word] (.loadCell (.var 0)) .word := .loadCell (.var rfl) .word
+  have _ : Core.HasType [.cell .word] (.loadCell (.var 0)) .word := .loadCell (.var rfl)
   have _ : ¬ (Core.Expr.loadCell (.var 0)).LocalFragment := by intro impossible; cases impossible
   let invalid ← parsed "function f(x:T,c:Bool) returns(T){if(c){return x;}else{return missing;}}"
   let some actual := bindRuntimeParameters? (table .word) owner invalid.value.signature.parameters.elements

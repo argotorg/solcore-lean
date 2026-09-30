@@ -3363,13 +3363,13 @@ theorem LocalFunctionApplicationEvaluates.preserves_runtime_type
     (environmentTyped : Core.RuntimeEnvironmentHasTypes world
       (Resolved.LocalScope.values environment) (Resolved.LocalScope.values context))
     (storeTyped : Core.StoreHasTypes world initialStore) :
-    ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.StoreHasTypes finalWorld finalStore ∧
+    ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.RuntimeStoreHasTypes finalWorld finalStore ∧
       Core.RuntimeValueHasType finalWorld value type :=
   Core.evaluation_preserves_type ((elaboration.evaluates_iff sameIds).mp evaluation)
-    elaboration.core_hasType environmentTyped storeTyped
+    elaboration.core_hasType environmentTyped storeTyped.toRuntime
 
-/-- Whole source typing supplies successful evaluation only together with the
-actual aligned environment and store typed in the same runtime world. -/
+/-- A finite source evaluation supplies completion; source and runtime typing
+preserve its value and store in an extended world. -/
 theorem LocalFunctionApplicationHasType.runtime_evaluates
     {table : LocalNameTable} {context : Resolved.Context} {environment : Resolved.Environment}
     {source : Syntax.Expr} {type : Core.Ty}
@@ -3378,17 +3378,17 @@ theorem LocalFunctionApplicationHasType.runtime_evaluates
     {world : Core.StoreTyping} {store : Core.Store}
     (environmentTyped : Core.RuntimeEnvironmentHasTypes world
       (Resolved.LocalScope.values environment) (Resolved.LocalScope.values context))
-    (storeTyped : Core.StoreHasTypes world store) :
+    (storeTyped : Core.StoreHasTypes world store)
+    (finite : ∃ value finalStore,
+      LocalFunctionApplicationEvaluates table environment store source value finalStore) :
     ∃ finalWorld finalStore value cost, Core.WorldExtends world finalWorld ∧
-      Core.StoreHasTypes finalWorld finalStore ∧ Core.RuntimeValueHasType finalWorld value type ∧
+      Core.RuntimeStoreHasTypes finalWorld finalStore ∧ Core.RuntimeValueHasType finalWorld value type ∧
       LocalFunctionApplicationEvaluatesWithCost table environment store source value finalStore cost := by
   obtain ⟨core, elaboration⟩ := typing.elaborates_exact
-  have definitionsWellFormed : Core.DataEnvironment.WellFormed [] := by
-    intro definition member
-    cases member
-  obtain ⟨finalWorld, finalStore, value, extension, finalTyped, evaluated, valueTyped⟩ :=
-    Core.well_typed_evaluates elaboration.core_hasType definitionsWellFormed environmentTyped storeTyped
-  obtain ⟨cost, exactEvaluation⟩ := ((elaboration.evaluates_iff sameIds).mpr evaluated).exists_cost
+  obtain ⟨value, finalStore, evaluated⟩ := finite
+  obtain ⟨finalWorld, extension, finalTyped, valueTyped⟩ :=
+    evaluated.preserves_runtime_type elaboration sameIds environmentTyped storeTyped
+  obtain ⟨cost, exactEvaluation⟩ := evaluated.exists_cost
   exact ⟨finalWorld, finalStore, value, cost, extension, finalTyped, valueTyped, exactEvaluation⟩
 
 /-- One actual successful cost gives all continuation-local paths and both
@@ -3401,9 +3401,11 @@ theorem LocalFunctionApplicationElaborates.runtime_typed_execution
     {world : Core.StoreTyping} {store : Core.Store}
     (environmentTyped : Core.RuntimeEnvironmentHasTypes world
       (Resolved.LocalScope.values environment) (Resolved.LocalScope.values context))
-    (storeTyped : Core.StoreHasTypes world store) :
+    (storeTyped : Core.StoreHasTypes world store)
+    (finite : ∃ value finalStore,
+      LocalFunctionApplicationEvaluates table environment store source value finalStore) :
     ∃ finalWorld finalStore value cost, Core.WorldExtends world finalWorld ∧
-      Core.StoreHasTypes finalWorld finalStore ∧ Core.RuntimeValueHasType finalWorld value type ∧
+      Core.RuntimeStoreHasTypes finalWorld finalStore ∧ Core.RuntimeValueHasType finalWorld value type ∧
       LocalFunctionApplicationEvaluatesWithCost table environment store source value finalStore cost ∧
       (∀ continuation : List Core.Frame, Core.Steps cost
         ⟨.eval core (Resolved.LocalScope.values environment), continuation, store⟩
@@ -3415,7 +3417,7 @@ theorem LocalFunctionApplicationElaborates.runtime_typed_execution
           (Core.State.initial core (Resolved.LocalScope.values environment) store) =
             .outOfFuel checkpoint) ↔ fuel < cost) := by
   obtain ⟨finalWorld, finalStore, value, cost, extension, finalTyped, valueTyped, evaluation⟩ :=
-    elaboration.hasType.runtime_evaluates sameIds environmentTyped storeTyped
+    elaboration.hasType.runtime_evaluates sameIds environmentTyped storeTyped finite
   have path := evaluation.toSteps elaboration sameIds
   exact ⟨finalWorld, finalStore, value, cost, extension, finalTyped, valueTyped, evaluation,
     evaluation.toStepsWithContinuation elaboration sameIds,
@@ -3434,7 +3436,7 @@ theorem elaborateLocalFunctionApplication?_runtime_run_done_sound
       (Core.State.initial core (Resolved.LocalScope.values environment) initialStore) =
         .done value finalStore) :
     LocalFunctionApplicationEvaluates table environment initialStore source value finalStore ∧
-      ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.StoreHasTypes finalWorld finalStore ∧
+      ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.RuntimeStoreHasTypes finalWorld finalStore ∧
         Core.RuntimeValueHasType finalWorld value type := by
   have elaboration := elaborateLocalFunctionApplication?_sound accepted
   have evaluation := (elaboration.evaluates_iff sameIds).mpr (Core.runStateful_evaluation_sound completed)
@@ -3630,28 +3632,30 @@ theorem runApplication?_runtime_done_sound
     (storeTyped : Core.StoreHasTypes world initialStore)
     (result : inputs.runApplication? fuel source initialStore = some (type, .done value finalStore)) :
     LocalFunctionApplicationEvaluates inputs.names inputs.environment initialStore source value finalStore ∧
-      ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.StoreHasTypes finalWorld finalStore ∧
+      ∃ finalWorld, Core.WorldExtends world finalWorld ∧ Core.RuntimeStoreHasTypes finalWorld finalStore ∧
         Core.RuntimeValueHasType finalWorld value type := by
   obtain ⟨core, checked, execution⟩ := runApplication?_eq_some_iff.mp result
   exact elaborateLocalFunctionApplication?_runtime_run_done_sound checked inputs.sameIds
     environmentTyped storeTyped execution
 
-/-- Actual runtime-world typing supplies successful evaluation and an exact
-cost for these inputs. Both fuel thresholds retain the same value and store. -/
+/-- A supplied finite evaluation fixes an exact cost. Runtime-world typing
+preserves its result, and both fuel thresholds retain the same value and store. -/
 theorem runApplication?_runtime_has_exact_cost
     {inputs : LocalInputs} {source : Syntax.Expr} {type : Core.Ty}
     (typing : LocalFunctionApplicationHasType inputs.names inputs.context source type)
     {world : Core.StoreTyping} {store : Core.Store}
     (environmentTyped : Core.RuntimeEnvironmentHasTypes world
       (Resolved.LocalScope.values inputs.environment) (Resolved.LocalScope.values inputs.context))
-    (storeTyped : Core.StoreHasTypes world store) :
+    (storeTyped : Core.StoreHasTypes world store)
+    (finite : ∃ value finalStore,
+      LocalFunctionApplicationEvaluates inputs.names inputs.environment store source value finalStore) :
     ∃ finalWorld finalStore value cost, Core.WorldExtends world finalWorld ∧
-      Core.StoreHasTypes finalWorld finalStore ∧ Core.RuntimeValueHasType finalWorld value type ∧
+      Core.RuntimeStoreHasTypes finalWorld finalStore ∧ Core.RuntimeValueHasType finalWorld value type ∧
       LocalFunctionApplicationEvaluatesWithCost inputs.names inputs.environment store source value finalStore cost ∧
       ∀ fuel, (inputs.runApplication? fuel source store = some (type, .done value finalStore) ↔ cost ≤ fuel) ∧
         ((∃ checkpoint, inputs.runApplication? fuel source store = some (type, .outOfFuel checkpoint)) ↔ fuel < cost) := by
   obtain ⟨finalWorld, finalStore, value, cost, extension, finalTyped, valueTyped, evaluation⟩ :=
-    typing.runtime_evaluates inputs.sameIds environmentTyped storeTyped
+    typing.runtime_evaluates inputs.sameIds environmentTyped storeTyped finite
   exact ⟨finalWorld, finalStore, value, cost, extension, finalTyped, valueTyped, evaluation,
     fun fuel => ⟨runApplication?_done_iff_of_cost typing evaluation (fuel := fuel),
       runApplication?_outOfFuel_iff_of_cost typing evaluation (fuel := fuel)⟩⟩

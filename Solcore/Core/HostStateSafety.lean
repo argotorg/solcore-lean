@@ -70,22 +70,19 @@ inductive HostFrameHasType
       HostFrameHasType world (.caseBranches leftBranch rightBranch environment)
         (.sum leftType rightType) resultType definitions
   | newCellApply {definitions : DataEnvironment} {elementType : Ty} :
-      CellPayload elementType →
       HostFrameHasType world (.newCellApply elementType) elementType
         (.cell elementType) definitions
   | loadCellApply {definitions : DataEnvironment} {elementType : Ty} :
-      CellPayload elementType →
       HostFrameHasType world .loadCellApply (.cell elementType) elementType definitions
   | storeCellValue {definitions : DataEnvironment} {valueExpr : Expr}
       {environment : Environment} {context : Context} {elementType : Ty} :
       HostRuntimeEnvironmentHasTypes world environment context definitions →
       HasType context valueExpr elementType definitions →
-      CellPayload elementType →
       HostFrameHasType world (.storeCellValue valueExpr environment)
         (.cell elementType) .unit definitions
   | storeCellApply {definitions : DataEnvironment} {elementType : Ty}
       {location : Location} :
-      world[location]? = some elementType → CellPayload elementType →
+      world[location]? = some elementType →
       HostFrameHasType world (.storeCellApply elementType location)
         elementType .unit definitions
   | constructApply {definitions : DataEnvironment} {constructor : ConstructorId}
@@ -161,10 +158,10 @@ theorem HostFrameHasType.weaken {definitions : DataEnvironment}
   | inLeftApply => exact .inLeftApply
   | inRightApply => exact .inRightApply
   | caseBranches env left right => exact .caseBranches (env.weaken extension) left right
-  | newCellApply payload => exact .newCellApply payload
-  | loadCellApply payload => exact .loadCellApply payload
-  | storeCellValue env value payload => exact .storeCellValue (env.weaken extension) value payload
-  | storeCellApply found payload => exact .storeCellApply (extension.lookup found) payload
+  | newCellApply => exact .newCellApply
+  | loadCellApply => exact .loadCellApply
+  | storeCellValue env value => exact .storeCellValue (env.weaken extension) value
+  | storeCellApply found => exact .storeCellApply (extension.lookup found)
   | constructApply lookup => exact .constructApply lookup
   | matchDataApply lookup env branches => exact .matchDataApply lookup (env.weaken extension) branches
   | applyArgument env argument => exact .applyArgument (env.weaken extension) argument

@@ -126,9 +126,9 @@ theorem one_saved_world_extends_to_every_further_actual_path
     (xt : Core.RuntimeValueHasType world r.argument.value r.argument.type)
     (st : Core.StoreHasTypes world store) (kt : Core.ContinuationHasType world k r.resultType result)
     (spent : Nat) (cp : Core.State) (stopped : Core.runStateful spent (start o r n store k)=.outOfFuel cp) :
-    ∃ saved, Core.WorldExtends world saved ∧ Core.StoreHasTypes saved cp.store ∧
+    ∃ saved, Core.WorldExtends world saved ∧ Core.RuntimeStoreHasTypes saved cp.store ∧
       ∀ {steps next}, Core.Steps steps cp next →
-        ∃ future, Core.WorldExtends saved future ∧ Core.StoreHasTypes future next.store ∧
+        ∃ future, Core.WorldExtends saved future ∧ Core.RuntimeStoreHasTypes future next.store ∧
           ∀ {location : Nat} {type : Core.Ty}, world[location]?=some type → future[location]?=some type := by
   obtain ⟨saved,extension,stored,later⟩ := (preparation s o r n).runtime_checkpoint_world_extension
     RecursiveLocalComputationElaborates.core_hasType (argumentsTyped r ft xt) st kt stopped
@@ -159,10 +159,10 @@ private theorem manual (r : Actual) (n m : Nat) (initial final : Core.Store) (v 
 private def delayed (a : Core.Ty) : Nat → Core.Expr
   | 0 => .newCell a (.var 0)
   | m+1 => .letE (.var 0) (delayed a m)
-private theorem delayedTyped (a : Core.Ty) (payload : Core.CellPayload a) (m : Nat) (context : Core.Context) :
+private theorem delayedTyped (a : Core.Ty) (_payload : Core.CellPayload a) (m : Nat) (context : Core.Context) :
     Core.HasType (a::context) (delayed a m) (.cell a) := by
   induction m generalizing context with
-  | zero => exact .newCell (.var rfl) payload
+  | zero => exact .newCell (.var rfl)
   | succ m ih => exact .letE (.var rfl) (ih (a::context))
 private theorem delayedPath (a : Core.Ty) (m : Nat) (v : Core.Value) (captured : Core.Environment) (store : Core.Store) (k : List Core.Frame) :
     Core.Steps (3*m+3) ⟨.eval (delayed a m) (v::captured),k,store⟩ ⟨.ret (.cellRef a store.length),k,store++[v]⟩ := by
@@ -183,9 +183,9 @@ private def saved (a : Core.Ty) (v retained : Core.Value) (store : Core.Store) :
 private def allocatedAgain (a : Core.Ty) (v retained : Core.Value) (store : Core.Store) : Core.State :=
   ⟨.ret (.cellRef a (store.length+1)),[.pairApply retained],store++[v,v]⟩
 private theorem pendingTyped {world : Core.StoreTyping} {retained : Core.Value} {a b : Core.Ty}
-    (payload : Core.CellPayload a) (typed : Core.RuntimeValueHasType world retained b) :
+    (_payload : Core.CellPayload a) (typed : Core.RuntimeValueHasType world retained b) :
     Core.ContinuationHasType world (pending a retained) (.cell a) (.product b (.cell a)) :=
-  .cons (.loadCellApply payload) (.cons (.newCellApply payload) (.cons (.pairApply typed) .nil))
+  .cons (.loadCellApply) (.cons (.newCellApply) (.cons (.pairApply typed) .nil))
 private theorem savedPath (a : Core.Ty) (v retained : Core.Value) (store : Core.Store) :
     Core.Steps 2 (saved a v retained store) (allocatedAgain a v retained store) := by
   have path := Core.Steps.cons (.applyLoadCell (elementType := a) (Core.Store.allocate_fresh_lookup store v))
@@ -226,7 +226,7 @@ theorem callee_and_caller_allocations_strictly_extend_the_same_saved_world
     Core.StateHasType (saved arg.type arg.value retained store) (.product retainedType (.cell arg.type)) ∧
       (∀ fuel error faultState, Core.runStateful fuel (saved arg.type arg.value retained store) ≠ .fault error faultState) ∧
       ∃ savedWorld future, Core.WorldExtends world savedWorld ∧ Core.WorldExtends savedWorld future ∧
-        Core.StoreHasTypes savedWorld (store++[arg.value]) ∧ Core.StoreHasTypes future (store++[arg.value,arg.value]) ∧
+        Core.RuntimeStoreHasTypes savedWorld (store++[arg.value]) ∧ Core.RuntimeStoreHasTypes future (store++[arg.value,arg.value]) ∧
         world.length<savedWorld.length ∧ savedWorld.length<future.length ∧
         ∀ {location : Nat} {type : Core.Ty}, world[location]?=some type → future[location]?=some type := by
   let r := allocator arg payload captured context ct.erase m

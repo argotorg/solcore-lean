@@ -274,7 +274,7 @@ def frontendParsedLocalApplicationEvaluationEntryTests : IO Unit := do
     for n in [0, 1, 4, 9] do
       execute argument .word (delayed n) [] (.closure .nil (delayedTyped n _)) (fun _ => w 7) id (3 * n + 1)
         (delayedEvaluation n [w x]) (delayedPath n [w x])
-    execute argument (.cell .word) (.newCell .word (.var 0)) [] (.closure .nil (.newCell (.var rfl) .word))
+    execute argument (.cell .word) (.newCell .word (.var 0)) [] (.closure .nil (.newCell (.var rfl)))
       (fun s => .cellRef .word s.length) (fun s => s ++ [w x]) 3
       (fun _ => .newCell (.var rfl)) (fun _ _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
   for type in [Core.Ty.namedData ⟨99⟩, .product (.namedData ⟨99⟩) (.cell (.namedData ⟨17⟩))] do

@@ -101,10 +101,10 @@ private def reader : Core.Value := .closure .word .word readBody [.cellRef .word
 private def writer : Core.Value := .closure .word .word writeBody [.cellRef .word 0]
 private def allocator : Core.Value := .closure .word (.cell .word) (.newCell .word (.var 0)) []
 private theorem readerTyped : Core.ValueHasType reader (.function .word .word) :=
-  .closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)
+  .closure (.cons .cellRef .nil) (.loadCell (.var rfl))
 private theorem writerTyped : Core.ValueHasType writer (.function .word .word) :=
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))
-private theorem allocatorTyped : Core.ValueHasType allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl) .word)
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))
+private theorem allocatorTyped : Core.ValueHasType allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl))
 private structure Body (body : Core.Expr) (actual : Core.Environment) (store : Core.Store) where
   value : Core.Value
   final : Core.Store
@@ -163,9 +163,9 @@ private def verify (s : LocalInputs) (text : String) (type : Core.Ty) (value : C
       match runtime with
       | some proof =>
           have _ := LocalInputs.runApplication?_runtime_done_sound proof.down.1 proof.down.2 done
-          have identified : ∃ future, Core.WorldExtends [.word] future ∧ Core.StoreHasTypes future final ∧
+          have identified : ∃ future, Core.WorldExtends [.word] future ∧ Core.RuntimeStoreHasTypes future final ∧
               Core.RuntimeValueHasType future value type := by
-            obtain ⟨fw,fs,v,n,extension,st,vt,e,_⟩ := LocalInputs.runApplication?_runtime_has_exact_cost whole proof.down.1 proof.down.2
+            obtain ⟨fw,fs,v,n,extension,st,vt,e,_⟩ := LocalInputs.runApplication?_runtime_has_exact_cost whole proof.down.1 proof.down.2 ⟨value, final, evaluation.erase⟩
             obtain ⟨rfl,rfl,rfl⟩ := e.deterministic evaluation
             exact ⟨fw,extension,st,vt⟩
           have _ := identified
@@ -215,10 +215,10 @@ private def fixtures : IO Unit := do
   | _ => throw (IO.userError "original singleton call changed")
   for old in [23,91] do
     have st : Core.StoreHasTypes [.word] [w old] := Core.StoreHasTypes.nil.allocate .word .word
-    have rt : Core.RuntimeValueHasType [.word] reader (.function .word .word) := .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word)
+    have rt : Core.RuntimeValueHasType [.word] reader (.function .word .word) := .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl))
     have wt : Core.RuntimeValueHasType [.word] writer (.function .word .word) := .closure (.cons (.cellRef rfl) .nil)
-      (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))
-    have atyped : Core.RuntimeValueHasType [.word] allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl) .word)
+      (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))
+    have atyped : Core.RuntimeValueHasType [.word] allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl))
     verify r "f(x)" .word (w old) 8 [w old] [w old] (some ⟨⟨.cons .word (.cons rt (.cons wt (.cons .bool .nil))),st⟩⟩)
     verify writerInputs "f(x)" .word (w 14) 15 [w old] [w 14] (some ⟨⟨.cons .word (.cons wt (.cons rt (.cons .bool .nil))),st⟩⟩)
     verify a "f(x)" (.cell .word) (.cellRef .word 1) 8 [w old] [w old,w 14]

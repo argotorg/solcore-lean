@@ -236,11 +236,11 @@ private def verify (source : Syntax.FunctionDecl) (f g x y : TypedRuntimeArgumen
       | .fault _ _ => throw (IO.userError "independent successful path faulted")
     return prepared
   else throw (IO.userError "independent exact Core/type")
-private def guardReader : TypedRuntimeArgument := ⟨.function .bool .bool,.closure .bool .bool (.loadCell (.var 1)) [.cellRef .bool 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .bool)⟩
+private def guardReader : TypedRuntimeArgument := ⟨.function .bool .bool,.closure .bool .bool (.loadCell (.var 1)) [.cellRef .bool 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def guardWriter : TypedRuntimeArgument := ⟨.function .bool .bool,.closure .bool .bool (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .bool 0],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .bool) (.loadCell (.var rfl) .bool))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private def writer : TypedRuntimeArgument := ⟨.function .bool .word,.closure .bool .word (.letE (.storeCell (.var 1) (.var 2)) (.loadCell (.var 2))) [.cellRef .word 1,w 14],
-  .closure (.cons .cellRef (.cons .word .nil)) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  .closure (.cons .cellRef (.cons .word .nil)) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 end RecursiveConditionalEntries
 open RecursiveConditionalEntries
 def frontendParsedRecursiveConditionalFunctionEntryTests : IO Unit := do
@@ -254,7 +254,7 @@ def frontendParsedRecursiveConditionalFunctionEntryTests : IO Unit := do
   for choice in [false,true] do
     let arg : TypedRuntimeArgument := ⟨.bool,.bool choice,.bool⟩
     discard <| verify source guardWriter writer arg y .word core [.bool (!choice),w 99] [.bool choice,if choice then w 14 else w 99] (if choice then w 14 else w 23) (if choice then 32 else 18)
-  let alternate : TypedRuntimeArgument := ⟨writer.type,.closure .bool .word (.letE (.storeCell (.var 1) (.var 2)) (.loadCell (.var 2))) [.cellRef .word 1,w 23],.closure (.cons .cellRef (.cons .word .nil)) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  let alternate : TypedRuntimeArgument := ⟨writer.type,.closure .bool .word (.letE (.storeCell (.var 1) (.var 2)) (.loadCell (.var 2))) [.cellRef .word 1,w 23],.closure (.cons .cellRef (.cons .word .nil)) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
   for choice in [false,true] do
     let selected := if choice then writer.value else alternate.value; let word := if choice then w 14 else w 23
     discard <| verify (← bodySource "return f(x)?g:y;") guardReader writer x alternate writer.type (.ifE (call 3 1) (.var 2) (.var 0)) [.bool choice] [.bool choice] selected 11

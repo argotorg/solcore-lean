@@ -57,11 +57,11 @@ example : Evaluates [] [] (Expr.wordLe (.word zero) (.word one)) (.bool true) []
 
 example : Evaluates [] [] (Expr.wordLt (.word zero) (.word one)) (.bool true) [] :=
   Evaluates.wordLt_lt (definitions := [])
-    (by decide) .word .word .word .word .nil .nil
+    (by decide) .word .word .word .word .nil .nil .nil
 
 example : Evaluates [] [] (Expr.wordGe (.word one) (.word zero)) (.bool true) [] :=
   Evaluates.wordGe_not_lt (definitions := [])
-    (by decide) .word .word .word .word .nil .nil
+    (by decide) .word .word .word .word .nil .nil .nil
 
 private def booleanProgram (body : Expr) : Program := {
   resultType := .bool

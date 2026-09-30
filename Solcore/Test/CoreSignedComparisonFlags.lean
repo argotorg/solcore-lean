@@ -67,22 +67,22 @@ example : Evaluates [] []
 
 example : Evaluates [] [] (Expr.wordSltFlag (.word zero) (.word one))
     (.word (if one.signedGt zero then one else zero)) [] :=
-  Evaluates.wordSltFlag (definitions := []) .word .word .word .word .nil .nil
+  Evaluates.wordSltFlag (definitions := []) .word .word .word .word .nil .nil .nil
 example : Evaluates [] [] (Expr.wordSltFlag (.word zero) (.word one)) (.word one) [] :=
   Evaluates.wordSltFlag_both_nonnegative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] []
     (Expr.wordSltFlag (.word highBit) (.word Word.maximum)) (.word one) [] :=
   Evaluates.wordSltFlag_both_negative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] []
     (Expr.wordSltFlag (.word zero) (.word Word.maximum)) (.word zero) [] :=
   Evaluates.wordSltFlag_nonnegative_negative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] []
     (Expr.wordSltFlag (.word Word.maximum) (.word zero)) (.word one) [] :=
   Evaluates.wordSltFlag_negative_nonnegative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 
 private def wordProgram (body : Expr) : Program := { resultType := .word, body }
 

@@ -214,7 +214,7 @@ theorem the_same_actual_word_bundle_transports_runtime_world_safety
       some (.word, .fault error fault) ∧
     runRuntimeApplicationFunction? (types .word) owner (entry "Payload") (arguments (word 9) (word 14)) 6 [] =
       some (.word, .done (word 9).val []) ∧
-    ∃ world, Core.WorldExtends [] world ∧ Core.StoreHasTypes world [] ∧
+    ∃ world, Core.WorldExtends [] world ∧ Core.RuntimeStoreHasTypes world [] ∧
       Core.RuntimeValueHasType world (word 9).val .word := by
   have environmentTyped : Core.RuntimeEnvironmentHasTypes []
       (inputs (word 9) (word 14)).environment.values (inputs (word 9) (word 14)).context.values :=

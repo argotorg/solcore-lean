@@ -112,10 +112,10 @@ private def reader : Core.Value := .closure .word .word readBody [.cellRef .word
 private def writer : Core.Value := .closure .word .word writeBody [.cellRef .word 0]
 private def allocator : Core.Value := .closure .word (.cell .word) (.newCell .word (.var 0)) []
 private theorem readerTyped : Core.ValueHasType reader (.function .word .word) :=
-  .closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)
+  .closure (.cons .cellRef .nil) (.loadCell (.var rfl))
 private theorem writerTyped : Core.ValueHasType writer (.function .word .word) :=
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))
-private theorem allocatorTyped : Core.ValueHasType allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl) .word)
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))
+private theorem allocatorTyped : Core.ValueHasType allocator (.function .word (.cell .word)) := .closure .nil (.newCell (.var rfl))
 private structure Body (body : Core.Expr) (actual : Core.Environment) (store : Core.Store) where
   value : Core.Value
   final : Core.Store
@@ -236,11 +236,13 @@ private def fixtures : IO Unit := do
   verify r "{return f(x);}" target .word (.bool true) 8 [.bool true] [.bool true]
   have _ : ¬ Core.ValueHasType (.bool true) .word := by intro h; cases h
   have et : Core.RuntimeEnvironmentHasTypes [.word] r.environment.values r.context.values := .cons .word
-    (.cons (.closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word))
-    (.cons (.closure (.cons (.cellRef rfl) .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))) (.cons .bool .nil)))
+    (.cons (.closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl)))
+    (.cons (.closure (.cons (.cellRef rfl) .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))) (.cons .bool .nil)))
   have st : Core.StoreHasTypes [.word] [w 23] := Core.StoreHasTypes.nil.allocate .word .word
   let app ← application r ret.source
+  let finite ← counted r [w 23] ret.source
   have _ := LocalInputs.runApplication?_runtime_has_exact_cost app.evidence.hasType et st
+    ⟨finite.value, finite.final, finite.evidence.erase⟩
   for store in [[],[w 23],[.bool true]] do
     let cp : Core.State := ⟨.eval (.var 0) r.environment.values,[.applyClosure .word .word readBody [.cellRef .word 0]],store⟩
     if checked : r.checkApplication? ret.source = some (target,.word) then

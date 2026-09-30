@@ -85,7 +85,7 @@ theorem fixed_source_and_types_have_no_uniform_actual_body_cost (bound : Nat) :
 private def reader : Core.Value := .closure .unit .word (.loadCell (.var 1)) [.cellRef .word 0]
 private def w (n : Nat) : Core.Value := .word (Core.Word.ofNatModulo n)
 private theorem readerTyped : Core.RuntimeValueHasType [.word] reader (.function .unit .word) :=
-  .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word)
+  .closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl))
 private theorem wordStore (n : Nat) : Core.StoreHasTypes [.word] [w n] := by
   simpa [w] using Core.StoreHasTypes.nil.allocate .word (Core.ValueHasType.word (value := Core.Word.ofNatModulo n))
 private theorem readerCost (n : Nat) : LocalFunctionApplicationEvaluatesWithCost names
@@ -123,11 +123,12 @@ theorem typed_completion_retains_the_independently_fixed_value_and_cost
     {world : Core.StoreTyping} {a b : Core.Ty} {x v : Core.Value}
     (xt : Core.RuntimeValueHasType world x a) (vt : Core.RuntimeValueHasType world v b)
     (n : Nat) {store : Core.Store} (st : Core.StoreHasTypes world store) :
-    ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future store ∧
+    ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future store ∧
       Core.RuntimeValueHasType future v b ∧ LocalFunctionApplicationEvaluatesWithCost names
         (environment (delayed a b n v) x) store (source span span) v store (3 * n + 6) := by
   obtain ⟨future, final, result, cost, ext, stored, typed, evaluated⟩ :=
     (elaborated a b span span).hasType.runtime_evaluates rfl (environmentTyped (delayedTyped vt n) xt) st
+      ⟨v, store, (delayedCost a b n x v store span span).erase⟩
   obtain ⟨rfl, rfl, rfl⟩ := evaluated.deterministic (delayedCost a b n x v store span span)
   exact ⟨future, ext, stored, typed, evaluated⟩
 
@@ -140,11 +141,12 @@ theorem actual_cost_precedes_all_endpoints_and_closed_fuel_thresholds
       ((∃ cp, Core.runStateful fuel (.initial core (environment (delayed a b n v) x).values store) = .outOfFuel cp) ↔ fuel < 3 * n + 6) := by
   obtain ⟨_, final, result, cost, _, _, _, evaluated, paths, thresholds⟩ :=
     (elaborated a b span span).runtime_typed_execution rfl (environmentTyped (delayedTyped vt n) xt) st
+      ⟨v, store, (delayedCost a b n x v store span span).erase⟩
   obtain ⟨rfl, rfl, rfl⟩ := evaluated.deterministic (delayedCost a b n x v store span span)
   exact ⟨paths, thresholds⟩
 
 theorem preservation_and_checker_soundness_keep_the_actual_store (n : Nat) :
-    (∃ future, Core.WorldExtends [.word] future ∧ Core.StoreHasTypes future [w n] ∧ Core.RuntimeValueHasType future (w n) .word) ∧
+    (∃ future, Core.WorldExtends [.word] future ∧ Core.RuntimeStoreHasTypes future [w n] ∧ Core.RuntimeValueHasType future (w n) .word) ∧
     LocalFunctionApplicationEvaluates names (environment reader .unit) [w n] (source span span) (w n) [w n] := by
   have e := elaborated .unit .word span span
   have et := environmentTyped readerTyped Core.RuntimeValueHasType.unit
@@ -161,7 +163,7 @@ theorem allocation_changes_both_the_store_and_its_world {world : Core.StoreTypin
     Core.RuntimeValueHasType (world ++ [.word]) (.cellRef .word store.length) (.cell .word) ∧
     LocalFunctionApplicationEvaluatesWithCost names (environment allocator (w n)) store (source span span)
       (.cellRef .word store.length) (store ++ [w n]) 8 ∧ store ++ [w n] ≠ store := by
-  refine ⟨environmentTyped (.closure .nil (.newCell (.var rfl) .word)) .word, ⟨[.word], rfl⟩,
+  refine ⟨environmentTyped (.closure .nil (.newCell (.var rfl))) .word, ⟨[.word], rfl⟩,
     st.allocate .word .word, .cellRef ?_, ?_, ?_⟩
   · simp [← st.length_eq]
   · exact callCost .word (.cell .word) (.newCell .word (.var 0)) [] (w n) (.cellRef .word store.length)

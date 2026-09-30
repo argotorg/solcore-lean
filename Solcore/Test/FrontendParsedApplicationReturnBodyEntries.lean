@@ -210,10 +210,10 @@ private def execute (argument : TypedRuntimeArgument) (output : Core.Ty) (body :
     have _ := LocalInputs.runApplicationReturnBody?_eq_some_iff.mp done
     have childDone := (equal cost s) ▸ done
     have _ := LocalInputs.runApplication?_runtime_done_sound runtimeTyped storeTyped childDone
-    have agreement : ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future t ∧
+    have agreement : ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future t ∧
         Core.RuntimeValueHasType future value output := by
       obtain ⟨future, final, v, count, extension, st, vt, evaluated, _⟩ :=
-        LocalInputs.runApplication?_runtime_has_exact_cost child.hasType runtimeTyped storeTyped
+        LocalInputs.runApplication?_runtime_has_exact_cost child.hasType runtimeTyped storeTyped ⟨value, t, costed.erase⟩
       obtain ⟨rfl, rfl, _⟩ := costed.deterministic evaluated
       exact ⟨future, extension, st, vt⟩
     have _ := agreement
@@ -262,13 +262,13 @@ def frontendParsedApplicationReturnBodyEntryTests : IO Unit := do
   for current in [3, 17] do
     have st : Core.StoreHasTypes [.word] [w current] := Core.StoreHasTypes.nil.allocate .word .word
     execute ⟨.unit, .unit, .unit⟩ .word (.loadCell (.var 1)) [.cellRef .word 0] [.word] [w current] [w current] (w current) 3
-      .unit (.closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl) .word)) st
+      .unit (.closure (.cons (.cellRef rfl) .nil) (.loadCell (.var rfl))) st
       (fun _ => .cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl)))
     execute ⟨.word, w 9, .word⟩ (.cell .word) (.newCell .word (.var 0)) [] [.word] [w current] [w current, w 9] (.cellRef .word 1) 3
-      .word (.closure .nil (.newCell (.var rfl) .word)) st (fun _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
+      .word (.closure .nil (.newCell (.var rfl))) st (fun _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
     execute ⟨.word, w 9, .word⟩ .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0]
       [.word] [w current] [w 9] (w 9) 10 .word
-      (.closure (.cons (.cellRef rfl) .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))) st
+      (.closure (.cons (.cellRef rfl) .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))) st
       (fun _ => .cons .enterLet (.cons .enterStoreCell (.cons (.var rfl) (.cons (.beginStoreCellValue rfl)
         (.cons (.var rfl) (.cons (.applyStoreCell rfl) (.cons .bindLet (.cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl))))))))))
   for type in [Core.Ty.namedData ⟨99⟩, .product (.namedData ⟨4⟩) (.namedData ⟨8⟩)] do

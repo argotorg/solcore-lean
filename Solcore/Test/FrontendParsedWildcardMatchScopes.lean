@@ -210,9 +210,9 @@ private def rawBody (table : LocalNameTable) (env : Resolved.Environment) (s : C
       | _ => throw (IO.userError "raw wildcard")
   | _ => throw (IO.userError "raw fixed body shape")
 termination_by sizeOf b
-private def allocator : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.newCell .word (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.newCell (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
-private def reader (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word l],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
-private def writer (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word l],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+private def allocator : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.newCell .word (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.newCell (.var rfl)) (.loadCell (.var rfl)))⟩
+private def reader (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word l],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
+private def writer (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word l],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private theorem runtimeArguments {world : Core.StoreTyping} (args : List TypedRuntimeArgument)
     (typed : ∀ arg ∈ args, Core.RuntimeValueHasType world arg.value arg.type) :
     Core.RuntimeEnvironmentHasTypes world (args.map (·.value)) (args.map (·.type)) := by
@@ -259,7 +259,7 @@ private def verify (source : Syntax.FunctionDecl) (s final : Core.Store) (value 
         | .outOfFuel cp =>
             have _ := safe.2.2 stopped
             have saved := original.runtime_checkpoint_world_extension RecursiveLocalComputationElaborates.core_hasType actual runtime.2 typedK stopped
-            have retained : ∃ savedWorld future, Core.WorldExtends [.word,.word,.word] savedWorld ∧ Core.StoreHasTypes savedWorld cp.store ∧ Core.WorldExtends savedWorld future ∧ Core.StoreHasTypes future manual.final ∧ future[2]?=some .word := by
+            have retained : ∃ savedWorld future, Core.WorldExtends [.word,.word,.word] savedWorld ∧ Core.RuntimeStoreHasTypes savedWorld cp.store ∧ Core.WorldExtends savedWorld future ∧ Core.RuntimeStoreHasTypes future manual.final ∧ future[2]?=some .word := by
               obtain ⟨savedWorld,extension,stored,resumed⟩ := saved
               obtain ⟨future,growth,finalTyped⟩ := resumed (whole.residual_of_outOfFuel stopped).2
               exact ⟨savedWorld,future,extension,stored,growth,finalTyped,(extension.trans growth).lookup rfl⟩

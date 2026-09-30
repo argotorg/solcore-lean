@@ -76,20 +76,17 @@ mutual
         {context : Context} {definitions : DataEnvironment}
         {elementType : Ty} {initializer : Expr} :
         HasType context initializer elementType definitions →
-        CellPayload elementType →
         HasType context (.newCell elementType initializer) (.cell elementType) definitions
     | loadCell
         {context : Context} {definitions : DataEnvironment}
         {elementType : Ty} {reference : Expr} :
         HasType context reference (.cell elementType) definitions →
-        CellPayload elementType →
         HasType context (.loadCell reference) elementType definitions
     | storeCell
         {context : Context} {definitions : DataEnvironment}
         {elementType : Ty} {reference value : Expr} :
         HasType context reference (.cell elementType) definitions →
         HasType context value elementType definitions →
-        CellPayload elementType →
         HasType context (.storeCell reference value) .unit definitions
     | construct
         {context : Context} {definitions : DataEnvironment}
@@ -230,22 +227,18 @@ mutual
         | _ => none
     | .newCell elementType initializer =>
         if inferWithDefinitions? definitions context initializer = some elementType then
-          if elementType.isCellPayload then some (.cell elementType) else none
+          some (.cell elementType)
         else
           none
     | .loadCell reference =>
         match inferWithDefinitions? definitions context reference with
-        | some (.cell elementType) =>
-            if elementType.isCellPayload then some elementType else none
+        | some (.cell elementType) => some elementType
         | _ => none
     | .storeCell reference value =>
         match inferWithDefinitions? definitions context reference with
         | some (.cell elementType) =>
-            if elementType.isCellPayload then
-              if inferWithDefinitions? definitions context value = some elementType then
-                some .unit
-              else
-                none
+            if inferWithDefinitions? definitions context value = some elementType then
+              some .unit
             else
               none
         | _ => none
@@ -372,25 +365,12 @@ theorem infer_complete
       ]
   | caseE _ _ _ scrutineeIH leftIH rightIH =>
       simp [inferWithDefinitions?, scrutineeIH, leftIH, rightIH]
-  | newCell _ payload initializerIH =>
-      simp [
-        inferWithDefinitions?,
-        initializerIH,
-        Ty.isCellPayload_complete payload
-      ]
-  | loadCell _ payload referenceIH =>
-      simp [
-        inferWithDefinitions?,
-        referenceIH,
-        Ty.isCellPayload_complete payload
-      ]
-  | storeCell _ _ payload referenceIH valueIH =>
-      simp [
-        inferWithDefinitions?,
-        referenceIH,
-        valueIH,
-        Ty.isCellPayload_complete payload
-      ]
+  | newCell _ initializerIH =>
+      simp [inferWithDefinitions?, initializerIH]
+  | loadCell _ referenceIH =>
+      simp [inferWithDefinitions?, referenceIH]
+  | storeCell _ _ referenceIH valueIH =>
+      simp [inferWithDefinitions?, referenceIH, valueIH]
   | construct lookup _ payloadIH =>
       simp [inferWithDefinitions?, lookup, payloadIH]
   | matchData lookup resultWellFormed _ _ scrutineeIH branchesIH =>
@@ -604,16 +584,11 @@ theorem infer_sound
   | newCell elementType initializer initializerIH =>
       by_cases initializerInferred :
           inferWithDefinitions? definitions context initializer = some elementType
-      · by_cases payloadAccepted : elementType.isCellPayload = true
-        · have resultEquality : Ty.cell elementType = type := by
-            exact Option.some.inj (by
-              simpa [inferWithDefinitions?, initializerInferred, payloadAccepted]
-                using inferred)
-          subst type
-          exact .newCell
-            (initializerIH initializerInferred)
-            (Ty.isCellPayload_sound payloadAccepted)
-        · simp [inferWithDefinitions?, initializerInferred, payloadAccepted] at inferred
+      · have resultEquality : Ty.cell elementType = type := by
+          exact Option.some.inj (by
+            simpa [inferWithDefinitions?, initializerInferred] using inferred)
+        subst type
+        exact .newCell (initializerIH initializerInferred)
       · simp [inferWithDefinitions?, initializerInferred] at inferred
   | loadCell reference referenceIH =>
       cases referenceInferred : inferWithDefinitions? definitions context reference with
@@ -621,16 +596,11 @@ theorem infer_sound
       | some referenceType =>
           cases referenceType with
           | cell elementType =>
-              by_cases payloadAccepted : elementType.isCellPayload = true
-              · have resultEquality : elementType = type := by
-                  exact Option.some.inj (by
-                    simpa [inferWithDefinitions?, referenceInferred, payloadAccepted]
-                      using inferred)
-                subst type
-                exact .loadCell
-                  (referenceIH referenceInferred)
-                  (Ty.isCellPayload_sound payloadAccepted)
-              · simp [inferWithDefinitions?, referenceInferred, payloadAccepted] at inferred
+              have resultEquality : elementType = type := by
+                exact Option.some.inj (by
+                  simpa [inferWithDefinitions?, referenceInferred] using inferred)
+              subst type
+              exact .loadCell (referenceIH referenceInferred)
           | unit | bool | word | product | function | sum | namedData =>
               simp [inferWithDefinitions?, referenceInferred] at inferred
   | storeCell reference value referenceIH valueIH =>
@@ -639,29 +609,15 @@ theorem infer_sound
       | some referenceType =>
           cases referenceType with
           | cell elementType =>
-              by_cases payloadAccepted : elementType.isCellPayload = true
-              · by_cases valueInferred :
-                    inferWithDefinitions? definitions context value = some elementType
-                · have resultEquality : Ty.unit = type := by
-                    exact Option.some.inj (by
-                      simpa [
-                        inferWithDefinitions?,
-                        referenceInferred,
-                        payloadAccepted,
-                        valueInferred
-                      ] using inferred)
-                  subst type
-                  exact .storeCell
-                    (referenceIH referenceInferred)
-                    (valueIH valueInferred)
-                    (Ty.isCellPayload_sound payloadAccepted)
-                · simp [
-                    inferWithDefinitions?,
-                    referenceInferred,
-                    payloadAccepted,
-                    valueInferred
-                  ] at inferred
-              · simp [inferWithDefinitions?, referenceInferred, payloadAccepted] at inferred
+              by_cases valueInferred :
+                  inferWithDefinitions? definitions context value = some elementType
+              · have resultEquality : Ty.unit = type := by
+                  exact Option.some.inj (by
+                    simpa [inferWithDefinitions?, referenceInferred, valueInferred]
+                      using inferred)
+                subst type
+                exact .storeCell (referenceIH referenceInferred) (valueIH valueInferred)
+              · simp [inferWithDefinitions?, referenceInferred, valueInferred] at inferred
           | unit | bool | word | product | function | sum | namedData =>
               simp [inferWithDefinitions?, referenceInferred] at inferred
   | construct constructor payload payloadIH =>

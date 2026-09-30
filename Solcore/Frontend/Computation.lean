@@ -3,6 +3,7 @@ import Solcore.Core.Syntax
 import Solcore.Frontend.LocalFunctionApplication
 import Solcore.Core.LocalFragment
 import Solcore.Core.Eval
+import Solcore.Core.BoundedSafety
 import Solcore.Core.Renaming
 import Solcore.Frontend.StructuralType
 import Solcore.Frontend.LocalTypeInputs
@@ -3541,9 +3542,11 @@ theorem ComputationReturnTreeElaborates.runtime_typed_execution
     (sameIds : environment.ids = inputs.context.ids)
     {world : Core.StoreTyping} {store : Core.Store}
     (environmentTyped : Core.RuntimeEnvironmentHasTypes world environment.values inputs.context.values)
-    (storeTyped : Core.StoreHasTypes world store) :
+    (storeTyped : Core.StoreHasTypes world store)
+    (finite : ∃ value finalStore,
+      Core.Evaluates environment.values store core value finalStore) :
     ∃ finalWorld finalStore value cost, Core.WorldExtends world finalWorld ∧
-      Core.StoreHasTypes finalWorld finalStore ∧ Core.RuntimeValueHasType finalWorld value type ∧
+      Core.RuntimeStoreHasTypes finalWorld finalStore ∧ Core.RuntimeValueHasType finalWorld value type ∧
       ComputationReturnTreeEvaluatesWithCost ChildCost owner inputs.names environment
         store body value finalStore cost ∧
       (∀ continuation : List Core.Frame, Core.Steps cost
@@ -3553,12 +3556,10 @@ theorem ComputationReturnTreeElaborates.runtime_typed_execution
           .done value finalStore ↔ cost ≤ fuel) ∧
         ((∃ checkpoint, Core.runStateful fuel (.initial core environment.values store) =
           .outOfFuel checkpoint) ↔ fuel < cost) := by
-  have definitionsWellFormed : Core.DataEnvironment.WellFormed [] := by
-    intro definition member
-    cases member
-  obtain ⟨finalWorld, finalStore, value, extension, finalTyped, evaluated, valueTyped⟩ :=
-    Core.well_typed_evaluates (elaboration.core_hasType childCoreType)
-      definitionsWellFormed environmentTyped storeTyped
+  obtain ⟨value, finalStore, evaluated⟩ := finite
+  obtain ⟨finalWorld, extension, finalTyped, valueTyped⟩ :=
+    Core.evaluation_preserves_type evaluated (elaboration.core_hasType childCoreType)
+      environmentTyped storeTyped.toRuntime
   have raw := (ComputationReturnTreeElaborates.evaluates_iff (F := F)
     (ChildElab := ChildElab) (ChildEval := ChildEval)
     childMembership childWeakening childInserts childExecution elaboration sameIds).mpr evaluated
@@ -3646,10 +3647,12 @@ theorem ComputationFunctionPrepares.runtime_typed_execution
     (preparation : ComputationFunctionPrepares ChildElab types owner declaration arguments prepared)
     {world : Core.StoreTyping} {store : Core.Store}
     (argumentsTyped : ∀ argument ∈ arguments, Core.RuntimeValueHasType world argument.value argument.type)
-    (storeTyped : Core.StoreHasTypes world store) :
+    (storeTyped : Core.StoreHasTypes world store)
+    (finite : ∃ value finalStore, Core.Evaluates prepared.inputs.environment.values
+      store prepared.core value finalStore) :
     prepareComputationFunction? checkChild types owner declaration arguments = some prepared ∧
     ∃ finalWorld finalStore value cost,
-      Core.WorldExtends world finalWorld ∧ Core.StoreHasTypes finalWorld finalStore ∧
+      Core.WorldExtends world finalWorld ∧ Core.RuntimeStoreHasTypes finalWorld finalStore ∧
       Core.RuntimeValueHasType finalWorld value prepared.returnType ∧
       ComputationReturnTreeEvaluatesWithCost ChildCost owner prepared.inputs.names prepared.inputs.environment
         store declaration.value.body value finalStore cost ∧
@@ -3669,7 +3672,7 @@ theorem ComputationFunctionPrepares.runtime_typed_execution
   have execution := ComputationReturnTreeElaborates.runtime_typed_execution (F := F)
     (ChildElab := ChildElab) (ChildEval := ChildEval) (ChildCost := ChildCost)
     childCoreType childMembership childWeakening childInserts childExecution childCostIff childPaths childSteps
-    preparation.body sameIds (by simpa only [LocalInputs.toTypeInputs_context] using environmentTyped) storeTyped
+    preparation.body sameIds (by simpa only [LocalInputs.toTypeInputs_context] using environmentTyped) storeTyped finite
   obtain ⟨finalWorld, finalStore, value, cost, extension, finalTyped, valueTyped, costed, paths, thresholds⟩ := execution
   refine ⟨accepted, finalWorld, finalStore, value, cost, extension, finalTyped, valueTyped, ?_, paths, thresholds, ?_⟩
   · simpa only [LocalInputs.toTypeInputs_names] using costed
@@ -3687,68 +3690,6 @@ world. Every further finite path retains a further extension of that same world.
 set_option autoImplicit false
 namespace Solcore.Frontend
 
-private theorem world_types {world : Core.StoreTyping} {store : Core.Store}
-    (typed : Core.StoreHasTypes world store) : world = store.map Core.Value.type := by
-  induction world generalizing store with
-  | nil =>
-      have empty : store = [] := List.length_eq_zero_iff.mp typed.length_eq.symm
-      subst store; rfl
-  | cons type types ih =>
-      cases store with
-      | nil => have impossible := typed.length_eq; cases impossible
-      | cons value values =>
-          obtain ⟨head,found,_,headTyped⟩ := typed.lookup (location := 0) rfl
-          have same : head = value := (Option.some.inj found).symm
-          subst head
-          have tail : Core.StoreHasTypes types values :=
-            ⟨Nat.succ.inj typed.length_eq,fun {index _} found => typed.lookup (location := index+1) found⟩
-          simp only [List.map_cons,← headTyped.type_eq,ih tail]
-
-private theorem world_unique {definitions : Core.DataEnvironment}
-    {left right : Core.StoreTyping} {store : Core.Store}
-    (first : Core.RuntimeStoreHasTypes left store definitions)
-    (second : Core.StoreHasTypes right store) : left = right :=
-  first.world_eq.trans (world_types second).symm
-
-private theorem transition_world {definitions : Core.DataEnvironment} {state next : Core.State}
-    {resultType : Core.Ty} {world : Core.StoreTyping}
-    (typed : Core.StateHasType state resultType definitions) (stored : Core.StoreHasTypes world state.store)
-    (transition : Core.Transition state next) :
-    ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future next.store := by
-  cases transition <;> try exact ⟨world,Core.WorldExtends.refl world,stored⟩
-  case applyNewCell =>
-    cases typed with
-    | @ret _ actualWorld _ _ _ _ _ actualStored valueTyped continuationTyped =>
-        have same : actualWorld = world := world_unique actualStored stored
-        subst actualWorld
-        cases continuationTyped with
-        | cons frame _ => cases frame with
-          | newCellApply payload =>
-              exact ⟨_,⟨[_],rfl⟩,stored.allocate payload (payload.valueHasType_rebase valueTyped.erase)⟩
-  case applyStoreCell =>
-    rename_i written
-    cases typed with
-    | @ret _ actualWorld _ _ _ _ _ actualStored valueTyped continuationTyped =>
-        have same : actualWorld = world := world_unique actualStored stored
-        subst actualWorld
-        cases continuationTyped with
-        | cons frame _ => cases frame with
-          | storeCellApply found payload =>
-              exact ⟨world,Core.WorldExtends.refl world,
-                stored.write found (payload.valueHasType_rebase valueTyped.erase) written⟩
-
-private theorem steps_world {definitions : Core.DataEnvironment} {start finish : Core.State}
-    {resultType : Core.Ty} {world : Core.StoreTyping} {steps : Nat}
-    (typed : Core.StateHasType start resultType definitions) (stored : Core.StoreHasTypes world start.store)
-    (path : Core.Steps steps start finish) :
-    ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future finish.store := by
-  induction path generalizing world with
-  | refl => exact ⟨world,Core.WorldExtends.refl world,stored⟩
-  | cons transition tail ih =>
-      obtain ⟨middle,extended,middleStored⟩ := transition_world typed stored transition
-      obtain ⟨future,further,finalStored⟩ := ih (Core.transition_preserves_state_type typed transition) middleStored
-      exact ⟨future,extended.trans further,finalStored⟩
-
 theorem ComputationReturnTreeElaborates.runtime_checkpoint_world_extension
     {ChildElab : LocalNameTable → Resolved.Context → Syntax.Expr → Core.Expr → Core.Ty → Prop}
     (childCoreType : ∀ {table context source core type},
@@ -3763,13 +3704,13 @@ theorem ComputationReturnTreeElaborates.runtime_checkpoint_world_extension
     (continuationTyped : Core.ContinuationHasType world continuation type resultType)
     {spent : Nat} {checkpoint : Core.State}
     (exhausted : Core.runStateful spent ⟨.eval core environment,continuation,store⟩ = .outOfFuel checkpoint) :
-    ∃ savedWorld, Core.WorldExtends world savedWorld ∧ Core.StoreHasTypes savedWorld checkpoint.store ∧
+    ∃ savedWorld, Core.WorldExtends world savedWorld ∧ Core.RuntimeStoreHasTypes savedWorld checkpoint.store ∧
       ∀ {steps next}, Core.Steps steps checkpoint next →
-        ∃ future, Core.WorldExtends savedWorld future ∧ Core.StoreHasTypes future next.store := by
+        ∃ future, Core.WorldExtends savedWorld future ∧ Core.RuntimeStoreHasTypes future next.store := by
   have safe := elaboration.runtime_checkpoint_safety childCoreType environmentTyped storeTyped continuationTyped
   have path := (Core.runStateful_outOfFuel_sound exhausted).1
-  obtain ⟨savedWorld,extended,savedStored⟩ := steps_world safe.1 storeTyped path
-  exact ⟨savedWorld,extended,savedStored,fun further => steps_world (safe.2.2 exhausted).1 savedStored further⟩
+  obtain ⟨savedWorld,extended,savedStored⟩ := path.preserve_store_world safe.1 storeTyped.toRuntime
+  exact ⟨savedWorld,extended,savedStored,fun further => further.preserve_store_world (safe.2.2 exhausted).1 savedStored⟩
 
 end Solcore.Frontend
 
@@ -3851,9 +3792,9 @@ theorem ComputationFunctionPrepares.runtime_checkpoint_world_extension
     {spent : Nat} {checkpoint : Core.State}
     (exhausted : Core.runStateful spent
       ⟨.eval prepared.core prepared.inputs.environment.values, continuation, store⟩ = .outOfFuel checkpoint) :
-    ∃ savedWorld, Core.WorldExtends world savedWorld ∧ Core.StoreHasTypes savedWorld checkpoint.store ∧
+    ∃ savedWorld, Core.WorldExtends world savedWorld ∧ Core.RuntimeStoreHasTypes savedWorld checkpoint.store ∧
       ∀ {steps next}, Core.Steps steps checkpoint next →
-        ∃ future, Core.WorldExtends savedWorld future ∧ Core.StoreHasTypes future next.store := by
+        ∃ future, Core.WorldExtends savedWorld future ∧ Core.RuntimeStoreHasTypes future next.store := by
   have environmentTyped :=
     checkpoint_prepared_runtime_environment preparation.parameters argumentsTyped
   exact preparation.body.runtime_checkpoint_world_extension childCoreType

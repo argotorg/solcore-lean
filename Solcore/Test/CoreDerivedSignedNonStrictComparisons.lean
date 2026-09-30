@@ -67,22 +67,22 @@ example : Evaluates [] []
 
 example : Evaluates [] [] (Expr.wordSge (.word one) (.word zero))
     (.bool (!zero.signedGt one)) [] :=
-  Evaluates.wordSge (definitions := []) .word .word .word .word .nil .nil
+  Evaluates.wordSge (definitions := []) .word .word .word .word .nil .nil .nil
 example : Evaluates [] [] (Expr.wordSge (.word one) (.word zero)) (.bool true) [] :=
   Evaluates.wordSge_both_nonnegative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] []
     (Expr.wordSge (.word Word.maximum) (.word highBit)) (.bool true) [] :=
   Evaluates.wordSge_both_negative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] []
     (Expr.wordSge (.word zero) (.word Word.maximum)) (.bool true) [] :=
   Evaluates.wordSge_nonnegative_negative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 example : Evaluates [] []
     (Expr.wordSge (.word Word.maximum) (.word zero)) (.bool false) [] :=
   Evaluates.wordSge_negative_nonnegative (definitions := [])
-    (by decide) (by decide) .word .word .word .word .nil .nil
+    (by decide) (by decide) .word .word .word .word .nil .nil .nil
 
 private def boolProgram (body : Expr) : Program := { resultType := .bool, body }
 

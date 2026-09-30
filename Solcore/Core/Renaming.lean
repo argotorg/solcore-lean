@@ -338,12 +338,12 @@ theorem HasType.rename
   | caseE _ _ _ scrutineeIH leftIH rightIH =>
       exact .caseE (scrutineeIH respect)
         (leftIH (respect.lift _)) (rightIH (respect.lift _))
-  | newCell _ payload initializerIH =>
-      exact .newCell (initializerIH respect) payload
-  | loadCell _ payload referenceIH =>
-      exact .loadCell (referenceIH respect) payload
-  | storeCell _ _ payload referenceIH valueIH =>
-      exact .storeCell (referenceIH respect) (valueIH respect) payload
+  | newCell _ initializerIH =>
+      exact .newCell (initializerIH respect)
+  | loadCell _ referenceIH =>
+      exact .loadCell (referenceIH respect)
+  | storeCell _ _ referenceIH valueIH =>
+      exact .storeCell (referenceIH respect) (valueIH respect)
   | construct found _ payloadIH =>
       exact .construct found (payloadIH respect)
   | matchData found resultWellFormed _ _ scrutineeIH branchesIH =>
@@ -1021,10 +1021,9 @@ set_option autoImplicit false
 namespace Solcore.Core
 
 /--
-Weakening a typed expression at the outermost context position is exact for
-cell-payload result types. The inserted runtime value is completely arbitrary:
-the original free variables are shifted past it, so no typing assumption on the
-new head is required.
+Weakening is exact for cell-payload results when the actual final store contains
+only first-order payloads. General heap values require the relational theorem:
+insertion can change a stored closure's captures even when its result is scalar.
 -/
 theorem Evaluates.weakenAt_zero_cellPayload
     {definitions : DataEnvironment}
@@ -1037,11 +1036,13 @@ theorem Evaluates.weakenAt_zero_cellPayload
     (payload : CellPayload type)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore)
+    (storeTyping : RuntimeStoreHasTypes world initialStore definitions)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore)
     (inserted : Value) :
     Evaluates (inserted :: environment) initialStore
       (expr.weakenAt 0) result finalStore := by
-  obtain ⟨finalWorld, _, finalStoreTyping, resultTyping⟩ :=
+  obtain ⟨_, _, _, resultTyping⟩ :=
     evaluation_preserves_type evaluation typing environmentTyping storeTyping
   obtain ⟨targetResult, targetFinalStore, targetEvaluation,
       resultRelated, finalStoresRelated⟩ :=
@@ -1066,11 +1067,13 @@ theorem Evaluates.weakenAt_zero_word
     (typing : HasType context expr .word definitions)
     (environmentTyping :
       RuntimeEnvironmentHasTypes world environment context definitions)
-    (storeTyping : StoreHasTypes world initialStore)
+    (storeTyping : RuntimeStoreHasTypes world initialStore definitions)
+    {finalWorld : StoreTyping}
+    (finalStoreTyping : StoreHasTypes finalWorld finalStore)
     (inserted : Value) :
     Evaluates (inserted :: environment) initialStore
       (expr.weakenAt 0) (.word result) finalStore :=
   evaluation.weakenAt_zero_cellPayload typing .word
-    environmentTyping storeTyping inserted
+    environmentTyping storeTyping finalStoreTyping inserted
 
 end Solcore.Core

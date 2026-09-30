@@ -340,7 +340,7 @@ mutual
                 diagnoseWithFuel fuel definitions context initializerPath initializer
             | some actual =>
                 if actual = elementType then
-                  { path, data := .invalidCellPayload elementType }
+                  { path, data := .inferenceFailure }
                 else
                   { path := initializerPath,
                     data := .cellInitializerTypeMismatch elementType actual }
@@ -349,8 +349,8 @@ mutual
             match infer? context reference definitions with
             | none =>
                 diagnoseWithFuel fuel definitions context referencePath reference
-            | some (.cell elementType) =>
-                { path := referencePath, data := .invalidCellPayload elementType }
+            | some (.cell _) =>
+                { path, data := .inferenceFailure }
             | some actual => { path := referencePath, data := .expectedCell actual }
         | .storeCell reference value =>
             let referencePath := path.child .storeCellReference
@@ -358,16 +358,13 @@ mutual
             | none =>
                 diagnoseWithFuel fuel definitions context referencePath reference
             | some (.cell elementType) =>
-                if elementType.isCellPayload then
-                  let valuePath := path.child .storeCellValue
-                  match infer? context value definitions with
-                  | none =>
-                      diagnoseWithFuel fuel definitions context valuePath value
-                  | some actual =>
-                      { path := valuePath,
-                        data := .cellValueTypeMismatch elementType actual }
-                else
-                  { path := referencePath, data := .invalidCellPayload elementType }
+                let valuePath := path.child .storeCellValue
+                match infer? context value definitions with
+                | none =>
+                    diagnoseWithFuel fuel definitions context valuePath value
+                | some actual =>
+                    { path := valuePath,
+                      data := .cellValueTypeMismatch elementType actual }
             | some actual => { path := referencePath, data := .expectedCell actual }
         | .construct constructor payload =>
             match definitions.lookupDataType? constructor.owner with

@@ -1,7 +1,7 @@
 import Solcore.Core.HostRunner
 
-/-! Higher-order host stores preserve capability and location typing. These
-regressions exercise store invariants without changing cell admission yet. -/
+/-! General host cells preserve capability and location typing through
+checker admission, allocation, suspension, and response resumption. -/
 
 set_option autoImplicit false
 
@@ -12,6 +12,42 @@ open Solcore.Core
 private def functionType : Ty := .function .word .word
 
 private def zero : Word := ⟨0, by decide⟩
+
+private def storedCapabilityProgram : Program := {
+  resultType := .word
+  body :=
+    .apply
+      (.loadCell (.newCell functionType (.var HostFunction.storageRead.index)))
+      (.word zero)
+}
+
+private theorem storedCapabilityProgram_checked :
+    storedCapabilityProgram.checkHost = true := by decide
+
+private theorem storedCapabilityProgram_initial_hasType :
+    HostStateHasType (State.initial storedCapabilityProgram.body hostEnvironment) .word :=
+  .eval .nil (hostEnvironment_hasTypes [] [])
+    (Program.checkHost_sound storedCapabilityProgram_checked) .nil
+
+/-- A capability stored by admitted code is recovered before its host call. -/
+example : storedCapabilityProgram.runHostStateful 9 =
+    .suspended ⟨.storageRead zero, [], [.hostFunction .storageRead]⟩ 0 := by
+  rfl
+
+/-- General cell admission retains finite safety at the host boundary. -/
+example (fuel : Nat) (fault : MachineFault) (state : State) :
+    storedCapabilityProgram.runHostStateful fuel ≠ .fault fault state :=
+  hostRun_never_faults storedCapabilityProgram_initial_hasType
+
+/-- The stored capability survives a response without becoming a pure closure. -/
+example (response : Word) :
+    HostStateHasType
+      ((⟨.storageRead zero, [], [.hostFunction .storageRead]⟩ : HostSuspension).resume response)
+      .word := by
+  have suspended := hostRun_suspended_hasType storedCapabilityProgram_initial_hasType
+    (show hostRun 9 (State.initial storedCapabilityProgram.body hostEnvironment) =
+      .suspended ⟨.storageRead zero, [], [.hostFunction .storageRead]⟩ 0 from rfl)
+  exact suspended.resume response
 
 /-- A capability can occupy a general cell without being erased to pure typing. -/
 example : HostStoreHasTypes [functionType] [.hostFunction .storageRead] := by

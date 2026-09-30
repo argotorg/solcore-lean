@@ -250,7 +250,7 @@ def CoreResultHasPublicType (compiled : CompiledEntry)
           (.declaration compiled.root.declaration) compiled.resultType =
             .ok publicType ∧
         ∃ finalWorld,
-          Core.StoreHasTypes finalWorld finalStore ∧
+          Core.RuntimeStoreHasTypes finalWorld finalStore ∧
             Core.RuntimeValueHasType finalWorld value publicType
   | .typedSource => False
 
@@ -328,7 +328,7 @@ def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult �
       match compiled.executable with
       | .core entry =>
           ∃ finalWorld,
-            Core.StoreHasTypes finalWorld finalStore ∧
+            Core.RuntimeStoreHasTypes finalWorld finalStore ∧
               Core.RuntimeValueHasType finalWorld value
                 entry.elaborated.returnType
       | .typedSource => False

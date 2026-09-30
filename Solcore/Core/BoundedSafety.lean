@@ -27,7 +27,7 @@ theorem transition_preserves_store_world
         cases continuationTyped with
         | cons frame _ =>
             cases frame with
-            | newCellApply _ =>
+            | newCellApply =>
                 exact ⟨_, ⟨[_], rfl⟩, stored.allocate valueTyped⟩
   case applyStoreCell =>
     rename_i written
@@ -39,7 +39,7 @@ theorem transition_preserves_store_world
         cases continuationTyped with
         | cons frame _ =>
             cases frame with
-            | storeCellApply found _ =>
+            | storeCellApply found =>
                 exact ⟨world, .refl world, stored.write found valueTyped written⟩
 
 theorem Steps.preserve_store_world

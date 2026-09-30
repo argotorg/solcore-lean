@@ -68,8 +68,8 @@ private def allocations : Nat → Nat → Core.Expr
 private theorem allocationsTyped (n index : Nat) (context : Core.Context)
     (found : context[index]?=some .word) : Core.HasType context (allocations n index) (.cell .word) := by
   induction n generalizing index context with
-  | zero => exact .newCell (.var found) .word
-  | succ n ih => exact .letE (.newCell (.var found) .word) (ih (index+1) (.cell .word::context) (by simpa using found))
+  | zero => exact .newCell (.var found)
+  | succ n ih => exact .letE (.newCell (.var found)) (ih (index+1) (.cell .word::context) (by simpa using found))
 private theorem allocationsPath (n index : Nat) (env : Core.Environment) (s : Core.Store)
     (word : Core.Word) (k : List Core.Frame) (found : env[index]?=some (.word word)) :
     Core.Steps (5*n+3) ⟨.eval (allocations n index) env,k,s⟩
@@ -94,9 +94,9 @@ private def allocator (n : Nat) (captured : Core.Environment) : Core.Value :=
   .closure .word (.cell .word) (allocations n 0) captured
 
 private abbrev worldChain (world : Core.StoreTyping) (cp : Core.State) : Prop :=
-  ∃ saved, Core.WorldExtends world saved ∧ Core.StoreHasTypes saved cp.store ∧
+  ∃ saved, Core.WorldExtends world saved ∧ Core.RuntimeStoreHasTypes saved cp.store ∧
     ∀ {steps next}, Core.Steps steps cp next →
-      ∃ later, Core.WorldExtends saved later ∧ Core.StoreHasTypes later next.store
+      ∃ later, Core.WorldExtends saved later ∧ Core.RuntimeStoreHasTypes later next.store
 private theorem checkpoint {world : Core.StoreTyping} {f : Core.Value} {b result : Core.Ty}
     {word : Core.Word} {s : Core.Store} {k : List Core.Frame} {spent : Nat} {cp : Core.State}
     (ft : Core.RuntimeValueHasType world f (.function .word b)) (st : Core.StoreHasTypes world s)
@@ -160,9 +160,9 @@ theorem arbitrary_allocations_retain_original_captures_and_typed_pending_frames
 
 theorem every_resumed_exhaustion_extends_the_same_saved_world
     {world : Core.StoreTyping} {cp : Core.State} (chain : worldChain world cp) :
-    ∃ saved, Core.WorldExtends world saved ∧ Core.StoreHasTypes saved cp.store ∧
+    ∃ saved, Core.WorldExtends world saved ∧ Core.RuntimeStoreHasTypes saved cp.store ∧
       ∀ {additional next}, Core.runStateful additional cp=.outOfFuel next →
-        ∃ later, Core.WorldExtends saved later ∧ Core.StoreHasTypes later next.store := by
+        ∃ later, Core.WorldExtends saved later ∧ Core.RuntimeStoreHasTypes later next.store := by
   obtain ⟨saved,ext,typed,further⟩ := chain
   exact ⟨saved,ext,typed,fun exhausted => further (Core.runStateful_outOfFuel_sound exhausted).1⟩
 
@@ -227,7 +227,7 @@ theorem typed_writes_change_actual_values_without_changing_any_world_type
       .outOfFuel (bound (.closure .word .word writeBody (.cellRef .word location::captured)) (.word word) (.word word) updated k) :=
     Core.runStateful_outOfFuel_complete prefixPath (Core.advance_next_iff.mpr (.var rfl))
   have ft : Core.RuntimeValueHasType world (.closure .word .word writeBody (.cellRef .word location::captured)) (.function .word .word) :=
-    .closure (.cons (.cellRef found) ct) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))
+    .closure (.cons (.cellRef found) ct) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))
   exact ⟨st.write found .word written,changed,counted .word writeBody _ _ _ _ _ 10 (p []),exhausted,
     checkpoint ft st kt exhausted⟩
 
@@ -242,11 +242,11 @@ theorem literal_nested_captures_and_pending_references_survive_every_later_world
     let k := Core.Frame.pairApply nested::pending
     let cp := bound (allocator n [nested]) (.word word) (.cellRef .word (s.length+n)) (s++List.replicate (n+1) (.word word)) k
     Core.runStateful (5*n+10) ⟨.eval core (environment (allocator n [nested]) (.word word)).values,k,s⟩=.outOfFuel cp ∧
-    ∃ saved, Core.WorldExtends world saved ∧ Core.StoreHasTypes saved cp.store ∧
+    ∃ saved, Core.WorldExtends world saved ∧ Core.RuntimeStoreHasTypes saved cp.store ∧
       Core.RuntimeValueHasType saved nested (.function .unit .unit) ∧
       Core.RuntimeValueHasType saved (.cellRef element location) (.cell element) ∧
       ∀ {steps next}, Core.Steps steps cp next → ∃ later,
-        Core.WorldExtends saved later ∧ Core.StoreHasTypes later next.store ∧
+        Core.WorldExtends saved later ∧ Core.RuntimeStoreHasTypes later next.store ∧
           Core.RuntimeValueHasType later nested (.function .unit .unit) := by
   dsimp only
   have nt : Core.RuntimeValueHasType world (nestedReference element location) (.function .unit .unit) :=

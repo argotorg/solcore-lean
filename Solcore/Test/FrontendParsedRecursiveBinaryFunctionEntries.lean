@@ -249,9 +249,9 @@ private def verify (source : Syntax.FunctionDecl) (f g x : TypedRuntimeArgument)
       | .fault _ _ => throw (IO.userError "independent successful path faulted")
     return prepared
   else throw (IO.userError "independent exact Core/type")
-private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
+private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 end RecursiveBinaryEntries
 open RecursiveBinaryEntries
 def frontendParsedRecursiveBinaryFunctionEntryTests : IO Unit := do

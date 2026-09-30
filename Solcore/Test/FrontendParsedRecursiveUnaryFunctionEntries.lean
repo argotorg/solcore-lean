@@ -224,11 +224,11 @@ private def verify (source : Syntax.FunctionDecl) (f g x y : TypedRuntimeArgumen
       | .fault _ _ => throw (IO.userError "independent successful path faulted")
     return prepared
   else throw (IO.userError "independent exact Core/type")
-private def reader (t : Core.Ty) (payload : Core.CellPayload t) (location : Nat) : TypedRuntimeArgument :=
-  ⟨.function t t,.closure t t (.loadCell (.var 1)) [.cellRef t location],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) payload)⟩
-private def writer (t : Core.Ty) (payload : Core.CellPayload t) (location : Nat) : TypedRuntimeArgument :=
+private def reader (t : Core.Ty) (_payload : Core.CellPayload t) (location : Nat) : TypedRuntimeArgument :=
+  ⟨.function t t,.closure t t (.loadCell (.var 1)) [.cellRef t location],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
+private def writer (t : Core.Ty) (_payload : Core.CellPayload t) (location : Nat) : TypedRuntimeArgument :=
   ⟨.function t t,.closure t t (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef t location],
-    .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) payload) (.loadCell (.var rfl) payload))⟩
+    .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 end RecursiveUnaryEntries
 open RecursiveUnaryEntries
 def frontendParsedRecursiveUnaryFunctionEntryTests : IO Unit := do

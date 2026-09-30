@@ -356,18 +356,18 @@ theorem host_state_progress
               cases valueTyping with
               | inLeft => exact .inr (.inl ⟨_, .core .chooseLeft⟩)
               | inRight => exact .inr (.inl ⟨_, .core .chooseRight⟩)
-          | newCellApply _ => exact .inr (.inl ⟨_, .core .applyNewCell⟩)
-          | loadCellApply _ =>
+          | newCellApply => exact .inr (.inl ⟨_, .core .applyNewCell⟩)
+          | loadCellApply =>
               cases valueTyping with
               | cellRef found =>
                   obtain ⟨loaded, read, _⟩ := storeTyping.lookup found
                   exact .inr (.inl ⟨_, .core (.applyLoadCell read)⟩)
-          | storeCellValue _ _ _ =>
+          | storeCellValue _ _ =>
               cases valueTyping with
               | cellRef found =>
                   obtain ⟨oldValue, read, _⟩ := storeTyping.lookup found
                   exact .inr (.inl ⟨_, .core (.beginStoreCellValue read)⟩)
-          | storeCellApply found _ =>
+          | storeCellApply found =>
               obtain ⟨updatedStore, written⟩ :=
                 storeTyping.write_exists (value := value) found
               exact .inr (.inl ⟨_, .core (.applyStoreCell written)⟩)

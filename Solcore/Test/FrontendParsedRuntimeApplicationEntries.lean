@@ -261,20 +261,20 @@ def frontendParsedRuntimeApplicationEntryTests : IO Unit := do
       (.closure .nil (delayedTyped n .word [])) (delayedPath n (w x) [] [])
   for current in [3,17] do
     execute ⟨.word,w 9,.word⟩ .word (.loadCell (.var 1)) [.cellRef .word 0] [w current] [w current] (w current) 3
-      (.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word))
+      (.closure (.cons .cellRef .nil) (.loadCell (.var rfl)))
       (fun _ => .cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl)))
     execute ⟨.word,w 9,.word⟩ (.cell .word) (.newCell .word (.var 0)) [] [w current] [w current,w 9] (.cellRef .word 1) 3
-      (.closure .nil (.newCell (.var rfl) .word)) (fun _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
+      (.closure .nil (.newCell (.var rfl))) (fun _ => .cons .enterNewCell (.cons (.var rfl) (.cons .applyNewCell .refl)))
     execute ⟨.word,w 9,.word⟩ .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0]
       [w current] [w 9] (w 9) 10
-      (.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word)))
+      (.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl))))
       (fun _ => .cons .enterLet (.cons .enterStoreCell (.cons (.var rfl) (.cons (.beginStoreCellValue rfl)
         (.cons (.var rfl) (.cons (.applyStoreCell rfl) (.cons .bindLet (.cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl))))))))))
   for type in [Core.Ty.namedData ⟨99⟩,.product (.namedData ⟨4⟩) (.namedData ⟨8⟩)] do
     let a : TypedRuntimeArgument := ⟨.function type type,.closure type type (.var 0) [],.closure .nil (.var rfl)⟩
     execute a a.type (.var 0) [] [] [] a.value 1 (.closure .nil (.var rfl)) (fun _ => .cons (.var rfl) .refl)
   execute ⟨.word,w 9,.word⟩ .word (.loadCell (.var 1)) [.cellRef .word 0] [.bool true] [.bool true] (.bool true) 3
-    (.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word))
+    (.closure (.cons .cellRef .nil) (.loadCell (.var rfl)))
     (fun _ => .cons .enterLoadCell (.cons (.var rfl) (.cons (.applyLoadCell rfl) .refl)))
   have _ : ¬ Core.ValueHasType (.bool true) .word := by intro impossible; cases impossible
   let f : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.var 0) [],.closure .nil (.var rfl)⟩

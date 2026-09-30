@@ -231,7 +231,7 @@ theorem structurally_typed_actual_values_do_not_prove_cells_allocated (location 
     Core.runStateful 7 (Core.State.initial core (readerEnvironment location) []) =
       .fault (.invalidCellLocation location) ⟨.ret (.cellRef .word location), [.loadCellApply], []⟩ :=
   ⟨(exactCall _ _ ranges [] []).complete,
-    .cons .cellRef (.cons (.closure .nil (.loadCell (.var rfl) .word))
-      (.cons (.closure .nil (.loadCell (.var rfl) .word)) (.cons .bool (.cons .word .nil)))), rfl⟩
+    .cons .cellRef (.cons (.closure .nil (.loadCell (.var rfl)))
+      (.cons (.closure .nil (.loadCell (.var rfl))) (.cons .bool (.cons .word .nil)))), rfl⟩
 
 end Tests.FrontendLocalFunctionApplication

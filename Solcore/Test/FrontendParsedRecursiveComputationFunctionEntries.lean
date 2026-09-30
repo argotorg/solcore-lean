@@ -261,9 +261,9 @@ private def verify (source : Syntax.FunctionDecl) (f g x : TypedRuntimeArgument)
         runRecursiveComputationFunction? types owner source args 16 [w 23]=some (.word,.done (w 23) [w 23]))) "same prepared records preserve three store outcomes"
     return ⟨types,compiled,prepared,compiledSome⟩
   else throw (IO.userError "independent exact Core/type")
-private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
+private def reader : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 end RecursiveFunctionEntries
 open RecursiveFunctionEntries
 def frontendParsedRecursiveComputationFunctionEntryTests : IO Unit := do
@@ -281,11 +281,11 @@ def frontendParsedRecursiveComputationFunctionEntryTests : IO Unit := do
     let hiddenBody ← bodySource "f(g(x));{f(g(x));return x;}"; let hidden ← verify hiddenBody reader writer x .word (.letE (nested 2 1 0) (.letE (nested 3 2 1) (.var 2))) [w old] [w 14] (w 14) 49
     check (decide (runRecursiveComputationFunction? hidden.types owner hiddenBody [reader,writer,x] 24 [w old]=
       some (.word,.outOfFuel ⟨.eval (.letE (nested 3 2 1) (.var 2)) (w 14::hidden.prepared.inputs.environment.values),[],[w 14]⟩))) "entry hidden slot/captured reader/updated store"
-    let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl) .word)⟩
-    let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word,.closure (.cell .word) .word (.loadCell (.var 0)) [],.closure .nil (.loadCell (.var rfl) .word)⟩
+    let alloc : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl))⟩
+    let load : TypedRuntimeArgument := ⟨.function (.cell .word) .word,.closure (.cell .word) .word (.loadCell (.var 0)) [],.closure .nil (.loadCell (.var rfl))⟩
     discard <| verify (← bodySource "let r=f(g(x));return r;") load alloc x .word core [w old] [w old,w 14] (w 14) 18
     for choice in [false,true] do
-      let guard : TypedRuntimeArgument := ⟨.function .word .bool,.closure .word .bool (.letE (.storeCell (.var 1) (.var 0)) (.bool choice)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) .bool)⟩
+      let guard : TypedRuntimeArgument := ⟨.function .word .bool,.closure .word .bool (.letE (.storeCell (.var 1) (.var 0)) (.bool choice)) [.cellRef .word 0],.closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) .bool)⟩
       discard <| verify (← bodySource "if(f(g(x))){g(x);return x;}else{return x;}") guard identity x .word (.ifE (nested 2 1 0) (.letE (.apply (.var 1) (.var 0)) (.var 1)) (.var 0)) [w old] [w 14] (w 14) (if choice then 29 else 21)
     let maker : TypedRuntimeArgument := ⟨.function .word reader.type,.closure .word reader.type (.var 1) [reader.value],.closure (.cons reader.valueTyped .nil) (.var rfl)⟩
     discard <| verify (← bodySource "let h=f(x);return h(g(x));") maker writer x .word (.letE (.apply (.var 2) (.var 0)) (nested 0 2 1)) [w old] [w 14] (w 14) 30

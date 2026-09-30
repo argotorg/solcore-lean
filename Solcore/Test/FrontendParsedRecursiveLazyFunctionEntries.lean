@@ -239,9 +239,9 @@ private def verify (source : Syntax.FunctionDecl) (f g x y : TypedRuntimeArgumen
       | .fault _ _ => throw (IO.userError "independent successful path faulted")
     return prepared
   else throw (IO.userError "independent exact Core/type")
-private def reader : TypedRuntimeArgument := ⟨.function .bool .bool,.closure .bool .bool (.loadCell (.var 1)) [.cellRef .bool 1],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .bool)⟩
+private def reader : TypedRuntimeArgument := ⟨.function .bool .bool,.closure .bool .bool (.loadCell (.var 1)) [.cellRef .bool 1],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer (location : Nat) : TypedRuntimeArgument := ⟨.function .bool .bool,.closure .bool .bool (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .bool location],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .bool) (.loadCell (.var rfl) .bool))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private def arg (value : Bool) : TypedRuntimeArgument := ⟨.bool,.bool value,.bool⟩
 end RecursiveLazyEntries
 open RecursiveLazyEntries
@@ -273,7 +273,7 @@ def frontendParsedRecursiveLazyFunctionEntryTests : IO Unit := do
   let missing := Core.StatefulRunResult.fault (.invalidCellLocation 1) ⟨.ret (.cellRef .bool 1),[.loadCellApply],[.bool true]⟩
   check (decide (run 23 [.bool false]=some (.bool,.outOfFuel missingCp) ∧ run 24 [.bool false]=some (.bool,missing) ∧ Core.runStateful 1 missingCp=missing ∧ runRecursiveComputationFunction? types owner source [f,reader,arg false,y] 18 [.bool true]=some (.bool,.done (.bool false) [.bool false]))) "selected missing RHS versus skipped missing RHS preserves left update"
   let badLeft : TypedRuntimeArgument := ⟨f.type,.closure .bool .bool (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 3))) [.cellRef .bool 0,.cellRef .bool 2],
-    .closure (.cons .cellRef (.cons .cellRef .nil)) (.letE (.storeCell (.var rfl) (.var rfl) .bool) (.loadCell (.var rfl) .bool))⟩
+    .closure (.cons .cellRef (.cons .cellRef .nil)) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
   let badEnv := [(arg true).value,x.value,g.value,badLeft.value]
   let badFrames := [Core.Frame.ifBranches right (.bool false) badEnv]; let updated := [.bool true,.bool false,w 99]
   let badCp : Core.State := ⟨.ret (.cellRef .bool 2),.loadCellApply::badFrames,updated⟩

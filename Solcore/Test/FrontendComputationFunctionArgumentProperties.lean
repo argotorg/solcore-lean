@@ -236,10 +236,10 @@ theorem reconstruction_does_not_replace_the_first_initializer_checkpoint
 private def delayed (a : Core.Ty) : Nat → Core.Expr
   | 0 => .newCell a (.var 0)
   | m+1 => .letE (.var 0) (delayed a m)
-private theorem delayedTyped (a : Core.Ty) (payload : Core.CellPayload a) (m : Nat) (context : Core.Context) :
+private theorem delayedTyped (a : Core.Ty) (_payload : Core.CellPayload a) (m : Nat) (context : Core.Context) :
     Core.HasType (a::context) (delayed a m) (.cell a) := by
   induction m generalizing context with
-  | zero => exact .newCell (.var rfl) payload
+  | zero => exact .newCell (.var rfl)
   | succ m ih => exact .letE (.var rfl) (ih (a::context))
 private theorem delayedPath (a : Core.Ty) (m : Nat) (v : Core.Value) (captured : Core.Environment) (store : Core.Store) (k : List Core.Frame) :
     Core.Steps (3*m+3) ⟨.eval (delayed a m) (v::captured),k,store⟩ ⟨.ret (.cellRef a store.length),k,store++[v]⟩ := by

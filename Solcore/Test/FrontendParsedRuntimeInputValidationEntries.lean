@@ -157,14 +157,18 @@ private def positive (source : Syntax.FunctionDecl) (f : TypedRuntimeArgument) (
   check (decide (manual.value=value ∧ manual.final=final ∧ manual.cost=cost)) "independently fixed value/store/cost"
   if validated : validateRuntimeInputs world [f,x] s=true then
     have runtime := validateRuntimeInputs_iff.mp validated
+    have finitePath : Core.Steps manual.cost
+        (.initial p.1.core p.1.inputs.environment.values s) (.final manual.value manual.final) := by
+      rw [p.2.down.2.1]
+      exact manual.evidence []
     have safe := ComputationFunctionPrepares.runtime_typed_execution (F := RecursiveLocalComputationFragment)
       (ChildElab := RecursiveLocalComputationElaborates) (ChildEval := RecursiveLocalComputationEvaluates) (ChildCost := RecursiveLocalComputationEvaluatesWithCost)
       RecursiveLocalComputationElaborates.core_hasType RecursiveLocalComputationElaborates.core_fragment
       RecursiveLocalComputationFragment.weakenAt RecursiveLocalComputationFragment.evaluates_insert_iff
       RecursiveLocalComputationElaborates.evaluates_iff recursiveLocalComputationEvaluates_iff_exists_cost
       RecursiveLocalComputationFragment.insertion_paths RecursiveLocalComputationEvaluatesWithCost.toStepsWithContinuation
-      elaborateRecursiveLocalComputation?_iff p.2.down.1 runtime.1 runtime.2
-    have agreement : ∃ future, Core.WorldExtends world future ∧ Core.StoreHasTypes future manual.final ∧
+      elaborateRecursiveLocalComputation?_iff p.2.down.1 runtime.1 runtime.2 ⟨manual.value, manual.final, Core.steps_from_initial_sound finitePath⟩
+    have agreement : ∃ future, Core.WorldExtends world future ∧ Core.RuntimeStoreHasTypes future manual.final ∧
         Core.RuntimeValueHasType future manual.value output ∧ RecursiveComputationReturnTreeEvaluatesWithCost owner p.1.inputs.names p.1.inputs.environment s source.value.body manual.value manual.final manual.cost ∧
         (∀ k, Core.Steps manual.cost ⟨.eval core env,k,s⟩ ⟨.ret manual.value,k,manual.final⟩) ∧
         (∀ fuel, (Core.runStateful fuel (.initial core env s)=.done manual.value manual.final ↔ manual.cost≤fuel) ∧
@@ -177,7 +181,7 @@ private def positive (source : Syntax.FunctionDecl) (f : TypedRuntimeArgument) (
       · simpa only [p.2.down.2.1] using paths
       · simpa only [p.2.down.2.1] using thresholds
     if grows : s.length < manual.final.length then
-      have extension : ∃ future, Core.WorldExtends world future ∧ world.length < future.length ∧ Core.StoreHasTypes future manual.final := by
+      have extension : ∃ future, Core.WorldExtends world future ∧ world.length < future.length ∧ Core.RuntimeStoreHasTypes future manual.final := by
         obtain ⟨future,ext,st,_,_⟩ := agreement
         exact ⟨future,ext,by simpa only [runtime.2.length_eq,st.length_eq] using grows,st⟩
       have _ := extension
@@ -222,14 +226,14 @@ private def rejected (source : Syntax.FunctionDecl) (f : TypedRuntimeArgument) (
       | .outOfFuel cp => check (decide (Core.runStateful 40 cp=expected env ∧ Core.runStateful 3 cp=Core.runStateful (fuel+3) (.initial core env s))) "rejected raw checkpoint remains resumable"
       | _ => throw (IO.userError "rejected raw first threshold")
     else check (decide (actual=expected env)) "rejection does not replace raw success/fault"
-private def reader (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word l],.closure (.cons .cellRef .nil) (.loadCell (.var rfl) .word)⟩
+private def reader (l : Nat) : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.loadCell (.var 1)) [.cellRef .word l],.closure (.cons .cellRef .nil) (.loadCell (.var rfl))⟩
 private def writer : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.letE (.storeCell (.var 1) (.var 0)) (.loadCell (.var 2))) [.cellRef .word 0],
-  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl) .word) (.loadCell (.var rfl) .word))⟩
+  .closure (.cons .cellRef .nil) (.letE (.storeCell (.var rfl) (.var rfl)) (.loadCell (.var rfl)))⟩
 private def identity : TypedRuntimeArgument := ⟨.function .word .word,.closure .word .word (.var 0) [],.closure .nil (.var rfl)⟩
 private def nested (l : Nat) (used : Bool) : TypedRuntimeArgument :=
   ⟨.function .word .word,.closure .word .word (if used then invocation else .var 0) [(reader l).value],
     .closure (.cons (reader l).valueTyped .nil) (by split; exact .apply (.var rfl) (.var rfl); exact .var rfl)⟩
-private def allocator : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl) .word)⟩
+private def allocator : TypedRuntimeArgument := ⟨.function .word (.cell .word),.closure .word (.cell .word) (.newCell .word (.var 0)) [],.closure .nil (.newCell (.var rfl))⟩
 end ParsedRuntimeInputValidationEntries
 open ParsedRuntimeInputValidationEntries
 def frontendParsedRuntimeInputValidationEntryTests : IO Unit := do
