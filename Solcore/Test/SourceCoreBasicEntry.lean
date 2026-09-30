@@ -182,9 +182,7 @@ private def testPreparationRejections (program : CheckedProgram) : IO Unit := do
   expectError "compilation fuel" (prepare program valid 0 reason)
     fun error => error matches .lowering (.traversalExhausted _)
   for (name, accepts) in ([
-      ("loop", fun error => error matches .lowering (.unsupportedStatement _ _)),
-      ("stagedResult", fun error => error matches .stagedResultUnsupported _),
-      ("literalEvidence", fun error => error matches .lowering (.requirementsPresent _))] :
+      ("stagedResult", fun error => error matches .stagedResultUnsupported _)] :
       List (String × (Error → Bool))) do
     let input ← plan program [← request program name]
     expectError name (prepare program input 100 reason) accepts
@@ -194,6 +192,9 @@ private def prepareNamed (program : CheckedProgram) (name : String) : IO (Plan �
   pure (input, ← entryAt (← preparePlan program input) 0)
 
 private def testControlAndDiagnostics (program : CheckedProgram) : IO Unit := do
+  let (_, literal) ← prepareNamed program "literalEvidence"
+  assertTrue ((← invoke literal []).observation == .succeeded (scalar 1) [])
+    "prepared entry did not compile its authenticated Word integer literal"
   let (_, blocked) ← prepareNamed program "blocked"
   assertTrue ((← invoke blocked [scalar 5]).observation ==
       .succeeded (scalar 5) [present (scalar 5)]) "nested block return was not compiled"

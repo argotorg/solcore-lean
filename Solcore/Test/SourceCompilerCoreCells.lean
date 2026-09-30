@@ -38,6 +38,15 @@ private def workspace : Workspace.RawWorkspace := {
     "function chooseFailure(flag: Bool, value: Word) returns (Word) {",
     "  let absent: Word; return flag ? value : absent;",
     "}",
+    "function arithmetic(initial: Word) returns (Word) {",
+    "  let value: Word = initial + 2; value = value * 3; return value - 1;",
+    "}",
+    "function andFailure(flag: Bool) returns (Bool) {",
+    "  let absent: Bool; return flag && absent;",
+    "}",
+    "function orFailure(flag: Bool) returns (Bool) {",
+    "  let absent: Bool; return flag || absent;",
+    "}",
     "function direct(input: Word) returns (Word) { return input; }",
     "function recurse(value: Word) returns (Word) {",
     "  return value == 0 ? 5 : recurse(value - 1);",
@@ -190,6 +199,40 @@ private def testRetainedBackends (program : CheckedProgram) : IO Unit := do
       assertTrue (value == word 5) "retained recursive fallback value changed"
   | result => throw (IO.userError s!"retained recursive fallback failed: {reprStr result}")
 
+private def testPrimitiveIntegration (program : CheckedProgram) : IO Unit := do
+  for preference in [BackendPreference.automatic, .core] do
+    let arithmetic ← compileNamed program "arithmetic" [] preference
+    assertTrue (arithmetic.backend == .core) "mutable literal/arithmetic code did not select Core"
+    for (initial, stored, expected) in ([(4, 18, 17), (0, 6, 5)] : List (Nat × Nat × Nat)) do
+      let actual ← observation (arithmetic.runCore [scalar initial] execution)
+      assertTrue (actual == .succeeded (scalar expected) [present (scalar initial), present (scalar stored)])
+        "public primitive policy lost literals, mutation, arithmetic order or cached entry reuse"
+    for (name, shortValue, evaluatingValue) in [
+        ("andFailure", false, true), ("orFailure", true, false)] do
+      let compiled ← compileNamed program name [] preference
+      assertTrue (compiled.backend == .core) "short-circuit local code did not select Core"
+      let skipped ← observation (compiled.runCore [.bool shortValue] execution)
+      assertTrue (skipped == .succeeded (.bool shortValue)
+          [present (.bool shortValue), .inLeft .bool .unit])
+        "public short circuit evaluated its uninitialized right operand"
+      let (node, binder) ← match ← localReads program compiled "absent" with
+        | [site] => pure site
+        | _ => throw (IO.userError "short-circuit fixture lost its right read occurrence")
+      match ← observation (compiled.runCore [.bool evaluatingValue] execution) with
+      | .failed token store =>
+          assertTrue (token != Core.Word.zero && store ==
+              [present (.bool evaluatingValue), .inLeft .bool .unit])
+            "public short-circuit failure lost its nonzero reason or preserved store"
+          assertTrue (decide (compiled.coreFailureDiagnostic? token = some {
+              error := .uninitializedLocal binder, site := .occurrence node.id.occurrence,
+              span := some node.span })) "public short-circuit failure lost the right operand's source diagnostic"
+      | result => throw (IO.userError s!"public short circuit skipped a required right operand: {reprStr result}")
+  let typed ← compileNamed program "arithmetic" [] .typedSource
+  match typed.runTyped [.word (word 4)] execution with
+  | .ok (.typedSource (.done (.word value) _)) =>
+      assertTrue (value == word 17) "explicit typed-source arithmetic disagrees with the Core result"
+  | result => throw (IO.userError s!"explicit typed-source arithmetic failed: {reprStr result}")
+
 private def testFallthroughChecking : IO Unit := do
   let incomplete : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := []
@@ -223,6 +266,7 @@ def run : IO Unit := do
   testSpecializationAndFailure program
   testControlAndDiagnostics program
   testRetainedBackends program
+  testPrimitiveIntegration program
   testFallthroughChecking
 
 end Tests.SourceCompilerCoreCells

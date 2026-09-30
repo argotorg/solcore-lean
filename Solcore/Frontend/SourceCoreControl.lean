@@ -51,7 +51,11 @@ def lowerExpressionWithReasons : Nat → TypedSource → Scope → ExpressionId 
 /-- `tailReturns` is true only for a function's top-level list. Nested blocks
 and conditional bodies execute statement sequences, so their last expression
 falls through. Temporary Core binders are introduced by the helper layer. -/
-def lowerFlowStatementsWithReasons : Nat → TypedSource → Scope → List StatementId → Core.Ty →
+abbrev ExpressionLowerer := Nat → TypedSource → Scope → ExpressionId →
+  (ExpressionId → Core.Word) → Except Error LoweredExpr
+
+/-- Statement control is independent of the authenticated expression profile. -/
+def lowerFlowStatementsWithExpression (lowerExpression : ExpressionLowerer) : Nat → TypedSource → Scope → List StatementId → Core.Ty →
     (ExpressionId → Core.Word) → Bool →
     Except Error Core.Expr
   | _, _, _, [], resultType, _, _ => .ok (Core.LocalControl.fallthrough resultType)
@@ -66,21 +70,21 @@ def lowerFlowStatementsWithReasons : Nat → TypedSource → Scope → List Stat
           let payloadType ← SourceCoreBasic.lowerBinder source scope binder
           match initializer with
           | none =>
-              let body ← lowerFlowStatementsWithReasons fuel source ((binder.id, payloadType) :: scope)
+              let body ← lowerFlowStatementsWithExpression lowerExpression fuel source ((binder.id, payloadType) :: scope)
                 rest resultType reasonAt tailReturns
               pure (Core.LocalSequence.letUninitialized payloadType body)
           | some initializer =>
-              let initializer ← lowerExpressionWithReasons fuel source scope initializer reasonAt
+              let initializer ← lowerExpression fuel source scope initializer reasonAt
               SourceCoreBasic.ensureType (.binder binder.id) payloadType initializer.type
-              let body ← lowerFlowStatementsWithReasons fuel source ((binder.id, payloadType) :: scope)
+              let body ← lowerFlowStatementsWithExpression lowerExpression fuel source ((binder.id, payloadType) :: scope)
                 rest resultType reasonAt tailReturns
               pure (Core.LocalSequence.letInitialized controlType payloadType initializer.expression body)
       | .assignValue assignment operator value =>
           SourceCoreBasic.ensureType site .unit type
           let (index, payloadType) ← SourceCoreBasic.lowerAssignment source scope assignment operator
-          let value ← lowerExpressionWithReasons fuel source scope value reasonAt
+          let value ← lowerExpression fuel source scope value reasonAt
           SourceCoreBasic.ensureType site payloadType value.type
-          let body ← lowerFlowStatementsWithReasons fuel source scope rest resultType reasonAt tailReturns
+          let body ← lowerFlowStatementsWithExpression lowerExpression fuel source scope rest resultType reasonAt tailReturns
           pure (Core.LocalSequence.assign controlType (.var index) value.expression body)
       | .returnStmt none =>
           SourceCoreBasic.ensureType site resultType type
@@ -88,11 +92,11 @@ def lowerFlowStatementsWithReasons : Nat → TypedSource → Scope → List Stat
           pure (Core.LocalControl.returned .unit)
       | .returnStmt (some value) =>
           SourceCoreBasic.ensureType site resultType type
-          let value ← lowerExpressionWithReasons fuel source scope value reasonAt
+          let value ← lowerExpression fuel source scope value reasonAt
           SourceCoreBasic.ensureType site resultType value.type
           pure (Core.LocalControl.returnValue resultType value.expression)
       | .expression value trailingSemicolon =>
-          let value ← lowerExpressionWithReasons fuel source scope value reasonAt
+          let value ← lowerExpression fuel source scope value reasonAt
           if !trailingSemicolon && tailReturns && rest.isEmpty then
             SourceCoreBasic.ensureType site resultType type
             SourceCoreBasic.ensureType site resultType value.type
@@ -100,23 +104,40 @@ def lowerFlowStatementsWithReasons : Nat → TypedSource → Scope → List Stat
           else
             if trailingSemicolon then SourceCoreBasic.ensureType site .unit type
             else SourceCoreBasic.ensureType site type value.type
-            let body ← lowerFlowStatementsWithReasons fuel source scope rest resultType reasonAt tailReturns
+            let body ← lowerFlowStatementsWithExpression lowerExpression fuel source scope rest resultType reasonAt tailReturns
             pure (Core.LocalSequence.discard controlType value.expression body)
       | .block statements =>
-          let block ← lowerFlowStatementsWithReasons fuel source scope statements resultType reasonAt false
-          let body ← lowerFlowStatementsWithReasons fuel source scope rest resultType reasonAt tailReturns
+          let block ← lowerFlowStatementsWithExpression lowerExpression fuel source scope statements resultType reasonAt false
+          let body ← lowerFlowStatementsWithExpression lowerExpression fuel source scope rest resultType reasonAt tailReturns
           pure (Core.LocalControl.sequence resultType block body)
       | .ifThen condition thenBody elseBody =>
-          let condition ← lowerExpressionWithReasons fuel source scope condition reasonAt
+          let condition ← lowerExpression fuel source scope condition reasonAt
           SourceCoreBasic.ensureType site .bool condition.type
-          let thenBranch ← lowerFlowStatementsWithReasons fuel source scope thenBody resultType reasonAt false
+          let thenBranch ← lowerFlowStatementsWithExpression lowerExpression fuel source scope thenBody resultType reasonAt false
           let elseBranch ← match elseBody with
             | none => pure (Core.LocalControl.fallthrough resultType)
-            | some statements => lowerFlowStatementsWithReasons fuel source scope statements resultType reasonAt false
-          let body ← lowerFlowStatementsWithReasons fuel source scope rest resultType reasonAt tailReturns
+            | some statements => lowerFlowStatementsWithExpression lowerExpression fuel source scope statements resultType reasonAt false
+          let body ← lowerFlowStatementsWithExpression lowerExpression fuel source scope rest resultType reasonAt tailReturns
           pure (Core.LocalControl.sequence resultType
             (Core.LocalControl.conditional resultType condition.expression thenBranch elseBranch) body)
       | form => .error (.unsupportedStatement id form)
+
+def lowerFlowStatementsWithReasons (fuel : Nat) (source : TypedSource) (scope : Scope)
+    (statements : List StatementId) (resultType : Core.Ty)
+    (reasonAt : ExpressionId → Core.Word) (tailReturns : Bool) : Except Error Core.Expr :=
+  lowerFlowStatementsWithExpression lowerExpressionWithReasons fuel source scope statements
+    resultType reasonAt tailReturns
+
+/-- Use a checked expression profile without changing scope or control rules. -/
+def lowerStatementsWithExpression (lowerExpression : ExpressionLowerer)
+    (fuel : Nat) (source : TypedSource) (scope : Scope)
+    (statements : List StatementId) (resultType : Core.Ty)
+    (reasonAt : ExpressionId → Core.Word) (fellThroughReason : Core.Word) : Except Error Core.Expr := do
+  let flow ← lowerFlowStatementsWithExpression lowerExpression fuel source scope statements
+    resultType reasonAt true
+  let fallback := if resultType = .unit then Core.LanguageResult.success .unit
+    else Core.LanguageResult.failure resultType (.word fellThroughReason)
+  pure (Core.LocalControl.finish resultType flow fallback)
 
 /-- A constant token is convenient for fragment proofs and small callers. -/
 def lowerExpression (fuel : Nat) (source : TypedSource) (scope : Scope)
@@ -174,7 +195,8 @@ theorem lowerFlowStatements_block
       .ok next) :
     lowerFlowStatementsWithReasons (fuel + 1) source scope (id :: rest) resultType reasonAt tailReturns =
       .ok (Core.LocalControl.sequence resultType blockCode next) := by
-  simp [lowerFlowStatementsWithReasons, metadata, form, blockLowered, tailLowered,
+  simp only [lowerFlowStatementsWithReasons] at blockLowered tailLowered
+  simp [lowerFlowStatementsWithReasons, lowerFlowStatementsWithExpression, metadata, form, blockLowered, tailLowered,
     bind, Except.bind, pure, Pure.pure, Except.pure]
 
 theorem lowerFlowStatements_ifWithElse
@@ -191,7 +213,8 @@ theorem lowerFlowStatements_ifWithElse
     lowerFlowStatementsWithReasons (fuel + 1) source scope (id :: rest) resultType reasonAt tailReturns =
       .ok (Core.LocalControl.sequence resultType
         (Core.LocalControl.conditional resultType conditionCode thenCode elseCode) next) := by
-  simp [lowerFlowStatementsWithReasons, metadata, form, conditionLowered, thenLowered, elseLowered,
+  simp only [lowerFlowStatementsWithReasons] at thenLowered elseLowered tailLowered
+  simp [lowerFlowStatementsWithReasons, lowerFlowStatementsWithExpression, metadata, form, conditionLowered, thenLowered, elseLowered,
     tailLowered, SourceCoreBasic.ensureType, bind, Except.bind, pure, Pure.pure, Except.pure]
 
 theorem lowerFlowStatements_ifWithoutElse
@@ -207,7 +230,8 @@ theorem lowerFlowStatements_ifWithoutElse
     lowerFlowStatementsWithReasons (fuel + 1) source scope (id :: rest) resultType reasonAt tailReturns =
       .ok (Core.LocalControl.sequence resultType
         (Core.LocalControl.conditional resultType conditionCode thenCode (Core.LocalControl.fallthrough resultType)) next) := by
-  simp [lowerFlowStatementsWithReasons, metadata, form, conditionLowered, thenLowered,
+  simp only [lowerFlowStatementsWithReasons] at thenLowered tailLowered
+  simp [lowerFlowStatementsWithReasons, lowerFlowStatementsWithExpression, metadata, form, conditionLowered, thenLowered,
     tailLowered, SourceCoreBasic.ensureType, bind, Except.bind, pure, Pure.pure, Except.pure]
 
 end Solcore.Frontend.SourceCoreControl

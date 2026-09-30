@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceCoreLocalCell
+import Solcore.Frontend.SourceCompilationPlan.Types
 import Solcore.Core.LocalSequence
 
 /-! A scalar/product source fragment compiled to ordinary Core language results.
@@ -28,11 +29,14 @@ inductive Error where
   | requirementsPresent (id : ExpressionId)
   | coercionsPresent (id : ExpressionId)
   | typeProjection (error : SourceCoreElaboration.Error)
+  | literalEvidence (error : SourceCoreElaboration.Error)
+  | callPreparation (error : SourceTypedRuntime.RuntimeError)
   | typeMismatch (site : SourceCoreElaboration.ErrorSite) (expected actual : Core.Ty)
   | invalidWordLiteral (id : ExpressionId) (literal : Syntax.CoreLiteralValue)
   | localRead (error : SourceCoreLocalCell.Error)
   | unsupportedExpression (id : ExpressionId) (form : ExpressionForm)
   | unsupportedStatement (id : StatementId) (form : StatementForm)
+  | unsupportedForItem (form : ForItemForm)
   | polymorphicBinding (id : Resolved.LocalId)
   | bindingRequirementsPresent (id : Resolved.LocalId)
   | comptimeBinding (id : Resolved.LocalId)

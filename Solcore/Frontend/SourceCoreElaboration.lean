@@ -626,9 +626,43 @@ private def validateIntegerLiteralResolutionWith {error : Type}
                 consumedRequirements := [resolution.requirement]
               }
 
-/-- Validate the complete builtin `Int.fromInteger` contract before erasing it
-to the runtime Word constant.  Expression and pattern carriers share this
-primitive validation, including exact attachment and evidence checks. -/
+/-- A Word literal whose exact builtin evidence and raw spelling were checked.
+The requirement list records the obligations consumed by that validation. -/
+structure WordIntegerLiteral where
+  value : Core.Word
+  consumedRequirements : List RequirementId
+  deriving Repr, DecidableEq
+
+/-- Shared metadata-only validation for runtime Word integer literals. This
+does not traverse children, evaluate source code, or choose a user method. -/
+def validateWordIntegerLiteralWith {error : Type}
+    (lift : Error → error) (site : ErrorSite)
+    (solvedRequirements : List SolvedRequirement) (nodeType : Ty)
+    (attachedRequirements : List RequirementId)
+    (source : Syntax.CoreLiteralValue)
+    (resolution : IntegerLiteralResolution) :
+    Except error WordIntegerLiteral := do
+  let validated ← validateIntegerLiteralResolutionWith lift site
+    solvedRequirements nodeType attachedRequirements source resolution
+    (.builtin .intWord)
+    (fun target => ensureTypeWith lift site .word target)
+  pure {
+    value := Core.Word.ofNatModulo validated.rawValue
+    consumedRequirements := validated.consumedRequirements
+  }
+
+/-- The ordinary local compiler accepts the literal's own evidence, while
+coercion execution remains outside this primitive interface. -/
+def validateWordIntegerLiteral
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution) :
+    Except Error WordIntegerLiteral := do
+  unless node.coercions.isEmpty do
+    fail (.occurrence node.id.occurrence) (.coercionsPresent node.coercions)
+  validateWordIntegerLiteralWith id (.occurrence node.id.occurrence)
+    solvedRequirements node.type node.requirements source resolution
+
+/-- Expression and pattern carriers share the same Word evidence validator. -/
 private def lowerIntegerLiteralResolutionWith {error : Type}
     (lift : Error → error) (site : ErrorSite)
     (solvedRequirements : List SolvedRequirement) (nodeType : Ty)
@@ -636,14 +670,9 @@ private def lowerIntegerLiteralResolutionWith {error : Type}
     (source : Syntax.CoreLiteralValue)
     (resolution : IntegerLiteralResolution) :
     Except error LoweredExpression := do
-  let validated ← validateIntegerLiteralResolutionWith lift site
-    solvedRequirements nodeType attachedRequirements source resolution
-    (.builtin .intWord)
-    (fun target => ensureTypeWith lift site .word target)
-  pure {
-    resolved := .word (Core.Word.ofNatModulo validated.rawValue)
-    consumedRequirements := validated.consumedRequirements
-  }
+  let validated ← validateWordIntegerLiteralWith lift site solvedRequirements
+    nodeType attachedRequirements source resolution
+  pure { resolved := .word validated.value, consumedRequirements := validated.consumedRequirements }
 
 /-- Expression-node wrapper for the shared integer-literal validator. -/
 private def lowerIntegerLiteralWith {error : Type} (lift : Error → error)
@@ -3584,5 +3613,163 @@ typing equation at its public boundary. -/
     Core.infer? function.inputs.values function.core =
       some function.returnType :=
   function.coreTypeChecked
+
+end Solcore.Frontend.SourceCoreElaboration
+
+namespace Solcore.Frontend.SourceCoreElaboration
+open SourceInference TypeSystem
+
+private theorem lowerType_word_source {site : ErrorSite} {type : Ty}
+    (lowered : lowerType site type = .ok .word) : type = .word := by
+  cases type with
+  | «variable» | parameter | function | mapping | proxy | comptime | error =>
+      simp [lowerType, fail] at lowered
+  | constructor constructor =>
+      cases constructor with
+      | declaration => simp [lowerType, fail] at lowered
+      | builtin builtin => cases builtin <;> simp_all [lowerType, fail, Ty.word]
+  | product left right =>
+      cases leftResult : lowerType site left <;>
+        cases rightResult : lowerType site right <;>
+          simp_all [lowerType, bind, Except.bind, pure, Pure.pure, Except.pure]
+  | application function argument =>
+      simp only [lowerType] at lowered
+      split at lowered <;> simp [fail] at lowered
+
+local instance : LawfulBEq RequirementId where
+  rfl := by intro value; change (value.index == value.index) = true; simp
+  eq_of_beq := by
+    intro left right equal
+    change (left.index == right.index) = true at equal
+    have indices : left.index = right.index := beq_iff_eq.mp equal
+    cases left
+    cases right
+    cases indices
+    rfl
+
+private theorem builtinWordPredicate_of_beq {predicate : ProgramPredicate}
+    (equal : (predicate == ProgramSignatures.builtinIntPredicate .word) = true) :
+    predicate = ProgramSignatures.builtinIntPredicate .word := by
+  cases predicate with
+  | mk trait subject arguments =>
+    cases trait with
+    | builtin builtin =>
+      cases builtin
+      change ((subject == .word) && (arguments == [])) = true at equal
+      simp only [Bool.and_eq_true, beq_iff_eq] at equal
+      rcases equal with ⟨rfl, rfl⟩
+      rfl
+    | declaration id =>
+      change false = true at equal
+      contradiction
+
+private theorem exactIntegerLiteralRequirementWith_member
+    {site : ErrorSite} {requirements : List SolvedRequirement}
+    {requirement : RequirementId} {solved : SolvedRequirement}
+    (found : exactIntegerLiteralRequirementWith id site requirements requirement = .ok solved) :
+    solved ∈ requirements ∧ solved.id = requirement := by
+  unfold exactIntegerLiteralRequirementWith at found
+  dsimp only at found
+  split at found
+  · simp [failWith] at found
+  · rename_i selected exact
+    simp only [pure, Pure.pure, Except.pure, Except.ok.injEq] at found
+    subst solved
+    have member : selected ∈ requirements.filter (fun item => decide (item.id = requirement)) := by
+      rw [exact]
+      simp
+    simpa using member
+  · simp [failWith] at found
+
+/-- Facts established by successful Word-literal validation. The evidence entry
+is taken from the supplied ledger; this certificate does not assume that the
+entire ledger is semantically valid. -/
+structure WordIntegerLiteralCertificate
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
+    (validated : WordIntegerLiteral) : Prop where
+  targetType : resolution.targetType = .word
+  nodeType : node.type = .word
+  requirements : node.requirements = [resolution.requirement]
+  coercions : node.coercions = []
+  meaning : NumericLiteralDenotes source resolution.rawValue
+  value : validated.value = Core.Word.ofNatModulo resolution.rawValue
+  consumedRequirements : validated.consumedRequirements = [resolution.requirement]
+  solved : ∃ solved ∈ solvedRequirements, solved.id = resolution.requirement ∧
+    solved.predicate = ProgramSignatures.builtinIntPredicate .word
+
+/-- Extract the literal's static semantic facts from the actual validator. No
+evaluation derivation or successful lowering is assumed. -/
+theorem validateWordIntegerLiteral_sound
+    {solvedRequirements : List SolvedRequirement} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {validated : WordIntegerLiteral}
+    (accepted : validateWordIntegerLiteral solvedRequirements node source resolution = .ok validated) :
+    WordIntegerLiteralCertificate solvedRequirements node source resolution validated := by
+  have emptyCoercions : node.coercions = [] := by
+    by_cases empty : node.coercions = []
+    · exact empty
+    · simp [validateWordIntegerLiteral, empty, fail, bind, Except.bind] at accepted
+  simp only [validateWordIntegerLiteral, emptyCoercions, List.isEmpty_nil, ↓reduceIte] at accepted
+  unfold validateWordIntegerLiteralWith at accepted
+  cases checked : validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+      solvedRequirements node.type node.requirements source resolution (.builtin .intWord)
+      (fun target => ensureTypeWith id (.occurrence node.id.occurrence) .word target) with
+  | error err => simp [checked, bind, Except.bind] at accepted
+  | ok rawValidated =>
+    simp only [checked, bind, Except.bind, pure, Pure.pure, Except.pure,
+      Except.ok.injEq] at accepted
+    subst validated
+    unfold validateIntegerLiteralResolutionWith at checked
+    split at checked
+    · simp [failWith] at checked
+    · rename_i target
+      split at checked
+      · simp [failWith] at checked
+      · rename_i requirements
+        cases decodedEq : numericLiteralValue? source with
+        | none => simp [decodedEq, failWith, bind, Except.bind] at checked
+        | some decoded =>
+          simp only [decodedEq, bind, Except.bind, pure, Pure.pure, Except.pure] at checked
+          split at checked
+          · simp [failWith] at checked
+          · rename_i raw
+            cases lowered : lowerType (.occurrence node.id.occurrence) resolution.targetType with
+            | error err => simp [ensureTypeWith, lowered, Except.mapError, bind, Except.bind] at checked
+            | ok coreType =>
+              by_cases wordType : coreType = .word
+              · subst coreType
+                simp only [ensureTypeWith, lowered, Except.mapError, ↓reduceIte,
+                  bind, Except.bind, pure, Pure.pure, Except.pure] at checked
+                cases found : exactIntegerLiteralRequirementWith id (.occurrence node.id.occurrence)
+                    solvedRequirements resolution.requirement with
+                | error err => simp [found] at checked
+                | ok solved =>
+                  simp only [found] at checked
+                  split at checked
+                  · simp [failWith] at checked
+                  · rename_i predicate
+                    split at checked
+                    · simp [failWith] at checked
+                    · rename_i goal
+                      split at checked
+                      · simp [failWith] at checked
+                      · split at checked
+                        · simp [failWith] at checked
+                        · split at checked
+                          · simp [failWith] at checked
+                          · simp only [Except.ok.injEq] at checked
+                            subst rawValidated
+                            have targetWord := lowerType_word_source lowered
+                            have targetEq : resolution.targetType = node.type := by simpa using target
+                            have attached : node.requirements = [resolution.requirement] := by simpa using requirements
+                            have rawEq : decoded = resolution.rawValue := by simpa using raw
+                            have predicateEq : solved.predicate = ProgramSignatures.builtinIntPredicate .word :=
+                              builtinWordPredicate_of_beq (by simpa [bne, IntegerLiteralResolution.predicate, targetWord] using predicate)
+                            have solvedMember := exactIntegerLiteralRequirementWith_member found
+                            exact ⟨targetWord, targetEq ▸ targetWord, attached, emptyCoercions,
+                              numericLiteralValue?_sound (rawEq ▸ decodedEq), rfl, rfl,
+                              ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
+              · simp [ensureTypeWith, lowered, wordType, Except.mapError, failWith, bind, Except.bind] at checked
 
 end Solcore.Frontend.SourceCoreElaboration

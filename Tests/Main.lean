@@ -1014,6 +1014,8 @@ import Solcore.Test.CoreLanguageResult
 import Solcore.Test.CoreOptionalCells
 import Solcore.Test.CoreLocalSequence
 import Solcore.Test.CoreLocalControl
+import Solcore.Test.CoreLocalLoop
+import Solcore.Test.CoreTaggedFunction
 import Solcore.Test.CoreFirstOrderWeakening
 import Solcore.Test.SourceCoreLocalCell
 import Solcore.Test.SourceCoreBasic
@@ -1024,6 +1026,10 @@ import Solcore.Test.SourceCoreBasicExpressionCertificates
 import Solcore.Test.SourceCoreBasicStatementCertificates
 import Solcore.Test.SourceCoreBasicStatementMeaning
 import Solcore.Test.SourceCoreControl
+import Solcore.Test.SourceCoreControlExpressions
+import Solcore.Test.SourceCorePrimitive
+import Solcore.Test.SourceCorePrimitiveExpressions
+import Solcore.Test.SourceCoreLoops
 import Solcore.Test.SourceCoreBasicEntry
 import Solcore.Test.SourceCompilerCoreCells
 import Solcore.Test.ContractLanguageResult
@@ -2408,6 +2414,10 @@ def run : IO Unit := do
   SourceCoreLocalCell.run
   SourceCoreBasic.run
   SourceCoreControl.run
+  SourceCorePrimitive.run
+  SourceCoreLoops.run
+  CoreLocalLoop.run
+  CoreTaggedFunction.run
   SourceCoreBasicEntry.run
   SourceCompilerCoreCells.run
   ContractLanguageResult.test

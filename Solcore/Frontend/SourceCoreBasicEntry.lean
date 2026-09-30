@@ -1,4 +1,6 @@
 import Solcore.Frontend.SourceCoreControl
+import Solcore.Frontend.SourceCorePrimitive
+import Solcore.Frontend.SourceCoreLoops
 import Solcore.Frontend.SourceCoreFaultSites
 import Solcore.Frontend.SourceCompilationPlan
 
@@ -78,6 +80,10 @@ private def lowerInputs (source : TypedSource) :
       let inputs ← lowerInputs source ((binder.id, type) :: scope) rest
       pure ({ id := binder.id, sourceType := binder.scheme.body, type, comptime := binder.comptime } :: inputs)
 
+/-- Reuse the same parameter validation for prepared program entries. -/
+def prepareInputs (source : TypedSource) : Except Error (List Input) :=
+  lowerInputs source [] source.inputs
+
 private def compileEntry (compilationFuel : Nat)
     (specialized : SourceSpecialization.SpecializedFunction) : Except Error Entry := do
   let function := specialized.function
@@ -101,8 +107,11 @@ private def compileEntry (compilationFuel : Nat)
   let statements ← source.roots.mapM fun
     | .statement id => pure id
     | .expression id => .error (.expectedStatementRoot id)
-  let body ← (SourceCoreControl.lowerStatementsWithReasons compilationFuel source (inputScope inputs)
-    statements resultType faultSites.reasonAt Core.Word.zero).mapError Error.lowering
+  let body ← (SourceCoreLoops.lowerStatementsWithExpression
+    (fun fuel source scope id reasonAt => SourceCorePrimitive.lowerExpressionWithReasons
+      fuel ⟨function.solvedRequirements⟩ source scope id reasonAt)
+    compilationFuel source (inputScope inputs) statements resultType faultSites.reasonAt
+    Core.Word.zero faultSites.escapedReason).mapError Error.lowering
   if checked : Core.infer? (inputContext inputs) body = some (Core.LanguageResult.resultType resultType) then
     pure { key := specialized.key, inputs, sourceResultType, resultType, resultProjection := result.property,
            faultSites, body

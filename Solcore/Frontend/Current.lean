@@ -13,6 +13,8 @@ import Solcore.Frontend.SourceCoreElaboration
 import Solcore.Frontend.SourceCoreLocalCell
 import Solcore.Frontend.SourceCoreBasic
 import Solcore.Frontend.SourceCoreControl
+import Solcore.Frontend.SourceCorePrimitive
+import Solcore.Frontend.SourceCoreLoops
 import Solcore.Frontend.SourceCoreFaultSites
 import Solcore.Frontend.SourceCoreBasicEntry
 import Solcore.Frontend.SourceTypedRuntime

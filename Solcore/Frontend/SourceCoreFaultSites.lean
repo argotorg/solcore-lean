@@ -4,7 +4,8 @@ import Solcore.Frontend.SourceCompilationPlan.Types
 /-! Source diagnostics for returned Core language failures. Reasons are assigned
 without modulo wrapping. Zero is reserved for function fallthrough, while each
 ordinary local-read occurrence has its own positive reason and source span.
-The table contains metadata only; it never evaluates source code. -/
+The next unused positive reason denotes escaped loop control. The table
+contains metadata only; it never evaluates source code. -/
 
 set_option autoImplicit false
 
@@ -29,6 +30,9 @@ structure Table where
   owner : Resolved.DeclarationId
   resultType : TypeSystem.Ty
   reads : List ReadSite
+  escapedReason : Core.Word
+  /-- Other functions' boundary faults in a prepared program. -/
+  additional : List (Core.Word × Diagnostic) := []
   deriving Repr, DecidableEq
 
 inductive Error where
@@ -57,7 +61,10 @@ private def collect (owner : Resolved.DeclarationId) :
 
 def prepare (source : TypedSource) (resultType : TypeSystem.Ty) : Except Error Table := do
   let reads ← collect source.owner 0 source.nodes []
-  pure { owner := source.owner, resultType, reads }
+  let escapedReason ← match Core.Word.ofNat? (reads.length + 1) with
+    | some reason => pure reason
+    | none => .error .reasonSpaceExhausted
+  pure { owner := source.owner, resultType, reads, escapedReason }
 
 def Table.reasonAt (table : Table) (expression : ExpressionId) : Core.Word :=
   match table.reads.find? fun site => decide (site.expression = expression) with
@@ -72,11 +79,21 @@ def Table.diagnostic? (table : Table) (reason : Core.Word) : Option Diagnostic :
       span := none
     }
   else
-    (table.reads.find? fun site => decide (site.reason = reason)).map fun site => {
-      error := .uninitializedLocal site.binder
-      site := .occurrence site.expression.occurrence
-      span := some site.span
-    }
+    if reason = table.escapedReason then
+      some {
+        error := .controlEscapedFunction
+        site := .declaration table.owner
+        span := none
+      }
+    else
+      match table.additional.find? fun site => decide (site.1 = reason) with
+      | some site => some site.2
+      | none =>
+        (table.reads.find? fun site => decide (site.reason = reason)).map fun site => {
+          error := .uninitializedLocal site.binder
+          site := .occurrence site.expression.occurrence
+          span := some site.span
+        }
 
 theorem Table.fallthrough_diagnostic (table : Table) :
     table.diagnostic? Core.Word.zero = some {
@@ -88,11 +105,21 @@ theorem Table.fallthrough_diagnostic (table : Table) :
 /-- A checked positive reason is recovered with its exact occurrence and span. -/
 theorem Table.read_diagnostic {table : Table} {site : ReadSite}
     (positive : site.reason ≠ Core.Word.zero)
+    (ordinary : site.reason ≠ table.escapedReason)
+    (noBoundary : table.additional.find? (fun candidate => decide (candidate.1 = site.reason)) = none)
     (found : table.reads.find? (fun candidate => decide (candidate.reason = site.reason)) = some site) :
     table.diagnostic? site.reason = some {
       error := .uninitializedLocal site.binder
       site := .occurrence site.expression.occurrence
       span := some site.span
-    } := by simp [Table.diagnostic?, positive, found]
+    } := by simp [Table.diagnostic?, positive, ordinary, noBoundary, found]
+
+theorem Table.escaped_diagnostic (table : Table)
+    (positive : table.escapedReason ≠ Core.Word.zero) :
+    table.diagnostic? table.escapedReason = some {
+      error := .controlEscapedFunction
+      site := .declaration table.owner
+      span := none
+    } := by simp [Table.diagnostic?, positive]
 
 end Solcore.Frontend.SourceCoreFaultSites
