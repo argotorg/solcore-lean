@@ -1,5 +1,5 @@
 import Solcore.Frontend.SourceProgramExecution
-import Solcore.Frontend.SourceSpecializationWorklist
+import Solcore.Frontend.SourceCompilationPlan
 import Solcore.Frontend.SourceTypedRuntimeDeepSafety
 import Solcore.Core.Safety
 import Solcore.Frontend.SourceCoreDirectLinking
@@ -194,7 +194,7 @@ def HasCheckedSourceWitness (compiled : CompiledEntry) : Prop :=
 preflight. Successful compilation guarantees this when that backend is
 selected; it is not asserted for Core artifacts. -/
 def HasValidatedTypedPlan (compiled : CompiledEntry) : Prop :=
-  SourceTypedRuntime.validateExecutablePlanEvidence compiled.program
+  SourceCompilationPlan.validateExecutablePlanEvidence compiled.program
     compiled.plan = .ok ()
 
 /-- A source-typed runtime value has this artifact's public source result type
@@ -446,7 +446,7 @@ private def selectCoreBackend (program : CheckedProgram)
 private def selectTypedSourceBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) :
     Except CompileError Executable :=
-  match SourceTypedRuntime.validateExecutablePlanEvidence program plan with
+  match SourceCompilationPlan.validateExecutablePlanEvidence program plan with
   | .ok _ => .ok .typedSource
   | .error error => .error (.backendRejected (.typedSource error))
 
@@ -496,7 +496,7 @@ private theorem selectTypedSourceBackend_success_backend
     (executable : Executable)
     (selected : selectTypedSourceBackend program plan = .ok executable) :
     executable.backend = .typedSource := by
-  cases validated : SourceTypedRuntime.validateExecutablePlanEvidence program
+  cases validated : SourceCompilationPlan.validateExecutablePlanEvidence program
       plan with
   | error error =>
       simp [selectTypedSourceBackend, validated] at selected
@@ -511,8 +511,8 @@ private theorem selectTypedSourceBackend_success_validation
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
     (executable : Executable)
     (selected : selectTypedSourceBackend program plan = .ok executable) :
-    SourceTypedRuntime.validateExecutablePlanEvidence program plan = .ok () := by
-  cases validated : SourceTypedRuntime.validateExecutablePlanEvidence program
+    SourceCompilationPlan.validateExecutablePlanEvidence program plan = .ok () := by
+  cases validated : SourceCompilationPlan.validateExecutablePlanEvidence program
       plan with
   | error error =>
       simp [selectTypedSourceBackend, validated] at selected
@@ -554,7 +554,7 @@ private theorem selectBackend_automatic_typed_source
   cases direct : SourceCoreDirectLinking.linkWithStagingFuel program
       (.complete plan) stagingFuel with
   | error error =>
-      cases validated : SourceTypedRuntime.validateExecutablePlanEvidence
+      cases validated : SourceCompilationPlan.validateExecutablePlanEvidence
           program plan with
       | ok value =>
           cases value
@@ -578,7 +578,7 @@ private theorem selectBackend_typed_plan
     (stagingFuel : Nat) (preference : BackendPreference)
     (selected : selectBackend program plan stagingFuel preference =
       .ok .typedSource) :
-    SourceTypedRuntime.validateExecutablePlanEvidence program plan = .ok () := by
+    SourceCompilationPlan.validateExecutablePlanEvidence program plan = .ok () := by
   cases preference with
   | core =>
       have impossible := selectCoreBackend_success_backend program plan

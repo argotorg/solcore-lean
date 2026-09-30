@@ -1229,6 +1229,7 @@ import Solcore.Test.SourceStagedRequiredOperators
 import Solcore.Test.SourceStagedMarkedImplMethods
 import Solcore.Test.SourceSpecialization
 import Solcore.Test.SourceSpecializationWorklist
+import Solcore.Test.SourceCompilationPlan
 import Solcore.Test.SourceCoreElaboration
 import Solcore.Test.SourceCoreDirectLinking
 import Solcore.Test.SourceTypedRuntime
@@ -2079,6 +2080,7 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceStagedMarkedImplMethods.testSourceStagedMarkedImplMethods
   SourceSpecialization.testSourceSpecialization
   SourceSpecializationWorklist.testSourceSpecializationWorklist
+  SourceCompilationPlan.testSourceCompilationPlan
   SourceCoreElaboration.testSourceCoreElaboration
   SourceCoreDirectLinking.testSourceCoreDirectLinking
   SourceTypedRuntime.testSourceTypedRuntime
