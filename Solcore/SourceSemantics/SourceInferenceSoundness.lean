@@ -14351,6 +14351,326 @@ theorem inferMatchCasesFuel_success_sound_at
                           (bodyResult.sawReturn && tail.allReturn)
                         rw [headAgreement.sawReturn_eq, tailAgreement]
 
+theorem inferMatchCasesFuel_success_sound_at_bounded
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : Frontend.SourceInference.State}
+    {result : Detail.MatchCasesResult}
+    {source : TypedSource} {control : ControlContext}
+    {outer : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {roots : List NodeId}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (ready : state.InferenceReady)
+    (scrutineeBelow :
+      scrutineeType.VariablesBelow state.inference.next)
+    (returnBelow : expectedReturn.VariablesBelow state.inference.next)
+    (below : state.LocalBindersBelowNextLocal)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (owner_eq : source.owner = state.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (scrutineeAdmissible :
+      TypeAdmissible semanticContext (outer.apply scrutineeType))
+    (initialInvariant :
+      ActiveLocalContextInvariant state outer semanticContext)
+    (scopeEq : state.lexicalScope = outerScope)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (resultSourceExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer) source)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (requirementsOccur : ∀ matchCase,
+      matchCase ∈ result.cases →
+      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+        PrimaryRequirementOccursAt source occurrence requirement)
+    (bodySound :
+      ∀ {childFuel : Nat} {statements : List Syntax.Statement}
+        {childInitial : Frontend.SourceInference.State}
+        {childResult : Detail.BlockResult}
+        {childContext : SourceSemantics.Context},
+        childFuel < fuel →
+        ActiveLocalContextInvariant childInitial outer childContext →
+        Detail.inferStatementsFuel childFuel inferenceContext statements
+            expectedReturn childInitial = .ok childResult →
+        childInitial.NodesBelowNextOccurrence →
+        TypingSourceExtends
+          ((childResult.state.toTypedSource roots).applySubstitution outer)
+          source →
+        childResult.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        childResult.state.requirements ⊆ evidenceState.requirements →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant childResult.state outer finalContext ∧
+            StatementsHaveType source control childContext
+              childResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer childResult facts)
+    (success : Detail.inferMatchCasesFuel fuel inferenceContext scrutineeType
+      expectedReturn outerScope cases state = .ok result) :
+    ∃ caseFacts,
+      MatchCasesHaveType source control semanticContext
+        (outer.apply scrutineeType)
+        (result.cases.map (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+      allBodiesSawReturn caseFacts = result.allReturn := by
+  induction fuel generalizing outerScope cases state result with
+  | zero =>
+      simp [Detail.inferMatchCasesFuel] at success
+  | succ fuel induction =>
+      cases cases with
+      | nil =>
+          unfold Detail.inferMatchCasesFuel at success
+          injection success with resultEq
+          subst result
+          exact ⟨[], .nil control semanticContext
+            (outer.apply scrutineeType), rfl⟩
+      | cons arm rest =>
+          have traversalSuccess := success
+          unfold Detail.inferMatchCasesFuel at success
+          simp only [bind, Except.bind] at success
+          cases patternSuccess : Detail.inferMatchPatternFuel fuel
+              inferenceContext arm.value.pattern scrutineeType state with
+          | error error =>
+              simp [patternSuccess] at success
+          | ok patternPair =>
+              rcases patternPair with ⟨pattern, patternState⟩
+              simp only [patternSuccess] at success
+              cases bodySuccess : Detail.inferStatementsFuel fuel
+                  inferenceContext arm.value.body.value expectedReturn
+                  patternState with
+              | error error =>
+                  simp [bodySuccess] at success
+              | ok bodyResult =>
+                  simp only [bodySuccess] at success
+                  let tailInput :=
+                    bodyResult.state.restoreLexicalScope outerScope
+                  cases tailSuccess : Detail.inferMatchCasesFuel fuel
+                      inferenceContext scrutineeType expectedReturn outerScope
+                      rest tailInput with
+                  | error error =>
+                      simp [tailInput, tailSuccess] at success
+                  | ok tail =>
+                      simp only [tailInput, tailSuccess, pure, Pure.pure,
+                        Except.pure] at success
+                      injection success with resultEq
+                      subst result
+                      have patternProperties :=
+                        Detail.inferMatchPatternFuel_inferenceProperties ready
+                          scrutineeBelow validated patternSuccess
+                      have patternNodesBelow :
+                          patternState.NodesBelowNextOccurrence :=
+                        (Detail.inferMatchPatternFuel_occurrenceBoundExtends
+                          patternSuccess).nodesBelowNextOccurrence initialBelow
+                      have bodyNodesBelow :
+                          bodyResult.state.NodesBelowNextOccurrence :=
+                        (Detail.inferStatementsFuel_occurrenceBoundExtends
+                          bodySuccess).nodesBelowNextOccurrence
+                            patternNodesBelow
+                      have tailInputNodesBelow :
+                          tailInput.NodesBelowNextOccurrence :=
+                        Frontend.SourceInference.State.restoreLexicalScope_preserves_nodesBelowNextOccurrence
+                          bodyResult.state outerScope bodyNodesBelow
+                      have tailInputSourceExtension : TypingSourceExtends
+                          (tailInput.toTypedSource roots)
+                          (tail.state.toTypedSource roots) := by
+                        constructor
+                        · exact Detail.inferMatchCasesFuel_preserves_owner
+                            tailSuccess
+                        · exact Detail.inferMatchCasesFuel_preserves_nodesPrefix
+                            tailSuccess (nodesPrefix := List.prefix_rfl)
+                              (baseBelow := tailInputNodesBelow)
+                              (cutoffLe := Nat.le_refl _)
+                      have bodySourceExtension : TypingSourceExtends
+                          ((bodyResult.state.toTypedSource roots).applySubstitution
+                            outer) source := by
+                        have bodyToTailInput : TypingSourceExtends
+                            (bodyResult.state.toTypedSource roots)
+                            (tailInput.toTypedSource roots) :=
+                          ⟨rfl, List.prefix_rfl⟩
+                        exact ((TypingSourceExtends.trans bodyToTailInput
+                          tailInputSourceExtension).applySubstitution outer).trans
+                            resultSourceExtension
+                      have bodyIntegerPatternsSubset :
+                          bodyResult.state.integerPatterns ⊆
+                            evidenceState.integerPatterns :=
+                        List.Subset.trans (by
+                          simpa [tailInput,
+                            Frontend.SourceInference.State.restoreLexicalScope]
+                            using
+                              (Detail.inferMatchCasesFuel_integerPatterns_subset
+                                tailSuccess)) integerPatternsSubset
+                      have bodyRequirementsSubset :
+                          bodyResult.state.requirements ⊆
+                            evidenceState.requirements :=
+                        List.Subset.trans (by
+                          simpa [tailInput,
+                            Frontend.SourceInference.State.restoreLexicalScope]
+                            using
+                              (Detail.inferMatchCasesFuel_requirements_subset
+                                tailSuccess)) requirementsSubset
+                      have returnAtPattern :=
+                        returnBelow.weaken patternProperties.1.next_le
+                      have bodyProperties :=
+                        Detail.inferStatementsFuel_inferenceProperties
+                          patternProperties.2.1 validated functionsCanonical
+                          returnAtPattern bodySuccess
+                      have throughBody :=
+                        patternProperties.1.trans bodyProperties.1
+                      have restoredProperties :
+                          state.InferenceProgress tailInput ∧
+                            tailInput.InferenceReady := by
+                        unfold tailInput
+                        rw [← scopeEq]
+                        exact Frontend.SourceInference.State.restoreLexicalScope_inferenceProperties
+                          ready throughBody
+                      have tailScrutineeBelow :=
+                        scrutineeBelow.weaken restoredProperties.1.next_le
+                      have tailReturnBelow :=
+                        returnBelow.weaken restoredProperties.1.next_le
+                      have tailProperties :=
+                        Detail.inferMatchCasesFuel_inferenceProperties
+                          (outerScope := outerScope) (state := tailInput)
+                          (result := tail)
+                          restoredProperties.2 validated functionsCanonical
+                          tailScrutineeBelow tailReturnBelow (by
+                            simp [tailInput]) tailSuccess
+                      change outer.SemanticallyExtends
+                        tail.state.inference.substitution at outerExtension
+                      have outerTailInput : outer.SemanticallyExtends
+                          tailInput.inference.substitution :=
+                        TypeSystem.Substitution.SemanticallyExtends.trans
+                          outerExtension
+                          tailProperties.1.substitution_extends
+                      have outerBody : outer.SemanticallyExtends
+                          bodyResult.state.inference.substitution := by
+                        simpa [tailInput,
+                          Frontend.SourceInference.State.restoreLexicalScope]
+                          using outerTailInput
+                      have outerPattern : outer.SemanticallyExtends
+                          patternState.inference.substitution :=
+                        TypeSystem.Substitution.SemanticallyExtends.trans
+                          outerBody bodyProperties.1.substitution_extends
+                      have patternMetadata :=
+                        Detail.inferMatchCasesFuel_headPatternState_metadata_subset
+                          patternSuccess bodySuccess traversalSuccess
+                      have patternIntegerPatternsSubset :
+                          patternState.integerPatterns ⊆
+                            evidenceState.integerPatterns :=
+                        List.Subset.trans patternMetadata.1
+                          integerPatternsSubset
+                      have patternRequirementsSubset :
+                          patternState.requirements ⊆
+                            evidenceState.requirements :=
+                        List.Subset.trans patternMetadata.2
+                          requirementsSubset
+                      have patternRequirementsOccur : ∀ requirement,
+                          requirement ∈ pattern.requirements →
+                            PrimaryRequirementOccursAt source occurrence
+                              requirement := by
+                        intro requirement member
+                        exact requirementsOccur {
+                          span := arm.span
+                          pattern
+                          body := bodyResult.statements
+                        } (by simp) requirement member
+                      obtain ⟨headCertificate⟩ :=
+                        inferMatchCaseFuel_success_sound_at validated catalog
+                          semanticSignaturesEq evidence ready scrutineeBelow
+                          below owner_eq semanticOwner scrutineeAdmissible
+                          initialInvariant outerPattern
+                          patternIntegerPatternsSubset
+                          patternRequirementsSubset patternRequirementsOccur
+                          (fun armInvariant armSuccess =>
+                            bodySound (Nat.lt_succ_self fuel) armInvariant
+                              armSuccess patternNodesBelow bodySourceExtension
+                                bodyIntegerPatternsSubset
+                                bodyRequirementsSubset)
+                          patternSuccess bodySuccess
+                      obtain ⟨headFacts, headTyping, headAgreement⟩ :=
+                        headCertificate.toMatchCaseHasType
+                          (arm := arm)
+                      have tailInvariant : ActiveLocalContextInvariant
+                          tailInput outer semanticContext := by
+                        unfold tailInput
+                        rw [← scopeEq]
+                        exact initialInvariant.restoreLexicalScope
+                      have patternNextLocal :
+                          state.nextLocal ≤ patternState.nextLocal :=
+                        Detail.inferMatchPatternFuel_nextLocal_le patternSuccess
+                      have bodyNextLocal :
+                          patternState.nextLocal ≤
+                            bodyResult.state.nextLocal :=
+                        Detail.inferStatementsFuel_nextLocal_le bodySuccess
+                      have tailNextLocal :
+                          state.nextLocal ≤ tailInput.nextLocal := by
+                        simpa [tailInput] using
+                          Nat.le_trans patternNextLocal bodyNextLocal
+                      have tailBelow : tailInput.LocalBindersBelowNextLocal := by
+                        apply Frontend.SourceInference.State.LocalBindersBelowNextLocal.transport
+                          (before := state) (after := tailInput)
+                        · change outerScope.binders = state.localBinders
+                          simpa [Frontend.SourceInference.State.lexicalScope]
+                            using congrArg LexicalScope.binders scopeEq.symm
+                        · exact tailNextLocal
+                        · exact below
+                      have patternOwner : patternState.owner = state.owner :=
+                        Detail.inferMatchPatternFuel_preserves_owner
+                          patternSuccess
+                      have bodyOwner :
+                          bodyResult.state.owner = patternState.owner :=
+                        Detail.inferStatementsFuel_preserves_owner bodySuccess
+                      have tailOwner : source.owner = tailInput.owner := by
+                        simpa [tailInput,
+                          Frontend.SourceInference.State.restoreLexicalScope]
+                          using owner_eq.trans
+                            (patternOwner.symm.trans bodyOwner.symm)
+                      have tailScopeEq : tailInput.lexicalScope = outerScope := by
+                        simp [tailInput]
+                      have tailRequirementsOccur : ∀ matchCase,
+                          matchCase ∈ tail.cases →
+                          ∀ requirement,
+                            requirement ∈ matchCase.pattern.requirements →
+                              PrimaryRequirementOccursAt source occurrence
+                                requirement := by
+                        intro matchCase caseMember requirement member
+                        exact requirementsOccur matchCase (by
+                          simp [caseMember]) requirement member
+                      obtain ⟨tailFacts, tailTyping, tailAgreement⟩ :=
+                        induction restoredProperties.2 tailScrutineeBelow
+                          tailReturnBelow tailBelow tailInputNodesBelow
+                          tailOwner tailInvariant tailScopeEq outerExtension
+                          resultSourceExtension integerPatternsSubset
+                          requirementsSubset tailRequirementsOccur
+                          (fun childBound childInvariant childSuccess
+                            childBelow childExtension childIntegerSubset
+                            childRequirementSubset =>
+                            bodySound
+                              (Nat.lt_trans childBound (Nat.lt_succ_self fuel))
+                              childInvariant childSuccess childBelow
+                                childExtension childIntegerSubset
+                                childRequirementSubset)
+                          tailSuccess
+                      refine ⟨headFacts :: tailFacts, ?_, ?_⟩
+                      · simpa only [List.map_cons] using
+                          (MatchCasesHaveType.cons headTyping tailTyping)
+                      · change (headFacts.sawReturn &&
+                            allBodiesSawReturn tailFacts) =
+                          (bodyResult.sawReturn && tail.allReturn)
+                        rw [headAgreement.sawReturn_eq, tailAgreement]
+
 /-- The deep default-free match theorem reconstructs every explicit arm and
 its control merge from pattern soundness, ordinary recursive statement-list
 soundness, and the parser/recovery-sensitive fact that an arm is present.
@@ -18634,7 +18954,7 @@ known-function branch validates the two retained expectation paths.  The
 fresh-function branch uses the unification equation for the synthesized
 function type and an empty bundled-argument path. -/
 theorem
-    inferExprsFuel_inferExprFuel_applyFunctionType_recordIndirectCall_success_expressionTypingBase_scoped
+    inferExprsFuel_inferExprFuel_applyFunctionType_recordIndirectCall_success_expressionTypingBase_from_children
     {fuel : Nat}
     {inferenceContext : Frontend.SourceInference.Context}
     {argumentSources : List Syntax.Expr}
@@ -18653,9 +18973,9 @@ theorem
     {sourceContext base active : SourceSemantics.Context}
     {ledgerSource : TypedSource}
     {closedVariables : List TypeSystem.TypeVarId}
-    (argumentsSuccess : Detail.inferExprsFuel fuel inferenceContext
+    (_argumentsSuccess : Detail.inferExprsFuel fuel inferenceContext
       argumentSources argumentInitial = .ok (arguments, argumentState))
-    (calleeSuccess : Detail.inferExprFuel fuel inferenceContext calleeSource
+    (_calleeSuccess : Detail.inferExprFuel fuel inferenceContext calleeSource
       none argumentState = .ok (callee, calleeState))
     (applicationSuccess : Detail.applyFunctionType inferenceContext call
       callee.type arguments expected calleeState = .ok application)
@@ -18675,14 +18995,12 @@ theorem
     (sourceExtension : TypingSourceExtends
       ((resultState.toTypedSource roots).applySubstitution
         later.inference.substitution) ledgerSource)
-    (expressionSound :
-      ∀ {childFuel : Nat} {expression : Syntax.Expr}
-        {childInitial childFinal : Frontend.SourceInference.State}
-        {child : InferredExpression},
-        Detail.inferExprFuel childFuel inferenceContext expression none
-            childInitial = .ok (child, childFinal) →
-          ExpressionHasType ledgerSource active child.id
-            (later.inference.substitution.apply child.type))
+    (argumentsType : ExpressionsHaveTypes ledgerSource active
+      (arguments.map (·.id))
+      (arguments.map fun argument =>
+        later.inference.substitution.apply argument.type))
+    (calleeType : ExpressionHasType ledgerSource active callee.id
+      (later.inference.substitution.apply callee.type))
     (traitSuccess :
       Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
         .ok (some trait))
@@ -18734,15 +19052,6 @@ theorem
       (Detail.recordIndirectCall_requirements_subset source callee arguments
         application)
       requirementsSubset
-  have argumentsType : ExpressionsHaveTypes ledgerSource active
-      (arguments.map (·.id))
-      (arguments.map fun argument =>
-        later.inference.substitution.apply argument.type) :=
-    inferExprsFuel_success_expressionsHaveTypes expressionSound
-      argumentsSuccess
-  have calleeType : ExpressionHasType ledgerSource active callee.id
-      (later.inference.substitution.apply callee.type) :=
-    expressionSound calleeSuccess
   let argumentType := TypeSystem.Ty.productMany (arguments.map (·.type))
   let coercedArgumentType := application.argumentCoercions.foldl
     (fun _ step => step.target) argumentType
@@ -19023,6 +19332,103 @@ theorem
           state := fittedResult.state
         }) (roots := roots) calleeFunctionType argumentsType argumentPath
           outputPath)
+
+/-- Compatibility form of indirect-call soundness.  The child expressions
+are supplied by a general callback; callers with a bounded operational trace
+can use the underlying `..._from_children` theorem instead. -/
+theorem
+    inferExprsFuel_inferExprFuel_applyFunctionType_recordIndirectCall_success_expressionTypingBase_scoped
+    {fuel : Nat}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {argumentSources : List Syntax.Expr}
+    {argumentInitial argumentState calleeState resultState later :
+      Frontend.SourceInference.State}
+    {arguments : List InferredExpression}
+    {source calleeSource : Syntax.Expr}
+    {callee : InferredExpression}
+    {call : ExpressionId} {expected : Option TypeSystem.Ty}
+    {application : Detail.IndirectApplicationResult}
+    {result : InferredExpression}
+    {roots : List NodeId}
+    {trait : Resolved.DeclarationId}
+    {profile : Detail.CoercionMethodProfile}
+    {solved : List SolvedRequirement}
+    {sourceContext base active : SourceSemantics.Context}
+    {ledgerSource : TypedSource}
+    {closedVariables : List TypeSystem.TypeVarId}
+    (argumentsSuccess : Detail.inferExprsFuel fuel inferenceContext
+      argumentSources argumentInitial = .ok (arguments, argumentState))
+    (calleeSuccess : Detail.inferExprFuel fuel inferenceContext calleeSource
+      none argumentState = .ok (callee, calleeState))
+    (applicationSuccess : Detail.applyFunctionType inferenceContext call
+      callee.type arguments expected calleeState = .ok application)
+    (recordEq : Detail.recordIndirectCall source callee arguments application =
+      (result, resultState))
+    (applicationReady : calleeState.InferenceReady)
+    (calleeBelow : callee.type.VariablesBelow
+      calleeState.inference.next)
+    (argumentsBelow : ∀ argument ∈ arguments,
+      argument.type.VariablesBelow calleeState.inference.next)
+    (expectedBelow : ∀ expectedType ∈ expected,
+      expectedType.VariablesBelow calleeState.inference.next)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        resultState.inference.substitution)
+    (requirementsSubset : resultState.requirements ⊆ later.requirements)
+    (sourceExtension : TypingSourceExtends
+      ((resultState.toTypedSource roots).applySubstitution
+        later.inference.substitution) ledgerSource)
+    (expressionSound :
+      ∀ {childFuel : Nat} {expression : Syntax.Expr}
+        {childInitial childFinal : Frontend.SourceInference.State}
+        {child : InferredExpression},
+        Detail.inferExprFuel childFuel inferenceContext expression none
+            childInitial = .ok (child, childFinal) →
+          ExpressionHasType ledgerSource active child.id
+            (later.inference.substitution.apply child.type))
+    (traitSuccess :
+      Detail.conventionalTraitWithArity? inferenceContext "Coerce" 2 =
+        .ok (some trait))
+    (profileSuccess :
+      Detail.coercionMethodProfile? inferenceContext trait =
+        .ok (some profile))
+    (catalog : SignatureCatalogWellFormed sourceContext.signatures)
+    (contextValid : FlexibleSubstitution.ContextSubstitutionValid
+      later.inference.substitution closedVariables sourceContext active)
+    (signaturesEq : sourceContext.signatures = inferenceContext.signatures)
+    (traitName :
+      (inferenceContext.signatures.trait? trait).map (·.name) =
+        some "Coerce")
+    (solveSuccess : Detail.solveRequirements inferenceContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base ledgerSource)
+    (ownership : RequirementOwnership base ledgerSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (callCovered : TemplateScopeCovered ledgerSource active
+      (.expression result.id)) :
+    ExpressionTypingBase (resultState.toTypedSource roots) ledgerSource active
+      later.inference.substitution result := by
+  have argumentsType : ExpressionsHaveTypes ledgerSource active
+      (arguments.map (·.id))
+      (arguments.map fun argument =>
+        later.inference.substitution.apply argument.type) :=
+    inferExprsFuel_success_expressionsHaveTypes expressionSound
+      argumentsSuccess
+  have calleeType : ExpressionHasType ledgerSource active callee.id
+      (later.inference.substitution.apply callee.type) :=
+    expressionSound calleeSuccess
+  exact
+    inferExprsFuel_inferExprFuel_applyFunctionType_recordIndirectCall_success_expressionTypingBase_from_children
+      argumentsSuccess calleeSuccess applicationSuccess recordEq
+      applicationReady calleeBelow argumentsBelow expectedBelow
+      substitutionExtends requirementsSubset sourceExtension argumentsType
+      calleeType traitSuccess profileSuccess catalog contextValid signaturesEq
+      traitName solveSuccess solvedEq ledger ownership activeSignaturesEq
+      activeRequirementsEq assumptionsMono callCovered
 
 namespace ArgumentTypingBasesValid
 
