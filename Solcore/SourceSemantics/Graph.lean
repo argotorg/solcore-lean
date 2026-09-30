@@ -500,6 +500,82 @@ theorem statementExpressionChild_of_noBindings_and_reference
     simpa [Node.id] using congrArg NodeId.statement contains.2
   · simpa [nodeChildIds, Node.references] using member
 
+/-- The condition slot of a `for` statement is distinct from every
+initializer/post-item slot.  Hence it cannot start a qualified local-scheme
+initializer scope, even though the enclosing statement contains initialized
+header bindings.  The condition inherits the parent's template assumptions. -/
+theorem forLoopCondition
+    {source : TypedSource} {parentContext conditionContext : Context}
+    {id : StatementId} {span : Syntax.SourceSpan} {type : TypeSystem.Ty}
+    {initializer post : List ForItemForm} {condition : ExpressionId}
+    {body : List StatementId}
+    (parentCovered : TemplateScopeCovered source parentContext (.statement id))
+    (closed : OccurrenceGraphClosed source)
+    (contains : ContainsStatement source id {
+      id, span, type, form := .forLoop initializer condition post body })
+    (assumptionsEq : conditionContext.assumptions =
+      parentContext.assumptions) :
+    TemplateScopeCovered source conditionContext (.expression condition) := by
+  let node : StatementNode := {
+    id, span, type, form := .forLoop initializer condition post body }
+  have edge : DirectChild source (.statement id)
+      (.expression condition) := by
+    refine ⟨.statement node, ⟨contains.1, rfl⟩, ?_⟩
+    simp [node, nodeChildIds, Node.references, StatementForm.references]
+  apply TemplateScopeCovered.child parentCovered
+    closed.childHasUniqueParent edge
+  · intro predicate member
+    rw [assumptionsEq]
+    exact member
+  · intro owner ownerContains initializerEq
+    obtain ⟨ownerNode, ownerNodeContains, bindingMem, ownerEdge⟩ :=
+      InitializedLetBinding.owningStatement
+        (owner.binding_mem ownerContains)
+    have parentEq : ownerNode.id = id := by
+      have equal := closed.childHasUniqueParent
+        (by simpa [initializerEq] using ownerEdge) edge
+      exact NodeId.statement.inj equal
+    have nodeEq : ownerNode = node := by
+      have ownerLookup := lookupStatement?_complete
+        closed.wellFormed.nodeOccurrencesUnique ownerNodeContains
+      have parentLookup := lookupStatement?_complete
+        closed.wellFormed.nodeOccurrencesUnique contains
+      rw [parentEq, parentLookup] at ownerLookup
+      exact Option.some.inj ownerLookup.symm
+    subst ownerNode
+    have slots : (initializer.flatMap ForItemForm.references ++
+        (.expression condition ::
+          (post.flatMap ForItemForm.references ++
+            body.map NodeId.statement))).Nodup := by
+      have unique := closed.childSlotsUnique (.statement node) contains.1
+      simpa [node, nodeChildIds, Node.references,
+        StatementForm.references, List.append_assoc]
+        using unique
+    have separated := (List.nodup_append.mp slots).2.2
+    have tailUnique := (List.nodup_append.mp slots).2.1
+    have notInInitializer : (.expression condition : NodeId) ∉
+        initializer.flatMap ForItemForm.references := by
+      intro member
+      exact separated _ member _ (by simp) rfl
+    have notInPost : (.expression condition : NodeId) ∉
+        post.flatMap ForItemForm.references := by
+      intro member
+      have firstFresh := (List.nodup_cons.mp tailUnique).1
+      exact firstFresh (List.mem_append.mpr (Or.inl member))
+    simp only [node, statementInitializedLetBindings,
+      List.mem_append] at bindingMem
+    rcases bindingMem with initialized | after
+    · have reference :=
+        initializedLetBinding_initializer_mem_forItemsChildIds initialized
+      rw [initializerEq] at reference
+      exact False.elim (notInInitializer (by
+        simpa [forItemChildIds] using reference))
+    · have reference :=
+        initializedLetBinding_initializer_mem_forItemsChildIds after
+      rw [initializerEq] at reference
+      exact False.elim (notInPost (by
+        simpa [forItemChildIds] using reference))
+
 /-- Coverage propagates between expression occurrences in the same context.
 An expression child cannot start a local-scheme initializer: every such
 initializer already has a statement parent, contradicting unique incoming
