@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.SourceInferenceCheckedBodyTypingBridge
 import Solcore.SourceSemantics.SourceInferenceStatementsSoundness
 import Solcore.SourceSemantics.SourceInferenceStatementLocalBound
+import Solcore.SourceSemantics.SourceInferenceUnannotatedLetCertificate
 
 /-!
 An actual-success interface for the remaining mutually recursive inference
@@ -31,6 +32,7 @@ structure RecursiveStatementInvariant
   returnBelow : expectedReturn.VariablesBelow state.inference.next
   bindersBelow : state.LocalBindersBelowNextLocal
   nodesBelow : state.NodesBelowNextOccurrence
+  schemeIsolation : ActiveSchemeQuantifierIsolation state
   substitutionExtension : finalized.substitution.SemanticallyExtends
     state.inference.substitution
   signaturesEq : semanticContext.signatures =
@@ -70,6 +72,7 @@ theorem RecursiveStatementInvariant.allocateStatementId
     returnBelow := ?_
     bindersBelow := ?_
     nodesBelow := ?_
+    schemeIsolation := ?_
     substitutionExtension := ?_
     signaturesEq := invariant.signaturesEq
     typeParametersEq := invariant.typeParametersEq
@@ -84,6 +87,8 @@ theorem RecursiveStatementInvariant.allocateStatementId
       initial invariant.bindersBelow
   · exact State.allocateStatementId_preserves_nodesBelowNextOccurrence
       initial invariant.nodesBelow
+  · exact activeSchemeQuantifierIsolation_allocateStatementId
+      invariant.schemeIsolation allocationEq
   · exact invariant.substitutionExtension
 
 /-- An actual expression traversal may refine types and append expression
@@ -125,6 +130,7 @@ theorem RecursiveStatementInvariant.inferExprFuel
       invariant.bindersBelow success
     nodesBelow := (Detail.inferExprFuel_occurrenceBoundExtends success
       ).nodesBelowNextOccurrence invariant.nodesBelow
+    schemeIsolation := ?_
     substitutionExtension := resultSubstitutionExtension
     signaturesEq := invariant.signaturesEq
     typeParametersEq := invariant.typeParametersEq
@@ -133,6 +139,12 @@ theorem RecursiveStatementInvariant.inferExprFuel
     solvedRequirementsEq := invariant.solvedRequirementsEq
     assumptionsMono := invariant.assumptionsMono
   }
+  have bindersEq : resultState.localBinders = initial.localBinders := by
+    simpa [State.lexicalScope] using
+      congrArg LexicalScope.binders
+        (Detail.inferExprFuel_success_lexicalScope_eq success)
+  exact activeSchemeQuantifierIsolation_transport
+    invariant.schemeIsolation bindersEq
 
 /-- Leaving a branch restores the outer lexical binders while retaining all
 allocator and substitution progress of the inner traversal. -/
@@ -161,6 +173,7 @@ theorem RecursiveStatementInvariant.restoreLexicalScope
       invariant.bindersBelow nextLocalLe
     nodesBelow := State.restoreLexicalScope_preserves_nodesBelowNextOccurrence
       inner outer.lexicalScope innerBelow
+    schemeIsolation := ?_
     substitutionExtension := ?_
     signaturesEq := invariant.signaturesEq
     typeParametersEq := invariant.typeParametersEq
@@ -169,6 +182,8 @@ theorem RecursiveStatementInvariant.restoreLexicalScope
     solvedRequirementsEq := invariant.solvedRequirementsEq
     assumptionsMono := invariant.assumptionsMono
   }
+  · apply activeSchemeQuantifierIsolation_transport invariant.schemeIsolation
+    rfl
   exact substitutionExtension
 
 /-- Once a branch has produced its actual semantic typing, the generic
@@ -199,6 +214,7 @@ theorem RecursiveStatementInvariant.of_statement_typing
     (resultSubstitutionExtension :
       finalized.substitution.SemanticallyExtends
         result.state.inference.substitution)
+    (resultSchemeIsolation : ActiveSchemeQuantifierIsolation result.state)
     (typing : StatementHasType
       ((result.state.toTypedSource roots).applySubstitution
         finalized.substitution)
@@ -218,6 +234,7 @@ theorem RecursiveStatementInvariant.of_statement_typing
     bindersBelow := resultBindersBelow
     nodesBelow := (Detail.inferStatementFuel_occurrenceBoundExtends success
       ).nodesBelowNextOccurrence initialInvariant.nodesBelow
+    schemeIsolation := resultSchemeIsolation
     substitutionExtension := resultSubstitutionExtension
     signaturesEq := fields.1.trans initialInvariant.signaturesEq
     typeParametersEq := fields.2.1.trans initialInvariant.typeParametersEq
@@ -257,6 +274,7 @@ theorem RecursiveStatementInvariant.close_statement_branch
     (resultSubstitutionExtension :
       finalized.substitution.SemanticallyExtends
         result.state.inference.substitution)
+    (resultSchemeIsolation : ActiveSchemeQuantifierIsolation result.state)
     (branch : ∃ finalContext facts,
       ActiveLocalContextInvariant result.state finalized.substitution
         finalContext ∧
@@ -283,7 +301,7 @@ theorem RecursiveStatementInvariant.close_statement_branch
   exact ⟨finalContext, facts,
     RecursiveStatementInvariant.of_statement_typing initialInvariant success
       signatureFormation functionsCanonical resultActive resultBindersBelow
-      resultSubstitutionExtension typing,
+      resultSubstitutionExtension resultSchemeIsolation typing,
     typing, agreement⟩
 
 /-- The one-statement obligation for a fuel-indexed proof.  Its only dynamic
@@ -343,7 +361,8 @@ theorem inferStatementsFuelSoundness_of_statementSoundness
   intro inferenceContext statements expectedReturn initial result
     evidenceState roots finalized semanticContext success resources
     signatureFormation functionsCanonical catalog signatureParameters
-    initialActive ready returnBelow bindersBelow initialBelow
+    initialActive initialSchemeIsolation ready returnBelow bindersBelow
+    initialBelow
     finalSubstitutionExtension rawResultExtension resultExtension
     integerPatternsSubset
     integerLiteralsSubset requirementsSubset signaturesEq typeParametersEq
@@ -361,6 +380,7 @@ theorem inferStatementsFuelSoundness_of_statementSoundness
     returnBelow
     bindersBelow
     nodesBelow := initialBelow
+    schemeIsolation := initialSchemeIsolation
     substitutionExtension := initialSubstitutionExtension
     signaturesEq
     typeParametersEq
@@ -623,7 +643,8 @@ theorem inferStatementsFuelSoundness_of_scopedSoundness
   intro inferenceContext statements expectedReturn initial result
     evidenceState roots finalized semanticContext success resources
     signatureFormation functionsCanonical catalog signatureParameters
-    initialActive ready returnBelow bindersBelow initialBelow
+    initialActive initialSchemeIsolation ready returnBelow bindersBelow
+    initialBelow
     finalSubstitutionExtension rawResultExtension resultExtension
     integerPatternsSubset integerLiteralsSubset requirementsSubset
     signaturesEq typeParametersEq declarationEq residual
@@ -641,6 +662,7 @@ theorem inferStatementsFuelSoundness_of_scopedSoundness
     returnBelow
     bindersBelow
     nodesBelow := initialBelow
+    schemeIsolation := initialSchemeIsolation
     substitutionExtension := initialSubstitutionExtension
     signaturesEq
     typeParametersEq
@@ -811,11 +833,17 @@ theorem inferStatementFuel_success_block_of_scoped_body
           bodyAgreement⟩)
     obtain ⟨facts, active, typing, agreement⟩ := blockSound
     exact ⟨semanticContext, facts, active, typing, agreement⟩
+  have resultSchemeIsolation : ActiveSchemeQuantifierIsolation
+      result.state := by
+    apply activeSchemeQuantifierIsolation_transport
+      allocatedInvariant.schemeIsolation
+    simp [resultEq, State.restoreLexicalScope, State.recordNode,
+      State.lexicalScope]
   exact RecursiveStatementInvariant.close_statement_branch initialInvariant
     success signatureFormation functionsCanonical
     (inferStatementFuel_preserves_localBindersBelowNextLocal
       initialInvariant.bindersBelow success)
-    resultSubstitutionExtension branch
+    resultSubstitutionExtension resultSchemeIsolation branch
 
 /-- The while-loop body is checked at the actual condition-result state and
 typed under the loop-depth increment.  Its semantic source is the completed
@@ -1008,11 +1036,17 @@ theorem inferStatementFuel_success_whileLoop_of_scoped_body
         conditionTyping conditionEq bodyTyping
     · exact StatementResultMatchesFactsAfterSubstitution.whileLoop
         finalized.substitution bodyFacts id _
+  have resultSchemeIsolation : ActiveSchemeQuantifierIsolation
+      result.state := by
+    apply activeSchemeQuantifierIsolation_transport
+      conditionInvariant.schemeIsolation
+    simp [resultEq, State.restoreLexicalScope, State.recordNode,
+      State.lexicalScope]
   exact RecursiveStatementInvariant.close_statement_branch initialInvariant
     success signatureFormation functionsCanonical
     (inferStatementFuel_preserves_localBindersBelowNextLocal
       initialInvariant.bindersBelow success)
-    resultSubstitutionExtension branch
+    resultSubstitutionExtension resultSchemeIsolation branch
 
 /-- The no-else conditional consumes only its actual then-body traversal;
 the missing else branch contributes the ordinary unit control fact. -/
@@ -1198,11 +1232,17 @@ theorem inferStatementFuel_success_ifWithoutElse_of_scoped_body
         conditionTyping conditionEq thenTyping
     · exact StatementResultMatchesFactsAfterSubstitution.ifWithoutElse
         finalized.substitution thenFacts id _
+  have resultSchemeIsolation : ActiveSchemeQuantifierIsolation
+      result.state := by
+    apply activeSchemeQuantifierIsolation_transport
+      conditionInvariant.schemeIsolation
+    simp [resultEq, State.restoreLexicalScope, State.recordNode,
+      State.lexicalScope]
   exact RecursiveStatementInvariant.close_statement_branch initialInvariant
     success signatureFormation functionsCanonical
     (inferStatementFuel_preserves_localBindersBelowNextLocal
       initialInvariant.bindersBelow success)
-    resultSubstitutionExtension branch
+    resultSubstitutionExtension resultSchemeIsolation branch
 
 /-- Both branches of a successful conditional are typed from their concrete
 traces.  The second branch starts from the restored condition scope, while
@@ -1466,10 +1506,16 @@ theorem inferStatementFuel_success_ifWithElse_of_scoped_bodies
         elseAgreement elseSubstitutionExtension
     · exact StatementResultMatchesFactsAfterSubstitution.ifWithElse
         thenAgreement elseAgreement elseSubstitutionExtension id _
+  have resultSchemeIsolation : ActiveSchemeQuantifierIsolation
+      result.state := by
+    apply activeSchemeQuantifierIsolation_transport
+      conditionInvariant.schemeIsolation
+    simp [resultEq, State.restoreLexicalScope, State.recordNode,
+      State.lexicalScope]
   exact RecursiveStatementInvariant.close_statement_branch initialInvariant
     success signatureFormation functionsCanonical
     (inferStatementFuel_preserves_localBindersBelowNextLocal
       initialInvariant.bindersBelow success)
-    resultSubstitutionExtension branch
+    resultSubstitutionExtension resultSchemeIsolation branch
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
