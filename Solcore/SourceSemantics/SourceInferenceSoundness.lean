@@ -9289,6 +9289,7 @@ private theorem inferStatementFuel_success_matchWithDefault_deep_of_cases
         {childInitial : Frontend.SourceInference.State}
         {childResult : Detail.BlockResult}
         {childContext : SourceSemantics.Context},
+        childFuel ≤ fuel →
         ActiveLocalContextInvariant childInitial outer childContext →
         Detail.inferStatementsFuel childFuel inferenceContext statements
             expectedReturn childInitial = .ok childResult →
@@ -9451,7 +9452,7 @@ private theorem inferStatementFuel_success_matchWithDefault_deep_of_cases
       checkedIntegerPatternsSubset checkedRequirementsSubset
       checkedRequirementsOccur casesSuccess
   obtain ⟨defaultFinal, defaultFacts, _defaultInvariant, defaultTyping,
-      defaultAgreement⟩ := bodySound checkedInvariant defaultSuccess
+      defaultAgreement⟩ := bodySound (Nat.le_refl fuel) checkedInvariant defaultSuccess
   obtain ⟨summary, merged⟩ :=
     mergeBodyControls_withDefault_eq_some caseFacts defaultFacts
   refine ⟨{
@@ -10556,6 +10557,7 @@ structure StatementInferenceSoundnessCallbacks
       {childInitial : Frontend.SourceInference.State}
       {childResult : Detail.BlockResult}
       {semanticContext : SourceSemantics.Context},
+      childFuel ≤ fuel →
       ActiveLocalContextInvariant childInitial outer semanticContext →
       Detail.inferStatementsFuel childFuel childContext statements
           expectedReturn childInitial = .ok childResult →
@@ -10574,6 +10576,7 @@ structure StatementInferenceSoundnessCallbacks
       {childInitial : Frontend.SourceInference.State}
       {childResult : Detail.InferredForItems}
       {semanticContext : SourceSemantics.Context},
+      childFuel ≤ fuel →
       ActiveLocalContextInvariant childInitial outer semanticContext →
       Detail.inferForItemsFuel childFuel childContext items childInitial =
           .ok childResult →
@@ -10799,15 +10802,15 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                       checkedIntegerPatternsSubset checkedRequirementsSubset
                       checkedRequirementsOccur casesSuccess)
                   callbacks.matchScrutinee
-                  (fun checkedInvariant defaultSuccess =>
-                    callbacks.statements checkedInvariant defaultSuccess)
+                  (fun childBound checkedInvariant defaultSuccess =>
+                    callbacks.statements childBound checkedInvariant defaultSuccess)
               exact ⟨target, facts, finalInvariant, typing, agreement⟩
       | forLoop headerSpan initializer condition post body =>
           obtain ⟨facts, finalInvariant, typing, agreement⟩ :=
             inferStatementFuel_success_forLoop_sound rfl allocationEq success
               invariant roots
               (fun initializerSuccess => by
-                simpa using callbacks.forItems allocatedInvariant
+                simpa using callbacks.forItems (Nat.le_refl fuel) allocatedInvariant
                   initializerSuccess)
               (fun initializerInvariant conditionSuccess =>
                 callbacks.booleanExpressionInContext initializerInvariant
@@ -10815,12 +10818,12 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
               (fun conditionInvariant bodySuccess => by
                 obtain ⟨bodyFinal, bodyFacts, bodyInvariant, bodyTyping,
                     _bodyAgreement⟩ :=
-                  callbacks.statements conditionInvariant bodySuccess
+                  callbacks.statements (Nat.le_refl fuel) conditionInvariant bodySuccess
                 exact ⟨bodyFinal, bodyFacts, bodyInvariant, by
                   simpa [ControlContext.enterLoop] using bodyTyping⟩)
               (fun postInvariant postSuccess => by
                 obtain ⟨postContext, finalInvariant, postTyping⟩ :=
-                  callbacks.forItems postInvariant postSuccess
+                  callbacks.forItems (Nat.le_refl fuel) postInvariant postSuccess
                 exact ⟨postContext, finalInvariant, by
                   simpa [ControlContext.enterLoop] using postTyping⟩)
           exact ⟨target, facts, finalInvariant, typing, agreement⟩
@@ -10833,7 +10836,7 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
               (fun conditionInvariant bodySuccess => by
                 obtain ⟨bodyFinal, bodyFacts, bodyInvariant, bodyTyping,
                     bodyAgreement⟩ :=
-                  callbacks.statements conditionInvariant bodySuccess
+                  callbacks.statements (Nat.le_refl fuel) conditionInvariant bodySuccess
                 exact ⟨bodyFinal, bodyFacts, bodyInvariant, by
                   simpa [ControlContext.enterLoop] using bodyTyping,
                   bodyAgreement⟩)
@@ -10848,7 +10851,7 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                   (fun conditionSuccess =>
                     callbacks.expression conditionSuccess)
                   (fun conditionInvariant thenSuccess =>
-                    callbacks.statements conditionInvariant thenSuccess)
+                    callbacks.statements (Nat.le_refl fuel) conditionInvariant thenSuccess)
               exact ⟨target, facts, finalInvariant, typing, agreement⟩
           | some elseBody =>
               obtain ⟨facts, finalInvariant, typing, agreement⟩ :=
@@ -10858,15 +10861,15 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
                   (fun conditionSuccess =>
                     callbacks.expression conditionSuccess)
                   (fun conditionInvariant thenSuccess =>
-                    callbacks.statements conditionInvariant thenSuccess)
+                    callbacks.statements (Nat.le_refl fuel) conditionInvariant thenSuccess)
                   (fun elseInvariant elseSuccess =>
-                    callbacks.statements elseInvariant elseSuccess)
+                    callbacks.statements (Nat.le_refl fuel) elseInvariant elseSuccess)
               exact ⟨target, facts, finalInvariant, typing, agreement⟩
       | block body =>
           obtain ⟨facts, finalInvariant, typing, agreement⟩ :=
             inferStatementFuel_success_block_sound rfl allocationEq success
               invariant roots (fun bodySuccess => by
-                simpa using callbacks.statements allocatedInvariant
+                simpa using callbacks.statements (Nat.le_refl fuel) allocatedInvariant
                   bodySuccess)
           exact ⟨target, facts, finalInvariant, typing, agreement⟩
       | assembly body =>
@@ -13928,6 +13931,7 @@ theorem inferMatchCasesFuel_success_sound
         {childInitial : Frontend.SourceInference.State}
         {childResult : Detail.BlockResult}
         {childContext : SourceSemantics.Context},
+        childFuel ≤ fuel →
         ActiveLocalContextInvariant childInitial outer childContext →
         Detail.inferStatementsFuel childFuel inferenceContext statements
             expectedReturn childInitial = .ok childResult →
@@ -14032,7 +14036,9 @@ theorem inferMatchCasesFuel_success_sound
                         inferMatchCaseFuel_success_sound validated catalog
                           semanticSignaturesEq branches ready scrutineeBelow
                           below owner_eq semanticOwner scrutineeAdmissible
-                          initialInvariant outerPattern bodySound
+                          initialInvariant outerPattern
+                          (fun armInvariant armSuccess =>
+                            bodySound (Nat.le_succ fuel) armInvariant armSuccess)
                           patternSuccess bodySuccess
                       obtain ⟨headFacts, headTyping, headAgreement⟩ :=
                         headCertificate.toMatchCaseHasType
@@ -14077,7 +14083,11 @@ theorem inferMatchCasesFuel_success_sound
                       obtain ⟨tailFacts, tailTyping, tailAgreement⟩ :=
                         induction restoredProperties.2 tailScrutineeBelow
                           tailReturnBelow tailBelow tailOwner tailInvariant
-                          tailScopeEq outerExtension tailSuccess
+                          tailScopeEq outerExtension
+                          (fun childBound childInvariant childSuccess =>
+                            bodySound (Nat.le_trans childBound (Nat.le_succ fuel))
+                              childInvariant childSuccess)
+                          tailSuccess
                       refine ⟨headFacts :: tailFacts, ?_, ?_⟩
                       · simpa only [List.map_cons] using
                           (MatchCasesHaveType.cons headTyping tailTyping)
@@ -14140,6 +14150,7 @@ theorem inferMatchCasesFuel_success_sound_at
         {childInitial : Frontend.SourceInference.State}
         {childResult : Detail.BlockResult}
         {childContext : SourceSemantics.Context},
+        childFuel ≤ fuel →
         ActiveLocalContextInvariant childInitial outer childContext →
         Detail.inferStatementsFuel childFuel inferenceContext statements
             expectedReturn childInitial = .ok childResult →
@@ -14271,7 +14282,9 @@ theorem inferMatchCasesFuel_success_sound_at
                           initialInvariant outerPattern
                           patternIntegerPatternsSubset
                           patternRequirementsSubset patternRequirementsOccur
-                          bodySound patternSuccess bodySuccess
+                          (fun armInvariant armSuccess =>
+                            bodySound (Nat.le_succ fuel) armInvariant armSuccess)
+                          patternSuccess bodySuccess
                       obtain ⟨headFacts, headTyping, headAgreement⟩ :=
                         headCertificate.toMatchCaseHasType
                           (arm := arm)
@@ -14325,7 +14338,11 @@ theorem inferMatchCasesFuel_success_sound_at
                         induction restoredProperties.2 tailScrutineeBelow
                           tailReturnBelow tailBelow tailOwner tailInvariant
                           tailScopeEq outerExtension integerPatternsSubset
-                          requirementsSubset tailRequirementsOccur tailSuccess
+                          requirementsSubset tailRequirementsOccur
+                          (fun childBound childInvariant childSuccess =>
+                            bodySound (Nat.le_trans childBound (Nat.le_succ fuel))
+                              childInvariant childSuccess)
+                          tailSuccess
                       refine ⟨headFacts :: tailFacts, ?_, ?_⟩
                       · simpa only [List.map_cons] using
                           (MatchCasesHaveType.cons headTyping tailTyping)
@@ -14419,7 +14436,8 @@ theorem inferStatementFuel_success_matchWithoutDefault_deep_sound
     functionsCanonical catalog signatures_eq patternBranches hiddenReady
     hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
-    bodySound casesSuccess
+    (fun _ childInvariant childSuccess =>
+      bodySound childInvariant childSuccess) casesSuccess
 
 /-- Occurrence-aware deep soundness for a default-free match statement.
 Finalized integer-pattern evidence is fixed at the enclosing statement
@@ -14512,7 +14530,9 @@ theorem inferStatementFuel_success_matchWithoutDefault_deep_sound_at
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
     (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
     (List.Subset.trans checkedRequirementsSubset requirementsSubset)
-    checkedRequirementsOccur bodySound casesSuccess
+    checkedRequirementsOccur
+    (fun _ childInvariant childSuccess =>
+      bodySound childInvariant childSuccess) casesSuccess
 
 /-- The deep match-with-default statement theorem closes explicit arm typing
 with `inferMatchCasesFuel_success_sound`.  Its only pattern-specific semantic
@@ -14589,7 +14609,9 @@ theorem inferStatementFuel_success_matchWithDefault_deep_sound
   apply inferStatementFuel_success_matchWithDefault_deep_of_cases
     statementEq defaultEq allocationEq success signatureFormation
     functionsCanonical ready returnBelow below invariant outerExtension roots
-    ?_ scrutineeSound bodySound
+    ?_ scrutineeSound
+    (fun _ childInvariant childSuccess =>
+      bodySound childInvariant childSuccess)
   intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
     hiddenInvariant checkedExtension _checkedIntegerPatternsSubset
@@ -14598,7 +14620,8 @@ theorem inferStatementFuel_success_matchWithDefault_deep_sound
     functionsCanonical catalog signatures_eq patternBranches hiddenReady
     hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
-    bodySound casesSuccess
+    (fun _ childInvariant childSuccess =>
+      bodySound childInvariant childSuccess) casesSuccess
 
 /-- Occurrence-aware deep soundness for a match statement with a fallback
 arm.  Explicit-case pattern evidence is owned by the enclosing statement;
@@ -14679,7 +14702,9 @@ theorem inferStatementFuel_success_matchWithDefault_deep_sound_at
   apply inferStatementFuel_success_matchWithDefault_deep_of_cases
     statementEq defaultEq allocationEq success signatureFormation
     functionsCanonical ready returnBelow below invariant outerExtension roots
-    ?_ scrutineeSound bodySound
+    ?_ scrutineeSound
+    (fun _ childInvariant childSuccess =>
+      bodySound childInvariant childSuccess)
   intro scrutinee hiddenState checked hiddenReady hiddenScrutineeBelow
     hiddenReturnBelow hiddenBelow sourceOwner scrutineeAdmissible
     hiddenInvariant checkedExtension checkedIntegerPatternsSubset
@@ -14690,7 +14715,9 @@ theorem inferStatementFuel_success_matchWithDefault_deep_sound_at
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
     (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
     (List.Subset.trans checkedRequirementsSubset requirementsSubset)
-    checkedRequirementsOccur bodySound casesSuccess
+    checkedRequirementsOccur
+    (fun _ childInvariant childSuccess =>
+      bodySound childInvariant childSuccess) casesSuccess
 
 /-- Successful statement inference is sound in the finalized typed source.
 The constructor dispatcher handles every statement form, while explicit match
@@ -14754,8 +14781,8 @@ theorem inferStatementFuel_success_sound_of_callbacks
     functionsCanonical catalog signatures_eq patternBranches
     hiddenReady hiddenScrutineeBelow hiddenReturnBelow hiddenBelow sourceOwner
     semanticOwner scrutineeAdmissible hiddenInvariant rfl checkedExtension
-    (fun bodyInvariant bodySuccess =>
-      callbacks.statements bodyInvariant bodySuccess)
+    (fun childBound bodyInvariant bodySuccess =>
+      callbacks.statements childBound bodyInvariant bodySuccess)
     casesSuccess
 
 /-- Occurrence-aware statement inference soundness in the finalized typed
@@ -14826,8 +14853,8 @@ theorem inferStatementFuel_success_sound_of_callbacks_at
     (List.Subset.trans checkedIntegerPatternsSubset integerPatternsSubset)
     (List.Subset.trans checkedRequirementsSubset requirementsSubset)
     checkedRequirementsOccur
-    (fun bodyInvariant bodySuccess =>
-      callbacks.statements bodyInvariant bodySuccess)
+    (fun childBound bodyInvariant bodySuccess =>
+      callbacks.statements childBound bodyInvariant bodySuccess)
     casesSuccess
 
 /-- Successful single-statement inference grows the typed-source node table by
