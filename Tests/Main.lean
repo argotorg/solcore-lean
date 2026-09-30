@@ -12,6 +12,7 @@ import Solcore.Test.SourceCoreFunctionCalls
 import Solcore.Test.SourceCoreContractedFunctions
 import Solcore.Test.SourceCoreDataExpressionSequence
 import Solcore.Test.SourceCoreDataPlaceKeyOrder
+import Solcore.Test.SourceCoreDataPlaceModifier
 import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCallStageGuards
 import Solcore.Test.SourceCallStageBoundary

@@ -13,6 +13,7 @@ import Solcore.SourceSemantics.CoreLowering.DataPayloadWriteBack
 import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.DataExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
+import Solcore.SourceSemantics.CoreLowering.DataPlaceModifier
 import Solcore.SourceSemantics.CoreLowering.GenericMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.DataPlacePathHelpers
 import Solcore.SourceSemantics.CoreLowering.GenericMatchMeaning
