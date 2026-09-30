@@ -48,40 +48,48 @@ structure Function where
   inputs : List (TypedBinder × Core.Ty)
   deriving Repr
 
-private def prepareInputs (checked : Checked) (source : TypedSource) :
+/-- Representation hooks retain the common contextual traversal, evidence
+validation and control flow. The enclosing artifact checks generated code under
+its actual data definitions, including any source-allocation marker suffix. -/
+structure Representation where
+  expressions : SourceCoreFunctions.Policy
+  allowStaged : Bool := false
+  loops : List SolvedRequirement → SourceCoreAssignmentFaultSites.Table →
+    SourceCoreDataPlaceFaultSites.Program → Key → SourceCoreFunctions.ExpressionLowerer →
+    SourceCoreLoops.Policy
+
+private def prepareInputs (representation : Representation) (source : TypedSource) :
     SourceCoreBasic.Scope → List TypedBinder → Except Error (List (TypedBinder × Core.Ty))
   | _, [] => pure []
   | scope, binder :: rest => do
-      let type ← (SourceCoreGeneralTypes.lowerBinder checked source scope binder).mapError Error.lowering
-      let remaining ← prepareInputs checked source ((binder.id, type) :: scope) rest
+      let type ← (representation.expressions.lowerBinder source scope binder).mapError Error.lowering
+      let remaining ← prepareInputs representation source ((binder.id, type) :: scope) rest
       pure ((binder, type) :: remaining)
 
-private def prepareFunction (program : CheckedProgram) (checked : Checked) (specialized : SourceSpecialization.SpecializedFunction) :
+def prepareFunctionWithRepresentation (program : CheckedProgram) (representation : Representation) (specialized : SourceSpecialization.SpecializedFunction) :
     Except Error Function := do
   let function := specialized.function
   discard <| (SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program specialized.key specialized.assumptions)
     |>.mapError Error.plan
-  if function.returnComptime && !checked.catalog.callableContracts then throw (.stagedResultUnsupported specialized.key)
+  if function.returnComptime && !representation.allowStaged then throw (.stagedResultUnsupported specialized.key)
   let (parameter, result) ← match function.type with
     | .function parameter result => pure (parameter, result)
     | _ => throw (.invalidFunctionType specialized.key)
   if result ≠ function.inferredBodyType then throw (.resultMetadataMismatch specialized.key)
   let site := SourceCoreElaboration.ErrorSite.declaration specialized.key.declaration
-  let parameterType ← (SourceCoreGeneralTypes.projectType checked site parameter).mapError Error.lowering
-  let resultType ← (SourceCoreGeneralTypes.projectType checked site result).mapError Error.lowering
-  let inputs ← prepareInputs checked function.typedBody [] function.typedBody.inputs
+  let parameterType ← (representation.expressions.projectType site parameter).mapError Error.lowering
+  let resultType ← (representation.expressions.projectType site result).mapError Error.lowering
+  let inputs ← prepareInputs representation function.typedBody [] function.typedBody.inputs
   pure { specialized, inputs, signature := { key := specialized.key, parameterType, resultType } }
 
-def bodyLowerer (checked : Checked) (signatures : ProgramSignatures)
-    (solvedRequirements : List SolvedRequirement) (assignments : SourceCoreAssignmentFaultSites.Table)
-    (diagnostics : SourceCoreDataPlaceFaultSites.Program) (owner : Key)
-    (lowerBinder : TypedSource → SourceCoreBasic.Scope → TypedBinder → Except SourceCoreBasic.Error Core.Ty :=
-      SourceCoreGeneralTypes.lowerBinder checked) : SourceCoreFunctions.BodyLowerer :=
-  fun expression fuel source scope statements result reasonAt fellThrough escaped =>
-    SourceCoreLoops.lowerStatementsWithPolicy {
+/-- The strict catalog uses the same compiler entry as other representations. -/
+def strictRepresentation (checked : Checked) (signatures : ProgramSignatures) : Representation := {
+  expressions := SourceCoreGeneralTypes.policy checked signatures
+  allowStaged := checked.catalog.callableContracts
+  loops := fun solvedRequirements assignments diagnostics owner expression => {
       lowerExpression := expression
       readStatement := SourceCoreGeneralTypes.readStatement checked
-      lowerBinder := lowerBinder
+      lowerBinder := SourceCoreGeneralTypes.lowerBinder checked
       lowerAssignment := SourceCoreGeneralTypes.lowerAssignment checked
       lowerMatch := some (SourceCoreDataMatches.lowerWithReasons
         { checked, signatures, solvedRequirements })
@@ -102,7 +110,29 @@ def bodyLowerer (checked : Checked) (signatures : ProgramSignatures)
           (diagnostics.placeReason owner site assignment.target.root none)
           (assignments.reasonAt site assignment.target.root .bitNot)
           (fun type => diagnostics.placeReason owner site assignment.target.root (some type))
+    }
+}
+
+def bodyLowererWithRepresentation (representation : Representation)
+    (solvedRequirements : List SolvedRequirement) (assignments : SourceCoreAssignmentFaultSites.Table)
+    (diagnostics : SourceCoreDataPlaceFaultSites.Program) (owner : Key)
+    (lowerBinder : TypedSource → SourceCoreBasic.Scope → TypedBinder → Except SourceCoreBasic.Error Core.Ty :=
+      representation.expressions.lowerBinder) : SourceCoreFunctions.BodyLowerer :=
+  fun expression fuel source scope statements result reasonAt fellThrough escaped =>
+    SourceCoreLoops.lowerStatementsWithPolicy {
+      representation.loops solvedRequirements assignments diagnostics owner expression with
+      sourceCells := representation.expressions.sourceCells
+      lowerBinder
     } fuel source scope statements result reasonAt fellThrough escaped
+
+/-- Existing strict callers retain their catalog and diagnostics API. -/
+def bodyLowerer (checked : Checked) (signatures : ProgramSignatures)
+    (solvedRequirements : List SolvedRequirement) (assignments : SourceCoreAssignmentFaultSites.Table)
+    (diagnostics : SourceCoreDataPlaceFaultSites.Program) (owner : Key)
+    (lowerBinder : TypedSource → SourceCoreBasic.Scope → TypedBinder → Except SourceCoreBasic.Error Core.Ty :=
+      SourceCoreGeneralTypes.lowerBinder checked) : SourceCoreFunctions.BodyLowerer :=
+  bodyLowererWithRepresentation (strictRepresentation checked signatures)
+    solvedRequirements assignments diagnostics owner lowerBinder
 
 private def localError (id : ExpressionId) (node : ExpressionNode)
     (error : SourceCoreLocalPolymorphism.Error) : SourceCoreBasic.Error :=
@@ -110,10 +140,10 @@ private def localError (id : ExpressionId) (node : ExpressionNode)
   | .metadata error => error
   | _ => .unsupportedExpression id node.form
 
-private def contextualBinder (checked : Checked) (locals : SourceCoreLocalPolymorphism.Catalog)
+private def contextualBinder (representation : Representation) (locals : SourceCoreLocalPolymorphism.Catalog)
     (owner : Key) (active : TypeSystem.Substitution) (source : TypedSource)
     (scope : SourceCoreBasic.Scope) (binder : TypedBinder) : Except SourceCoreBasic.Error Core.Ty :=
-  if binder.scheme.quantified.isEmpty then SourceCoreGeneralTypes.lowerBinder checked source scope binder
+  if binder.scheme.quantified.isEmpty then representation.expressions.lowerBinder source scope binder
   else (SourceCoreLocalPolymorphism.lowerBinder locals owner active source scope binder).mapError fun
     | .metadata error => error
     | _ => .polymorphicBinding binder.id
@@ -179,7 +209,7 @@ def callablePolicy (native : Option CallableContext) (active : TypeSystem.Substi
 /-- Contextual local instances re-enter the shared expression traversal with
 concrete metadata. Every closure captures the same lexical references; the
 bundle is constructed before the generalized binding's cell is allocated. -/
-private def lowerContextualExpression (program : CheckedProgram) (checked : Checked)
+private def lowerContextualExpression (program : CheckedProgram) (representation : Representation)
     (signatures : ProgramSignatures) (locals : SourceCoreLocalPolymorphism.Catalog)
     (assignments : SourceCoreAssignmentFaultSites.Table)
     (diagnostics : SourceCoreDataPlaceFaultSites.Program) (context : SourceCoreFunctions.Context)
@@ -194,14 +224,14 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
         | some prepared => pure prepared.caller
         | none => (SourceCompilationPlan.exactSpecialization context.plan context.owner)
             |>.mapError SourceCoreBasic.Error.callPreparation
-      let bind := contextualBinder checked locals context.owner active
-      let lowerBody := bodyLowerer checked signatures context.solvedRequirements assignments diagnostics context.owner bind
-      let policy := { SourceCoreGeneralTypes.policy checked signatures with
+      let bind := contextualBinder representation locals context.owner active
+      let lowerBody := bodyLowererWithRepresentation representation context.solvedRequirements assignments diagnostics context.owner bind
+      let policy := { representation.expressions with
         callables
         lowerBinder := bind
         readExpression := fun source id => do
           let source ← contextualSource program context.plan locals context.owner parent source id
-          SourceCoreDataExpressions.readExpression checked source id
+          representation.expressions.readExpression source id
         lowerSpecial? := some fun current child budget source scope id reasonAt => do
           let source ← contextualSource program current.plan locals current.owner parent source id
           let node ← match source.lookupExpression? id with
@@ -215,7 +245,7 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
               let prepared ← (SourceCoreLocalEvidence.prepare program current.plan candidate parent).mapError fun _ =>
                 SourceCoreLocalPolymorphism.Error.initializerMetadataMismatch id
               let childContext := { current with solvedRequirements := prepared.caller.function.solvedRequirements }
-              let lowered ← (lowerContextualExpression program checked signatures locals assignments diagnostics childContext native
+              let lowered ← (lowerContextualExpression program representation signatures locals assignments diagnostics childContext native
                 (some prepared) (some id) (min budget fuel) prepared.source scope id reasonAt)
                 |>.mapError SourceCoreLocalPolymorphism.Error.metadata
               (SourceCoreBasic.ensureType (.occurrence id.occurrence) candidate.type lowered.type)
@@ -224,7 +254,7 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
               | .inRight .word closure => pure closure
               | _ => throw (.initializerMetadataMismatch id)).mapError (localError id node)
             return some lowered
-          let evidence ← SourceCoreEvidence.lowerWithCaller program checked caller current child budget source scope id reasonAt callables
+          let evidence ← SourceCoreEvidence.lowerWithProjector program representation.expressions.projectType caller current child budget source scope id reasonAt callables
           if let some lowered := evidence then return some lowered
           match node.form with
           | .reference _ (.local binder) =>
@@ -237,7 +267,7 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1) context source scope id reasonAt
 termination_by fuel => fuel
 
-private def compileClosure (program : CheckedProgram) (checked : Checked) (signatures : ProgramSignatures) (plan : Plan)
+def compileClosureWithRepresentation (program : CheckedProgram) (representation : Representation) (signatures : ProgramSignatures) (plan : Plan)
     (globals : List Signature) (diagnostics : SourceCoreDataPlaceFaultSites.Program)
     (locals : SourceCoreLocalPolymorphism.Catalog) (native : Option CallableContext)
     (fuel : Nat) (function : Function) : Except Error Core.Expr := do
@@ -253,31 +283,39 @@ private def compileClosure (program : CheckedProgram) (checked : Checked) (signa
     solvedRequirements := function.specialized.function.solvedRequirements
     internalReason := Core.Word.zero
   }
-  let lowerBody := bodyLowerer checked signatures function.specialized.function.solvedRequirements own.assignments
-    diagnostics function.signature.key (contextualBinder checked locals function.signature.key [])
+  let lowerBody := bodyLowererWithRepresentation representation function.specialized.function.solvedRequirements own.assignments
+    diagnostics function.signature.key (contextualBinder representation locals function.signature.key [])
   let body ← (lowerBody
-    (lowerContextualExpression program checked signatures locals own.assignments diagnostics context native none none)
+    (lowerContextualExpression program representation signatures locals own.assignments diagnostics context native none none)
     fuel source (function.inputs.reverse.map (fun (binder, type) => (binder.id, type))) statements
     function.signature.resultType (diagnostics.reasonAt function.signature.key)
     own.fellThroughReason own.table.escapedReason).mapError Error.lowering
-  pure (.lambda function.signature.parameterType (Core.LanguageResult.resultType function.signature.resultType)
-    (SourceCoreFunctions.bindParameters function.inputs function.signature.resultType body))
+  let body ← match representation.expressions.sourceCells with
+    | none => pure (SourceCoreFunctions.bindParameters function.inputs function.signature.resultType body)
+    | some allocate => (SourceCoreSourceCells.bindParameters allocate source [] function.inputs
+        function.signature.resultType SourceCoreFunctions.argumentProjection body).mapError Error.lowering
+  pure (.lambda function.signature.parameterType (Core.LanguageResult.resultType function.signature.resultType) body)
+
+def assembleCall (globals : List Signature) (functions : List Function) (closures : List Core.Expr)
+    (key : Key) (arguments : SourceCoreBasic.LoweredExpr) : Except Error Core.Expr := do
+  let (function, index) ← match functions.zipIdx.find? (fun entry => decide (entry.1.signature.key = key)) with
+    | some found => pure found
+    | none => throw (.missingGlobal key)
+  (SourceCoreBasic.ensureType (.declaration function.signature.key.declaration)
+    function.signature.parameterType arguments.type).mapError Error.lowering
+  let invoked := SourceCoreCalls.call function.signature index arguments.expression Core.Word.zero
+  pure (SourceCoreRecursiveEntry.allocateGlobals globals.reverse
+    (SourceCoreRecursiveEntry.installFunctions closures invoked))
 
 private def assemble (globals : List Signature) (functions : List Function) (closures : List Core.Expr)
     (diagnostics : SourceCoreDataPlaceFaultSites.Program) {checked : Checked}
     (request : SourceCoreGeneralEntry.BodyRequest checked) : Except Error SourceCoreGeneralEntry.LoweredBody := do
-  let (function, index) ← match functions.zipIdx.find? (fun entry => decide (entry.1.signature.key = request.specialized.key)) with
-    | some found => pure found
-    | none => throw (.missingGlobal request.specialized.key)
   let arguments := SourceCoreCalls.packArguments (request.inputs.zipIdx.map fun (input, index) =>
     ⟨input.type, Core.OptionalCell.read input.type
       (.var (globals.length + (request.inputs.length - 1 - index))) Core.Word.zero⟩)
-  (SourceCoreBasic.ensureType (.declaration function.signature.key.declaration)
-    function.signature.parameterType arguments.type).mapError Error.lowering
-  let invoked := SourceCoreCalls.call function.signature index arguments.expression Core.Word.zero
+  let expression ← assembleCall globals functions closures request.specialized.key arguments
   pure {
-    expression := SourceCoreRecursiveEntry.allocateGlobals globals.reverse
-      (SourceCoreRecursiveEntry.installFunctions closures invoked)
+    expression
     faultSites := diagnostics.rootTable
   }
 
@@ -289,7 +327,8 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
     (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.plan)
   let locals ← (SourceCoreLocalPolymorphism.prepare checked plan).mapError
     (SourceCoreGeneralEntry.CompileError.lowering ∘ Error.localInstances)
-  let functions ← (plan.specializations.reverse.mapM (prepareFunction program checked)).mapError
+  let representation := strictRepresentation checked program.signatures
+  let functions ← (plan.specializations.reverse.mapM (prepareFunctionWithRepresentation program representation)).mapError
     SourceCoreGeneralEntry.CompileError.lowering
   let globals := functions.map (·.signature)
   match plan.seedKeys with
@@ -311,7 +350,7 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
       let diagnostics := match native with
         | none => diagnostics
         | some native => { diagnostics with rootTable := native.diagnostics.rootTable }
-      let closures ← (functions.mapM (compileClosure program checked program.signatures plan globals diagnostics locals native fuel)).mapError
+      let closures ← (functions.mapM (compileClosureWithRepresentation program representation program.signatures plan globals diagnostics locals native fuel)).mapError
         SourceCoreGeneralEntry.CompileError.lowering
       SourceCoreGeneralEntry.prepareValidated plan checked fuel (fun _ request =>
         assemble globals functions closures diagnostics request) true
