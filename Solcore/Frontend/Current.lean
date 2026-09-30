@@ -49,5 +49,6 @@ import Solcore.Frontend.SourceCoreLocalPolymorphism
 import Solcore.Frontend.SourceCoreLocalEvidence
 import Solcore.Frontend.SourceCoreStageContracts
 import Solcore.Frontend.SourceCoreStageCodebook
+import Solcore.Frontend.SourceCoreCallableContracts
 
 /-! Current whole-program source pipeline and preservation results. -/
