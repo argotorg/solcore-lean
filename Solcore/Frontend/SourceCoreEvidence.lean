@@ -72,7 +72,8 @@ private def withNode (source : TypedSource) (node : ExpressionNode) : TypedSourc
 /-- The prepared plan authenticates closed evidence and selected helper edges.
 Each special occurrence rechecks its ledger and endpoint types before emitting
 ordinary Core calls, including output coercions and indirect argument coercions. -/
-def lower (program : CheckedProgram) (checked : Checked) (context : Context) (child : Child)
+def lowerWithCaller (program : CheckedProgram) (checked : Checked)
+    (caller : SourceSpecialization.SpecializedFunction) (context : Context) (child : Child)
     (fuel : Nat) (source : TypedSource) (scope : Scope) (id : ExpressionId)
     (reasonAt : ExpressionId → Core.Word) : Except Error (Option Lowered) := do
   let node ← match source.lookupExpression? id with
@@ -90,7 +91,7 @@ def lower (program : CheckedProgram) (checked : Checked) (context : Context) (ch
   if node.coercions.isEmpty && !hasIndirectCoercions && (node.requirements.isEmpty || isNativeLiteral) then
     return none
   unless node.hasValidCoercionPath do throw (.coercionsPresent id)
-  let caller ← (SourceCompilationPlan.exactSpecialization context.plan context.owner).mapError SourceCoreBasic.Error.callPreparation
+  if caller.key ≠ context.owner then throw (.ownerMismatch context.owner.declaration caller.key.declaration)
   let available ← (SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions)
     |>.mapError SourceCoreBasic.Error.callPreparation
   let raw := {node with type := node.rawType, requirements := ordinary, coercions := []}
@@ -162,5 +163,15 @@ def lower (program : CheckedProgram) (checked : Checked) (context : Context) (ch
   let result ← applyCoercions program checked context caller available scope node result node.coercions
   SourceCoreBasic.ensureType (.occurrence id.occurrence) (← project checked node node.type) result.type
   pure (some result)
+
+/-- Ordinary occurrences use the exact authenticated plan caller. Contextual
+local lambdas supply an authenticated rebinding of the same caller ledger to
+`lowerWithCaller`; helper edges and selected globals still use the same plan. -/
+def lower (program : CheckedProgram) (checked : Checked) (context : Context) (child : Child)
+    (fuel : Nat) (source : TypedSource) (scope : Scope) (id : ExpressionId)
+    (reasonAt : ExpressionId → Core.Word) : Except Error (Option Lowered) := do
+  let caller ← (SourceCompilationPlan.exactSpecialization context.plan context.owner)
+    |>.mapError SourceCoreBasic.Error.callPreparation
+  lowerWithCaller program checked caller context child fuel source scope id reasonAt
 
 end Solcore.Frontend.SourceCoreEvidence

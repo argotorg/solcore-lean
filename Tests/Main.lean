@@ -1087,6 +1087,7 @@ import Solcore.Test.SourceCompilerCoreGeneral
 import Solcore.Test.SourceCompilerSession
 import Solcore.Test.SourceCoreEvidence
 import Solcore.Test.SourceCoreLocalPolymorphism
+import Solcore.Test.SourceCoreLocalEvidence
 import Solcore.Test.SourceCoreLocalPolymorphicExecution
 import Solcore.Test.SourceCoreDataPlaceMappingProofs
 import Solcore.Test.SourceCoreForLoopStatementCertificates
@@ -2520,6 +2521,7 @@ def run : IO Unit := do
   SourceCompilerSession.run
   SourceCoreEvidence.run
   SourceCoreLocalPolymorphism.run
+  SourceCoreLocalEvidence.run
   SourceCoreLocalPolymorphicExecution.run
   SourceCoreDataPlaceMappingProofs.run
   SourceCoreForLoopStatementCertificates.run

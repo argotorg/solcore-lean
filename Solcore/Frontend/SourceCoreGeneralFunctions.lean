@@ -2,6 +2,7 @@ import Solcore.Frontend.SourceCoreGeneralEntry
 import Solcore.Frontend.SourceCoreGeneralTypes
 import Solcore.Frontend.SourceCoreEvidence
 import Solcore.Frontend.SourceCoreLocalPolymorphism
+import Solcore.Frontend.SourceCoreLocalEvidence
 import Solcore.Frontend.SourceCoreRecursiveEntry
 import Solcore.Frontend.SourceCoreDataFaultSites
 import Solcore.Frontend.SourceCoreDataMatches
@@ -113,6 +114,24 @@ private def contextualBinder (checked : Checked) (locals : SourceCoreLocalPolymo
     | .metadata error => error
     | _ => .polymorphicBinding binder.id
 
+private def contextualSource (program : CheckedProgram) (plan : Plan)
+    (locals : SourceCoreLocalPolymorphism.Catalog) (owner : Key)
+    (parent : Option SourceCoreLocalEvidence.Prepared) (source : TypedSource) (id : ExpressionId) :
+    Except SourceCoreBasic.Error TypedSource := do
+  let node ← match source.lookupExpression? id with
+    | some node => pure node
+    | none => throw (.missingExpression id)
+  match node.form with
+  | .reference _ (.local binder) =>
+      if locals.bindings.any (fun binding => decide (binding.caller = owner ∧ binding.binder.id = binder)) then
+        let binding ← (locals.binding owner binder).mapError (localError id node)
+        (SourceCoreLocalEvidence.normalizeOccurrence program plan binding parent source id).mapError fun
+          | .plan error => .callPreparation error
+          | .missingExpression missing => .missingExpression missing
+          | _ => .unsupportedExpression id node.form
+      else pure source
+  | _ => pure source
+
 /-- Contextual local instances re-enter the shared expression traversal with
 concrete metadata. Every closure captures the same lexical references; the
 bundle is constructed before the generalized binding's cell is allocated. -/
@@ -120,15 +139,24 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
     (signatures : ProgramSignatures) (locals : SourceCoreLocalPolymorphism.Catalog)
     (assignments : SourceCoreAssignmentFaultSites.Table)
     (diagnostics : SourceCoreDataPlaceFaultSites.Program) (context : SourceCoreFunctions.Context)
-    (active : TypeSystem.Substitution) (skipInitializer : Option ExpressionId) :
+    (parent : Option SourceCoreLocalEvidence.Prepared) (skipInitializer : Option ExpressionId) :
     SourceCoreFunctions.ExpressionLowerer
   | 0, _, _, id, _ => .error (.traversalExhausted (.occurrence id.occurrence))
   | fuel + 1, source, scope, id, reasonAt => do
+      let active := parent.map SourceCoreLocalEvidence.Prepared.substitution |>.getD []
+      let caller ← match parent with
+        | some prepared => pure prepared.caller
+        | none => (SourceCompilationPlan.exactSpecialization context.plan context.owner)
+            |>.mapError SourceCoreBasic.Error.callPreparation
       let bind := contextualBinder checked locals context.owner active
       let lowerBody := bodyLowerer checked signatures context.solvedRequirements assignments diagnostics context.owner bind
       let policy := { SourceCoreGeneralTypes.policy checked signatures with
         lowerBinder := bind
+        readExpression := fun source id => do
+          let source ← contextualSource program context.plan locals context.owner parent source id
+          SourceCoreDataExpressions.readExpression checked source id
         lowerSpecial? := some fun current child budget source scope id reasonAt => do
+          let source ← contextualSource program current.plan locals current.owner parent source id
           let node ← match source.lookupExpression? id with
             | some node => pure node
             | none => throw (.missingExpression id)
@@ -137,8 +165,11 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
           if let some initialized := initialized.filter (fun _ => skipInitializer ≠ some id) then
             let binding ← (locals.binding current.owner initialized.binder.id).mapError (localError id node)
             let lowered ← (SourceCoreLocalPolymorphism.lowerInitializer binding active fun candidate => do
-              let lowered ← (lowerContextualExpression program checked signatures locals assignments diagnostics current
-                candidate.origin.substitution (some id) (min budget fuel) candidate.source scope id reasonAt)
+              let prepared ← (SourceCoreLocalEvidence.prepare program current.plan candidate parent).mapError fun _ =>
+                SourceCoreLocalPolymorphism.Error.initializerMetadataMismatch id
+              let childContext := { current with solvedRequirements := prepared.caller.function.solvedRequirements }
+              let lowered ← (lowerContextualExpression program checked signatures locals assignments diagnostics childContext
+                (some prepared) (some id) (min budget fuel) prepared.source scope id reasonAt)
                 |>.mapError SourceCoreLocalPolymorphism.Error.metadata
               (SourceCoreBasic.ensureType (.occurrence id.occurrence) candidate.type lowered.type)
                 |>.mapError SourceCoreLocalPolymorphism.Error.metadata
@@ -146,7 +177,7 @@ private def lowerContextualExpression (program : CheckedProgram) (checked : Chec
               | .inRight .word closure => pure closure
               | _ => throw (.initializerMetadataMismatch id)).mapError (localError id node)
             return some lowered
-          let evidence ← SourceCoreEvidence.lower program checked current child budget source scope id reasonAt
+          let evidence ← SourceCoreEvidence.lowerWithCaller program checked caller current child budget source scope id reasonAt
           if let some lowered := evidence then return some lowered
           match node.form with
           | .reference _ (.local binder) =>
@@ -177,7 +208,7 @@ private def compileClosure (program : CheckedProgram) (checked : Checked) (signa
   let lowerBody := bodyLowerer checked signatures function.specialized.function.solvedRequirements own.assignments
     diagnostics function.signature.key (contextualBinder checked locals function.signature.key [])
   let body ← (lowerBody
-    (lowerContextualExpression program checked signatures locals own.assignments diagnostics context [] none)
+    (lowerContextualExpression program checked signatures locals own.assignments diagnostics context none none)
     fuel source (function.inputs.reverse.map (fun (binder, type) => (binder.id, type))) statements
     function.signature.resultType (diagnostics.reasonAt function.signature.key)
     own.fellThroughReason own.table.escapedReason).mapError Error.lowering

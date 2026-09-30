@@ -46,5 +46,6 @@ import Solcore.Frontend.SourceCoreSession
 import Solcore.Frontend.SourceCompilerSession
 import Solcore.Frontend.SourceCoreEvidence
 import Solcore.Frontend.SourceCoreLocalPolymorphism
+import Solcore.Frontend.SourceCoreLocalEvidence
 
 /-! Current whole-program source pipeline and preservation results. -/
