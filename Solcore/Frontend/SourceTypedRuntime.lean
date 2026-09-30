@@ -217,19 +217,6 @@ private def unpackValues : Nat → Value → Option (List Value)
       pure (value :: (← unpackValues (count + 1) rest))
   | _ + 2, _ => none
 
-def defaultValue? : Nat → Ty → Option Value
-  | 0, _ => none
-  | _ + 1, .constructor (.builtin .unit) => some .unit
-  | _ + 1, .constructor (.builtin .bool) => some (.bool false)
-  | _ + 1, .constructor (.builtin .word) => some (.word Core.Word.zero)
-  | _ + 1, .constructor (.builtin .integer) => some (.integer 0)
-  | fuel + 1, .product left right => do
-      pure (.product (← defaultValue? fuel left) (← defaultValue? fuel right))
-  | _ + 1, .proxy inner => some (.proxy inner)
-  | _ + 1, .mapping key value => some (.mapping key value [])
-  | fuel + 1, .comptime inner => defaultValue? fuel inner
-  | _, _ => none
-
 def mappingLookup? (key : Value) : List (Value × Value) → Option Value
   | [] => none
   | entry :: rest =>

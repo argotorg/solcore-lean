@@ -106,6 +106,22 @@ def allocate (state : RuntimeState) (type : Ty) (value : Option Value) :
 
 end RuntimeState
 
+/-- Ordinary executable defaults retain the raw metadata of proxies and
+mappings. In particular, a missing mapping entry uses its stored value type.
+This pure constructor is shared by the Core adapter and compiler-time code. -/
+def defaultValue? : Nat → Ty → Option Value
+  | 0, _ => none
+  | _ + 1, .constructor (.builtin .unit) => some .unit
+  | _ + 1, .constructor (.builtin .bool) => some (.bool false)
+  | _ + 1, .constructor (.builtin .word) => some (.word Core.Word.zero)
+  | _ + 1, .constructor (.builtin .integer) => some (.integer 0)
+  | fuel + 1, .product left right => do
+      pure (.product (← defaultValue? fuel left) (← defaultValue? fuel right))
+  | _ + 1, .proxy inner => some (.proxy inner)
+  | _ + 1, .mapping key value => some (.mapping key value [])
+  | fuel + 1, .comptime inner => defaultValue? fuel inner
+  | _, _ => none
+
 
 private def findSpecialization? (plan : Plan) (key : Key) :
     Option SourceSpecialization.SpecializedFunction :=
