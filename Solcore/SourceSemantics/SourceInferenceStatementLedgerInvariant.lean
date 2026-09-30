@@ -776,6 +776,89 @@ theorem inferStatementFuel_matchWithDefault_ledger
     (casesIH checkedSuccess hiddenTracked)).restoreLexicalScope
       hiddenState.lexicalScope).recordStatement_noBindings _ rfl
 
+/-- Every accepted statement constructor preserves the ambient ledger once
+the actual smaller-fuel child traversals do.  Missing-initializer and parser
+recovery branches have no successful result. -/
+theorem inferStatementFuelLedgerPreservation_step
+    {fuel : Nat}
+    (expressionIH : InferExprFuelLedgerPreservation fuel)
+    (expressionsIH : InferExprsFuelLedgerPreservation fuel)
+    (statementsIH : InferStatementsFuelLedgerPreservation fuel)
+    (forItemsIH : InferForItemsFuelLedgerPreservation fuel)
+    (placeIH : InferPlaceFuelLedgerPreservation fuel)
+    (assignmentIH : InferAssignedValueFuelLedgerPreservation fuel)
+    (casesIH : InferMatchCasesFuelLedgerPreservation fuel) :
+    InferStatementFuelLedgerPreservation (fuel + 1) := by
+  intro context statement expectedReturn initial result pending success tracked
+  cases statementEq : statement.value
+  case letDecl name sourceType initializer =>
+    cases sourceType with
+    | none =>
+        cases initializer with
+        | none =>
+            simp [Detail.inferStatementFuel, statementEq, bind, Except.bind]
+              at success
+        | some initializer =>
+            exact inferStatementFuel_letUnannotatedInitialized_ledger
+              statementEq success expressionIH tracked
+    | some sourceType =>
+        cases initializer with
+        | none =>
+            exact inferStatementFuel_letAnnotatedUninitialized_ledger
+              statementEq success tracked
+        | some initializer =>
+            exact inferStatementFuel_letAnnotatedInitialized_ledger
+              statementEq success expressionIH tracked
+  case returnStmt value =>
+    cases value with
+    | none =>
+        exact inferStatementFuel_returnUnit_ledger statementEq success tracked
+    | some value =>
+        exact inferStatementFuel_returnValue_ledger statementEq success
+          expressionIH tracked
+  case expression expression trailingSemicolon =>
+    exact inferStatementFuel_expression_ledger statementEq success
+      expressionIH tracked
+  case assignValue target operator value =>
+    exact inferStatementFuel_assignValue_ledger statementEq success
+      assignmentIH tracked
+  case assignBitNot target operatorSpan =>
+    exact inferStatementFuel_assignBitNot_ledger statementEq success
+      placeIH tracked
+  case matchWith scrutinees arms =>
+    cases defaultEq : arms.value.defaultBody with
+    | none =>
+        exact inferStatementFuel_matchWithoutDefault_ledger statementEq
+          defaultEq success expressionIH expressionsIH casesIH tracked
+    | some defaultBody =>
+        exact inferStatementFuel_matchWithDefault_ledger statementEq defaultEq
+          success expressionIH expressionsIH casesIH statementsIH tracked
+  case forLoop headerSpan initializer condition post body =>
+    exact inferStatementFuel_forLoop_ledger statementEq success forItemsIH
+      expressionIH statementsIH tracked
+  case whileLoop condition body =>
+    exact inferStatementFuel_whileLoop_ledger statementEq success expressionIH
+      statementsIH tracked
+  case ifThen condition thenBody elseBody =>
+    cases elseBody with
+    | none =>
+        exact inferStatementFuel_ifWithoutElse_ledger statementEq success
+          expressionIH statementsIH tracked
+    | some elseBody =>
+        exact inferStatementFuel_ifWithElse_ledger statementEq success
+          expressionIH statementsIH tracked
+  case block body =>
+    exact inferStatementFuel_block_ledger statementEq success statementsIH
+      tracked
+  case assembly body =>
+    simp [Detail.inferStatementFuel, statementEq] at success
+  case breakStmt =>
+    exact inferStatementFuel_break_ledger statementEq success tracked
+  case continueStmt =>
+    exact inferStatementFuel_continue_ledger statementEq success tracked
+  case error =>
+    simp [Detail.inferStatementFuel, statementEq] at success
+
 /-- A successful statement list preserves the canonical requirement and
 qualified-template ledgers once the actual smaller-fuel head and tail calls
 preserve them. -/
