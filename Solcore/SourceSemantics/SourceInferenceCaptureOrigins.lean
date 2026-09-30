@@ -553,4 +553,136 @@ theorem inferStatementFuel_forLoop_captureOrigins
       _
   simpa only [resultEq] using recorded
 
+/-- Match scrutinees preserve the active binder stack, whether inferred as a
+single expression or packaged into the synthetic tuple occurrence. -/
+theorem ActiveBinderCaptureOrigins.inferMatchScrutineesFuel
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {span : Syntax.SourceSpan} {sources : List Syntax.Expr}
+    {state final : State} {inferred : InferredExpression}
+    {wholeSource : TypedSource}
+    (origins : ActiveBinderCaptureOrigins state wholeSource)
+    (success : SourceInferenceSoundness.inferMatchScrutineesFuel fuel
+      inferenceContext span sources state = .ok (inferred, final)) :
+    ActiveBinderCaptureOrigins final wholeSource := by
+  cases sources with
+  | nil =>
+      unfold SourceInferenceSoundness.inferMatchScrutineesFuel at success
+      cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext []
+          state with
+      | error error => simp [elementsSuccess, bind, Except.bind] at success
+      | ok elementsPair =>
+          rcases elementsPair with ⟨elements, elementsState⟩
+          simp only [elementsSuccess, bind, Except.bind, pure, Pure.pure,
+            Except.pure] at success
+          injection success with resultEq
+          cases resultEq
+          exact (origins.inferExprsFuel elementsSuccess).congr_localBinders rfl
+  | cons first rest =>
+      cases rest with
+      | nil =>
+          apply origins.inferExprFuel
+          simpa [SourceInferenceSoundness.inferMatchScrutineesFuel] using
+            success
+      | cons second tail =>
+          unfold SourceInferenceSoundness.inferMatchScrutineesFuel at success
+          cases elementsSuccess : Detail.inferExprsFuel fuel inferenceContext
+              (first :: second :: tail) state with
+          | error error => simp [elementsSuccess, bind, Except.bind] at success
+          | ok elementsPair =>
+              rcases elementsPair with ⟨elements, elementsState⟩
+              simp only [elementsSuccess, bind, Except.bind, pure, Pure.pure,
+                Except.pure] at success
+              injection success with resultEq
+              cases resultEq
+              exact (origins.inferExprsFuel elementsSuccess).congr_localBinders
+                rfl
+
+/-- Explicit match arms restore the outer lexical scope, so their pattern
+binders do not escape when there is no default arm. -/
+theorem inferStatementFuel_matchWithoutDefault_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {expectedReturn : Ty}
+    {initial allocated : State} {id : StatementId}
+    {result : Detail.StatementResult} {wholeSource : TypedSource}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = none)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
+      scrutineeSuccess, hiddenAllocation, casesSuccess, _, resultEq, _⟩ :=
+    inferStatementFuel_success_matchWithoutDefault_facts statementEq
+      defaultEq allocationEq success
+  have hiddenOrigins : ActiveBinderCaptureOrigins hiddenState wholeSource :=
+    ((origins.allocateStatementId allocationEq).inferMatchScrutineesFuel
+      scrutineeSuccess).allocateHiddenLocal hiddenAllocation
+  have scopeEq : checked.state.lexicalScope = hiddenState.lexicalScope :=
+    Detail.inferMatchCasesFuel_success_lexicalScope_eq rfl casesSuccess
+  have checkedOrigins : ActiveBinderCaptureOrigins checked.state wholeSource :=
+    hiddenOrigins.congr_localBinders (by
+      simpa only [State.lexicalScope] using
+        congrArg LexicalScope.binders scopeEq)
+  have recorded := checkedOrigins.recordNode (.statement {
+    id, span := statement.span,
+    type := if checked.allReturn then checked.state.resolve expectedReturn
+      else .unit,
+    form := .matchWith {
+      scrutinee := scrutinee.id
+      hiddenScrutinee
+      cases := checked.cases
+      defaultBody := none
+      requirements := checked.cases.flatMap fun arm =>
+        arm.pattern.requirements
+    }
+  })
+  simpa only [resultEq] using recorded
+
+/-- A default arm is followed by an explicit lexical restoration; the
+outward active binders are exactly those before case traversal. -/
+theorem inferStatementFuel_matchWithDefault_captureOrigins
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {statement : Syntax.Statement}
+    {scrutinees : Syntax.NonemptyDelimitedList Syntax.Expr}
+    {arms : Syntax.MatchArms} {defaultBody : Syntax.Block}
+    {expectedReturn : Ty} {initial allocated : State}
+    {id : StatementId} {result : Detail.StatementResult}
+    {wholeSource : TypedSource}
+    (statementEq : statement.value = .matchWith scrutinees arms)
+    (defaultEq : arms.value.defaultBody = some defaultBody)
+    (allocationEq : initial.allocateStatementId = (id, allocated))
+    (success : Detail.inferStatementFuel (fuel + 1) inferenceContext
+      statement expectedReturn initial = .ok result)
+    (origins : ActiveBinderCaptureOrigins initial wholeSource) :
+    ActiveBinderCaptureOrigins result.state wholeSource := by
+  obtain ⟨scrutinee, scrutineeState, hiddenScrutinee, hiddenState, checked,
+      defaultResult, scrutineeSuccess, hiddenAllocation, _, _, _, resultEq,
+      _⟩ :=
+    inferStatementFuel_success_matchWithDefault_facts statementEq defaultEq
+      allocationEq success
+  have hiddenOrigins : ActiveBinderCaptureOrigins hiddenState wholeSource :=
+    ((origins.allocateStatementId allocationEq).inferMatchScrutineesFuel
+      scrutineeSuccess).allocateHiddenLocal hiddenAllocation
+  have recorded : ActiveBinderCaptureOrigins
+      ((defaultResult.state.restoreLexicalScope hiddenState.lexicalScope
+        ).recordNode (.statement {
+          id, span := statement.span,
+          type := if checked.allReturn && defaultResult.sawReturn then
+            (defaultResult.state.restoreLexicalScope
+              hiddenState.lexicalScope).resolve expectedReturn else .unit,
+          form := .matchWith {
+            scrutinee := scrutinee.id
+            hiddenScrutinee
+            cases := checked.cases
+            defaultBody := some defaultResult.statements
+            requirements := checked.cases.flatMap fun arm =>
+              arm.pattern.requirements
+          }
+        })) wholeSource :=
+    hiddenOrigins.restoreLexicalScope_recordNode _
+  simpa only [resultEq] using recorded
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
