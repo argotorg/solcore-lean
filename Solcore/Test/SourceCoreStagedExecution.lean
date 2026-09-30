@@ -89,13 +89,13 @@ private def check (program : CheckedProgram) (name : String) (arguments : List C
     | some entry => pure entry
     | none => throw (IO.userError "staged cached entry missing")
   let old ← legacy program key arguments
-  let verify := fun observation => do
+  let verify := fun observation diagnosticAt => do
     match observation, old, expected with
     | .succeeded value _, .done oldValue _, some expected =>
         unless value == expected && legacyNative oldValue == some expected do
           throw (IO.userError s!"{name} staged result changed: {reprStr value}")
     | .failed reason store, .fault oldError _, none =>
-        let diagnostic ← match entry.faultSites.diagnostic? reason with
+        let diagnostic ← match diagnosticAt reason with
           | some diagnostic => pure diagnostic
           | none => throw (IO.userError s!"{name} lost staged diagnostic")
         unless diagnostic.error == oldError do
@@ -106,11 +106,20 @@ private def check (program : CheckedProgram) (name : String) (arguments : List C
     | observation, _, _ => throw (IO.userError s!"{name} staged outcome changed: {reprStr observation}")
   for _ in [0, 1] do
     match entry.run arguments 65536 with
-    | .ok result => verify result.observation
+    | .ok result => verify result.observation entry.faultSites.diagnostic?
     | .error error => throw (IO.userError s!"{name} staged input rejected: {reprStr error}")
   match entry.run arguments 0 with
-  | .ok {observation := .outOfFuel state, ..} => verify (Core.LanguageResult.observeResult (Core.runStateful 65536 state))
+  | .ok {observation := .outOfFuel state, ..} => verify (Core.LanguageResult.observeResult (Core.runStateful 65536 state)) entry.faultSites.diagnostic?
   | _ => throw (IO.userError s!"{name} staged entry did not suspend")
+  for backend in [SourceCompiler.BackendPreference.core, .automatic] do
+    let compiled ← match SourceCompiler.compileChecked program (.declaration key.declaration)
+        {backendPreference := backend, specializationBudget := 128, stagingFuel := 256} with
+      | .ok compiled => pure compiled
+      | .error error => throw (IO.userError s!"{name} public staged Core compile failed: {reprStr error}")
+    unless compiled.backend == .core do throw (IO.userError s!"{name} public staged execution selected legacy")
+    match compiled.runCore arguments {executionFuel := 65536} with
+    | .ok (.coreLanguageResult observation) => verify observation compiled.coreFailureDiagnostic?
+    | result => throw (IO.userError s!"{name} public staged Core run failed: {reprStr result}")
 
 def run : IO Unit := do
   let program ← match checkProgram workspace 4096 with

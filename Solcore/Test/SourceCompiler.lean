@@ -804,8 +804,8 @@ private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := 
       integerBitXor.backend = .core ∧
       integerBitOr.backend = .core ∧
       integerBitNot.backend = .core ∧
-      markedEffects.backend = .typedSource ∧
-      markedEffectsEntry.backend = .typedSource))
+      markedEffects.backend = .core ∧
+      markedEffectsEntry.backend = .core))
     "staged capability cases selected an unexpected backend"
   assertTrue (decide (
       constrained.inputTypes = [.word] ∧ constrained.resultType = .word ∧
@@ -865,10 +865,10 @@ private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := 
     integerBitOr.runCore [] runtimeOptions
   expectCoreInteger "integer bitwise not" (-6) <|
     integerBitNot.runCore [] runtimeOptions
-  expectTypedWord "marked closure/mutation/mapping" 12 <|
-    markedEffects.runTyped [.word (word 9)] runtimeOptions
-  expectTypedWord "effectful staged call" 12 <|
-    markedEffectsEntry.runTyped [] runtimeOptions
+  expectCoreLanguageWord "marked closure/mutation/mapping" 12 <|
+    markedEffects.runCore [.word (word 9)] runtimeOptions
+  expectCoreLanguageWord "effectful staged call" 12 <|
+    markedEffectsEntry.runCore [] runtimeOptions
 
 private def testPublicCompilationErrors (checked : CheckedProgram) : IO Unit := do
   let main ← moduleId "main.solc"

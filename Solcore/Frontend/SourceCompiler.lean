@@ -103,13 +103,14 @@ explicit preference use this common carrier, so clients need only one
 diagnostic traversal. -/
 inductive BackendRejection where
   | core (error : SourceCoreDirectLinking.Error)
+  | coreCatalog (error : SourceCorePlanCatalog.Error)
   | typedSource (error : SourceTypedRuntime.RuntimeError)
   deriving Repr
 
 namespace BackendRejection
 
 def backend : BackendRejection → Backend
-  | .core _ => .core
+  | .core _ | .coreCatalog _ => .core
   | .typedSource _ => .typedSource
 
 end BackendRejection
@@ -531,7 +532,7 @@ private def prepareCoreRuntime (program : CheckedProgram)
       | .ok prepared => .ok prepared
       | .error _ => SourceCoreFunctionEntry.prepare program plan compilationFuel reason
 
-private def selectCoreBackend (program : CheckedProgram)
+private def selectCoreBackendFallback (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat) :
     Except CompileError Executable :=
   let complete : SourceSpecializationWorklist.Outcome := .complete plan
@@ -554,6 +555,26 @@ private def selectCoreBackend (program : CheckedProgram)
               | entries => .error (.backendEntryCountMismatch .core entries.length)
           | .error _ => .error (.backendRejected (.core error))
 
+/-- Callable-bearing plans require the retained contract profile before any
+older lowering can erase parameter count or staging flags. -/
+private def needsCallableContracts (plan : SourceSpecializationWorklist.Plan) : Bool :=
+  plan.specializations.any fun specialized =>
+    specialized.function.typedBody.nodes.any (fun
+      | .expression {form := .lambda .., ..} => true
+      | .expression {form := .call _ _ (.indirect _), ..} => true
+      | _ => false)
+
+private def selectCoreBackend (program : CheckedProgram)
+    (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat) :
+    Except CompileError Executable :=
+  if needsCallableContracts plan then
+    match SourceCoreSession.Recipe.prepareAutomatic program plan stagingFuel true with
+    | .error error => .error (.backendRejected (.coreCatalog error))
+    | .ok recipe => match recipe.program.entries with
+        | [entry] => .ok (.coreGeneral ⟨recipe, entry⟩)
+        | entries => .error (.backendEntryCountMismatch .core entries.length)
+  else selectCoreBackendFallback program plan stagingFuel
+
 private def selectTypedSourceBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) :
     Except CompileError Executable :=
@@ -570,23 +591,23 @@ private def selectBackend (program : CheckedProgram)
   | .automatic =>
       match selectCoreBackend program plan stagingFuel with
       | .ok executable => .ok executable
-      | .error (.backendRejected (.core directError)) =>
+      | .error (.backendRejected coreError) =>
           match selectTypedSourceBackend program plan with
           | .ok executable => .ok executable
           | .error (.backendRejected (.typedSource typedSourceError)) =>
               .error (.noBackend [
-                .core directError,
+                coreError,
                 .typedSource typedSourceError
               ])
           | .error error => .error error
       | .error error => .error error
 
-private theorem selectCoreBackend_success_backend
+private theorem selectCoreBackendFallback_success_backend
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
     (stagingFuel : Nat) (executable : Executable)
-    (selected : selectCoreBackend program plan stagingFuel = .ok executable) :
+    (selected : selectCoreBackendFallback program plan stagingFuel = .ok executable) :
     executable.backend = .core := by
-  unfold selectCoreBackend at selected
+  unfold selectCoreBackendFallback at selected
   cases linkedResult : SourceCoreDirectLinking.linkWithStagingFuel program
       (.complete plan) stagingFuel with
   | error error =>
@@ -626,6 +647,27 @@ private theorem selectCoreBackend_success_backend
               rfl
           | cons another tail =>
               simp [linkedResult, entries] at selected
+
+private theorem selectCoreBackend_success_backend
+    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (stagingFuel : Nat) (executable : Executable)
+    (selected : selectCoreBackend program plan stagingFuel = .ok executable) :
+    executable.backend = .core := by
+  unfold selectCoreBackend at selected
+  split at selected
+  · cases prepared : SourceCoreSession.Recipe.prepareAutomatic program plan stagingFuel true with
+    | error error => simp [prepared] at selected
+    | ok recipe =>
+        cases entries : recipe.program.entries with
+        | nil => simp [prepared, entries] at selected
+        | cons entry rest =>
+            cases rest with
+            | nil =>
+                simp [prepared, entries] at selected
+                cases selected
+                rfl
+            | cons another tail => simp [prepared, entries] at selected
+  · exact selectCoreBackendFallback_success_backend program plan stagingFuel executable selected
 
 private theorem selectTypedSourceBackend_success_backend
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
@@ -697,19 +739,16 @@ private theorem selectBackend_automatic_typed_source
   | error error =>
       cases error <;> simp [selectBackend, selectedCore] at selected
       rename_i rejection
-      cases rejection with
-      | typedSource error => cases selected
-      | core error =>
-          cases selectedTyped : selectTypedSourceBackend program plan with
-          | ok executable =>
-              simp only [selectedTyped] at selected
-              cases selected
-              rfl
-          | error error =>
-              rw [selectedTyped] at selected
-              cases error <;> simp at selected
-              rename_i rejection
-              cases rejection <;> simp at selected
+      cases selectedTyped : selectTypedSourceBackend program plan with
+      | ok executable =>
+          simp only [selectedTyped] at selected
+          cases selected
+          rfl
+      | error error =>
+          rw [selectedTyped] at selected
+          cases error <;> try cases selected
+          rename_i rejection
+          cases rejection <;> cases selected
 
 private theorem selectBackend_typed_plan
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)

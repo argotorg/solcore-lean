@@ -424,7 +424,7 @@ def Recipe.prepare (program : CheckedProgram) (plan : SourceSpecializationWorkli
   pure ⟨⟨checked, program.signatures⟩, prepared⟩
 
 def Recipe.prepareAutomatic (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
-    (compilationFuel : Nat) (callableContracts : Bool := false) : Except SourceCorePlanCatalog.Error Recipe := do
+    (compilationFuel : Nat) (callableContracts : Bool := true) : Except SourceCorePlanCatalog.Error Recipe := do
   let prepared ← SourceCorePlanCatalog.prepare program plan compilationFuel callableContracts
   pure ⟨⟨prepared.checked, program.signatures⟩, prepared.program⟩
 
