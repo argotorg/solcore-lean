@@ -73,6 +73,7 @@ theorem inferStatementFuel_success_assignValue_child_provenance
       TypingSourceExtends
         ((assignmentState.toTypedSource roots).applySubstitution outer)
         ((result.state.toTypedSource roots).applySubstitution outer) ∧
+      assignmentState.integerLiterals ⊆ result.state.integerLiterals ∧
       assignmentState.integerPatterns ⊆ result.state.integerPatterns ∧
       assignmentState.requirements ⊆ result.state.requirements := by
   obtain ⟨assignment, inferred, assignmentState, assignmentSuccess,
@@ -87,12 +88,14 @@ theorem inferStatementFuel_success_assignValue_child_provenance
       simpa only [allocationEq] using nextBelow
   subst result
   refine ⟨assignment, inferred, assignmentState, assignmentSuccess,
-    allocatedBelow, ?_, ?_, ?_⟩
+    allocatedBelow, ?_, ?_, ?_, ?_⟩
   · apply TypingSourceExtends.applySubstitution outer
     constructor
     · rfl
     · exact Frontend.SourceInference.State.recordNode_nodesPrefix
         assignmentState _
+  · intro literal member
+    exact member
   · intro pattern member
     exact member
   · intro requirement member
@@ -123,6 +126,7 @@ theorem inferStatementFuel_success_assignBitNot_child_provenance
       TypingSourceExtends
         ((placeState.toTypedSource roots).applySubstitution outer)
         ((result.state.toTypedSource roots).applySubstitution outer) ∧
+      placeState.integerLiterals ⊆ result.state.integerLiterals ∧
       placeState.integerPatterns ⊆ result.state.integerPatterns ∧
       placeState.requirements ⊆ result.state.requirements := by
   obtain ⟨place, placeState, unified, placeSuccess, unifiedSuccess, _,
@@ -161,8 +165,12 @@ theorem inferStatementFuel_success_assignBitNot_child_provenance
     · exact Frontend.SourceInference.State.recordNode_nodesPrefix unified _
   subst result
   refine ⟨place, placeState, unified, placeSuccess, unifiedSuccess,
-    allocatedBelow, ?_, ?_, ?_⟩
+    allocatedBelow, ?_, ?_, ?_, ?_⟩
   · exact (placeToUnified.trans unifiedToRecorded).applySubstitution outer
+  · intro literal member
+    change literal ∈ unified.integerLiterals
+    rw [Detail.unify_integerLiterals unifiedSuccess]
+    exact member
   · intro pattern member
     change pattern ∈ unified.integerPatterns
     rw [Detail.unify_integerPatterns unifiedSuccess]
