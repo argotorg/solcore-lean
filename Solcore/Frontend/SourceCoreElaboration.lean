@@ -2314,6 +2314,105 @@ def rejectCoercions : CoercionElaborator Error :=
     fail (.occurrence node.id.occurrence)
       (.coercionsPresent node.coercions)
 
+namespace Internal
+
+/-- Internal proof interface to the existing expression traversal. This fixes
+the standalone rejection policies and disables staged caching; it is not a
+new expression compiler or a finalized public source API. -/
+def lowerExpression (fuel : Nat) (source : TypedSource)
+    (scope : Resolved.Context) (id : ExpressionId) :
+    Except Error LoweredExpression :=
+  lowerExpressionFuelWith (fun error => error) (fun _ => rejectCalls)
+    rejectStagedIntegerCalls none rejectRequiredUnaries rejectRequiredBinaries
+    rejectCoercions [] fuel source scope [] [] id
+
+private theorem lookupExpression_of_found
+    {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node) :
+    lookupExpression source id = .ok node := by
+  unfold TypedSource.lookupExpression? at found
+  cases lookup : source.lookupNode? id.occurrence with
+  | none => simp [lookup] at found
+  | some selected =>
+      cases selected with
+      | statement => simp [lookup] at found
+      | expression selected =>
+          simp only [lookup, Option.some.injEq] at found
+          subst selected
+          simp [lookupExpression, lookup]
+
+theorem lowerExpression_unit
+    (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
+    (id : ExpressionId) (node : ExpressionNode)
+    (found : source.lookupExpression? id = some node)
+    (form : node.form = .tuple []) (typed : node.type = .unit)
+    (requirements : node.requirements = []) (coercions : node.coercions = []) :
+    lowerExpression (fuel + 1) source scope id =
+      .ok { resolved := .unit, consumedRequirements := [] } := by
+  have lookup := lookupExpression_of_found found
+  simp [lowerExpression, lowerExpressionFuelWith, lookup, Except.mapError,
+    bind, Except.bind, pure, Pure.pure, Except.pure, coercions, form,
+    lowerExpressionNodeWith, requirements, typed, Ty.unit, lowerType, productExpression]
+
+theorem lowerExpression_bool
+    (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
+    (id : ExpressionId) (node : ExpressionNode) (name : String) (value : Bool)
+    (found : source.lookupExpression? id = some node)
+    (form : node.form = .reference name (.builtinBoolean value))
+    (typed : node.type = .bool)
+    (requirements : node.requirements = []) (coercions : node.coercions = []) :
+    lowerExpression (fuel + 1) source scope id =
+      .ok { resolved := .bool value, consumedRequirements := [] } := by
+  have lookup := lookupExpression_of_found found
+  simp [lowerExpression, lowerExpressionFuelWith, lookup, Except.mapError,
+    bind, Except.bind, pure, Pure.pure, Except.pure, coercions, form,
+    lowerExpressionNodeWith, requirements, typed, Ty.bool, lowerType]
+
+theorem lowerExpression_word
+    (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
+    (id : ExpressionId) (node : ExpressionNode)
+    (literal : Syntax.CoreLiteralValue) (value : Core.Word)
+    (found : source.lookupExpression? id = some node)
+    (form : node.form = .literal literal) (typed : node.type = .word)
+    (requirements : node.requirements = []) (coercions : node.coercions = [])
+    (meaning : WordLiteralDenotes ⟨node.span, literal⟩ value) :
+    lowerExpression (fuel + 1) source scope id =
+      .ok { resolved := .word value, consumedRequirements := [] } := by
+  have lookup := lookupExpression_of_found found
+  have decoded := interpretWordLiteral?_complete meaning
+  simp [lowerExpression, lowerExpressionFuelWith, lookup, Except.mapError,
+    bind, Except.bind, pure, Pure.pure, Except.pure, coercions, form,
+    lowerExpressionNodeWith, requirements, typed, Ty.word, lowerType, decoded]
+
+theorem lowerExpression_pair
+    (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
+    (id : ExpressionId) (node : ExpressionNode) (leftId rightId : ExpressionId)
+    (leftType rightType : Ty) (leftCoreType rightCoreType : Core.Ty)
+    (left right : LoweredExpression)
+    (found : source.lookupExpression? id = some node)
+    (form : node.form = .tuple [leftId, rightId])
+    (typed : node.type = .product leftType rightType)
+    (requirements : node.requirements = []) (coercions : node.coercions = [])
+    (leftTypeLowered : lowerType (.occurrence node.id.occurrence) leftType =
+      .ok leftCoreType)
+    (rightTypeLowered : lowerType (.occurrence node.id.occurrence) rightType =
+      .ok rightCoreType)
+    (leftLowered : lowerExpression fuel source scope leftId = .ok left)
+    (rightLowered : lowerExpression fuel source scope rightId = .ok right) :
+    lowerExpression (fuel + 1) source scope id = .ok {
+      resolved := .pair left.resolved right.resolved
+      consumedRequirements := left.consumedRequirements ++ right.consumedRequirements
+    } := by
+  have lookup := lookupExpression_of_found found
+  unfold lowerExpression at leftLowered rightLowered ⊢
+  rw [lowerExpressionFuelWith]
+  simp only [lookup, Except.mapError, bind, Except.bind, coercions, form]
+  simp [lowerExpressionNodeWith, form, requirements, typed, lowerType,
+    leftTypeLowered, rightTypeLowered, leftLowered, rightLowered,
+    productExpression, bind, Except.bind, pure, Pure.pure, Except.pure]
+
+end Internal
+
 private def reconcileConsumedRequirementsAux
     (declaration : Resolved.DeclarationId) (seen available : List RequirementId) :
     List RequirementId → Except Error (List RequirementId)
