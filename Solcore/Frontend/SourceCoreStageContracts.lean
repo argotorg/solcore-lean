@@ -69,7 +69,7 @@ def prepareSidecar (plan : Plan) (key : Key) : Except Error Sidecar := do
         .ok (.mk plan caller (same ▸ analyzed))
       else .error (.sidecarMismatch key)
 
-private def expression (sidecar : Sidecar) (id : ExpressionId) : Except Error ExpressionNode := do
+def expression (sidecar : Sidecar) (id : ExpressionId) : Except Error ExpressionNode := do
   if id.occurrence.owner ≠ sidecar.source.owner then
     throw (.ownerMismatch sidecar.source.owner id.occurrence.owner)
   match sidecar.source.nodes.filterMap (fun

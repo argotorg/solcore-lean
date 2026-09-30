@@ -37,6 +37,7 @@ import Solcore.SourceSemantics.CoreLowering.ContractedFunctionCalls
 import Solcore.SourceSemantics.CoreLowering.ActualCallablePolicy
 import Solcore.SourceSemantics.CoreLowering.CallStageGuard
 import Solcore.SourceSemantics.CoreLowering.CallStageBoundary
+import Solcore.SourceSemantics.CoreLowering.AuthenticatedCallableLedger
 import Solcore.SourceSemantics.CoreLowering.BasicStatements
 import Solcore.SourceSemantics.CoreLowering.BasicExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.BasicStatementCertificates

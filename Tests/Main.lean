@@ -17,6 +17,7 @@ import Solcore.Test.SourceCoreDataPlaceAssignmentMeaning
 import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCoreHeapMarkers
 import Solcore.Test.SourceRuntimeValidationBoundary
+import Solcore.Test.SourceCallableLedger
 import Solcore.Test.SourceCallStageGuards
 import Solcore.Test.SourceCallStageBoundary
 import Solcore.Test.SourceCoreRawMetadata

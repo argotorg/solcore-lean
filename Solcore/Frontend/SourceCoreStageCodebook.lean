@@ -121,7 +121,7 @@ def decisionCount (table : Table) : Nat := table.decisions.length
 
 end Table
 
-private def insert (limits : Limits) (firstId : Nat) (entries : List Entry)
+def insert (limits : Limits) (firstId : Nat) (entries : List Entry)
     (origin : Origin) (count : Nat) (contract : Option Contract) : Except Error (List Entry) := do
   if entries.any (fun entry => decide (entry.origin = origin)) then return entries
   if entries.length ≥ limits.maxContracts then throw (.contractBudgetExhausted limits.maxContracts)
@@ -135,7 +135,7 @@ private def lambdaIds (sidecar : Sidecar) : List ExpressionId :=
     | .expression { id, form := .lambda _ _ _, .. } => some id
     | _ => none
 
-private def collectLambdas (limits : Limits) (firstId : Nat) (sidecar : Sidecar)
+def collectLambdas (limits : Limits) (firstId : Nat) (sidecar : Sidecar)
     (prepared : Option SourceCoreLocalEvidence.Prepared) (entries : List Entry) : Except Error (List Entry) := do
   let mut entries := entries
   let context := prepared.map (·.substitution) |>.getD []
@@ -194,7 +194,7 @@ private def contextualReceipts (program : CheckedProgram) (plan : Plan) : Nat �
         | none => throw (.contractBudgetExhausted 0)
       contextualReceipts program plan fuel parents remaining
 
-private def collectDecisions (limits : Limits) (sidecars : List Sidecar) (entries : List Entry) :
+def collectDecisions (limits : Limits) (sidecars : List Sidecar) (entries : List Entry) :
     Except Error (List Decision) := do
   let mut rows := []
   for sidecar in sidecars do
