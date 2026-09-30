@@ -255,7 +255,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   let checked ← checkedWorkspace
   let direct ← compileNamed checked "main.solc" "direct"
   let recursive ← compileNamed checked "main.solc" "recurse"
-  let typed ← compileNamed checked "main.solc" "visibleAlias"
+  let general ← compileNamed checked "main.solc" "visibleAlias"
+  let typed ← compileNamedWithBackend checked "main.solc" "visibleAlias" .typedSource
   let polymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
   let nestedPolymorphicLocal ←
     compileNamed checked "main.solc" "nestedPolymorphicLocal"
@@ -270,6 +271,7 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
   assertTrue (decide (
       direct.backend = .core ∧
       recursive.backend = .core ∧
+      general.backend = .core ∧
       typed.backend = .typedSource ∧
       polymorphicLocal.backend = .typedSource ∧
       nestedPolymorphicLocal.backend = .typedSource ∧
@@ -359,6 +361,8 @@ private def testCheckedReuseAndPrecedence : IO PreparedSet := do
         "recursive local contexts did not discover two contextual generic calls"
   | result => throw (IO.userError
       s!"recursive-context plan reconstruction failed: {reprStr result}")
+  expectCoreLanguageWord "automatic nominal Core root" 12 <|
+    general.runCore [.pair (.word (word 4)) (.word (word 5))] runtimeOptions
   expectCoreWord "direct Core root" 14 <|
     direct.runCore [.word (word 7)] runtimeOptions
   expectCoreWord "reused direct Core root" 18 <|
@@ -684,6 +688,7 @@ private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
 private def testOneShotLimits : IO Unit := do
   let main ← moduleId "main.solc"
   let limits : Limits := {
+    backendPreference := .typedSource
     checkingFuel := 1024
     specializationBudget := 32
     stagingFuel := 128
@@ -709,11 +714,16 @@ private def testBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
   expectCoreLanguageWord "forced recursive Core root" 31 <|
     recursive.runCore [.word (word 3)] runtimeOptions
   match compileChecked checked (Seed.named main "visibleAlias") coreOptions with
-  | .error (.backendRejected (.core _)) => pure ()
+  | .ok compiled =>
+      assertTrue (compiled.backend == .core) "forced nominal Core root changed its backend"
+      expectCoreLanguageWord "forced nominal Core root" 12 <|
+        compiled.runCore [.pair (.word (word 7)) (.word (word 8))] runtimeOptions
   | .error error => throw (IO.userError
-      s!"forced Core rejection changed category: {reprStr error}")
-  | .ok compiled => throw (IO.userError
-      s!"forced Core silently fell through to {reprStr compiled.backend}")
+      s!"forced nominal Core compilation failed: {reprStr error}")
+  match compileChecked checked (Seed.named main "polymorphicLocal") coreOptions with
+  | .error (.backendRejected (.core _)) => pure ()
+  | .error error => throw (IO.userError s!"forced polymorphic Core rejection changed category: {reprStr error}")
+  | .ok compiled => throw (IO.userError s!"unmigrated local polymorphism selected {reprStr compiled.backend}")
   match compileChecked checked (Seed.named blocked "blocked") compilerOptions with
   | .error (.noBackend [
       .core directError,
