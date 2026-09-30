@@ -2148,6 +2148,28 @@ theorem statementHasType_assumptions_eq
       (by assumption : BinderExtends source.owner before _ after)
     exact fields.2.2.2.1
 
+/-- Every statement preserves the non-lexical semantic context fields.  Let
+declarations change only the lexical tables, even when generalized. -/
+theorem statementHasType_nonlocal_fields_eq
+    {source : TypedSource} {control : ControlContext}
+    {before after : SourceSemantics.Context}
+    {id : StatementId} {facts : StatementFacts}
+    (typing : StatementHasType source control before id after facts) :
+    after.signatures = before.signatures ∧
+    after.typeParameters = before.typeParameters ∧
+    after.currentDeclaration = before.currentDeclaration ∧
+    after.residualTypeVariables = before.residualTypeVariables ∧
+    after.solvedRequirements = before.solvedRequirements ∧
+    after.assumptions = before.assumptions := by
+  cases typing <;> try simp
+  all_goals
+    have fields := BinderExtends.context_fields
+      (by assumption : BinderExtends source.owner before _ after)
+    have residual := BinderExtends.residualTypeVariables_eq
+      (by assumption : BinderExtends source.owner before _ after)
+    exact ⟨fields.1, fields.2.2.1, fields.2.1, residual,
+      fields.2.2.2.2, fields.2.2.2.1⟩
+
 /-- Sequencing preserves the same ambient assumption row. -/
 theorem statementsHaveType_assumptions_eq
     {source : TypedSource} {control : ControlContext}
@@ -2242,12 +2264,18 @@ theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_sco
     (requirementsSubset :
       result.state.requirements ⊆ evidenceState.requirements)
     (extraResult : extra result.state)
-    (extraHead : ∀ {childFuel : Nat} {tail : Detail.BlockResult}
-        {childState : Frontend.SourceInference.State}
+    (extraHead : ∀ {headFuel childFuel : Nat}
+        {headInitial : Frontend.SourceInference.State}
+        {headContext : SourceSemantics.Context}
+        {headStatement : Syntax.Statement}
+        {head : Detail.StatementResult} {tail : Detail.BlockResult}
         {remaining : List Syntax.Statement},
+      invariant headInitial headContext →
+      Detail.inferStatementFuel headFuel inferenceContext headStatement
+        expectedReturn headInitial = .ok head →
       Detail.inferStatementsFuel childFuel inferenceContext remaining
-        expectedReturn childState = .ok tail →
-      extra tail.state → extra childState)
+        expectedReturn head.state = .ok tail →
+      extra tail.state → extra head.state)
     (coveredStatements : ∀ id, id ∈ result.statements →
       TemplateScopeCovered coverageSource semanticContext (.statement id))
     (statementSound :
@@ -2340,7 +2368,7 @@ theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_sco
                   (Detail.inferStatementsFuel_requirements_subset tailSuccess)
                   requirementsSubset
               have headExtra : extra head.state :=
-                extraHead tailSuccess extraResult
+                extraHead initialInvariant headSuccess tailSuccess extraResult
               have headCovered : TemplateScopeCovered coverageSource
                   semanticContext (.statement head.id) :=
                 coveredStatements head.id (by simp)
@@ -2446,7 +2474,7 @@ theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_sco
   inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_with_extra
     invariant (fun _ => True) (roots := roots) initialInvariant initialBelow
     resultExtension integerPatternsSubset requirementsSubset trivial
-    (fun _ _ => trivial) coveredStatements
+    (fun _ _ _ _ => trivial) coveredStatements
     (fun bound inv childSuccess extension integerSubset requirementSubset _
       covered =>
       statementSound bound inv childSuccess extension integerSubset
@@ -2514,7 +2542,7 @@ theorem inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_sco
     invariant (fun s => s.integerLiterals ⊆ evidenceState.integerLiterals)
     (roots := roots) initialInvariant initialBelow resultExtension
     integerPatternsSubset requirementsSubset integerLiteralsSubset
-    (fun tailSuccess tailSubset =>
+    (fun _ _ tailSuccess tailSubset =>
       List.Subset.trans
         (Detail.inferStatementsFuel_integerLiterals_subset tailSuccess)
         tailSubset)
