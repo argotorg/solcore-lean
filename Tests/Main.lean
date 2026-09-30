@@ -1079,6 +1079,7 @@ import Solcore.Test.SourceCoreDataEqualityInitialization
 import Solcore.Test.SourceCoreDataEqualityStoreProofs
 import Solcore.Test.SourceCoreSession
 import Solcore.Test.SourceCompilerCoreGeneral
+import Solcore.Test.SourceCompilerSession
 import Solcore.Test.SourceCoreForLoopStatementCertificates
 import Solcore.Test.SourceCoreLoopStatementCertificates
 import Solcore.Test.SourceCoreLoopStatementMeaning
@@ -2507,6 +2508,7 @@ def run : IO Unit := do
   SourceCoreDataEqualityInitialization.run
   SourceCoreSession.run
   SourceCompilerCoreGeneral.run
+  SourceCompilerSession.run
   SourceCoreForLoopStatementCertificates.run
   SourceCoreLoopStatementMeaning.run
   SourceCoreLoopFiniteComposition.run
