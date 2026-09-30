@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericHeap
 import Solcore.SourceSemantics.CoreLowering.StagedValue
 import Solcore.SourceSemantics.CoreLowering.Literals
 import Solcore.SourceSemantics.CoreLowering.LocalCell
