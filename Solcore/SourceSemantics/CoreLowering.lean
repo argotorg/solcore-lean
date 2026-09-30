@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.DataPlaceMappingHelpers
+import Solcore.SourceSemantics.CoreLowering.DataMappingHeap
 import Solcore.SourceSemantics.CoreLowering.GenericHeap
 import Solcore.SourceSemantics.CoreLowering.StagedValue
 import Solcore.SourceSemantics.CoreLowering.Literals
