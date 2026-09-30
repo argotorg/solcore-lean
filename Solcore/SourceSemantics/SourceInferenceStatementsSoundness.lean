@@ -3864,9 +3864,10 @@ theorem inferMatchCasesFuel_success_sound_of_bounded_statements_scoped
     rw [assumptionsEq]
     exact coveredCases _ caseMember child childMember owner scopes
   · intro childFuel statements childInitial childResult childContext
-      childBound childInvariant childSuccess childBelow childExtension
-      childIntegerSubset childLiteralToResult childRequirementSubset
-      childCovered
+      childBound childInvariant childSuccess _childReady _childReturnBelow
+      _childBindersBelow childBelow _childSubstitutionExtension
+      _childRawExtension childExtension childIntegerSubset
+      childLiteralToResult childRequirementSubset childCovered
     exact
       inferStatementsFuel_success_statementsHaveType_under_ambient_bounded_scoped_evidence_literals
         (fun s c => ActiveLocalContextInvariant s outer c)

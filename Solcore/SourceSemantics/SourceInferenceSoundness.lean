@@ -11221,6 +11221,7 @@ structure MatchPatternInferenceCertificate
     (pattern.applySubstitution outer) (outer.apply expected) binders rootArity
   binders_extend : BindersExtend source.owner semanticContext binders armContext
   pattern_invariant : ActiveLocalContextInvariant patternState outer armContext
+  pattern_below : patternState.LocalBindersBelowNextLocal
 
 /-- Algorithmic state facts used by the semantic dispatcher.  Keeping the two
 frontend theorems in one package lets the private branch helpers share a
@@ -13477,6 +13478,7 @@ theorem inferMatchPatternFuel_success_sound_of_flat
         }
         binders_extend := certificate.binders_extend
         pattern_invariant := certificate.invariant
+        pattern_below := certificate.below
       }⟩
 
 /-- Successful public pattern inference has a complete source-level semantic
@@ -14351,7 +14353,8 @@ theorem inferMatchCasesFuel_success_sound_at
                           (bodyResult.sawReturn && tail.allReturn)
                         rw [headAgreement.sawReturn_eq, tailAgreement]
 
-theorem inferMatchCasesFuel_success_sound_at_bounded
+theorem inferMatchCasesFuel_success_sound_at_bounded_with_extra
+    (extra : SourceSemantics.Context → Detail.BlockResult → Prop)
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {scrutineeType expectedReturn : TypeSystem.Ty}
     {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
@@ -14399,6 +14402,14 @@ theorem inferMatchCasesFuel_success_sound_at_bounded
       matchCase ∈ result.cases →
       ∀ requirement, requirement ∈ matchCase.pattern.requirements →
         PrimaryRequirementOccursAt source occurrence requirement)
+    (extraHead :
+      ∀ {arm : Syntax.MatchCase} {pattern : TypedMatchPattern}
+        {bodyResult : Detail.BlockResult} {binders : List TypedBinder}
+        {armContext : SourceSemantics.Context},
+        ({ span := arm.span, pattern, body := bodyResult.statements } :
+          TypedMatchCase) ∈ result.cases →
+        BindersExtend source.owner semanticContext binders armContext →
+        extra armContext bodyResult)
     (bodySound :
       ∀ {childFuel : Nat} {statements : List Syntax.Statement}
         {childInitial : Frontend.SourceInference.State}
@@ -14408,12 +14419,21 @@ theorem inferMatchCasesFuel_success_sound_at_bounded
         ActiveLocalContextInvariant childInitial outer childContext →
         Detail.inferStatementsFuel childFuel inferenceContext statements
             expectedReturn childInitial = .ok childResult →
+        childInitial.InferenceReady →
+        expectedReturn.VariablesBelow childInitial.inference.next →
+        childInitial.LocalBindersBelowNextLocal →
         childInitial.NodesBelowNextOccurrence →
+        outer.SemanticallyExtends childResult.state.inference.substitution →
+        TypingSourceExtends
+          (childResult.state.toTypedSource roots)
+          (result.state.toTypedSource roots) →
         TypingSourceExtends
           ((childResult.state.toTypedSource roots).applySubstitution outer)
           source →
         childResult.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        childResult.state.integerLiterals ⊆ result.state.integerLiterals →
         childResult.state.requirements ⊆ evidenceState.requirements →
+        extra childContext childResult →
           ∃ finalContext facts,
             ActiveLocalContextInvariant childResult.state outer finalContext ∧
             StatementsHaveType source control childContext
@@ -14503,6 +14523,15 @@ theorem inferMatchCasesFuel_success_sound_at_bounded
                         exact ((TypingSourceExtends.trans bodyToTailInput
                           tailInputSourceExtension).applySubstitution outer).trans
                             resultSourceExtension
+                      have bodyRawResultExtension : TypingSourceExtends
+                          (bodyResult.state.toTypedSource roots)
+                          (tail.state.toTypedSource roots) := by
+                        have bodyToTailInput : TypingSourceExtends
+                            (bodyResult.state.toTypedSource roots)
+                            (tailInput.toTypedSource roots) :=
+                          ⟨rfl, List.prefix_rfl⟩
+                        exact TypingSourceExtends.trans bodyToTailInput
+                          tailInputSourceExtension
                       have bodyIntegerPatternsSubset :
                           bodyResult.state.integerPatterns ⊆
                             evidenceState.integerPatterns :=
@@ -14512,6 +14541,14 @@ theorem inferMatchCasesFuel_success_sound_at_bounded
                             using
                               (Detail.inferMatchCasesFuel_integerPatterns_subset
                                 tailSuccess)) integerPatternsSubset
+                      have bodyIntegerLiteralsSubset :
+                          bodyResult.state.integerLiterals ⊆
+                            tail.state.integerLiterals := by
+                        simpa [tailInput,
+                          Frontend.SourceInference.State.restoreLexicalScope]
+                          using
+                            (Detail.inferMatchCasesFuel_integerLiterals_subset
+                              tailSuccess)
                       have bodyRequirementsSubset :
                           bodyResult.state.requirements ⊆
                             evidenceState.requirements :=
@@ -14586,19 +14623,44 @@ theorem inferMatchCasesFuel_success_sound_at_bounded
                           pattern
                           body := bodyResult.statements
                         } (by simp) requirement member
-                      obtain ⟨headCertificate⟩ :=
-                        inferMatchCaseFuel_success_sound_at validated catalog
-                          semanticSignaturesEq evidence ready scrutineeBelow
-                          below owner_eq semanticOwner scrutineeAdmissible
-                          initialInvariant outerPattern
+                      obtain ⟨patternCertificate⟩ :=
+                        inferMatchPatternFuel_success_sound_at validated
+                          catalog semanticSignaturesEq evidence ready
+                          scrutineeBelow below owner_eq semanticOwner
+                          scrutineeAdmissible initialInvariant outerPattern
                           patternIntegerPatternsSubset
                           patternRequirementsSubset patternRequirementsOccur
-                          (fun armInvariant armSuccess =>
-                            bodySound (Nat.lt_succ_self fuel) armInvariant
-                              armSuccess patternNodesBelow bodySourceExtension
-                                bodyIntegerPatternsSubset
-                                bodyRequirementsSubset)
-                          patternSuccess bodySuccess
+                          patternSuccess
+                      have headExtra : extra patternCertificate.armContext
+                          bodyResult :=
+                        extraHead (arm := arm) (pattern := pattern)
+                          (bodyResult := bodyResult)
+                          (binders := patternCertificate.binders)
+                          (armContext := patternCertificate.armContext)
+                          (by simp) patternCertificate.binders_extend
+                      obtain ⟨finalContext, headFacts, _bodyInvariant,
+                          headBodyTyping, headBodyAgreement⟩ :=
+                        bodySound (Nat.lt_succ_self fuel)
+                          patternCertificate.pattern_invariant bodySuccess
+                          patternProperties.2.1 returnAtPattern
+                          patternCertificate.pattern_below patternNodesBelow
+                          outerBody bodyRawResultExtension bodySourceExtension
+                          bodyIntegerPatternsSubset bodyIntegerLiteralsSubset
+                          bodyRequirementsSubset headExtra
+                      let headCertificate : MatchCaseInferenceCertificate
+                          source control semanticContext outer scrutineeType
+                          pattern patternState bodyResult := {
+                        binders := patternCertificate.binders
+                        rootArity := patternCertificate.rootArity
+                        armContext := patternCertificate.armContext
+                        finalContext
+                        facts := headFacts
+                        pattern_type := patternCertificate.pattern_type
+                        binders_extend := patternCertificate.binders_extend
+                        pattern_invariant := patternCertificate.pattern_invariant
+                        body_type := headBodyTyping
+                        body_matches := headBodyAgreement
+                      }
                       obtain ⟨headFacts, headTyping, headAgreement⟩ :=
                         headCertificate.toMatchCaseHasType
                           (arm := arm)
@@ -14654,14 +14716,26 @@ theorem inferMatchCasesFuel_success_sound_at_bounded
                           tailOwner tailInvariant tailScopeEq outerExtension
                           resultSourceExtension integerPatternsSubset
                           requirementsSubset tailRequirementsOccur
+                          (fun {arm} {pattern} {bodyResult} {binders}
+                            {armContext} member binderExtension =>
+                            extraHead (arm := arm) (pattern := pattern)
+                              (bodyResult := bodyResult) (binders := binders)
+                              (armContext := armContext)
+                              (by simp [member]) binderExtension)
                           (fun childBound childInvariant childSuccess
-                            childBelow childExtension childIntegerSubset
-                            childRequirementSubset =>
+                            childReady childReturnBelow childBindersBelow
+                            childBelow childSubstitutionExtension
+                            childRawExtension childExtension childIntegerSubset
+                            childLiteralSubset childRequirementSubset
+                            childExtra =>
                             bodySound
                               (Nat.lt_trans childBound (Nat.lt_succ_self fuel))
-                              childInvariant childSuccess childBelow
-                                childExtension childIntegerSubset
-                                childRequirementSubset)
+                              childInvariant childSuccess childReady
+                              childReturnBelow childBindersBelow childBelow
+                              childSubstitutionExtension childRawExtension
+                              childExtension childIntegerSubset
+                                childLiteralSubset childRequirementSubset
+                                childExtra)
                           tailSuccess
                       refine ⟨headFacts :: tailFacts, ?_, ?_⟩
                       · simpa only [List.map_cons] using
@@ -14670,6 +14744,100 @@ theorem inferMatchCasesFuel_success_sound_at_bounded
                             allBodiesSawReturn tailFacts) =
                           (bodyResult.sawReturn && tail.allReturn)
                         rw [headAgreement.sawReturn_eq, tailAgreement]
+
+/-! The historical bounded interface does not ask its caller for an arm
+certificate.  It is recovered as the trivial specialization of the stronger
+actual-arm core above. -/
+theorem inferMatchCasesFuel_success_sound_at_bounded
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {scrutineeType expectedReturn : TypeSystem.Ty}
+    {outerScope : LexicalScope} {cases : List Syntax.MatchCase}
+    {state : Frontend.SourceInference.State}
+    {result : Detail.MatchCasesResult}
+    {source : TypedSource} {control : ControlContext}
+    {outer : TypeSystem.Substitution}
+    {semanticContext : SourceSemantics.Context}
+    {evidenceState : Frontend.SourceInference.State} {occurrence : NodeId}
+    {roots : List NodeId}
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (functionsCanonical : ∀ signature ∈
+      inferenceContext.signatures.functions,
+      signature.scheme.body = .function
+        (TypeSystem.Ty.productMany signature.parameterTypes)
+        (TypeSystem.Ty.productMany signature.returnTypes))
+    (catalog : SignatureCatalogWellFormed semanticContext.signatures)
+    (semanticSignaturesEq :
+      semanticContext.signatures = inferenceContext.signatures)
+    (evidence : IntegerPatternEvidenceAt source semanticContext outer
+      evidenceState occurrence)
+    (ready : state.InferenceReady)
+    (scrutineeBelow :
+      scrutineeType.VariablesBelow state.inference.next)
+    (returnBelow : expectedReturn.VariablesBelow state.inference.next)
+    (below : state.LocalBindersBelowNextLocal)
+    (initialBelow : state.NodesBelowNextOccurrence)
+    (owner_eq : source.owner = state.owner)
+    (semanticOwner : semanticContext.currentDeclaration = some source.owner)
+    (scrutineeAdmissible :
+      TypeAdmissible semanticContext (outer.apply scrutineeType))
+    (initialInvariant :
+      ActiveLocalContextInvariant state outer semanticContext)
+    (scopeEq : state.lexicalScope = outerScope)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (resultSourceExtension : TypingSourceExtends
+      ((result.state.toTypedSource roots).applySubstitution outer) source)
+    (integerPatternsSubset :
+      result.state.integerPatterns ⊆ evidenceState.integerPatterns)
+    (requirementsSubset :
+      result.state.requirements ⊆ evidenceState.requirements)
+    (requirementsOccur : ∀ matchCase,
+      matchCase ∈ result.cases →
+      ∀ requirement, requirement ∈ matchCase.pattern.requirements →
+        PrimaryRequirementOccursAt source occurrence requirement)
+    (bodySound :
+      ∀ {childFuel : Nat} {statements : List Syntax.Statement}
+        {childInitial : Frontend.SourceInference.State}
+        {childResult : Detail.BlockResult}
+        {childContext : SourceSemantics.Context},
+        childFuel < fuel →
+        ActiveLocalContextInvariant childInitial outer childContext →
+        Detail.inferStatementsFuel childFuel inferenceContext statements
+            expectedReturn childInitial = .ok childResult →
+        childInitial.NodesBelowNextOccurrence →
+        TypingSourceExtends
+          ((childResult.state.toTypedSource roots).applySubstitution outer)
+          source →
+        childResult.state.integerPatterns ⊆ evidenceState.integerPatterns →
+        childResult.state.requirements ⊆ evidenceState.requirements →
+          ∃ finalContext facts,
+            ActiveLocalContextInvariant childResult.state outer finalContext ∧
+            StatementsHaveType source control childContext
+              childResult.statements finalContext facts ∧
+            BlockResultMatchesFactsAfterSubstitution outer childResult facts)
+    (success : Detail.inferMatchCasesFuel fuel inferenceContext scrutineeType
+      expectedReturn outerScope cases state = .ok result) :
+    ∃ caseFacts,
+      MatchCasesHaveType source control semanticContext
+        (outer.apply scrutineeType)
+        (result.cases.map (TypedMatchCase.applySubstitution outer)) caseFacts ∧
+      allBodiesSawReturn caseFacts = result.allReturn := by
+  apply inferMatchCasesFuel_success_sound_at_bounded_with_extra
+    (extra := fun _ _ => True) validated functionsCanonical catalog
+    semanticSignaturesEq evidence ready scrutineeBelow returnBelow below
+    initialBelow owner_eq semanticOwner scrutineeAdmissible initialInvariant
+    scopeEq outerExtension resultSourceExtension integerPatternsSubset
+    requirementsSubset requirementsOccur ?_ ?_ success
+  · intro arm pattern bodyResult binders armContext member extension
+    trivial
+  · intro childFuel statements childInitial childResult childContext
+      childBound childInvariant childSuccess _childReady _childReturnBelow
+      _childBindersBelow childBelow _childSubstitutionExtension
+      _childRawExtension childExtension childIntegerSubset
+      _childLiteralSubset childRequirementSubset _extra
+    exact bodySound childBound childInvariant childSuccess childBelow
+      childExtension childIntegerSubset childRequirementSubset
 
 /-- The deep default-free match theorem reconstructs every explicit arm and
 its control merge from pattern soundness, ordinary recursive statement-list
