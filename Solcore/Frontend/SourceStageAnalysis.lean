@@ -105,7 +105,9 @@ inductive Error where
   | unreachableNode (occurrence : OccurrenceId)
   deriving Repr, DecidableEq
 
-private abbrev Environment := List BinderStage
+/-- Proof-facing lexical table.  The soundness proof follows the analyzer's
+actual scope transitions; exposing this alias changes no runtime behavior. -/
+abbrev Environment := List BinderStage
 
 /-- Types whose values exist only at staged evaluation time in the current
 source language.  `comptime<T>` is structural; the arbitrary-precision
@@ -129,7 +131,14 @@ def directCallStage (node : ExpressionNode)
   else
     .deferred
 
-private structure Traversal where
+/-! The following executable helpers are public only through `Detail`, for
+the independent soundness proof.  Keeping them in one proof-facing namespace
+discourages callers from depending on traversal internals. -/
+namespace Detail
+
+/-- Proof-facing traversal state.  Its fields permit the independent staging
+soundness proof to state and preserve invariants through recursive calls. -/
+structure Traversal where
   active : List OccurrenceId := []
   visited : List OccurrenceId := []
   expressions : List ExpressionStage := []
@@ -139,18 +148,18 @@ private structure Traversal where
   immutable compile-time value by later consumers. -/
   mutableBinders : List Resolved.LocalId := []
 
-private def lookupEnvironment? (environment : Environment)
+def lookupEnvironment? (environment : Environment)
     (binder : Resolved.LocalId) : Option Stage :=
   (environment.find? fun entry => decide (entry.binder = binder)).map (·.stage)
 
-private def enterOccurrence (state : Traversal) (occurrence : OccurrenceId) :
+def enterOccurrence (state : Traversal) (occurrence : OccurrenceId) :
     Except Error Traversal :=
   if state.active.any fun active => decide (active = occurrence) then
     .error (.cycle occurrence)
   else
     .ok { state with active := occurrence :: state.active }
 
-private def leaveOccurrence (state : Traversal) (occurrence : OccurrenceId) :
+def leaveOccurrence (state : Traversal) (occurrence : OccurrenceId) :
     Except Error Traversal :=
   if state.visited.any fun visited => decide (visited = occurrence) then
     .error (.duplicateTraversal occurrence)
@@ -161,7 +170,7 @@ private def leaveOccurrence (state : Traversal) (occurrence : OccurrenceId) :
       visited := state.visited ++ [occurrence]
     }
 
-private def recordExpressionStage (state : Traversal)
+def recordExpressionStage (state : Traversal)
     (expression : ExpressionId) (stage : Stage) : Except Error Traversal :=
   match state.expressions.find? fun entry =>
       decide (entry.expression = expression) with
@@ -175,7 +184,7 @@ private def recordExpressionStage (state : Traversal)
       else
         .error (.conflictingExpressionStage expression previous.stage stage)
 
-private def registerBinder (owner : Resolved.DeclarationId)
+def registerBinder (owner : Resolved.DeclarationId)
     (environment : Environment) (state : Traversal)
     (binder : Resolved.LocalId) (stage : Stage) :
     Except Error (Environment × Traversal) := do
@@ -189,7 +198,7 @@ private def registerBinder (owner : Resolved.DeclarationId)
     state with binders := state.binders ++ [entry]
   })
 
-private def registerTypedBinders (owner : Resolved.DeclarationId)
+def registerTypedBinders (owner : Resolved.DeclarationId)
     (forceComptime : Bool) : List TypedBinder → Environment → Traversal →
       Except Error (Environment × Traversal)
   | [], environment, state => .ok (environment, state)
@@ -203,7 +212,7 @@ private def registerTypedBinders (owner : Resolved.DeclarationId)
         registerBinder owner environment state binder.id stage
       registerTypedBinders owner forceComptime rest environment state
 
-private def validateNodeTable (owner : Resolved.DeclarationId) :
+def validateNodeTable (owner : Resolved.DeclarationId) :
     List OccurrenceId → List Node → Except Error Unit
   | _, [] => .ok ()
   | seen, node :: rest => do
@@ -214,14 +223,14 @@ private def validateNodeTable (owner : Resolved.DeclarationId) :
         throw (.duplicateOccurrence occurrence)
       validateNodeTable owner (occurrence :: seen) rest
 
-private def validateOccurrenceOwner (source : TypedSource)
+def validateOccurrenceOwner (source : TypedSource)
     (occurrence : OccurrenceId) : Except Error Unit :=
   if occurrence.owner = source.owner then
     .ok ()
   else
     .error (.nodeOwnerMismatch source.owner occurrence)
 
-private def lookupExpression (source : TypedSource) (id : ExpressionId) :
+def lookupExpression (source : TypedSource) (id : ExpressionId) :
     Except Error ExpressionNode := do
   validateOccurrenceOwner source id.occurrence
   match source.lookupNode? id.occurrence with
@@ -229,7 +238,7 @@ private def lookupExpression (source : TypedSource) (id : ExpressionId) :
   | some (.statement _) => throw (.expectedExpressionNode id.occurrence)
   | some (.expression node) => pure node
 
-private def lookupStatement (source : TypedSource) (id : StatementId) :
+def lookupStatement (source : TypedSource) (id : StatementId) :
     Except Error StatementNode := do
   validateOccurrenceOwner source id.occurrence
   match source.lookupNode? id.occurrence with
@@ -237,7 +246,7 @@ private def lookupStatement (source : TypedSource) (id : StatementId) :
   | some (.expression _) => throw (.expectedStatementNode id.occurrence)
   | some (.statement node) => pure node
 
-private def analyzeExpressionListWith
+def analyzeExpressionListWith
     (analyze : Traversal → ExpressionId →
       Except Error (Stage × Traversal)) :
     List ExpressionId → Traversal → Except Error (List Stage × Traversal)
@@ -247,7 +256,7 @@ private def analyzeExpressionListWith
       let (stages, state) ← analyzeExpressionListWith analyze rest state
       pure (stage :: stages, state)
 
-private def analyzeStatementListWith
+def analyzeStatementListWith
     (analyze : Environment → Traversal → StatementId →
       Except Error (Environment × Traversal)) :
     List StatementId → Environment → Traversal →
@@ -257,19 +266,19 @@ private def analyzeStatementListWith
       let (environment, state) ← analyze environment state statement
       analyzeStatementListWith analyze rest environment state
 
-private def bindersInPatternInstruction :
+def bindersInPatternInstruction :
     MatchPatternInstruction → List TypedBinder
   | .binder binder => [binder]
   | _ => []
 
-private def bindersInPatternResolution :
+def bindersInPatternResolution :
     MatchPatternResolution → List TypedBinder
   | .binder binder => [binder]
   | .constructor _ instructions
   | .tuple instructions => instructions.flatMap bindersInPatternInstruction
   | _ => []
 
-private def registerPatternBinders (owner : Resolved.DeclarationId)
+def registerPatternBinders (owner : Resolved.DeclarationId)
     (stage : Stage) : List TypedBinder → Environment → Traversal →
       Except Error (Environment × Traversal)
   | [], environment, state => pure (environment, state)
@@ -278,13 +287,13 @@ private def registerPatternBinders (owner : Resolved.DeclarationId)
         registerBinder owner environment state binder.id stage
       registerPatternBinders owner stage binders environment state
 
-private def mutableBindersInForItem : ForItemForm → List Resolved.LocalId
+def mutableBindersInForItem : ForItemForm → List Resolved.LocalId
   | .assignValue assignment _ _
   | .assignBitNot assignment => [assignment.target.root]
   | .letDecl _ _
   | .expression _ => []
 
-private def mutableBindersInNode : Node → List Resolved.LocalId
+def mutableBindersInNode : Node → List Resolved.LocalId
   | .statement { form := .assignValue assignment _ _, .. }
   | .statement { form := .assignBitNot assignment, .. } =>
       [assignment.target.root]
@@ -292,9 +301,233 @@ private def mutableBindersInNode : Node → List Resolved.LocalId
       (initializer ++ post).flatMap mutableBindersInForItem
   | _ => []
 
+/-- Evaluate the index occurrences of one place in projection order.  The
+helper exposes the same fold used by assignment analysis to the soundness
+proof. -/
+def analyzePlaceProjectionsWith
+    (analyzeExpression : Traversal → ExpressionId →
+      Except Error (Stage × Traversal)) :
+    List PlaceProjection → Traversal → Except Error Traversal
+  | [], state => pure state
+  | .member _ _ :: rest, state =>
+      analyzePlaceProjectionsWith analyzeExpression rest state
+  | .index key :: rest, state => do
+      let (_, state) ← analyzeExpression state key
+      analyzePlaceProjectionsWith analyzeExpression rest state
+
+/-- Source-ordered match-arm traversal, factored out so stage soundness can
+induct on the arm list without changing the classifier's execution. -/
+def analyzeMatchCasesWith (owner : Resolved.DeclarationId)
+    (scrutineeStage : Stage)
+    (analyzeStatements : List StatementId → Environment → Traversal →
+      Except Error (Environment × Traversal)) :
+    List TypedMatchCase → Environment → Traversal → Except Error Traversal
+  | [], _, state => pure state
+  | arm :: arms, environment, state => do
+      let (armEnvironment, state) ← registerPatternBinders owner scrutineeStage
+        (bindersInPatternResolution arm.pattern.resolution) environment state
+      let (_, state) ← analyzeStatements arm.body armEnvironment state
+      analyzeMatchCasesWith owner scrutineeStage analyzeStatements arms
+        environment state
+
+/-- Analyze an optional branch body while discarding its branch-local scope. -/
+def analyzeOptionalStatementsWith
+    (analyzeStatement : Environment → Traversal → StatementId →
+      Except Error (Environment × Traversal))
+    (body : Option (List StatementId)) (environment : Environment)
+    (state : Traversal) : Except Error Traversal :=
+  match body with
+  | none => pure state
+  | some body => do
+      let (_, state) ← analyzeStatementListWith analyzeStatement body
+        environment state
+      pure state
+
+/-- Source-ordered `for` header traversal, factored out so stage soundness can
+induct on the item list without changing the classifier's execution. -/
+def analyzeForItemWith (source : TypedSource)
+    (analyzeExpression : Environment → Traversal → ExpressionId →
+      Except Error (Stage × Traversal))
+    (item : ForItemForm) (environment : Environment) (state : Traversal) :
+    Except Error (Environment × Traversal) :=
+  let analyzeItemExpression := analyzeExpression environment
+  match item with
+  | .letDecl binder initializer => do
+      let (stage, state) ← match initializer with
+        | none => pure (.deferred, state)
+        | some value => analyzeItemExpression state value
+      registerBinder source.owner environment state binder.id stage
+  | .expression value => do
+      let (_, state) ← analyzeItemExpression state value
+      pure (environment, state)
+  | .assignValue assignment _ value => do
+      let state ← analyzePlaceProjectionsWith analyzeItemExpression
+        assignment.target.projections state
+      let (_, state) ← analyzeItemExpression state value
+      pure (environment, state)
+  | .assignBitNot assignment => do
+      let state ← analyzePlaceProjectionsWith analyzeItemExpression
+        assignment.target.projections state
+      pure (environment, state)
+
+/-- Iterate the proof-facing one-item traversal in source order. -/
+def analyzeForItemsWith (source : TypedSource)
+    (analyzeExpression : Environment → Traversal → ExpressionId →
+      Except Error (Stage × Traversal)) :
+    List ForItemForm → Environment → Traversal →
+      Except Error (Environment × Traversal)
+  | [], environment, state => pure (environment, state)
+  | item :: rest, environment, state => do
+      let (environment, state) ← analyzeForItemWith source analyzeExpression item
+        environment state
+      analyzeForItemsWith source analyzeExpression rest environment state
+
+/-- The expression-form decision, separated from occurrence bookkeeping for
+the proof that every successful decision satisfies declarative staging. -/
+def analyzeExpressionFormWith (source : TypedSource) (expression : ExpressionId)
+    (node : ExpressionNode)
+    (environment : Environment) (state : Traversal)
+    (analyzeExpression : Traversal → ExpressionId → Except Error (Stage × Traversal))
+    (analyzeStatement : Environment → Traversal → StatementId →
+      Except Error (Environment × Traversal)) :
+    Except Error (Stage × Traversal) :=
+  match node.form with
+  | .literal _
+  | .integerLiteral _ _ =>
+      pure (.comptime, state)
+  | .reference _ (.builtinBoolean _) =>
+      pure (.comptime, state)
+  | .reference _ (.local binder) =>
+      if binder.owner != source.owner then
+        throw (.binderOwnerMismatch source.owner binder)
+      else
+        match lookupEnvironment? environment binder with
+        | some stage => pure (stage, state)
+        | none => throw (.unknownLocal expression binder)
+  | .reference _ (.declaration _)
+  | .reference _ (.builtinFunction _) =>
+      pure (.deferred, state)
+  | .group inner
+  | .unary _ inner =>
+      analyzeExpression state inner
+  | .tuple elements => do
+      let (stages, state) ←
+        analyzeExpressionListWith analyzeExpression elements state
+      pure (Stage.join stages, state)
+  | .binary left _ right => do
+      let (leftStage, state) ← analyzeExpression state left
+      let (rightStage, state) ← analyzeExpression state right
+      pure (Stage.join [leftStage, rightStage], state)
+  | .conditional condition thenBranch elseBranch => do
+      let (conditionStage, state) ← analyzeExpression state condition
+      let (thenStage, state) ← analyzeExpression state thenBranch
+      let (elseStage, state) ← analyzeExpression state elseBranch
+      pure (Stage.join [conditionStage, thenStage, elseStage], state)
+  | .lambda parameters _ body => do
+      let (lambdaEnvironment, state) ←
+        registerTypedBinders source.owner false parameters environment state
+      let (_, state) ← analyzeStatementListWith analyzeStatement body
+        lambdaEnvironment state
+      pure (.deferred, state)
+  | .call callee arguments resolution => do
+      let (_, state) ← analyzeExpression state callee
+      let (argumentStages, state) ←
+        analyzeExpressionListWith analyzeExpression arguments state
+      let stage := match resolution with
+        | .declaration instantiation =>
+            directCallStage node instantiation argumentStages
+        | .indirect _
+        | .builtinFunction _ => Stage.deferred
+      pure (stage, state)
+  | .constructor _ arguments => do
+      let (_, state) ←
+        analyzeExpressionListWith analyzeExpression arguments state
+      pure (.deferred, state)
+  | .member base _ _ => do
+      let (_, state) ← analyzeExpression state base
+      pure (.deferred, state)
+  | .proxy _ =>
+      pure (.deferred, state)
+  | .index base index => do
+      let (_, state) ← analyzeExpression state base
+      let (_, state) ← analyzeExpression state index
+      pure (.deferred, state)
+
+/-- The statement-form decision, separated from occurrence bookkeeping for
+the proof that successful lexical transitions satisfy declarative staging. -/
+def analyzeStatementFormWith (source : TypedSource) (node : StatementNode)
+    (environment : Environment) (state : Traversal)
+    (analyzeExpression : Environment → Traversal → ExpressionId →
+      Except Error (Stage × Traversal))
+    (analyzeStatement : Environment → Traversal → StatementId →
+      Except Error (Environment × Traversal)) :
+    Except Error (Environment × Traversal) :=
+  let analyzeItemExpression := analyzeExpression environment
+  match node.form with
+  | .letDecl binder initializer => do
+      let (stage, state) ← match initializer with
+        | none => pure (Stage.deferred, state)
+        | some initializer => analyzeItemExpression state initializer
+      registerBinder source.owner environment state binder.id stage
+  | .returnStmt value => do
+      let state ← match value with
+        | none => pure state
+        | some value => (analyzeItemExpression state value).map (·.2)
+      pure (environment, state)
+  | .expression expression _ => do
+      let (_, state) ← analyzeItemExpression state expression
+      pure (environment, state)
+  | .assignValue assignment _ value => do
+      let state ← analyzePlaceProjectionsWith analyzeItemExpression
+        assignment.target.projections state
+      let (_, state) ← analyzeItemExpression state value
+      pure (environment, state)
+  | .assignBitNot assignment => do
+      let state ← analyzePlaceProjectionsWith analyzeItemExpression
+        assignment.target.projections state
+      pure (environment, state)
+  | .ifThen condition thenBody elseBody => do
+      let (_, state) ← analyzeItemExpression state condition
+      let (_, state) ← analyzeStatementListWith analyzeStatement thenBody
+        environment state
+      let state ← analyzeOptionalStatementsWith analyzeStatement elseBody
+        environment state
+      pure (environment, state)
+  | .block body => do
+      let (_, state) ← analyzeStatementListWith analyzeStatement body
+        environment state
+      pure (environment, state)
+  | .matchWith resolution => do
+      let (scrutineeStage, state) ←
+        analyzeItemExpression state resolution.scrutinee
+      let (_, state) ← registerBinder source.owner environment state
+        resolution.hiddenScrutinee scrutineeStage
+      let state ← analyzeMatchCasesWith source.owner scrutineeStage
+        (analyzeStatementListWith analyzeStatement) resolution.cases
+        environment state
+      let state ← analyzeOptionalStatementsWith analyzeStatement
+        resolution.defaultBody environment state
+      pure (environment, state)
+  | .forLoop initializer condition post body => do
+      let (loopEnvironment, state) ← analyzeForItemsWith source
+        analyzeExpression initializer environment state
+      let (_, state) ← analyzeExpression loopEnvironment state condition
+      let (_, state) ← analyzeStatementListWith analyzeStatement body
+        loopEnvironment state
+      let (_, state) ← analyzeForItemsWith source analyzeExpression post
+        loopEnvironment state
+      pure (environment, state)
+  | .whileLoop condition body => do
+      let (_, state) ← analyzeItemExpression state condition
+      let (_, state) ← analyzeStatementListWith analyzeStatement body
+        environment state
+      pure (environment, state)
+  | .breakStmt
+  | .continueStmt => pure (environment, state)
+
 mutual
 
-  private def analyzeExpressionFuel (source : TypedSource) :
+  def analyzeExpressionFuel (source : TypedSource) :
       Nat → Environment → Traversal → ExpressionId →
         Except Error (Stage × Traversal)
     | 0, _, _, expression => .error (.depthLimit expression.occurrence)
@@ -302,208 +535,28 @@ mutual
         let state ← enterOccurrence state expression.occurrence
         let node ← lookupExpression source expression
         let recurse := analyzeExpressionFuel source fuel environment
-        let (stage, state) ← match node.form with
-          | .literal _
-          | .integerLiteral _ _ =>
-              pure (.comptime, state)
-          | .reference _ (.builtinBoolean _) =>
-              pure (.comptime, state)
-          | .reference _ (.local binder) =>
-              if binder.owner != source.owner then
-                throw (.binderOwnerMismatch source.owner binder)
-              else
-                match lookupEnvironment? environment binder with
-                | some stage => pure (stage, state)
-                | none => throw (.unknownLocal expression binder)
-          | .reference _ (.declaration _)
-          | .reference _ (.builtinFunction _) =>
-              pure (.deferred, state)
-          | .group inner
-          | .unary _ inner =>
-              recurse state inner
-          | .tuple elements => do
-              let (stages, state) ←
-                analyzeExpressionListWith recurse elements state
-              pure (Stage.join stages, state)
-          | .binary left _ right => do
-              let (leftStage, state) ← recurse state left
-              let (rightStage, state) ← recurse state right
-              pure (Stage.join [leftStage, rightStage], state)
-          | .conditional condition thenBranch elseBranch => do
-              let (conditionStage, state) ← recurse state condition
-              let (thenStage, state) ← recurse state thenBranch
-              let (elseStage, state) ← recurse state elseBranch
-              pure (Stage.join [conditionStage, thenStage, elseStage], state)
-          | .lambda parameters _ body => do
-              let (lambdaEnvironment, state) ←
-                registerTypedBinders source.owner false parameters environment state
-              let (_, state) ← analyzeStatementListWith
-                (analyzeStatementFuel source fuel) body lambdaEnvironment state
-              pure (.deferred, state)
-          | .call callee arguments resolution => do
-              let (_, state) ← recurse state callee
-              let (argumentStages, state) ←
-                analyzeExpressionListWith recurse arguments state
-              let stage := match resolution with
-                | .declaration instantiation =>
-                    directCallStage node instantiation argumentStages
-                | .indirect _
-                | .builtinFunction _ => Stage.deferred
-              pure (stage, state)
-          | .constructor _ arguments => do
-              let (_, state) ←
-                analyzeExpressionListWith recurse arguments state
-              pure (.deferred, state)
-          | .member base _ _ => do
-              let (_, state) ← recurse state base
-              pure (.deferred, state)
-          | .proxy _ =>
-              pure (.deferred, state)
-          | .index base index => do
-              let (_, state) ← recurse state base
-              let (_, state) ← recurse state index
-              pure (.deferred, state)
+        let (stage, state) ← analyzeExpressionFormWith source expression node
+          environment state recurse (analyzeStatementFuel source fuel)
         let state ← recordExpressionStage state expression stage
         let state ← leaveOccurrence state expression.occurrence
         pure (stage, state)
 
-  private def analyzeStatementFuel (source : TypedSource) :
+  def analyzeStatementFuel (source : TypedSource) :
       Nat → Environment → Traversal → StatementId →
         Except Error (Environment × Traversal)
     | 0, _, _, statement => .error (.depthLimit statement.occurrence)
     | fuel + 1, environment, state, statement => do
         let state ← enterOccurrence state statement.occurrence
         let node ← lookupStatement source statement
-        let analyzeExpression := analyzeExpressionFuel source fuel environment
-        let (environment, state) ← match node.form with
-          | .letDecl binder initializer => do
-              let (stage, state) ← match initializer with
-                | none => pure (Stage.deferred, state)
-                | some initializer => analyzeExpression state initializer
-              registerBinder source.owner environment state binder.id stage
-          | .returnStmt value => do
-              let state ← match value with
-                | none => pure state
-                | some value => (analyzeExpression state value).map (·.2)
-              pure (environment, state)
-          | .expression expression _ => do
-              let (_, state) ← analyzeExpression state expression
-              pure (environment, state)
-          | .assignValue assignment _ value => do
-              let state ← assignment.target.projections.foldlM
-                (fun state projection => match projection with
-                  | .index key => (analyzeExpression state key).map (fun result => result.2)
-                  | .member _ _ => pure state) state
-              let (_, state) ← analyzeExpression state value
-              pure (environment, state)
-          | .assignBitNot assignment => do
-              let state ← assignment.target.projections.foldlM
-                (fun state projection => match projection with
-                  | .index key => (analyzeExpression state key).map (fun result => result.2)
-                  | .member _ _ => pure state) state
-              pure (environment, state)
-          | .ifThen condition thenBody elseBody => do
-              let (_, state) ← analyzeExpression state condition
-              let (_, state) ← analyzeStatementListWith
-                (analyzeStatementFuel source fuel) thenBody environment state
-              let state ← match elseBody with
-                | none => pure state
-                | some body => do
-                    let (_, state) ← analyzeStatementListWith
-                      (analyzeStatementFuel source fuel) body environment state
-                    pure state
-              pure (environment, state)
-          | .block body => do
-              let (_, state) ← analyzeStatementListWith
-                (analyzeStatementFuel source fuel) body environment state
-              pure (environment, state)
-          | .matchWith resolution => do
-              let (scrutineeStage, state) ←
-                analyzeExpression state resolution.scrutinee
-              let (_, state) ←
-                registerBinder source.owner environment state
-                resolution.hiddenScrutinee scrutineeStage
-              let rec analyzeCases : List TypedMatchCase → Traversal →
-                  Except Error Traversal
-                | [], state => pure state
-                | arm :: arms, state => do
-                    let (armEnvironment, state) ← registerPatternBinders
-                      source.owner scrutineeStage
-                      (bindersInPatternResolution arm.pattern.resolution)
-                      environment state
-                    let (_, state) ← analyzeStatementListWith
-                      (analyzeStatementFuel source fuel) arm.body armEnvironment
-                        state
-                    analyzeCases arms state
-              let state ← analyzeCases resolution.cases state
-              let state ← match resolution.defaultBody with
-                | none => pure state
-                | some body => do
-                    let (_, state) ← analyzeStatementListWith
-                      (analyzeStatementFuel source fuel) body environment state
-                    pure state
-              pure (environment, state)
-          | .forLoop initializer condition post body => do
-              let rec analyzeItems :
-                  List ForItemForm → Environment → Traversal →
-                    Except Error (Environment × Traversal)
-                | [], itemEnvironment, itemState =>
-                    pure (itemEnvironment, itemState)
-                | item :: rest, itemEnvironment, itemState => do
-                    let analyzeItemExpression :=
-                      analyzeExpressionFuel source fuel itemEnvironment
-                    let (itemEnvironment, itemState) ← match item with
-                      | .letDecl itemBinder initializer => do
-                          let (stage, itemState) ← match initializer with
-                            | none => pure (.deferred, itemState)
-                            | some value =>
-                                analyzeItemExpression itemState value
-                          registerBinder source.owner itemEnvironment itemState
-                            itemBinder.id stage
-                      | .expression value => do
-                          let (_, itemState) ←
-                            analyzeItemExpression itemState value
-                          pure (itemEnvironment, itemState)
-                      | .assignValue assignment _ value => do
-                          let itemState ← assignment.target.projections.foldlM
-                            (fun itemState projection => match projection with
-                              | .index key =>
-                                  (analyzeItemExpression itemState key).map
-                                    (fun result => result.2)
-                              | .member _ _ => pure itemState) itemState
-                          let (_, itemState) ←
-                            analyzeItemExpression itemState value
-                          pure (itemEnvironment, itemState)
-                      | .assignBitNot assignment => do
-                          let itemState ← assignment.target.projections.foldlM
-                            (fun itemState projection => match projection with
-                              | .index key =>
-                                  (analyzeItemExpression itemState key).map
-                                    (fun result => result.2)
-                              | .member _ _ => pure itemState) itemState
-                          pure (itemEnvironment, itemState)
-                    analyzeItems rest itemEnvironment itemState
-              let (loopEnvironment, state) ←
-                analyzeItems initializer environment state
-              let (_, state) ←
-                analyzeExpressionFuel source fuel loopEnvironment state condition
-              let (_, state) ← analyzeStatementListWith
-                (analyzeStatementFuel source fuel) body loopEnvironment state
-              let (_, state) ← analyzeItems post loopEnvironment state
-              pure (environment, state)
-          | .whileLoop condition body => do
-              let (_, state) ← analyzeExpression state condition
-              let (_, state) ← analyzeStatementListWith
-                (analyzeStatementFuel source fuel) body environment state
-              pure (environment, state)
-          | .breakStmt
-          | .continueStmt => pure (environment, state)
+        let (environment, state) ← analyzeStatementFormWith source node
+          environment state (analyzeExpressionFuel source fuel)
+          (analyzeStatementFuel source fuel)
         let state ← leaveOccurrence state statement.occurrence
         pure (environment, state)
 
 end
 
-private def analyzeRoots (source : TypedSource) (fuel : Nat) :
+def analyzeRoots (source : TypedSource) (fuel : Nat) :
     List NodeId → Environment → Traversal →
       Except Error (Environment × Traversal)
   | [], environment, state => .ok (environment, state)
@@ -515,13 +568,17 @@ private def analyzeRoots (source : TypedSource) (fuel : Nat) :
         analyzeStatementFuel source fuel environment state statement
       analyzeRoots source fuel rest environment state
 
-private def firstUnvisited? (state : Traversal) : List Node → Option OccurrenceId
+def firstUnvisited? (state : Traversal) : List Node → Option OccurrenceId
   | [] => none
   | node :: rest =>
       if state.visited.any fun visited => decide (visited = node.occurrenceId) then
         firstUnvisited? state rest
       else
         some node.occurrenceId
+
+end Detail
+
+open Detail
 
 /-- Classify every reachable expression and lexical binder in a checked
 function.  The traversal follows roots and lexical statement order rather than
