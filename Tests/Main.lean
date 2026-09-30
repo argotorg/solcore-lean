@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreDataPlacePaths
 import Solcore.Test.SourceCoreGenericMatch
 import Solcore.Test.SourceCoreGenericHeap
 import Solcore
@@ -2524,6 +2525,7 @@ def run : IO Unit := do
   SourceCoreLocalEvidence.run
   SourceCoreLocalPolymorphicExecution.run
   SourceCoreDataPlaceMappingProofs.run
+  SourceCoreDataPlacePaths.run
   SourceCoreForLoopStatementCertificates.run
   SourceCoreLoopStatementMeaning.run
   SourceCoreLoopFiniteComposition.run
