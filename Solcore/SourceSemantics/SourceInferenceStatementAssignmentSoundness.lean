@@ -1161,4 +1161,32 @@ theorem inferAssignedValueFuel_success_value_provenance
       | bitXor => exact finishNonEqual success
       | bitOr => exact finishNonEqual success
 
+/-- The assignment's final type refinement changes no place projection
+edges.  Every indexed key of the actual inferred place is still a direct
+child of the recorded assignment statement. -/
+theorem inferAssignedValueFuel_success_target_references_eq
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {targetExpression value : Syntax.Expr}
+    {operator : Syntax.ValueAssignOp}
+    {initial placeState final : Frontend.SourceInference.State}
+    {place : PlaceResolution}
+    {assignment : AssignmentResolution}
+    {inferredValue : InferredExpression}
+    (placeSuccess : Detail.inferPlaceFuel fuel inferenceContext
+      targetExpression initial = .ok (place, placeState))
+    (success : Detail.inferAssignedValueFuel fuel inferenceContext
+      targetExpression operator value initial =
+        .ok (assignment, inferredValue, final)) :
+    assignment.target.references = place.references := by
+  unfold Detail.inferAssignedValueFuel at success
+  simp only [placeSuccess, bind, Except.bind] at success
+  cases operator <;>
+    simp only [pure, Pure.pure, Except.pure] at success <;>
+    repeat' (split at success) <;>
+    simp_all [PlaceResolution.references]
+  all_goals
+    rcases success with ⟨assignmentEq, _, _⟩
+    subst assignment
+    rfl
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
