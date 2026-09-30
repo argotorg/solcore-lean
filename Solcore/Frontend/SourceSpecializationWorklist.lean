@@ -281,12 +281,16 @@ private def hasOpenDeclarationInstantiation (node : ExpressionNode) : Bool :=
       !(declarationInstantiationVariables instantiation).isEmpty
   | none => false
 
-private structure LocalLambdaBinding where
+/-- A generalized ordinary let whose initializer is directly a lambda.
+Stable binder and expression identities are retained from typed source. -/
+structure LocalLambdaBinding where
   binder : TypedBinder
   initializer : ExpressionId
   deriving Repr, BEq, DecidableEq
 
-private structure LocalLambdaInstance where
+/-- One reachable local template context. Equality includes the entire
+cumulative flexible substitution, not only the lambda's resulting type. -/
+structure LocalLambdaInstance where
   binding : LocalLambdaBinding
   substitution : Substitution
   deriving Repr, BEq, DecidableEq
@@ -872,6 +876,32 @@ private def validateOpenDeclarationsCovered (source : TypedSource)
     | .statement _ => pure ()
   validateReachableOpenDeclarations source bindings instances
 
+/-- Expose the same ordered local-template contexts used by declaration-edge
+discovery. Exact binding/substitution duplicates are retained once, in first
+discovery order. The optional fuel is a diagnostic override of the existing
+compile-time context closure; normal planning uses the unchanged derived bound.
+Success validates the existing open-declaration policy, not runtime semantics
+or completeness of specialization for a wider source language. -/
+def localLambdaInstances (source : TypedSource) (contextFuel : Option Nat := none) :
+    Except Error (List LocalLambdaInstance) := do
+  let bindings := directPolymorphicLambdaBindings source
+  let initialInstances ← rootLocalLambdaInstances source bindings
+  let instances ← match contextFuel with
+    | none => closeLocalLambdaInstances source bindings initialInstances
+    | some fuel =>
+        closeLocalLambdaInstancesAux source bindings initialInstances initialInstances fuel
+  validateOpenDeclarationsCovered source bindings instances
+  pure instances
+
+/-- Original typed nodes in one lambda's direct lexical body, in source-node
+order. Nested generalized lambdas remain boundaries, as in edge discovery.
+Metadata is retained before the instance's cumulative substitution is applied. -/
+def localLambdaBodyNodes (source : TypedSource) (localInstance : LocalLambdaInstance) :
+    Except Error (List Node) := do
+  let ids ← localLambdaBodyNodeIds source (directPolymorphicLambdaBindings source)
+    localInstance.binding
+  pure (selectedNodes ids source.nodes)
+
 private def collectInstantiatedReferences (program : CheckedProgram)
     (caller : SourceSpecialization.SpecializationKey)
     (source : TypedSource) (bindings : List LocalLambdaBinding) :
@@ -899,9 +929,7 @@ private def collectAllReferences (program : CheckedProgram)
   let (requests, calls, references) ←
     collectReferences program caller source directCallees source.nodes
   let bindings := directPolymorphicLambdaBindings source
-  let initialInstances ← rootLocalLambdaInstances source bindings
-  let instances ← closeLocalLambdaInstances source bindings initialInstances
-  validateOpenDeclarationsCovered source bindings instances
+  let instances ← localLambdaInstances source
   let (instantiatedRequests, instantiatedCalls, instantiatedReferences) ←
     collectInstantiatedReferences program caller source bindings instances
   pure (requests ++ instantiatedRequests,
@@ -972,7 +1000,9 @@ private def firstDuplicatePlanSpecialization :
       else
         some (specialized.key, duplicates.length + 1)
 
-private def validatePlanSpecializationsUnique (plan : Plan) :
+/-- Reject the first duplicate specialization key in plan order. Shared by
+plan extension and evaluator-independent local-instance catalog preparation. -/
+def validatePlanSpecializationsUnique (plan : Plan) :
     Except Error Unit :=
   match firstDuplicatePlanSpecialization plan.specializations with
   | none => pure ()
