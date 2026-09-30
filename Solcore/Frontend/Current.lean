@@ -42,5 +42,6 @@ import Solcore.Frontend.SourceCoreGeneralEntry
 import Solcore.Frontend.SourceCoreGeneralFunctions
 import Solcore.Frontend.SourceCorePlanCatalog
 import Solcore.Frontend.SourceCoreDataValues
+import Solcore.Frontend.SourceCoreSession
 
 /-! Current whole-program source pipeline and preservation results. -/
