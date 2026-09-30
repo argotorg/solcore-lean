@@ -1,6 +1,6 @@
 import Solcore.Frontend.SourceCoreFaultSites
 
-/-! Metadata for absent Word assignment operands. Header items lack their own
+/-! Metadata for absent Word/Integer assignment operands. Header items lack their own
 occurrence and span, so they use the owning for statement. Repeated items with
 the same site, binder and kind share a diagnostic. Reasons never wrap. -/
 
@@ -21,6 +21,8 @@ structure Site where
   kind : Kind
   span : Syntax.SourceSpan
   reason : Core.Word
+  /-- Successful RHS values match this checked scalar assignment target type. -/
+  rhsType : TypeSystem.Ty := .word
   deriving Repr, DecidableEq
 
 structure Table where
@@ -34,7 +36,7 @@ inductive Error where
 
 def Site.diagnostic (site : Site) : SourceCoreFaultSites.Diagnostic := {
   error := match site.kind with
-    | .value operator => .invalidAssignmentOperands operator none (some .word)
+    | .value operator => .invalidAssignmentOperands operator none (some site.rhsType)
     | .bitNot => .invalidUnaryOperand .bitNot none
   site := site.site
   span := some site.span
@@ -60,14 +62,14 @@ private def add (owner : Resolved.DeclarationId) (firstReason : Nat) (sites : Li
     (assignment : AssignmentResolution) (kind : Kind) : Except Error (List Site) := do
   if assignment.target.root.owner ≠ owner then
     throw (.ownerMismatch owner assignment.target.root.owner)
-  if assignment.target.type ≠ .word then return sites
+  if assignment.target.type ≠ .word ∧ assignment.target.type ≠ .integer then return sites
   if sites.any (fun site => decide
       (site.site = location ∧ site.binder = assignment.target.root ∧ site.kind = kind)) then
     return sites
   let reason ← match Core.Word.ofNat? (firstReason + sites.length) with
     | some reason => pure reason
     | none => .error .reasonSpaceExhausted
-  pure (sites ++ [{ site := location, binder := assignment.target.root, kind, span, reason }])
+  pure (sites ++ [{ site := location, binder := assignment.target.root, kind, span, reason, rhsType := assignment.target.type }])
 
 private def addItem (owner : Resolved.DeclarationId) (firstReason : Nat)
     (location : SourceCoreElaboration.ErrorSite) (span : Syntax.SourceSpan) :

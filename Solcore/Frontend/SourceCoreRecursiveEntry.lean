@@ -41,7 +41,7 @@ structure Function where
   signature : Signature
   inputs : List Input
   sourceResultType : TypeSystem.Ty
-  resultProjection : SourceCoreElaboration.lowerType (.declaration signature.key.declaration)
+  resultProjection : SourceCoreScalar.lowerType (.declaration signature.key.declaration)
     sourceResultType = .ok signature.resultType
   deriving Repr
 
@@ -55,10 +55,10 @@ private def prepareFunction (specialized : SourceSpecialization.SpecializedFunct
     | .function parameter result => pure (parameter, result)
     | _ => .error (.entry (.invalidFunctionType key))
   if sourceResultType ≠ function.inferredBodyType then throw (.entry (.resultMetadataMismatch key))
-  let parameterType ← (SourceCoreBasic.projectType (.declaration key.declaration) sourceParameterType).mapError Error.lowering
-  let projected ← match projection : SourceCoreElaboration.lowerType (.declaration key.declaration) sourceResultType with
+  let parameterType ← (SourceCoreScalar.lowerType (.declaration key.declaration) sourceParameterType).mapError (Error.lowering ∘ SourceCoreBasic.Error.typeProjection)
+  let projected ← match projection : SourceCoreScalar.lowerType (.declaration key.declaration) sourceResultType with
     | .ok resultType => pure (⟨resultType, projection⟩ : { resultType : Core.Ty //
-        SourceCoreElaboration.lowerType (.declaration key.declaration) sourceResultType = .ok resultType })
+        SourceCoreScalar.lowerType (.declaration key.declaration) sourceResultType = .ok resultType })
     | .error error => .error (.lowering (.typeProjection error))
   let inputs ← (SourceCoreBasicEntry.prepareInputs function.typedBody).mapError Error.entry
   for input in inputs do

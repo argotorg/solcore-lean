@@ -224,21 +224,21 @@ private def expectCoreLanguageWord (label : String) (expected : Nat) :
   | .ok (.coreLanguageResult (.succeeded (.word actual) _)) =>
       assertTrue (actual == word expected) s!"{label} returned the wrong Word"
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
-private def expectTypedInteger (label : String) (expected : Int) :
+private def expectCoreInteger (label : String) (expected : Int) :
     Except RunError ExecutionResult → IO Unit
-  | .ok (.typedSource (.done (.integer actual) _)) =>
+  | .ok (.coreLanguageResult (.succeeded (.integer actual) _)) =>
       assertTrue (actual == expected) s!"{label} returned the wrong integer"
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
 private def expectTypedGlobal (label : String) :
     Except RunError ExecutionResult → IO Unit
   | .ok (.typedSource (.done (.global _ _) _)) => pure ()
   | result => throw (IO.userError s!"{label} returned {reprStr result}")
-private def expectTypedDeepStage (label : String)
+private def expectCoreDeepStage (label : String)
     (expectedLeft expectedMiddle expectedRight : Nat) :
     Except RunError ExecutionResult → IO Unit
-  | .ok (.typedSource (.done
-      (.product (.word actualLeft)
-        (.product (.word actualMiddle) (.word actualRight))) _)) =>
+  | .ok (.coreLanguageResult (.succeeded
+      (.pair (.word actualLeft)
+        (.pair (.word actualMiddle) (.word actualRight))) _)) =>
       assertTrue (actualLeft == word expectedLeft &&
           actualMiddle == word expectedMiddle &&
           actualRight == word expectedRight)
@@ -766,14 +766,14 @@ private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := 
       constrained.backend = .typedSource ∧
       staged.backend = .core ∧
       stagedTyped.backend = .typedSource ∧
-      stagedType.backend = .typedSource ∧
-      integerResult.backend = .typedSource ∧
-      nestedStaged.backend = .typedSource ∧
-      nestedComptime.backend = .typedSource ∧
-      integerBitAnd.backend = .typedSource ∧
-      integerBitXor.backend = .typedSource ∧
-      integerBitOr.backend = .typedSource ∧
-      integerBitNot.backend = .typedSource ∧
+      stagedType.backend = .core ∧
+      integerResult.backend = .core ∧
+      nestedStaged.backend = .core ∧
+      nestedComptime.backend = .core ∧
+      integerBitAnd.backend = .core ∧
+      integerBitXor.backend = .core ∧
+      integerBitOr.backend = .core ∧
+      integerBitNot.backend = .core ∧
       markedEffects.backend = .typedSource ∧
       markedEffectsEntry.backend = .typedSource))
     "staged capability cases selected an unexpected backend"
@@ -810,31 +810,31 @@ private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := 
   | result => throw (IO.userError s!"marked public input did not use prepared Core: {reprStr result}")
   expectTypedWord "explicit typed-source marked public input" 23 <|
     stagedTyped.runTyped [.word (word 23)] runtimeOptions
-  expectTypedWord "structural comptime input" 1 <|
-    stagedType.runTyped [.word (word 29)] runtimeOptions
-  expectTypedInteger "integer result" 1 <|
-    integerResult.runTyped [] runtimeOptions
-  expectTypedWord "nested comptime input" 1 <|
-    nestedStaged.runTyped
-      [.product (.word (word 2)) (.word (word 3))] runtimeOptions
+  expectCoreLanguageWord "structural comptime input" 1 <|
+    stagedType.runCore [.word (word 29)] runtimeOptions
+  expectCoreInteger "integer result" 1 <|
+    integerResult.runCore [] runtimeOptions
+  expectCoreLanguageWord "nested comptime input" 1 <|
+    nestedStaged.runCore
+      [.pair (.word (word 2)) (.word (word 3))] runtimeOptions
   match ← typedRejection checked "dependent" with
   | .stagedExpressionType _ type =>
       assertTrue (decide (type = Ty.integer))
         "runtime-dependent staged expression lost its Integer type"
   | error => throw (IO.userError
       s!"runtime-dependent staged expression changed rejection: {reprStr error}")
-  expectTypedDeepStage "recursively erased comptime product" 4 5 6 <|
-    nestedComptime.runTyped [
-      .product (.word (word 4))
-        (.product (.word (word 5)) (.word (word 6)))] runtimeOptions
-  expectTypedInteger "integer bitwise and" 1 <|
-    integerBitAnd.runTyped [] runtimeOptions
-  expectTypedInteger "integer bitwise xor" 6 <|
-    integerBitXor.runTyped [] runtimeOptions
-  expectTypedInteger "integer bitwise or" 7 <|
-    integerBitOr.runTyped [] runtimeOptions
-  expectTypedInteger "integer bitwise not" (-6) <|
-    integerBitNot.runTyped [] runtimeOptions
+  expectCoreDeepStage "recursively erased comptime product" 4 5 6 <|
+    nestedComptime.runCore [
+      .pair (.word (word 4))
+        (.pair (.word (word 5)) (.word (word 6)))] runtimeOptions
+  expectCoreInteger "integer bitwise and" 1 <|
+    integerBitAnd.runCore [] runtimeOptions
+  expectCoreInteger "integer bitwise xor" 6 <|
+    integerBitXor.runCore [] runtimeOptions
+  expectCoreInteger "integer bitwise or" 7 <|
+    integerBitOr.runCore [] runtimeOptions
+  expectCoreInteger "integer bitwise not" (-6) <|
+    integerBitNot.runCore [] runtimeOptions
   expectTypedWord "marked closure/mutation/mapping" 12 <|
     markedEffects.runTyped [.word (word 9)] runtimeOptions
   expectTypedWord "effectful staged call" 12 <|

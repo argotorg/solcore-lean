@@ -170,10 +170,10 @@ private def testPublicBoundary (program : CheckedProgram) : IO Unit := do
   match pair.run [.pair (scalar 8) (.bool true)] 100 [scalar 2] with
   | .error (.initialStoreUnsupported 1) => pure ()
   | _ => throw (IO.userError "function-entry silently consumed an unsupported initial store")
-  let staged ← plan program ["staged"]
-  match prepare program staged 100 Core.Word.zero with
-  | .error (.stagedInputUnsupported _ _) => pure ()
-  | _ => throw (IO.userError "staged input entered the ordinary function-entry profile")
+  let staged ← firstEntry (← prepared program ["staged"])
+  assertTrue (staged.inputs.map (·.comptime) == [true])
+    "comptime scalar seed input marker was discarded"
+  discard <| success staged [scalar 6] (scalar 6)
   let input ← plan program ["named"]
   match prepare program { input with referenceEdges := [] } 100 Core.Word.zero with
   | .error (.preparation _) => pure ()

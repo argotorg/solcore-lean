@@ -151,7 +151,7 @@ private def Executable.HasPublicResultProjection
         (.declaration root.declaration) root.function.inferredBodyType =
           .ok entry.elaborated.returnType
   | .coreRuntime entry =>
-      SourceCoreElaboration.lowerType
+      SourceCoreScalar.lowerType
         (.declaration root.declaration) root.function.inferredBodyType =
           .ok entry.resultType
   | .typedSource => True
@@ -265,9 +265,17 @@ public source result type rather than only the linker's private return type. -/
 def CoreResultHasPublicType (compiled : CompiledEntry)
     (value : Core.Value) (finalStore : Core.Store) : Prop :=
   match compiled.executable with
-  | .core _ | .coreRuntime _ =>
+  | .core _ =>
       ∃ publicType,
         SourceCoreElaboration.lowerType
+          (.declaration compiled.root.declaration) compiled.resultType =
+            .ok publicType ∧
+        ∃ finalWorld,
+          Core.RuntimeStoreHasTypes finalWorld finalStore ∧
+            Core.RuntimeValueHasType finalWorld value publicType
+  | .coreRuntime _ =>
+      ∃ publicType,
+        SourceCoreScalar.lowerType
           (.declaration compiled.root.declaration) compiled.resultType =
             .ok publicType ∧
         ∃ finalWorld,
@@ -280,7 +288,7 @@ exhaustion checkpoints from the ordinary Core result envelope. -/
 def CoreLanguageResultHasPublicType (compiled : CompiledEntry)
     (observation : Core.LanguageResult.Observation) : Prop :=
   ∃ publicType,
-    SourceCoreElaboration.lowerType (.declaration compiled.root.declaration)
+    SourceCoreScalar.lowerType (.declaration compiled.root.declaration)
       compiled.resultType = .ok publicType ∧ observation.HasType publicType
 
 end CompiledEntry
@@ -678,7 +686,7 @@ private def validatePublicResultType
         throw (.publicCoreResultMismatch projected
           entry.elaborated.returnType)
   | .coreRuntime entry =>
-      let projected ← (SourceCoreElaboration.lowerType
+      let projected ← (SourceCoreScalar.lowerType
           (.declaration root.declaration) root.function.inferredBodyType)
         |>.mapError CompileError.publicCoreResultProjection
       if projected = entry.resultType then
@@ -707,7 +715,7 @@ private theorem validatePublicResultType_correct
               Except.mapError, bind, Except.bind] at accepted
   | coreRuntime entry =>
       simp only [Executable.HasPublicResultProjection]
-      cases projection : SourceCoreElaboration.lowerType
+      cases projection : SourceCoreScalar.lowerType
           (.declaration root.declaration) root.function.inferredBodyType with
       | error error =>
           simp [validatePublicResultType, projection, Except.mapError,

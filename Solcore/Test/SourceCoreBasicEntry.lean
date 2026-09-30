@@ -241,7 +241,7 @@ private def testControlAndDiagnostics (program : CheckedProgram) : IO Unit := do
     "untaken uninitialized branch was evaluated"
 
 example (entry : Entry) :
-    SourceCoreElaboration.lowerType (.declaration entry.key.declaration) entry.sourceResultType =
+    SourceCoreScalar.lowerType (.declaration entry.key.declaration) entry.sourceResultType =
       .ok entry.resultType := entry.resultProjection
 
 example (type : Core.Ty) (result : Result type) (value : Core.Value) (store : Core.Store)

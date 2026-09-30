@@ -662,6 +662,25 @@ def validateWordIntegerLiteral
   validateWordIntegerLiteralWith id (.occurrence node.id.occurrence)
     solvedRequirements node.type node.requirements source resolution
 
+structure NativeIntegerLiteral where
+  value : Int
+  consumedRequirements : List RequirementId
+  deriving Repr, DecidableEq
+
+/-- Runtime Integer literals share the exact spelling, attachment and builtin
+evidence validator with comptime and Word literals. This performs no evaluation. -/
+def validateNativeIntegerLiteral
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution) :
+    Except Error NativeIntegerLiteral := do
+  unless node.coercions.isEmpty do
+    fail (.occurrence node.id.occurrence) (.coercionsPresent node.coercions)
+  let validated ← validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+    solvedRequirements node.type node.requirements source resolution (.builtin .intInteger)
+    (fun target => if target = Ty.integer then pure ()
+      else fail (.occurrence node.id.occurrence) (.unsupportedType target))
+  pure { value := Int.ofNat validated.rawValue, consumedRequirements := validated.consumedRequirements }
+
 /-- Expression and pattern carriers share the same Word evidence validator. -/
 private def lowerIntegerLiteralResolutionWith {error : Type}
     (lift : Error → error) (site : ErrorSite)
@@ -868,6 +887,13 @@ private def validateStagedIntegerBinderWith {error : Type}
       (.stagedIntegerTypeMismatch .integer binder.scheme.body)
   else
     pure ()
+
+/-- Metadata-only authentication usable by runtime Core lowering as well as
+the staged evaluator. The compiler preserves the existing call validation. -/
+def validateBuiltinFunctionCall (source : TypedSource) (node : ExpressionNode)
+    (callee : ExpressionId) (arguments : List ExpressionId) (function : BuiltinFunctionId) :
+    Except Error Unit :=
+  validateBuiltinFunctionCallWith id source node callee arguments function
 
 mutual
 

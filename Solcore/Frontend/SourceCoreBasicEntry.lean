@@ -1,3 +1,4 @@
+import Solcore.Frontend.SourceCoreScalar
 import Solcore.Frontend.SourceCoreControl
 import Solcore.Frontend.SourceCorePrimitive
 import Solcore.Frontend.SourceCoreLoops
@@ -44,7 +45,7 @@ structure Entry where
   inputs : List Input
   sourceResultType : TypeSystem.Ty
   resultType : Core.Ty
-  resultProjection : SourceCoreElaboration.lowerType (.declaration key.declaration) sourceResultType = .ok resultType
+  resultProjection : SourceCoreScalar.lowerType (.declaration key.declaration) sourceResultType = .ok resultType
   faultSites : SourceCoreFaultSites.Table
   body : Core.Expr
   bodyTyped : Core.HasType (inputContext inputs) body (Core.LanguageResult.resultType resultType)
@@ -77,9 +78,9 @@ private def lowerInputs (source : TypedSource) :
     SourceCoreBasic.Scope → List TypedBinder → Except Error (List Input)
   | _, [] => pure []
   | scope, binder :: rest => do
-      -- Scalar/product values are exactly the staged carrier, so a parameter
-      -- marked comptime uses the same checked value boundary in this fragment.
-      let type ← (SourceCoreBasic.lowerBinder source scope { binder with comptime := false }).mapError Error.lowering
+      -- Comptime parameter markers retain the same deep runtime value boundary.
+      -- Their elaboration and compile-time evaluation remain separate.
+      let type ← (SourceCoreScalar.lowerBinder source scope { binder with comptime := false }).mapError Error.lowering
       let inputs ← lowerInputs source ((binder.id, type) :: scope) rest
       pure ({ id := binder.id, sourceType := binder.scheme.body, type, comptime := binder.comptime } :: inputs)
 
@@ -98,10 +99,10 @@ private def compileEntry (compilationFuel : Nat)
     | _ => .error (.invalidFunctionType specialized.key)
   if sourceResultType ≠ function.inferredBodyType then
     throw (.resultMetadataMismatch specialized.key)
-  let result ← match projection : SourceCoreElaboration.lowerType
+  let result ← match projection : SourceCoreScalar.lowerType
       (.declaration specialized.key.declaration) sourceResultType with
     | .ok type => pure (⟨type, projection⟩ : { type : Core.Ty //
-        SourceCoreElaboration.lowerType (.declaration specialized.key.declaration) sourceResultType = .ok type })
+        SourceCoreScalar.lowerType (.declaration specialized.key.declaration) sourceResultType = .ok type })
     | .error error => .error (.lowering (.typeProjection error))
   let resultType := result.val
   let source := function.typedBody
@@ -147,14 +148,6 @@ def Entry.failureDiagnostic? (entry : Entry) (reason : Core.Word) :
     Option SourceCoreFaultSites.Diagnostic :=
   entry.faultSites.diagnostic? reason
 
-private theorem stagedRuntimeTyped (value : SourceStagedValue.Value) (world : Core.StoreTyping) :
-    Core.RuntimeValueHasType world (SourceStagedValue.toCore value) (SourceStagedValue.coreType value) := by
-  induction value with
-  | unit => exact .unit
-  | bool => exact .bool
-  | word => exact .word
-  | product _ _ left right => exact .pair left right
-
 /-- A checked input frame keeps the store world and lexical references aligned.
 Its context index records only already prepared inputs. -/
 private structure InputFrame (context : Core.Context) where
@@ -170,18 +163,18 @@ private def InputFrame.empty : InputFrame [] := {
 }
 
 private def InputFrame.push {context : Core.Context} (frame : InputFrame context)
-    (type : Core.Ty) (value : SourceStagedValue.Value)
-    (sameType : SourceStagedValue.coreType value = type) :
+    (type : Core.Ty) (value : SourceCoreScalar.Value)
+    (sameType : SourceCoreScalar.Value.type value = type) :
     InputFrame (Core.OptionalCell.referenceType type :: context) := by
   let payloadType := Core.OptionalCell.cellType type
   have extension : Core.WorldExtends frame.world (frame.world ++ [payloadType]) := ⟨_, rfl⟩
   have valueTyped : Core.RuntimeValueHasType frame.world
-      (.inRight .unit (SourceStagedValue.toCore value)) payloadType := by
+      (.inRight .unit (SourceCoreScalar.Value.toCore value)) payloadType := by
     apply Core.RuntimeValueHasType.inRight
-    exact sameType ▸ stagedRuntimeTyped value frame.world
+    exact sameType ▸ SourceCoreScalar.Value.typed value frame.world
   exact {
     world := frame.world ++ [payloadType]
-    store := frame.store ++ [.inRight .unit (SourceStagedValue.toCore value)]
+    store := frame.store ++ [.inRight .unit (SourceCoreScalar.Value.toCore value)]
     environment := .cellRef payloadType frame.store.length :: frame.environment
     storeTyped := frame.storeTyped.allocate valueTyped
     environmentTyped := .cons
@@ -194,15 +187,15 @@ private def prepareArguments {context : Core.Context} (index : Nat)
       Except Error (InputFrame (inputContext inputs ++ context))
   | [], [] => pure (by simpa [inputContext] using frame)
   | input :: inputs, argument :: arguments => do
-      let value ← match SourceStagedValue.ofCore? argument with
+      let value ← match SourceCoreScalar.Value.ofCore? argument with
         | some value => pure value
         | none => .error (.inputShape index input.type)
-      if sameType : SourceStagedValue.coreType value = input.type then
+      if sameType : SourceCoreScalar.Value.type value = input.type then
         let extended := frame.push input.type value sameType
         let prepared ← prepareArguments (index + 1) extended inputs arguments
         pure (by simpa [inputContext, List.reverse_cons, List.append_assoc] using prepared)
       else
-        throw (.inputTypeMismatch index input.type (SourceStagedValue.coreType value))
+        throw (.inputTypeMismatch index input.type (SourceCoreScalar.Value.type value))
   | inputs, arguments => .error (.argumentCountMismatch (index + inputs.length) (index + arguments.length))
 
 structure Checkpoint (resultType : Core.Ty) where

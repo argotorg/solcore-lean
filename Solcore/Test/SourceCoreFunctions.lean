@@ -215,7 +215,13 @@ private def testTypesAndBoundaries (program : CheckedProgram) : IO Unit := do
         (.product (Core.TaggedFunction.functionType .word .bool) .word)
         (Core.TaggedFunction.functionType .unit .word))) "recursive function type projection changed shape"
   | .error error => throw (IO.userError s!"higher-order type projection failed: {reprStr error}")
-  for type in ([.integer, .mapping .word .word, .proxy .word, .comptime .word] : List TypeSystem.Ty) do
+  match SourceCoreFunctionTypes.lowerType site .integer with
+  | .ok type => assertTrue (type == .integer) "native Integer projection changed"
+  | .error error => throw (IO.userError s!"native Integer projection failed: {reprStr error}")
+  match SourceCoreFunctionTypes.lowerType site (.comptime .word) with
+  | .ok type => assertTrue (type == .word) "staged scalar payload projection changed"
+  | .error error => throw (IO.userError s!"staged scalar projection failed: {reprStr error}")
+  for type in ([.mapping .word .word, .proxy .word] : List TypeSystem.Ty) do
     match SourceCoreFunctionTypes.lowerType site type with
     | .error _ => pure ()
     | .ok _ => throw (IO.userError "unsupported general type entered the function profile")

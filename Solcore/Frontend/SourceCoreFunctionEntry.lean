@@ -36,10 +36,9 @@ private def prepareInputs (key : Key) (source : TypedSource) :
     SourceCoreBasic.Scope → List TypedBinder → Except Error (List Input)
   | _, [] => pure []
   | scope, binder :: rest => do
-      if binder.comptime then throw (.stagedInputUnsupported key binder.id)
-      let type ← (SourceCoreFunctionTypes.lowerBinder source scope binder).mapError SourceCoreRecursiveEntry.Error.lowering
+      let type ← (SourceCoreFunctionTypes.lowerBinder source scope { binder with comptime := false }).mapError SourceCoreRecursiveEntry.Error.lowering
       let inputs ← prepareInputs key source ((binder.id, type) :: scope) rest
-      pure ({ id := binder.id, sourceType := binder.scheme.body, type, comptime := false } :: inputs)
+      pure ({ id := binder.id, sourceType := binder.scheme.body, type, comptime := binder.comptime } :: inputs)
 
 private def prepareFunction (specialized : SourceSpecialization.SpecializedFunction) : Except Error Function := do
   let key := specialized.key
@@ -111,10 +110,10 @@ private def assembleEntry (plan : Plan) (functions : List Function)
   -- Retain the existing public value boundary, even though internal function
   -- parameters and returned closures have broader representations.
   let inputs ← (SourceCoreBasicEntry.prepareInputs function.specialized.function.typedBody).mapError SourceCoreRecursiveEntry.Error.entry
-  let projected ← match projection : SourceCoreElaboration.lowerType
+  let projected ← match projection : SourceCoreScalar.lowerType
       (.declaration function.signature.key.declaration) function.sourceResultType with
     | .ok resultType => pure (⟨resultType, projection⟩ : { resultType : Core.Ty //
-        SourceCoreElaboration.lowerType (.declaration function.signature.key.declaration)
+        SourceCoreScalar.lowerType (.declaration function.signature.key.declaration)
           function.sourceResultType = .ok resultType })
     | .error error => .error (.lowering (.typeProjection error))
   (SourceCoreBasic.ensureType (.declaration key.declaration) projected.val function.signature.resultType).mapError SourceCoreRecursiveEntry.Error.lowering

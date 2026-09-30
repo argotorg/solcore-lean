@@ -1,9 +1,11 @@
 import Solcore.Frontend.SourceCoreControl
 import Solcore.Core.LocalAssignment
+import Solcore.Core.IntegerAssignment
+import Solcore.Frontend.SourceCoreScalar
 
 /-! Assignment policy for bare scalar/product equal assignments and builtin
-Word compound/unary assignments. Requirements and projections are rejected;
-method evidence and Integer operations are separate lowering work. The caller
+Word/Integer compound/unary assignments. Requirements and projections are
+rejected; method evidence remains separate lowering work. The caller
 supplies each assignment's diagnostic reason and a lexical continuation. -/
 
 set_option autoImplicit false
@@ -30,11 +32,31 @@ def operator? : Syntax.ValueAssignOp → Option Core.LocalAssignment.Operator
   | .bitOr => some .bitOr
   | .bitXor => some .bitXor
 
-/-- The equal-assignment validator already checks the target owner, binding,
-declared payload type, empty requirements and absence of projections. -/
+/-- Scalar target validation checks the owner, binding, declared payload type,
+empty requirements and absence of projections. Equal function assignments
+continue through the enclosing function profile's own callback. -/
 def target (source : TypedSource) (scope : Scope) (assignment : AssignmentResolution) :
-    Except Error (Nat × Core.Ty) :=
-  SourceCoreBasic.lowerAssignment source scope assignment .equal
+    Except Error (Nat × Core.Ty) := do
+  let binder := assignment.target.root
+  if binder.owner ≠ source.owner then throw (.ownerMismatch source.owner binder.owner)
+  unless assignment.requirements.isEmpty do throw (.assignmentRequirementsPresent binder)
+  unless assignment.target.projections.isEmpty do throw (.projectedAssignment binder)
+  let (index, type) ← match SourceCoreLocalCell.lookup? scope binder with
+    | some slot => pure slot
+    | none => .error (.missingBinding binder)
+  let projected ← (SourceCoreScalar.lowerType (.binder binder) assignment.target.type).mapError SourceCoreBasic.Error.typeProjection
+  SourceCoreBasic.ensureType (.binder binder) type projected
+  pure (index, type)
+
+private def integerOperator : Core.LocalAssignment.Operator → Core.IntegerAssignment.Operator
+  | .add => .add
+  | .subtract => .subtract
+  | .multiply => .multiply
+  | .divide => .divide
+  | .modulo => .modulo
+  | .bitAnd => .bitAnd
+  | .bitOr => .bitOr
+  | .bitXor => .bitXor
 
 def assignValue (lowerExpression : ExpressionLowerer) (fuel : Nat)
     (source : TypedSource) (scope : Scope) (assignment : AssignmentResolution)
@@ -47,10 +69,16 @@ def assignValue (lowerExpression : ExpressionLowerer) (fuel : Nat)
       SourceCoreBasic.ensureType (.binder assignment.target.root) payloadType rhs.type
       pure (Core.LocalSequence.assign outputType (.var index) rhs.expression next)
   | some operator =>
-      SourceCoreBasic.ensureType (.binder assignment.target.root) .word payloadType
-      let rhs ← lowerExpression fuel source scope rhs
-      SourceCoreBasic.ensureType (.binder assignment.target.root) .word rhs.type
-      pure (Core.LocalAssignment.compound outputType operator (.var index) rhs.expression next invalidReason)
+      if payloadType = .integer then
+        let rhs ← lowerExpression fuel source scope rhs
+        SourceCoreBasic.ensureType (.binder assignment.target.root) .integer rhs.type
+        pure (Core.IntegerAssignment.compound outputType (integerOperator operator) (.var index)
+          rhs.expression next invalidReason)
+      else
+        SourceCoreBasic.ensureType (.binder assignment.target.root) .word payloadType
+        let rhs ← lowerExpression fuel source scope rhs
+        SourceCoreBasic.ensureType (.binder assignment.target.root) .word rhs.type
+        pure (Core.LocalAssignment.compound outputType operator (.var index) rhs.expression next invalidReason)
 
 def assignValueWithReasons (lowerExpression : SourceCoreControl.ExpressionLowerer) (fuel : Nat)
     (source : TypedSource) (scope : Scope) (assignment : AssignmentResolution)
@@ -63,7 +91,10 @@ def assignValueWithReasons (lowerExpression : SourceCoreControl.ExpressionLowere
 def assignBitNot (source : TypedSource) (scope : Scope) (assignment : AssignmentResolution)
     (outputType : Core.Ty) (next : Core.Expr) (invalidReason : Core.Word) : Except Error Core.Expr := do
   let (index, payloadType) ← target source scope assignment
-  SourceCoreBasic.ensureType (.binder assignment.target.root) .word payloadType
-  pure (Core.LocalAssignment.bitNot outputType (.var index) next invalidReason)
+  if payloadType = .integer then
+    pure (Core.IntegerAssignment.bitNot outputType (.var index) next invalidReason)
+  else
+    SourceCoreBasic.ensureType (.binder assignment.target.root) .word payloadType
+    pure (Core.LocalAssignment.bitNot outputType (.var index) next invalidReason)
 
 end Solcore.Frontend.SourceCoreAssignments

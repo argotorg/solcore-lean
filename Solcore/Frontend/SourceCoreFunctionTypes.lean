@@ -1,10 +1,11 @@
-import Solcore.Frontend.SourceCoreBasic
+import Solcore.Frontend.SourceCoreScalar
 import Solcore.Core.TaggedFunction
 
 /-! The monomorphic function-value profile. Source functions become tagged
 ordinary Core closures returning language results. This extends the structural
 Unit/Bool/Word/product projection without changing the legacy scalar bridge.
-No nominal, Integer, mapping, staged or polymorphic representation is added. -/
+Native Integer is included. Nominal, mapping and polymorphic representations
+remain separate compiler profiles. -/
 
 set_option autoImplicit false
 
@@ -20,7 +21,7 @@ def lowerType (site : SourceCoreElaboration.ErrorSite) : TypeSystem.Ty → Excep
       pure (.product (← lowerType site left) (← lowerType site right))
   | .function parameter result => do
       pure (Core.TaggedFunction.functionType (← lowerType site parameter) (← lowerType site result))
-  | type => SourceCoreElaboration.lowerType site type
+  | type => SourceCoreScalar.lowerType site type
 
 def projectType (site : SourceCoreElaboration.ErrorSite) (type : TypeSystem.Ty) : Except Error Core.Ty :=
   (lowerType site type).mapError SourceCoreBasic.Error.typeProjection
