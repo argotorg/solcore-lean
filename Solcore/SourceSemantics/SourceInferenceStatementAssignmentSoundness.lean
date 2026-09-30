@@ -736,6 +736,7 @@ theorem inferAssignedValueFuel_success_place_state_provenance
       placeState.NodesBelowNextOccurrence ∧
       TypingSourceExtends (placeState.toTypedSource roots)
         (final.toTypedSource roots) ∧
+      placeState.integerLiterals ⊆ final.integerLiterals ∧
       placeState.integerPatterns ⊆ final.integerPatterns ∧
       placeState.requirements ⊆ final.requirements := by
   unfold Detail.inferAssignedValueFuel at success
@@ -767,6 +768,7 @@ theorem inferAssignedValueFuel_success_place_state_provenance
             actualState.NodesBelowNextOccurrence ∧
             TypingSourceExtends (actualState.toTypedSource roots)
               (final.toTypedSource roots) ∧
+            actualState.integerLiterals ⊆ final.integerLiterals ∧
             actualState.integerPatterns ⊆ final.integerPatterns ∧
             actualState.requirements ⊆ final.requirements := by
         cases unifyResult : Detail.unify placeState place.type .word with
@@ -809,7 +811,9 @@ theorem inferAssignedValueFuel_success_place_state_provenance
                 refine ⟨place, placeState, rfl, placeBelow,
                   placeToFitted.trans
                     (inferExprFuel_success_typingSourceExtends valueResult
-                      fittedBelow roots), ?_, ?_⟩
+                      fittedBelow roots), ?_, ?_, ?_⟩
+                · rw [← Detail.unify_integerLiterals unifyResult]
+                  exact Detail.inferExprFuel_integerLiterals_subset valueResult
                 · rw [← Detail.unify_integerPatterns unifyResult]
                   exact Detail.inferExprFuel_integerPatterns_subset valueResult
                 · exact (Detail.unify_requirements_subset unifyResult).trans
@@ -833,6 +837,7 @@ theorem inferAssignedValueFuel_success_place_state_provenance
               exact ⟨place, placeState, rfl, placeBelow,
                 inferExprFuel_success_typingSourceExtends valueResult
                   placeBelow roots,
+                Detail.inferExprFuel_integerLiterals_subset valueResult,
                 Detail.inferExprFuel_integerPatterns_subset valueResult,
                 Detail.inferExprFuel_requirements_subset valueResult⟩
       | add => exact finishNonEqual success
@@ -864,6 +869,7 @@ theorem inferPlaceFuel_success_index_base_state_provenance
       baseState.NodesBelowNextOccurrence ∧
       TypingSourceExtends (baseState.toTypedSource roots)
         (final.toTypedSource roots) ∧
+      baseState.integerLiterals ⊆ final.integerLiterals ∧
       baseState.integerPatterns ⊆ final.integerPatterns ∧
       baseState.requirements ⊆ final.requirements := by
   unfold Detail.inferPlaceFuel at success
@@ -931,7 +937,14 @@ theorem inferPlaceFuel_success_index_base_state_provenance
               refine ⟨basePlace, baseState, rfl, baseBelow,
                 baseToUnified.trans
                   (inferExprFuel_success_typingSourceExtends keyResult
-                    unifiedBelow roots), ?_, ?_⟩
+                    unifiedBelow roots), ?_, ?_, ?_⟩
+              · intro literal member
+                have inUnified : literal ∈ unifiedState.integerLiterals := by
+                  rw [Detail.unify_integerLiterals unifyResult]
+                  simpa [keyAllocation, valueAllocation,
+                    Frontend.SourceInference.State.fresh] using member
+                exact Detail.inferExprFuel_integerLiterals_subset keyResult
+                  inUnified
               · intro pattern member
                 have inUnified : pattern ∈ unifiedState.integerPatterns := by
                   rw [Detail.unify_integerPatterns unifyResult]
@@ -968,6 +981,7 @@ theorem inferPlaceFuel_success_index_key_provenance
       .expression inferredKey.id ∈ place.references ∧
       TypingSourceExtends (keyInitial.toTypedSource roots)
         (final.toTypedSource roots) ∧
+      keyInitial.integerLiterals ⊆ final.integerLiterals ∧
       keyInitial.integerPatterns ⊆ final.integerPatterns ∧
       keyInitial.requirements ⊆ final.requirements := by
   unfold Detail.inferPlaceFuel at success
@@ -1018,6 +1032,7 @@ theorem inferPlaceFuel_success_index_key_provenance
                 inferredKey, keyResult, unifiedBelow, ?_,
                 inferExprFuel_success_typingSourceExtends keyResult
                   unifiedBelow roots,
+                Detail.inferExprFuel_integerLiterals_subset keyResult,
                 Detail.inferExprFuel_integerPatterns_subset keyResult,
                 Detail.inferExprFuel_requirements_subset keyResult⟩
               simp [PlaceResolution.references,
@@ -1044,6 +1059,7 @@ theorem inferAssignedValueFuel_success_value_provenance
       valueInitial.NodesBelowNextOccurrence ∧
       TypingSourceExtends (valueInitial.toTypedSource roots)
         (final.toTypedSource roots) ∧
+      valueInitial.integerLiterals ⊆ final.integerLiterals ∧
       valueInitial.integerPatterns ⊆ final.integerPatterns ∧
       valueInitial.requirements ⊆ final.requirements := by
   unfold Detail.inferAssignedValueFuel at success
@@ -1074,6 +1090,7 @@ theorem inferAssignedValueFuel_success_value_provenance
             valueInitial.NodesBelowNextOccurrence ∧
             TypingSourceExtends (valueInitial.toTypedSource roots)
               (final.toTypedSource roots) ∧
+            valueInitial.integerLiterals ⊆ final.integerLiterals ∧
             valueInitial.integerPatterns ⊆ final.integerPatterns ∧
             valueInitial.requirements ⊆ final.requirements := by
         cases unifyResult : Detail.unify placeState place.type .word with
@@ -1101,6 +1118,7 @@ theorem inferAssignedValueFuel_success_value_provenance
                 exact ⟨.word, fittedState, valueResult, fittedBelow,
                   inferExprFuel_success_typingSourceExtends valueResult
                     fittedBelow roots,
+                  Detail.inferExprFuel_integerLiterals_subset valueResult,
                   Detail.inferExprFuel_integerPatterns_subset valueResult,
                   Detail.inferExprFuel_requirements_subset valueResult⟩
       cases operator with
@@ -1123,6 +1141,7 @@ theorem inferAssignedValueFuel_success_value_provenance
                 placeBelow,
                 inferExprFuel_success_typingSourceExtends valueResult
                   placeBelow roots,
+                Detail.inferExprFuel_integerLiterals_subset valueResult,
                 Detail.inferExprFuel_integerPatterns_subset valueResult,
                 Detail.inferExprFuel_requirements_subset valueResult⟩
       | add => exact finishNonEqual success
