@@ -28,6 +28,7 @@ import Solcore.SourceSemantics.SourceInferenceSoundness
 import Solcore.SourceSemantics.SourceInferenceExpressionSoundness
 import Solcore.SourceSemantics.SourceInferenceBodyTypingBridge
 import Solcore.SourceSemantics.SourceProgramCheckingSoundness
+import Solcore.SourceSemantics.SourceInferenceCheckedBodyTypingBridge
 import Solcore.SourceSemantics.Dynamic
 import Solcore.SourceSemantics.Staging
 import Solcore.SourceSemantics.SourceStageAnalysisSoundness
