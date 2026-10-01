@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceCoreCallablePairedOutputs
 import Solcore.Frontend.SourceCoreCallablePairedCellHeaders
+import Solcore.Frontend.SourceCoreCallablePairedHeapOutputs
 import Solcore.Frontend.ProgramChecking
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
@@ -36,6 +37,8 @@ private structure Projected (checked : SourceCoreCompatibleCatalog.Checked)
     (source : TypeSystem.Ty) (native : Core.Ty) : Type where
   eq : checked.catalog.project source = .ok native
 private def initial : List SourceTypedRuntime.Cell := [⟨.word, none⟩, ⟨.function .word .word, none⟩]
+private def prefixMatches (heap : List SourceTypedRuntime.Cell) : Bool :=
+  reprStr (heap.take initial.length) == reprStr initial
 
 private def closure (plan : SourceSpecializationWorklist.Plan) (value : SourceValue) : IO SourceTypedRuntime.Environment := do
   match value with
@@ -63,6 +66,8 @@ def run : IO Unit := do
     | .ok output => pure output | .error error => throw (IO.userError s!"deep output caches failed: {reprStr error}")
   let cellHeaders ← match SourceCoreCallablePairedCellHeaders.prepare (program := native) output.graph with
     | .ok headers => pure headers | .error error => throw (IO.userError s!"raw source cell headers failed: {reprStr error}")
+  let heapOutput ← match SourceCoreCallablePairedHeapOutputs.prepare native with
+    | .ok prepared => pure prepared | .error error => throw (IO.userError s!"heap output preparation failed: {reprStr error}")
   let inc ← key program "inc"
   let mapping : SourceValue := .mapping .word (.comptime (.function .word .word))
     [(.word (w 4), .global inc []), (.word (w 4), .global inc [])]
@@ -71,9 +76,14 @@ def run : IO Unit := do
      ("mappingReturn", [mapping, .word (w 3)]), ("plain", [.word (w 3)])]
   for (name, arguments) in fixtures do
     for budget in [0, 29, 100000] do
-      let completion ← match native.runSource (← key program name) arguments budget 500 with
-        | .ok completion => pure (completion.resume 100000)
+      let checkpoint ← match native.runSource (← key program name) arguments budget 500 with
+        | .ok completion => pure completion
         | .error error => throw (IO.userError s!"deep output native call failed: {reprStr error}")
+      if budget == 0 then
+        let early ← match SourceCoreCallablePairedHeapOutputs.exportHeap heapOutput checkpoint initial with
+          | .ok exported => pure exported | .error error => throw (IO.userError s!"early heap export failed: {reprStr error}")
+        assertTrue (early.heap.length == initial.length && prefixMatches early.heap) "zero-fuel export changed opaque source prefix"
+      let completion := checkpoint.resume 100000
       let projected ← match same : automatic.checked.catalog.project completion.entry.sourceResultType with
         | .error error => throw (IO.userError s!"deep output projection failed: {reprStr error}")
         | .ok type =>
@@ -88,6 +98,19 @@ def run : IO Unit := do
         let selected ← match SourceCoreCallablePairedCellHeaders.select cellHeaders row with
           | .ok selected => pure selected | .error error => throw (IO.userError s!"raw allocation header selection failed: {reprStr error}")
         assertTrue (selected.header.raw.binder.id == row.entry.key.binder.id) "raw source cell header changed binder identity"
+      let exported ← match SourceCoreCallablePairedHeapOutputs.exportHeap heapOutput completion initial with
+        | .ok exported => pure exported | .error error => throw (IO.userError s!"paired source heap export failed: {reprStr error}")
+      assertTrue (prefixMatches exported.heap) "heap export changed opaque source prefix"
+      assertTrue (exported.cells.length == decoded.ledger.ledger.rows.length) "heap export lost source allocation order"
+      let genericRows := decoded.ledger.ledger.rows.filter (fun row => !row.entry.key.binder.scheme.quantified.isEmpty)
+      if name != "plain" then
+        assertTrue (!genericRows.isEmpty) "generic closure fixture no longer records a principal"
+      for row in genericRows do
+        match exported.heap[row.sourceLocation.index]? with
+        | some ⟨_, some (.closure parameters _ _ _ _ captured _)⟩ =>
+          assertTrue (parameters.any (fun binder => !binder.scheme.body.freeVariables.isEmpty)) "heap export specialized original principal"
+          assertTrue (captured == row.environment) "heap export changed principal capture order or aliases"
+        | _ => throw (IO.userError "heap export lost raw generic principal closure")
       match name, decoded.decoded.source with
       | "tuple", .product left right =>
         let leftEnv ← closure plan left
