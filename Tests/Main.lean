@@ -97,6 +97,16 @@ import Solcore.Test.SourceCoreCallableAncestryPairedSeeds
 import Solcore.Test.SourceCoreCallablePairedHeaders
 import Solcore.Test.SourceCoreCallablePairedReadViews
 import Solcore.Test.SourceCoreCallablePairedRestoration
+import Solcore.Test.SourceCoreCallablePairedOutputs
+import Solcore.Test.SourceCoreCallablePairedProtocol
+import Solcore.Test.SourceCoreCallableIndexedFrames
+import Solcore.Test.SourceCoreCallableIndexedHistory
+import Solcore.Test.SourceCoreCallableIndexedFormation
+import Solcore.Test.SourceCoreCallableIndexedPrograms
+import Solcore.Test.SourceCoreCompatibleAssignment
+import Solcore.Test.SourceCoreCompatibleStructuralFault
+import Solcore.Test.SourceCoreCompatibleTargetFaults
+import Solcore.Test.SourceCoreRuntimeKeyGuards
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
 import Solcore.Test.SourceCoreCompatibleMixedPaths
@@ -2365,6 +2375,13 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallablePairedHeaders.run
   SourceCoreCallablePairedReadViews.run
   SourceCoreCallablePairedRestoration.run
+  SourceCoreCallablePairedOutputs.run
+  SourceCoreCallableIndexedFrames.run
+  SourceCoreCallableIndexedPrograms.run
+  SourceCoreCompatibleAssignment.run
+  SourceCoreCompatibleStructuralFault.run
+  SourceCoreCompatibleTargetFaults.run
+  SourceCoreRuntimeKeyGuards.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
   SourceCoreCompatibleMixedPaths.run

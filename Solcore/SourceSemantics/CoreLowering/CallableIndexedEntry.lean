@@ -20,7 +20,7 @@ private theorem installed_history {checked : Checked} {base : Base checked} {inp
   exact ⟨Store.write?_reads_written written, history⟩
 
 /-- The exact selector after the caller frame has been saved. The syntactic
-insertion law shifts emitted code, without an exact-value weakening axiom. -/
+insertion law shifts emitted code using its exact insertion receipt. -/
 theorem lambda_next_evaluates {layout : Layout} {environment : Environment} {before : Store}
     {referenceIndex location position : Nat} {current : NativeFrame}
     (table : SourceCoreCallableIndexedDispatch.Table) (origin : Word)
