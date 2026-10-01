@@ -42,6 +42,9 @@ import Solcore.Frontend.SourceCoreGeneralEntry
 import Solcore.Frontend.SourceCoreGeneralFunctions
 import Solcore.Frontend.SourceCoreCompatibleDataEquality
 import Solcore.Frontend.SourceCoreCompatibleDataExpressions
+import Solcore.Frontend.SourceCoreCompatibleDataPlaces
+import Solcore.Frontend.SourceCoreCompatibleDataMatches
+import Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites
 import Solcore.Frontend.SourceCorePlanCatalog
 import Solcore.Frontend.SourceCoreDataValues
 import Solcore.Frontend.SourceCoreSession

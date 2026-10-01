@@ -33,6 +33,7 @@ import Solcore.Test.SourceCallStageBoundary
 import Solcore.Test.SourceCoreRawMetadata
 import Solcore.Test.SourceCoreCompatibleValues
 import Solcore.Test.SourceCoreCompatibleDataExpressions
+import Solcore.Test.SourceCoreCompatibleDataControl
 import Solcore.Test.SourceCoreCompatibleFunctions
 import Solcore.Test.SourceCoreNativeEntry
 import Solcore.Test.SourceCoreRepresentationProjection
@@ -2553,6 +2554,7 @@ def run : IO Unit := do
   SourceCoreRawMetadata.run
   SourceCoreCompatibleValues.run
   SourceCoreCompatibleDataExpressions.run
+  SourceCoreCompatibleDataControl.run
   SourceCoreCompatibleFunctions.run
   SourceCoreNativeEntry.run
   SourceCoreRepresentationProjection.run
