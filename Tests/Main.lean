@@ -2,6 +2,8 @@ import Solcore.Test.SourceCoreCompatiblePayload
 import Solcore.Test.SourceCoreCompatibleMappings
 import Solcore.Test.SourceCoreCompatibleEncoding
 import Solcore.Test.SourceCoreCompatibleEqualityProofs
+import Solcore.Test.SourceCoreCompatibleMappingProofs
+import Solcore.Test.SourceCoreCompatibleMappingVirtualRoot
 import Solcore.Test.SourceCoreDataPlacePathFaults
 import Solcore.Test.SourceCoreDataPlaceWriteBack
 import Solcore.Test.SourceCoreStageContracts
@@ -63,6 +65,11 @@ import Solcore.Test.SourceCoreCallableViewWrappers
 import Solcore.Test.SourceCoreCallablePrincipals
 import Solcore.Test.SourceCoreCallableContextFrames
 import Solcore.Test.SourceCoreCallableContextFrameProofs
+import Solcore.Test.SourceCoreCallableContextFrameCodec
+import Solcore.Test.SourceCoreCallableAncestry
+import Solcore.Test.SourceCoreCallableAncestryPrograms
+import Solcore.Test.SourceCoreCallableAncestryOutputs
+import Solcore.Test.SourceCoreCallableAncestryMetadata
 import Solcore.Test.SourceCoreLambdaTemplates
 import Solcore.Test.SourceCoreCompatibleHeapOutputs
 import Solcore.Test.SourceCoreNativeEntry
@@ -2275,6 +2282,43 @@ def staticSemanticsSpineTests : IO Unit := do
   SourceStagedIntegerCalls.testSourceStagedIntegerCalls
   SourceStagedIntegerCallsTamper.testSourceStagedIntegerCallsTamper
 
+private def coreRuntimeUnificationTests : IO Unit := do
+  SourceCoreHeapMarkers.run
+  SourceCoreSourceCells.run
+  SourceCoreAllocationCodebook.run
+  SourceCoreAllocationDiscovery.run
+  SourceCoreAllocationContexts.run
+  SourceCoreAllocationLayouts.run
+  SourceCoreAllocationLedger.run
+  SourceCoreRawMetadata.run
+  SourceCoreCompatibleValues.run
+  SourceCoreCompatiblePayload.run
+  SourceCoreCompatibleMappings.run
+  SourceCoreCompatibleEncoding.run
+  SourceCoreCompatibleEqualityProofs.run
+  SourceCoreCompatibleMappingProofs.run
+  SourceCoreCompatibleMappingVirtualRoot.run
+  SourceCoreCompatibleDataExpressions.run
+  SourceCoreCompatibleDataControl.run
+  SourceCoreCompatibleFunctions.run
+  SourceCoreCompatiblePreparedFunctions.run
+  SourceCoreCompatibleInputs.run
+  SourceCoreCompatibleOutputs.run
+  SourceCoreCompatibleMarkedFunctions.run
+  SourceCoreCompatibleMarkedLedger.run
+  SourceCoreCallableViews.run
+  SourceCoreCallableViewWrappers.run
+  SourceCoreCallablePrincipals.run
+  SourceCoreCallableContextFrames.run
+  SourceCoreCallableContextFrameProofs.run
+  SourceCoreCallableContextFrameCodec.run
+  SourceCoreCallableAncestry.run
+  SourceCoreCallableAncestryPrograms.run
+  SourceCoreCallableAncestryOutputs.run
+  SourceCoreCallableAncestryMetadata.run
+  SourceCoreLambdaTemplates.run
+  SourceCoreCompatibleHeapOutputs.run
+
 def run : IO Unit := do
   coreLocalFragmentPairBoundaryTests
   resolvedPairBoundaryTests
@@ -2579,34 +2623,7 @@ def run : IO Unit := do
   SourceCoreDataCatalog.run
   SourceCoreDataEquality.run
   SourceCoreMappingWithDefault.run
-  SourceCoreHeapMarkers.run
-  SourceCoreSourceCells.run
-  SourceCoreAllocationCodebook.run
-  SourceCoreAllocationDiscovery.run
-  SourceCoreAllocationContexts.run
-  SourceCoreAllocationLayouts.run
-  SourceCoreAllocationLedger.run
-  SourceCoreRawMetadata.run
-  SourceCoreCompatibleValues.run
-  SourceCoreCompatiblePayload.run
-  SourceCoreCompatibleMappings.run
-  SourceCoreCompatibleEncoding.run
-  SourceCoreCompatibleEqualityProofs.run
-  SourceCoreCompatibleDataExpressions.run
-  SourceCoreCompatibleDataControl.run
-  SourceCoreCompatibleFunctions.run
-  SourceCoreCompatiblePreparedFunctions.run
-  SourceCoreCompatibleInputs.run
-  SourceCoreCompatibleOutputs.run
-  SourceCoreCompatibleMarkedFunctions.run
-  SourceCoreCompatibleMarkedLedger.run
-  SourceCoreCallableViews.run
-  SourceCoreCallableViewWrappers.run
-  SourceCoreCallablePrincipals.run
-  SourceCoreCallableContextFrames.run
-  SourceCoreCallableContextFrameProofs.run
-  SourceCoreLambdaTemplates.run
-  SourceCoreCompatibleHeapOutputs.run
+  coreRuntimeUnificationTests
   SourceCoreNativeEntry.run
   SourceCoreRepresentationProjection.run
   SourceCompilerSourceBoundaryObservations.run

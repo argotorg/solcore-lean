@@ -287,13 +287,15 @@ private theorem availableRuntimeEvidence?_some_goal
   have accepted := List.find?_some found
   exact of_decide_eq_true accepted
 
-private structure LocalRequirementBinding where
+/-- Exact pairing retained by the local-witness factory. Public for static
+metadata transport proofs; constructing it does not authenticate a witness. -/
+structure LocalRequirementBinding where
   template : LocalSchemeRequirement
   actualRequirement : RequirementId
   predicate : ProgramPredicate
   actualSolved : SolvedRequirement
 
-private def localRequirementBindings
+def localRequirementBindings
     (caller : SourceSpecialization.SpecializedFunction)
     (binder : TypedBinder) (node : ExpressionNode) :
     Except RuntimeError (Substitution × List LocalRequirementBinding) := do
