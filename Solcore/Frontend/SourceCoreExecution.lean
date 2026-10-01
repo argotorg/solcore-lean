@@ -374,6 +374,131 @@ def Session.invokePacked {artifact : Artifact} (session : Session artifact) (han
   | .error error => pure (.error error)
   | .ok checkpoint => pure (.ok (← checkpoint.resume options.executionFuel options.outputValidationFuel))
 
+
+private def PrefixPayload (artifact : Artifact) : Type :=
+  match artifact.opened with
+  | .empty _ => Unit
+  | .indexed _ _ native => SourceCoreIndexedSession.PrefixSnapshot native
+
+structure PrefixSnapshot (artifact : Artifact) where private mk ::
+  private payload : PrefixPayload artifact
+
+def PrefixSnapshot.cells {artifact : Artifact} (inert : PrefixSnapshot artifact) : List SourceCoreHeapSnapshot.Cell :=
+  match artifact, inert with
+  | ⟨_, .empty _⟩, ⟨_⟩ => []
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.cells
+
+def PrefixSnapshot.heapSize {artifact : Artifact} (inert : PrefixSnapshot artifact) : Nat := inert.cells.length
+
+def Artifact.bootstrapFromPrefix (artifact : Artifact) (inert : PrefixSnapshot artifact) : IO (Bootstrap artifact) := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact pure ⟨()⟩
+  | indexed recipe selected native =>
+      rcases inert with ⟨inert⟩
+      exact do return ⟨← native.bootstrapFromPrefix inert⟩
+
+namespace Legacy
+/-- The explicit migration boundary validates the former raw initial state.
+The common runtime accepts the sealed prefix and keeps its values inert. -/
+def preparePrefix (artifact : Artifact) (state : SourceTypedRuntime.RuntimeState)
+    (validationFuel : Nat := 1024) : Option (PrefixSnapshot artifact) :=
+  match artifact with
+  | ⟨_, .empty _⟩ => none
+  | ⟨_, .indexed _ _ native⟩ =>
+      (SourceCoreIndexedSession.Legacy.preparePrefix native state validationFuel).map fun inert => ⟨inert⟩
+end Legacy
+
+private def SnapshotPayload (artifact : Artifact) : Type :=
+  match artifact.opened with
+  | .empty _ => Unit
+  | .indexed _ _ native => SourceCoreIndexedSession.Snapshot native
+
+structure Snapshot (artifact : Artifact) where private mk ::
+  private payload : SnapshotPayload artifact
+
+def Snapshot.cells {artifact : Artifact} (snapshot : Snapshot artifact) : List SourceCoreHeapSnapshot.Cell :=
+  match artifact, snapshot with
+  | ⟨_, .empty _⟩, ⟨_⟩ => []
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.cells
+
+def Snapshot.heapSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.cells.length
+
+def Snapshot.nativeHeapSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat :=
+  match artifact, snapshot with
+  | ⟨_, .empty _⟩, ⟨_⟩ => 0
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.nativeHeapSize
+
+def Snapshot.pendingAllocation {artifact : Artifact} (snapshot : Snapshot artifact) : Bool :=
+  match artifact, snapshot with
+  | ⟨_, .empty _⟩, ⟨_⟩ => false
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.pendingAllocation
+
+def Snapshot.cellAt? {artifact : Artifact} (snapshot : Snapshot artifact) (location : Nat) : Option SourceCoreHeapSnapshot.Cell :=
+  snapshot.cells[location]?
+
+/-- This is the originally imported inert prefix. Restoring all active cells
+uses `restore`, retaining their native world and session ownership. -/
+def Snapshot.prefix {artifact : Artifact} (snapshot : Snapshot artifact) : PrefixSnapshot artifact :=
+  match artifact, snapshot with
+  | ⟨_, .empty _⟩, ⟨_⟩ => ⟨()⟩
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => ⟨native.prefix⟩
+
+def Snapshot.prefixSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.prefix.heapSize
+
+inductive RestoredSnapshot (artifact : Artifact) where
+  | ready (session : Session artifact)
+  | suspended (checkpoint : Checkpoint artifact)
+
+def Snapshot.restore {artifact : Artifact} (snapshot : Snapshot artifact) : RestoredSnapshot artifact :=
+  match artifact, snapshot with
+  | ⟨_, .empty _⟩, ⟨_⟩ => .ready ⟨()⟩
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ =>
+      match native.restore with
+      | .ready session => .ready ⟨session⟩
+      | .suspended checkpoint => .suspended ⟨checkpoint⟩
+
+def Session.restoreSnapshot {artifact : Artifact} (session : Session artifact) (snapshot : Snapshot artifact) :
+    Except SourceCoreIndexedSession.Error (RestoredSnapshot artifact) :=
+  match artifact, session, snapshot with
+  | ⟨_, .empty _⟩, ⟨_⟩, ⟨_⟩ => .ok (.ready ⟨()⟩)
+  | ⟨_, .indexed _ _ _⟩, ⟨session⟩, ⟨snapshot⟩ => do
+      match ← session.restoreSnapshot snapshot with
+      | .ready session => pure (.ready ⟨session⟩)
+      | .suspended checkpoint => pure (.suspended ⟨checkpoint⟩)
+
+def Session.snapshot {artifact : Artifact} (session : Session artifact) (boundaryFuel : Nat := 1024) :
+    IO (Except SourceCoreIndexedSession.Error (Snapshot artifact)) := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact pure (.ok ⟨()⟩)
+  | indexed recipe selected native =>
+      rcases session with ⟨session⟩
+      exact do return (← session.snapshot boundaryFuel).map fun snapshot => ⟨snapshot⟩
+
+def Checkpoint.snapshot {artifact : Artifact} (checkpoint : Checkpoint artifact) (boundaryFuel : Nat := 1024) :
+    IO (Except SourceCoreIndexedSession.Error (Snapshot artifact)) := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
+  | indexed recipe selected native =>
+      rcases checkpoint with ⟨checkpoint⟩
+      exact do return (← checkpoint.snapshot boundaryFuel).map fun snapshot => ⟨snapshot⟩
+
+theorem Snapshot.restore_native_size {artifact : Artifact} (snapshot : Snapshot artifact) :
+    match snapshot.restore with
+    | .ready session => session.heapSize = snapshot.nativeHeapSize
+    | .suspended checkpoint => checkpoint.heapSize = snapshot.nativeHeapSize := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rfl
+  | indexed recipe selected native =>
+      rcases snapshot with ⟨snapshot⟩
+      have same := snapshot.restore_native_size
+      cases restored : snapshot.restore with
+      | ready session => exact (by simpa only [Snapshot.restore, Snapshot.nativeHeapSize, Session.heapSize, Checkpoint.heapSize, restored] using same)
+      | suspended checkpoint => exact (by simpa only [Snapshot.restore, Snapshot.nativeHeapSize, Session.heapSize, Checkpoint.heapSize, restored] using same)
+
 theorem Completion.typed {artifact : Artifact} (completion : Completion artifact) :
     completion.session.Authenticates completion.boundaryFuel completion.sourceType completion.value :=
   completion.authenticated

@@ -10,6 +10,7 @@ export SourceCoreExecution
    prepare compileChecked compile compileEntryChecked compileEntry
    StaticWordRoot StaticWordProgram compileStaticWordChecked compileStaticWord
    Artifact Session Bootstrap BootResult Checkpoint Authentication Completion Outcome
+   Snapshot PrefixSnapshot RestoredSnapshot
    compileChecked_program compile_checked_source compileEntry_checked_source
    compileStaticWordChecked_program compileStaticWord_checked_source)
 
@@ -52,7 +53,7 @@ export SourceCoreExecution.StaticWordProgram (compiled roots count rootForSelect
 end StaticWordProgram
 
 namespace Artifact
-export SourceCoreExecution.Artifact (keys rootCount root? bootstrap)
+export SourceCoreExecution.Artifact (keys rootCount root? bootstrap bootstrapFromPrefix)
 end Artifact
 
 namespace Bootstrap
@@ -66,11 +67,11 @@ end BootResult
 namespace Session
 export SourceCoreExecution.Session
   (heapSize functionCount start startHandlePacked Authenticates authenticate
-   diagnostic handleDiagnostic named builtin run invokePacked)
+   diagnostic handleDiagnostic named builtin run invokePacked snapshot restoreSnapshot)
 end Session
 
 namespace Checkpoint
-export SourceCoreExecution.Checkpoint (heapSize diagnostic resume)
+export SourceCoreExecution.Checkpoint (heapSize diagnostic resume snapshot)
 end Checkpoint
 
 namespace Authentication
@@ -84,5 +85,22 @@ end Completion
 namespace Outcome
 export SourceCoreExecution.Outcome (succeeded failed outOfFuel exportError)
 end Outcome
+
+namespace Snapshot
+export SourceCoreExecution.Snapshot
+  (cells heapSize nativeHeapSize pendingAllocation cellAt? «prefix» prefixSize restore restore_native_size)
+end Snapshot
+
+namespace PrefixSnapshot
+export SourceCoreExecution.PrefixSnapshot (cells heapSize)
+end PrefixSnapshot
+
+namespace RestoredSnapshot
+export SourceCoreExecution.RestoredSnapshot (ready suspended)
+end RestoredSnapshot
+
+namespace Legacy
+export SourceCoreExecution.Legacy (preparePrefix)
+end Legacy
 
 end Solcore.Frontend.SourceCompiler
