@@ -1,18 +1,17 @@
-import Solcore.Frontend.SourceCompiler
+import Solcore.Test.SourceCompilerFeatureSupport
 import Solcore.Frontend.SourceCoreRawMetadata
 import Solcore.Frontend.SourceCoreRawMetadataRuntime
 
 /-! Concrete observations of the existing public source-value boundary.
-These checked source fixtures pin the behavior the native compatibility
-adapter must retain. They do not assert that the current strict Core codec
-already implements that adapter. The initial prefix is validated and inert;
+These checked fixtures use the exact cached artifact also prepared for the
+common public session. Internal observations pin raw prefix compatibility. The initial prefix is validated and inert;
 public captured-closure arguments remain rejected. -/
 
 set_option autoImplicit false
 
 namespace Tests.SourceCompilerSourceBoundaryObservations
 
-open Solcore Solcore.Frontend SourceInference SourceCompiler
+open Solcore Solcore.Frontend SourceInference
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
@@ -37,24 +36,21 @@ private def workspace : Workspace.RawWorkspace := {
     "function applyInteger(f: function(Word) returns (integer), value: Word) returns (integer) { return f(value); }"
   ] }] }
 
-private def compile (program : CheckedProgram) (name : String) : IO CompiledEntry := do
-  let function ← match program.signatures.functions.filter (·.name == name) with
-    | [function] => pure function
-    | _ => throw (IO.userError s!"source boundary fixture missing: {name}")
-  match compileChecked program (.declaration function.id [])
-      { backendPreference := .typedSource, stagingFuel := 128, specializationBudget := 128 } with
-  | .ok entry => pure entry
-  | .error error => throw (IO.userError s!"source boundary fixture rejected: {reprStr error}")
+private def compile (program : CheckedProgram) (name : String) : IO SourceCompilerFeatureSupport.Entry :=
+  SourceCompilerFeatureSupport.compileNamed program name []
+    {specializationBudget := 128, compilationFuel := 1000}
 
-private def options : RunOptions := { inputValidationFuel := 128, executionFuel := 10000 }
+private def options : SourceCoreExecution.RunOptions := { inputValidationFuel := 128, executionFuel := 10000 }
 
-private def completed (compiled : CompiledEntry) (arguments : List SourceTypedRuntime.Value)
-    (state : SourceTypedRuntime.RuntimeState := {}) : IO (SourceTypedRuntime.Value × SourceTypedRuntime.RuntimeState) :=
-  match compiled.runTyped arguments options state with
-  | .ok (.typedSource (.done value state)) => pure (value, state)
+private def completed (compiled : SourceCompilerFeatureSupport.Entry) (arguments : List SourceTypedRuntime.Value)
+    (state : SourceTypedRuntime.RuntimeState := {}) : IO (SourceTypedRuntime.Value × SourceTypedRuntime.RuntimeState) := do
+  let result ← SourceCompilerFeatureSupport.get "retained boundary execution"
+    (compiled.cached.run compiled.key arguments options.inputValidationFuel options.executionFuel state)
+  match result.observation with
+  | .done value state => pure (value, state)
   | other => throw (IO.userError s!"source boundary execution failed: {reprStr other}")
 
-private def wordResult (compiled : CompiledEntry) (arguments : List SourceTypedRuntime.Value) (expected : Nat)
+private def wordResult (compiled : SourceCompilerFeatureSupport.Entry) (arguments : List SourceTypedRuntime.Value) (expected : Nat)
     (state : SourceTypedRuntime.RuntimeState := {}) : IO SourceTypedRuntime.RuntimeState := do
   let (value, state) ← completed compiled arguments state
   match value with
@@ -145,12 +141,16 @@ def run : IO Unit := do
   let globalState ← wordResult apply [.global key [], .word (word 8)] 8
   assertTrue (globalState.heap.length == 4) "global input/callee parameter allocation changed"
   let unselected ← compile program "applyUnselected"
-  match unselected.runTyped [.global key [], .word (word 8)] options with
-  | .ok (.typedSource (.fault (.typeMismatch _ _) _)) => pure ()
+  let rejectedGlobal ← SourceCompilerFeatureSupport.get "unselected global audit"
+    (unselected.cached.run unselected.key [.global key [], .word (word 8)] options.inputValidationFuel options.executionFuel)
+  match rejectedGlobal.observation with
+  | .fault (.typeMismatch _ _) _ => pure ()
   | _ => throw (IO.userError "a global outside the selected plan was accepted")
   let invoke ← compile program "invokeUnit"
-  match invoke.runTyped [closure] options with
-  | .ok (.typedSource (.fault (.typeMismatch _ _) _)) => pure ()
+  let rejectedClosure ← SourceCompilerFeatureSupport.get "raw closure audit"
+    (invoke.cached.run invoke.key [closure] options.inputValidationFuel options.executionFuel)
+  match rejectedClosure.observation with
+  | .fault (.typeMismatch _ _) _ => pure ()
   | _ => throw (IO.userError "public raw captured closure argument was accepted")
   let builtin ← compile program "applyInteger"
   match (← completed builtin [.builtin .wordToInteger, .word (word 8)]).1 with
@@ -158,9 +158,26 @@ def run : IO Unit := do
   | _ => throw (IO.userError "public builtin function input changed")
   let malformedPrefix : SourceTypedRuntime.RuntimeState := {
     heap := [{type := .word, value := some (.bool true)}] }
-  match scalar.runTyped [.bool true] options malformedPrefix with
-  | .ok (.typedSource (.fault (.typeMismatch .word (some .bool)) _)) => pure ()
+  let malformedInput ← SourceCompilerFeatureSupport.get "input ordering audit"
+    (scalar.cached.run scalar.key [.bool true] options.inputValidationFuel options.executionFuel malformedPrefix)
+  match malformedInput.observation with
+  | .fault (.typeMismatch .word (some .bool)) _ => pure ()
   | _ => throw (IO.userError "public input failure did not precede initial heap rejection")
+  -- The public data carrier keeps the same accepted metadata and order.
+  unless (← proxy.run [.proxy (.comptime .word)]) == .proxy (.comptime .word) do
+    throw (IO.userError "public proxy metadata changed")
+  unless (← lookup.run [.mapping (.proxy .word) .word
+      [(.proxy (.comptime .word), .word (word 7))]]) == .word (word 0) do
+    throw (IO.userError "public proxy-key comparison erased raw metadata")
+  unless (← missing.run [.mapping .word (.proxy (.comptime .word)) []]) == .proxy (.comptime .word) do
+    throw (IO.userError "public mapping default lost its raw value header")
+  let publicMap : SourceCoreExecution.Value := .mapping (.comptime .word) (.comptime .word)
+    [(.word (word 3), .word (word 7)), (.word (word 3), .word (word 9))]
+  unless (← mapping.run [publicMap]) == publicMap do
+    throw (IO.userError "public mapping metadata or duplicate order changed")
+  let publicBox : SourceCoreExecution.Value := .constructed stagedMetadata [.word (word 7)]
+  unless (← echo.run [publicBox]) == publicBox && (← matchBox.run [publicBox]) == .word (word 99) do
+    throw (IO.userError "public nominal metadata or matching changed")
   IO.println "public raw metadata, function inputs and inert source heap observations GREEN"
 
 end Tests.SourceCompilerSourceBoundaryObservations

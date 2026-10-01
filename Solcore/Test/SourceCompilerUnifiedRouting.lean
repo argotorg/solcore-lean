@@ -1,16 +1,17 @@
-import Solcore.Frontend.SourceCompiler
+import Solcore.Test.SourceCompilerFeatureSupport
+import Solcore.Frontend.SourceCoreUnifiedRuntimeCertificates
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 #check_failure Solcore.Frontend.SourceTypedRuntime.runTrusted
 #check_failure Solcore.Frontend.SourceTypedRuntime.runDeepCertifiedWithValidationFuel
-#check_failure Solcore.Frontend.SourceCompiler.CompiledEntry.TypedCheckpoint.mk
+#check_failure Solcore.Frontend.SourceCoreExecution.Checkpoint.mk
 
-/-! The historical source-value invocation tag now executes a cached typed
-Core artifact. Its observations retain metadata, errors and the source heap;
-its sealed checkpoint resumes the native machine. -/
+/-! Public sessions execute one cached Core artifact. Internal compatibility
+observations retain raw metadata, errors and the inert source heap prefix;
+public checkpoints resume native execution without a backend selector. -/
 set_option autoImplicit false
 namespace Tests.SourceCompilerUnifiedRouting
-open Solcore Solcore.Frontend SourceInference SourceCompiler
+open Solcore Solcore.Frontend SourceInference
 
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
@@ -30,31 +31,29 @@ private def workspace : Workspace.RawWorkspace := {
     "function spin() returns (Word) { return spin(); }"
   ] }] }
 
-private def compile (program : CheckedProgram) (name : String) : IO CompiledEntry := do
-  let declaration ← match program.signatures.functions.filter (·.name == name) with
-    | [signature] => pure signature.id
-    | _ => throw (IO.userError s!"routing fixture missing {name}")
-  let compiled ← get "cached public compilation" (compileChecked program (.declaration declaration [])
-    { backendPreference := .typedSource, specializationBudget := 256, stagingFuel := 1000 })
-  assertTrue (compiled.backend == .typedSource) "historical source invocation tag changed"
-  pure compiled
+private def compile (program : CheckedProgram) (name : String) : IO SourceCompilerFeatureSupport.Entry :=
+  SourceCompilerFeatureSupport.compileNamed program name []
+    {specializationBudget := 256, compilationFuel := 1000}
 
 private def initial : SourceTypedRuntime.RuntimeState := { heap := [⟨.error, none⟩, ⟨.word, some (.word (w 99))⟩] }
-private def options : RunOptions := { inputValidationFuel := 500, executionFuel := 150000 }
-private def completed (compiled : CompiledEntry) (arguments : List SourceTypedRuntime.Value) :
+private def options : SourceCoreExecution.RunOptions := { inputValidationFuel := 500, executionFuel := 150000 }
+private def completed (compiled : SourceCompilerFeatureSupport.Entry) (arguments : List SourceTypedRuntime.Value) :
     IO (SourceTypedRuntime.Value × SourceTypedRuntime.RuntimeState) := do
-  match ← get "public source-compatible execution" (compiled.runTyped arguments options initial) with
-  | .typedSource (.done value final) =>
+  let result ← get "cached source observation" (compiled.cached.run compiled.key arguments
+    options.inputValidationFuel options.executionFuel initial)
+  match result.observation with
+  | .done value final =>
       assertTrue (reprStr (final.heap.take initial.heap.length) == reprStr initial.heap) "inert prefix changed"
       pure (value, final)
-  | other => throw (IO.userError s!"public source-compatible execution did not complete: {reprStr other}")
+  | other => throw (IO.userError s!"cached source observation did not complete: {reprStr other}")
 
-example {compiled : CompiledEntry} (checkpoint : compiled.TypedCheckpoint)
-    (canonical : compiled.HasCanonicalRoot)
+example {compiled : SourceCoreUnifiedCompilation.Compiled} (result : SourceCoreUnifiedCompilation.Result compiled)
     {value : SourceTypedRuntime.Value} {final : SourceTypedRuntime.RuntimeState}
-    (done : checkpoint.observation = .done value final) :
-    compiled.TypedDeepExecution checkpoint.inputArguments checkpoint.initialState value final :=
-  checkpoint.done_has_public_deepExecution canonical done
+    (done : result.observation = .done value final) :
+    ∃ execution, result.execution = some execution ∧
+      SourceTypedRuntime.PreparedDeepExecution compiled.indexed.base.sourceProgram compiled.indexed.base.validationPlan
+        execution.root.argumentTypes execution.root.expected execution.arguments execution.initial value final :=
+  result.done_certificate done
 
 def run : IO Unit := do
   let program ← get "routing checking" (checkProgram workspace)
@@ -72,7 +71,7 @@ def run : IO Unit := do
   assertTrue (reprStr (← completed builtin [.builtin .wordToInteger, .word (w 8)]).1 == reprStr (.integer 8 : SourceTypedRuntime.Value))
     "builtin argument changed"
   let capture ← compile program "capture"
-  let paused ← get "native source checkpoint" (capture.runTypedWithCheckpoint [.word (w 10)] { options with executionFuel := 0 } initial)
+  let paused ← get "native source checkpoint" (capture.cached.run capture.key [.word (w 10)] options.inputValidationFuel 0 initial)
   match paused.observation with
   | .outOfFuel state => assertTrue (reprStr state == reprStr initial) "zero fuel changed source prefix"
   | other => throw (IO.userError s!"zero fuel did not suspend: {reprStr other}")
@@ -82,17 +81,42 @@ def run : IO Unit := do
       assertTrue (value == w 17 && reprStr (final.heap.take 2) == reprStr initial.heap) "resumed captures or source prefix changed"
   | other => throw (IO.userError s!"resumed source checkpoint did not complete: {reprStr other}")
   let failure ← compile program "failAfterWrite"
-  match ← get "public source language fault" (failure.runTyped [] options initial) with
-  | .typedSource (.fault (.uninitializedLocal _) state) =>
+  let failed ← get "cached source language fault" (failure.cached.run failure.key [] options.inputValidationFuel options.executionFuel initial)
+  match failed.observation with
+  | .fault (.uninitializedLocal _) state =>
       assertTrue (state.heap.any fun cell => match cell.value with | some (.word value) => value == w 3 | _ => false)
         "language failure lost preceding captured mutation"
   | other => throw (IO.userError s!"public source fault changed: {reprStr other}")
   let spin ← compile program "spin"
-  let paused ← get "recursive native checkpoint" (spin.runTypedWithCheckpoint [] { options with executionFuel := 43 } initial)
+  let paused ← get "recursive native checkpoint" (spin.cached.run spin.key [] options.inputValidationFuel 43 initial)
   let continued ← get "recursive native resume" (paused.resume 211)
   match continued.observation with
   | .outOfFuel _ => pure ()
   | other => throw (IO.userError s!"recursive native resume unexpectedly terminated: {reprStr other}")
-  IO.println "public source-value routing uses cached Core execution and typed native resume GREEN"
+  let artifact ← apply.execution.open
+  let session ← SourceCompilerFeatureSupport.boot artifact
+  let named ← get "public selected global" (← session.named scalar)
+  match ← named.session.run apply.key [named.value, .word (w 8)] {executionFuel := 300000} with
+  | .ok (.succeeded result) => assertTrue (result.value == .word (w 8)) "public selected global changed"
+  | _ => throw (IO.userError "public selected global invocation failed")
+  let rawPublic : SourceCoreExecution.Value := .mapping (.comptime .word) (.comptime .word)
+    [(.word (w 1), .word (w 7)), (.word (w 1), .word (w 9))]
+  assertTrue ((← mapping.run [rawPublic]) == rawPublic) "public mapping header/order changed"
+  capture.checkResume [.word (w 10)] (.word (w 17)) 0
+  let publicFailure ← failure.invoke []
+  match publicFailure.outcome with
+  | .failed reason _ =>
+      match ← publicFailure.diagnostic reason with
+      | some {error := .uninitializedLocal _, ..} => pure ()
+      | _ => throw (IO.userError "public fault classification changed")
+  | _ => throw (IO.userError "public fault failed to occur")
+  let publicSpin ← spin.invoke [] {executionFuel := 43}
+  match publicSpin.outcome with
+  | .outOfFuel checkpoint =>
+      match ← checkpoint.resume 211 with
+      | .outOfFuel _ => pure ()
+      | _ => throw (IO.userError "public recursive resume unexpectedly terminated")
+  | _ => throw (IO.userError "public recursive invocation unexpectedly terminated")
+  IO.println "common public sessions and retained prefix audits use cached Core with typed resume GREEN"
 
 end Tests.SourceCompilerUnifiedRouting
