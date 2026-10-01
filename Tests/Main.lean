@@ -85,6 +85,20 @@ import Solcore.Test.SourceCoreCallableAncestrySourceActive
 import Solcore.Test.SourceCoreCallableAncestryReadRecipes
 import Solcore.Test.SourceCoreCallableAncestryReadRecipeProofs
 import Solcore.Test.SourceCoreCallableSharedHistory
+import Solcore.Test.SourceCoreCallablePairedFrames
+import Solcore.Test.SourceCoreCallablePairedPrograms
+import Solcore.Test.SourceCoreCallableAncestryPairedProfiles
+import Solcore.Test.SourceCoreCallableAncestryPairedLookup
+import Solcore.Test.SourceCoreCallableAncestryPairedPreparation
+import Solcore.Test.SourceCoreCallableAncestryPairedWorklist
+import Solcore.Test.SourceCoreCallableAncestryPairedRecipes
+import Solcore.Test.SourceCoreCallableAncestryPairedProgress
+import Solcore.Test.SourceCoreCallableAncestryPairedSeeds
+import Solcore.Test.SourceCoreCallablePairedHeaders
+import Solcore.Test.SourceCoreCallablePairedReadViews
+import Solcore.Test.SourceCoreCallablePairedRestoration
+import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
+import Solcore.Test.SourceCoreCompatiblePlaceOrder
 import Solcore.Test.SourceCoreCompatibleMixedPaths
 import Solcore.Test.SourceCoreCompatiblePathCertificates
 import Solcore.Test.SourceCoreCompatiblePlaceSnapshot
@@ -2346,6 +2360,13 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallableAncestryReadViews.run
   SourceCoreCallableAncestryReadRecipes.run
   SourceCoreCallableSharedHistory.run
+  SourceCoreCallablePairedPrograms.run
+  SourceCoreCallableAncestryPairedPreparation.run
+  SourceCoreCallablePairedHeaders.run
+  SourceCoreCallablePairedReadViews.run
+  SourceCoreCallablePairedRestoration.run
+  SourceCoreCompatiblePlaceKeyTyping.run
+  SourceCoreCompatiblePlaceOrder.run
   SourceCoreCompatibleMixedPaths.run
   SourceCoreCompatiblePathCertificates.run
   SourceCoreCompatiblePlaceSnapshot.run
