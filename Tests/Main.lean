@@ -127,6 +127,12 @@ import Solcore.Test.SourceCoreUnifiedOperatorCorpus
 import Solcore.Test.SourceCoreCompatibleBitNot
 import Solcore.Test.SourceCoreCompatibleIntegerBitNot
 import Solcore.Test.SourceCoreCompatibleAmbientHeap
+import Solcore.Test.SourceCoreCompatibleBareBitNot
+import Solcore.Test.SourceCoreUnifiedStagingCorpus
+import Solcore.Test.SourceCompilerUnifiedRouting
+import Solcore.Test.SourceCoreUnifiedImportBoundary
+import Solcore.Test.SourceCoreCompatibleExpressionReads
+import Solcore.Test.SourceCoreCallableIndexedAmbient
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -2416,6 +2422,11 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreUnifiedOperatorCorpus.run
   SourceCoreCompatibleBitNot.run
   SourceCoreCompatibleIntegerBitNot.run
+  SourceCoreCompatibleBareBitNot.run
+  SourceCoreUnifiedStagingCorpus.run
+  SourceCompilerUnifiedRouting.run
+  SourceCoreCompatibleExpressionReads.run
+  Solcore.Test.SourceCoreCallableIndexedAmbient.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
