@@ -10,7 +10,7 @@ open Core Frontend SourceInference GeneralHeap DataEquality
 /-- Any completed actual storeCell commits precisely the reconstructed source
 root once. The mapped heap and old administrative cells are preserved at the
 same world; helper allocations have already been reflected before this step. -/
-theorem reflects_storeCell {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
+theorem reflects_storeCell {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
     {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store finalStore : Store}
     {location : Dynamic.Location} {target : Location} {cell : Dynamic.Cell} {type : Ty}
     {sourceValue : Dynamic.Value} {value result : Value}

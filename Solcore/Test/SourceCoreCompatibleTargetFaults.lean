@@ -180,7 +180,7 @@ theorem whole {route : Route} {prepared : Prepared}
     .cons reference (.nil .nil)
   have writable : WritableLocal context binder.id prepared.route.rootSourceType := rootEq ▸ rootWritable
   obtain ⟨token, _, _, finalStore, finalMap, finalWorld, failed, _, _, evaluated, heaps, _⟩ :=
-    CompatiblePlaceTargetFaults.projection (index := 0) layout (childMeaning encoded.context.registry) environments heaps localAgrees
+    CompatiblePlaceTargetFaults.projection (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (index := 0) layout (childMeaning encoded.context.registry) environments heaps localAgrees
       (by simp [scope, SourceCoreLocalCell.lookup?, assignment]) writable
       (Dynamic.Environment.LooksUp.head) (Dynamic.Heap.Reads.intro .head)
       (Dynamic.SourceProjectionsEvaluate.index (keyEvaluates environment before) .nil) (Dynamic.Heap.Reads.intro .head)
@@ -223,7 +223,7 @@ theorem uninitialized {route : Route} {prepared : Prepared}
     .cons reference (.nil .nil)
   have writable : WritableLocal context binder.id prepared.route.rootSourceType := rootEq ▸ rootWritable
   obtain ⟨finalStore, finalMap, finalWorld, failed, evaluated, heaps, _⟩ :=
-    CompatiblePlaceTargetFaults.uninitialized (index := 0) layout (childMeaning compilation.registry) environments heaps absentAgrees
+    CompatiblePlaceTargetFaults.uninitialized (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (index := 0) layout (childMeaning compilation.registry) environments heaps absentAgrees
       (by simp [scope, SourceCoreLocalCell.lookup?, assignment]) writable
       (Dynamic.Environment.LooksUp.head) (Dynamic.Heap.Reads.intro .head)
       (Dynamic.SourceProjectionsEvaluate.index (keyEvaluates environment absent) .nil) (Dynamic.Heap.Reads.intro .head)

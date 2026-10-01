@@ -14,7 +14,7 @@ open DataPlaceCertificates CompatibleMixedRoute CompatiblePlaceCompilerCertifica
 /-- The actual path, retained source typing and final Core checker discharge
 all fields of the semantic Layout. The RHS typing is a static child-compiler
 obligation under the original context. -/
-theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Context}
+theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Context} {definitions : DataEnvironment}
     {source : TypedSource} {context : SourceSemantics.Context} {site : SourceCoreElaboration.ErrorSite}
     {assignment : AssignmentResolution} {route : Route} {prepared : Prepared}
     {fuel : Nat} {invalid : Word} {missing : TypeSystem.Ty → Word}
@@ -33,14 +33,14 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext)
       (execute prepared reference (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalidOperand)
-      resultType compilation.checked.catalog.definitions)
+      resultType definitions)
     (rhsTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) rhs
-      (LanguageResult.resultType prepared.route.leafType) compilation.checked.catalog.definitions) :
+      (LanguageResult.resultType prepared.route.leafType) definitions) :
     ∃ binder leaf sourceTypes,
       rootBinder source assignment.target.root = .ok binder ∧
       prepared.route.rootSourceType = binder.scheme.body ∧
       SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type ∧
-      CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext ∧
+      CompatiblePlaceAssignmentSuccess.Layout (definitions := definitions) compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext ∧
       ((∀ k v, prepared.route.rootSourceType ≠ .mapping k v) → prepared.route.rootMapping = none) := by
   obtain ⟨binder, leaf, description⟩ := CompatiblePlaceDescription.of_describe described
   obtain ⟨routeEq, _, path⟩ := description.prepared preparedBy
@@ -71,7 +71,7 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
 shape, all helper typing, exact child compiler receipt and raw RHS view.
 Independent source typing is retained explicitly until the enclosing checked
 statement induction supplies it. -/
-theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
+theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definitions : DataEnvironment}
     {source : TypedSource} {context : SourceSemantics.Context} {site : SourceCoreElaboration.ErrorSite}
     {assignment : AssignmentResolution} {fuel : Nat} {expression : ExpressionLowerer} {scope : Scope}
     {reasonAt : ExpressionId → Word} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
@@ -85,17 +85,17 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code ∧
       HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) code.expression (LanguageResult.resultType code.type)
-        compilation.checked.catalog.definitions)
+        definitions)
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator (some rhs) outputType
       next reasonAt invalid invalidOperand missing = .ok lowered)
-    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType compilation.checked.catalog.definitions) :
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType definitions) :
     ∃ binder leaf prepared codes sourceTypes index right node,
       (∃ route, describe compilation compilation.checked.signatures source site assignment = .ok route ∧
         prepare compilation fuel route invalid missing = .ok prepared) ∧
       rootBinder source assignment.target.root = .ok binder ∧
       prepared.route.rootSourceType = binder.scheme.body ∧
       SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, prepared.route.rootType) ∧
-      CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext ∧
+      CompatiblePlaceAssignmentSuccess.Layout (definitions := definitions) compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext ∧
       ((∀ k v, prepared.route.rootSourceType ≠ .mapping k v) → prepared.route.rootMapping = none) ∧
       expression fuel source scope rhs reasonAt = .ok right ∧
       source.lookupExpression? rhs = some node ∧ certificate scope rhs right ∧

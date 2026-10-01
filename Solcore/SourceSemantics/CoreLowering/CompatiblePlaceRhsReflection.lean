@@ -18,7 +18,8 @@ def remainder (prepared : Prepared) (keyType : Ty) (next : Expr) (outputType : T
       (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)))
 
 structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (program : Program) (context : SourceSemantics.Context)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (program : Program) (context : SourceSemantics.Context)
     (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (faults : FaultRep)
     (environment : Dynamic.Environment) (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr)
     (sourceTypes : List TypeSystem.Ty) (place : PlaceResolution) (leaf : TypeSystem.Ty)
@@ -38,7 +39,8 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
   related : ValueRep checked registry functions mapping world leaf right value prepared.route.leafType
 
 inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (program : Program) (context : SourceSemantics.Context)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (program : Program) (context : SourceSemantics.Context)
     (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (faults : FaultRep)
     (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (place : PlaceResolution) (leaf : TypeSystem.Ty) (environment : Dynamic.Environment) (coreEnvironment : Environment)
@@ -70,7 +72,8 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
 /-- Source and Core RHS types are connected by the retained raw runtime view,
 not by inverting the many-to-one native type projection. -/
 theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
@@ -82,7 +85,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     (coreType : lowered.type = prepared.route.leafType)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store}
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     {next : Expr} {outputType : Ty} {operator : Syntax.ValueAssignOp} {invalid : Word} {result : Value}
     (resolution : CompatiblePlacePrefixReflection.Result checked registry functions program context evidence source faults prepared codes sourceTypes

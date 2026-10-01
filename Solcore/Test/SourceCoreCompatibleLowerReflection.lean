@@ -125,7 +125,7 @@ theorem actual_lower_reflects {code : Expr}
   have binding : ∀ actual, rootBinder source assignment.target.root = .ok actual → actual = binder := by
     intro actual found
     exact Except.ok.inj (found.symm.trans (show rootBinder source assignment.target.root = .ok binder by cbv))
-  have reflected := CompatiblePlaceLowerReflection.reflects (certificate := Child)
+  have reflected := CompatiblePlaceLowerReflection.reflects (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
     unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _)) keyTyped
     (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment]) childReceipt accepted typed
     (.refl _) (childReflects compilation.registry (fun _ _ => True)) functionViews faithful observations

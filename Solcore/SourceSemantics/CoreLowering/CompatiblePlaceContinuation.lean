@@ -61,7 +61,7 @@ theorem plug {prepared : Prepared} {reference rhs : Expr} {keys : SourceCoreBasi
 /-- A universal expression IH supplies the continuation evaluation at the
 actual temporary slots. `completed` is an already proved assignment result,
 not a child-runtime assumption or a field of a static compilation receipt. -/
-theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
+theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {certificate : Certificate} {faults : FaultRep}
     (meaning : Preserves model program context evidence source certificate faults)
@@ -75,7 +75,7 @@ theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericH
       (.inRight .word .unit) store)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := definitions) catalog mapping world administrativeContext scope environment coreEnvironment)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (trace : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after) :
@@ -98,13 +98,14 @@ theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericH
 hidden slots. The completed prefix is constructed from independent source
 semantics here; it is not a caller-supplied execution assumption. -/
 theorem preserves_from_source {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
@@ -118,7 +119,7 @@ theorem preserves_from_source {compilation : SourceCoreCompatibleDataPlaces.Cont
       SourceCoreRawMetadata.runtimeType leaf = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))

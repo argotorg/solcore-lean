@@ -12,7 +12,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute Co
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 variable {compilation : SourceCoreCompatibleDataPlaces.Context}
-  {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+  {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
   {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
   {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
   {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
@@ -26,9 +27,9 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context}
 /-- Independent structural failure determines the actual whole emitted
 assignment's failure before its RHS, modifier, setter or continuation starts. -/
 theorem projection
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -89,7 +90,7 @@ theorem projection
   have typedEnvironment : RuntimeEnvironmentHasTypes keys.keyWorld
       (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
       ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
-        (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) compilation.checked.catalog.definitions :=
+        (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) ambient.definitions :=
     .cons (CompatiblePlaceResolution.values_typed keys.related)
       (.cons (.cellRef keys.reference.typed) ((environments.extend keys.maps keys.worlds).runtime_hasTypes))
   obtain ⟨finalWorld, extension, typedStore, _, frame⟩ :=
@@ -104,9 +105,9 @@ theorem projection
 /-- Actual describe supplies `ordinary`. It is a static route fact, not a
 claim that native type equality recovers the source declaration. -/
 theorem uninitialized
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))

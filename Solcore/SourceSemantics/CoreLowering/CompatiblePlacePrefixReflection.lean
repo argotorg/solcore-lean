@@ -22,7 +22,8 @@ def remainder (prepared : Prepared) (keyType : Ty) (rhs next : Expr) (outputType
         (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))
 
 inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (program : Program) (context : SourceSemantics.Context)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (program : Program) (context : SourceSemantics.Context)
     (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (faults : FaultRep)
     (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (place : PlaceResolution) (leaf : TypeSystem.Ty) (environment : Dynamic.Environment) (coreEnvironment : Environment)
@@ -52,13 +53,14 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
 They do not supply any source or native execution. All target source traces
 are reconstructed from a completed emitted assignment and universal child IH. -/
 theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context} {rhsType : Core.Ty}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext rhsType)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext rhsType)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : Reflects (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
@@ -70,7 +72,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -96,7 +98,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     have typedEnvironment : RuntimeEnvironmentHasTypes keys.keyWorld
         (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
         ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
-          (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) compilation.checked.catalog.definitions :=
+          (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) ambient.definitions :=
       .cons (CompatiblePlaceResolution.values_typed keys.related)
         (.cons (.cellRef keys.reference.typed) ((environments.extend keys.maps keys.worlds).runtime_hasTypes))
     have reflectGetter := fun {value : Value} {afterStore : Store}

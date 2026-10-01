@@ -172,7 +172,7 @@ theorem whole {route : Route} {prepared : Prepared}
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] (world prepared) [] (scope prepared) environment (nativeEnvironment prepared) :=
     .cons reference (.nil .nil)
   have writable : WritableLocal context binder.id prepared.route.rootSourceType := rootEq ▸ rootWritable
-  exact CompatiblePlaceContinuation.preserves_from_source (node := node) (nextNode := node) (index := 0) layout (.refl _) childMeaning faithful observations
+  exact CompatiblePlaceContinuation.preserves_from_source (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (node := node) (nextNode := node) (index := 0) layout (.refl _) childMeaning faithful observations
     ⟨rfl, rfl⟩ (by cbv) leafView leafEq.symm (.inl rfl) environments heaps localAgrees (by simp [scope, SourceCoreLocalCell.lookup?, assignment])
     writable sourceAssignment Word.zero ⟨rfl, rfl⟩ (by cbv) (.value (keyEvaluates environment after))
 

@@ -14,7 +14,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute Co
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (program : Program) (context : SourceSemantics.Context)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (program : Program) (context : SourceSemantics.Context)
     (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (faults : FaultRep)
     (place : PlaceResolution) (operator : Syntax.ValueAssignOp) (rhs : ExpressionId)
     (environment : Dynamic.Environment) (coreEnvironment : Environment)
@@ -50,7 +51,7 @@ private theorem resolved_type {program : Program} {context : SourceSemantics.Con
   | intro _ _ _ currentRead _ _ => exact congrArg Dynamic.Cell.type (currentRead.functional read)
 
 private theorem absent_initial {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {model : GenericHeap.PayloadModel catalog projects} {mapping : LocationMap} {world : StoreTyping}
+    {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions} {mapping : LocationMap} {world : StoreTyping}
     {cell : Dynamic.Cell} {optional : Value} {type : Ty}
     (related : GenericHeap.CellRepresents model mapping world cell optional type)
     (empty : cell.value = none) (notMapping : ¬ ∃ k v, cell.type = .mapping k v) :
@@ -63,13 +64,14 @@ private theorem absent_initial {catalog : SourceCoreDataCatalog.Catalog} {projec
 native-first modifier total, so a later structural fault has the same source
 priority. Raw default/token metadata remain authenticated throughout. -/
 theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (functionTypes : FunctionRuntimeViews functions)
@@ -81,7 +83,7 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before targetHeap : Dynamic.Heap} {store finalStore : Store}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     {target : Dynamic.ResolvedPlace}
     (sourceTrace : Dynamic.SourcePlaceResolves program context evidence source environment before place target targetHeap)
     (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared codes sourceTypes place leaf target
@@ -123,7 +125,7 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
           (.inRight .unit resolution.snapshot) right.value replacementValue coreEnvironment)
         (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
           OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
-        compilation.checked.catalog.definitions :=
+        ambient.definitions :=
       .cons replacementRep.runtime_hasType (.cons right.related.runtime_hasType (.cons (.inRight snapshotRep.runtime_hasType)
         (.cons (CompatiblePlaceResolution.values_typed keyRep) (.cons (.cellRef reference.typed)
           ((environments.extend (resolution.maps.trans right.meaning.maps) (resolution.worlds.trans right.meaning.worlds)).runtime_hasTypes)))))
