@@ -105,6 +105,7 @@ import Solcore.Test.SourceCoreCallableIndexedFormation
 import Solcore.Test.SourceCoreCallableIndexedSnapshots
 import Solcore.Test.SourceCoreCallableIndexedBodyMeaning
 import Solcore.Test.SourceCoreCallableIndexedOrdinaryAllocation
+import Solcore.Test.SourceCoreCallableIndexedParameters
 import Solcore.Test.SourceCoreCallableIndexedPrograms
 import Solcore.Test.SourceCoreCallableIndexedReadViews
 import Solcore.Test.SourceCoreCallableIndexedOutputs
@@ -120,6 +121,13 @@ import Solcore.Test.SourceCoreUnifiedRuntime
 import Solcore.Test.SourceCoreUnifiedRuntimeCertificates
 import Solcore.Test.SourceCoreUnifiedSourceBoundaryObservations
 import Solcore.Test.SourceCoreUnifiedCompilation
+import Solcore.Test.SourceCoreUnifiedControlCorpus
+import Solcore.Test.SourceCoreUnifiedEvidenceCorpus
+import Solcore.Test.SourceCoreUnifiedOperatorCorpus
+import Solcore.Test.SourceCoreCompatibleBitNot
+import Solcore.Test.SourceCoreCompatibleIntegerBitNot
+import Solcore.Test.SourceCoreCompatibleAmbientHeap
+import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
 import Solcore.Test.SourceCoreCompatibleMixedPaths
@@ -2403,6 +2411,12 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreUnifiedRuntime.run
   SourceCoreUnifiedSourceBoundaryObservations.run
   SourceCoreUnifiedCompilation.run
+  SourceCoreUnifiedControlCorpus.run
+  SourceCoreUnifiedEvidenceCorpus.run
+  SourceCoreUnifiedOperatorCorpus.run
+  SourceCoreCompatibleBitNot.run
+  SourceCoreCompatibleIntegerBitNot.run
+  SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
   SourceCoreCompatibleMixedPaths.run

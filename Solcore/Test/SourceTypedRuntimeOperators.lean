@@ -375,15 +375,15 @@ private def testPublicCompiler (program : CheckedProgram) : IO Unit := do
     | .ok compiled => pure compiled
     | .error error => throw (IO.userError
         s!"public operator compilation failed: {reprStr error}")
-  assertTrue (decide (compiled.backend = .typedSource))
-    "stateful selected operator did not choose the typed-source backend"
+  assertTrue (decide (compiled.backend = .core))
+    "stateful selected operator did not choose the Core backend"
   let runOptions : RunOptions := {
     inputValidationFuel := 64
     executionFuel := 8192
   }
-  match compiled.runTyped [] runOptions with
-  | .ok (.typedSource (.done (.word actual) state)) => do
-      assertTrue (actual == word 31 && !state.heap.isEmpty)
+  match compiled.runCore [] runOptions with
+  | .ok (.coreLanguageResult (.succeeded (.word actual) store)) => do
+      assertTrue (actual == word 31 && !store.isEmpty)
         "public stateful operator execution lost its result or heap effects"
   | result => throw (IO.userError
       s!"public stateful operator execution returned {reprStr result}")
