@@ -77,7 +77,18 @@ import Solcore.Test.SourceCoreCallableAncestryComposition
 import Solcore.Test.SourceCoreCompatibleOutputLeaves
 import Solcore.Test.SourceCoreCallableAncestryCaptures
 import Solcore.Test.SourceCoreCallableAncestryCache
+import Solcore.Test.SourceCoreCallableAncestryPreparation
+import Solcore.Test.SourceCoreCallableAncestryWorklist
+import Solcore.Test.SourceCoreCallableAncestryPrincipalHeaders
+import Solcore.Test.SourceCoreCallableAncestryReadViews
+import Solcore.Test.SourceCoreCallableAncestrySourceActive
+import Solcore.Test.SourceCoreCallableAncestryReadRecipes
+import Solcore.Test.SourceCoreCallableAncestryReadRecipeProofs
+import Solcore.Test.SourceCoreCallableSharedHistory
 import Solcore.Test.SourceCoreCompatibleMixedPaths
+import Solcore.Test.SourceCoreCompatiblePathCertificates
+import Solcore.Test.SourceCoreCompatiblePlaceSnapshot
+import Solcore.Test.SourceCoreCompatibleHeap
 import Solcore.Test.SourceCoreLambdaTemplates
 import Solcore.Test.SourceCoreCompatibleHeapOutputs
 import Solcore.Test.SourceCoreNativeEntry
@@ -2330,7 +2341,15 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCompatibleOutputLeaves.run
   SourceCoreCallableAncestryCaptures.run
   SourceCoreCallableAncestryCache.run
+  SourceCoreCallableAncestryPreparation.run
+  SourceCoreCallableAncestryPrincipalHeaders.run
+  SourceCoreCallableAncestryReadViews.run
+  SourceCoreCallableAncestryReadRecipes.run
+  SourceCoreCallableSharedHistory.run
   SourceCoreCompatibleMixedPaths.run
+  SourceCoreCompatiblePathCertificates.run
+  SourceCoreCompatiblePlaceSnapshot.run
+  SourceCoreCompatibleHeap.run
   SourceCoreLambdaTemplates.run
   SourceCoreCompatibleHeapOutputs.run
 
