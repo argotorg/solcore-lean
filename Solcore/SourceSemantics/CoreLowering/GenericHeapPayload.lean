@@ -17,7 +17,7 @@ catalog supplies only the registered Core definitions. The default preserves
 all existing strict-catalog APIs. -/
 abbrev Projection := TypeSystem.Ty → Core.Ty → Prop
 
-def strictProjection (catalog : SourceCoreDataCatalog.Catalog) : Projection :=
+abbrev strictProjection (catalog : SourceCoreDataCatalog.Catalog) : Projection :=
   fun source payload => catalog.project source = .ok payload
 
 structure PayloadModel (catalog : SourceCoreDataCatalog.Catalog)
