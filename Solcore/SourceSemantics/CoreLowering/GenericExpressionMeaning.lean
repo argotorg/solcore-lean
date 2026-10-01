@@ -15,13 +15,13 @@ abbrev ResultRepresents := @FunctionCalls.ResultRepresents
 
 /-- Every finite independent child execution has a matching Core execution.
 The payload model may include closures, mappings and catalog-authenticated data. -/
-def Preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} (model : GenericHeap.PayloadModel catalog projects)
+def Preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
     (source : TypedSource) (certificate : Certificate) (faults : FaultRep) : Prop :=
   ∀ {scope id lowered}, certificate scope id lowered →
   ∀ {node}, source.lookupExpression? id = some node →
   ∀ {mapping world administrativeContext environment canonical actual before store ξ outcome after},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical →
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
     GenericHeap.HeapRepresents model mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree ξ canonical actual →
@@ -35,13 +35,13 @@ def Preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.
 
 /-- Every completed Core child execution constructs its independent source
 outcome. No source child execution is a premise. -/
-def Reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} (model : GenericHeap.PayloadModel catalog projects)
+def Reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
     (source : TypedSource) (certificate : Certificate) (faults : FaultRep) : Prop :=
   ∀ {scope id lowered}, certificate scope id lowered →
   ∀ {node}, source.lookupExpression? id = some node →
   ∀ {mapping world administrativeContext environment canonical actual before store ξ value finalStore},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical →
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
     GenericHeap.HeapRepresents model mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree ξ canonical actual →
@@ -54,7 +54,7 @@ def Reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.P
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
 theorem ResultRepresents.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {model : GenericHeap.PayloadModel catalog projects} {mapping futureMapping : LocationMap}
+    {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions} {mapping futureMapping : LocationMap}
     {world futureWorld : StoreTyping} {sourceType : TypeSystem.Ty} {type : Ty} {faults : FaultRep}
     {outcome : Dynamic.ExpressionOutcome} {value : Value}
     (represented : ResultRepresents model mapping world sourceType type faults outcome value)
