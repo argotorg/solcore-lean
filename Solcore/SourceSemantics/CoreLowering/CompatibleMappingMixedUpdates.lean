@@ -10,7 +10,8 @@ open Core Frontend SourceInference CompatiblePayload CompatibleEquality DataEqua
 open SourceCoreCompatibleDataPlaces
 
 inductive UpdateTree (checked : SourceCoreCompatibleCatalog.Checked) (registry : Registry)
-    (functions : FunctionModel checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (prepared : Prepared) (keys : List Value) (replacementSource : Dynamic.Value) (replacement : Value) :
     TypeSystem.Ty → Dynamic.Value → Value → Ty → List PreparedStep → List Dynamic.EvaluatedProjection → Dynamic.Value → Nat → Prop where
   | leaf {sourceType source value type}
@@ -71,7 +72,8 @@ theorem replacePacked_evaluates {environment : Environment} {store : Store}
     (DataPlaceMembers.replacePacked_evaluates (index := index) (store := store) length selected newValue)
 
 theorem UpdateTree.preserves {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {replacementSource source updated : Dynamic.Value} {replacement value : Value}
     {sourceType : TypeSystem.Ty} {nativeType : Ty} {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {count : Nat}
     (tree : UpdateTree checked registry functions mapping world prepared keys replacementSource replacement sourceType source value nativeType steps projections updated count)

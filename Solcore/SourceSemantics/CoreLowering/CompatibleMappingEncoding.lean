@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleMappingMeaning
-import Solcore.SourceSemantics.CoreLowering.CompatibleEncoding
+import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientEncoding
 
 /-! Actual public encoder receipts supply the value-level lookup theorem.
 Registered layouts authenticate the omitted key type in the outer carrier;
@@ -35,7 +35,8 @@ open Core Frontend CompatiblePayload CompatibleEquality DataEquality
     (keyAccepted : SourceCoreCompatibleValues.encode fuel encodedMapping.context sourceKey keyCarrier = .ok encodedKey)
     (mappingMeaning : CompatibleEncoding.Means carrier (.mapping sourceKey sourceValue sources))
     (keyMeaning : CompatibleEncoding.Means keyCarrier sourceLookup)
-    {functions : FunctionModel context.checked.catalog} {identities : Dynamic.Value → Word → Prop}
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    {functions : FunctionModel context.checked.catalog ambient} {identities : Dynamic.Value → Word → Prop}
     (faithful : IdentityFaithful identities) (functionLeaves : FunctionObservations context.checked.catalog functions identities)
     (mapping : GeneralHeap.LocationMap) (world : StoreTyping) (environment : Environment) (store : Store) (missingBase : Word)
     (mappingExpression keyExpression : Expr)
@@ -50,9 +51,9 @@ open Core Frontend CompatiblePayload CompatibleEquality DataEquality
         (.initial (SourceCoreMappingWithDefault.lookup layout missingBase comparison.expression mappingExpression keyExpression) environment store) = .done actual actualStore →
           actual = result ∧ actualStore = finalStore) ∧
       ∃ administrative, finalStore = store ++ administrative ∧ administrative.length = context.checked.catalog.entries.length + 1 := by
-  have represented := CompatibleEncoding.encode_represents_at (functions := functions) mappingAccepted mappingMeaning mapping world
+  have represented := CompatibleAmbientEncoding.encode_represents_at (functions := functions) mappingAccepted mappingMeaning mapping world
   have represented := represented.extend encodedKey.preserves (.refl mapping) (.refl world)
-  have keyRep := CompatibleEncoding.encode_represents_at (context := encodedMapping.context) (functions := functions) keyAccepted keyMeaning mapping world
+  have keyRep := CompatibleAmbientEncoding.encode_represents_at (context := encodedMapping.context) (functions := functions) keyAccepted keyMeaning mapping world
   have mappingType := Except.ok.inj (encodedMapping.projected.symm.trans mappingProjection)
   have nativeKeyType := Except.ok.inj (encodedKey.projected.symm.trans keyProjection)
   rw [nativeKeyType] at keyRep

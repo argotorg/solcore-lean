@@ -9,7 +9,8 @@ open Core Frontend SourceInference CompatiblePayload CompatibleEquality DataEqua
 open SourceCoreCompatibleDataPlaces
 
 inductive FaultTree (checked : SourceCoreCompatibleCatalog.Checked) (registry : Registry)
-    (functions : FunctionModel checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (prepared : Prepared) (keys : List Value) :
     Dynamic.Value → Value → Ty → List PreparedStep → List Dynamic.EvaluatedProjection → Dynamic.SemanticFault → Word → Nat → Prop where
   | missing {sourceKey sourceValue index sources header entries fallback lookup key steps projections}
@@ -46,7 +47,8 @@ inductive FaultTree (checked : SourceCoreCompatibleCatalog.Checked) (registry : 
         (.index index :: steps) (.index lookup :: projections) reason token (checked.catalog.entries.length + 1 + count)
 
  theorem FaultTree.preserves {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {source : Dynamic.Value} {value : Value} {type : Ty}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {reason : Dynamic.SemanticFault} {token : Word} {count : Nat}
     (tree : FaultTree checked registry functions mapping world prepared keys source value type steps projections reason token count)

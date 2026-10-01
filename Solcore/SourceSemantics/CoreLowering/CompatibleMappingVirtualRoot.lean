@@ -130,14 +130,15 @@ theorem return_registry {fuel : Nat} {context : SourceCoreCompatibleValues.Conte
 
 theorem Generated.fields {context : SourceCoreCompatibleDataPlaces.Context} {route : Route}
     {key value : TypeSystem.Ty} (generated : Generated context route key value)
-    (functions : FunctionModel context.checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping) :
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    (functions : FunctionModel context.checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping) :
     ∃ expression header layout fallback,
       route.rootMapping = some expression ∧
       Quoted (Transport.carrier header fallback layout []) expression ∧
       Fields context.checked context.registry functions mapping world key value [] header layout [] fallback := by
   cases generated with
   | encoded accepted unchanged quote root =>
-    have represented := CompatibleEncoding.encode_represents_at (functions := functions) accepted (.mapping .empty) mapping world
+    have represented := CompatibleAmbientEncoding.encode_represents_at (functions := functions) accepted (.mapping .empty) mapping world
     have represented := represented.extend (return_registry _ unchanged) (.refl mapping) (.refl world)
     obtain ⟨header, layout, entries, fallback, native, _, _, fields⟩ := mapping_fields represented rfl
     have empty : entries = [] := by
@@ -149,7 +150,8 @@ theorem Generated.fields {context : SourceCoreCompatibleDataPlaces.Context} {rou
 
 theorem Generated.at_layout {context : SourceCoreCompatibleDataPlaces.Context} {route : Route}
     {key value : TypeSystem.Ty} (generated : Generated context route key value)
-    (functions : FunctionModel context.checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    (functions : FunctionModel context.checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (layout : Core.OrderedMapping.Layout) (registered : layout.Registered context.checked.catalog.definitions)
     (projected : context.checked.catalog.project (.mapping key value) = .ok (SourceCoreMappingWithDefault.type layout)) :
     ∃ expression header fallback,
@@ -163,7 +165,8 @@ theorem Generated.at_layout {context : SourceCoreCompatibleDataPlaces.Context} {
 
 theorem Generated.at_layout_extended {context : SourceCoreCompatibleDataPlaces.Context} {route : Route}
     {key value : TypeSystem.Ty} (generated : Generated context route key value)
-    (functions : FunctionModel context.checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    (functions : FunctionModel context.checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (layout : Core.OrderedMapping.Layout) (registered : layout.Registered context.checked.catalog.definitions)
     (projected : context.checked.catalog.project (.mapping key value) = .ok (SourceCoreMappingWithDefault.type layout))
     {registry : Registry} (extended : SourceCoreRawMetadata.Extends context.registry registry) :
@@ -189,7 +192,8 @@ theorem normalize_absent (prepared : Prepared) {expression : Expr} {value : Valu
 
 theorem generated_normalizes {context : SourceCoreCompatibleDataPlaces.Context} {prepared : Prepared}
     {key value : TypeSystem.Ty} (generated : Generated context prepared.route key value)
-    (functions : FunctionModel context.checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    (functions : FunctionModel context.checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (environment : Environment) (store : Store) (optional : Expr)
     (selected : Selects environment optional (.inLeft prepared.route.rootType .unit)) :
     ∃ header layout fallback,
@@ -205,7 +209,8 @@ theorem getter_absent {context : SourceCoreCompatibleDataPlaces.Context} {index 
     (registered : index.layout.Registered context.checked.catalog.definitions)
     (projected : context.checked.catalog.project (.mapping sourceKey sourceValue) = .ok (SourceCoreMappingWithDefault.type index.layout))
     {registry : Registry} (extended : SourceCoreRawMetadata.Extends context.registry registry)
-    {functions : FunctionModel context.checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    {functions : FunctionModel context.checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations context.checked.catalog functions identities)
     {sourceLookup : Dynamic.Value} {key : Value}
@@ -242,7 +247,8 @@ theorem setter_absent {context : SourceCoreCompatibleDataPlaces.Context} {index 
     (registered : index.layout.Registered context.checked.catalog.definitions)
     (projected : context.checked.catalog.project (.mapping sourceKey sourceValue) = .ok (SourceCoreMappingWithDefault.type index.layout))
     {registry : Registry} (extended : SourceCoreRawMetadata.Extends context.registry registry)
-    {functions : FunctionModel context.checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    {functions : FunctionModel context.checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations context.checked.catalog functions identities)
     {sourceLookup sourceReplacement : Dynamic.Value} {key replacement : Value}
@@ -279,7 +285,8 @@ theorem getter_absent_run {context : SourceCoreCompatibleDataPlaces.Context} {in
     (registered : index.layout.Registered context.checked.catalog.definitions)
     (projected : context.checked.catalog.project (.mapping sourceKey sourceValue) = .ok (SourceCoreMappingWithDefault.type index.layout))
     {registry : Registry} (extended : SourceCoreRawMetadata.Extends context.registry registry)
-    {functions : FunctionModel context.checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    {functions : FunctionModel context.checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations context.checked.catalog functions identities)
     {sourceLookup : Dynamic.Value} {key : Value}
@@ -311,7 +318,8 @@ theorem setter_absent_run {context : SourceCoreCompatibleDataPlaces.Context} {in
     (registered : index.layout.Registered context.checked.catalog.definitions)
     (projected : context.checked.catalog.project (.mapping sourceKey sourceValue) = .ok (SourceCoreMappingWithDefault.type index.layout))
     {registry : Registry} (extended : SourceCoreRawMetadata.Extends context.registry registry)
-    {functions : FunctionModel context.checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    {functions : FunctionModel context.checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations context.checked.catalog functions identities)
     {sourceLookup sourceReplacement : Dynamic.Value} {key replacement : Value}

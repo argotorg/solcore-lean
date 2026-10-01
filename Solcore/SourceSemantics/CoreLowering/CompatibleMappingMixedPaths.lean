@@ -15,7 +15,8 @@ inductive Selected (key : Dynamic.Value) (entries : List (Dynamic.Value × Dynam
   | default {value} : Dynamic.MappingAbsent key entries → Dynamic.DefaultValue type value → Selected key entries type value
 
 theorem Selected.payload {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {key source : Dynamic.Value} {entries : List (Dynamic.Value × Dynamic.Value)} {type : TypeSystem.Ty}
     (selected : Selected key entries type source) {nativeType : Ty} {missing header : Word} {result : Value}
     (meaning : ReadResult checked registry functions mapping world type key entries nativeType missing header result) :
@@ -31,7 +32,8 @@ theorem Selected.payload {checked : SourceCoreCompatibleCatalog.Checked} {regist
     | missing _ unavailable => exact (unavailable defaulted.defaultable).elim
 
 inductive ReadTree (checked : SourceCoreCompatibleCatalog.Checked) (registry : Registry)
-    (functions : FunctionModel checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (prepared : Prepared) (keys : List Value) (leafType : TypeSystem.Ty) (leafCore : Ty) :
     TypeSystem.Ty → Dynamic.Value → Value → List PreparedStep → List Dynamic.EvaluatedProjection → Dynamic.Value → Nat → Prop where
   | leaf {source value} (related : ValueRep checked registry functions mapping world leafType source value leafCore) :
@@ -64,7 +66,8 @@ inductive ReadTree (checked : SourceCoreCompatibleCatalog.Checked) (registry : R
         (.index index :: steps) (.index lookup :: projections) leaf (checked.catalog.entries.length + 1 + count)
 
 theorem ReadTree.preserves {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {leafType sourceType : TypeSystem.Ty} {leafCore : Ty}
     {source leaf : Dynamic.Value} {value : Value} {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {count : Nat}
     (tree : ReadTree checked registry functions mapping world prepared keys leafType leafCore sourceType source value steps projections leaf count)

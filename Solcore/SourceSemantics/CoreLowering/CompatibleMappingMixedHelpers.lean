@@ -35,7 +35,8 @@ inductive RootInput (prepared : Prepared) : Dynamic.Cell → Value → Dynamic.V
 
  theorem generated_root {context : SourceCoreCompatibleDataPlaces.Context} {prepared : Prepared} {key valueType : TypeSystem.Ty}
     (generated : VirtualRoot.Generated context prepared.route key valueType)
-    (functions : FunctionModel context.checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    (functions : FunctionModel context.checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     {registry : Registry} (extended : SourceCoreRawMetadata.Extends context.registry registry) :
     ∃ header layout fallback,
       Fields context.checked registry functions mapping world key valueType [] header layout [] fallback ∧
@@ -47,7 +48,8 @@ inductive RootInput (prepared : Prepared) : Dynamic.Cell → Value → Dynamic.V
     .virtual root quoted⟩
 
  theorem getter_preserves {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {leafType sourceType : TypeSystem.Ty} {leafCore : Ty}
     {cell : Dynamic.Cell} {source leaf : Dynamic.Value} {optional value : Value}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {count : Nat}
@@ -75,7 +77,8 @@ inductive RootInput (prepared : Prepared) : Dynamic.Cell → Value → Dynamic.V
     exact .caseRight (root.normalize _ store (.first (.var 0)) (.first (.var rfl))) evaluated
 
  theorem setter_preserves {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {sourceType : TypeSystem.Ty} {nativeType : Ty}
     {cell : Dynamic.Cell} {replacementSource source updated : Dynamic.Value} {replacement optional value : Value}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {count : Nat}
@@ -105,7 +108,8 @@ inductive RootInput (prepared : Prepared) : Dynamic.Cell → Value → Dynamic.V
     exact .caseRight (root.normalize _ store (.first (.var 0)) (.first (.var rfl))) evaluated
 
  theorem getter_fault {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {cell : Dynamic.Cell} {source : Dynamic.Value} {optional value : Value}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {reason : Dynamic.SemanticFault} {token : Word} {count : Nat}
     (root : RootInput prepared cell optional source value)
@@ -131,7 +135,8 @@ inductive RootInput (prepared : Prepared) : Dynamic.Cell → Value → Dynamic.V
     exact .caseRight (root.normalize _ store (.first (.var 0)) (.first (.var rfl))) readEvaluation
 
  theorem setter_fault {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {cell : Dynamic.Cell} {source : Dynamic.Value} {optional value : Value}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {reason : Dynamic.SemanticFault} {token : Word} {count : Nat}
     (root : RootInput prepared cell optional source value)

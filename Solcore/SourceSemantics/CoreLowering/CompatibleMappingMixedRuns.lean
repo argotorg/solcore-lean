@@ -17,7 +17,8 @@ theorem FiniteRun.of_evaluates {environment : Environment} {store after : Store}
     fun _ _ _ ran => evaluation_deterministic (runStateful_evaluation_sound ran) evaluated⟩
 
 theorem getter_preserves_run {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {leafType sourceType : TypeSystem.Ty} {leafCore : Ty}
     {cell : Dynamic.Cell} {source leaf : Dynamic.Value} {optional value : Value}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {count : Nat}
@@ -38,7 +39,8 @@ theorem getter_preserves_run {checked : SourceCoreCompatibleCatalog.Checked} {re
   exact ⟨native, finalStore, administrative, initial, meaning, represented, .of_evaluates evaluated, appended, counted⟩
 
 theorem setter_preserves_run {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {sourceType : TypeSystem.Ty} {nativeType : Ty}
     {cell : Dynamic.Cell} {replacementSource source updated : Dynamic.Value} {replacement optional value : Value}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {count : Nat}
@@ -60,7 +62,8 @@ theorem setter_preserves_run {checked : SourceCoreCompatibleCatalog.Checked} {re
   exact ⟨native, finalStore, administrative, initial, meaning, represented, .of_evaluates evaluated, appended, counted⟩
 
 theorem getter_fault_run {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {cell : Dynamic.Cell} {source : Dynamic.Value} {optional value : Value}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {reason : Dynamic.SemanticFault} {token : Word} {count : Nat}
     (root : RootInput prepared cell optional source value)
@@ -79,7 +82,8 @@ theorem getter_fault_run {checked : SourceCoreCompatibleCatalog.Checked} {regist
   exact ⟨finalStore, administrative, initial, meaning, .of_evaluates evaluated, appended, counted⟩
 
 theorem setter_fault_run {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {prepared : Prepared} {keys : List Value} {cell : Dynamic.Cell} {source : Dynamic.Value} {optional value : Value}
     {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection} {reason : Dynamic.SemanticFault} {token : Word} {count : Nat}
     (root : RootInput prepared cell optional source value)
