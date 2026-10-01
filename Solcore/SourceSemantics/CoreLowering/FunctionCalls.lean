@@ -25,7 +25,8 @@ inductive ResultRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects :
 
 /-- A universal semantic IH for an independently certified body. It is not a
 field of the static function code certificate. Source traces supply finiteness. -/
-def BodyPreserves {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def BodyPreserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    (model : GenericHeap.PayloadModel catalog projects)
     (program : Program) (function : Dynamic.Closure) (certificate : FunctionCode.BodyCertificate)
     (faults : FaultRep) : Prop :=
   ∀ {scope type body}, certificate function.source scope function.body type body →
@@ -46,7 +47,8 @@ def BodyPreserves {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap
 
 /-- The source body trace is constructed from Core execution. No finite source
 trace is a premise of this universal reflection obligation. -/
-def BodyReflects {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def BodyReflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    (model : GenericHeap.PayloadModel catalog projects)
     (program : Program) (function : Dynamic.Closure) (certificate : FunctionCode.BodyCertificate)
     (faults : FaultRep) : Prop :=
   ∀ {scope type body}, certificate function.source scope function.body type body →
