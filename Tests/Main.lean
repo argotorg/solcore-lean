@@ -148,6 +148,13 @@ import Solcore.Test.SourceCoreCompatibleExpressionConditionals
 import Solcore.Test.SourceCoreCompatibleExpressionConstructors
 import Solcore.Test.SourceCoreCompatibleExpressionMembers
 import Solcore.Test.SourceCoreCompatibleStatements
+import Solcore.Test.SourceCoreCompatibleExpressionIndices
+import Solcore.Test.SourceCoreCompatibleExpressionRecursive
+import Solcore.Test.SourceCoreCompatibleStatementBindings
+import Solcore.Test.SourceCoreCompatibleStatementInitialized
+import Solcore.Test.SourceCoreTypedDataExpressionSequence
+import Solcore.Test.SourceCoreCompatibleNamedBody
+import Solcore.Test.SourceCoreCompatibleNamedParameters
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -2464,6 +2471,13 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCompatibleExpressionConstructors.run
   SourceCoreCompatibleExpressionMembers.run
   SourceCoreCompatibleStatements.run
+  SourceCoreCompatibleExpressionIndices.run
+  SourceCoreCompatibleExpressionRecursive.run
+  SourceCoreCompatibleStatementBindings.run
+  SourceCoreCompatibleStatementInitialized.run
+  SourceCoreTypedDataExpressionSequence.run
+  SourceCoreCompatibleNamedBody.run
+  SourceCoreCompatibleNamedParameters.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
