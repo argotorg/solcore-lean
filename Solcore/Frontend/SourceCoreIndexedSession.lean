@@ -32,6 +32,11 @@ inductive ErrorCode where
   | checkFailed (expected : Core.Ty) (actual : Option Core.Ty)
   | globals (error : SourceCoreCallableNativeSlots.Error)
   | templates (error : SourceCoreCallableIndexedTemplates.Error)
+  | callable (error : SourceCompilationPlan.Error)
+  | missingBuiltin (function : BuiltinFunctionId)
+  | missingContract (origin : SourceCoreStageCodebook.Origin)
+  | identitySpaceExhausted
+  | diagnostics (error : SourceCoreCompatibleDataPlaceFaultSites.Error)
   | invalidBootstrap
   deriving Repr
 structure Error where
@@ -143,10 +148,75 @@ private def prepareRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
       else throw ⟨[], .checkFailed expected (Core.infer? context body compiled.indexed.layouts.definitions)⟩
     else throw ⟨[], .invalidBootstrap⟩
 
+/-- Compiler-owned callable imports. A named row retains the exact installed
+slot; a builtin retains its closed native template. Callers never supply either
+piece of code, an identity word or a descriptor. -/
+private structure CallableFactory (compiled : SourceCoreUnifiedCompilation.Compiled) where
+  sourceType : Ty
+  type : Core.Ty
+  generated : compiled.compatible.checked.catalog.project sourceType = .ok type
+  value : Core.Value
+  slot : Option (Nat × Core.Value)
+
+private def callableIdentity (index : Nat) : Except Error Core.Word :=
+  match Core.Word.ofNat? (index + 1) with
+  | some identity => pure identity
+  | none => throw ⟨[], .identitySpaceExhausted⟩
+
+private def callableDescriptor (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (origin : SourceCoreStageCodebook.Origin) : Except Error Core.Word := do
+  let table ← match compiled.indexed.base.callableContext with
+    | some context => pure context.table
+    | none => throw ⟨[], .missingContract origin⟩
+  let id ← match table.idAt? origin with
+    | some id => pure id
+    | none => throw ⟨[], .missingContract origin⟩
+  let entry ← match table.entryAt? id with
+    | some entry => pure entry
+    | none => throw ⟨[], .missingContract origin⟩
+  unless entry.origin = origin do throw ⟨[], .missingContract origin⟩
+  pure id
+
+private def prepareCallable (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (sourceType : Ty) (identity descriptor : Core.Word) (closure : Core.Value)
+    (slot : Option (Nat × Core.Value)) : Except Error (CallableFactory compiled) :=
+  match generated : compiled.compatible.checked.catalog.project sourceType with
+  | .error error => .error (fromCatalog error)
+  | .ok type =>
+      let value := Core.Value.pair (.pair (.inRight .unit (.word identity)) closure) (.word descriptor)
+      if value.type = type then .ok ⟨sourceType, type, generated, value, slot⟩
+      else .error ⟨[], .invalidNativeValue type value.type⟩
+
+private def prepareNamed (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (templates : SourceCoreCallableIndexedTemplates.Cache compiled.indexed) :
+    Except Error (List (Key × CallableFactory compiled)) :=
+  compiled.indexed.base.globals.zipIdx.mapM fun (signature, index) => do
+    let specialized ← (SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan signature.key)
+      |>.mapError (fun error => ⟨[], .callable error⟩)
+    let (location, installed) ← match templates.nativeGlobals[index]? with
+      | some slot => pure slot
+      | none => throw ⟨[], .invalidBootstrap⟩
+    let .inRight .unit closure := installed | throw ⟨[], .invalidBootstrap⟩
+    let factory ← prepareCallable compiled specialized.function.type (← callableIdentity index)
+      (← callableDescriptor compiled (.named signature.key)) closure (some (location, installed))
+    pure (signature.key, factory)
+
+private def prepareBuiltins (compiled : SourceCoreUnifiedCompilation.Compiled) :
+    Except Error (List (BuiltinFunctionId × CallableFactory compiled)) :=
+  BuiltinFunctionId.all.zipIdx.mapM fun (function, index) => do
+    let .lambda input output body := SourceCoreInteger.builtinClosure function
+      | throw ⟨[], .missingBuiltin function⟩
+    let factory ← prepareCallable compiled function.type
+      (← callableIdentity (compiled.indexed.base.globals.length + index))
+      (← callableDescriptor compiled (.builtin function)) (.closure input output body []) none
+    pure (function, factory)
+
 structure Recipe where private mk ::
   compiled : SourceCoreUnifiedCompilation.Compiled
   roots : List (Root compiled)
   templates : SourceCoreCallableIndexedTemplates.Cache compiled.indexed
+  private named : List (Key × CallableFactory compiled)
+  private builtins : List (BuiltinFunctionId × CallableFactory compiled)
   bootstrap : Core.Expr
   bootstrapTyped : Core.HasType [] bootstrap (Core.LanguageResult.resultType .unit) compiled.indexed.layouts.definitions
 
@@ -155,13 +225,39 @@ def Recipe.program (recipe : Recipe) := recipe.compiled.indexed
 def Recipe.prepare (compiled : SourceCoreUnifiedCompilation.Compiled) : Except Error Recipe := do
   let roots ← compiled.indexed.entries.mapM (prepareRoot compiled)
   let templates ← (SourceCoreCallableIndexedTemplates.prepare compiled.indexed).mapError (fun error => ⟨[], .templates error⟩)
+  let named ← prepareNamed compiled templates
+  let builtins ← prepareBuiltins compiled
   let bootstrap := SourceCoreCallableIndexedFrames.allocate compiled.indexed.ancestry.layout.frame
     (SourceCoreRecursiveEntry.allocateGlobals compiled.indexed.base.globals.reverse
       (SourceCoreRecursiveEntry.installFunctions compiled.indexed.secondPass.closures (Core.LanguageResult.success .unit)))
   if accepted : Core.infer? [] bootstrap compiled.indexed.layouts.definitions = some (Core.LanguageResult.resultType .unit) then
-    pure ⟨compiled, roots, templates, bootstrap, Core.infer_sound accepted⟩
+    pure ⟨compiled, roots, templates, named, builtins, bootstrap, Core.infer_sound accepted⟩
   else throw ⟨[], .checkFailed (Core.LanguageResult.resultType .unit)
       (Core.infer? [] bootstrap compiled.indexed.layouts.definitions)⟩
+
+/-- Actual factory provenance. Compiled code includes proofs and is never
+compared using executable equality. -/
+theorem Recipe.prepare_compiled {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
+    (accepted : Recipe.prepare compiled = .ok recipe) : recipe.compiled = compiled := by
+  unfold Recipe.prepare at accepted
+  cases roots : compiled.indexed.entries.mapM (prepareRoot compiled) with
+  | error error => simp [roots, bind, Except.bind] at accepted
+  | ok roots =>
+    cases templates : SourceCoreCallableIndexedTemplates.prepare compiled.indexed with
+    | error error => simp [roots, templates, Except.mapError, bind, Except.bind] at accepted
+    | ok cache =>
+      simp only [roots, templates, Except.mapError, bind, Except.bind, pure, Except.pure] at accepted
+      cases named : prepareNamed compiled cache with
+      | error error => simp [named] at accepted
+      | ok named =>
+        simp only [named] at accepted
+        cases builtins : prepareBuiltins compiled with
+        | error error => simp [builtins] at accepted
+        | ok builtins =>
+          simp only [builtins] at accepted
+          split at accepted
+          · cases accepted; rfl
+          · contradiction
 
 structure Artifact where private mk ::
   private authority : ArtifactAuthority
@@ -247,6 +343,11 @@ structure Bootstrap (artifact : Artifact) where private mk ::
 def Artifact.bootstrap (artifact : Artifact) (sourcePrefix : InertPrefix artifact) : IO (Bootstrap artifact) :=
   return ⟨← artifact.authority.newSession, .initial artifact.recipe.bootstrap [] [],
     .eval (.nil _) .nil artifact.recipe.bootstrapTyped .nil, sourcePrefix⟩
+
+/-- Fresh source sessions need no legacy heap/carrier argument. The native
+frame and global slots are still installed by the resumable bootstrap. -/
+def Artifact.bootstrapFresh (artifact : Artifact) : IO (Bootstrap artifact) :=
+  artifact.bootstrap ⟨{}, 1, rfl⟩
 
 inductive BootResult (artifact : Artifact) where
   | ready (session : Session artifact)
@@ -521,6 +622,35 @@ def Session.start {artifact : Artifact} (session : Session artifact) (key : Key)
   pure ⟨session, root, session.world, .initial root.body native session.store, session.stored,
     .eval session.stored inputs root.typed .nil, .refl _, session.registry, encoded.values, encoded.owner⟩
 
+private def diagnosticTable (artifact : Artifact) (root : Root artifact.recipe.compiled)
+    (values : Values) (owner : values.checked = artifact.recipe.compiled.compatible.checked) :
+    Except Error SourceCoreFaultSites.Table := do
+  have extension : SourceCoreRawMetadata.Extends artifact.recipe.compiled.compatible.checked.staticRegistry values.registry := by
+    simpa only [owner] using values.extension
+  let table ← match artifact.program.base.diagnostics with
+    | some diagnostics => (diagnostics.tableForRegistry values.registry extension).mapError (fun error => ⟨[], .diagnostics error⟩)
+    | none => pure { owner := root.key.declaration, resultType := root.result, reads := [], escapedReason := Core.Word.zero }
+  pure <| match artifact.program.base.callableDiagnostics with
+    | none => table
+    | some diagnostics => {table with additional := table.additional ++
+        diagnostics.rootTable.additional.filter (fun item => diagnostics.unknown.val ≤ item.1.val)}
+
+/-- Decode an actual language reason against the session's retained raw
+metadata IDs and cached source sites. Unknown reasons remain explicit. -/
+def Session.diagnostic {artifact : Artifact} (session : Session artifact) (key : Key)
+    (reason : Core.Word) : Except Error (Option SourceCoreFaultSites.Diagnostic) := do
+  let root ← match artifact.recipe.roots.find? (fun root => decide (root.key = key)) with
+    | some root => pure root | none => throw ⟨[], .missingEntry key⟩
+  let table ← diagnosticTable artifact root session.values session.owner
+  pure (table.diagnostic? reason)
+
+/-- A pending request retains newly interned input metadata even before it
+finishes; diagnostic lookup uses that registry rather than its origin's. -/
+def Checkpoint.diagnostic {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (reason : Core.Word) : Except Error (Option SourceCoreFaultSites.Diagnostic) := do
+  let table ← diagnosticTable artifact checkpoint.root checkpoint.values checkpoint.owner
+  pure (table.diagnostic? reason)
+
 private structure Exported {artifact : Artifact} (world : Core.StoreTyping)
     (authority : SessionAuthority) (fuel : Nat) (values : Values) (expected : Ty) (core : Core.Value) where
   value : Value
@@ -566,6 +696,40 @@ structure Completion (artifact : Artifact) where private mk ::
   authenticated : session.Authenticates boundaryFuel sourceType value
   private origin : Session artifact
   private extension : Core.WorldExtends origin.world session.world
+
+private def issueCallable {artifact : Artifact} (session : Session artifact)
+    (factory : CallableFactory artifact.recipe.compiled) (generation : ExportGeneration)
+    (boundaryFuel : Nat) : Except Error (Completion artifact) := do
+  discard <| checkGlobals artifact session.store
+  match factory.slot with
+  | some (location, expected) =>
+      unless session.store[location]? = some expected do throw ⟨[], .invalidBootstrap⟩
+  | none => pure ()
+  let validated ← validateAt artifact.program.layouts.definitions session.world factory.value factory.type
+  let exported ← exportValue session.authority generation boundaryFuel session.values session.registry factory.sourceType factory.value
+  let updated : Session artifact := {session with registry := exported.slots}
+  pure ⟨exported.value, factory.sourceType, updated, boundaryFuel,
+    ⟨exported.encoded, factory.type, exported.reencoded, factory.generated, by
+      change Core.RuntimeValueHasType session.world exported.encoded.value factory.type artifact.program.layouts.definitions
+      rw [exported.recovered]
+      exact validated.typed⟩,
+    session, .refl _⟩
+
+/-- Import a named function from this artifact's exact cached installation.
+The specialized key chooses code, identity and descriptor together. -/
+def Session.named {artifact : Artifact} (session : Session artifact) (key : Key)
+    (boundaryFuel : Nat := 1024) : IO (Except Error (Completion artifact)) := do
+  match artifact.recipe.named.find? (fun row => decide (row.1 = key)) with
+  | none => pure (.error ⟨[], .missingEntry key⟩)
+  | some (_, factory) => pure (issueCallable session factory (← SourceCorePublicValues.ExportGeneration.mint) boundaryFuel)
+
+/-- Import a closed builtin template owned by the artifact's callable table.
+No caller-supplied native closure is accepted. -/
+def Session.builtin {artifact : Artifact} (session : Session artifact) (function : BuiltinFunctionId)
+    (boundaryFuel : Nat := 1024) : IO (Except Error (Completion artifact)) := do
+  match artifact.recipe.builtins.find? (fun row => decide (row.1 = function)) with
+  | none => pure (.error ⟨[], .missingBuiltin function⟩)
+  | some (_, factory) => pure (issueCallable session factory (← SourceCorePublicValues.ExportGeneration.mint) boundaryFuel)
 
 inductive Outcome (artifact : Artifact) where
   | succeeded (completion : Completion artifact)
