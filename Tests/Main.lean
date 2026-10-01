@@ -214,6 +214,10 @@ import Solcore.Test.SourceCoreCompatibleMatchTypedPrefixes
 import Solcore.Test.SourceCoreProtectedNamedLexicalAssignments
 import Solcore.Test.SourceCoreBuiltinImperativeFor
 import Solcore.Test.SourceCoreCallableLambdaViewDataTrees
+import Solcore.Test.SourceCoreCallableLambdaViewIndexedTrees
+import Solcore.Test.SourceCoreCallableLambdaViewBuiltinTrees
+import Solcore.Test.SourceCoreProtectedBareNamedAssignments
+import Solcore.Test.SourceCoreGenericImperativeMatch
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
 import Solcore.Test.SourceCoreProtectedNamedPlaces
 import Solcore.Test.SourceSemanticsIntegerBitNot
@@ -2599,6 +2603,10 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreProtectedNamedLexicalAssignments.run
   SourceCoreBuiltinImperativeFor.run
   SourceCoreCallableLambdaViewDataTrees.run
+  SourceCoreCallableLambdaViewIndexedTrees.run
+  SourceCoreCallableLambdaViewBuiltinTrees.run
+  SourceCoreProtectedBareNamedAssignments.run
+  SourceCoreGenericImperativeMatch.run
   SourceCoreRecursiveNamedExpressions.run
   SourceCoreProtectedNamedPlaces.run
   SourceSemanticsIntegerBitNot.run

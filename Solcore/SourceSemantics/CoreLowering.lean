@@ -398,6 +398,14 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedSelectionPrefix
 import Solcore.SourceSemantics.CoreLowering.NamedLexicalAssignments
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeFor
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewRecursiveTrees
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewIndexedTrees
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewBuiltinTrees
+import Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchReflection
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchPreservation
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeReceipts
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
