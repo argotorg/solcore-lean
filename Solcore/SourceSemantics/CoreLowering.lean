@@ -391,6 +391,14 @@ import Solcore.SourceSemantics.CoreLowering.DataEqualityScalarCertificates
 import Solcore.SourceSemantics.CoreLowering.DataEqualityCertificates
 import Solcore.SourceSemantics.CoreLowering.DataMatchSourceScopes
 
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchScrutineeReflection
+import Solcore.SourceSemantics.CoreLowering.NamedLexicalStatements
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewScalarTrees
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedSelectionPrefix
+import Solcore.SourceSemantics.CoreLowering.NamedLexicalAssignments
+import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeFor
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewRecursiveTrees
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
