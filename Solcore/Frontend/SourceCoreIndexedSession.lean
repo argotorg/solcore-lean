@@ -2,6 +2,7 @@ import Solcore.Frontend.SourceCorePublicValues
 import Solcore.Frontend.SourceCoreUnifiedCompilation
 import Solcore.Frontend.SourceCoreCallableIndexedTemplates
 import Solcore.Frontend.SourceCoreHeapSnapshot
+import Solcore.Frontend.SourceCoreIndexedHeapMigration
 
 /-! Persistent typed Core sessions for the source-compatible indexed program.
 Bootstrap installs the owned context cell and global closures once. Subsequent
@@ -45,6 +46,8 @@ inductive ErrorCode where
   | heap (error : SourceCoreAllocationLedger.Error)
   | cellHeader (error : SourceCoreCallableIndexedCellHeaders.Error)
   | principal (error : SourceCoreCallableIndexedPrincipalAllocations.Error)
+  | heapMigration (error : SourceCoreIndexedHeapMigration.Error)
+  | invalidExportedPrefix (validationFuel : Nat)
   deriving Repr
 structure Error where
   path : List PathStep := []
@@ -1106,6 +1109,21 @@ def Snapshot.cells {artifact : Artifact} (snapshot : Snapshot artifact) : List S
   snapshot.observed.prefixCells ++ snapshot.observed.native.cells
 def Snapshot.prefix {artifact : Artifact} (snapshot : Snapshot artifact) : PrefixSnapshot artifact :=
   ⟨snapshot.saved.session.sourcePrefix⟩
+
+/-- Export all recorded source cells as a new inert prefix. Actual native
+callables are reconstructed through cached code/capture receipts, then the
+unchanged deep source validator authenticates the complete exported heap.
+The original `Snapshot.prefix` continues to mean the initial sidecar only. -/
+def Snapshot.exportPrefix {artifact : Artifact} (snapshot : Snapshot artifact)
+    (validationFuel : Nat := 1024) (boundaryFuel : Nat := 1024) : Except Error (PrefixSnapshot artifact) := do
+  let session := snapshot.saved.session
+  let exported ← (SourceCoreIndexedHeapMigration.exportHeap artifact.recipe.compiled.runtime.output
+    snapshot.observed.ledger session.values session.owner boundaryFuel).mapError fun error => ⟨[], .heapMigration error⟩
+  let state : SourceTypedRuntime.RuntimeState := ⟨exported.heap⟩
+  if accepted : state.isDeeplySafe validationFuel artifact.program.base.sourceProgram.signatures artifact.program.base.plan = true then
+    pure ⟨⟨state, validationFuel, accepted⟩⟩
+  else throw ⟨[], .invalidExportedPrefix validationFuel⟩
+
 def Snapshot.prefixSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.observed.prefixCells.length
 def Snapshot.heapSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.cells.length
 def Snapshot.nativeHeapSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.saved.session.heapSize
@@ -1185,4 +1203,41 @@ theorem Session.restoreSnapshot_self {artifact : Artifact} (session : Session ar
     session.restoreSnapshot snapshot = .ok snapshot.restore := by
   simp only [Session.restoreSnapshot, same, ↓reduceIte]
 
+theorem PrefixSnapshot.deeply_safe {artifact : Artifact} (snapshot : PrefixSnapshot artifact) :
+    snapshot.sourcePrefix.state.DeeplySafe artifact.program.base.sourceProgram.signatures artifact.program.base.plan :=
+  SourceTypedRuntime.RuntimeState.isDeeplySafe_sound snapshot.sourcePrefix.accepted
+
+theorem Snapshot.exportPrefix_length {artifact : Artifact} {snapshot : Snapshot artifact}
+    {validationFuel boundaryFuel : Nat} {exported : PrefixSnapshot artifact}
+    (accepted : snapshot.exportPrefix validationFuel boundaryFuel = .ok exported) :
+    exported.heapSize = snapshot.heapSize := by
+  unfold Snapshot.exportPrefix at accepted
+  cases migration : SourceCoreIndexedHeapMigration.exportHeap artifact.recipe.compiled.runtime.output
+      snapshot.observed.ledger snapshot.saved.session.values snapshot.saved.session.owner boundaryFuel with
+  | error error => simp [migration, Except.mapError, bind, Except.bind] at accepted
+  | ok result =>
+    simp only [migration, Except.mapError, bind, Except.bind] at accepted
+    split at accepted
+    · cases accepted
+      rw [PrefixSnapshot.source_length]
+      change result.heap.length = snapshot.heapSize
+      rw [result.length, snapshot.source_length, snapshot.prefix_length]
+      rfl
+    · cases accepted
+
+theorem Snapshot.exportPrefix_original {artifact : Artifact} {snapshot : Snapshot artifact}
+    {validationFuel boundaryFuel : Nat} {exported : PrefixSnapshot artifact}
+    (accepted : snapshot.exportPrefix validationFuel boundaryFuel = .ok exported) :
+    exported.sourcePrefix.state.heap.take snapshot.prefixSize = snapshot.saved.session.sourcePrefix.state.heap := by
+  unfold Snapshot.exportPrefix at accepted
+  cases migration : SourceCoreIndexedHeapMigration.exportHeap artifact.recipe.compiled.runtime.output
+      snapshot.observed.ledger snapshot.saved.session.values snapshot.saved.session.owner boundaryFuel with
+  | error error => simp [migration, Except.mapError, bind, Except.bind] at accepted
+  | ok result =>
+    simp only [migration, Except.mapError, bind, Except.bind] at accepted
+    split at accepted
+    · cases accepted
+      rw [snapshot.prefix_length]
+      exact result.prefix
+    · cases accepted
 end Solcore.Frontend.SourceCoreIndexedSession
