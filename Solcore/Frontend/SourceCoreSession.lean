@@ -1,7 +1,7 @@
 import Solcore.Frontend.SourceCoreDataValues
 import Solcore.Frontend.SourceCoreGeneralFunctions
 import Solcore.Frontend.SourceCorePlanCatalog
-import Std.Sync.Mutex
+import Solcore.Frontend.SourceCorePublicValues
 
 /-! Owned source values over a typed Core session. The public carrier cannot
 contain Core code or references. Function handles are minted only when exporting
@@ -18,98 +18,25 @@ abbrev DataContext := SourceCoreDataValues.Context
 abbrev Checked := SourceCoreDataCatalog.Checked
 abbrev Key := SourceSpecialization.SpecializationKey
 
-private structure Token where
-  index : Nat
-  deriving Repr, DecidableEq
+abbrev ArtifactAuthority := SourceCorePublicValues.ArtifactAuthority
+abbrev SessionAuthority := SourceCorePublicValues.SessionAuthority
+abbrev ExportGeneration := SourceCorePublicValues.ExportGeneration
+abbrev Handle := SourceCorePublicValues.Handle
+abbrev Value := SourceCorePublicValues.Value
 
-private initialize tokenCounter : Std.Mutex Nat ← Std.Mutex.new 0
-
-private def mint : IO Token := tokenCounter.atomically do
-  let index ← get
-  set (index + 1)
-  pure ⟨index⟩
-
-/-- A lookup capability, never serialized Core code. Constructors and ownership
-fields stay private. Export generations prevent slot reuse in branched immutable
-session snapshots. Tokens are allocated internally, never selected by callers. -/
-structure Handle where private mk ::
-  private artifact : Token
-  private session : Token
-  private generation : Token
-  private slot : Nat
-  private sourceType : Ty
-  deriving Repr, DecidableEq
-
-inductive Value where
-  | unit | bool (value : Bool) | word (value : Core.Word) | integer (value : Int)
-  | product (left right : Value)
-  | constructed (instantiation : DataConstructorInstantiation) (payloads : List Value)
-  | mapping (keyType valueType : Ty) (entries : List (Value × Value))
-  | proxy (inner : Ty)
-  | function (handle : Handle)
-  deriving Repr
-
-mutual
-  def Value.decEq (left right : Value) : Decidable (left = right) := by
-    cases left <;> cases right <;> try (solve | apply isFalse; intro equality; cases equality)
-    case unit.unit => exact isTrue rfl
-    case bool.bool left right => exact decidable_of_iff (left = right) (by simp)
-    case word.word left right => exact decidable_of_iff (left = right) (by simp)
-    case integer.integer left right => exact decidable_of_iff (left = right) (by simp)
-    case proxy.proxy left right => exact decidable_of_iff (left = right) (by simp)
-    case function.function left right => exact decidable_of_iff (left = right) (by simp)
-    case product.product leftA leftB rightA rightB =>
-      letI := Value.decEq leftA rightA
-      letI := Value.decEq leftB rightB
-      exact decidable_of_iff (leftA = rightA ∧ leftB = rightB) (by simp)
-    case constructed.constructed leftMetadata leftPayloads rightMetadata rightPayloads =>
-      letI := Value.listDecEq leftPayloads rightPayloads
-      exact decidable_of_iff (leftMetadata = rightMetadata ∧ leftPayloads = rightPayloads) (by simp)
-    case mapping.mapping leftKey leftValue leftEntries rightKey rightValue rightEntries =>
-      letI := Value.entriesDecEq leftEntries rightEntries
-      exact decidable_of_iff (leftKey = rightKey ∧ leftValue = rightValue ∧ leftEntries = rightEntries) (by simp)
-  termination_by sizeOf left
-  decreasing_by all_goals simp_wf; omega
-
-  def Value.listDecEq (left right : List Value) : Decidable (left = right) := by
-    cases left <;> cases right <;> try (solve | apply isFalse; intro equality; cases equality)
-    case nil.nil => exact isTrue rfl
-    case cons.cons leftHead leftTail rightHead rightTail =>
-      letI := Value.decEq leftHead rightHead
-      letI := Value.listDecEq leftTail rightTail
-      exact decidable_of_iff (leftHead = rightHead ∧ leftTail = rightTail) (by simp)
-  termination_by sizeOf left
-  decreasing_by all_goals simp_wf; omega
-
-  def Value.entriesDecEq (left right : List (Value × Value)) : Decidable (left = right) := by
-    cases left <;> cases right <;> try (solve | apply isFalse; intro equality; cases equality)
-    case nil.nil => exact isTrue rfl
-    case cons.cons leftHead leftTail rightHead rightTail =>
-      rcases leftHead with ⟨leftKey, leftValue⟩
-      rcases rightHead with ⟨rightKey, rightValue⟩
-      letI := Value.decEq leftKey rightKey
-      letI := Value.decEq leftValue rightValue
-      letI := Value.entriesDecEq leftTail rightTail
-      letI : Decidable ((leftKey, leftValue) = (rightKey, rightValue)) :=
-        decidable_of_iff (leftKey = rightKey ∧ leftValue = rightValue) (by simp)
-      exact decidable_of_iff ((leftKey, leftValue) = (rightKey, rightValue) ∧ leftTail = rightTail) (by simp)
-  termination_by sizeOf left
-  decreasing_by all_goals simp_wf; omega
-end
-
-instance : DecidableEq Value := Value.decEq
-instance : BEq Value := ⟨fun left right => decide (left = right)⟩
-instance : LawfulBEq Value where
-  eq_of_beq := of_decide_eq_true
-  rfl := by intro value; exact decide_eq_true rfl
-
-def Value.type : Value → Ty
-  | .unit => .unit | .bool _ => .bool | .word _ => .word | .integer _ => .integer
-  | .product left right => .product left.type right.type
-  | .constructed instantiation _ => instantiation.resultType
-  | .mapping key value _ => .mapping key value
-  | .proxy inner => .proxy inner
-  | .function handle => handle.sourceType
+@[match_pattern] abbrev Value.unit := SourceCorePublicValues.Value.unit
+@[match_pattern] abbrev Value.bool := SourceCorePublicValues.Value.bool
+@[match_pattern] abbrev Value.word := SourceCorePublicValues.Value.word
+@[match_pattern] abbrev Value.integer := SourceCorePublicValues.Value.integer
+@[match_pattern] abbrev Value.product := SourceCorePublicValues.Value.product
+@[match_pattern] abbrev Value.constructed := SourceCorePublicValues.Value.constructed
+@[match_pattern] abbrev Value.mapping := SourceCorePublicValues.Value.mapping
+@[match_pattern] abbrev Value.proxy := SourceCorePublicValues.Value.proxy
+@[match_pattern] abbrev Value.function := SourceCorePublicValues.Value.function
+abbrev Value.type (value : Value) : Ty := SourceCorePublicValues.Value.type value
+abbrev Value.decEq := SourceCorePublicValues.Value.decEq
+abbrev Value.listDecEq := SourceCorePublicValues.Value.listDecEq
+abbrev Value.entriesDecEq := SourceCorePublicValues.Value.entriesDecEq
 
 abbrev PathStep := SourceCoreDataValues.PathStep
 
@@ -218,10 +145,10 @@ private def Registry.weaken {context : DataContext} {world future : Core.StoreTy
   registry.map (Slot.weaken extension)
 
 private def resolve {context : DataContext} {world : Core.StoreTyping}
-    (artifact session : Token) (registry : Registry context world) (expected : Ty) (handle : Handle) :
+    (artifact : ArtifactAuthority) (session : SessionAuthority) (registry : Registry context world) (expected : Ty) (handle : Handle) :
     Except Error Core.Value := do
-  unless handle.artifact = artifact do throw ⟨[], .foreignArtifact⟩
-  unless handle.session = session do throw ⟨[], .foreignSession⟩
+  unless handle.belongsToArtifact artifact do throw ⟨[], .foreignArtifact⟩
+  unless handle.belongsToSession session do throw ⟨[], .foreignSession⟩
   let slot ← match registry.find? fun slot => decide (slot.handle = handle) with
     | none => throw ⟨[], .unknownHandle⟩
     | some slot => pure slot
@@ -235,7 +162,7 @@ private def identity (context : DataContext) (type : Ty) : Except Error Core.Dat
 
 mutual
   private def encodeRaw {context : DataContext} {world : Core.StoreTyping} :
-      Nat → Token → Token → Registry context world → Ty → Value → Except Error Core.Value
+      Nat → ArtifactAuthority → SessionAuthority → Registry context world → Ty → Value → Except Error Core.Value
     | 0, _, _, _, _, _ => throw ⟨[], .data .exhausted⟩
     | fuel + 1, artifact, session, registry, expected, value => do
         match expected, value with
@@ -266,7 +193,7 @@ mutual
         | expected, value => throw ⟨[], .data (.sourceTypeMismatch expected value.type)⟩
 
   private def encodePayloads {context : DataContext} {world : Core.StoreTyping} (fuel : Nat)
-      (artifact session : Token) (registry : Registry context world) (types : List Ty) (values : List Value)
+      (artifact : ArtifactAuthority) (session : SessionAuthority) (registry : Registry context world) (types : List Ty) (values : List Value)
       (index : Nat) : Except Error Core.Value := do
     if types.length ≠ values.length then throw ⟨[], .data (.payloadCountMismatch types.length values.length)⟩
     match fuel, types, values with
@@ -280,7 +207,7 @@ mutual
     | _, _, _ => throw ⟨[], .data (.payloadCountMismatch types.length values.length)⟩
 
   private def encodeEntries {context : DataContext} {world : Core.StoreTyping} :
-      Nat → Token → Token → Registry context world → Ty → Ty → Core.DataTypeId → List (Value × Value) →
+      Nat → ArtifactAuthority → SessionAuthority → Registry context world → Ty → Ty → Core.DataTypeId → List (Value × Value) →
       Nat → Except Error Core.Value
     | _, _, _, _, _, _, id, [], _ => pure (.constructed ⟨id, 0⟩ .unit)
     | 0, _, _, _, _, _, _, _ :: _, _ => throw ⟨[], .data .exhausted⟩
@@ -292,19 +219,19 @@ mutual
 end
 
 private def register {context : DataContext} {world : Core.StoreTyping}
-    (artifact session generation : Token) (registry : Registry context world)
+    (_artifact : ArtifactAuthority) (session : SessionAuthority) (generation : ExportGeneration) (registry : Registry context world)
     (sourceType : Ty) (value : Core.Value) : Except Error (Handle × Registry context world) := do
   match registry.find? fun slot => decide (slot.handle.sourceType = sourceType ∧ slot.value = value) with
   | some slot => pure (slot.handle, registry)
   | none =>
       let projection ← (SourceCoreGeneralEntry.projectType context.checked sourceType).mapError fromCatalog
       let validation ← validateAt context.checked.catalog.definitions world value projection.type
-      let handle : Handle := ⟨artifact, session, generation, registry.length, sourceType⟩
+      let handle : Handle := session.issue generation registry.length sourceType
       pure (handle, registry ++ [⟨handle, value, projection.type, projection.generated, validation.typed⟩])
 
 mutual
   private def decodeRaw {context : DataContext} {world : Core.StoreTyping} :
-      Nat → Token → Token → Token → Registry context world → Ty → Core.Value →
+      Nat → ArtifactAuthority → SessionAuthority → ExportGeneration → Registry context world → Ty → Core.Value →
       Except Error (Value × Registry context world)
     | 0, _, _, _, _, _, _ => throw ⟨[], .data .exhausted⟩
     | fuel + 1, artifact, session, generation, registry, expected, value => do
@@ -340,7 +267,7 @@ mutual
             throw ⟨[], .data (.coreShapeMismatch projected value.type)⟩
 
   private def decodePayloads {context : DataContext} {world : Core.StoreTyping} :
-      Nat → Token → Token → Token → Registry context world → List Ty → Core.Value → Nat →
+      Nat → ArtifactAuthority → SessionAuthority → ExportGeneration → Registry context world → List Ty → Core.Value → Nat →
       Except Error (List Value × Registry context world)
     | _, _, _, _, registry, [], .unit, _ => pure ([], registry)
     | 0, _, _, _, _, _, _, _ => throw ⟨[], .data .exhausted⟩
@@ -354,7 +281,7 @@ mutual
     | _, _, _, _, _, _, _, _ => throw ⟨[], .data .constructorMetadataMismatch⟩
 
   private def decodeEntries {context : DataContext} {world : Core.StoreTyping} :
-      Nat → Token → Token → Token → Registry context world → Ty → Ty → Core.DataTypeId → Core.Value → Nat →
+      Nat → ArtifactAuthority → SessionAuthority → ExportGeneration → Registry context world → Ty → Ty → Core.DataTypeId → Core.Value → Nat →
       Except Error (List (Value × Value) × Registry context world)
     | 0, _, _, _, _, _, _, _, _, _ => throw ⟨[], .data .exhausted⟩
     | fuel + 1, artifact, session, generation, registry, keyType, valueType, id, core, index => do
@@ -378,7 +305,7 @@ private structure Encoded {context : DataContext} (world : Core.StoreTyping) (so
   typed : Core.RuntimeValueHasType world value type context.checked.catalog.definitions
 
 private def encode {context : DataContext} {world : Core.StoreTyping} (fuel : Nat)
-    (artifact session : Token) (registry : Registry context world) (expected : Ty) (value : Value) :
+    (artifact : ArtifactAuthority) (session : SessionAuthority) (registry : Registry context world) (expected : Ty) (value : Value) :
     Except Error (Encoded (context := context) world expected) := do
   let projection ← (SourceCoreGeneralEntry.projectType context.checked expected).mapError fromCatalog
   let core ← encodeRaw fuel artifact session registry expected value
@@ -386,7 +313,7 @@ private def encode {context : DataContext} {world : Core.StoreTyping} (fuel : Na
   pure ⟨core, projection.type, projection.generated, validation.typed⟩
 
 private structure Exported {context : DataContext} (world : Core.StoreTyping)
-    (artifact session : Token) (fuel : Nat) (expected : Ty) (core : Core.Value) where
+    (artifact : ArtifactAuthority) (session : SessionAuthority) (fuel : Nat) (expected : Ty) (core : Core.Value) where
   value : Value
   registry : Registry context world
   reencoded : encodeRaw fuel artifact session registry expected value = .ok core
@@ -395,7 +322,7 @@ private structure Exported {context : DataContext} (world : Core.StoreTyping)
 its complete identity tag, code and captured reference tree inside the owned
 registry. Source data substitutions and mapping order are authenticated too. -/
 private def exportValue {context : DataContext} {world : Core.StoreTyping} (fuel : Nat)
-    (artifact session generation : Token) (registry : Registry context world)
+    (artifact : ArtifactAuthority) (session : SessionAuthority) (generation : ExportGeneration) (registry : Registry context world)
     (expected : Ty) (core : Core.Value) :
     Except Error (Exported (context := context) world artifact session fuel expected core) := do
   let (value, registry) ← decodeRaw fuel artifact session generation registry expected core
@@ -430,14 +357,14 @@ def Recipe.prepareAutomatic (program : CheckedProgram) (plan : SourceSpecializat
 
 /-- An owned artifact uses a cached, authenticated recipe. -/
 structure Artifact where private mk ::
-  private identity : Token
+  private identity : ArtifactAuthority
   private context : DataContext
   private program : SourceCoreGeneralEntry.PreparedProgram context.checked
 
 /-- Opening the same recipe again creates a separate owned artifact. This only
 mints an identity and copies the cached entries; no compiler is run here. -/
 def Recipe.open (recipe : Recipe) : IO Artifact :=
-  return ⟨← mint, recipe.context, recipe.prepared⟩
+  return ⟨← SourceCorePublicValues.ArtifactAuthority.mint, recipe.context, recipe.prepared⟩
 
 def Artifact.prepare (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
     (checked : Checked) (compilationFuel : Nat) :
@@ -458,14 +385,14 @@ def Artifact.keys (artifact : Artifact) : List Key := artifact.program.entries.m
 /-- A persistent version of one owned execution session. Heap cells and
 registry values are private; copying this value does not mint another identity. -/
 structure Session (artifact : Artifact) where private mk ::
-  private identity : Token
+  private identity : SessionAuthority
   private world : Core.StoreTyping
   private store : Core.Store
   private stored : Core.RuntimeStoreHasTypes world store artifact.context.checked.catalog.definitions
   private registry : Registry artifact.context world
 
 def Artifact.newSession (artifact : Artifact) : IO (Session artifact) := do
-  pure ⟨← mint, [], [], .nil _, []⟩
+  pure ⟨← artifact.identity.newSession, [], [], .nil _, []⟩
 
 def Session.heapSize {artifact : Artifact} (session : Session artifact) : Nat := session.store.length
 def Session.functionCount {artifact : Artifact} (session : Session artifact) : Nat := session.registry.length
@@ -552,7 +479,7 @@ private def arguments {artifact : Artifact} (session : Session artifact) (fuel :
 
 structure Checkpoint (artifact : Artifact) where private mk ::
   private origin : Session artifact
-  private identity : Token
+  private identity : SessionAuthority
   private sourceType : Ty
   private type : Core.Ty
   private generated : artifact.context.checked.catalog.project sourceType = .ok type
@@ -602,7 +529,7 @@ inductive Outcome (artifact : Artifact) where
   | outOfFuel (checkpoint : Checkpoint artifact)
   | exportError (error : Error) (session : Session artifact)
 
-private def complete {artifact : Artifact} (checkpoint : Checkpoint artifact) (generation : Token)
+private def complete {artifact : Artifact} (checkpoint : Checkpoint artifact) (generation : ExportGeneration)
     (fuel boundaryFuel : Nat) (value : Core.Value) (store : Core.Store)
     (finished : Core.runStateful fuel checkpoint.state = .done value store) : Outcome artifact := by
   let world := store.map Core.Value.type
@@ -675,7 +602,7 @@ An export error can reject source metadata; it is not a machine fault. -/
 def Checkpoint.resume {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat)
     (boundaryFuel : Nat := 1024) : IO (Outcome artifact) := do
   match executed : Core.runStateful fuel checkpoint.state with
-  | .done value store => pure (complete checkpoint (← mint) fuel boundaryFuel value store executed)
+  | .done value store => pure (complete checkpoint (← SourceCorePublicValues.ExportGeneration.mint) fuel boundaryFuel value store executed)
   | .fault _error _faultState =>
       pure (False.elim (Core.well_typed_runStateful_never_faults checkpoint.typed executed))
   | .outOfFuel state =>
