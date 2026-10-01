@@ -19,6 +19,11 @@ import Solcore.Test.SourceCoreDataPlaceLayout
 import Solcore.Test.SourceCoreDataPlaceReadReflection
 import Solcore.Test.SourceCoreDataPlaceExactFault
 import Solcore.Test.SourceCoreDataPlaceGetterReflection
+import Solcore.Test.SourceCoreDataPlacePrefixReflection
+import Solcore.Test.SourceCoreDataPlaceRhsReflection
+import Solcore.Test.SourceCoreDataPlaceSetterReflection
+import Solcore.Test.SourceCoreDataPlaceModifierReflection
+import Solcore.Test.SourceCoreDataPlaceCommitReflection
 import Solcore.Test.SourceCoreDataPlaceCatalogBoundary
 import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCoreHeapMarkers
