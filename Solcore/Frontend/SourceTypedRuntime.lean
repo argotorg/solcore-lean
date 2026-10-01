@@ -1,3 +1,4 @@
+import Solcore.Frontend.SourceRuntimeDeepValidation
 import Solcore.Frontend.SourceRuntimeHeapTyping
 import Solcore.Frontend.SourceCompilationPlan
 
@@ -1829,16 +1830,6 @@ theorem runTrusted_done_has_inferredBodyType
           · split at done
             · cases done
             · exact finishFunctionFlow_done_type _ _ _ _ _ done
-
-/-- A value has the expected runtime representation in the exact executable
-plan deterministically prepared from a caller-supplied specialization plan.
-This retains provenance for first-class globals discovered only through a
-selected operator or coercion method. -/
-def Value.HasPreparedType (program : CheckedProgram) (plan : Plan)
-    (value : Value) (expected : Ty) : Prop :=
-  ∃ executablePlan,
-    prepareExecutablePlanEvidence program plan = .ok executablePlan ∧
-      value.type? executablePlan = some (runtimeType expected)
 
 /-- Recheck the public result against the complete executable plan, including
 authenticated method/helper specializations appended during preparation. -/

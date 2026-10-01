@@ -1058,4 +1058,14 @@ structure PreparedDeepExecution (program : CheckedProgram) (plan : Plan)
   value_safe : value.DeeplySafe program.signatures
     (preparedDeepExecutablePlan program plan) finalState resultType
 
+/-- A value has the expected runtime representation in the exact executable
+plan deterministically prepared from a caller-supplied specialization plan.
+This retains provenance for first-class globals discovered only through a
+selected operator or coercion method. -/
+def Value.HasPreparedType (program : CheckedProgram) (plan : Plan)
+    (value : Value) (expected : Ty) : Prop :=
+  ∃ executablePlan,
+    prepareExecutablePlanEvidence program plan = .ok executablePlan ∧
+      value.type? executablePlan = some (runtimeType expected)
+
 end Solcore.Frontend.SourceTypedRuntime
