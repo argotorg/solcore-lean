@@ -1,4 +1,6 @@
 import Solcore.Frontend.SourceCoreCallableIndexedLedger
+import Solcore.Frontend.SourceCoreCallableIndexedCellHeaders
+import Solcore.Frontend.SourceCoreCallableIndexedPrincipalAllocations
 import Solcore.Frontend.SourceCoreCallableAncestryPairedPreparation
 import Solcore.Frontend.ProgramChecking
 
@@ -67,6 +69,10 @@ example {checked : Checked} {prepared : Prepared checked}
 private def successful {checked : Checked} (prepared : Prepared checked) (owner : Key)
     (arguments : List SourceTypedRuntime.Value) (expected : Nat) (spent : Nat) :
     IO (SourceCoreCallableIndexedPrograms.Completion prepared) := do
+  let cellHeaders ← get "indexed raw cell header cache"
+    (SourceCoreCallableIndexedCellHeaders.prepare (program := prepared) prepared.ancestry.graph)
+  let principalHeaders ← get "indexed raw principal header cache"
+    (SourceCoreCallablePairedHeaders.prepare prepared.ancestry.graph)
   let first ← get "indexed native start" (prepared.runSource owner arguments spent 500)
   let early ← get "indexed partial typed ledger" (SourceCoreCallableIndexedLedger.scan first initial)
   assertTrue (early.ledger.initialHeap.map (·.type) == initial.map (·.type)) "suspension altered inert source prefix"
@@ -75,6 +81,18 @@ private def successful {checked : Checked} (prepared : Prepared checked) (owner 
   assertTrue ledger.ledger.pending.isNone "indexed completion retained an incomplete marker"
   assertTrue (ledger.ledger.rows.all (fun row => initial.length ≤ row.sourceLocation.index))
     "indexed administrative cell entered the source prefix"
+  for row in ledger.ledger.rows do
+    let selected ← get "indexed raw cell header" (SourceCoreCallableIndexedCellHeaders.select cellHeaders row)
+    assertTrue (selected.header.raw.binder.id == row.entry.key.binder.id) "indexed cache changed stable source binder identity"
+    if !selected.header.raw.binder.scheme.quantified.isEmpty then
+      let restored ← get "indexed raw generic principal"
+        (SourceCoreCallableIndexedPrincipalAllocations.restore principalHeaders row)
+      assertTrue (restored.cell.type == selected.header.raw.binder.scheme.body) "indexed principal lost original raw type"
+      match restored.cell.value with
+      | some (.closure parameters _ _ _ _ captures _) =>
+        assertTrue (captures == row.environment) "indexed principal changed capture order or aliases"
+        assertTrue (parameters.any (fun binder => !binder.scheme.body.freeVariables.isEmpty)) "indexed principal was specialized during export"
+      | _ => throw (IO.userError "indexed principal was not restored as its original closure")
   assertTrue (SourceCoreCallableIndexedLedger.frame? completion == some .empty)
     "indexed invocation failed to restore its empty current frame"
   match completion.result.native.observation with
