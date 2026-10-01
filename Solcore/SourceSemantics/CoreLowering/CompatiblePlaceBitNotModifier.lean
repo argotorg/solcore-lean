@@ -3,8 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.DataPlaceUpdateTotality
 import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
 
 /-! Bit-not consumes the saved leaf. The generated Unit RHS is administrative
-and has no corresponding source expression. The independent assignment rule
-currently has only a Word constructor; Integer primitive agreement is separate. -/
+and has no corresponding source expression. This module supplies
+the Word case; Integer snapshot agreement is provided by IntegerBitNotSnapshot. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotModifier
 open Core Frontend SourceInference GeneralHeap CompatiblePayload CompatibleEquality
@@ -36,9 +36,7 @@ theorem word_success
 
 theorem functional {current : Option Dynamic.Value} {left right : Dynamic.Value}
     (first : Dynamic.BitNotSnapshot current left) (second : Dynamic.BitNotSnapshot current right) : left = right := by
-  cases first
-  cases second
-  rfl
+  cases first <;> cases second <;> rfl
 
 /-- A successful independent target supplies all structural facts needed for
 a snapshot-only write. No post-RHS source heap exists in this operation. -/

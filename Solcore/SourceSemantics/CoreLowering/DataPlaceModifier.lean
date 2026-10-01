@@ -160,8 +160,8 @@ theorem word_bitNot_success (value : Word) {environment : Environment} {snapshot
   intro invalid
   exact invalid.excludes_application ⟨_, .wordBitNot value⟩
 
-/-- Integer bit-not agrees with the unary primitive. It is deliberately not
-presented as `BitNotSnapshot`, whose independent assignment rule is Word-only. -/
+/-- Integer bit-not agrees with the unary primitive. The corresponding
+snapshot-assignment constructor is connected in IntegerBitNotSnapshot. -/
 theorem integer_bitNot_primitive (value : Int) {environment : Environment} {snapshot rhs : Expr}
     (snapshotSelected : Selects environment snapshot (.inRight .unit (.integer value)))
     (operator : Option Core.BinaryOp) (store : Store) (invalid : Word) :

@@ -219,6 +219,8 @@ resolution. -/
 inductive BitNotSnapshot : Option Value → Value → Prop where
   | word (value : Core.Word) :
       BitNotSnapshot (some (.word value)) (.word value.bitNot)
+  | integer (value : Int) :
+      BitNotSnapshot (some (.integer value)) (.integer (~~~value))
 
 /-- Restore a scoped control result to its entry environment. -/
 def restoreControl (outer : Environment) : ControlOutcome → ControlOutcome

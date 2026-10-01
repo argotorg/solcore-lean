@@ -335,8 +335,9 @@ theorem preserves
     (current_typed : OptionalValueHasType context heap current .word)
     (applies : BitNotSnapshot current result) :
     ValueHasType context heap result .word := by
-  cases applies
-  exact .word _
+  cases applies with
+  | word => exact .word _
+  | integer => cases current_typed with | some typed => cases typed
 
 end BitNotSnapshot
 
