@@ -1,0 +1,162 @@
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceKeyReflection
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceGetterReflection
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceAssignmentSuccess
+
+/-! Reflection of the actual reference, key and snapshot prefix. Universal
+child reflection supplies source key traces; authenticated getter reflection
+then supplies the independent target result. The real RHS continuation is an
+output witness under its three hidden slots, never a static premise. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.CompatiblePlacePrefixReflection
+open Core Frontend SourceInference GeneralHeap DataPatternValues GenericExpressionMeaning
+open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute CompatiblePlaceKeys
+open SourceCoreCompatibleDataPlaces DataPlaceExecution
+
+def remainder (prepared : Prepared) (keyType : Ty) (rhs next : Expr) (outputType : Ty)
+    (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word) : Expr :=
+  LanguageResult.bind outputType (shift 3 rhs)
+    (LanguageResult.bind outputType
+      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid)
+      (LanguageResult.bind outputType
+        (.apply (setter prepared keyType) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
+        (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))
+
+inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
+    (functions : FunctionModel checked.catalog) (program : Program) (context : SourceSemantics.Context)
+    (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (faults : FaultRep)
+    (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
+    (place : PlaceResolution) (leaf : TypeSystem.Ty) (environment : Dynamic.Environment) (coreEnvironment : Environment)
+    (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
+    (rhs next : Expr) (outputType : Ty) (operator : Option BinaryOp) (bitNot : Bool) (invalid : Word)
+    (result : Value) (finalStore : Store) : Prop where
+  | fault {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
+      {finalMap : LocationMap} {finalWorld : StoreTyping}
+      (sourceFault : Dynamic.SourcePlaceFaults program context evidence source environment before place reason after)
+      (resultEq : result = .inLeft outputType (.word token)) (tokenRep : faults reason token)
+      (heaps : HeapRepresents checked registry functions finalMap finalWorld after finalStore)
+      (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
+      (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after) :
+      Result checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
+        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore
+  | resolved {target : Dynamic.ResolvedPlace} {after : Dynamic.Heap}
+      (sourceTrace : Dynamic.SourcePlaceResolves program context evidence source environment before place target after)
+      (execution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
+        coreEnvironment store mapping world before after)
+      (continuation : Evaluates (snapshotEnvironment prepared.route.rootType execution.target (packValues execution.values)
+        (.inRight .unit execution.snapshot) coreEnvironment) execution.store
+        (remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid) result finalStore) :
+      Result checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
+        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore
+
+/-- The diagnostic premises are static interpretations of emitted tokens.
+They do not supply any source or native execution. All target source traces
+are reconstructed from a completed emitted assignment and universal child IH. -/
+theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext : Core.Context}
+    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (meaning : Reflects (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
+    (functionTypes : FunctionRuntimeViews functions)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (missingTokens : ∀ {root resolved reason token count},
+      FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
+    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
+    {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
+    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    (completed : Evaluates coreEnvironment store
+      (execute prepared (.var index) (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalid) result finalStore) :
+    Result compilation.checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
+      coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore := by
+  obtain ⟨scheme, staticLookup, _, _, _⟩ := rootTyped.scheme
+  obtain ⟨location, initialCell, lookup, initialRead, _, _⟩ := locals.lookup staticLookup
+  have keyPhase := CompatiblePlaceKeyReflection.reflects layout.children meaning environments heaps locals slot rootTyped lookup initialRead completed
+  cases keyPhase with
+  | fault sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata =>
+    exact .fault sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata
+  | @keys sourceLocation resolved after keyLookup sourceTrace keys continuation =>
+    have locationEq := lookup.functional keyLookup
+    subst sourceLocation
+    have arguments := layout.views.arguments keys.shaped keys.related (fun _ _ found => by simpa only [Nat.zero_add] using found)
+    have currentPath : PreparedPath compilation.checked source site keys.cell.type place.projections 0 prepared.steps prepared.keys leaf := keys.type ▸ layout.path
+    have currentArguments : Arguments compilation.checked registry functions keys.keyMap keys.keyWorld source site keys.values currentPath resolved := by
+      simpa only [keys.type] using arguments
+    have typedEnvironment : RuntimeEnvironmentHasTypes keys.keyWorld
+        (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
+        ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
+          (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) compilation.checked.catalog.definitions :=
+      .cons (CompatiblePlaceResolution.values_typed keys.related)
+        (.cons (.cellRef keys.reference.typed) ((environments.extend keys.maps keys.worlds).runtime_hasTypes))
+    have reflectGetter := fun {value : Value} {afterStore : Store}
+        (evaluated : Evaluates (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment) keys.keyStore
+          (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0))) value afterStore) =>
+      CompatiblePlaceGetterReflection.reflects currentArguments layout.leafProjected
+        (fun k v same => layout.virtual k v (keys.type.symm.trans same))
+        (fun nonmapping => ordinary (fun k v same => nonmapping k v (keys.type.trans same)))
+        registryExtension layout.nonempty functionTypes faithful observations (layout.keyTypes ▸ keys.related.length.2)
+        keys.heaps keys.reference keys.read typedEnvironment layout.getterTyped (.var rfl) (.var rfl) evaluated
+    cases continuation with
+    | caseLeft getterEvaluated failed =>
+      obtain ⟨futureWorld, _, resultRep, finalHeaps, extension, frame, _⟩ := reflectGetter getterEvaluated
+      cases resultRep with
+      | missing initial fault receipt =>
+        cases failed with
+        | inLeft valueEvaluated =>
+          cases valueEvaluated with
+          | var found =>
+            simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+            subst_vars
+            exact .fault (.projectionRead lookup initialRead sourceTrace keys.read initial fault) rfl
+              (missingTokens receipt) finalHeaps keys.maps (keys.worlds.trans extension) (keys.frame.trans frame) keys.metadata
+      | uninitialized empty notMapping nonempty =>
+        cases failed with
+        | inLeft valueEvaluated =>
+          cases valueEvaluated with
+          | var found =>
+            simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+            subst_vars
+            exact .fault (.uninitialized lookup initialRead sourceTrace keys.read empty notMapping nonempty) rfl
+              (invalidTokens _) finalHeaps keys.maps (keys.worlds.trans extension) (keys.frame.trans frame) keys.metadata
+    | caseRight getterEvaluated remaining =>
+      obtain ⟨futureWorld, _, resultRep, finalHeaps, extension, frame, _⟩ := reflectGetter getterEvaluated
+      cases resultRep with
+      | @read sourceRoot selected snapshot initial read represented =>
+        exact .resolved (.intro lookup initialRead sourceTrace keys.read initial read)
+          { target := keys.target
+            sources := keys.sources
+            values := keys.values
+            selected := selected
+            snapshot := snapshot
+            keyStore := keys.keyStore
+            store := _
+            mapping := keys.keyMap
+            world := futureWorld
+            selectedEq := rfl
+            currentCell := keys.cell
+            currentRead := keys.read
+            currentType := keys.type
+            reference := keys.reference.extend (.refl _) extension
+            shaped := keys.shaped
+            keysEvaluated := keys.evaluated
+            snapshotEvaluated := getterEvaluated
+            keysRelated := keys.related.extend (.refl _) extension
+            snapshotRelated := represented
+            heaps := finalHeaps
+            maps := keys.maps
+            worlds := keys.worlds.trans extension
+            frame := keys.frame.trans frame
+            metadata := keys.metadata } remaining
+
+end Solcore.SourceSemantics.CoreLowering.CompatiblePlacePrefixReflection
