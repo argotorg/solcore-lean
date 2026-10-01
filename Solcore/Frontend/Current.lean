@@ -102,7 +102,6 @@ import Solcore.Frontend.SourceCorePublicValues
 import Solcore.Frontend.SourceCoreIndexedSession
 import Solcore.Frontend.SourceCoreRootDiscovery
 import Solcore.Frontend.SourceCoreExecution
-import Solcore.Frontend.SourceCompilerSession
 import Solcore.Frontend.SourceCoreEvidence
 import Solcore.Frontend.SourceCoreLocalPolymorphism
 import Solcore.Frontend.SourceCoreLocalEvidence
