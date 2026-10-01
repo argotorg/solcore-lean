@@ -166,6 +166,13 @@ import Solcore.Test.SourceCoreTypedNamedParameters
 import Solcore.Test.SourceCoreCompatibleTypedPlaceExpressions
 import Solcore.Test.SourceCoreCompatibleTypedAssignment
 import Solcore.Test.SourceCoreTypedScopedStatements
+import Solcore.Test.SourceCoreTypedScopedControl
+import Solcore.Test.SourceCoreCompatibleTypedAssignmentFaults
+import Solcore.Test.SourceCoreTypedMixedNamedParameters
+import Solcore.Test.SourceCoreTypedLexicalControl
+import Solcore.Test.SourceCoreCompatibleBareAssignment
+import Solcore.Test.SourceCoreCompatibleGeneralIndices
+import Solcore.Test.SourceCoreTypedLexicalNamedParameters
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -2500,6 +2507,13 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCompatibleTypedPlaceExpressions.run
   SourceCoreCompatibleTypedAssignment.run
   SourceCoreTypedScopedStatements.run
+  SourceCoreTypedScopedControl.run
+  SourceCoreCompatibleTypedAssignmentFaults.run
+  SourceCoreTypedMixedNamedParameters.run
+  SourceCoreTypedLexicalControl.run
+  SourceCoreCompatibleBareAssignment.run
+  SourceCoreCompatibleGeneralIndices.run
+  SourceCoreTypedLexicalNamedParameters.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
