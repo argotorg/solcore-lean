@@ -191,14 +191,20 @@ import Solcore.Test.SourceCoreCallableNamedCanonicalOrder
 import Solcore.Test.SourceCoreTypedForHeader
 import Solcore.Test.SourceCoreCallableIndexedRetainedNamedValues
 import Solcore.Test.SourceCoreBuiltinLexicalStatements
+import Solcore.Test.SourceCoreBuiltinAssignmentStatements
 import Solcore.Test.SourceCoreCallableIndexedLambdaValues
 import Solcore.Test.SourceCoreTypedImperativeFor
 import Solcore.Test.SourceCoreCompatibleRenamedBareBitNot
 import Solcore.Test.SourceCoreBuiltinNamedCalls
 import Solcore.Test.SourceCoreCompatiblePatternProofs
+import Solcore.Test.SourceCoreCompatibleCompositePatterns
+import Solcore.Test.SourceCoreCompatibleMatchArmAllocations
 import Solcore.Test.SourceCoreTypedImperativeForUnary
 import Solcore.Test.SourceCoreCallableIndexedLambdaCalls
+import Solcore.Test.SourceCoreCallableIndexedLambdaViewCalls
+import Solcore.Test.SourceCoreCallableLambdaViewEdits
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
+import Solcore.Test.SourceCoreProtectedNamedPlaces
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -2560,14 +2566,20 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreTypedForHeader.run
   SourceCoreCallableIndexedRetainedNamedValues.run
   SourceCoreBuiltinLexicalStatements.run
+  SourceCoreBuiltinAssignmentStatements.run
   SourceCoreCallableIndexedLambdaValues.run
   SourceCoreTypedImperativeFor.run
   SourceCoreCompatibleRenamedBareBitNot.run
   SourceCoreBuiltinNamedCalls.run
   SourceCoreCompatiblePatternProofs.run
+  SourceCoreCompatibleCompositePatterns.run
+  SourceCoreCompatibleMatchArmAllocations.run
   SourceCoreTypedImperativeForUnary.run
   SourceCoreCallableIndexedLambdaCalls.run
+  SourceCoreCallableIndexedLambdaViewCalls.run
+  SourceCoreCallableLambdaViewEdits.run
   SourceCoreRecursiveNamedExpressions.run
+  SourceCoreProtectedNamedPlaces.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
