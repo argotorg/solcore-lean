@@ -10,6 +10,7 @@ import Solcore.SourceSemantics.Dynamic.Evidence
 import Solcore.SourceSemantics.Dynamic.EvidenceSubstitutionProperties
 import Solcore.SourceSemantics.Dynamic.LocalSchemes
 import Solcore.SourceSemantics.Dynamic.Evaluation
+import Solcore.SourceSemantics.Dynamic.Initialization
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.Dynamic.Control
 import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
