@@ -186,6 +186,15 @@ def Prepared.lambdaAt? {checked : Checked} {base : Base checked} {graph : Graph 
     (position : Nat) (descriptor : Core.Word) : Option (LambdaHeader graph prepared.principals) :=
   prepared.lambdaHeaders.find? fun header => decide (header.position.val = position ∧ header.template.descriptor = descriptor)
 
+/-- A read wrapper retains its original principal binder and initializer.
+Its native target can have a cumulative context different from this lexical
+header, so selection uses the cached lexical position and source identities. -/
+def Prepared.principalBinderAt? {checked : Checked} {base : Base checked} {graph : Graph base}
+    (prepared : Prepared graph) (position : Nat) (binder : Resolved.LocalId) (initializer : ExpressionId) :
+    Option (PrincipalHeader graph prepared.principals) :=
+  prepared.principalHeaders.find? fun header => decide (header.position.val = position ∧
+    header.principal.principal.binder.id = binder ∧ header.declaration.initializer = initializer)
+
 theorem PrincipalHeader.raw_source {checked : Checked} {base : Base checked} {graph : Graph base} {principals : Principals base}
     (header : PrincipalHeader graph principals) (captured : SourceTypedRuntime.Environment) :
     header.sourceValue captured = .closure header.parameters header.resultType header.body header.state.metadata.source
