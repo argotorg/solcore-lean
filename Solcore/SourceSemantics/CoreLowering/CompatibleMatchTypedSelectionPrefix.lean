@@ -60,6 +60,9 @@ theorem Certificate.selected_prefix_typed
       AdministrativePreserved mapping store finalMap finalStore ∧
       EnvironmentsAgree finalEmbedding finalCanonical finalActual ∧
       RuntimeEnvironmentHasTypes finalWorld finalActual finalContext ambient.definitions ∧
+      finalCanonical[finalScope.length + 1 + globals]? = some (.cellRef frame.type contextLocation) ∧
+      finalStore.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native) ∧
+      contextLocation ∉ finalMap ∧
       ContinuationAgreement actual before (code.rename ξ) finalActual finalStore (body.rename finalEmbedding) := by
   cases certificate with
   | @matchWith statementNode statementType scrutineeNode type scrutinee arms fallback branches _
@@ -93,12 +96,12 @@ theorem Certificate.selected_prefix_typed
     have decision := CompatibleMatchSourceSelection.Arms.selects armCertificates fallbackCertificate valid
       catalogValid extended nextRepresented selectedSource
     obtain ⟨finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
-      finalEmbedding, finalContext, body, selected, finalEnvironments, finalHeaps, maps, worlds, preserved, finalLayout, finalTyped, agreement⟩ :=
+      finalEmbedding, finalContext, body, selected, finalEnvironments, finalHeaps, maps, worlds, preserved, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, agreement⟩ :=
       CompatibleMatchTypedBranchesPrefix.Decision.prefix_typed definitions registered allocator decision armCertificates
         branchesCertified kinds nextReference nextRead stillUnmapped hiddenEnvironments hiddenHeaps hiddenLayout hiddenTyped
     exact ⟨hiddenHeap, location, finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore,
       finalMap, finalWorld, finalEmbedding, finalContext, body, allocated, decision.source, selected, finalEnvironments, finalHeaps,
-      hiddenMaps.trans maps, hiddenWorlds.trans worlds, hiddenFrame.trans preserved, finalLayout, finalTyped, hiddenAgreement.trans agreement⟩
+      hiddenMaps.trans maps, hiddenWorlds.trans worlds, hiddenFrame.trans preserved, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, hiddenAgreement.trans agreement⟩
 
 
 
@@ -152,15 +155,18 @@ theorem Certificate.success_prefix_typed
       AdministrativePreserved mapping store finalMap finalStore ∧
       EnvironmentsAgree finalEmbedding finalCanonical finalActual ∧
       RuntimeEnvironmentHasTypes finalWorld finalActual finalContext ambient.definitions ∧
+      finalCanonical[finalScope.length + 1 + globals]? = some (.cellRef frame.type contextLocation) ∧
+      finalStore.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native) ∧
+      contextLocation ∉ finalMap ∧
       ContinuationAgreement actual before (code.rename ξ) finalActual finalStore (body.rename finalEmbedding) := by
   obtain ⟨selection, selected⟩ := CompatibleMatchDecision.Certificate.source_selects certificate valid catalogValid extended found represented
   obtain ⟨hiddenHeap, location, finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore,
       finalMap, finalWorld, finalEmbedding, finalContext, body, allocated, sourceSelect, bodySelect, finalEnvironments,
-      finalHeaps, maps, worlds, preserved, finalLayout, finalTyped, agreement⟩ :=
+      finalHeaps, maps, worlds, preserved, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, agreement⟩ :=
     Certificate.selected_prefix_typed certificate ordinary onError allocator valid catalogValid definitions registered extended
       found uniqueExpression represented environments heaps agrees actualTyped reference read unmapped evaluated selected
   exact ⟨hiddenHeap, location, selection, finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore,
     finalMap, finalWorld, finalEmbedding, finalContext, body, allocated, sourceSelect, bodySelect, finalEnvironments,
-    finalHeaps, maps, worlds, preserved, finalLayout, finalTyped, agreement⟩
+    finalHeaps, maps, worlds, preserved, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, agreement⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleMatchTypedSelectionPrefix

@@ -59,7 +59,7 @@ theorem selected_closure_body
         result = LocalLoop.returnedValue (.closure .unit .unit (.var 0) selectedActual) ∧ finished = selectedStore) := by
   obtain ⟨hiddenHeap, location, finalScope, selectedEnvironment, selectedHeap, selectedCanonical, selectedActual,
       selectedStore, selectedMap, selectedWorld, selectedEmbedding, selectedContext, body,
-      allocated, selected, selectedBody, finalEnvironments, finalHeaps, maps, worlds, preserved, finalLayout, finalTyped, agreement⟩ :=
+      allocated, selected, selectedBody, finalEnvironments, finalHeaps, maps, worlds, preserved, finalLayout, finalTyped, _finalReference, _finalRead, _finalUnmapped, agreement⟩ :=
     CompatibleMatchTypedSelectionPrefix.Certificate.selected_prefix_typed certificate ordinary onError allocator valid catalogValid
       definitions registered extended found uniqueExpression represented environments heaps agrees actualTyped reference read unmapped evaluated selectedSource
   cases selectedBody with

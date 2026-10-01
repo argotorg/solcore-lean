@@ -63,6 +63,10 @@ theorem bindArm_prefix_typed {layouts : SourceCoreAllocationLayouts.Prepared}
       EnvironmentsAgree finalEmbedding finalCanonical finalActual ∧
       RuntimeEnvironmentHasTypes finalWorld finalActual
         (CompatibleMatchTypedArmAllocation.prefixContext bindings actualContext) nativeDefinitions ∧
+      finalCanonical[(bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope).length +
+        (if named then 0 else 1) + globals]? = some (.cellRef layout.type contextLocation) ∧
+      finalStore.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native) ∧
+      contextLocation ∉ finalMap ∧
       ContinuationAgreement actual store
         (code.rename ξ)
         finalActual finalStore (body.rename finalEmbedding) := by
@@ -74,14 +78,26 @@ theorem bindArm_prefix_typed {layouts : SourceCoreAllocationLayouts.Prepared}
     simpa using represented.length.2
   obtain ⟨finalEnvironment, finalHeap, finalCanonical, finalLogical, finalActual, finalStore, finalMap,
     finalWorld, finalEmbedding, allocated, finalEnv, finalHeapRep, maps, worlds, frame,
-    finalSourceLayout, finalActualLayout, _, finalTyped, agreement⟩ :=
+    finalSourceLayout, finalActualLayout, spine, finalTyped, agreement⟩ :=
     CompatibleMatchTypedArmAllocation.prefix_typed
       (CompatibleMatchArmCertificates.of_accepted onError allocator accepted) definitions registered represented
       environments heaps sourceLayout actualLayout actualTyped (start := 0) rfl rfl length
       (fun {_ _} found => by simpa using found) kinds reference read unmapped
+  obtain ⟨added, prefixLength, canonicalEq, logicalEq⟩ := spine
+  have finalReference : finalCanonical[(bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope).length +
+      (if named then 0 else 1) + globals]? = some (.cellRef layout.type contextLocation) := by
+    rw [canonicalEq]
+    have scopeLength : (bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope).length =
+        bindings.length + scope.length := by simp
+    rw [scopeLength]
+    have index : bindings.length + scope.length + (if named then 0 else 1) + globals =
+        added.length + (scope.length + (if named then 0 else 1) + globals) := by omega
+    rw [index, List.getElem?_append_right (by omega)]
+    simpa using reference
+  obtain ⟨stillUnmapped, stillRead⟩ := frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1
   refine ⟨finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap,
     finalWorld, Renaming.comp finalEmbedding (liftMany bindings.length κ), allocated, finalEnv,
-    finalHeapRep, maps, worlds, frame, ?_, finalTyped, ?_⟩
+    finalHeapRep, maps, worlds, frame, ?_, finalTyped, finalReference, stillRead.trans read, stillUnmapped, ?_⟩
   · intro index value found
     exact finalActualLayout (finalSourceLayout found)
   · have same : ((body.weakenAt bindings.length).weakenAt bindings.length).rename finalEmbedding =

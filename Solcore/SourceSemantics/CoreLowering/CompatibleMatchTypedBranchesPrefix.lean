@@ -82,6 +82,9 @@ theorem Decision.prefix_typed {compilation : SourceCoreCompatibleDataMatches.Con
       AdministrativePreserved mapping store finalMap finalStore ∧
       EnvironmentsAgree finalEmbedding finalCanonical finalActual ∧
       RuntimeEnvironmentHasTypes finalWorld finalActual finalContext ambient.definitions ∧
+      finalCanonical[finalScope.length + 1 + globals]? = some (.cellRef layout.type contextLocation) ∧
+      finalStore.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native) ∧
+      contextLocation ∉ finalMap ∧
       ContinuationAgreement actual store
         (branches.rename ξ)
         finalActual finalStore (body.rename finalEmbedding) := by
@@ -96,7 +99,7 @@ theorem Decision.prefix_typed {compilation : SourceCoreCompatibleDataMatches.Con
       cases branchesCompiled with
       | cons allocation tailBranches =>
         obtain ⟨finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
-          finalEmbedding, allocated, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, agreement⟩ :=
+          finalEmbedding, allocated, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, agreement⟩ :=
           CompatibleMatchTypedArmPrefix.bindArm_prefix_typed (bindings_arguments bindingsRepresented) definitions registered allocator allocation
             (named := false) (kinds (pattern, body) (by simp)) reference read unmapped
             environments heaps (actualLayout.lift (packValues values))
@@ -105,7 +108,7 @@ theorem Decision.prefix_typed {compilation : SourceCoreCompatibleDataMatches.Con
         rw [bindings] at allocated
         exact ⟨_, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
           finalEmbedding, _, body, .arm bindings allocated certified,
-          finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, (case_right matchedCore).trans agreement⟩
+          finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, (case_right matchedCore).trans agreement⟩
   | @tail arm rest pattern body arms fallback fallbackCode selection notMatched fails next ih =>
     cases certificates with
     | cons certificate matcherTyped bodyCertified tail =>
@@ -120,10 +123,10 @@ theorem Decision.prefix_typed {compilation : SourceCoreCompatibleDataMatches.Con
       cases branchesCompiled with
       | cons allocation tailBranches =>
         obtain ⟨finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
-          finalEmbedding, finalContext, body, choice, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, agreement⟩ :=
+          finalEmbedding, finalContext, body, choice, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, agreement⟩ :=
           ih tail tailBranches (fun item member => kinds item (List.mem_cons_of_mem _ member)) nextLayout (.cons .unit actualTyped)
         refine ⟨finalScope, finalEnvironment, finalHeap, finalCanonical, finalActual, finalStore, finalMap, finalWorld,
-          finalEmbedding, finalContext, body, choice, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, ?_⟩
+          finalEmbedding, finalContext, body, choice, finalEnv, finalHeapRep, maps, worlds, frame, finalLayout, finalTyped, finalReference, finalRead, finalUnmapped, ?_⟩
         simp only [LoopStatements.rename_insert] at agreement
         simp only [Expr.rename, LoopRenaming.weakenZero]
         exact (case_left failedCore).trans agreement
@@ -131,7 +134,7 @@ theorem Decision.prefix_typed {compilation : SourceCoreCompatibleDataMatches.Con
     cases branchesCompiled
     refine ⟨scope, environment, heap, canonical, actual, store, mapping, world,
       Renaming.comp ξ (Renaming.insertion 0), actualContext, _, .default certified, environments, heaps,
-      .refl _, .refl _, .refl _ _, ?_, actualTyped, ?_⟩
+      .refl _, .refl _, .refl _ _, ?_, actualTyped, reference, read, unmapped, ?_⟩
     · intro index foundValue found
       exact actualLayout (index := index + 1) found
     · simp only [← Expr.rename_insertion, Expr.rename_comp]
@@ -140,7 +143,7 @@ theorem Decision.prefix_typed {compilation : SourceCoreCompatibleDataMatches.Con
     cases branchesCompiled
     refine ⟨scope, environment, heap, canonical, actual, store, mapping, world,
       Renaming.comp ξ (Renaming.insertion 0), actualContext, _, .noBranch, environments, heaps,
-      .refl _, .refl _, .refl _ _, ?_, actualTyped, ?_⟩
+      .refl _, .refl _, .refl _ _, ?_, actualTyped, reference, read, unmapped, ?_⟩
     · intro index foundValue found
       exact actualLayout (index := index + 1) found
     · simp only [← Expr.rename_insertion, Expr.rename_comp]
