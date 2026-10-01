@@ -150,7 +150,7 @@ theorem Tree.preserves
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 
-  | @assignment context scope mode id node assignment operator rhs rest expected type body found form head projected headErrors remaining ih =>
+  | @assignment context scope mode id node assignment operator rhs rest expected type body found form head headErrors remaining ih =>
     have go {middleContext : SourceSemantics.Context} {next : Dynamic.Environment} {middle : Dynamic.Heap}
         (first : Dynamic.StatementExecutes program context evidence source environment before id middleContext (.fallthrough next) middle)
         (tail : Executes mode program middleContext evidence source next middle rest resultContext outcome after) :
@@ -165,8 +165,8 @@ theorem Tree.preserves
       obtain ⟨rfl, same, updated, assigned⟩ := ScalarStatementViews.assignValue unique (lookupStatement?_sound found) form first
       cases same
       obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, observed, continuation⟩ :=
-        ProtectedAssignmentStatements.Head.preserves_prefix functions extension program evidence transport
-          (expressionPreserves _ contextValid) faithful observations head projected
+        ProtectedAssignmentHeads.Head.preserves_prefix functions extension program evidence transport
+          (expressionPreserves _ contextValid) faithful observations head
           environments heaps locals agrees actualTyped installed assigned
       have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
       obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical⟩ :=
@@ -188,8 +188,8 @@ theorem Tree.preserves
       rcases ScalarStatementViews.cons_fault_view mode unique (lookupStatement?_sound found) (by intro _ _; simp [form]) failed with
         ⟨rfl, first⟩ | ⟨_, _, _, first, tail⟩
       · obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, observed⟩ :=
-          ProtectedAssignmentStatements.Head.preserves_fault functions extension program evidence transport
-            (expressionPreserves _ contextValid) faithful observations head projected
+          ProtectedAssignmentHeads.Head.preserves_fault functions extension program evidence transport
+            (expressionPreserves _ contextValid) faithful observations head
             environments heaps locals agrees actualTyped installed headErrors
             (ScalarStatementViews.assignValue_fault unique (lookupStatement?_sound found) form first) body (LocalLoop.controlType type)
         exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds, preservation, metadata,

@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.BuiltinLexicalStatements
 
 /-! Concrete recursive named-call expression trees close lexical initializer,
 condition, discarded and returned children at their actual source contexts.
-Installed global code/captures/history are explicit entry facts. Bare assignment, loops and static named contextual-tree extraction remain separate; no runtime child meaning is an
+Installed global code/captures/history are explicit entry facts. Loops and static named contextual-tree extraction remain separate; no runtime child meaning is an
 external premise of these consumers. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.NamedLexicalAssignments

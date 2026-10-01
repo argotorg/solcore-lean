@@ -1,10 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedLexicalStatementReflection
-import Solcore.SourceSemantics.CoreLowering.NamedAssignmentStatementTail
+import Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads
 
 /-! Recursive guarded lexical composition with ordinary marked source bindings
-and nonempty projected assignments. The lexical fragment stays unchanged.
+and bare or projected assignments. The lexical fragment stays unchanged.
 Diagnostic alignment is static; no child or body execution is stored here.
-Bare assignment, loops and whole contextual tree extraction remain separate. -/
+Loops and whole contextual tree extraction remain separate. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.ProtectedLexicalAssignments
 open Core Frontend SourceInference
@@ -84,7 +84,6 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
   | assignment {context scope mode id node assignment operator rhs rest expected type body}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (head : GenericAssignmentStatements.Head values source context (expressions context) scope administrative definitions assignment operator rhs)
-      (projected : head.prepared.steps ≠ [])
       (errors : head.Errors registry faults)
       (remaining : Tree layouts owner active frame globals onError values source expressions administrative definitions registry faults
         context scope mode rest expected type body) :

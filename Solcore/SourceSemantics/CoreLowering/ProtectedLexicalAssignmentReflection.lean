@@ -164,10 +164,10 @@ theorem Tree.reflects
       (ControlAt.conditional_reflects transport expressionReflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
 
-  | @assignment context scope mode id node assignment operator rhs rest expected type body found form head projected headErrors remaining ih =>
-    rcases ProtectedAssignmentStatements.Head.reflects functions extension program evidence transport
+  | @assignment context scope mode id node assignment operator rhs rest expected type body found form head headErrors remaining ih =>
+    rcases ProtectedAssignmentHeads.Head.reflects functions extension program evidence transport
       (expressionPreserves _ contextValid) (expressionReflects _ contextValid) faithful observations
-      head projected environments heaps locals agrees actualTyped installed runtimeViews headErrors evaluated with
+      head environments heaps locals agrees actualTyped installed runtimeViews headErrors evaluated with
       ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata, observed⟩ |
       ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, observed, continuation⟩
     · exact ⟨context, .fault reason, after, finalMap, finalWorld,

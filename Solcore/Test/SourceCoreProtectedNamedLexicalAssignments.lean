@@ -5,7 +5,7 @@ import Solcore.Test.SourceCoreUnifiedCorpusSupport
 #check_failure Solcore.SourceSemantics.CoreLowering.BuiltinNamedBody.Certificate.mk
 /-! Concrete consumers close named child/body meanings at the actual static
 administrative context. Core-only fixtures combine source bindings, scoped
-control and projected writes; ordered source cells, raw headers/duplicate keys,
+control and bare/projected writes; ordered source cells, raw headers/duplicate keys,
 first faults, retained writes and real resume are observed separately. -/
 set_option autoImplicit false
 set_option maxHeartbeats 4000000
@@ -72,6 +72,50 @@ theorem concrete_named_reflects {context : SourceSemantics.Context} {scope : Sco
   NamedLexicalAssignments.Tree.reflects functions definitions registered extension faithful observations runtimeViews evidence
     unique owners uninitialized missing bodyUninitialized bodyMissing tree
 
+include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
+/-- A real head, including an empty projection path, composes with the same
+concrete recursive tail. No projected-path or runtime child premise is needed. -/
+theorem concrete_named_assignment_preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+    {id : StatementId} {node : StatementNode} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {rest : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {body : Expr} {administrative : Core.Context}
+    (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+    (head : ProtectedAssignmentHeads.Head values source context
+      (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)
+      scope administrative ambient.definitions assignment operator rhs)
+    (errors : head.Errors registry faults)
+    (tail : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt administrative registry faults
+      context scope mode rest expected type body) :
+    ProtectedLexicalAssignments.ControlAt.Preserves functions program evidence
+      (administrative := administrative) (entry := NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix)
+      (source := source) (context := context) (registry := registry) (faults := faults)
+      (solved := solved) (frameLayout := frame) (globals := globals)
+      (scope := scope) mode (id :: rest) expected type (head.emit body (LocalLoop.controlType type)) :=
+  concrete_named_preserves functions definitions registered extension faithful observations runtimeViews evidence
+    unique owners uninitialized missing bodyUninitialized bodyMissing (.assignment found form head errors tail)
+
+include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
+/-- Whole completed code is reflected through a bare or projected head before
+the recursive tail; its seven real slots and protected entry come from the head. -/
+theorem concrete_named_assignment_reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+    {id : StatementId} {node : StatementNode} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {rest : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {body : Expr} {administrative : Core.Context}
+    (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+    (head : ProtectedAssignmentHeads.Head values source context
+      (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)
+      scope administrative ambient.definitions assignment operator rhs)
+    (errors : head.Errors registry faults)
+    (tail : Tree bodies layouts owner active frame globals onError compilation fuel source solved reasonAt administrative registry faults
+      context scope mode rest expected type body) :
+    ProtectedLexicalAssignments.ControlAt.Reflects functions program evidence
+      (administrative := administrative) (entry := NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix)
+      (source := source) (context := context) (registry := registry) (faults := faults)
+      (solved := solved) (frameLayout := frame) (globals := globals)
+      (scope := scope) mode (id :: rest) expected type (head.emit body (LocalLoop.controlType type)) :=
+  concrete_named_reflects functions definitions registered extension faithful observations runtimeViews evidence
+    unique owners uninitialized missing bodyUninitialized bodyMissing (.assignment found form head errors tail)
+
 end Static
 
 private def content : String := String.intercalate "\n" [
@@ -86,7 +130,11 @@ private def content : String := String.intercalate "\n" [
   "function earlyReturn(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); if (predicate(saved)) { let delta = first(2); raw[key(1)] += first(delta); return first(raw[key(1)]); } else { return first(6); } return bad(99); }",
   "function tailFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { let delta = first(4); raw[key(1)] += first(delta); } if (predicate(saved)) { raw[key(1)] += first(2); } return bad(saved); }",
   "function unitTail(raw: mapping(Word => Word), seed: Word) { let saved = first(seed); let gap: Word; { let delta = first(4); raw[key(1)] = first(delta); } if (predicate(saved)) { raw[key(1)] += first(2); } }",
-  "function getterFault(table: mapping(Word => mapping(Word => function(Word) returns (Word))), seed: Word, replacement: function(Word) returns (Word)) returns (Word) { { let chosen = first(seed); table[key(chosen)][first(chosen)] = replacement; } return seed; }"
+  "function getterFault(table: mapping(Word => mapping(Word => function(Word) returns (Word))), seed: Word, replacement: function(Word) returns (Word)) returns (Word) { { let chosen = first(seed); table[key(chosen)][first(chosen)] = replacement; } return seed; }",
+  "function bareMixed(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: Word; saved = first(seed); { let delta = first(saved + 1); saved += first(delta); raw[key(1)] += first(saved); } if (predicate(saved)) { saved = first(saved + 2); raw[key(1)] += first(saved); } else { saved = first(99); } return first(saved + raw[key(1)]); }",
+  "function bareBranch(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { let saved: Word; saved = first(4); raw[key(1)] += first(saved); } if (predicate(saved)) { saved += first(2); } else { saved = first(5); } return first(saved); }",
+  "function bareOperandFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: Word; { raw[key(1)] += first(4); saved += first(seed); } return first(99); }",
+  "function bareRhsFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { saved += first(4); raw[key(1)] += first(saved); } if (predicate(saved)) { saved = bad(saved); } return first(99); }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -117,7 +165,8 @@ private def gapBinder (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Re
 
 def run : IO Unit := do
   let compiled ← SourceCoreUnifiedCorpusSupport.prepare "protected named lexical assignments" content
-    ["nested", "shadow", "rhsFault", "keyFault", "earlyReturn", "tailFault", "unitTail", "getterFault"]
+    ["nested", "shadow", "rhsFault", "keyFault", "earlyReturn", "tailFault", "unitTail", "getterFault",
+      "bareMixed", "bareBranch", "bareOperandFault", "bareRhsFault"]
   let initial : SourceTypedRuntime.RuntimeState := {heap := [⟨.comptime .word, none⟩,
     ⟨.word, some (wordValue 819)⟩]}
   let gap ← gapBinder compiled
@@ -168,5 +217,29 @@ def run : IO Unit := do
       cells initial final [( .mapping .word (.mapping .word functionTy),some outer), present 3,
         (functionTy,some replacement), present 3,present 3,present 3,present 3,present 3,present 3,present 3] "getterFault"
     | other => throw (IO.userError s!"protected lexical assignment default: {reprStr other}")
-  IO.println "protected named lexical assignments: recursive bindings/scopes/projected writes, exact ordered cells/raw metadata/duplicates, first faults/retained writes, guarded consumers and resume GREEN"
+    match ← finish compiled "bareMixed" [table 10, wordValue 3] fuel initial with
+    | .done actual final =>
+      SourceCoreUnifiedCorpusSupport.assertTrue (reprStr actual == reprStr (wordValue 35)) "mixed bare/projected result changed"
+      cells initial final ((mapType,some (table 26)) :: present 3 :: present 9 ::
+        ([3,3,4,4,4,4,4,1,1,7,7,7,7,9,9,1,1,9,9,1,1,35,35]).map present) "bareMixed"
+    | other => throw (IO.userError s!"protected mixed bare/projected: {reprStr other}")
+    for (seed, chosen) in [(3,2), (0,5)] do
+      match ← finish compiled "bareBranch" [table 10,wordValue seed] fuel initial with
+      | .done actual final =>
+        SourceCoreUnifiedCorpusSupport.assertTrue (reprStr actual == reprStr (wordValue 5)) "bare scoped branch result changed"
+        cells initial final ((mapType,some (table 14)) ::
+          ([seed,seed,seed,5,4,4,4,1,1,4,4,seed,seed,chosen,chosen,5,5]).map present) "bareBranch"
+      | other => throw (IO.userError s!"protected bare restored branch: {reprStr other}")
+    match ← finish compiled "bareOperandFault" [table 10,wordValue 3] fuel initial with
+    | .fault (.invalidAssignmentOperands .add none (some .word)) final =>
+      cells initial final ((mapType,some (table 14)) :: present 3 :: (.word,none) ::
+        ([1,1,4,4,3,3]).map present) "bareOperandFault"
+    | other => throw (IO.userError s!"protected bare fault after projected write: {reprStr other}")
+    match ← finish compiled "bareRhsFault" [table 10,wordValue 3] fuel initial with
+    | .fault (.uninitializedLocal actual) final =>
+      SourceCoreUnifiedCorpusSupport.assertTrue (actual == gap) "bare RHS exact fault binder changed"
+      cells initial final ((mapType,some (table 17)) ::
+        (([3,3,3,7,4,4,1,1,7,7,7,7,7]).map present ++ [(.word,none)])) "bareRhsFault"
+    | other => throw (IO.userError s!"protected bare RHS after retained writes: {reprStr other}")
+  IO.println "protected named lexical assignments: recursive bindings/scopes/bare and projected writes, exact ordered cells/raw metadata/duplicates, first faults/retained writes, guarded consumers and resume GREEN"
 end Tests.SourceCoreProtectedNamedLexicalAssignments
