@@ -253,6 +253,10 @@ theorem tree_of_functions
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
     Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
   induction syntaxTree generalizing node fuel lowered with
+  | proxy originalFound form =>
+    exact .proxy (CompatibleExpressionProxies.certificate_of_functions originalFound form
+      (policyFor.special _ (.proxy originalFound form)) (policyFor.read _ (.proxy originalFound form))
+      policyFor.leaf accepted)
   | fragment syntaxTree =>
     refine .fragment (CompatibleExpressionRecursive.tree_of_functions unique declarations signatures closed residual ?_ ?_ syntaxTree found typed accepted)
     · exact ⟨fun id child => policyFor.special id (.fragment child),

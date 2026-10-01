@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedCompositions
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyMeaning
 
 /-! Arbitrarily nested data/control/scalar-key index expressions use actual
 runtime typing for every generated comparator capture. Recursive induction
@@ -59,6 +60,7 @@ theorem preserves :
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
   induction tree with
+  | proxy receipt => exact CompatibleExpressionProxies.preserves functions extension program context evidence unique faults receipt
   | fragment child =>
     exact TypedGenericExpressionMeaning.preserves_of_unrestricted
       (CompatibleExpressionRecursive.preserves functions extension program evidence valid unique uninitialized) child
@@ -244,6 +246,7 @@ theorem reflects :
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
   induction tree with
+  | proxy receipt => exact CompatibleExpressionProxies.reflects functions extension program context evidence faults receipt
   | fragment child =>
     exact TypedGenericExpressionMeaning.reflects_of_unrestricted
       (CompatibleExpressionRecursive.reflects functions extension program evidence valid uninitialized) child

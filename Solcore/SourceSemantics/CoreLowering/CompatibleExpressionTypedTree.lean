@@ -1,7 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualRecursive
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualIndices
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProxyCertificates
 
-/-! Typed recursive data/control grammar includes scalar-key mapping indices
+/-! Typed recursive data/control grammar includes proxies and scalar-key mapping indices
 at every child position. Static receipts preserve the actual comparator, raw
 metadata and generated code, while meaning later uses actual environment typing. -/
 set_option autoImplicit false
@@ -11,6 +12,8 @@ abbrev ValuesContext := SourceCoreCompatibleValues.Context
 abbrev Scope := SourceCoreLocalCell.Scope
 
 inductive Syntax (source : TypedSource) : ExpressionId → Prop where
+  | proxy {id node inner} (found : source.lookupExpression? id = some node)
+      (form : node.form = .proxy inner) : Syntax source id
   | fragment {id} (child : CompatibleExpressionRecursive.Syntax source id) : Syntax source id
   | group {id node inner} (found : source.lookupExpression? id = some node)
       (form : node.form = .group inner) (child : Syntax source inner) : Syntax source id
@@ -41,6 +44,8 @@ inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
     (context : SourceSemantics.Context) (solved : List SolvedRequirement)
     (reasonAt : ExpressionId → Word) (scope : Scope) :
     ExpressionId → SourceCoreBasic.LoweredExpr → Prop where
+  | proxy {id lowered} (receipt : CompatibleExpressionProxies.Certificate values source scope id lowered) :
+      Tree fuel values source context solved reasonAt scope id lowered
   | fragment {id lowered}
       (child : CompatibleExpressionRecursive.Tree fuel values source context solved reasonAt scope id lowered) :
       Tree fuel values source context solved reasonAt scope id lowered
@@ -133,6 +138,11 @@ theorem Tree.projected {fuel : Nat} {values : ValuesContext} {source : TypedSour
     {node : ExpressionNode} (found : source.lookupExpression? id = some node) :
     values.checked.catalog.project node.type = .ok lowered.type := by
   cases tree with
+  | proxy certificate =>
+      cases certificate with
+      | proxy receipt =>
+          have same := Option.some.inj (receipt.metadata.found.symm.trans found)
+          exact same ▸ receipt.metadata.projected
   | fragment child => exact child.projected found
   | constructor receipt _ _ _ _ _ =>
       have same := Option.some.inj (receipt.metadata.found.symm.trans found)

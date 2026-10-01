@@ -7,7 +7,7 @@ import Solcore.Frontend.SourceCoreCallableIndexedFrames
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 /-! Actual production contextual receipts close every semantic child obligation
 in the typed recursive grammar. Runtime cases combine index, constructor,
-member, primitive, conditional and product syntax under captured hidden slots. -/
+member, proxy, primitive, conditional and product syntax under captured hidden slots. -/
 set_option autoImplicit false
 set_option maxHeartbeats 4000000
 set_option maxRecDepth 65536
@@ -101,6 +101,11 @@ private def workspace : Workspace.RawWorkspace := {
     "function member_base() returns (Box<mapping(Bool => Bool)>) { let m: mapping(Bool => Bool); return .Box(m); }",
     "function child_fault() returns (Box<Bool>) { let m: mapping(Bool => Bool); let missing: Bool; let n: mapping(Bool => Bool); return .Box(m[true] || missing || n[true]); }",
     "function skipped() returns (Box<Bool>) { let m: mapping(Bool => Bool); return .Box(false && m[true]); }",
+    "function proxy_box() returns (Box<@Word>) { return .Box(@Word); }",
+    "function proxy_choice(flag: Bool) returns (@Word) { return flag ? @Word : @Word; }",
+    "function proxy_pair() returns ((@Word, @Bool)) { return (@Word, @Bool); }",
+    "function proxy_nested() returns ((Box<@Word>, @Bool)) { let boxed: Box<@Word> = .Box(@Word); return (boxed, @Bool); }",
+    "function proxy_parent() returns (Box<@Word>) { let make = lam(value) -> Box<@Word> { return .Box(@Word); }; return make(true); }",
     "function parent(seed: Bool) returns (Box<Bool>) { let f = lam(item) -> Box<Bool> { let m: mapping(Bool => Bool); return .Box(m[seed] ? m[false] : !m[true]); }; return f(true); }"]}] }
 private def reached : Nat → TypedSource → ExpressionId → List ExpressionNode
   | 0, _, _ => []
@@ -120,7 +125,7 @@ private def inspect {checked : SourceCoreCompatibleCatalog.Checked}
     (solved : List SolvedRequirement) (name : String) (expression : ExpressionId) : IO Unit := do
   let originalNode ← match original.lookupExpression? expression with
     | some node => pure node | none => throw (IO.userError "typed recursive original expression missing")
-  let original ← if name == "paired" then do
+  let original ← if name == "paired" || name == "proxy_nested" then do
       let constructor ← match original.nodes.findSome? fun
         | .expression node => match node.form with | .constructor _ _ => some node.id | _ => none
         | _ => none with
@@ -138,10 +143,29 @@ private def inspect {checked : SourceCoreCompatibleCatalog.Checked}
       let indexed : ExpressionNode := { id := nextId 2, span := originalNode.span, type := .bool, form := .index selected.id key.id }
       ({ original with roots := [.expression indexed.id], nodes := original.nodes ++
         [.expression selected, .expression key, .expression indexed] }, indexed.id)
+    else if name == "proxy_raw" then
+      -- Retained typed IR changes only raw proxy metadata; the native identity
+      -- is deliberately shared with canonical @Word. This is not new source admission.
+      let raw := TypeSystem.Ty.comptime .word
+      ({ original with nodes := original.nodes.map fun
+        | .expression node => match node.form with
+          | .proxy .word => .expression {node with type := .proxy raw, form := .proxy raw}
+          | .tuple _ => if node.id == expression then
+              .expression {node with type := .product (.proxy raw) (.proxy .bool)} else .expression node
+          | _ => .expression node
+        | other => other }, expression)
     else (original, expression)
   let nodes := reached 100 source expression
   let ids := (nodes.filterMap fun node => match node.form with | .reference _ (.local binder) => some binder | _ => none).eraseDups
   let mut values := SourceCoreCompatibleValues.Context.initial checked
+  if name == "proxy_raw" then
+    let raw := TypeSystem.Ty.comptime .word
+    let encoded ← get "typed raw proxy registry" (SourceCoreCompatibleValues.encode 100 values (.proxy raw) (.proxy raw))
+    values := encoded.context
+    assertTrue ((checked.catalog.project (.proxy raw)).toOption == (checked.catalog.project (.proxy .word)).toOption)
+      "raw proxy fixture no longer shares native type"
+    assertTrue (values.registry.id? (.proxy raw) != values.registry.id? (.proxy .word))
+      "raw proxy inner metadata collapsed to canonical header"
   let mut bindings : List (TypedBinder × Ty × Expr × Option Value) := []
   for id in ids do
     let binder ← get "typed recursive binder" (SourceCoreDataPlaces.rootBinder source id)
@@ -197,7 +221,11 @@ private def inspect {checked : SourceCoreCompatibleCatalog.Checked}
         match name, decoded with
         | "build_box", .constructed _ [.bool true] | "conditional", .constructed _ [.bool true]
         | "parent", .constructed _ [.bool true] | "skipped", .constructed _ [.bool false]
-        | "member_base", .bool false | "paired", .product (.constructed _ [.bool true]) (.bool false) => pure ()
+        | "member_base", .bool false | "paired", .product (.constructed _ [.bool true]) (.bool false)
+        | "proxy_box", .constructed _ [.proxy .word] | "proxy_parent", .constructed _ [.proxy .word]
+        | "proxy_choice", .proxy .word | "proxy_pair", .product (.proxy .word) (.proxy .bool)
+        | "proxy_raw", .product (.proxy (.comptime .word)) (.proxy .bool)
+        | "proxy_nested", .product (.constructed _ [.proxy .word]) (.proxy .bool) => pure ()
         | _, other => throw (IO.userError s!"typed recursive {name} unexpected result: {reprStr other}")
       for ((binder, type, _, expected), position) in bindings.zipIdx do
         if let some expected := expected then
@@ -217,27 +245,34 @@ def run : IO Unit := do
   let mut count := 0
   for function in prepared.prepared.functions do
     let name := (program.signatures.functions.find? (·.id == function.signature.key.declaration)).map (·.name) |>.getD ""
-    if name != "parent" then
+    if name != "parent" && name != "proxy_parent" then
       let source := function.specialized.function.typedBody
       let returnId ← match source.nodes.findSome? fun
         | .statement node => match node.form with | .returnStmt (some id) => some id | _ => none
         | _ => none with
         | some id => pure id | none => throw (IO.userError "typed recursive return missing")
       inspect prepared.prepared source function.signature.key none function.specialized.function.solvedRequirements name returnId
+      if name == "proxy_pair" then
+        inspect prepared.prepared source function.signature.key none function.specialized.function.solvedRequirements "proxy_raw" returnId
       count := count + 1
   let mut parentsSeen := 0
+  let mut proxyParentsSeen := 0
   for parent in prepared.prepared.contexts do
     if !parent.substitution.isEmpty then
       for entry in parent.source.nodes do
         match entry with
         | .expression node => match node.form with
           | .constructor _ _ =>
-            inspect prepared.prepared parent.source parent.caller.key (some parent) parent.caller.function.solvedRequirements "parent" node.id
-            parentsSeen := parentsSeen + 1
+            let name := (program.signatures.functions.find? (·.id == parent.caller.key.declaration)).map (·.name) |>.getD ""
+            let fixture := if name == "proxy_parent" then "proxy_parent" else "parent"
+            inspect prepared.prepared parent.source parent.caller.key (some parent) parent.caller.function.solvedRequirements fixture node.id
+            if fixture == "proxy_parent" then proxyParentsSeen := proxyParentsSeen + 1
+            else parentsSeen := parentsSeen + 1
           | _ => pure ()
         | _ => pure ()
-  assertTrue (count == 6) s!"typed recursive cases missing: {count}"
+  assertTrue (count == 10) s!"typed recursive cases missing: {count}"
   assertTrue (parentsSeen > 0) "typed recursive specialized parent case missing"
-  IO.println "typed recursive expressions: constructor/control/index/key/member/product, typed captures, lazy effects, skipped/failing child, parent and resume GREEN"
+  assertTrue (proxyParentsSeen > 0) "typed recursive specialized proxy parent missing"
+  IO.println "typed recursive expressions: proxy raw headers, nested proxies, constructor/control/index/key/member/product, typed captures, lazy effects, skipped/failing child, parent and resume GREEN"
 
 end Tests.SourceCoreCompatibleTypedExpressions

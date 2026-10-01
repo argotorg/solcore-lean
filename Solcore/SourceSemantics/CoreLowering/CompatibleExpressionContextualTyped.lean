@@ -59,7 +59,7 @@ private theorem contextualSource_fragment
           simp [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure]
     | unary found form _ | binary found form _ _ | group found form _ | pair found form _ _ | conditional found form _ _ _ | constructor found form _ | member found form _ =>
         simp [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure]
-  | unary found form _ | binary found form _ _ | group found form _ | pair found form _ _ | conditional found form _ _ _ | constructor found form _ | member found form _ | index found form _ _ _ _ =>
+  | proxy found form | unary found form _ | binary found form _ _ | group found form _ | pair found form _ _ | conditional found form _ _ _ | constructor found form _ | member found form _ | index found form _ _ _ _ =>
       simp [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure]
 
 private theorem evidence_fragment (program : CheckedProgram) (projector : SourceCoreEvidence.Projector)
@@ -128,7 +128,7 @@ private theorem evidence_fragment (program : CheckedProgram) (projector : Source
         subst node
         simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions,
           CompatibleExpressionLiterals.owned, bind, Except.bind, pure, Except.pure]
-  | unary originalFound form _ | binary originalFound form _ _ | group originalFound form _ | pair originalFound form _ _ | conditional originalFound form _ _ _ | constructor originalFound form _ | member originalFound form _ | index originalFound form _ _ _ _ =>
+  | proxy originalFound form | unary originalFound form _ | binary originalFound form _ _ | group originalFound form _ | pair originalFound form _ _ | conditional originalFound form _ _ _ | constructor originalFound form _ | member originalFound form _ | index originalFound form _ _ _ _ =>
       have same := Option.some.inj (originalFound.symm.trans found)
       subst node
       simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions,
@@ -154,7 +154,7 @@ private theorem fragment_has_node {source : TypedSource} {id : ExpressionId} (sy
             | constructor found _ _ => exact ⟨_, found⟩
         | member found _ _ => exact ⟨_, found⟩
     | unary found _ _ | binary found _ _ _ | group found _ _ | pair found _ _ _ | conditional found _ _ _ _ | constructor found _ _ | member found _ _ => exact ⟨_, found⟩
-  | unary found _ _ | binary found _ _ _ | group found _ _ | pair found _ _ _ | conditional found _ _ _ _ | constructor found _ _ | member found _ _ | index found _ _ _ _ _ => exact ⟨_, found⟩
+  | proxy found _ | unary found _ _ | binary found _ _ _ | group found _ _ | pair found _ _ _ | conditional found _ _ _ _ | constructor found _ _ | member found _ _ | index found _ _ _ _ _ => exact ⟨_, found⟩
 
 private theorem context_bind_accepted {α β ε : Type} {action : Except ε α} {next : α → Except ε β} {output : β}
     (accepted : action >>= next = .ok output) : ∃ value, action = .ok value ∧ next value = .ok output := by
