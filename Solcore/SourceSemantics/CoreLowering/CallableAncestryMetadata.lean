@@ -247,7 +247,7 @@ structure Named {checked : Checked} {base : Base checked} (owned : Owned base) (
 def Named.state {checked : Checked} {base : Base checked} {owned : Owned base} {id : Core.Word}
     (named : Named owned id) : State := ⟨named.owner, [], named.caller.function.typedBody⟩
 
-private def named {checked : Checked} {base : Base checked} (owned : Owned base) (id : Core.Word) :
+def named {checked : Checked} {base : Base checked} (owned : Owned base) (id : Core.Word) :
     Except Error (Named owned id) := do
   match selected : owned.callable.table.entryAt? id with
   | none => throw (.unknownDescriptor id)
@@ -266,7 +266,7 @@ structure LambdaAt {checked : Checked} {base : Base checked} (owned : Owned base
   descriptorSelected : owned.callable.table.entryAt? id = some entry
   origin : entry.origin = .lambda template.owner template.id template.active
 
-private def lambdaAt {checked : Checked} {base : Base checked} (owned : Owned base) (id : Core.Word) :
+def lambdaAt {checked : Checked} {base : Base checked} (owned : Owned base) (id : Core.Word) :
     Except Error (LambdaAt owned id) := do
   match selected : owned.templates.lambdaAt? id with
   | none => throw (.unknownDescriptor id)
@@ -286,7 +286,7 @@ structure ViewAt {checked : Checked} {base : Base checked} (owned : Owned base)
   targetOrigin : targetLambda.entry.origin = .lambda entry.view.owner entry.view.principal.initializer entry.view.cumulative
   generalized : entry.view.wrapsPrincipal = true
 
-private def viewAt {checked : Checked} {base : Base checked} (owned : Owned base) (id target : Core.Word) :
+def viewAt {checked : Checked} {base : Base checked} (owned : Owned base) (id target : Core.Word) :
     Except Error (ViewAt owned id target) := do
   match selected : owned.views.entryAt? id with
   | none => throw (.unknownView id)
@@ -342,7 +342,7 @@ theorem recipe {original : TypedSource} (step : ViewStep view before) (prior : S
     SourceRecipe original step.after.source := .instance prior step.substitution step.witnesses
 end ViewStep
 
-private def prepareStep {checked : Checked} {base : Base checked} {owned : Owned base} {id target : Core.Word}
+def prepareStep {checked : Checked} {base : Base checked} {owned : Owned base} {id target : Core.Word}
     (view : ViewAt owned id target) (before : State) : Except Error (ViewStep view before) := do
   if owner : before.owner = view.entry.view.owner then
     if active : before.active = view.entry.view.parentActive then
@@ -389,7 +389,7 @@ structure LambdaSource {checked : Checked} {base : Base checked} {owned : Owned 
   body : List StatementId
   shape : node.form = .lambda parameters resultType body
 
-private def lambdaSource {checked : Checked} {base : Base checked} {owned : Owned base} {id : Core.Word}
+def lambdaSource {checked : Checked} {base : Base checked} {owned : Owned base} {id : Core.Word}
     (lambda : LambdaAt owned id) (state : State) : Except Error (LambdaSource lambda state) := do
   if owner : state.owner = lambda.template.owner then
     if active : state.active = lambda.template.active then
