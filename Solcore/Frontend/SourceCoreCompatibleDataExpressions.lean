@@ -124,7 +124,9 @@ def lowerRead (fuel : Nat) (context : Context) (source : TypedSource) (scope : S
       pure (readMapping (.var index) empty)
   | _ => pure (Core.OptionalCell.read payload (.var index) reason)
 
-private def memberBranches (context : Context) (node : ExpressionNode)
+/-- The actual member branch generator, also used to extract static lowering
+certificates for the raw constructor metadata and selected payload. -/
+def memberBranches (context : Context) (node : ExpressionNode)
     (baseType : TypeSystem.Ty) (result : Core.Ty) (index : Nat) :
     Except Error (Core.DataTypeId × List Core.Expr) := do
   let baseType := SourceCoreRawMetadata.runtimeType baseType
