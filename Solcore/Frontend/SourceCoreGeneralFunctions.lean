@@ -57,6 +57,18 @@ structure Representation where
   loops : List SolvedRequirement → SourceCoreAssignmentFaultSites.Table →
     SourceCoreDataPlaceFaultSites.Program → Key → SourceCoreFunctions.ExpressionLowerer →
     SourceCoreLoops.Policy
+  allocatorAt : Key → TypeSystem.Substitution → Option SourceCoreSourceCells.Allocator :=
+    fun _ _ => expressions.sourceCells
+  loopsWithSourceCells : Option SourceCoreSourceCells.Allocator →
+    List SolvedRequirement → SourceCoreAssignmentFaultSites.Table →
+    SourceCoreDataPlaceFaultSites.Program → Key → SourceCoreFunctions.ExpressionLowerer →
+    SourceCoreLoops.Policy := fun cells solved assignments diagnostics owner expression =>
+      {loops solved assignments diagnostics owner expression with sourceCells := cells}
+
+def Representation.atContext (representation : Representation) (owner : Key)
+    (active : TypeSystem.Substitution) : Representation :=
+  {representation with expressions := {representation.expressions with
+    sourceCells := representation.allocatorAt owner active}}
 
 private def prepareInputs (representation : Representation) (source : TypedSource) :
     SourceCoreBasic.Scope → List TypedBinder → Except Error (List (TypedBinder × Core.Ty))
@@ -120,7 +132,8 @@ def bodyLowererWithRepresentation (representation : Representation)
       representation.expressions.lowerBinder) : SourceCoreFunctions.BodyLowerer :=
   fun expression fuel source scope statements result reasonAt fellThrough escaped =>
     SourceCoreLoops.lowerStatementsWithPolicy {
-      representation.loops solvedRequirements assignments diagnostics owner expression with
+      representation.loopsWithSourceCells representation.expressions.sourceCells
+        solvedRequirements assignments diagnostics owner expression with
       sourceCells := representation.expressions.sourceCells
       lowerBinder
     } fuel source scope statements result reasonAt fellThrough escaped
@@ -219,6 +232,7 @@ private def lowerContextualExpression (program : CheckedProgram) (representation
   | 0, _, _, id, _ => .error (.traversalExhausted (.occurrence id.occurrence))
   | fuel + 1, source, scope, id, reasonAt => do
       let active := parent.map SourceCoreLocalEvidence.Prepared.substitution |>.getD []
+      let representation := representation.atContext context.owner active
       let callables := callablePolicy native active
       let caller ← match parent with
         | some prepared => pure prepared.caller
@@ -271,6 +285,7 @@ def compileClosureWithRepresentation (program : CheckedProgram) (representation 
     (globals : List Signature) (diagnostics : SourceCoreDataPlaceFaultSites.Program)
     (locals : SourceCoreLocalPolymorphism.Catalog) (native : Option CallableContext)
     (fuel : Nat) (function : Function) : Except Error Core.Expr := do
+  let representation := representation.atContext function.signature.key []
   let source := function.specialized.function.typedBody
   let own ← match diagnostics.base.find? function.signature.key with
     | some own => pure own

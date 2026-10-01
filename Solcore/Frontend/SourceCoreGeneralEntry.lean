@@ -322,6 +322,17 @@ def NativeEntry.compile (definitions : Core.DataEnvironment) (inputTypes : List 
   else .error (.coreCheckFailed (Core.LanguageResult.resultType resultType)
     (Core.infer? (nativeInputContext inputTypes) body definitions))
 
+theorem NativeEntry.compile_fields {definitions : Core.DataEnvironment}
+    {inputTypes : List Core.Ty} {resultType : Core.Ty} {body : Core.Expr}
+    {entry : NativeEntry definitions}
+    (accepted : NativeEntry.compile definitions inputTypes resultType body = .ok entry) :
+    entry.inputTypes = inputTypes ∧ entry.resultType = resultType ∧ entry.body = body := by
+  unfold NativeEntry.compile at accepted
+  split at accepted
+  · cases accepted
+    exact ⟨rfl, rfl, rfl⟩
+  · cases accepted
+
 /-- Fresh native inputs are administrative cells in source argument order.
 Existing public Core stores retain their historical rejection behavior. -/
 def NativeEntry.start {definitions : Core.DataEnvironment} (entry : NativeEntry definitions)
