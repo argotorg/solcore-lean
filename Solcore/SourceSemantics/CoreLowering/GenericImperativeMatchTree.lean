@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
 import Solcore.SourceSemantics.CoreLowering.GenericMatchChildren
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchSelectionPrefix
 import Solcore.SourceSemantics.CoreLowering.GenericForHeaderPost
@@ -368,7 +369,7 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
         (certificates context) (GenericMatchChildren.Occurs requests) matched)
       (ordinary : CompatibleMatchSelectionPrefix.Ordinary receipt)
       (children : ∀ request, request ∈ requests → ∀ childContext,
-        GenericMatchChildren.ContextFor source context scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
         Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
           childContext request.scope (.statements false request.statements) expected type request.code)
       (remaining : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
@@ -579,7 +580,7 @@ inductive Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionC
         (certificates context) (GenericMatchChildren.Occurs requests) matched}
       {ordinary : CompatibleMatchSelectionPrefix.Ordinary receipt}
       {children : ∀ request, request ∈ requests → ∀ childContext,
-        GenericMatchChildren.ContextFor source context scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
         Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
           childContext request.scope (.statements false request.statements) expected type request.code}
       {remaining : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative

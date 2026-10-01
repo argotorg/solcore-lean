@@ -71,6 +71,82 @@ def DefaultReflects : Prop :=
       (administrative := administrative) (frameLayout := frame) (globals := globals)
       (faults := faults) (scope := finalScope) false statements expected type body
 
+def ArmPreservesScoped (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.arm statements bindings) →
+    SelectedBody bodyCertificate scope environment heap type (.arm statements bindings)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {armContext staticFinal facts},
+    BindersExtend source.owner parent (bindings.map Prod.fst) armContext →
+    StatementsHaveType source control armContext statements staticFinal facts →
+    TypedLexicalWhile.Preserves functions program evidence (values := compilation.values)
+      (source := source) (context := armContext) (registry := registry) (solved := solved)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) false statements expected type body
+
+def ArmReflectsScoped (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.arm statements bindings) →
+    SelectedBody bodyCertificate scope environment heap type (.arm statements bindings)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {armContext staticFinal facts},
+    BindersExtend source.owner parent (bindings.map Prod.fst) armContext →
+    StatementsHaveType source control armContext statements staticFinal facts →
+    TypedLexicalWhile.Reflects functions program evidence (values := compilation.values)
+      (source := source) (context := armContext) (registry := registry) (solved := solved)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) false statements expected type body
+
+def DefaultPreservesScoped (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.default statements) →
+    SelectedBody bodyCertificate scope environment heap type (.default statements)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {staticFinal facts}, StatementsHaveType source control parent statements staticFinal facts →
+    TypedLexicalWhile.Preserves functions program evidence (values := compilation.values)
+      (source := source) (context := parent) (registry := registry) (solved := solved)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) false statements expected type body
+
+def DefaultReflectsScoped (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.default statements) →
+    SelectedBody bodyCertificate scope environment heap type (.default statements)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {staticFinal facts}, StatementsHaveType source control parent statements staticFinal facts →
+    TypedLexicalWhile.Reflects functions program evidence (values := compilation.values)
+      (source := source) (context := parent) (registry := registry) (solved := solved)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) false statements expected type body
+
+section Adaptation
+variable {functions program parent control evidence resolution bodyCertificate expected type}
+theorem ArmPreserves.scoped (meaning : ArmPreserves functions program parent control evidence resolution bodyCertificate expected type (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)) (outerScope : Scope) :
+    ArmPreservesScoped functions program parent control evidence resolution bodyCertificate expected type outerScope (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults) := by
+  intro sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body sameScope
+  exact meaning
+
+theorem ArmReflects.scoped (meaning : ArmReflects functions program parent control evidence resolution bodyCertificate expected type (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)) (outerScope : Scope) :
+    ArmReflectsScoped functions program parent control evidence resolution bodyCertificate expected type outerScope (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults) := by
+  intro sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body sameScope
+  exact meaning
+
+theorem DefaultPreserves.scoped (meaning : DefaultPreserves functions program parent control evidence resolution bodyCertificate expected type (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)) (outerScope : Scope) :
+    DefaultPreservesScoped functions program parent control evidence resolution bodyCertificate expected type outerScope (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults) := by
+  intro sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body sameScope
+  exact meaning
+
+theorem DefaultReflects.scoped (meaning : DefaultReflects functions program parent control evidence resolution bodyCertificate expected type (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)) (outerScope : Scope) :
+    DefaultReflectsScoped functions program parent control evidence resolution bodyCertificate expected type outerScope (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults) := by
+  intro sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body sameScope
+  exact meaning
+
+end Adaptation
+
 theorem valid_binders {owner : Resolved.DeclarationId} {context finalContext : SourceSemantics.Context}
     {binders : List TypedBinder} (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     (extended : BindersExtend owner context binders finalContext) :

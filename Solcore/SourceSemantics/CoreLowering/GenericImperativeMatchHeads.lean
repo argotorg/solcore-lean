@@ -101,7 +101,7 @@ theorem head_preserves (unique : NodeOccurrencesUnique source)
       TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel compilation.checked registry functions)
         program context evidence source expressionCertificate faults)
     (children : ∀ request, request ∈ requests → ∀ childContext,
-      ContextFor source context node.type resolution.cases resolution.defaultBody request childContext →
+      ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) node.type resolution.cases resolution.defaultBody request childContext →
       TypedLexicalWhile.Preserves functions program evidence (values := compilation.values) (source := source)
         (context := childContext) (registry := registry) (solved := solved) (administrative := administrative)
         (frameLayout := frame) (globals := globals) (faults := faults) (scope := request.scope)
@@ -110,22 +110,25 @@ theorem head_preserves (unique : NodeOccurrencesUnique source)
       (context := context) (registry := registry) (solved := solved) (administrative := administrative)
       (frameLayout := frame) (globals := globals) (faults := faults) (scope := scope) id expected type code := by
   obtain ⟨lowered, child, restricted⟩ := Certificate.singleton receipt
-  apply CompatibleMatchPreservation.Certificate.preserves onError allocator functions definitions registered extension
+  apply CompatibleMatchPreservation.Certificate.preserves_scoped onError allocator functions definitions registered extension
     restricted (show CompatibleMatchSelectionPrefix.Ordinary restricted from ordinary) unique valid catalogValid found
     (fun _ certificate => certificate.2.2) casesTyped (fun same => defaultTyped _ same)
   · intro contextValid
     exact singleton_preserves (expressionMeaning contextValid) child
-  · intro sourceValue hiddenScope environment heap statements bindings finalScope finalEnvironment finalHeap body selected bodySelected
+  · intro sourceValue hiddenScope environment heap statements bindings finalScope finalEnvironment finalHeap body sameScope selected bodySelected
       armContext staticFinal facts extended bodyTyped
+    have scopeIds := selected_arm_ids bodySelected
+    rw [sameScope] at scopeIds
     cases bodySelected with
     | arm binders allocated certified =>
       exact children ⟨_, statements, body⟩ certified armContext
-        (ContextFor.selected_arm_at ⟨_, statements, body⟩ rfl casesTyped selected extended)
-  · intro sourceValue hiddenScope environment heap statements finalScope finalEnvironment finalHeap body selected bodySelected
+        (ScopedContextFor.selected_arm_at ⟨_, statements, body⟩ rfl scopeIds casesTyped selected extended)
+  · intro sourceValue hiddenScope environment heap statements finalScope finalEnvironment finalHeap body sameScope selected bodySelected
       staticFinal facts bodyTyped
+    have scopeIds := (selected_default_ids bodySelected).trans sameScope
     cases bodySelected with
     | default certified =>
-      exact children ⟨_, statements, body⟩ certified context (.default (default_selected selected))
+      exact children ⟨_, statements, body⟩ certified context (.default (default_selected selected) scopeIds)
 
 include allocator definitions registered extension ordinary valid catalogValid found casesTyped defaultTyped in
 /-- Concrete child induction discharges both selected-arm and default semantics.
@@ -134,7 +137,7 @@ theorem head_reflects (expressionMeaning : CompatibleExpressionLiterals.ContextV
       TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel compilation.checked registry functions)
         program context evidence source expressionCertificate faults)
     (children : ∀ request, request ∈ requests → ∀ childContext,
-      ContextFor source context node.type resolution.cases resolution.defaultBody request childContext →
+      ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) node.type resolution.cases resolution.defaultBody request childContext →
       TypedLexicalWhile.Reflects functions program evidence (values := compilation.values) (source := source)
         (context := childContext) (registry := registry) (solved := solved) (administrative := administrative)
         (frameLayout := frame) (globals := globals) (faults := faults) (scope := request.scope)
@@ -143,21 +146,24 @@ theorem head_reflects (expressionMeaning : CompatibleExpressionLiterals.ContextV
       (context := context) (registry := registry) (solved := solved) (administrative := administrative)
       (frameLayout := frame) (globals := globals) (faults := faults) (scope := scope) id expected type code := by
   obtain ⟨lowered, child, restricted⟩ := Certificate.singleton receipt
-  apply CompatibleMatchReflection.Certificate.reflects onError allocator functions definitions registered extension
+  apply CompatibleMatchReflection.Certificate.reflects_scoped onError allocator functions definitions registered extension
     restricted (show CompatibleMatchSelectionPrefix.Ordinary restricted from ordinary) valid catalogValid found
     (fun _ certificate => certificate.2.2) casesTyped (fun same => defaultTyped _ same)
   · intro contextValid
     exact singleton_reflects (expressionMeaning contextValid) child
-  · intro sourceValue hiddenScope environment heap statements bindings finalScope finalEnvironment finalHeap body selected bodySelected
+  · intro sourceValue hiddenScope environment heap statements bindings finalScope finalEnvironment finalHeap body sameScope selected bodySelected
       armContext staticFinal facts extended bodyTyped
+    have scopeIds := selected_arm_ids bodySelected
+    rw [sameScope] at scopeIds
     cases bodySelected with
     | arm binders allocated certified =>
       exact children ⟨_, statements, body⟩ certified armContext
-        (ContextFor.selected_arm_at ⟨_, statements, body⟩ rfl casesTyped selected extended)
-  · intro sourceValue hiddenScope environment heap statements finalScope finalEnvironment finalHeap body selected bodySelected
+        (ScopedContextFor.selected_arm_at ⟨_, statements, body⟩ rfl scopeIds casesTyped selected extended)
+  · intro sourceValue hiddenScope environment heap statements finalScope finalEnvironment finalHeap body sameScope selected bodySelected
       staticFinal facts bodyTyped
+    have scopeIds := (selected_default_ids bodySelected).trans sameScope
     cases bodySelected with
     | default certified =>
-      exact children ⟨_, statements, body⟩ certified context (.default (default_selected selected))
+      exact children ⟨_, statements, body⟩ certified context (.default (default_selected selected) scopeIds)
 
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeMatch

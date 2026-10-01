@@ -70,7 +70,7 @@ private theorem arm_request
     (typed : MatchCasesHaveType source control parent expected cases facts)
     (member : wanted ∈ cases) :
     ∃ request childContext, request ∈ requests ∧ request.statements = wanted.body ∧
-      GenericMatchChildren.ContextFor source parent expected cases fallback request childContext := by
+      GenericMatchChildren.ScopedContextFor source parent (scope.map Prod.fst) expected cases fallback request childContext := by
   induction certified generalizing facts with
   | nil => cases member
   | @cons arm rest pattern code nativeArms patternCertificate matcher body tail ih =>
@@ -81,13 +81,13 @@ private theorem arm_request
         cases head with
         | intro patternTyped extended _ =>
           exact ⟨⟨_, wanted.body, code⟩, _, body, rfl,
-            .arm List.mem_cons_self rfl patternTyped extended⟩
+            GenericMatchChildren.ScopedContextFor.compiled_arm_ids code List.mem_cons_self patternCertificate patternTyped extended⟩
       | tail _ member =>
         obtain ⟨request, childContext, retained, sameBody, context⟩ := ih typedTail member
         refine ⟨request, childContext, retained, sameBody, ?_⟩
         cases context with
-        | arm member same typed extended => exact .arm (List.mem_cons_of_mem _ member) same typed extended
-        | default same => exact .default same
+        | arm member same typed extended ids => exact .arm (List.mem_cons_of_mem _ member) same typed extended ids
+        | default same ids => exact .default same ids
 
 /-- Success control only uses genuine success derivations of the selected
 body. Fault judgments remain separate and cannot satisfy this premise. -/
@@ -258,7 +258,7 @@ theorem Tree.control_shapeAt {context : SourceSemantics.Context} {scope : Scope}
           rw [selected] at fallbackCertificate
           cases fallbackCertificate with
           | some certified =>
-            exact childIH ⟨_, statements, _⟩ certified context (.default selected)
+            exact childIH ⟨_, statements, _⟩ certified context (.default selected rfl)
   | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot => trivial
 
 theorem Tree.control_shape {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}

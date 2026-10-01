@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GenericMatchChildren
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchSelectionPrefix
 
 /-! Finite match requests retain their ordered source binder identities.
 The source context still comes from independent pattern typing and lexical
@@ -196,5 +197,40 @@ theorem selected_default_ids
     finalScope.map Prod.fst = scope.map Prod.fst := by
   cases selected
   rfl
+
+private theorem instruction_ids (instructions : List MatchPatternInstruction) :
+    (SourceCoreDataPlaces.instructionBinders instructions).map (·.id) =
+      MatchPatternInstruction.binderIds instructions := by
+  induction instructions with
+  | nil => rfl
+  | cons instruction rest ih =>
+    cases instruction <;> simp [SourceCoreDataPlaces.instructionBinders, MatchPatternInstruction.binderIds] at ih ⊢ <;> exact ih
+
+theorem typed_binder_ids {context : SourceSemantics.Context} {pattern : TypedMatchPattern}
+    {type : TypeSystem.Ty} {binders : List TypedBinder} {arity : Nat}
+    (typed : TypedMatchPatternHasType context pattern type binders arity) :
+    binders.map (·.id) = pattern.binderIds := by
+  rw [← CompatiblePatternSourceBinders.pattern_binders typed]
+  cases resolution : pattern.resolution <;>
+    simp only [SourceCoreDataPlaces.patternBinders, TypedMatchPattern.binderIds, resolution]
+  all_goals try rfl
+  all_goals exact instruction_ids _
+
+theorem ScopedContextFor.compiled_arm_ids
+    {compilation : CompatiblePatternCertificates.Compilation} {source : TypedSource}
+    {parent child : SourceSemantics.Context} {scope : Scope} {site : StatementId}
+    {scrutineeType : TypeSystem.Ty} {cases : List TypedMatchCase}
+    {fallback : Option (List StatementId)} {arm : TypedMatchCase} {pattern : Pattern}
+    {binders : List TypedBinder} {arity : Nat} (body : Expr)
+    (member : arm ∈ cases)
+    (certificate : CompatiblePatternCertificates.Certificate compilation source scope site arm.span
+      scrutineeType arm.pattern pattern)
+    (typed : TypedMatchPatternHasType parent arm.pattern scrutineeType binders arity)
+    (extended : BindersExtend source.owner parent binders child) :
+    ScopedContextFor source parent (scope.map Prod.fst) scrutineeType cases fallback
+      ⟨CompatibleMatchCertificates.armScope scope pattern, arm.body, body⟩ child := by
+  apply ScopedContextFor.arm member rfl typed extended
+  rw [CompatibleMatchCertificates.armScope, scope_binder_ids,
+    CompatibleMatchSelectionPrefix.certificate_binding_ids certificate, ← typed_binder_ids typed]
 
 end Solcore.SourceSemantics.CoreLowering.GenericMatchChildren

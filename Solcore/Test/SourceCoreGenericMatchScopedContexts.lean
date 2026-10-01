@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
 
 /-! Same-body arms and a same-body default retain different source scope IDs.
@@ -175,4 +176,19 @@ example : (request 0).statements = (request 1).statements ∧ (request 0).statem
 example : (request 0).scope.map Prod.fst ≠ (request 1).scope.map Prod.fst := by decide
 example : (request 0).scope.map Prod.fst ≠ defaultRequest.scope.map Prod.fst := by decide
 example : ContextFor source context .unit resolution.cases resolution.defaultBody (request 0) (armContext 0) := first_scoped.forget
+private theorem hiddenSourceFresh : GenericImperativeMatch.MatchHiddenFresh source := by
+  intro id actualNode actualResolution found form
+  have sameNode : actualNode = node := by
+    have member := (lookupStatement?_sound found).1
+    simpa [source] using member
+  subst actualNode
+  have sameResolution : actualResolution = resolution := StatementForm.matchWith.inj form.symm
+  subst actualResolution
+  exact hiddenAbsent
+
+theorem automatic_child_scopes {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+    {definitions : DataEnvironment} {administrative : Core.Context} :
+    GenericImperativeMatch.MatchChildStatic compilation source certificates definitions administrative :=
+  GenericImperativeMatch.MatchChildStatic.of_hidden hiddenSourceFresh
+
 end Tests.SourceCoreGenericMatchScopedContexts

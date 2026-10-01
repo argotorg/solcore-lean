@@ -39,7 +39,7 @@ private theorem default_selected {context : SourceSemantics.Context} {value : Dy
 termination_by cases.length
 decreasing_by simp_all
 
-theorem Certificate.reflects
+theorem Certificate.reflects_scoped
     {compilation : SourceCoreCompatibleDataMatches.Context}
     {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
     {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
@@ -71,10 +71,10 @@ theorem Certificate.reflects
     (expressionMeaning : CompatibleExpressionLiterals.ContextValid solved context evidence →
       TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel compilation.checked registry functions)
         program context evidence source expressionCertificate faults)
-    (armMeaning : ArmReflects functions program context control evidence resolution bodyCertificate expected type
+    (armMeaning : ArmReflectsScoped functions program context control evidence resolution bodyCertificate expected type scope
       (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals)
       (registry := registry) (faults := faults))
-    (defaultMeaning : DefaultReflects functions program context control evidence resolution bodyCertificate expected type
+    (defaultMeaning : DefaultReflectsScoped functions program context control evidence resolution bodyCertificate expected type scope
       (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals)
       (registry := registry) (faults := faults)) :
     TypedLexicalWhile.HeadReflects functions program evidence (values := compilation.values) (source := source)
@@ -123,7 +123,7 @@ theorem Certificate.reflects
             DataMatchSourceScopes.MatchCasesSelect.arm_scope casesTyped selected
           obtain ⟨finalContext, outcome, after, finalMap, finalWorld, sourceBody, related,
             finalHeaps, thirdMaps, thirdWorlds, thirdFrame, thirdMetadata, lexical⟩ :=
-            armMeaning selected (.arm binders allocated certified) extendedContext typed
+            armMeaning rfl selected (.arm binders allocated certified) extendedContext typed
               (valid_binders evidence contextValid extendedContext) selectedEnv selectedRelated
               (binders_agree extendedContext (arm_monomorphic casesTyped selected)
                 (locals.mono (firstMetadata.trans (.of_allocation hiddenAllocated))) allocated)
@@ -138,7 +138,7 @@ theorem Certificate.reflects
           obtain ⟨staticFinal, facts, typed⟩ := defaultTyped (default_selected selected)
           obtain ⟨finalContext, outcome, after, finalMap, finalWorld, sourceBody, related,
             finalHeaps, thirdMaps, thirdWorlds, thirdFrame, thirdMetadata, lexical⟩ :=
-            defaultMeaning (environment := environment) (heap := hiddenHeap) selected (.default certified) typed contextValid selectedEnv selectedRelated
+            defaultMeaning (environment := environment) (heap := hiddenHeap) rfl selected (.default certified) typed contextValid selectedEnv selectedRelated
               (locals.mono (firstMetadata.trans (.of_allocation hiddenAllocated))) selectedLayout selectedTyped
               selectedReference selectedRead selectedUnmapped bodyEval
           have sourceMatch := (DataMatchSourceTrace.Trace.default (lookupExpression?_sound found) sourceEval hiddenAllocated
@@ -156,5 +156,49 @@ theorem Certificate.reflects
             (by intro next same; exact Dynamic.ControlOutcome.fallthrough.inj same.symm),
             .fallthrough environment, selectedRelated, firstMaps.trans secondMaps, firstWorlds.trans secondWorlds,
             firstFrame.trans secondFrame, firstMetadata.trans (.of_allocation hiddenAllocated)⟩
+
+theorem Certificate.reflects
+    {compilation : SourceCoreCompatibleDataMatches.Context}
+    {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+    {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    (allocator : compilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    (functions : FunctionModel compilation.checked.catalog ambient)
+    (definitions : layouts.definitions = ambient.definitions) (registered : frame.Registered ambient.definitions)
+    {registry : SourceCoreRawMetadata.Registry}
+    (extended : SourceCoreRawMetadata.Extends compilation.values.registry registry)
+    {source : TypedSource} {context : SourceSemantics.Context} {control : ControlContext}
+    {program : Program} {evidence : Dynamic.EvidenceEnvironment} {scope : Scope}
+    {id : StatementId} {resolution : MatchResolution} {expected : TypeSystem.Ty} {type : Ty} {reason : Word}
+    {expressionCertificate : ExpressionCertificate} {bodyCertificate : BodyCertificate} {code : Expr}
+    (certificate : CompatibleMatchCertificates.Certificate compilation source scope id resolution type reason
+      expressionCertificate bodyCertificate code)
+    (ordinary : CompatibleMatchSelectionPrefix.Ordinary certificate)
+    (valid : CompatiblePatternLeaves.ContextValid compilation context)
+    (catalogValid : SignatureCatalogWellFormed compilation.checked.signatures)
+    {node : ExpressionNode} (found : source.lookupExpression? resolution.scrutinee = some node)
+    {lowered : SourceCoreBasic.LoweredExpr}
+    (uniqueExpression : ∀ other, expressionCertificate scope resolution.scrutinee other → other = lowered)
+    {caseFacts : List BodyFacts}
+    (casesTyped : MatchCasesHaveType source control context node.type resolution.cases caseFacts)
+    (defaultTyped : ∀ {statements}, resolution.defaultBody = some statements →
+      ∃ finalContext facts, StatementsHaveType source control context statements finalContext facts)
+    {solved : List SolvedRequirement} {administrative : Core.Context} {faults : FunctionCalls.FaultRep}
+    (expressionMeaning : CompatibleExpressionLiterals.ContextValid solved context evidence →
+      TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel compilation.checked registry functions)
+        program context evidence source expressionCertificate faults)
+    (armMeaning : ArmReflects functions program context control evidence resolution bodyCertificate expected type
+      (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals)
+      (registry := registry) (faults := faults))
+    (defaultMeaning : DefaultReflects functions program context control evidence resolution bodyCertificate expected type
+      (source := source) (solved := solved) (administrative := administrative) (frame := frame) (globals := globals)
+      (registry := registry) (faults := faults)) :
+    TypedLexicalWhile.HeadReflects functions program evidence (values := compilation.values) (source := source)
+      (context := context) (solved := solved) (administrative := administrative) (frameLayout := frame)
+      (globals := globals) (registry := registry) (faults := faults) (scope := scope) id expected type code := by
+  exact Certificate.reflects_scoped onError allocator functions definitions registered extended certificate ordinary valid catalogValid
+    found uniqueExpression casesTyped defaultTyped expressionMeaning (armMeaning.scoped scope) (defaultMeaning.scoped scope)
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleMatchReflection

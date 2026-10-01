@@ -101,6 +101,17 @@ private theorem syntaxTree (mode : Bool) : GenericImperativeMatch.Syntax source 
     exact .body (.nil (.inl rfl))
   · exact .body (.nil (.inr rfl))
 
+private theorem hiddenSourceFresh : GenericImperativeMatch.MatchHiddenFresh source := by
+  intro id node actualResolution found form
+  have sameNode : node = statementNode := by
+    have member := (lookupStatement?_sound found).1
+    simpa [source] using member
+  subst node
+  have sameResolution : actualResolution = resolution := StatementForm.matchWith.inj form.symm
+  subst actualResolution
+  simp [SourceCoreDataPlaces.declaredBinders, SourceCoreDataPlaces.patternBinders,
+    source, statementNode, scrutineeNode, resolution, arm, pattern]
+
 section ActualFlow
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {specialization : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
@@ -112,7 +123,6 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {specialization : Sour
   (matchValues : matchCompilation.values = values) (matchDefinitions : matchCompilation.definitions = definitions)
   (matchAllocator : matchCompilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
     (layouts.allocatorAt specialization active onError)))
-  (childStatic : GenericImperativeMatch.MatchChildStatic matchCompilation source certificates definitions administrative)
   (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
   (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
     policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
@@ -140,12 +150,12 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {specialization : Sour
   (flowAccepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope [site] .unit reasonAt mode selfReason = .ok code)
   (nativeTyped : infer? (SourceCoreLocalCell.coreContext scope ++ administrative) code definitions = some nativeType)
 
-include matchPolicy matchValues matchDefinitions matchAllocator childStatic readPolicy binderPolicy allocationPolicy expressions assignments unaryPolicy assignmentExpressions declarations flowAccepted nativeTyped in
+include matchPolicy matchValues matchDefinitions matchAllocator readPolicy binderPolicy allocationPolicy expressions assignments unaryPolicy assignmentExpressions declarations flowAccepted nativeTyped in
 /-- A real accepted emitted flow exposes finite recursive match children;
 there is no semantic body assumption in this extraction. -/
 theorem actual_flow_tree : GenericImperativeMatch.Tree layouts specialization active frame globals onError values source
     expressionSyntax certificates definitions administrative context scope (.statements mode [site]) .unit .unit code := by
-  exact GenericImperativeMatch.tree_of_typed_flow matchPolicy matchValues matchDefinitions matchAllocator childStatic
+  exact GenericImperativeMatch.tree_of_typed_flow matchPolicy matchValues matchDefinitions matchAllocator (GenericImperativeMatch.MatchChildStatic.of_hidden hiddenSourceFresh)
     readPolicy binderPolicy allocationPolicy expressions assignments unaryPolicy unique assignmentExpressions
     (syntaxTree mode) rfl rfl rfl declarations (by cbv) flowAccepted (infer_sound nativeTyped)
 end ActualFlow

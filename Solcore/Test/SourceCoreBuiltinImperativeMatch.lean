@@ -129,6 +129,17 @@ private theorem sourceTrace (mode : Bool) : TypedScopedStatements.Executes mode 
   exact TypedScopedStatements.prepend (lookupStatement?_sound (node := statementNode) rfl)
     (by intro _ _ _ impossible; cases impossible) matched (by cases mode <;> exact .control .nil)
 
+private theorem hiddenSourceFresh : GenericImperativeMatch.MatchHiddenFresh source := by
+  intro id node actualResolution found form
+  have sameNode : node = statementNode := by
+    have member := (lookupStatement?_sound found).1
+    simpa [source] using member
+  subst node
+  have sameResolution : actualResolution = resolution := StatementForm.matchWith.inj form.symm
+  subst actualResolution
+  simp [SourceCoreDataPlaces.declaredBinders, SourceCoreDataPlaces.patternBinders,
+    source, statementNode, scrutineeNode, resolution, arm, pattern]
+
 section CompilerBridge
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {specialization : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
@@ -158,20 +169,18 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {specialization : Sour
   (matchValues : matchCompilation.values = values) (matchDefinitions : matchCompilation.definitions = definitions)
   (matchAllocator : matchCompilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
     (layouts.allocatorAt specialization active onError)))
-  (childStatic : GenericImperativeMatch.MatchChildStatic matchCompilation source
-    (fun context => CompatibleExpressionBuiltins.Tree 100 values source context [] reasonAt) definitions administrative)
   {scope : SourceCoreLocalCell.Scope}
   (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
   {mode : Bool} {fuel : Nat} {selfReason : Word} {code : Expr} {nativeType : Ty}
   (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy loopPolicy fuel source scope [site] .unit reasonAt mode selfReason = .ok code)
   (nativeTyped : infer? (SourceCoreLocalCell.coreContext scope ++ administrative) code definitions = some nativeType)
 
-include matchPolicy matchValues matchDefinitions matchAllocator childStatic expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped in
+include matchPolicy matchValues matchDefinitions matchAllocator expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped in
 /-- Every builtin child is extracted from the actual expression lowerer. Only
 source typing and actual native checker facts remain as static conditions. -/
 theorem certified : BuiltinImperativeMatch.Tree layouts specialization active frame globals onError 100 values source [] reasonAt
     definitions administrative context scope (.statements mode [site]) .unit .unit code := by
-  apply GenericImperativeMatch.tree_of_typed_flow matchPolicy matchValues matchDefinitions matchAllocator childStatic matched.read binderPolicy allocationPolicy ?_ matched unaryPolicy unique ?_
+  apply GenericImperativeMatch.tree_of_typed_flow (certificates := fun current => CompatibleExpressionBuiltins.Tree 100 values source current [] reasonAt) matchPolicy matchValues matchDefinitions matchAllocator (GenericImperativeMatch.MatchChildStatic.of_hidden (matchCompilation := matchCompilation) (certificates := fun current => CompatibleExpressionBuiltins.Tree 100 values source current [] reasonAt) (definitions := definitions) (administrative := administrative) hiddenSourceFresh) matched.read binderPolicy allocationPolicy ?_ matched unaryPolicy unique ?_
     (syntaxTree mode) rfl rfl rfl declarations (by cbv) accepted (infer_sound nativeTyped)
   · intro current closed residual signatures scope budget expression node lowered declarations syntaxValue found typed generated
     exact CompatibleExpressionBuiltins.tree_of_functions unique declarations signatures closed residual
@@ -196,7 +205,7 @@ variable {ambient : AmbientDefinitions checked.catalog.definitions}
   {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
   (observations : FunctionObservations values.checked.catalog functions identities)
   (runtimeViews : FunctionRuntimeViews functions)
-  (errors : GenericImperativeMatch.Tree.Ready registry faults (certified nativeContext expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren matchPolicy matchValues matchDefinitions matchAllocator childStatic declarations accepted nativeTyped))
+  (errors : GenericImperativeMatch.Tree.Ready registry faults (certified nativeContext expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren matchPolicy matchValues matchDefinitions matchAllocator declarations accepted nativeTyped))
   {mapping : LocationMap} {world : StoreTyping} {canonical actual : Environment} {actualContext : Core.Context}
   {store : Store} {ξ : Renaming} {location : Location} {native : CallableIndexedHistory.NativeFrame}
   (environments : DataHeap.EnvRepresents (storageCatalog values.checked.catalog) mapping world administrative scope environment canonical ambient.definitions)
@@ -208,7 +217,7 @@ variable {ambient : AmbientDefinitions checked.catalog.definitions}
   (read : store.read? location = some (SourceCoreCallableIndexedFrames.encode frame native))
   (unmapped : location ∉ mapping)
 
-include matchPolicy matchValues matchDefinitions matchAllocator childStatic expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped sameDefinitions layoutDefinitions registered extension catalogValid valid uninitialized missing faithful observations runtimeViews errors environments heaps locals agrees typed reference read unmapped in
+include matchPolicy matchValues matchDefinitions matchAllocator expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped sameDefinitions layoutDefinitions registered extension catalogValid valid uninitialized missing faithful observations runtimeViews errors environments heaps locals agrees typed reference read unmapped in
 theorem compiled_preserves :
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (code.rename ξ) value finalStore ∧
@@ -219,10 +228,10 @@ theorem compiled_preserves :
       TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment context after := by
   cases sameDefinitions
-  exact (certified nativeContext expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren matchPolicy matchValues matchDefinitions matchAllocator childStatic declarations accepted nativeTyped).preserves functions layoutDefinitions registered catalogValid extension program []
+  exact (certified nativeContext expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren matchPolicy matchValues matchDefinitions matchAllocator declarations accepted nativeTyped).preserves functions layoutDefinitions registered catalogValid extension program []
     uninitialized missing faithful observations runtimeViews errors valid unique environments heaps locals agrees typed reference read unmapped (sourceTrace mode)
 
-include matchPolicy matchValues matchDefinitions matchAllocator childStatic expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped sameDefinitions layoutDefinitions registered extension catalogValid valid uninitialized missing faithful observations runtimeViews errors environments heaps locals agrees typed reference read unmapped in
+include matchPolicy matchValues matchDefinitions matchAllocator expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren declarations accepted nativeTyped sameDefinitions layoutDefinitions registered extension catalogValid valid uninitialized missing faithful observations runtimeViews errors environments heaps locals agrees typed reference read unmapped in
 theorem compiled_reflects {value : Value} {finalStore : Store}
     (completed : Evaluates actual store (code.rename ξ) value finalStore) :
     ∃ finalContext outcome sourceHeap finalMap finalWorld,
@@ -234,7 +243,7 @@ theorem compiled_reflects {value : Value} {finalStore : Store}
       TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext sourceHeap := by
   cases sameDefinitions
-  exact (certified nativeContext expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren matchPolicy matchValues matchDefinitions matchAllocator childStatic declarations accepted nativeTyped).reflects functions layoutDefinitions registered catalogValid extension program []
+  exact (certified nativeContext expressionPolicy matched unaryPolicy binderPolicy allocationPolicy nativeChildren matchPolicy matchValues matchDefinitions matchAllocator declarations accepted nativeTyped).reflects functions layoutDefinitions registered catalogValid extension program []
     uninitialized missing faithful observations runtimeViews errors valid unique environments heaps locals agrees typed reference read unmapped completed
 end CompilerBridge
 

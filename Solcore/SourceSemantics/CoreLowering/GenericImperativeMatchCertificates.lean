@@ -31,7 +31,7 @@ def MatchChildStatic (compilation : SourceCoreCompatibleDataMatches.Context)
       (certificates context) (GenericMatchChildren.Occurs requests) code →
     HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions →
     ∀ request, request ∈ requests → ∀ childContext,
-      GenericMatchChildren.ContextFor source context scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+      GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
       CompatibleExpressionReads.ScopeDeclarations source request.scope childContext
 
 variable {matchCompilation : SourceCoreCompatibleDataMatches.Context}
@@ -53,6 +53,21 @@ private theorem unary_read_found {checked : SourceCoreCompatibleCatalog.Checked}
       obtain ⟨projected, _, same⟩ := bind_ok accepted
       cases same
       rfl
+
+/-- Source-hidden IDs must remain absent from ordinary source declarations.
+Native current-scope freshness alone does not establish this condition. -/
+def MatchHiddenFresh (source : TypedSource) : Prop :=
+  ∀ {id node resolution}, source.lookupStatement? id = some node → node.form = .matchWith resolution →
+    resolution.hiddenScrutinee ∉ (SourceCoreDataPlaces.declaredBinders source).map (·.id)
+
+theorem MatchChildStatic.of_hidden (hidden : MatchHiddenFresh source) :
+    MatchChildStatic matchCompilation source certificates definitions administrative := by
+  intro context scope id resolution scrutineeNode type internalReason requests code nativeType
+    found declarations receipt nativeTyped request member childContext related
+  cases receipt with
+  | matchWith read allowed form =>
+    have statementFound := unary_read_found read
+    exact related.source_declarations statementFound form (hidden statementFound form) declarations
 
 open CompatibleStatementBindings (binder_projected scope_bind)
 
@@ -494,8 +509,8 @@ theorem tree_of_typed_position
         obtain ⟨⟨childFuel, generated⟩, childTyped⟩ := generatedChildren request member
         have childDeclarations :=
           matchChildStatic scrutineeFound declarations receipt matchedTyped request member childContext selectedContext
-        obtain ⟨sameSignatures, sameVariables, sameResidual⟩ := GenericMatchChildren.ContextFor.closed_fields selectedContext
-        exact childIH request childContext selectedContext (sameVariables.trans closed) (sameResidual.trans residual)
+        obtain ⟨sameSignatures, sameVariables, sameResidual⟩ := GenericMatchChildren.ScopedContextFor.closed_fields selectedContext
+        exact childIH request childContext selectedContext.forget (sameVariables.trans closed) (sameResidual.trans residual)
           (sameSignatures.trans sourceSignatures) childDeclarations projection generated childTyped
       · exact restIH closed residual sourceSignatures declarations projection generatedBody tailTyped
 
