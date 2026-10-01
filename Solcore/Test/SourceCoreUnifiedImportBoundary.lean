@@ -6,6 +6,12 @@ boundary certificates without exporting the historical source evaluator. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.runTrusted
 #check_failure Solcore.Frontend.SourceTypedRuntime.runWithValidationFuel
 #check_failure Solcore.Frontend.SourceTypedRuntime.runDeepCertifiedWithValidationFuel
+#check_failure Solcore.Frontend.SourceTypedRuntime.run?
+#check_failure Solcore.Frontend.SourceTypedRuntime.ExpressionResult
+#check_failure Solcore.Frontend.SourceTypedRuntime.FlowOutcome
+#check_failure Solcore.Frontend.SourceTypedRuntime.ResolvedPlace
+#check_failure Solcore.Frontend.SourceTypedRuntime.updateResolvedValue
+#check_failure Solcore.Frontend.SourceTypedRuntime.writeResolvedPlace
 
 #check Solcore.Frontend.SourceCoreUnifiedCompilation.prepare
 #check Solcore.Frontend.SourceCoreUnifiedCompilation.Compiled.run
