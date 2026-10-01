@@ -21,7 +21,7 @@ structure Ordinary (source : TypedSource) (locals : SourceCoreLocalPolymorphism.
     node.form = .reference name (.local binder) →
     locals.bindings.any (fun binding => decide (binding.caller = owner ∧ binding.binder.id = binder)) = false
 
-private theorem contextualSource_fragment
+theorem contextualSource_fragment
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
     (locals : SourceCoreLocalPolymorphism.Catalog) (owner : SourceSpecialization.SpecializationKey)
     (parent : Option SourceCoreLocalEvidence.Prepared) {source : TypedSource} {id : ExpressionId}
@@ -62,7 +62,7 @@ private theorem contextualSource_fragment
   | proxy found form | unary found form _ | binary found form _ _ | group found form _ | pair found form _ _ | conditional found form _ _ _ | constructor found form _ | member found form _ | index found form _ _ _ =>
       simp [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure]
 
-private theorem evidence_fragment (program : CheckedProgram) (projector : SourceCoreEvidence.Projector)
+theorem evidence_fragment (program : CheckedProgram) (projector : SourceCoreEvidence.Projector)
     (caller : SourceSpecialization.SpecializedFunction) (context : SourceCoreFunctions.Context)
     (child : SourceCoreFunctions.ExpressionLowerer) (fuel : Nat) (scope : Scope)
     (reasonAt : ExpressionId → Word) (callables : SourceCoreFunctions.CallablePolicy)
@@ -134,7 +134,7 @@ private theorem evidence_fragment (program : CheckedProgram) (projector : Source
       simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions,
         CompatibleExpressionLiterals.owned, bind, Except.bind, pure, Except.pure]
 
-private theorem fragment_has_node {source : TypedSource} {id : ExpressionId} (syntaxTree : Syntax source id) :
+theorem fragment_has_node {source : TypedSource} {id : ExpressionId} (syntaxTree : Syntax source id) :
     ∃ node, source.lookupExpression? id = some node := by
   cases syntaxTree with
   | fragment oldRecursive =>
