@@ -412,6 +412,11 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewBuiltinBodyTree
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewSemanticReceipt
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticCalls
+import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
+import Solcore.SourceSemantics.CoreLowering.NamedWhileEdges
+import Solcore.SourceSemantics.CoreLowering.NamedWhileStatements
+import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchBodyMeaning
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
