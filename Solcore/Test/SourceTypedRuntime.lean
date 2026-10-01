@@ -1,10 +1,14 @@
-import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Test.SourceCoreUnifiedCorpusSupport
+
+#check_failure Solcore.Frontend.SourceTypedRuntime.run
+#check_failure Solcore.Frontend.SourceTypedRuntime.runTrusted
 
 /-!
-End-to-end regressions for the phase-7 typed-source runtime.
+End-to-end regressions for source-compatible Core execution.
 
-Every executable fixture crosses the real raw-workspace, program-checking, and
-finite-specialization boundaries before it reaches `SourceTypedRuntime.run`.
+Executable fixtures cross raw-workspace checking and finite specialization,
+then cache the actual Core artifact. Rewritten metadata is tested through pure
+plan validation; retained implicit-tail IR has a separate Core fragment test.
 -/
 
 set_option autoImplicit false
@@ -71,10 +75,13 @@ private def signatureNamed (program : CheckedProgram) (name : String) :
   | signatures => throw (IO.userError
       s!"expected one signature named `{name}`, found {signatures.length}")
 
-private structure Prepared where
+private structure ValidationFixture where
   program : CheckedProgram
   plan : SourceSpecializationWorklist.Plan
   key : SourceSpecialization.SpecializationKey
+
+private structure Prepared extends ValidationFixture where
+  compiled : SourceCoreUnifiedCompilation.Compiled
 
 private def prepareNamed (program : CheckedProgram) (name : String)
     (budget : Nat := 32) : IO Prepared := do
@@ -86,7 +93,9 @@ private def prepareNamed (program : CheckedProgram) (name : String)
   match SourceSpecializationWorklist.run program [request] budget with
   | .ok (.complete plan) =>
       match plan.seedKeys with
-      | [key] => pure { program, plan, key }
+      | [key] => do
+          let compiled ← SourceCoreUnifiedCorpusSupport.preparePlan name program plan key
+          pure { program, plan, key, compiled }
       | keys => throw (IO.userError
           s!"`{name}` retained {keys.length} seed keys")
   | .ok outcome => throw (IO.userError
@@ -95,12 +104,19 @@ private def prepareNamed (program : CheckedProgram) (name : String)
       s!"`{name}` specialization failed: {reprStr error}")
 
 private def runPrepared (prepared : Prepared)
-    (arguments : List Value := []) (fuel : Nat := 4096) : RunResult :=
-  SourceTypedRuntime.run prepared.program prepared.plan prepared.key
-    arguments fuel
+    (arguments : List Value := []) (fuel : Nat := 300000)
+    (initial : RuntimeState := {}) : IO RunResult :=
+  SourceCoreUnifiedCorpusSupport.observe prepared.compiled prepared.key arguments fuel initial
+
+/-- Rewritten plans have no executable authority. Validation returns its actual
+error and retains the unexecuted caller state as separate inert data. -/
+private def validateTampered (prepared : ValidationFixture)
+    (initial : RuntimeState := {}) : Except RuntimeError Unit × RuntimeState :=
+  (SourceCompilationPlan.validateExecutablePlanEvidence prepared.program prepared.plan,
+    initial)
 
 private def rewriteEntryNodes (prepared : Prepared)
-    (rewrite : List SourceInference.Node → List SourceInference.Node) : Prepared :=
+    (rewrite : List SourceInference.Node → List SourceInference.Node) : ValidationFixture :=
   let specializations := prepared.plan.specializations.map fun specialized =>
     if specialized.key = prepared.key then
       { specialized with
@@ -114,17 +130,19 @@ private def rewriteEntryNodes (prepared : Prepared)
       }
     else
       specialized
-  { prepared with plan := { prepared.plan with specializations } }
+  { program := prepared.program, key := prepared.key,
+    plan := { prepared.plan with specializations } }
 
 private def rewriteEntryFunction (prepared : Prepared)
     (rewrite : SourceInference.CheckedFunction →
-      SourceInference.CheckedFunction) : Prepared :=
+      SourceInference.CheckedFunction) : ValidationFixture :=
   let specializations := prepared.plan.specializations.map fun specialized =>
     if specialized.key = prepared.key then
       { specialized with function := rewrite specialized.function }
     else
       specialized
-  { prepared with plan := { prepared.plan with specializations } }
+  { program := prepared.program, key := prepared.key,
+    plan := { prepared.plan with specializations } }
 
 private def rewriteFirstExpression
     (rewrite : SourceInference.ExpressionNode → SourceInference.ExpressionNode) :
@@ -170,8 +188,8 @@ private def firstSingletonLambdaTail? :
 
 /-- The surface parser intentionally requires semicolons inside lambda blocks.
 This test-only rewrite starts from a checked lambda with an explicit return and
-forges the equivalent resolved-carrier tail-expression shape, so the runtime
-path is covered without broadening the parser contract. -/
+retains the equivalent tail-expression IR for a standalone typed Core fragment
+test. It claims no checker receipt for the rewritten plan. -/
 private def rewriteFirstLambdaReturnAsImplicitTail
     (nodes : List SourceInference.Node) : List SourceInference.Node :=
   match firstSingletonLambdaTail? nodes with
@@ -190,6 +208,39 @@ private def rewriteFirstLambdaReturnAsImplicitTail
           else
             node
       | _ => node
+
+/-- The edited IR is a fragment, not a checked executable plan. Its actual
+implicit lambda tail is lowered and checked in the parameter-cell context. -/
+private def testRetainedLambdaTail (prepared : ValidationFixture) : IO Unit := do
+  let specialized ← SourceCoreUnifiedCorpusSupport.get "retained lambda specialization"
+    (SourceCompilationPlan.exactSpecialization prepared.plan prepared.key)
+  let source := specialized.function.typedBody
+  let (parameter, statements) ← match source.nodes.findSome? fun
+      | .expression { form := .lambda [parameter] .word statements, .. } =>
+          some (parameter, statements)
+      | _ => none with
+    | some lambda => pure lambda
+    | none => throw (IO.userError "retained implicit tail lost its Word lambda")
+  let scope : SourceCoreLocalCell.Scope := [(parameter.id, .word)]
+  let body ← SourceCoreUnifiedCorpusSupport.get "retained implicit lambda tail lowering"
+    (SourceCoreLoops.lowerStatements 100
+      { solvedRequirements := specialized.function.solvedRequirements }
+      source scope statements .word Core.Word.zero Core.Word.zero Core.Word.zero)
+  assertTrue (Core.infer? (SourceCoreLocalCell.coreContext scope) body ==
+      some (Core.LanguageResult.resultType .word))
+    "retained implicit lambda tail failed Core checking"
+  let store : Core.Store := [.inRight .unit (.word (word 41))]
+  let initial := Core.State.initial body
+    [.cellRef (Core.OptionalCell.cellType .word) 0] store
+  let expected := Core.StatefulRunResult.done (.inRight .word (.word (word 42))) store
+  assertTrue (Core.runStateful 2000 initial == expected)
+    "retained implicit lambda tail changed its result or parameter cell"
+  match Core.runStateful 2 initial with
+  | .outOfFuel checkpoint =>
+      assertTrue (Core.runStateful 2000 checkpoint == expected)
+        "retained implicit lambda tail changed after resuming Core"
+  | result => throw (IO.userError
+      s!"retained implicit lambda tail expected a native checkpoint: {reprStr result}")
 
 private def expectWord (label : String) (expected : Nat) : RunResult → IO Unit
   | .done (.word actual) _ =>
@@ -478,7 +529,7 @@ private def source : String := String.intercalate "\n" [
 private def testNominalConstructionAndRecursiveCalls
     (program : CheckedProgram) : IO Unit := do
   let nested ← prepareNamed program "makeNested"
-  match runPrepared nested with
+  match ← runPrepared nested with
   | .done (.constructed _ [
         .constructed _ [.word left],
         .constructed _ [.word right]]) _ =>
@@ -487,7 +538,7 @@ private def testNominalConstructionAndRecursiveCalls
   | result => throw (IO.userError
       s!"recursive generic enum construction returned {reprStr result}")
   let descend ← prepareNamed program "descend"
-  match runPrepared descend [.word (word 3)] with
+  match ← runPrepared descend [.word (word 3)] with
   | .done (.constructed _ [.word actual]) _ =>
       assertTrue (actual == word 9)
         "direct recursive call changed its nominal result"
@@ -496,58 +547,56 @@ private def testNominalConstructionAndRecursiveCalls
 
 private def testNestedMatchingAndCalls (program : CheckedProgram) : IO Unit := do
   let nominal ← prepareNamed program "nominalCall"
-  expectWord "recursive nominal call" 42 (runPrepared nominal)
+  expectWord "recursive nominal call" 42 (← runPrepared nominal)
   let tuple ← prepareNamed program "tupleMatch"
-  expectWord "tuple/constructor/binder match" 7 (runPrepared tuple)
+  expectWord "tuple/constructor/binder match" 7 (← runPrepared tuple)
 
 private def testAssignmentsMappingsAndControl
     (program : CheckedProgram) : IO Unit := do
   let assignments ← prepareNamed program "assignments"
   let expected := Core.Word.maximum.sub (word 8) |>.val
-  let assignmentResult := runPrepared assignments
+  let assignmentResult ← runPrepared assignments
   expectWord "compound and bit-not assignment" expected
     assignmentResult
   expectShallowHeap "compound and bit-not assignment" assignments.plan
     assignmentResult
   let mappings ← prepareNamed program "mappings"
-  let mappingResult := runPrepared mappings
+  let mappingResult ← runPrepared mappings
   expectWord "empty and nested mapping" 16 mappingResult
   expectShallowHeap "empty and nested mapping" mappings.plan mappingResult
   let loops ← prepareNamed program "loops"
-  expectWord "for/while break/continue" 6 (runPrepared loops  [] 8192)
+  expectWord "for/while break/continue" 6 (← runPrepared loops  [] 300000)
 
 private def testClosuresOrderProxyAndFuel
     (program : CheckedProgram) : IO Unit := do
   let capture ← prepareNamed program "sharedCapture"
-  expectWord "shared-cell closure capture" 9 (runPrepared capture)
+  expectWord "shared-cell closure capture" 9 (← runPrepared capture)
   let order ← prepareNamed program "assignmentOrder"
   expectWord "assignment target-before-RHS order" 1207
-    (runPrepared order [] 8192)
+    (← runPrepared order [] 300000)
   let proxy ← prepareNamed program "proxyValue"
-  expectProxyWord "proxy value" (runPrepared proxy)
+  expectProxyWord "proxy value" (← runPrepared proxy)
   let implicitTail ← prepareNamed program "implicitTail"
-  expectWord "top-level implicit tail return" 42 (runPrepared implicitTail)
+  expectWord "top-level implicit tail return" 42 (← runPrepared implicitTail)
   let closureImplicitTail ← prepareNamed program "closureImplicitTail"
   let closureImplicitTail := rewriteEntryNodes closureImplicitTail
     rewriteFirstLambdaReturnAsImplicitTail
-  /- This test-only carrier is not the checker-produced plan.  The trusted
-  entry exercises its evaluator branch; the safe entry must reject it. -/
-  match runPrepared closureImplicitTail with
-  | .fault .nonCanonicalInputPlan _ => pure ()
+  /- The canonical validator rejects this test-only plan. The retained tail is
+  covered by an independently checked Core fragment below. -/
+  match (validateTampered closureImplicitTail).1 with
+  | .error .nonCanonicalInputPlan => pure ()
   | result => throw (IO.userError
       s!"forged closure tail escaped plan validation: {reprStr result}")
-  expectWord "closure implicit tail return" 42
-    (SourceTypedRuntime.runTrusted closureImplicitTail.program
-      closureImplicitTail.plan closureImplicitTail.key [] 4096)
+  testRetainedLambdaTail closureImplicitTail
   let spin ← prepareNamed program "spin"
-  match runPrepared spin [.word (word 1)] 3 with
+  match ← runPrepared spin [.word (word 1)] 3 with
   | .outOfFuel _ => pure ()
   | result => throw (IO.userError
       s!"recursive low-fuel call did not exhaust: {reprStr result}")
 
 private def testLocalLetPolymorphism (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "localPolymorphism"
-  let result := runPrepared prepared [.bool true]
+  let result ← runPrepared prepared [.bool true]
   match result with
   | .done (.product (.word actual) (.bool selected)) _ =>
       assertTrue (actual == word 41 && selected)
@@ -559,7 +608,7 @@ private def testLocalLetPolymorphism (program : CheckedProgram) : IO Unit := do
 private def testQualifiedLocalLetPolymorphism
     (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "qualifiedLocalProof"
-  let result := runPrepared prepared [.bool true]
+  let result ← runPrepared prepared [.bool true]
   match result with
   | .done (.product (.word actual) (.bool selected)) _ =>
       assertTrue (actual == word 53 && selected)
@@ -595,11 +644,11 @@ private def assertContextualGenericPlan (label : String)
   | _ => throw (IO.userError s!"{label} retained an impossible edge shape")
 
 private def expectRuntimeFault (label : String)
-    (accept : RuntimeError → Bool) : RunResult → IO Unit
-  | .fault error _ =>
+    (accept : RuntimeError → Bool) : Except RuntimeError Unit → IO Unit
+  | .error error =>
       assertTrue (accept error) s!"{label} reported {reprStr error}"
-  | result => throw (IO.userError
-      s!"{label} did not reject tampered metadata: {reprStr result}")
+  | .ok () => throw (IO.userError
+      s!"{label} did not reject tampered metadata")
 
 private def testContextualGenericEdgeTampering
     (prepared : Prepared) : IO Unit := do
@@ -610,8 +659,8 @@ private def testContextualGenericEdgeTampering
     | edges => throw (IO.userError
         s!"contextual generic plan retained {edges.length} Word edges")
 
-  let duplicate := {
-    prepared with
+  let duplicate : ValidationFixture := {
+    prepared.toValidationFixture with
     plan := {
       prepared.plan with
       callEdges := wordEdge :: prepared.plan.callEdges
@@ -621,17 +670,17 @@ private def testContextualGenericEdgeTampering
     (fun error => match error with
       | .nonCanonicalInputPlan => true
       | _ => false)
-    (runPrepared duplicate [.bool true])
-  expectRuntimeFault "trusted duplicate contextual generic edge"
+    (validateTampered duplicate).1
+  expectRuntimeFault "exact duplicate contextual generic edge"
     (fun error => match error with
       | .duplicateCallEdge caller occurrence 2 =>
           decide (caller = prepared.key ∧ occurrence = wordEdge.occurrence)
       | _ => false)
-    (SourceTypedRuntime.runTrusted duplicate.program duplicate.plan
-      duplicate.key [.bool true] 4096)
+    ((SourceCompilationPlan.exactCallKey duplicate.plan duplicate.key
+      wordEdge.occurrence wordEdge.callee).map fun _ => ())
 
-  let missing := {
-    prepared with
+  let missing : ValidationFixture := {
+    prepared.toValidationFixture with
     plan := {
       prepared.plan with
       callEdges := prepared.plan.callEdges.filter fun edge =>
@@ -642,27 +691,27 @@ private def testContextualGenericEdgeTampering
     (fun error => match error with
       | .nonCanonicalInputPlan => true
       | _ => false)
-    (runPrepared missing [.bool true])
-  expectRuntimeFault "trusted missing contextual generic edge"
+    (validateTampered missing).1
+  expectRuntimeFault "exact missing contextual generic edge"
     (fun error => match error with
       | .missingCallEdge caller occurrence =>
           decide (caller = prepared.key ∧ occurrence = wordEdge.occurrence)
       | _ => false)
-    (SourceTypedRuntime.runTrusted missing.program missing.plan
-      missing.key [.bool true] 4096)
+    ((SourceCompilationPlan.exactCallKey missing.plan missing.key
+      wordEdge.occurrence wordEdge.callee).map fun _ => ())
 
 private def testContextualLocalGenericCalls
     (program : CheckedProgram) : IO Unit := do
   let direct ← prepareNamed program "localGenericCalls"
   assertContextualGenericPlan "contextual local generic call" direct
-  let directResult := runPrepared direct [.bool true]
+  let directResult ← runPrepared direct [.bool true]
   expectWordBool "contextual local generic call" 43 true directResult
   expectShallowHeap "contextual local generic call" direct.plan directResult
   testContextualGenericEdgeTampering direct
 
   let escaped ← prepareNamed program "localGenericAliasEscape"
   assertContextualGenericPlan "ground alias escape" escaped
-  let escapedResult := runPrepared escaped [.bool false]
+  let escapedResult ← runPrepared escaped [.bool false]
   expectWordBool "ground alias escape" 47 false escapedResult
   expectShallowHeap "ground alias escape" escaped.plan escapedResult
 
@@ -713,8 +762,8 @@ private def testNominalInputValidation (program : CheckedProgram) : IO Unit := d
     payloadTypes := [.word]
     resultType
   }
-  expectWord "validated nominal input" 13 <| runPrepared prepared
-    [.constructed legitimate [.word (word 13)]]
+  expectWord "validated nominal input" 13 <| (← runPrepared prepared
+    [.constructed legitimate [.word (word 13)]])
   let forged := {
     legitimate with
     constructor := {
@@ -722,7 +771,7 @@ private def testNominalInputValidation (program : CheckedProgram) : IO Unit := d
       constructorIndex := leaf.id.constructorIndex + 100
     }
   }
-  match runPrepared prepared [.constructed forged [.word (word 13)]] with
+  match ← runPrepared prepared [.constructed forged [.word (word 13)]] with
   | .fault (.typeMismatch expected actual) _ =>
       assertTrue (decide (expected = resultType ∧ actual = some resultType))
         "forged constructor failed for an unrelated input type"
@@ -739,7 +788,7 @@ private def testNominalInputValidation (program : CheckedProgram) : IO Unit := d
     payloadTypes := stagedConstructor.payloadTypes
     resultType := stagedResultType
   }
-  let stagedResult := runPrepared stagedPrepared
+  let stagedResult ← runPrepared stagedPrepared
     [.constructed stagedInstantiation [.integer 13]]
   expectWord "validated staged nominal input" 17 stagedResult
   expectShallowHeap "validated staged nominal input" stagedPrepared.plan
@@ -748,7 +797,7 @@ private def testNominalInputValidation (program : CheckedProgram) : IO Unit := d
 private def testStagedRuntimeTypesAndEffects
     (program : CheckedProgram) : IO Unit := do
   let nested ← prepareNamed program "nestedComptime"
-  let nestedResult := runPrepared nested [
+  let nestedResult ← runPrepared nested [
     .product (.word (word 4))
       (.product (.word (word 5)) (.word (word 6)))]
   match nestedResult with
@@ -767,7 +816,7 @@ private def testStagedRuntimeTypesAndEffects
       ("integerBitAndNegative", 3), ("integerBitOrNegative", -5),
       ("integerBitXorNegative", -7)] do
     let prepared ← prepareNamed program name
-    match runPrepared prepared with
+    match ← runPrepared prepared with
     | .done (.integer actual) state =>
         assertTrue (actual == expected)
           s!"{name} returned the wrong integer"
@@ -776,60 +825,62 @@ private def testStagedRuntimeTypesAndEffects
     | result => throw (IO.userError s!"{name} returned {reprStr result}")
 
   let effects ← prepareNamed program "markedEffects"
-  let effectsResult := runPrepared effects [.word (word 9)]
+  let effectsResult ← runPrepared effects [.word (word 9)]
   expectWord "marked closure/mutation/mapping" 12 effectsResult
   expectShallowHeap "marked closure/mutation/mapping" effects.plan
     effectsResult
 
   let closureClosed ← prepareNamed program "markedClosureClosed"
-  expectWord "closed marked closure call" 21 (runPrepared closureClosed)
+  expectWord "closed marked closure call" 21 (← runPrepared closureClosed)
   let closureRuntime ← prepareNamed program "markedClosureRuntime"
-  match runPrepared closureRuntime [.word (word 21)] with
+  match ← runPrepared closureRuntime [.word (word 21)] with
   | .fault (.comptimeArgumentStageMismatch _ _ 0 _ .runtime) _ => pure ()
   | result => throw (IO.userError
       s!"runtime marked closure argument returned {reprStr result}")
 
   let globalClosed ← prepareNamed program "markedGlobalClosed"
-  expectWord "closed marked global call" 22 (runPrepared globalClosed)
+  expectWord "closed marked global call" 22 (← runPrepared globalClosed)
   let globalRuntime ← prepareNamed program "markedGlobalRuntime"
-  match runPrepared globalRuntime [.word (word 22)] with
+  match ← runPrepared globalRuntime [.word (word 22)] with
   | .fault (.comptimeArgumentStageMismatch _ _ 0 _ .runtime) _ => pure ()
   | result => throw (IO.userError
       s!"runtime marked global argument returned {reprStr result}")
 
   let blockedResult ← prepareNamed program "markedResultIndirectBlocked"
-  match runPrepared blockedResult with
+  match ← runPrepared blockedResult with
   | .fault (.comptimeResultStageMismatch _ _ _ .deferred) _ => pure ()
   | result => throw (IO.userError
       s!"ordinary indirect staged result returned {reprStr result}")
   let stagedResult ← prepareNamed program "markedResultIndirectStaged"
-  expectWord "staged indirect marked result" 24 (runPrepared stagedResult)
+  expectWord "staged indirect marked result" 24 (← runPrepared stagedResult)
 
   let functionResult ← prepareNamed program "functionFromCoercion"
-  match runPrepared functionResult [.word (word 1)] with
+  match ← runPrepared functionResult [.word (word 1)] with
   | .done (.global _ _) _ => pure ()
   | result => throw (IO.userError
       s!"method-discovered first-class global returned {reprStr result}")
 
 private def expectPreExecutionFault (label : String)
-    (accept : RuntimeError → Bool) : RunResult → IO Unit
-  | .fault error { heap := [] } =>
+    (accept : RuntimeError → Bool) :
+    Except RuntimeError Unit × RuntimeState → IO Unit
+  | (.error error, { heap := [] }) =>
       assertTrue (accept error) s!"{label} reported {reprStr error}"
-  | .fault error state => throw (IO.userError
+  | (.error error, state) => throw (IO.userError
       s!"{label} mutated state before rejecting metadata: {reprStr error}, {reprStr state}")
-  | result => throw (IO.userError
-      s!"{label} did not reject tampered metadata: {reprStr result}")
+  | (.ok (), _) => throw (IO.userError
+      s!"{label} did not reject tampered plan metadata")
 
 private def expectPreExecutionFaultPreservingSentinel (label : String)
-    (accept : RuntimeError → Bool) : RunResult → IO Unit
-  | .fault error { heap := [{ type := actualType, value := none }] } => do
+    (accept : RuntimeError → Bool) :
+    Except RuntimeError Unit × RuntimeState → IO Unit
+  | (.error error, { heap := [{ type := actualType, value := none }] }) => do
       assertTrue (accept error) s!"{label} reported {reprStr error}"
       assertTrue (actualType == .word)
         s!"{label} changed the sentinel cell type to {reprStr actualType}"
-  | .fault error state => throw (IO.userError
+  | (.error error, state) => throw (IO.userError
       s!"{label} changed the initial state before rejecting metadata: {reprStr error}, {reprStr state}")
-  | result => throw (IO.userError
-      s!"{label} did not reject tampered metadata: {reprStr result}")
+  | (.ok (), _) => throw (IO.userError
+      s!"{label} did not reject tampered plan metadata")
 
 private def expectPlanValidationFault (label : String)
     (accept : RuntimeError → Bool) : Except RuntimeError Unit → IO Unit
@@ -859,7 +910,7 @@ private def testTamperedExecutableMetadata
             functionDeclaration = impostor.key.declaration ∧
             typedBodyOwner = impostor.key.declaration)
       | _ => false)
-    (runPrepared withImpostorBody)
+    (validateTampered withImpostorBody)
 
   let fakeRequirement : SourceInference.RequirementId := { index := 1000000 }
   let proxy ← prepareNamed program "proxyValue"
@@ -867,7 +918,7 @@ private def testTamperedExecutableMetadata
     fun node => { node with requirements := [fakeRequirement] }
   expectPreExecutionFault "unsupported expression requirement"
     (fun error => error == .unsupportedRequirements [fakeRequirement])
-    (runPrepared withRequirement)
+    (validateTampered withRequirement)
 
   let fakeCoercion : SourceInference.CoercionStep := {
     requirement := fakeRequirement
@@ -878,7 +929,7 @@ private def testTamperedExecutableMetadata
     fun node => { node with coercions := [fakeCoercion] }
   expectPreExecutionFault "invalid result coercion"
     (fun error => error matches .invalidExpressionCoercionPath _ _ _)
-    (runPrepared withResultCoercion)
+    (validateTampered withResultCoercion)
 
   let capture ← prepareNamed program "sharedCapture"
   let withArgumentCoercion := rewriteEntryNodes capture <|
@@ -887,7 +938,7 @@ private def testTamperedExecutableMetadata
     }
   expectPreExecutionFault "invalid indirect argument coercion"
     (fun error => error matches .invalidIndirectArgumentCoercionPath _)
-    (runPrepared withArgumentCoercion)
+    (validateTampered withArgumentCoercion)
 
   let inconsistentResult := rewriteEntryFunction proxy fun function =>
     { function with inferredBodyType := .bool }
@@ -896,7 +947,7 @@ private def testTamperedExecutableMetadata
       | .inferredResultTypeMismatch key declared inferred =>
           decide (key = proxy.key ∧ declared = .proxy .word ∧ inferred = .bool)
       | _ => false)
-    (runPrepared inconsistentResult)
+    (validateTampered inconsistentResult)
 
 private def testIndirectArgumentCountMetadata
     (program : CheckedProgram) : IO Unit := do
@@ -909,7 +960,7 @@ private def testIndirectArgumentCountMetadata
     (fun error => match error with
       | .argumentArityMismatch 2 1 => true
       | _ => false)
-    (runPrepared forgedProduct)
+    (validateTampered forgedProduct)
 
   let split ← prepareNamed program "callSplit"
   let forgedSplit := rewriteEntryNodes split <|
@@ -920,7 +971,7 @@ private def testIndirectArgumentCountMetadata
     (fun error => match error with
       | .argumentArityMismatch 1 2 => true
       | _ => false)
-    (runPrepared forgedSplit)
+    (validateTampered forgedSplit)
 
 private def testIndirectEndpointMetadata
     (program : CheckedProgram) : IO Unit := do
@@ -928,9 +979,8 @@ private def testIndirectEndpointMetadata
   let initialState : RuntimeState := {
     heap := [{ type := .word, value := none }]
   }
-  let runTampered (tampered : Prepared) :=
-    SourceTypedRuntime.runWithValidationFuel tampered.program tampered.plan
-      tampered.key [.bool true] 4096 4096 initialState
+  let validateWithSentinel (tampered : ValidationFixture) :=
+    validateTampered tampered initialState
 
   let beforeMismatch := rewriteEntryNodes prepared <|
     rewriteFirstIndirectCall fun metadata => {
@@ -947,7 +997,7 @@ private def testIndirectEndpointMetadata
       | .indirectArgumentBundleMismatch _ expected actual =>
           decide (expected = .bool ∧ actual = .word)
       | _ => false)
-    (runTampered beforeMismatch)
+    (validateWithSentinel beforeMismatch)
 
   let afterMismatch := rewriteEntryNodes prepared <|
     rewriteFirstIndirectCall fun metadata => {
@@ -964,7 +1014,7 @@ private def testIndirectEndpointMetadata
       | .indirectParameterTypeMismatch _ expected actual =>
           decide (expected = .word ∧ actual = .bool)
       | _ => false)
-    (runTampered afterMismatch)
+    (validateWithSentinel afterMismatch)
 
   let resultMismatch := rewriteEntryNodes prepared <|
     rewriteFirstIndirectCallNode fun node =>
@@ -982,7 +1032,7 @@ private def testIndirectEndpointMetadata
       | .indirectResultTypeMismatch _ expected actual =>
           decide (expected = .word ∧ actual = .bool)
       | _ => false)
-    (runTampered resultMismatch)
+    (validateWithSentinel resultMismatch)
 
 private def letBinderNamed
     (specialized : SourceSpecialization.SpecializedFunction) (name : String) :
@@ -1006,7 +1056,7 @@ private def entrySpecialization (prepared : Prepared) :
 private def rewriteEntryExpressionAt (prepared : Prepared)
     (target : SourceInference.ExpressionId)
     (rewrite : SourceInference.ExpressionNode →
-      SourceInference.ExpressionNode) : Prepared :=
+      SourceInference.ExpressionNode) : ValidationFixture :=
   rewriteEntryNodes prepared fun nodes => nodes.map fun node =>
     match node with
     | .expression expression =>
@@ -1017,7 +1067,7 @@ private def rewriteEntryExpressionAt (prepared : Prepared)
 private def rewriteEntryLetBinder (prepared : Prepared)
     (target : Resolved.LocalId)
     (rewrite : SourceInference.TypedBinder → SourceInference.TypedBinder) :
-    Prepared :=
+    ValidationFixture :=
   rewriteEntryNodes prepared fun nodes => nodes.map fun node =>
     match node with
     | .statement statement@{ form := .letDecl binder initializer, .. } =>
@@ -1168,7 +1218,7 @@ private def constrainedCallFixture
 
 private def rewriteEntrySolvedEvidence (prepared : Prepared)
     (requirement : SourceInference.RequirementId)
-    (evidence : SourceInference.PredicateEvidence) : Prepared :=
+    (evidence : SourceInference.PredicateEvidence) : ValidationFixture :=
   rewriteEntryFunction prepared fun function => {
     function with
     solvedRequirements := function.solvedRequirements.map fun solved =>
@@ -1180,7 +1230,7 @@ private def testContextualCallRequirementValidation
     (program : CheckedProgram) : IO Unit := do
   let fixture ← constrainedCallFixture program
   let prepared := fixture.prepared
-  let result := runPrepared prepared [.bool true]
+  let result ← runPrepared prepared [.bool true]
   expectWordBool "contextual constrained local call" 2 true result
   expectShallowHeap "contextual constrained local call" prepared.plan result
 
@@ -1193,7 +1243,7 @@ private def testContextualCallRequirementValidation
       | .invalidDirectCallRequirementLayout caller occurrence [] =>
           decide (caller = prepared.key ∧ occurrence = fixture.occurrence)
       | _ => false)
-    (runPrepared missingCallRequirement [.bool true])
+    (validateTampered missingCallRequirement)
 
   let duplicateCallRequirement := rewriteEntryExpressionAt prepared
     fixture.occurrence fun node =>
@@ -1214,7 +1264,7 @@ private def testContextualCallRequirementValidation
             occurrence = fixture.occurrence ∧
             requirement = fixture.requirement)
       | _ => false)
-    (runPrepared duplicateCallRequirement [.bool true])
+    (validateTampered duplicateCallRequirement)
 
   let missingSolved := rewriteEntryFunction prepared fun function => {
     function with
@@ -1228,7 +1278,7 @@ private def testContextualCallRequirementValidation
             occurrence = fixture.occurrence ∧
             requirement = fixture.requirement)
       | _ => false)
-    (runPrepared missingSolved [.bool true])
+    (validateTampered missingSolved)
 
   let duplicateSolved := rewriteEntryFunction prepared fun function => {
     function with
@@ -1241,7 +1291,7 @@ private def testContextualCallRequirementValidation
             occurrence = fixture.occurrence ∧
             requirement = fixture.requirement)
       | _ => false)
-    (runPrepared duplicateSolved [.bool true])
+    (validateTampered duplicateSolved)
 
   let wrongPredicate : ProgramPredicate := {
     fixture.predicate with subject := .bool
@@ -1263,7 +1313,7 @@ private def testContextualCallRequirementValidation
             requirement = fixture.requirement ∧
             expected = fixture.predicate ∧ actual = wrongPredicate)
       | _ => false)
-    (runPrepared predicateMismatch [.bool true])
+    (validateTampered predicateMismatch)
 
   let goalMismatch := rewriteEntryFunction prepared fun function => {
     function with
@@ -1282,7 +1332,7 @@ private def testContextualCallRequirementValidation
             requirement = fixture.requirement ∧
             expected = fixture.predicate ∧ actual = wrongPredicate)
       | _ => false)
-    (runPrepared goalMismatch [.bool true])
+    (validateTampered goalMismatch)
 
   let assumptionEvidence := rewriteEntryFunction prepared fun function => {
     function with
@@ -1301,7 +1351,7 @@ private def testContextualCallRequirementValidation
             requirement = fixture.requirement ∧
             predicate = fixture.predicate)
       | _ => false)
-    (runPrepared assumptionEvidence [.bool true])
+    (validateTampered assumptionEvidence)
 
   let (implementation, premise) ← match fixture.solved.evidence with
     | .implementation (.byImpl goal implementation [premise]) => do
@@ -1330,7 +1380,7 @@ private def testContextualCallRequirementValidation
             requirement = fixture.requirement ∧
             goal = fixture.predicate ∧ actual = premiseImplementation)
       | _ => false)
-    (runPrepared wrongImplementation [.bool true])
+    (validateTampered wrongImplementation)
 
   let missingPremiseEvidence : SourceInference.PredicateEvidence :=
     .implementation (.byImpl fixture.predicate implementation [])
@@ -1344,7 +1394,7 @@ private def testContextualCallRequirementValidation
             requirement = fixture.requirement ∧
             goal = fixture.predicate ∧ actual = implementation)
       | _ => false)
-    (runPrepared missingPremise [.bool true])
+    (validateTampered missingPremise)
 
   let wrongPremiseGoal : TypedTraitResolution.Evidence :=
     .byImpl fixture.predicate premiseImplementation []
@@ -1361,7 +1411,7 @@ private def testContextualCallRequirementValidation
             requirement = fixture.requirement ∧
             goal = fixture.predicate ∧ actual = implementation)
       | _ => false)
-    (runPrepared wrongPremiseGoal [.bool true])
+    (validateTampered wrongPremiseGoal)
 
   let wrongPremiseImplementation : TypedTraitResolution.Evidence :=
     .byImpl premiseGoal implementation []
@@ -1379,10 +1429,10 @@ private def testContextualCallRequirementValidation
             requirement = fixture.requirement ∧
             goal = fixture.predicate ∧ actual = implementation)
       | _ => false)
-    (runPrepared wrongPremiseImplementation [.bool true])
+    (validateTampered wrongPremiseImplementation)
 
-  let constrainedSeed : Prepared := {
-    prepared with
+  let constrainedSeed : ValidationFixture := {
+    prepared.toValidationFixture with
     plan := {
       prepared.plan with
       seedKeys := fixture.callee :: prepared.plan.seedKeys
@@ -1395,8 +1445,8 @@ private def testContextualCallRequirementValidation
       | _ => false)
     (SourceTypedRuntime.validateExecutablePlan constrainedSeed.plan)
 
-  let constrainedReference : Prepared := {
-    prepared with
+  let constrainedReference : ValidationFixture := {
+    prepared.toValidationFixture with
     plan := {
       prepared.plan with
       referenceEdges := {
@@ -1443,7 +1493,7 @@ private def testRuntimeEvidenceForwarding
   assertTrue (rootSpecialized.assumptions.length == 1)
     "ground constrained root lost its retained predicate"
   expectWord "ground constrained root evidence" 59
-    (runPrepared constrainedRoot [.word (word 59)])
+    (← runPrepared constrainedRoot [.word (word 59)])
 
   let nested ← prepareNamed program "nestedConstrained"
   let nestedRoot ← entrySpecialization nested
@@ -1454,7 +1504,7 @@ private def testRuntimeEvidenceForwarding
       keep.assumptions.length == 1)
     "nested constrained calls lost their implementation/assumption chain"
   expectWord "nested runtime evidence forwarding" 61
-    (runPrepared nested [.word (word 61)])
+    (← runPrepared nested [.word (word 61)])
 
   let recursive ← prepareNamed program "recursiveConstrained"
   let repeated ← specializationNamedInPlan program recursive "repeat"
@@ -1464,8 +1514,8 @@ private def testRuntimeEvidenceForwarding
       repeated.assumptions.length == 1)
     "constrained recursion lost its self edge or caller assumption"
   expectWord "recursive runtime evidence forwarding" 67
-    (runPrepared recursive [.word (word 67)])
-  match runPrepared recursive [.word (word 67)] 1 with
+    (← runPrepared recursive [.word (word 67)])
+  match ← runPrepared recursive [.word (word 67)] 1 with
   | .outOfFuel _ => pure ()
   | result => throw (IO.userError
       s!"constrained recursion ignored its fuel boundary: {reprStr result}")
@@ -1476,7 +1526,7 @@ private def testRuntimeEvidenceForwarding
       closureRelay.assumptions.length == 1)
     "constrained closure lost its retained caller assumption"
   expectWord "captured runtime evidence forwarding" 71
-    (runPrepared closure [.word (word 71)])
+    (← runPrepared closure [.word (word 71)])
 
   let ordered ← prepareNamed program "orderedConstrained"
   let relayBoth ← specializationNamedInPlan program ordered "relayBoth"
@@ -1487,7 +1537,7 @@ private def testRuntimeEvidenceForwarding
       hasAssumptionEvidence relayBoth)
     "callee-ordered runtime evidence lost or reused caller predicate order"
   expectWord "callee-ordered runtime evidence forwarding" 79
-    (runPrepared ordered [.word (word 79)])
+    (← runPrepared ordered [.word (word 79)])
 
 private def testQualifiedLocalRequirementValidation
     (program : CheckedProgram) : IO Unit := do
@@ -1502,7 +1552,7 @@ private def testQualifiedLocalRequirementValidation
           decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
             binder = fixture.binder.id)
       | _ => false)
-    (runPrepared missingActual [.bool true])
+    (validateTampered missingActual)
 
   let missingSolved := rewriteEntryFunction prepared fun function => {
     function with
@@ -1515,7 +1565,7 @@ private def testQualifiedLocalRequirementValidation
           decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
             requirement = fixture.actualRequirement)
       | _ => false)
-    (runPrepared missingSolved [.bool true])
+    (validateTampered missingSolved)
 
   let duplicateSolved := rewriteEntryFunction prepared fun function => {
     function with
@@ -1527,7 +1577,7 @@ private def testQualifiedLocalRequirementValidation
           decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
             requirement = fixture.actualRequirement)
       | _ => false)
-    (runPrepared duplicateSolved [.bool true])
+    (validateTampered duplicateSolved)
 
   let wrongPredicate : ProgramPredicate := {
     fixture.actualSolved.predicate with subject := .bool
@@ -1546,7 +1596,7 @@ private def testQualifiedLocalRequirementValidation
           decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
             requirement = fixture.actualRequirement ∧ actual = wrongPredicate)
       | _ => false)
-    (runPrepared predicateMismatch [.bool true])
+    (validateTampered predicateMismatch)
 
   let assumption := rewriteEntrySolvedEvidence prepared
     fixture.actualRequirement (.assumption fixture.actualSolved.predicate)
@@ -1556,7 +1606,7 @@ private def testQualifiedLocalRequirementValidation
           decide (caller = prepared.key ∧ occurrence = fixture.reference.id ∧
             requirement = fixture.actualRequirement)
       | _ => false)
-    (runPrepared assumption [.bool true])
+    (validateTampered assumption)
 
   let forgedEvidence : SourceInference.PredicateEvidence :=
     .implementation (.byImpl fixture.actualSolved.predicate
@@ -1570,7 +1620,7 @@ private def testQualifiedLocalRequirementValidation
             requirement = fixture.actualRequirement ∧
             goal = fixture.actualSolved.predicate)
       | _ => false)
-    (runPrepared forged [.bool true])
+    (validateTampered forged)
 
   let duplicateTemplate := rewriteEntryLetBinder prepared fixture.binder.id
     fun binder => {
@@ -1585,7 +1635,7 @@ private def testQualifiedLocalRequirementValidation
             binder = fixture.binder.id ∧
             requirement = fixture.template.templateRequirement)
       | _ => false)
-    (runPrepared duplicateTemplate [.bool true])
+    (validateTampered duplicateTemplate)
 
   let unusedId : SourceInference.RequirementId := {
     index := fixture.template.templateRequirement.index + 1000000
@@ -1603,7 +1653,7 @@ private def testQualifiedLocalRequirementValidation
           decide (caller = prepared.key ∧ binder = fixture.binder.id ∧
             requirement = unusedId)
       | _ => false)
-    (runPrepared unusedTemplate [.bool true])
+    (validateTampered unusedTemplate)
 
   let escapedCallee := rewriteEntryFunction prepared fun function => {
     function with
@@ -1618,7 +1668,7 @@ private def testQualifiedLocalRequirementValidation
           decide (caller = prepared.key ∧ call = fixture.call.id ∧
             callee = fixture.callee)
       | _ => false)
-    (runPrepared escapedCallee [.bool true])
+    (validateTampered escapedCallee)
 
   let escapedInitializer := rewriteEntryFunction prepared fun function => {
     function with
@@ -1633,7 +1683,7 @@ private def testQualifiedLocalRequirementValidation
           decide (caller = prepared.key ∧ binder = fixture.binder.id ∧
             initializer = fixture.initializer)
       | _ => false)
-    (runPrepared escapedInitializer [.bool true])
+    (validateTampered escapedInitializer)
 
 private def testAssignmentRootsAreDeferred
     (program : CheckedProgram) : IO Unit := do
@@ -1683,8 +1733,7 @@ private def testOperatorMethodNestedInCoercion : IO Unit := do
   let initialState : RuntimeState := {
     heap := [{ type := .word, value := none }]
   }
-  match SourceTypedRuntime.runWithValidationFuel prepared.program prepared.plan
-      prepared.key [.bool true] 4096 4096 initialState with
+  match ← runPrepared prepared [.bool true] 300000 initialState with
   | .done (.constructed _ []) finalState =>
       match finalState.heap with
       | { type := type, value := none } :: _ =>
@@ -1699,13 +1748,13 @@ private def testOperatorMethodNestedInCoercion : IO Unit := do
 
 private def testRuntimeCoercions (program : CheckedProgram) : IO Unit := do
   let chain ← prepareNamed program "coercionChain"
-  match runPrepared chain [.bool true] 8192 with
+  match ← runPrepared chain [.bool true] 300000 with
   | .done (.product (.word left) (.word right)) _ =>
       assertTrue (left == word 41 && right == word 41)
         "typed runtime did not compose both selected coercion methods"
   | result => throw (IO.userError
       s!"typed multi-step coercion returned {reprStr result}")
-  match runPrepared chain [.bool false] 8192 with
+  match ← runPrepared chain [.bool false] 300000 with
   | .done (.product (.word left) (.word right)) _ =>
       assertTrue (left == word 7 && right == word 7)
         "typed runtime changed the false coercion branch"
@@ -1713,13 +1762,13 @@ private def testRuntimeCoercions (program : CheckedProgram) : IO Unit := do
       s!"typed multi-step coercion false branch returned {reprStr result}")
   let generic ← prepareNamed program "genericCoercion"
   expectWord "generic caller coercion evidence" 41
-    (runPrepared generic [.bool true] 8192)
+    (← runPrepared generic [.bool true] 300000)
   let result ← prepareNamed program "resultCoercion"
   expectWord "expression result coercion" 7
-    (runPrepared result [.bool false] 8192)
+    (← runPrepared result [.bool false] 300000)
   let indirect ← prepareNamed program "indirectCoercion"
   expectWord "indirect argument coercion" 41
-    (runPrepared indirect [.bool true] 8192)
+    (← runPrepared indirect [.bool true] 300000)
 
   let specialized ← entrySpecialization chain
   let coercedNode ← match specialized.function.typedBody.nodes.findSome? fun
@@ -1749,7 +1798,7 @@ private def testRuntimeCoercions (program : CheckedProgram) : IO Unit := do
       | .callRequirementPredicateMismatch caller occurrence _ _ _ =>
           decide (caller = chain.key ∧ occurrence = coercedNode.id)
       | _ => false)
-    (runPrepared reordered [.bool true] 8192)
+    (validateTampered reordered)
 
   let duplicated := rewriteEntryExpressionAt chain coercedNode.id fun node =>
     let coercions := match node.coercions with
@@ -1770,7 +1819,7 @@ private def testRuntimeCoercions (program : CheckedProgram) : IO Unit := do
       | .duplicateCoercionRequirement caller occurrence _ =>
           decide (caller = chain.key ∧ occurrence = coercedNode.id)
       | _ => false)
-    (runPrepared duplicated [.bool true] 8192)
+    (validateTampered duplicated)
 
 private def testAll : IO Unit := do
   let program ← checkedProgram source
