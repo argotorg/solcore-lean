@@ -145,6 +145,9 @@ import Solcore.Test.SourceCoreCompatibleExpressionProducts
 import Solcore.Test.SourceCoreCompatibleAmbientBitNot
 import Solcore.Test.SourceCoreCompatibleExpressionPrimitives
 import Solcore.Test.SourceCoreCompatibleExpressionConditionals
+import Solcore.Test.SourceCoreCompatibleExpressionConstructors
+import Solcore.Test.SourceCoreCompatibleExpressionMembers
+import Solcore.Test.SourceCoreCompatibleStatements
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -1256,6 +1259,9 @@ import Solcore.Test.SourceCoreIndexedSessionFactories
 import Solcore.Test.SourceCoreIndexedSessionInvocation
 import Solcore.Test.SourceCoreRootDiscovery
 import Solcore.Test.SourceCoreExecution
+import Solcore.Test.SourceCoreHeapSnapshot
+import Solcore.Test.SourceCoreExecutionSnapshots
+import Solcore.Test.SourceCoreActiveHeapPrefix
 import Solcore.Test.SourceCompilerCoreGeneral
 import Solcore.Test.SourceCompilerSession
 import Solcore.Test.SourceCoreEvidence
@@ -2455,6 +2461,9 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCompatibleExpressionProducts.run
   SourceCoreCompatibleExpressionPrimitives.run
   SourceCoreCompatibleExpressionConditionals.run
+  SourceCoreCompatibleExpressionConstructors.run
+  SourceCoreCompatibleExpressionMembers.run
+  SourceCoreCompatibleStatements.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
@@ -2796,6 +2805,9 @@ def run : IO Unit := do
   SourceCoreIndexedSessionInvocation.run
   SourceCoreRootDiscovery.run
   SourceCoreExecution.run
+  SourceCoreHeapSnapshot.run
+  SourceCoreExecutionSnapshots.run
+  SourceCoreActiveHeapPrefix.run
   SourceCompilerCoreGeneral.run
   SourceCompilerSession.run
   SourceCoreEvidence.run
