@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreCompatiblePayload
 import Solcore.Test.SourceCoreDataPlacePathFaults
 import Solcore.Test.SourceCoreDataPlaceWriteBack
 import Solcore.Test.SourceCoreStageContracts
@@ -2568,6 +2569,7 @@ def run : IO Unit := do
   SourceCoreAllocationContexts.run
   SourceCoreRawMetadata.run
   SourceCoreCompatibleValues.run
+  SourceCoreCompatiblePayload.run
   SourceCoreCompatibleDataExpressions.run
   SourceCoreCompatibleDataControl.run
   SourceCoreCompatibleFunctions.run
