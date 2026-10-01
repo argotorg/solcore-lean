@@ -132,7 +132,12 @@ import Solcore.Test.SourceCoreUnifiedStagingCorpus
 import Solcore.Test.SourceCompilerUnifiedRouting
 import Solcore.Test.SourceCoreUnifiedImportBoundary
 import Solcore.Test.SourceCoreCompatibleExpressionReads
+import Solcore.Test.SourceCoreCompatibleContextualReads
+import Solcore.Test.SourceCoreCompatibleExpressionLiterals
 import Solcore.Test.SourceCoreCallableIndexedAmbient
+import Solcore.Test.SourceCoreCompatibleAmbientMappings
+import Solcore.Test.SourceCoreCompatibleAmbientPaths
+import Solcore.Test.SourceCoreCompatibleAmbientSnapshot
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -2426,7 +2431,12 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreUnifiedStagingCorpus.run
   SourceCompilerUnifiedRouting.run
   SourceCoreCompatibleExpressionReads.run
+  SourceCoreCompatibleContextualReads.run
+  SourceCoreCompatibleExpressionLiterals.run
   Solcore.Test.SourceCoreCallableIndexedAmbient.run
+  Solcore.Test.SourceCoreCompatibleAmbientMappings.run
+  SourceCoreCompatibleAmbientPaths.run
+  SourceCoreCompatibleAmbientSnapshot.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
