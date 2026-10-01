@@ -177,6 +177,11 @@ import Solcore.Test.SourceCoreCompatibleGeneralExpressions
 import Solcore.Test.SourceCoreTypedLexicalNamedParameters
 import Solcore.Test.SourceCoreTypedLexicalWhile
 import Solcore.Test.SourceCoreBuiltinBodyMeaning
+import Solcore.Test.SourceCoreBuiltinCalls
+import Solcore.Test.SourceCoreTypedBuiltinCalls
+import Solcore.Test.SourceCoreTypedLexicalWhileNative
+import Solcore.Test.SourceCoreCompatibleAssignmentStatements
+import Solcore.Test.SourceCoreNamedCalls
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -2522,6 +2527,11 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreTypedLexicalNamedParameters.run
   SourceCoreTypedLexicalWhile.run
   SourceCoreBuiltinBodyMeaning.run
+  SourceCoreBuiltinCalls.run
+  SourceCoreTypedBuiltinCalls.run
+  SourceCoreTypedLexicalWhileNative.run
+  SourceCoreCompatibleAssignmentStatements.run
+  SourceCoreNamedCalls.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
