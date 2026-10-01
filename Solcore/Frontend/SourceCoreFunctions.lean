@@ -97,7 +97,8 @@ private def globalAt (globals : List Signature) (key : Key) : Except Error (Nat 
   | [(signature, index)] => .ok (index, signature)
   | candidates => .error (.callPreparation (.duplicateSpecialization key candidates.length))
 
-private def selectedSignature (policy : Policy) (context : Context) (source : TypedSource) (node : ExpressionNode)
+/-- Actual plan/global selection, exposed for compiler certificates. -/
+def selectedSignature (policy : Policy) (context : Context) (source : TypedSource) (node : ExpressionNode)
     (instantiation : DeclarationInstantiation) (isReference : Bool) : Except Error (Nat × Signature) := do
   if source.owner ≠ context.owner.declaration then throw (.ownerMismatch context.owner.declaration source.owner)
   let caller ← (SourceCompilationPlan.exactSpecialization context.plan context.owner).mapError SourceCoreBasic.Error.callPreparation
@@ -161,7 +162,8 @@ def lambdaParameters (policy : Policy) (source : TypedSource) : Scope → List T
       let (remaining, scope) ← lambdaParameters policy source ((parameter.id, type) :: scope) parameters
       pure ((parameter, type) :: remaining, scope)
 
-private def builtinReference (callables : CallablePolicy) (context : Context) (source : TypedSource) (node : ExpressionNode)
+/-- Actual builtin metadata lowering, exposed for compiler certificates. -/
+def builtinReference (callables : CallablePolicy) (context : Context) (source : TypedSource) (node : ExpressionNode)
     (name : String) (function : BuiltinFunctionId) : Except Error LoweredExpr := do
   if name ≠ function.spelling || node.type ≠ function.type then
     throw (.unsupportedExpression node.id node.form)
