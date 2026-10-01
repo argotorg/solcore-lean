@@ -617,6 +617,9 @@ structure Checkpoint (artifact : Artifact) where private mk ::
   private values : Values
   private owner : values.checked = artifact.recipe.compiled.compatible.checked
 
+/-- Native allocation count at this actual suspended checkpoint. -/
+def Checkpoint.heapSize {artifact : Artifact} (checkpoint : Checkpoint artifact) : Nat := checkpoint.state.store.length
+
 private def functionParts : Ty → Option (Ty × Ty)
   | .function parameter result => some (parameter, result)
   | .comptime type => functionParts type

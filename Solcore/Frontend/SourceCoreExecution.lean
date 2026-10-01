@@ -245,6 +245,11 @@ private def CheckpointPayload (artifact : Artifact) : Type :=
 structure Checkpoint (artifact : Artifact) where private mk ::
   private payload : CheckpointPayload artifact
 
+def Checkpoint.heapSize {artifact : Artifact} (checkpoint : Checkpoint artifact) : Nat :=
+  match artifact, checkpoint with
+  | ⟨_, .empty _⟩, ⟨impossible⟩ => nomatch impossible
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.heapSize
+
 def Session.start {artifact : Artifact} (session : Session artifact) (key : Key)
     (arguments : List Value) (fuel : Nat := 1024) : Except SourceCoreIndexedSession.Error (Checkpoint artifact) :=
   match artifact, session with

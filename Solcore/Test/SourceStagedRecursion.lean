@@ -1,4 +1,5 @@
 import Solcore
+import Solcore.Test.SourceCompilerFeatureSupport
 
 /-!
 End-to-end regressions for fuel-bounded, selected-branch staged recursion.
@@ -7,8 +8,8 @@ These tests exercise both the dedicated staged-integer evaluator and the
 general Core-representable staged-value evaluator through the public program
 preparation boundary.  Successful cases must close to constants and preserve
 the caller's store; divergent staged calls and ordinary runtime recursion keep
-distinct errors. Runtime recursion is exercised through the public compiler's
-typed-source fallback rather than the direct-Core preparation boundary.
+distinct errors. Runtime recursion uses the common public Core compiler and
+a typed checkpoint; staging and runtime keep separate execution budgets.
 -/
 
 set_option autoImplicit false
@@ -262,29 +263,24 @@ private def runtimeRecursionSource : String := String.intercalate "\n" [
 
 private def testRuntimeRecursionUsesExecutionFuel : IO Unit := do
   let moduleId ← mainModule
-  let compileOptions : SourceCompiler.CheckingOptions := {
-    checkingFuel := 4096
-    specializationBudget := 1
-    stagingFuel := 64
-  }
-  match SourceCompiler.compile (workspace runtimeRecursionSource)
-      (SourceCompiler.Seed.named moduleId "loop") compileOptions with
-  | .ok compiled =>
-      assertTrue (decide (compiled.backend = .core ∧
-          compiled.specializationCount = 1))
-        "runtime recursion did not select one Core specialization"
-      let runOptions : SourceCompiler.RunOptions := {
-        inputValidationFuel := 64
-        executionFuel := 8
-      }
-      match compiled.runCore [.word (word 1)] runOptions with
-      | .ok (.coreLanguageResult (.outOfFuel state)) =>
-          assertTrue (!state.store.isEmpty)
-            "runtime recursion did not retain its allocated parameter cells"
-      | result => throw (IO.userError
-          s!"runtime recursion did not use execution fuel: {reprStr result}")
-  | .error error => throw (IO.userError
-      s!"runtime recursion was not compiled: {reprStr error}")
+  let source ← SourceCompilerFeatureSupport.get "runtime recursion compilation"
+    (SourceCoreCompiler.compile (workspace runtimeRecursionSource)
+      [SourceCoreCompiler.Seed.named moduleId "loop"]
+      {checkingFuel := 4096, specializationBudget := 1, compilationFuel := 1000})
+  assertTrue (source.rootCount == 1 && source.plan.specializations.length == 1)
+    "runtime recursion did not retain one Core specialization"
+  let compiled ← SourceCompilerFeatureSupport.fromCompiled source
+  let invoked ← compiled.invoke [.word (word 1)] {inputValidationFuel := 64, executionFuel := 200}
+  match invoked.outcome with
+  | .outOfFuel checkpoint =>
+      assertTrue (checkpoint.heapSize > invoked.initial.heapSize)
+        "runtime recursion did not retain its allocated parameter cells"
+      match ← checkpoint.resume 200 with
+      | .outOfFuel continued =>
+          assertTrue (continued.heapSize ≥ checkpoint.heapSize)
+            "resumed runtime recursion discarded allocated cells"
+      | _ => throw (IO.userError "resumed runtime recursion unexpectedly terminated")
+  | _ => throw (IO.userError "runtime recursion did not use the execution fuel boundary")
 
 /-- Exercise staged and Core runtime recursion through their
 independent public fuel boundaries. -/
