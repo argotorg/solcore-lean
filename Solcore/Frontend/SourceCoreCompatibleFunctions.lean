@@ -59,6 +59,7 @@ structure Prepared (checked : Checked) where private mk ::
   signatureOwnership : checked.signatures = sourceProgram.signatures
   validationPlan : Plan
   plan : Plan
+  planPrepared : SourceCompilationPlan.prepareExecutablePlanEvidence sourceProgram validationPlan = .ok plan
   locals : SourceCoreLocalPolymorphism.Catalog
   contexts : List SourceCoreLocalEvidence.Prepared
   functions : List SourceCoreGeneralFunctions.Function
@@ -88,11 +89,19 @@ private def project (checked : Checked) (type : TypeSystem.Ty) :
     | .catalog error => .projection error
     | .metadata _ => .projection (.unsupportedType type)
 
+private def prepareExecutable (program : CheckedProgram) (validationPlan : Plan) :
+    Except SourceCompilationPlan.Error
+      {actual : Plan // SourceCompilationPlan.prepareExecutablePlanEvidence program validationPlan = .ok actual} :=
+  match _selected : SourceCompilationPlan.prepareExecutablePlanEvidence program validationPlan with
+  | .error error => .error error
+  | .ok executable => .ok ⟨executable, rfl⟩
+
 def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Checked)
     (ownership : checked.signatures = program.signatures) (fuel : Nat) :
     Except Error (Prepared checked) := do
   let validationPlan := plan
-  let plan ← (SourceCompilationPlan.prepareExecutablePlanEvidence program plan).mapError Error.plan
+  let executable ← (prepareExecutable program validationPlan).mapError Error.plan
+  let plan := executable.val
   let context := SourceCoreCompatibleValues.Context.initial checked
   let representation := representation context fuel
   let locals ← (SourceCoreLocalPolymorphism.prepareWithProjection (project checked) plan).mapError Error.locals
@@ -102,7 +111,7 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
     (SourceCoreGeneralFunctions.prepareFunctionWithRepresentation program representation)).mapError Error.functions
   let globals := functions.map (·.signature)
   match plan.seedKeys with
-  | [] => pure ⟨program, ownership, validationPlan, plan, locals, contexts,
+  | [] => pure ⟨program, ownership, validationPlan, plan, executable.property, locals, contexts,
       functions, globals, [], none, none, none, none, []⟩
   | first :: _ =>
       let diagnostics ← (SourceCoreCompatibleDataPlaceFaultSites.prepare context plan first
@@ -133,7 +142,7 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
         let native ← (SourceCoreGeneralEntry.NativeEntry.compile checked.catalog.definitions (function.inputs.map Prod.snd)
           function.signature.resultType body).mapError Error.native
         pure (Entry.mk key (function.inputs.map Prod.fst) function.specialized.function.inferredBodyType native)
-      pure ⟨program, ownership, validationPlan, plan, locals, contexts,
+      pure ⟨program, ownership, validationPlan, plan, executable.property, locals, contexts,
         functions, globals, closures, native, some sourceInputs, some diagnostics, native.map (·.diagnostics), entries⟩
 
 structure Automatic where private mk ::
