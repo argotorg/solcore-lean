@@ -3,6 +3,7 @@ import Solcore.Frontend.SourceCoreCompatibleInputs
 import Solcore.Frontend.SourceCoreCompatibleMarkedFunctions
 import Solcore.Frontend.SourceCoreCallableAncestryPrograms
 import Solcore.Frontend.SourceCoreCallablePairedPrograms
+import Solcore.Frontend.SourceCoreCallableIndexedPrograms
 
 /-! Reverse source values from a cached compatible artifact. Named outputs
 must match both the installed global slot and its prepared code/capture
@@ -75,46 +76,54 @@ inductive ArtifactOrigin (checked : Checked) where
   | marked (prepared : SourceCoreCompatibleMarkedFunctions.Prepared checked)
   | ancestry (prepared : SourceCoreCallableAncestryPrograms.Prepared checked)
   | paired (prepared : SourceCoreCallablePairedPrograms.Prepared checked)
+  | indexed (prepared : SourceCoreCallableIndexedPrograms.Prepared checked)
 
 def ArtifactOrigin.base {checked : Checked} : ArtifactOrigin checked → Prepared checked
   | .ordinary prepared => prepared
   | .marked prepared => prepared.base
   | .ancestry prepared => prepared.base
   | .paired prepared => prepared.base
+  | .indexed prepared => prepared.base
 
 def ArtifactOrigin.definitions {checked : Checked} : ArtifactOrigin checked → Core.DataEnvironment
   | .ordinary _ => checked.catalog.definitions
   | .marked prepared => prepared.layouts.definitions
   | .ancestry prepared => prepared.layouts.definitions
   | .paired prepared => prepared.layouts.definitions
+  | .indexed prepared => prepared.layouts.definitions
 
 def ArtifactOrigin.closures {checked : Checked} : ArtifactOrigin checked → List Core.Expr
   | .ordinary prepared => prepared.closures
   | .marked prepared => prepared.secondPass.closures
   | .ancestry prepared => prepared.secondPass.closures
   | .paired prepared => prepared.secondPass.closures
+  | .indexed prepared => prepared.secondPass.closures
 
 def ArtifactOrigin.inputContext? {checked : Checked} : ArtifactOrigin checked → Option SourceCoreCompatibleInputs.Context
   | .ordinary prepared => prepared.sourceInputs.map (·.context)
   | .marked prepared => some prepared.sourceInputs.context
   | .ancestry prepared => some prepared.sourceInputs.context
   | .paired prepared => some prepared.sourceInputs.context
+  | .indexed prepared => some prepared.sourceInputs.context
 
 /-- The administrative reference follows every source-global reference. -/
 def ArtifactOrigin.contextSuffix {checked : Checked} : ArtifactOrigin checked → Core.Context
   | .ordinary _ | .marked _ => []
   | .ancestry prepared => [prepared.ancestry.layout.referenceType]
   | .paired prepared => [prepared.ancestry.layout.referenceType]
+  | .indexed prepared => [prepared.ancestry.layout.referenceType]
 
 def ArtifactOrigin.environmentSuffix {checked : Checked} : ArtifactOrigin checked → Core.Environment
   | .ordinary _ | .marked _ => []
   | .ancestry prepared => [.cellRef prepared.ancestry.layout.frame.type 0]
   | .paired prepared => [.cellRef prepared.ancestry.layout.frame.type 0]
+  | .indexed prepared => [.cellRef prepared.ancestry.layout.frame.type 0]
 
 def ArtifactOrigin.globalBase {checked : Checked} : ArtifactOrigin checked → Nat
   | .ordinary _ | .marked _ => 0
   | .ancestry _ => 1
   | .paired _ => 1
+  | .indexed _ => 1
 
 structure Recipe (checked : Checked) (definitions : Core.DataEnvironment := checked.catalog.definitions) where private mk ::
   private origin : ArtifactOrigin checked
@@ -197,6 +206,10 @@ def prepareAncestry {checked : Checked} (prepared : SourceCoreCallableAncestryPr
 
 def preparePaired {checked : Checked} (prepared : SourceCoreCallablePairedPrograms.Prepared checked) :
     Except Error (Recipe checked prepared.layouts.definitions) := prepareOrigin (.paired prepared)
+
+/-- Exact named/builtin code and global slots for the finite indexed runner. -/
+def prepareIndexed {checked : Checked} (prepared : SourceCoreCallableIndexedPrograms.Prepared checked) :
+    Except Error (Recipe checked prepared.layouts.definitions) := prepareOrigin (.indexed prepared)
 
 structure Snapshot {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) where private mk ::
   store : Core.Store
