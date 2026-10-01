@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotModifier
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceNumericBitNotModifier
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceAssignmentSuccess
 
 /-! Generate the real bit-not tail from independent target resolution and a
@@ -58,7 +58,7 @@ private theorem resolved_nonempty {checked : Checked} {source : TypedSource} {si
 
 /-- Consume an independent snapshot write and derive its actual native
 modifier, latest-root reconstruction and single mapped store update. -/
-theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
+theorem of_write_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {place : PlaceResolution} {prepared : Prepared}
@@ -68,7 +68,7 @@ theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
-    (profile : SourceCoreRawMetadata.runtimeType leaf = .word)
+    (profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before selectedHeap after : Dynamic.Heap} {store : Store} {target : Dynamic.ResolvedPlace} {updated : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -89,7 +89,7 @@ theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
     rw [resolution.selectedEq] at applies
     obtain ⟨replacement', replacementValue, replacementRep, applies', modifiedEvaluated, _⟩ :=
-      CompatiblePlaceBitNotModifier.word_success observations profile snapshotRep
+      CompatiblePlaceNumericBitNotModifier.success observations profile snapshotRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) .unit coreEnvironment)
         (.var (index := 1) rfl) operator resolution.store invalid
@@ -132,5 +132,28 @@ theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     exact ⟨⟨replacementValue, updatedValue, helperStore, finalStore, finalWorld,
       by simpa only [cellType] using updatedRep, finalHeaps, extension, frame, metadata,
       modifiedEvaluated, setterEvaluated, ⟨_, helperRead⟩, coreWritten⟩⟩
+
+/-- Word-only compatibility API. -/
+theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext : Core.Context}
+    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (profile : SourceCoreRawMetadata.runtimeType leaf = .word)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
+    {before selectedHeap after : Dynamic.Heap} {store : Store} {target : Dynamic.ResolvedPlace} {updated : Dynamic.Value}
+    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared codes sourceTypes place leaf target
+      coreEnvironment store mapping world before selectedHeap)
+    (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)
+    (operator : Option BinaryOp) (invalid : Word) :
+    Nonempty (Execution compilation.checked registry functions prepared codes coreEnvironment resolution.store resolution.mapping resolution.world
+      resolution.target resolution.values resolution.snapshot selectedHeap after updated operator invalid) :=
+  of_write_numeric layout registryExtension faithful observations (.inl profile) environments resolution written operator invalid
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCommit

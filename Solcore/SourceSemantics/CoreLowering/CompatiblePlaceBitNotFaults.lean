@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceTargetKeys
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceAssignmentSuccess
-import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotModifier
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceNumericBitNotModifier
 
 /-! Target-resolution faults for absent-RHS bit-not. The actual key runs are derived
 from the universal expression theorem. The getter uses the live root after
@@ -196,10 +196,10 @@ theorem uninitialized
   exact .letE (.var keys.selected)
     (LanguageResult.bind_success _ keys.evaluated (LanguageResult.bind_failure _ evaluated))
 
-/-- Every independent fault in the supported Word profile occurs before the
+/-- Every independent fault in the supported numeric profile occurs before the
 administrative RHS. Typed live locals exclude dangling/unbound roots; an
-accepted successful projected read supplies an initialized Word snapshot. -/
-theorem preserves
+accepted successful projected read supplies an initialized numeric snapshot. -/
+theorem preserves_numeric
     (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
@@ -209,7 +209,7 @@ theorem preserves
     (missingTokens : ∀ {root resolved reason token count},
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
-    (profile : SourceCoreRawMetadata.runtimeType leaf = .word)
+    (profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
     (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
@@ -264,8 +264,38 @@ theorem preserves
       environments heaps locals slot rootTyped resolve
     have same := Option.some.inj (selected.symm.trans resolution.selectedEq)
     obtain ⟨replacement, native, represented, applies, evaluated, valid⟩ :=
-      CompatiblePlaceBitNotModifier.word_success observations profile resolution.snapshotRelated
+      CompatiblePlaceNumericBitNotModifier.success observations profile resolution.snapshotRelated
         (environment := [.inRight .unit resolution.snapshot]) (rhs := .unit) (.var (index := 0) rfl) none resolution.store invalidOperand
     exact (valid (same ▸ invalid)).elim
+
+/-- Word-only compatibility API. -/
+theorem preserves
+    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (missingTokens : ∀ {root resolved reason token count},
+      FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
+    (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
+    (profile : SourceCoreRawMetadata.runtimeType leaf = .word)
+    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {reason : Dynamic.SemanticFault}
+    (trace : Dynamic.SourcePlaceBitNotFaults program context evidence source environment before place reason after)
+    (operator : Syntax.ValueAssignOp) (next : Expr) (outputType : Ty) (invalidOperand : Word) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates coreEnvironment store (execute prepared (.var index) (SourceCoreCalls.packArguments codes)
+        (LanguageResult.success .unit) next outputType (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand)
+        (.inLeft outputType (.word token)) finalStore ∧
+      faults reason token ∧ HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_numeric layout ordinary registryExtension meaning faithful observations missingTokens invalidTokens (.inl profile)
+    environments heaps locals slot rootTyped trace operator next outputType invalidOperand
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotFaults
