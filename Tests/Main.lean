@@ -222,11 +222,15 @@ import Solcore.Test.SourceCoreBuiltinImperativeMatch
 import Solcore.Test.SourceCoreCompatibleMatchArmScopes
 import Solcore.Test.SourceCoreCallableLambdaViewBuiltinBodyTree
 import Solcore.Test.SourceCoreCallableLambdaViewSourceTyping
+import Solcore.Test.SourceCoreCallableLambdaViewStaticTyping
 import Solcore.Test.SourceCoreCallableLambdaViewSemanticReceipt
 import Solcore.Test.SourceCoreCallableIndexedLambdaSemanticCalls
 import Solcore.Test.SourceCoreGenericMatchScopedContexts
 import Solcore.Test.SourceCoreProtectedNamedWhileEdges
 import Solcore.Test.SourceCoreProtectedNamedWhileStatements
+import Solcore.Test.SourceCoreProtectedWhileBodyContracts
+import Solcore.Test.SourceCoreProtectedNamedLoops
+import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
 import Solcore.Test.SourceCoreProtectedNamedPlaces
@@ -2620,10 +2624,14 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreBuiltinImperativeMatch.run
   SourceCoreCallableLambdaViewBuiltinBodyTree.run
   SourceCoreCallableLambdaViewSourceTyping.run
+  SourceCoreCallableLambdaViewStaticTyping.run
   SourceCoreCallableLambdaViewSemanticReceipt.run
   SourceCoreCallableIndexedLambdaSemanticCalls.run
   SourceCoreProtectedNamedWhileEdges.run
   SourceCoreProtectedNamedWhileStatements.run
+  SourceCoreProtectedWhileBodyContracts.run
+  SourceCoreProtectedNamedLoops.run
+  SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
   SourceCoreRecursiveNamedExpressions.run
   SourceCoreProtectedNamedPlaces.run
