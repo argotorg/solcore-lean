@@ -83,7 +83,94 @@ inductive Evidence (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
       (goal : Predicate Trait Ty)
       (implId : ImplId)
       (premises : List (Evidence Trait Ty ImplId))
-  deriving Repr, BEq
+  deriving Repr
+
+namespace Evidence
+
+mutual
+/-- Structural comparison retains the derived comparison's goal, implementation,
+and ordered-premise checks while making its finite recursion proof-visible. -/
+def beq [BEq Trait] [BEq Ty] [BEq ImplId] :
+    Evidence Trait Ty ImplId → Evidence Trait Ty ImplId → Bool
+  | .byImpl goal implementation premises, .byImpl otherGoal otherImplementation otherPremises =>
+      goal == otherGoal && (implementation == otherImplementation && beqList premises otherPremises)
+
+def beqList [BEq Trait] [BEq Ty] [BEq ImplId] :
+    List (Evidence Trait Ty ImplId) → List (Evidence Trait Ty ImplId) → Bool
+  | [], [] => true
+  | first :: rest, other :: remaining => beq first other && beqList rest remaining
+  | _, _ => false
+end
+
+end Evidence
+
+instance instBEqEvidence [BEq Trait] [BEq Ty] [BEq ImplId] : BEq (Evidence Trait Ty ImplId) where
+  beq := Evidence.beq
+
+namespace Evidence
+
+private instance predicateLawful [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty] :
+    LawfulBEq (Predicate Trait Ty) where
+  eq_of_beq := by
+    intro left right same
+    cases left with
+    | mk a b c =>
+      cases right with
+      | mk x y z =>
+        change ((a == x) && ((b == y) && (c == z))) = true at same
+        simp only [Bool.and_eq_true, beq_iff_eq] at same
+        rcases same with ⟨rfl, rfl, rfl⟩
+        rfl
+  rfl := by
+    intro value
+    change ((value.trait == value.trait) && ((value.subject == value.subject) && (value.arguments == value.arguments))) = true
+    simp
+
+mutual
+/-- Equality reflection requires lawful comparisons of every retained field. -/
+theorem eq_of_beq [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
+    [BEq ImplId] [LawfulBEq ImplId] (left right : Evidence Trait Ty ImplId)
+    (same : beq left right = true) : left = right := by
+  cases left with
+  | byImpl goal implementation premises =>
+    cases right with
+    | byImpl otherGoal otherImplementation otherPremises =>
+      simp only [beq, Bool.and_eq_true, beq_iff_eq] at same
+      rcases same with ⟨rfl, rfl, tails⟩
+      rw [list_eq_of_beq premises otherPremises tails]
+
+theorem list_eq_of_beq [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
+    [BEq ImplId] [LawfulBEq ImplId] (left right : List (Evidence Trait Ty ImplId))
+    (same : beqList left right = true) : left = right := by
+  cases left with
+  | nil => cases right <;> simp_all [beqList]
+  | cons head rest =>
+    cases right with
+    | nil => cases same
+    | cons other remaining =>
+      simp only [beqList, Bool.and_eq_true] at same
+      rw [eq_of_beq head other same.1, list_eq_of_beq rest remaining same.2]
+end
+
+mutual
+theorem beq_self [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
+    [BEq ImplId] [LawfulBEq ImplId] (value : Evidence Trait Ty ImplId) : beq value value = true := by
+  cases value with
+  | byImpl goal implementation premises => simp only [beq, BEq.rfl, Bool.true_and, list_beq_self premises]
+
+theorem list_beq_self [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
+    [BEq ImplId] [LawfulBEq ImplId] (values : List (Evidence Trait Ty ImplId)) : beqList values values = true := by
+  cases values with
+  | nil => rfl
+  | cons head rest => simp only [beqList, beq_self head, list_beq_self rest, Bool.and_self]
+end
+
+end Evidence
+
+instance instLawfulBEqEvidence [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
+    [BEq ImplId] [LawfulBEq ImplId] : LawfulBEq (Evidence Trait Ty ImplId) where
+  eq_of_beq := Evidence.eq_of_beq _ _
+  rfl := Evidence.beq_self _
 
 /-- Why bounded resolution could not make a coherent yes/no decision. -/
 inductive InconclusiveReason (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
