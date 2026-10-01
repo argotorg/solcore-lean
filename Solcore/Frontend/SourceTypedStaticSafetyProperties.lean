@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Frontend.SourceRuntimeDeepValidation
 
 /-!
 Static lookup provenance for source-typed runtime lambdas.
@@ -13,7 +13,7 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend.SourceTypedRuntime
 
-open SourceInference TypeSystem
+open SourceInference TypeSystem SourceCompilationPlan
 
 /-- A successful exact runtime lookup selects a member of the finite plan
 whose key is precisely the requested key. -/

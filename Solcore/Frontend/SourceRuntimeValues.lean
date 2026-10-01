@@ -1,5 +1,5 @@
 import Solcore.Core.Primitive
-import Solcore.Frontend.SourceCompilationPlan
+import Solcore.Frontend.SourceRuntimePlanAPI
 
 /-! Source values and heap observations shared by compiler adapters.
 The historical public namespace is retained for API compatibility. This module
@@ -58,10 +58,10 @@ inductive Value where
       (owner : Key)
       (captured : Environment)
       (evidence : RuntimeEvidenceEnvironment)
-  /-- A runtime-only view of a principal value at one concrete occurrence.
-  The wrapper keeps the stored closure and its plan provenance unchanged;
-  callable execution applies the substitution to the closure's checked source
-  graph just before entering its body. -/
+  /-- A source observation of a principal value at one concrete occurrence.
+  The wrapper records the occurrence substitution and evidence separately from
+  the original closure's plan provenance. Core adapters prepare these views
+  before execution and call the corresponding native closure. -/
   | instantiated
       (substitution : Substitution)
       (requirements : List LocalRequirementWitness)

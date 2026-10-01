@@ -1,4 +1,4 @@
-import Solcore.Frontend.SourceTypedRuntimeDeepSafety
+import Solcore.Frontend.SourceRuntimeDeepValidation
 
 /-! Audit of the existing typed-source input predicate.  These theorems
 describe its current domain; they do not strengthen that domain or certify

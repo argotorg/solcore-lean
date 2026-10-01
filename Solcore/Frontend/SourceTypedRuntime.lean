@@ -24,29 +24,6 @@ open SourceInference TypeSystem
 
 open SourceCompilationPlan
 
-/- Compatibility names for the shared compilation-plan API. -/
-export SourceCompilationPlan (
-  exactSpecialization
-  runtimeEvidenceGoal
-  validateRuntimeEvidence
-  validateAuthenticatedRuntimeEvidence
-  validateRuntimeEvidence_success_matches
-  validateAuthenticatedRuntimeEvidence_success_matches
-  materializeCallEvidence
-  materializeCallEvidence_success_matches
-  exactDirectCallRuntimeEvidence
-  exactDeclarationReferenceRuntimeEvidence
-  exactDirectCallRuntimeEvidence_success_matches
-  exactDeclarationReferenceRuntimeEvidence_success_matches
-  exactRuntimeRequirementEvidence
-  exactRuntimeRequirementEvidence_success_goal
-  exactRuntimeRequirementEvidenceList
-  exactRuntimeRequirementEvidenceList_success_matches
-  validateExecutablePlan
-  validateCanonicalInputPlan
-  prepareExecutablePlanEvidenceWithBudget
-  prepareExecutablePlanEvidence
-  validateExecutablePlanEvidence)
 
 
 

@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.LegacyClosureBoundary
+import Solcore.Frontend.SourceTypedRuntimeDeepSafety
 
 /-! Checked-source examples of the legacy capture boundary.  The code and
 evidence stay authentic; only caller-supplied capture lists change.  This is

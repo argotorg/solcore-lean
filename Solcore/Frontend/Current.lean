@@ -23,11 +23,10 @@ import Solcore.Frontend.SourceCoreFunctions
 import Solcore.Frontend.SourceCoreFunctionEntry
 import Solcore.Frontend.SourceCoreFaultSites
 import Solcore.Frontend.SourceCoreBasicEntry
-import Solcore.Frontend.SourceTypedRuntime
 import Solcore.Frontend.SourceCoreDirectLinking
-import Solcore.Frontend.SourceTypedStaticSafetyProperties
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceCompiler
+import Solcore.Frontend.SourceTypedStaticSafetyProperties
 
 import Solcore.Frontend.SourceCoreAssignments
 import Solcore.Frontend.SourceCoreAssignmentFaultSites
