@@ -408,6 +408,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeReceipts
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchFallthrough
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchReadyFactory
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatch
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchArmScopes
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewBuiltinBodyTree
@@ -419,6 +420,9 @@ import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
 import Solcore.SourceSemantics.CoreLowering.NamedWhileEdges
 import Solcore.SourceSemantics.CoreLowering.NamedWhileStatements
 import Solcore.SourceSemantics.CoreLowering.NamedLoopStatements
+import Solcore.SourceSemantics.CoreLowering.NamedLoopFunctionFallthrough
+import Solcore.SourceSemantics.CoreLowering.NamedLoopFunctionBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.ProtectedForGenericEndpoint
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchBodyMeaning
 
 /-! Proofs connecting executable Core lowering to the independent source

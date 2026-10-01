@@ -218,6 +218,7 @@ import Solcore.Test.SourceCoreCallableLambdaViewIndexedTrees
 import Solcore.Test.SourceCoreCallableLambdaViewBuiltinTrees
 import Solcore.Test.SourceCoreProtectedBareNamedAssignments
 import Solcore.Test.SourceCoreGenericImperativeMatch
+import Solcore.Test.SourceCoreGenericImperativeMatchReadyFactory
 import Solcore.Test.SourceCoreBuiltinImperativeMatch
 import Solcore.Test.SourceCoreCompatibleMatchArmScopes
 import Solcore.Test.SourceCoreCallableLambdaViewBuiltinBodyTree
@@ -230,6 +231,8 @@ import Solcore.Test.SourceCoreProtectedNamedWhileEdges
 import Solcore.Test.SourceCoreProtectedNamedWhileStatements
 import Solcore.Test.SourceCoreProtectedWhileBodyContracts
 import Solcore.Test.SourceCoreProtectedNamedLoops
+import Solcore.Test.SourceCoreNamedLoopFunctionBody
+import Solcore.Test.SourceCoreProtectedForBodyContracts
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2631,6 +2634,8 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreProtectedNamedWhileStatements.run
   SourceCoreProtectedWhileBodyContracts.run
   SourceCoreProtectedNamedLoops.run
+  SourceCoreNamedLoopFunctionBody.run
+  SourceCoreProtectedForBodyContracts.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
   SourceCoreRecursiveNamedExpressions.run
