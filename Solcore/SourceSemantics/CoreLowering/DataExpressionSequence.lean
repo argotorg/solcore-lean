@@ -63,7 +63,7 @@ theorem Tree.of_mapM {α error : Type} {source : TypedSource} {certificate : Cer
         subst codes
         exact .cons (extract input code head) (ih tail)
 
-inductive Values {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+inductive Values {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} (model : GenericHeap.PayloadModel catalog projects)
     (mapping : LocationMap) (world : StoreTyping) :
     List TypeSystem.Ty → List Ty → List Dynamic.Value → List Value → Prop where
   | nil : Values model mapping world [] [] [] []
@@ -72,7 +72,7 @@ inductive Values {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.
       (tail : Values model mapping world sourceTypes types sources values) :
       Values model mapping world (sourceType :: sourceTypes) (type :: types) (source :: sources) (value :: values)
 
-theorem Values.extend {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+theorem Values.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
     {mapping futureMapping : LocationMap} {world futureWorld : StoreTyping}
     {sourceTypes : List TypeSystem.Ty} {types : List Ty} {sources : List Dynamic.Value} {values : List Value}
     (represented : Values model mapping world sourceTypes types sources values)
@@ -82,7 +82,7 @@ theorem Values.extend {catalog : SourceCoreDataCatalog.Catalog} {model : Generic
   | nil => exact .nil
   | cons head _ ih => exact .cons (model.extend head maps worlds) ih
 
-theorem Values.length {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+theorem Values.length {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
     {mapping : LocationMap} {world : StoreTyping}
     {sourceTypes : List TypeSystem.Ty} {types : List Ty} {sources : List Dynamic.Value} {values : List Value}
     (represented : Values model mapping world sourceTypes types sources values) :
@@ -108,7 +108,7 @@ inductive Trace (program : Program) (context : SourceSemantics.Context)
       (failed : Dynamic.ExpressionsFault program context evidence source environment before ids reason after) :
       Trace program context evidence source environment before ids (.error reason) after
 
-inductive Result {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+inductive Result {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} (model : GenericHeap.PayloadModel catalog projects)
     (mapping : LocationMap) (world : StoreTyping) (types : List TypeSystem.Ty)
     (codes : List SourceCoreBasic.LoweredExpr) (faults : FaultRep) : Outcome → Value → Prop where
   | values {sources values}
@@ -118,7 +118,7 @@ inductive Result {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.
       Result model mapping world types codes faults (.error reason)
         (.inLeft (SourceCoreCalls.packArguments codes).type (.word token))
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
   {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
   {source : TypedSource} {certificate : Certificate} {faults : FaultRep}
   {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {sourceTypes : List TypeSystem.Ty}

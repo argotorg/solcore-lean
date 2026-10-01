@@ -14,7 +14,8 @@ open FunctionArguments FunctionCallBody
 
 abbrev FaultRep := Dynamic.SemanticFault → Word → Prop
 
-inductive ResultRepresents {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+inductive ResultRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    (model : GenericHeap.PayloadModel catalog projects)
     (mapping : LocationMap) (world : StoreTyping) (sourceType : TypeSystem.Ty) (type : Ty) (faults : FaultRep) :
     Dynamic.ExpressionOutcome → Value → Prop where
   | value {source value} (represented : model.Represents mapping world sourceType source value type) :

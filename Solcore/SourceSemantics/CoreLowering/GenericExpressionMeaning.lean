@@ -15,7 +15,7 @@ abbrev ResultRepresents := @FunctionCalls.ResultRepresents
 
 /-- Every finite independent child execution has a matching Core execution.
 The payload model may include closures, mappings and catalog-authenticated data. -/
-def Preserves {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def Preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} (model : GenericHeap.PayloadModel catalog projects)
     (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
     (source : TypedSource) (certificate : Certificate) (faults : FaultRep) : Prop :=
   ∀ {scope id lowered}, certificate scope id lowered →
@@ -35,7 +35,7 @@ def Preserves {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.Pay
 
 /-- Every completed Core child execution constructs its independent source
 outcome. No source child execution is a premise. -/
-def Reflects {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def Reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} (model : GenericHeap.PayloadModel catalog projects)
     (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
     (source : TypedSource) (certificate : Certificate) (faults : FaultRep) : Prop :=
   ∀ {scope id lowered}, certificate scope id lowered →
@@ -53,8 +53,8 @@ def Reflects {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.Payl
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
-theorem ResultRepresents.extend {catalog : SourceCoreDataCatalog.Catalog}
-    {model : GenericHeap.PayloadModel catalog} {mapping futureMapping : LocationMap}
+theorem ResultRepresents.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    {model : GenericHeap.PayloadModel catalog projects} {mapping futureMapping : LocationMap}
     {world futureWorld : StoreTyping} {sourceType : TypeSystem.Ty} {type : Ty} {faults : FaultRep}
     {outcome : Dynamic.ExpressionOutcome} {value : Value}
     (represented : ResultRepresents model mapping world sourceType type faults outcome value)

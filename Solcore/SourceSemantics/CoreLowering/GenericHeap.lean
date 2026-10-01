@@ -21,7 +21,7 @@ private theorem append_lookup {mapping : LocationMap} {fresh index target : Nat}
     subst index
     exact ⟨rfl, by simpa using found.symm⟩
 
-structure HeapRepresents {catalog : SourceCoreDataCatalog.Catalog} (model : PayloadModel catalog) (mapping : LocationMap) (world : Core.StoreTyping)
+structure HeapRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} (model : PayloadModel catalog projects) (mapping : LocationMap) (world : Core.StoreTyping)
     (heap : Dynamic.Heap) (store : Core.Store) : Prop where
   length_eq : mapping.length = heap.cells.length
   injective : LocationMap.Injective mapping
@@ -32,7 +32,7 @@ structure HeapRepresents {catalog : SourceCoreDataCatalog.Catalog} (model : Payl
       world[target]? = some (Core.OptionalCell.cellType payload) ∧
       store.read? target = some value ∧ CellRepresents model mapping world cell value payload
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {model : PayloadModel catalog}
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {model : PayloadModel catalog projects}
 
 theorem HeapRepresents.empty : HeapRepresents model [] [] ⟨[]⟩ [] := by
   refine ⟨rfl, ?_, Core.RuntimeStoreHasTypes.nil catalog.definitions, ?_⟩

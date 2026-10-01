@@ -8,7 +8,7 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.DataMappingHeap
 open Core Frontend GeneralHeap GenericHeap
 
-theorem heap_append {catalog : SourceCoreDataCatalog.Catalog} {model : PayloadModel catalog}
+theorem heap_append {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : PayloadModel catalog projects}
     {mapping : LocationMap} {world futureWorld : StoreTyping} {heap : Dynamic.Heap} {store suffix : Store}
     (related : HeapRepresents model mapping world heap store)
     (extension : WorldExtends world futureWorld)
@@ -28,7 +28,7 @@ theorem administrative_append (mapping : LocationMap) (store suffix : Store) :
 
 /-- Combine a proved finite helper evaluation and its exact store suffix with
 the actual Core typing proof. The source heap and map remain unchanged. -/
-theorem evaluation_preserves_frame {catalog : SourceCoreDataCatalog.Catalog} {model : PayloadModel catalog}
+theorem evaluation_preserves_frame {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : PayloadModel catalog projects}
     {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store finalStore : Store}
     (related : HeapRepresents model mapping world heap store)
     {environment : Environment} {context : Core.Context} {expression : Expr} {value : Value} {type : Ty}

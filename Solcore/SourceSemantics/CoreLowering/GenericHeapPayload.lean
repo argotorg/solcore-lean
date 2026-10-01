@@ -12,10 +12,19 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.GenericHeap
 open Frontend Frontend.SourceInference GeneralHeap
 
-structure PayloadModel (catalog : SourceCoreDataCatalog.Catalog) where
+/-- A projection relation can describe a different native carrier while the
+catalog supplies only the registered Core definitions. The default preserves
+all existing strict-catalog APIs. -/
+abbrev Projection := TypeSystem.Ty → Core.Ty → Prop
+
+def strictProjection (catalog : SourceCoreDataCatalog.Catalog) : Projection :=
+  fun source payload => catalog.project source = .ok payload
+
+structure PayloadModel (catalog : SourceCoreDataCatalog.Catalog)
+    (projects : Projection := strictProjection catalog) where
   Represents : LocationMap → Core.StoreTyping → TypeSystem.Ty → Dynamic.Value → Core.Value → Core.Ty → Prop
   projection : ∀ {mapping world sourceType sourceValue value payload},
-    Represents mapping world sourceType sourceValue value payload → catalog.project sourceType = .ok payload
+    Represents mapping world sourceType sourceValue value payload → projects sourceType payload
   runtime_hasType : ∀ {mapping world sourceType sourceValue value payload},
     Represents mapping world sourceType sourceValue value payload →
       Core.RuntimeValueHasType world value payload catalog.definitions
@@ -27,20 +36,20 @@ structure PayloadModel (catalog : SourceCoreDataCatalog.Catalog) where
 /-- Optional ordinary cells preserve the source declaration's type and reject
 retained generalized-cell metadata. Their payload representation is supplied
 by the model, not inferred from Core runtime typing. -/
-inductive CellRepresents {catalog : SourceCoreDataCatalog.Catalog} (model : PayloadModel catalog)
+inductive CellRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} (model : PayloadModel catalog projects)
     (mapping : LocationMap) (world : Core.StoreTyping) : Dynamic.Cell → Core.Value → Core.Ty → Prop where
   | uninitialized {sourceType : TypeSystem.Ty} {payload : Core.Ty}
-      (projection : catalog.project sourceType = .ok payload) :
+      (projection : projects sourceType payload) :
       CellRepresents model mapping world ⟨sourceType, none, none⟩ (.inLeft payload .unit) payload
   | initialized {sourceType : TypeSystem.Ty} {payload : Core.Ty} {source : Dynamic.Value} {value : Core.Value}
       (represented : model.Represents mapping world sourceType source value payload) :
       CellRepresents model mapping world ⟨sourceType, some source, none⟩ (.inRight .unit value) payload
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {model : PayloadModel catalog}
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {model : PayloadModel catalog projects}
 
 theorem CellRepresents.projection {mapping : LocationMap} {world : Core.StoreTyping}
     {cell : Dynamic.Cell} {value : Core.Value} {payload : Core.Ty}
-    (represented : CellRepresents model mapping world cell value payload) : catalog.project cell.type = .ok payload := by
+    (represented : CellRepresents model mapping world cell value payload) : projects cell.type payload := by
   cases represented with
   | uninitialized projection => exact projection
   | initialized related => exact model.projection related

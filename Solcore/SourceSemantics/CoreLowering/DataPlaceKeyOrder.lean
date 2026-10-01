@@ -227,7 +227,7 @@ open GeneralHeap GenericExpressionMeaning
 
 /-- Index effects are evaluated exactly once in source projection order. The
 generated values remain fully represented after later index effects. -/
-theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {certificate : GenericExpressionMeaning.Certificate} {faults : FaultRep}
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
@@ -255,7 +255,7 @@ theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap
   exact ⟨sources, values, finalStore, finalMap, finalWorld, shaped, evaluated, represented,
     finalHeaps, maps, worlds, frame, metadata⟩
 
-theorem preserves_fault {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+theorem preserves_fault {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {certificate : GenericExpressionMeaning.Certificate} {faults : FaultRep}
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
@@ -287,7 +287,7 @@ inductive OutcomeTrace (program : Program) (context : SourceSemantics.Context)
       (trace : Dynamic.SourceProjectionsFault program context evidence source environment before projections reason after) :
       OutcomeTrace program context evidence source environment before projections (.error reason) after
 
-theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {certificate : GenericExpressionMeaning.Certificate} {faults : FaultRep}
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
