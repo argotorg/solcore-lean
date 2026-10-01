@@ -250,4 +250,34 @@ def prepare (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan
   validateWitnesses program caller origin.substitution witnesses
   pure ⟨candidate, contextualCaller caller origin.substitution witnesses, witnesses⟩
 
+/-- A bundle is created in its lexical environment, but a ground candidate
+may have been discovered only at a read inside another generalized lambda.
+Keep that read-parent authentication separate from the creation parent.
+`authentic` records a successful invocation of the same checked factory; no
+candidate caller or witness ledger is accepted directly. -/
+structure Emission (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (candidate : Instance) (lexicalParent : Option Prepared) where private mk ::
+  readParent : Option Prepared
+  prepared : Prepared
+  authentic : prepare program plan candidate readParent = .ok prepared
+
+/-- Existing lexical preparation stays first. Alternative parents are finite
+owned receipts, and each alternative is reauthenticated against this program,
+plan and complete candidate key. The caller retains its lexical Core scope. -/
+def prepareForEmission (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
+    (candidate : Instance) (lexicalParent : Option Prepared) (parents : List Prepared) :
+    Except Error (Emission program plan candidate lexicalParent) := do
+  match original : prepare program plan candidate lexicalParent with
+  | .ok prepared => pure ⟨lexicalParent, prepared, original⟩
+  | .error originalError =>
+    let mut found := none
+    for parent in parents do
+      if found.isNone then
+        match authentic : prepare program plan candidate (some parent) with
+        | .ok prepared => found := some (Emission.mk (some parent) prepared authentic)
+        | .error _ => pure ()
+    match found with
+    | some emission => pure emission
+    | none => throw originalError
+
 end Solcore.Frontend.SourceCoreLocalEvidence

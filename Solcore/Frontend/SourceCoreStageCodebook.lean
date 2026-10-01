@@ -156,19 +156,9 @@ Try the original caller and already authenticated contexts; every accepted
 receipt checks the exact full cumulative instance and its evidence chain. -/
 private def contextualReceipt (program : CheckedProgram) (plan : Plan)
     (parents : List SourceCoreLocalEvidence.Prepared) (candidate : SourceCoreLocalPolymorphism.Instance) :
-    Except Error SourceCoreLocalEvidence.Prepared := do
-  match SourceCoreLocalEvidence.prepare program plan candidate with
-  | .ok prepared => pure prepared
-  | .error originalError =>
-      let mut found := none
-      for parent in parents do
-        if found.isNone then
-          match SourceCoreLocalEvidence.prepare program plan candidate (some parent) with
-          | .ok prepared => found := some prepared
-          | .error _ => pure ()
-      match found with
-      | some prepared => pure prepared
-      | none => throw (.localEvidence originalError)
+    Except Error SourceCoreLocalEvidence.Prepared :=
+  (SourceCoreLocalEvidence.prepareForEmission program plan candidate none parents).map (·.prepared)
+    |>.mapError Error.localEvidence
 
 /-- Storage order of source nodes need not be lexical parent order. Revisit
 pending instances after each progress pass; every pass authenticates at least

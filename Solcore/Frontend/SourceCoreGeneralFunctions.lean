@@ -239,6 +239,7 @@ concrete metadata. Every closure captures the same lexical references; the
 bundle is constructed before the generalized binding's cell is allocated. -/
 private def lowerContextualExpression (program : CheckedProgram) (representation : Representation)
     (signatures : ProgramSignatures) (locals : SourceCoreLocalPolymorphism.Catalog)
+    (candidateParents : List SourceCoreLocalEvidence.Prepared)
     (assignments : SourceCoreAssignmentFaultSites.Table)
     (diagnostics : SourceCoreDataPlaceFaultSites.Program) (context : SourceCoreFunctions.Context)
     (native : Option CallableContext)
@@ -271,10 +272,11 @@ private def lowerContextualExpression (program : CheckedProgram) (representation
           if let some initialized := initialized.filter (fun _ => skipInitializer ≠ some id) then
             let binding ← (locals.binding current.owner initialized.binder.id).mapError (localError id node)
             let lowered ← (SourceCoreLocalPolymorphism.lowerInitializer binding active fun candidate => do
-              let prepared ← (SourceCoreLocalEvidence.prepare program current.plan candidate parent).mapError fun _ =>
+              let emission ← (SourceCoreLocalEvidence.prepareForEmission program current.plan candidate parent candidateParents).mapError fun _ =>
                 SourceCoreLocalPolymorphism.Error.initializerMetadataMismatch id
+              let prepared := emission.prepared
               let childContext := { current with solvedRequirements := prepared.caller.function.solvedRequirements }
-              let lowered ← (lowerContextualExpression program representation signatures locals assignments diagnostics childContext native
+              let lowered ← (lowerContextualExpression program representation signatures locals candidateParents assignments diagnostics childContext native
                 (some prepared) (some id) (min budget fuel) prepared.source scope id reasonAt)
                 |>.mapError SourceCoreLocalPolymorphism.Error.metadata
               (SourceCoreBasic.ensureType (.occurrence id.occurrence) candidate.type lowered.type)
@@ -304,6 +306,8 @@ def compileClosureWithRepresentation (program : CheckedProgram) (representation 
     (fuel : Nat) (function : Function) : Except Error Core.Expr := do
   let representation := representation.atContext function.signature.key []
   let source := function.specialized.function.typedBody
+  let candidateParents ← (SourceCoreStageCodebook.prepareContexts program plan
+    (locals.bindings.flatMap (·.instances))).mapError Error.callableContracts
   let own ← match diagnostics.base.find? function.signature.key with
     | some own => pure own
     | none => throw (.missingDiagnostics function.signature.key)
@@ -318,7 +322,7 @@ def compileClosureWithRepresentation (program : CheckedProgram) (representation 
   let lowerBody := bodyLowererWithRepresentation representation function.specialized.function.solvedRequirements own.assignments
     diagnostics function.signature.key (contextualBinder representation locals function.signature.key [])
   let body ← (lowerBody
-    (lowerContextualExpression program representation signatures locals own.assignments diagnostics context native none none)
+    (lowerContextualExpression program representation signatures locals candidateParents own.assignments diagnostics context native none none)
     fuel source (function.inputs.reverse.map (fun (binder, type) => (binder.id, type))) statements
     function.signature.resultType (diagnostics.reasonAt function.signature.key)
     own.fellThroughReason own.table.escapedReason).mapError Error.lowering
