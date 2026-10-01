@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceCompiler
+import Solcore.Frontend.SourceCoreLegacyHeapImport
 
 #check_failure Solcore.Frontend.SourceCoreExecution.Snapshot.mk
 #check_failure Solcore.Frontend.SourceCoreExecution.Snapshot.payload
@@ -6,6 +7,8 @@ import Solcore.Frontend.SourceCompiler
 #check_failure Solcore.Frontend.SourceCoreExecution.PrefixSnapshot.payload
 #check_failure Solcore.Frontend.SourceCoreHeapSnapshot.ObservedValue.source
 #check_failure Solcore.Frontend.SourceCoreHeapSnapshot.Principal.source
+#check_failure Solcore.Frontend.SourceCompiler.Legacy.preparePrefix
+#check_failure Solcore.Frontend.SourceCoreExecution.Legacy.preparePrefix
 
 set_option autoImplicit false
 namespace Tests.SourceCoreExecutionSnapshots
@@ -42,6 +45,11 @@ example {artifact : Artifact} (snapshot : Snapshot artifact) :
 example : SourceCompiler.Compiled = Compiled := rfl
 example : SourceCompiler.Session = Session := rfl
 
+example {artifact : Artifact} {snapshot : Snapshot artifact} {exported : PrefixSnapshot artifact}
+    {validationFuel boundaryFuel : Nat}
+    (accepted : snapshot.exportPrefix validationFuel boundaryFuel = .ok exported) :
+    exported.heapSize = snapshot.heapSize := snapshot.exportPrefix_length accepted
+
 def run : IO Unit := do
   let checked ← get "snapshot checking" (checkProgram workspace)
   let seeds ← ["make", "unused", "absent", "spin"].mapM fun name =>
@@ -55,8 +63,18 @@ def run : IO Unit := do
   let artifact ← compiled.open
   let raw : SourceTypedRuntime.RuntimeState := {heap := [
     ⟨.error, none⟩, ⟨.word, some (.word (Core.Word.ofNatModulo 99))⟩]}
-  let inert ← match Legacy.preparePrefix artifact raw with
+  let legacy ← match SourceCoreLegacyHeapImport.preparePrefix artifact raw with
     | some inert => pure inert | none => throw (IO.userError "snapshot valid inert prefix rejected")
+  let inert ← get "common initial heap input" (artifact.preparePrefix [
+    ⟨.error, none⟩, ⟨.word, some (word 99)⟩])
+  require (legacy.cells.map (·.type) == inert.cells.map (·.type))
+    "common heap input changed historical raw cell types"
+  match artifact.preparePrefix [⟨.word, some (.bool true)⟩] with
+  | .error {code := .validationRejected 1024, ..} => pure ()
+  | _ => throw (IO.userError "common heap input accepted a forged cell payload")
+  match artifact.preparePrefix [⟨.product .word .word, some (.product (word 1) (word 2))⟩] 1024 1 with
+  | .error {path := [.cell 0, .left], code := .conversionFuelExhausted} => pure ()
+  | _ => throw (IO.userError "common heap input lost conversion budget or path")
   require (inert.heapSize == 2) "snapshot prefix lost a source cell"
   let initial ← boot (← artifact.bootstrapFromPrefix inert)
   let made ← execute initial (← key 0) [word 10]
@@ -68,6 +86,9 @@ def run : IO Unit := do
   let stored ← match snapshot.cellAt? 3 with
     | some {value := some (.data (.function handle)), ..} => pure handle
     | _ => throw (IO.userError "public snapshot did not export the stored callable")
+  match artifact.preparePrefix [⟨stored.sourceType, some (.function stored)⟩] with
+  | .error {path := [.cell 0], code := .callableRequiresSnapshot} => pure ()
+  | _ => throw (IO.userError "common initial heap imported an unjoined callable handle")
   match made.session.startHandlePacked stored (word 1) with
   | .error {code := .unknownHandle, ..} => pure ()
   | _ => throw (IO.userError "snapshot-issued handle escaped its saved registry")
@@ -81,6 +102,22 @@ def run : IO Unit := do
   | .error {code := .foreignSession, ..} => pure ()
   | _ => throw (IO.userError "public snapshot transferred another session's ownership")
   let reused ← boot (← artifact.bootstrapFromPrefix snapshot.prefix)
+  let completePrefix ← get "public full heap export" snapshot.exportPrefix
+  require (completePrefix.heapSize == snapshot.heapSize) "public heap export lost source cells"
+  match (completePrefix.cells[3]? : Option SourceCoreHeapSnapshot.Cell) with
+  | some {value := some (.legacy observed), ..} =>
+      match observed.view with
+      | .closure _ _ _ captures _ => require (captures.map (·.2) == [2]) "public heap export changed raw captures"
+      | _ => throw (IO.userError "public exported prefix lost callable metadata")
+  | _ => throw (IO.userError "public exported prefix did not retain an inert callable")
+  let migrated ← boot (← artifact.bootstrapFromPrefix completePrefix)
+  match migrated.startHandlePacked stored (word 1) with
+  | .error {code := .foreignSession, ..} => pure ()
+  | _ => throw (IO.userError "public prefix export transferred live handle ownership")
+  let migratedMade ← execute migrated (← key 0) [word 20]
+  let migratedSnapshot ← get "public full prefix reuse" (← migratedMade.session.snapshot)
+  require (migratedSnapshot.prefixSize == 4 && migratedSnapshot.heapSize == 6)
+    "public full heap reuse lost prefix or allocation offsets"
   let generic ← execute reused (← key 1) [word 8]
   let genericSnapshot ← get "public principal snapshot" (← generic.session.snapshot)
   require (genericSnapshot.prefixSize == 2 && genericSnapshot.heapSize == 4)
@@ -119,6 +156,11 @@ def run : IO Unit := do
     "empty snapshot invented cells"
   let emptyAgain ← boot (← emptyArtifact.bootstrapFromPrefix emptySnapshot.prefix)
   require (emptyAgain.heapSize == 0) "empty prefix bootstrap invented native state"
+  let emptyInput ← get "empty common initial heap" (emptyArtifact.preparePrefix [])
+  require (emptyInput.heapSize == 0) "empty initial heap invented source cells"
+  match emptyArtifact.preparePrefix [⟨.word, none⟩] with
+  | .error {code := .emptyArtifactHeap 1, ..} => pure ()
+  | _ => throw (IO.userError "empty artifact erased a nonempty initial heap")
   IO.println "common public snapshot, principal views, owned restore and suspended continuation GREEN"
 
 end Tests.SourceCoreExecutionSnapshots

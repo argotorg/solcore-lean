@@ -53,7 +53,7 @@ export SourceCoreExecution.StaticWordProgram (compiled roots count rootForSelect
 end StaticWordProgram
 
 namespace Artifact
-export SourceCoreExecution.Artifact (keys rootCount root? bootstrap bootstrapFromPrefix)
+export SourceCoreExecution.Artifact (keys rootCount root? bootstrap bootstrapFromPrefix preparePrefix)
 end Artifact
 
 namespace Bootstrap
@@ -88,7 +88,7 @@ end Outcome
 
 namespace Snapshot
 export SourceCoreExecution.Snapshot
-  (cells heapSize nativeHeapSize pendingAllocation cellAt? «prefix» prefixSize restore restore_native_size)
+  (cells heapSize nativeHeapSize pendingAllocation cellAt? «prefix» prefixSize exportPrefix exportPrefix_length restore restore_native_size)
 end Snapshot
 
 namespace PrefixSnapshot
@@ -98,9 +98,5 @@ end PrefixSnapshot
 namespace RestoredSnapshot
 export SourceCoreExecution.RestoredSnapshot (ready suspended)
 end RestoredSnapshot
-
-namespace Legacy
-export SourceCoreExecution.Legacy (preparePrefix)
-end Legacy
 
 end Solcore.Frontend.SourceCompiler

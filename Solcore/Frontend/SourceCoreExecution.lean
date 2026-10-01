@@ -1,6 +1,7 @@
 import Solcore.Frontend.SourceCoreCompiler
 import Solcore.Frontend.SourceCoreIndexedSession
 import Solcore.Frontend.SourceCoreRootDiscovery
+import Solcore.Frontend.SourceCoreHeapInput
 
 /-! A single source-facing compilation, value and session boundary. The
 indexed recipe is prepared once from the cached compiler artifact. Opening
@@ -398,16 +399,32 @@ def Artifact.bootstrapFromPrefix (artifact : Artifact) (inert : PrefixSnapshot a
       rcases inert with ⟨inert⟩
       exact do return ⟨← native.bootstrapFromPrefix inert⟩
 
-namespace Legacy
-/-- The explicit migration boundary validates the former raw initial state.
-The common runtime accepts the sealed prefix and keeps its values inert. -/
-def preparePrefix (artifact : Artifact) (state : SourceTypedRuntime.RuntimeState)
-    (validationFuel : Nat := 1024) : Option (PrefixSnapshot artifact) :=
+namespace Internal
+/-- A provider can only return an already authenticated, artifact-indexed
+prefix. This bridge allows the separate historical import module to use the
+common sealed prefix without adding raw state to the public compiler API. -/
+def importPrefix (artifact : Artifact)
+    (provider : (native : SourceCoreIndexedSession.Artifact) → Option (SourceCoreIndexedSession.PrefixSnapshot native)) :
+    Option (PrefixSnapshot artifact) :=
   match artifact with
   | ⟨_, .empty _⟩ => none
-  | ⟨_, .indexed _ _ native⟩ =>
-      (SourceCoreIndexedSession.Legacy.preparePrefix native state validationFuel).map fun inert => ⟨inert⟩
-end Legacy
+  | ⟨_, .indexed _ _ native⟩ => (provider native).map fun inert => ⟨inert⟩
+end Internal
+
+/-- Build an initial inert heap using the common data carrier. Existing
+callables are transferred by `Snapshot.exportPrefix`, with cached provenance. -/
+def Artifact.preparePrefix (artifact : Artifact) (cells : List SourceCoreHeapInput.Cell)
+    (validationFuel : Nat := 1024) (conversionFuel : Nat := 1024) :
+    Except SourceCoreHeapInput.Error (PrefixSnapshot artifact) := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected =>
+      exact if cells.isEmpty then .ok ⟨()⟩ else .error ⟨[], .emptyArtifactHeap cells.length⟩
+  | indexed recipe selected native => exact do
+      let state ← SourceCoreHeapInput.Internal.convert cells conversionFuel
+      match SourceCoreIndexedSession.Legacy.preparePrefix native state validationFuel with
+      | some inert => pure ⟨inert⟩
+      | none => throw ⟨[], .validationRejected validationFuel⟩
 
 private def SnapshotPayload (artifact : Artifact) : Type :=
   match artifact.opened with
@@ -445,6 +462,37 @@ def Snapshot.prefix {artifact : Artifact} (snapshot : Snapshot artifact) : Prefi
   | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => ⟨native.prefix⟩
 
 def Snapshot.prefixSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.prefix.heapSize
+
+/-- Authenticate the entire recorded source heap as a fresh inert prefix.
+Export reconstructs callables from allocation receipts and validates the heap;
+it does not transfer the saved native continuation or handle ownership. -/
+def Snapshot.exportPrefix {artifact : Artifact} (snapshot : Snapshot artifact)
+    (validationFuel : Nat := 1024) (boundaryFuel : Nat := 1024) :
+    Except SourceCoreIndexedSession.Error (PrefixSnapshot artifact) :=
+  match artifact, snapshot with
+  | ⟨_, .empty _⟩, ⟨_⟩ => .ok ⟨()⟩
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => (native.exportPrefix validationFuel boundaryFuel).map fun inert => ⟨inert⟩
+
+theorem Snapshot.exportPrefix_length {artifact : Artifact} {snapshot : Snapshot artifact}
+    {validationFuel boundaryFuel : Nat} {exported : PrefixSnapshot artifact}
+    (accepted : snapshot.exportPrefix validationFuel boundaryFuel = .ok exported) :
+    exported.heapSize = snapshot.heapSize := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected =>
+      rcases snapshot with ⟨snapshot⟩
+      simp only [Snapshot.exportPrefix] at accepted
+      cases accepted
+      rfl
+  | indexed recipe selected native =>
+      rcases snapshot with ⟨snapshot⟩
+      unfold Snapshot.exportPrefix at accepted
+      cases result : snapshot.exportPrefix validationFuel boundaryFuel with
+      | error error => simp [result, Except.map] at accepted
+      | ok inert =>
+          simp only [result, Except.map] at accepted
+          cases accepted
+          exact snapshot.exportPrefix_length result
 
 inductive RestoredSnapshot (artifact : Artifact) where
   | ready (session : Session artifact)

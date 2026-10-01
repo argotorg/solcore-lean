@@ -24,6 +24,9 @@ definitions; backend selection and the historical source evaluator are absent. -
 #check Solcore.Frontend.SourceCompiler.Session.invokePacked
 #check Solcore.Frontend.SourceCompiler.Session.authenticate
 #check Solcore.Frontend.SourceCompiler.Checkpoint.resume
+#check Solcore.Frontend.SourceCompiler.Artifact.preparePrefix
+#check Solcore.Frontend.SourceCompiler.Session.snapshot
+#check Solcore.Frontend.SourceCompiler.Snapshot.exportPrefix
 #check Solcore.Frontend.SourceCompiler.Options.compilationFuel
 #check Solcore.Frontend.SourceCompiler.RunOptions.executionFuel
 #check Solcore.Frontend.SourceCompiler.Authentication.typed
@@ -46,6 +49,9 @@ definitions; backend selection and the historical source evaluator are absent. -
 #check_failure Solcore.Frontend.SourceCompiler.Session.payload
 #check_failure Solcore.Frontend.SourceCompiler.Checkpoint.payload
 #check_failure Solcore.Frontend.SourceCompilerSession.Compiled
+#check_failure Solcore.Frontend.SourceCompiler.Legacy.preparePrefix
+#check_failure Solcore.Frontend.SourceCoreExecution.Legacy.preparePrefix
+#check_failure Solcore.Frontend.SourceCoreLegacyHeapImport.preparePrefix
 #check Solcore.Frontend.SourceTypedRuntime.Value.HasPreparedType
 #check Solcore.Frontend.SourceTypedRuntime.PreparedDeepExecution
 #check Solcore.Frontend.SourceTypedRuntime.checkedLambdaNode_provenance
@@ -65,6 +71,10 @@ example (artifact : SourceCompiler.Artifact) :
     SourceCompiler.Session artifact = SourceCoreExecution.Session artifact := rfl
 example (artifact : SourceCompiler.Artifact) :
     SourceCompiler.Checkpoint artifact = SourceCoreExecution.Checkpoint artifact := rfl
+example (artifact : SourceCompiler.Artifact) :
+    SourceCompiler.Snapshot artifact = SourceCoreExecution.Snapshot artifact := rfl
+example (artifact : SourceCompiler.Artifact) :
+    SourceCompiler.PrefixSnapshot artifact = SourceCoreExecution.PrefixSnapshot artifact := rfl
 example : @SourceCompiler.prepare = @SourceCoreExecution.prepare := rfl
 example : @SourceCompiler.compileChecked = @SourceCoreExecution.compileChecked := rfl
 example : @SourceCompiler.compileEntry = @SourceCoreExecution.compileEntry := rfl
@@ -72,6 +82,9 @@ example : @SourceCompiler.compileStaticWord = @SourceCoreExecution.compileStatic
 example : @SourceCompiler.Session.run = @SourceCoreExecution.Session.run := rfl
 example : @SourceCompiler.Session.invokePacked = @SourceCoreExecution.Session.invokePacked := rfl
 example : @SourceCompiler.Checkpoint.resume = @SourceCoreExecution.Checkpoint.resume := rfl
+example : @SourceCompiler.Artifact.preparePrefix = @SourceCoreExecution.Artifact.preparePrefix := rfl
+example : @SourceCompiler.Session.snapshot = @SourceCoreExecution.Session.snapshot := rfl
+example : @SourceCompiler.Snapshot.exportPrefix = @SourceCoreExecution.Snapshot.exportPrefix := rfl
 example : @SourceCompiler.Seed.declaration = @SourceCoreCompiler.Seed.declaration := rfl
 example : @SourceCompiler.Seed.named = @SourceCoreCompiler.Seed.named := rfl
 example (word : Core.Word) : SourceCompiler.Value.word word = SourceCorePublicValues.Value.word word := rfl
