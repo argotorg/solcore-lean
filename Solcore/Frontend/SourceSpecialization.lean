@@ -362,7 +362,7 @@ private def firstDuplicate : List TypeParameterId → Option TypeParameterId
   | parameter :: rest =>
       if rest.contains parameter then some parameter else firstDuplicate rest
 
-private def firstNonConcrete : Ty → Option NonConcreteType
+def firstNonConcrete : Ty → Option NonConcreteType
   | .variable id => some (.flexible id)
   | .parameter id => some (.rigid id)
   | .constructor _ => none

@@ -369,7 +369,7 @@ def instantiate (scheme : Scheme) (next : Nat) : Ty × Nat :=
 /-- Structurally match a scheme body against one occurrence type.  Only the
 listed quantified variables may acquire assignments, and repeated appearances
 must agree with the first assignment. -/
-private def matchBody? (quantified : List TypeVarId) :
+def matchBody? (quantified : List TypeVarId) :
     Ty → Ty → Substitution → Option Substitution
   | .variable metavariable, actual, substitution =>
       if quantified.contains metavariable then
@@ -409,13 +409,13 @@ private def matchBody? (quantified : List TypeVarId) :
   | .error, .error, substitution => some substitution
   | _, _, _ => none
 
-private structure InstanceMatch (scheme : Scheme) (actual : Ty) where
+structure InstanceMatch (scheme : Scheme) (actual : Ty) where
   substitution : Substitution
   quantifiedUnique : scheme.quantified.Nodup
   domainExact : Substitution.domain substitution = scheme.quantified
   applies : Substitution.apply substitution scheme.body = actual
 
-private def matchInstanceCertificate? (scheme : Scheme) (actual : Ty) :
+def matchInstanceCertificate? (scheme : Scheme) (actual : Ty) :
     Option (InstanceMatch scheme actual) :=
   if quantifiedUnique : scheme.quantified.Nodup then do
     let matched ← matchBody? scheme.quantified scheme.body actual []
