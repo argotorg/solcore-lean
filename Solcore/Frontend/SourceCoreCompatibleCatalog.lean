@@ -212,6 +212,30 @@ def prepare (signatures : ProgramSignatures) (fuel : Nat) (types : List Ty)
           SourceCoreRawMetadata.prepare_signatures registered⟩
       else throw (.catalog .invalidDefinitions)
 
+private theorem bind_ok {α β ε : Type} {action : Except ε α} {next : α → Except ε β} {output : β}
+    (accepted : action >>= next = .ok output) : ∃ value, action = .ok value ∧ next value = .ok output := by
+  cases action with
+  | error error => cases accepted
+  | ok value => exact ⟨value, rfl, accepted⟩
+
+/-- The catalog factory retains the supplied source signature owner. -/
+theorem prepare_signatures {signatures : ProgramSignatures} {fuel : Nat} {types : List Ty}
+    {metadata : List Metadata} {limits : Limits} {callableContracts : Bool} {checked : Checked}
+    (accepted : prepare signatures fuel types metadata limits callableContracts = .ok checked) :
+    checked.signatures = signatures := by
+  unfold prepare at accepted
+  obtain ⟨registered, _, accepted⟩ := bind_ok accepted
+  rcases registered with ⟨catalog, nativeTypes⟩
+  obtain ⟨_, _, accepted⟩ := bind_ok accepted
+  obtain ⟨discovered, _, accepted⟩ := bind_ok accepted
+  rcases discovered with ⟨seen, original⟩
+  dsimp only at accepted
+  split at accepted
+  · cases accepted
+  · split at accepted
+    · cases accepted; rfl
+    · cases accepted
+
 structure Projection (definitions : Core.DataEnvironment) where
   type : Core.Ty
   typed : type.WellFormed definitions

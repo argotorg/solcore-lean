@@ -48,6 +48,8 @@ import Solcore.Test.SourceCoreCompatibleValues
 import Solcore.Test.SourceCoreCompatibleDataExpressions
 import Solcore.Test.SourceCoreCompatibleDataControl
 import Solcore.Test.SourceCoreCompatibleFunctions
+import Solcore.Test.SourceCoreCompatiblePreparedFunctions
+import Solcore.Test.SourceCoreCompatibleInputs
 import Solcore.Test.SourceCoreNativeEntry
 import Solcore.Test.SourceCoreRepresentationProjection
 import Solcore.Test.SourceCompilerSourceBoundaryObservations
@@ -2573,6 +2575,8 @@ def run : IO Unit := do
   SourceCoreCompatibleDataExpressions.run
   SourceCoreCompatibleDataControl.run
   SourceCoreCompatibleFunctions.run
+  SourceCoreCompatiblePreparedFunctions.run
+  SourceCoreCompatibleInputs.run
   SourceCoreNativeEntry.run
   SourceCoreRepresentationProjection.run
   SourceCompilerSourceBoundaryObservations.run

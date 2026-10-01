@@ -211,6 +211,13 @@ def collectDecisions (limits : Limits) (sidecars : List Sidecar) (entries : List
       | _ => pure ()
   pure rows
 
+/-- Reuse the authenticated parent-order discovery for contextual metadata
+inventories, including diagnostics and source-allocation preparation. -/
+def prepareContexts (program : CheckedProgram) (plan : Plan)
+    (candidates : List SourceCoreLocalPolymorphism.Instance) :
+    Except Error (List SourceCoreLocalEvidence.Prepared) :=
+  contextualReceipts program plan candidates.length [] candidates
+
 /-- Construct once during artifact preparation. The IDs are positive words,
 never wrapping; the immutable table certifies unique origins, IDs, and lookup
 keys. The limits bound accepted origins and callsite/contract combinations. -/
