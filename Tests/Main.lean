@@ -150,6 +150,9 @@ import Solcore.Test.SourceCoreCompatibleExpressionMembers
 import Solcore.Test.SourceCoreCompatibleStatements
 import Solcore.Test.SourceCoreCompatibleExpressionIndices
 import Solcore.Test.SourceCoreCompatibleExpressionRecursive
+import Solcore.Test.SourceCoreCompatibleTypedCompositions
+import Solcore.Test.SourceCoreCompatibleTypedExpressions
+import Solcore.Test.SourceCoreCompatibleStatementMixed
 import Solcore.Test.SourceCoreCompatibleStatementBindings
 import Solcore.Test.SourceCoreCompatibleStatementInitialized
 import Solcore.Test.SourceCoreTypedDataExpressionSequence
@@ -2473,6 +2476,9 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCompatibleStatements.run
   SourceCoreCompatibleExpressionIndices.run
   SourceCoreCompatibleExpressionRecursive.run
+  SourceCoreCompatibleTypedCompositions.run
+  SourceCoreCompatibleTypedExpressions.run
+  SourceCoreCompatibleStatementMixed.run
   SourceCoreCompatibleStatementBindings.run
   SourceCoreCompatibleStatementInitialized.run
   SourceCoreTypedDataExpressionSequence.run
