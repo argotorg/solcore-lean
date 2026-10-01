@@ -98,7 +98,13 @@ def lowerWithProjector (program : CheckedProgram) (projectType : Projector)
         | some requirements => pure requirements
         | none => throw (.callPreparation (.unsupportedRequirements node.requirements))
   let isNativeLiteral := match node.form with | .integerLiteral .. => true | _ => false
-  if node.coercions.isEmpty && !hasIndirectCoercions && (node.requirements.isEmpty || isNativeLiteral) then
+  -- A method caller can own authenticated closed assumptions even when this
+  -- particular helper call/reference requires no dictionary of its own.
+  let authenticatesCaller := !caller.assumptions.isEmpty && (match node.form with
+    | .call _ _ (.declaration _) | .reference _ (.declaration _) => true
+    | _ => false)
+  if node.coercions.isEmpty && !hasIndirectCoercions && (node.requirements.isEmpty || isNativeLiteral) &&
+      !authenticatesCaller then
     return none
   unless node.hasValidCoercionPath do throw (.coercionsPresent id)
   if caller.key ≠ context.owner then throw (.ownerMismatch context.owner.declaration caller.key.declaration)
