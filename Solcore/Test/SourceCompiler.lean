@@ -186,7 +186,7 @@ private def orchestrationWorkspace : Workspace.RawWorkspace := {
 private def compilerOptions : CompileOptions :=
   { specializationBudget := 32, stagingFuel := 128 }
 private def runtimeOptions : RunOptions :=
-  { inputValidationFuel := 64, executionFuel := 4096 }
+  { inputValidationFuel := 64, executionFuel := 150000 }
 private def checkedWorkspace : IO CheckedProgram := do
   match checkProgram workspace with
   | .ok checked => pure checked
@@ -653,8 +653,8 @@ private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
     { inputValidationFuel := 64, executionFuel := 1 }
   match prepared.typed.runTyped [pair] shallowExecution with
   | .ok (.typedSource (.outOfFuel state)) =>
-      assertTrue (state.heap.length == 1)
-        "typed exhaustion did not retain the bound parameter cell"
+      assertTrue state.heap.isEmpty
+        "Core suspension before parameter allocation leaked an administrative cell"
   | result => throw (IO.userError
       s!"typed execution fuel was not independent: {reprStr result}")
   match prepared.typed.runCore [.word (word 7)] runtimeOptions with
@@ -713,8 +713,8 @@ private def testOneShotLimits : IO Unit := do
       (Invocation.typedFresh [
         .product (.word (word 7)) (.word (word 8))]) limits with
   | .ok (.typedSource (.outOfFuel state)) =>
-      assertTrue (state.heap.length == 1)
-        "one-shot limits did not reach the selected typed runtime"
+      assertTrue state.heap.isEmpty
+        "one-shot Core suspension leaked an administrative cell"
   | result => throw (IO.userError
       s!"one-shot compiler boundary returned {reprStr result}")
 

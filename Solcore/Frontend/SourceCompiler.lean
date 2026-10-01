@@ -1,6 +1,6 @@
 import Solcore.Frontend.SourceProgramExecution
 import Solcore.Frontend.SourceCompilationPlan
-import Solcore.Frontend.SourceTypedRuntimeDeepSafety
+import Solcore.Frontend.SourceCoreUnifiedPreparationCertificates
 import Solcore.Core.Safety
 import Solcore.Frontend.SourceCoreDirectLinking
 import Solcore.Frontend.SourceCoreBasicEntry
@@ -17,15 +17,17 @@ Single-root compilation resolves a ground root and discovers its finite
 specialization plan.  The whole-program facade can also discover conventional
 `main` and exported Static Word ABI roots, or compile an ordered explicit root
 set after checking the workspace once.  Automatic selection prefers direct
-Core, then ordinary optional-cell Core, then catalog-indexed Core, and otherwise uses the source-typed
-runtime. Clients may instead request
-an exact backend. Resulting artifacts can be run repeatedly without repeating
-checking or specialization.
+Core, then ordinary optional-cell Core, then catalog-indexed Core, and otherwise
+uses cached source-compatible Core with the historical source-value interface.
+Clients may request a specific invocation profile. Artifacts can be run
+repeatedly without repeating checking or specialization. Every selected
+execution path uses Core; `typedSource` remains a compatibility tag.
 
-Core stores/values and source-typed heaps/values use distinct invocation carriers.
-The ordinary Core routes validate full input trees against their actual definitions and allocate parameter
-cells in source order. Its decoded language results retain typed checkpoints
-and source diagnostic metadata without introducing a third backend.
+Core stores/values and source heaps/values still have distinct public carriers;
+their final API unification is a later step. Core routes validate complete input
+trees and allocate source parameter cells in order. Source-value observations
+retain source metadata and diagnostics, with a sealed typed Core checkpoint
+available for resumption.
 -/
 
 set_option autoImplicit false
@@ -37,7 +39,7 @@ open TypeSystem
 abbrev SeedTarget := SourceProgramExecution.SeedTarget
 abbrev Seed := SourceProgramExecution.Seed
 
-/-- The exact runtime selected for a compiled root. -/
+/-- Historical invocation-interface tags retained during the runtime migration. -/
 inductive Backend where
   | core
   | typedSource
@@ -45,7 +47,7 @@ inductive Backend where
 
 /-- Backend policy for one compilation. Automatic selection deliberately keeps
 the direct Core path first, tries ordinary Core lowering next, then chooses the
-catalog Core before the broader typed-source runtime while its remaining features migrate. -/
+catalog Core before the source-compatible Core interface. -/
 inductive BackendPreference where
   | automatic
   | core
@@ -54,7 +56,7 @@ inductive BackendPreference where
 
 namespace BackendPreference
 
-/-- The exact backend requested by a non-automatic preference. -/
+/-- The exact invocation profile requested by a non-automatic preference. -/
 def requested? : BackendPreference → Option Backend
   | .automatic => none
   | .core => some .core
@@ -105,13 +107,14 @@ inductive BackendRejection where
   | core (error : SourceCoreDirectLinking.Error)
   | coreCatalog (error : SourceCorePlanCatalog.Error)
   | typedSource (error : SourceTypedRuntime.RuntimeError)
+  | typedSourceCore (error : SourceCoreUnifiedCompilation.Error)
   deriving Repr
 
 namespace BackendRejection
 
 def backend : BackendRejection → Backend
   | .core _ | .coreCatalog _ => .core
-  | .typedSource _ => .typedSource
+  | .typedSource _ | .typedSourceCore _ => .typedSource
 
 end BackendRejection
 
@@ -140,18 +143,26 @@ private structure GeneralExecutable where
   entry : SourceCoreGeneralEntry.Entry recipe.checked
   deriving Repr
 
+private instance : Repr SourceCoreUnifiedCompilation.Compiled where
+  reprPrec cached _ := "cached source-compatible Core artifact " ++ repr cached.keys
+
 /-- Backend payload retained behind the compiled artifact's private constructor. -/
 private inductive Executable where
   | core (entry : SourceCoreDirectLinking.LinkedEntry)
   | coreRuntime (entry : SourceCoreBasicEntry.Entry)
   | coreGeneral (general : GeneralExecutable)
-  | typedSource
+  | typedSource (cached : SourceCoreUnifiedCompilation.Compiled)
   deriving Repr
 
 private def Executable.backend : Executable → Backend
   | .core _ => .core
   | .coreRuntime _ | .coreGeneral _ => .core
-  | .typedSource => .typedSource
+  | .typedSource _ => .typedSource
+
+private def Executable.OwnedBy (program : CheckedProgram)
+    (plan : SourceSpecializationWorklist.Plan) : Executable → Prop
+  | .typedSource cached => cached.sourceProgram = program ∧ cached.validationPlan = plan
+  | _ => True
 
 private def Executable.HasPublicResultProjection
     (root : SourceSpecialization.SpecializedFunction) : Executable → Prop
@@ -165,7 +176,7 @@ private def Executable.HasPublicResultProjection
           .ok entry.resultType
   | .coreGeneral general =>
       general.recipe.checked.catalog.project root.function.inferredBodyType = .ok general.entry.resultType
-  | .typedSource => True
+  | .typedSource _ => True
 
 /-- A checked, canonically specialized, reusable single-root artifact.  The
 private constructor prevents callers from pairing an arbitrary plan and root. -/
@@ -174,6 +185,7 @@ structure CompiledEntry where private mk ::
   private plan : SourceSpecializationWorklist.Plan
   private root : SourceSpecialization.SpecializedFunction
   private executable : Executable
+  private owned : executable.OwnedBy program plan
 
 namespace CompiledEntry
 
@@ -189,12 +201,12 @@ def inputTypes (compiled : CompiledEntry) : List Ty :=
 def resultType (compiled : CompiledEntry) : Ty :=
   compiled.root.function.inferredBodyType
 
-/-- The selected exact runtime. -/
+/-- The selected historical invocation profile. Execution uses Core. -/
 def backend (compiled : CompiledEntry) : Backend :=
   match compiled.executable with
   | .core _ => .core
   | .coreRuntime _ | .coreGeneral _ => .core
-  | .typedSource => .typedSource
+  | .typedSource _ => .typedSource
 
 /-- Recover the classification, source occurrence and span assigned by the
 ordinary Core compiler. The returned word remains separate from machine faults. -/
@@ -203,7 +215,7 @@ def coreFailureDiagnostic? (compiled : CompiledEntry) (reason : Core.Word) :
   match compiled.executable with
   | .coreRuntime entry => entry.failureDiagnostic? reason
   | .coreGeneral general => general.entry.failureDiagnostic? reason
-  | .core _ | .typedSource => none
+  | .core _ | .typedSource _ => none
 
 /-- Number of reachable canonical specializations retained by this artifact. -/
 def specializationCount (compiled : CompiledEntry) : Nat :=
@@ -211,8 +223,7 @@ def specializationCount (compiled : CompiledEntry) : Nat :=
 
 /-- The retained root is the unique specialization with the canonical seed
 key.  Successful compilation establishes this provenance fact; it is kept
-explicit because the sealed artifact's constructor itself carries no proof
-fields. -/
+explicit because the sealed artifact's constructor retains source/plan ownership separately. -/
 def HasCanonicalRoot (compiled : CompiledEntry) : Prop :=
   compiled.plan.specializations.filter (fun candidate =>
     decide (candidate.key = compiled.root.key)) = [compiled.root]
@@ -223,14 +234,13 @@ provide an arbitrary `CheckedProgram` record. -/
 def HasCheckedSourceWitness (compiled : CompiledEntry) : Prop :=
   ∃ raw fuel, checkProgram raw fuel = .ok compiled.program
 
-/-- The sealed plan passed the typed-source runtime's executable-profile
-preflight. Successful compilation guarantees this when that backend is
-selected; it is not asserted for Core artifacts. -/
+/-- The sealed plan passed the source-compatible executable-plan preflight.
+Successful compilation guarantees this for the `typedSource` invocation profile. -/
 def HasValidatedTypedPlan (compiled : CompiledEntry) : Prop :=
   SourceCompilationPlan.validateExecutablePlanEvidence compiled.program
     compiled.plan = .ok ()
 
-/-- A source-typed runtime value has this artifact's public source result type
+/-- A source value has this artifact's public source result type
 in the complete executable plan deterministically prepared from the sealed
 specialization plan.  This includes first-class globals discovered through
 selected methods.  It does not validate a closure body or heap. -/
@@ -246,7 +256,7 @@ def TypedDeepResult (compiled : CompiledEntry)
     (value : SourceTypedRuntime.Value)
     (finalState : SourceTypedRuntime.RuntimeState) : Prop :=
   match compiled.executable with
-  | .typedSource =>
+  | .typedSource _ =>
       SourceTypedRuntime.PreparedDeepResult compiled.program compiled.plan
         compiled.root.function.inferredBodyType value finalState
   | .core _ | .coreRuntime _ | .coreGeneral _ => False
@@ -260,7 +270,7 @@ def TypedDeepExecution (compiled : CompiledEntry)
     (value : SourceTypedRuntime.Value)
     (finalState : SourceTypedRuntime.RuntimeState) : Prop :=
   match compiled.executable with
-  | .typedSource =>
+  | .typedSource _ =>
       SourceTypedRuntime.PreparedDeepExecution compiled.program compiled.plan
         (compiled.root.function.typedBody.inputs.map (·.scheme.body))
         compiled.root.function.inferredBodyType arguments initial value finalState
@@ -298,7 +308,7 @@ def CoreResultHasPublicType (compiled : CompiledEntry)
         ∃ finalWorld,
           Core.RuntimeStoreHasTypes finalWorld finalStore (SourceCoreGeneralEntry.definitions general.recipe.checked) ∧
           Core.RuntimeValueHasType finalWorld value publicType (SourceCoreGeneralEntry.definitions general.recipe.checked)
-  | .typedSource => False
+  | .typedSource _ => False
 
 /-- The public projection covers successful values, failed stores and typed
 exhaustion checkpoints from the ordinary Core result envelope. -/
@@ -336,7 +346,7 @@ namespace Invocation
 def coreFresh (arguments : List Core.Value) : Invocation :=
   .coreValues arguments []
 
-/-- Invoke the source-typed backend with an empty heap. -/
+/-- Invoke the source-value compatibility profile with an empty heap. -/
 def typedFresh (arguments : List SourceTypedRuntime.Value) : Invocation :=
   .typedValues arguments {}
 
@@ -346,14 +356,15 @@ def kind : Invocation → InvocationKind
 
 end Invocation
 
-/-- Failures before a selected runtime starts.  Runtime faults and exhaustion
-remain in `ExecutionResult`. -/
+/-- Invocation rejection and source-observation adapter failures. Language
+faults and exhaustion remain in `ExecutionResult`. -/
 inductive RunError where
   | invocationKindMismatch (backend : Backend) (actual : InvocationKind)
   | coreInputTypesMismatch (expected actual : List Core.Ty)
   | coreRuntimeInput (error : SourceCoreBasicEntry.Error)
   | coreGeneralInput (error : SourceCoreGeneralEntry.RunError)
-  deriving Repr, DecidableEq
+  | typedSourceAdapter (error : SourceCoreUnifiedRuntime.Error)
+  deriving Repr
 
 /-- Lossless result carrier for all selected backends. -/
 inductive ExecutionResult where
@@ -366,7 +377,7 @@ namespace CompiledEntry
 
 /-- The extra semantic premise needed to lift executable runtime checks to a
 preservation theorem. Direct Core needs genuinely typed values and store,
-while the typed-source runtime needs the retained canonical-root certificate. -/
+while the source-value interface needs the retained canonical-root certificate. -/
 def PreservationPrecondition (compiled : CompiledEntry) : Invocation → Prop
   | .coreValues arguments store =>
       match compiled.executable with
@@ -376,10 +387,10 @@ def PreservationPrecondition (compiled : CompiledEntry) : Invocation → Prop
                 entry.elaborated.inputs.values ∧
               Core.StoreHasTypes world store
       | .coreRuntime _ | .coreGeneral _ => True
-      | .typedSource => False
+      | .typedSource _ => False
   | .typedValues _ _ =>
       match compiled.executable with
-      | .typedSource => compiled.HasCanonicalRoot
+      | .typedSource _ => compiled.HasCanonicalRoot
       | .core _ | .coreRuntime _ | .coreGeneral _ => False
 
 /-- Backend-native typing for every successful result carrier. Direct Core and
@@ -395,11 +406,11 @@ def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult �
               Core.RuntimeValueHasType finalWorld value
                 entry.elaborated.returnType
       | .coreRuntime _ | .coreGeneral _ => False
-      | .typedSource => False
+      | .typedSource _ => False
   | .core (.outOfFuel _) | .core (.fault _ _) => True
   | .typedSource (.done value finalState) =>
       match compiled.executable with
-      | .typedSource =>
+      | .typedSource _ =>
           SourceTypedRuntime.PreparedDeepResult compiled.program compiled.plan
             compiled.root.function.inferredBodyType value finalState
       | .core _ | .coreRuntime _ | .coreGeneral _ => False
@@ -409,9 +420,106 @@ def SuccessfulResultHasNativeType (compiled : CompiledEntry) : ExecutionResult �
       | .coreRuntime entry => observation.HasType entry.resultType
       | .coreGeneral general => observation.HasType general.entry.resultType
           (SourceCoreGeneralEntry.definitions general.recipe.checked)
-      | .core _ | .typedSource => False
+      | .core _ | .typedSource _ => False
 
-/-- Execute a reusable artifact in its selected runtime domain. -/
+/-- A source observation and its sealed typed Core continuation retain the
+exact original request across repeated resumptions. -/
+structure TypedCheckpoint (compiled : CompiledEntry) where private mk ::
+  private cached : SourceCoreUnifiedCompilation.Compiled
+  private selected : compiled.executable = .typedSource cached
+  private arguments : List SourceTypedRuntime.Value
+  private initial : SourceTypedRuntime.RuntimeState
+  private validationFuel : Nat
+  private result : SourceCoreUnifiedCompilation.Result cached
+  private requested : SourceCoreUnifiedRuntime.Result.Requests result compiled.key
+    arguments validationFuel initial
+
+namespace TypedCheckpoint
+
+def observation {compiled : CompiledEntry} (checkpoint : TypedCheckpoint compiled) :
+    SourceTypedRuntime.RunResult := checkpoint.result.observation
+
+/-- Continue the saved Core machine; source checking and compilation are cached. -/
+def resume {compiled : CompiledEntry} (checkpoint : TypedCheckpoint compiled) (fuel : Nat) :
+    Except RunError (TypedCheckpoint compiled) :=
+  match continued : checkpoint.result.resume fuel with
+  | .error error => .error (.typedSourceAdapter error)
+  | .ok result => .ok ⟨checkpoint.cached, checkpoint.selected, checkpoint.arguments,
+      checkpoint.initial, checkpoint.validationFuel, result,
+      SourceCoreUnifiedRuntime.Result.resume_requests checkpoint.requested continued⟩
+
+/-- The original request is exposed independently of its machine checkpoint. -/
+def inputArguments {compiled : CompiledEntry} (checkpoint : TypedCheckpoint compiled) :
+    List SourceTypedRuntime.Value := checkpoint.arguments
+
+def initialState {compiled : CompiledEntry} (checkpoint : TypedCheckpoint compiled) :
+    SourceTypedRuntime.RuntimeState := checkpoint.initial
+
+/-- Any successful observation after repeated native resumptions has the
+original public request's deep input/heap/result certificate. -/
+theorem done_has_public_deepExecution {compiled : CompiledEntry}
+    (checkpoint : TypedCheckpoint compiled) (canonical : compiled.HasCanonicalRoot)
+    {value : SourceTypedRuntime.Value} {finalState : SourceTypedRuntime.RuntimeState}
+    (done : checkpoint.observation = .done value finalState) :
+    compiled.TypedDeepExecution checkpoint.inputArguments checkpoint.initialState value finalState := by
+  obtain ⟨specialized, selected, certificate⟩ :=
+    SourceCoreUnifiedRuntime.Result.requested_done_specialization checkpoint.requested done
+  obtain ⟨sourceExact, planExact⟩ := SourceCoreUnifiedPreparationCertificates.compiled_fields checkpoint.cached
+  have owned := compiled.owned
+  rw [checkpoint.selected] at owned
+  simp only [Executable.OwnedBy] at owned
+  rw [sourceExact, planExact, owned.1, owned.2] at certificate
+  rw [planExact, owned.2] at selected
+  have rootSelected : SourceCompilationPlan.exactSpecialization compiled.plan compiled.key = .ok compiled.root := by
+    simp only [CompiledEntry.HasCanonicalRoot] at canonical
+    change SourceCompilationPlan.exactSpecialization compiled.plan compiled.root.key = .ok compiled.root
+    unfold SourceCompilationPlan.exactSpecialization
+    rw [canonical]
+  have same : specialized = compiled.root := Except.ok.inj (selected.symm.trans rootSelected)
+  subst specialized
+  simpa only [CompiledEntry.TypedDeepExecution, checkpoint.selected, inputArguments, initialState] using certificate
+
+/-- Native resumption retains the original source arguments and initial heap. -/
+theorem resume_request {compiled : CompiledEntry} {checkpoint resumed : TypedCheckpoint compiled} {fuel : Nat}
+    (continued : checkpoint.resume fuel = .ok resumed) :
+    resumed.inputArguments = checkpoint.inputArguments ∧ resumed.initialState = checkpoint.initialState := by
+  unfold resume at continued
+  split at continued
+  · cases continued
+  · cases continued
+    exact ⟨rfl, rfl⟩
+
+end TypedCheckpoint
+
+/-- Invoke the source-value interface while retaining the native continuation. -/
+def runTypedWithCheckpoint (compiled : CompiledEntry)
+    (arguments : List SourceTypedRuntime.Value) (options : RunOptions := {})
+    (state : SourceTypedRuntime.RuntimeState := {}) :
+    Except RunError (TypedCheckpoint compiled) :=
+  match selected : compiled.executable with
+  | .typedSource cached =>
+      match ran : cached.run compiled.key arguments options.inputValidationFuel options.executionFuel state with
+      | .error error => .error (.typedSourceAdapter error)
+      | .ok result => .ok ⟨cached, selected, arguments, state, options.inputValidationFuel,
+          result, SourceCoreUnifiedRuntime.run_requests ran⟩
+  | _ => .error (.invocationKindMismatch compiled.backend .typedValues)
+
+/-- The public checkpoint is tied to the actual invocation's source inputs. -/
+theorem runTypedWithCheckpoint_request (compiled : CompiledEntry)
+    {arguments : List SourceTypedRuntime.Value} {options : RunOptions}
+    {state : SourceTypedRuntime.RuntimeState} {checkpoint : TypedCheckpoint compiled}
+    (ran : compiled.runTypedWithCheckpoint arguments options state = .ok checkpoint) :
+    checkpoint.inputArguments = arguments ∧ checkpoint.initialState = state := by
+  unfold runTypedWithCheckpoint at ran
+  split at ran
+  · split at ran
+    · cases ran
+    · cases ran
+      exact ⟨rfl, rfl⟩
+  · cases ran
+
+/-- Execute a reusable artifact through its selected value interface. Both
+interfaces execute Core; the source-value route restores source observations. -/
 def run (compiled : CompiledEntry) (invocation : Invocation)
     (options : RunOptions := {}) :
     Except RunError ExecutionResult :=
@@ -429,10 +537,10 @@ def run (compiled : CompiledEntry) (invocation : Invocation)
       (general.entry.run arguments options.executionFuel store).map
         (fun result => .coreLanguageResult result.observation)
         |>.mapError RunError.coreGeneralInput
-  | .typedSource, .typedValues arguments state =>
-      .ok (.typedSource (SourceTypedRuntime.runDeepCertifiedWithValidationFuel
-        compiled.program compiled.plan compiled.root.key arguments
-        options.inputValidationFuel options.executionFuel state))
+  | .typedSource cached, .typedValues arguments state =>
+      (cached.run compiled.key arguments options.inputValidationFuel options.executionFuel state).map
+        (fun result => .typedSource result.observation)
+        |>.mapError RunError.typedSourceAdapter
   | _, invocation =>
       .error (.invocationKindMismatch compiled.backend invocation.kind)
 
@@ -498,7 +606,7 @@ private theorem exactRoot_seedKeys (plan : SourceSpecializationWorklist.Plan)
   next keys seedKeysEqual => cases accepted
 
 /-- Exact root recovery also retains the unique specialization witness needed
-by the typed runtime's successful-result preservation theorem. -/
+by the source-value successful-result preservation theorem. -/
 private theorem exactRoot_specializations
     (plan : SourceSpecializationWorklist.Plan)
     (root : SourceSpecialization.SpecializedFunction)
@@ -576,29 +684,28 @@ private def selectCoreBackend (program : CheckedProgram)
   else selectCoreBackendFallback program plan stagingFuel
 
 private def selectTypedSourceBackend (program : CheckedProgram)
-    (plan : SourceSpecializationWorklist.Plan) :
+    (plan : SourceSpecializationWorklist.Plan) (compilationFuel : Nat) :
     Except CompileError Executable :=
   match SourceCompilationPlan.validateExecutablePlanEvidence program plan with
-  | .ok _ => .ok .typedSource
   | .error error => .error (.backendRejected (.typedSource error))
+  | .ok _ =>
+      (SourceCoreUnifiedCompilation.prepare program plan compilationFuel).map Executable.typedSource
+        |>.mapError (fun error => .backendRejected (.typedSourceCore error))
 
 private def selectBackend (program : CheckedProgram)
     (plan : SourceSpecializationWorklist.Plan) (stagingFuel : Nat)
     (preference : BackendPreference) : Except CompileError Executable :=
   match preference with
   | .core => selectCoreBackend program plan stagingFuel
-  | .typedSource => selectTypedSourceBackend program plan
+  | .typedSource => selectTypedSourceBackend program plan stagingFuel
   | .automatic =>
       match selectCoreBackend program plan stagingFuel with
       | .ok executable => .ok executable
       | .error (.backendRejected coreError) =>
-          match selectTypedSourceBackend program plan with
+          match selectTypedSourceBackend program plan stagingFuel with
           | .ok executable => .ok executable
-          | .error (.backendRejected (.typedSource typedSourceError)) =>
-              .error (.noBackend [
-                coreError,
-                .typedSource typedSourceError
-              ])
+          | .error (.backendRejected typedSourceError) =>
+              .error (.noBackend [coreError, typedSourceError])
           | .error error => .error error
       | .error error => .error error
 
@@ -669,105 +776,87 @@ private theorem selectCoreBackend_success_backend
             | cons another tail => simp [prepared, entries] at selected
   · exact selectCoreBackendFallback_success_backend program plan stagingFuel executable selected
 
-private theorem selectTypedSourceBackend_success_backend
+private theorem selectTypedSourceBackend_success
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
-    (executable : Executable)
-    (selected : selectTypedSourceBackend program plan = .ok executable) :
-    executable.backend = .typedSource := by
-  cases validated : SourceCompilationPlan.validateExecutablePlanEvidence program
-      plan with
-  | error error =>
-      simp [selectTypedSourceBackend, validated] at selected
+    (fuel : Nat) (executable : Executable)
+    (selected : selectTypedSourceBackend program plan fuel = .ok executable) :
+    executable.backend = .typedSource ∧ executable.OwnedBy program plan ∧
+      SourceCompilationPlan.validateExecutablePlanEvidence program plan = .ok () := by
+  cases validated : SourceCompilationPlan.validateExecutablePlanEvidence program plan with
+  | error error => simp [selectTypedSourceBackend, validated] at selected
   | ok value =>
       cases value
-      have executableEq : executable = .typedSource := by
-        simpa [selectTypedSourceBackend, validated] using selected.symm
-      subst executable
-      rfl
+      cases prepared : SourceCoreUnifiedCompilation.prepare program plan fuel with
+      | error error => simp [selectTypedSourceBackend, validated, prepared, Except.mapError, Except.map] at selected
+      | ok cached =>
+          simp [selectTypedSourceBackend, validated, prepared, Except.mapError, Except.map] at selected
+          cases selected
+          obtain ⟨sourceExact, planExact, _⟩ := SourceCoreUnifiedPreparationCertificates.prepare_fields prepared
+          exact ⟨rfl, ⟨sourceExact, planExact⟩, rfl⟩
 
-private theorem selectTypedSourceBackend_success_validation
+private theorem selectBackend_success_ownership
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
-    (executable : Executable)
-    (selected : selectTypedSourceBackend program plan = .ok executable) :
-    SourceCompilationPlan.validateExecutablePlanEvidence program plan = .ok () := by
-  cases validated : SourceCompilationPlan.validateExecutablePlanEvidence program
-      plan with
-  | error error =>
-      simp [selectTypedSourceBackend, validated] at selected
-  | ok value =>
-      cases value
-      rfl
+    (fuel : Nat) (preference : BackendPreference) (executable : Executable)
+    (selected : selectBackend program plan fuel preference = .ok executable) :
+    executable.OwnedBy program plan := by
+  have coreOwned (accepted : selectCoreBackend program plan fuel = .ok executable) :
+      executable.OwnedBy program plan := by
+    have backend := selectCoreBackend_success_backend program plan fuel executable accepted
+    cases executable <;> simp_all [Executable.backend, Executable.OwnedBy]
+  cases preference with
+  | core => exact coreOwned (by simpa [selectBackend] using selected)
+  | typedSource => exact (selectTypedSourceBackend_success program plan fuel executable
+      (by simpa [selectBackend] using selected)).2.1
+  | automatic =>
+      cases selectedCore : selectCoreBackend program plan fuel with
+      | ok core =>
+          have same : core = executable := by simpa [selectBackend, selectedCore] using selected
+          subst core
+          exact coreOwned selectedCore
+      | error error =>
+          cases error <;> simp [selectBackend, selectedCore] at selected
+          rename_i rejection
+          cases selectedTyped : selectTypedSourceBackend program plan fuel with
+          | ok typed =>
+              have same : typed = executable := by simpa [selectedTyped] using selected
+              subst typed
+              exact (selectTypedSourceBackend_success program plan fuel executable selectedTyped).2.1
+          | error error =>
+              rw [selectedTyped] at selected
+              cases error <;> cases selected
 
-/-- An explicit backend preference cannot silently fall through to another
-runtime. -/
+/-- An explicit preference retains its invocation tag even when both value
+interfaces are implemented by Core. -/
 private theorem selectBackend_backend_of_preference
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
     (stagingFuel : Nat) (preference : BackendPreference)
     (backend : Backend) (executable : Executable)
     (requested : preference.requested? = some backend)
-    (selected : selectBackend program plan stagingFuel preference =
-      .ok executable) :
+    (selected : selectBackend program plan stagingFuel preference = .ok executable) :
     executable.backend = backend := by
   cases preference with
   | automatic => simp [BackendPreference.requested?] at requested
   | core =>
-      have backendEq : backend = .core := by
-        simpa [BackendPreference.requested?] using requested.symm
+      have same : backend = .core := by simpa [BackendPreference.requested?] using requested.symm
       subst backend
-      exact selectCoreBackend_success_backend program plan stagingFuel
-        executable (by simpa [selectBackend] using selected)
-  | typedSource =>
-      have backendEq : backend = .typedSource := by
-        simpa [BackendPreference.requested?] using requested.symm
-      subst backend
-      exact selectTypedSourceBackend_success_backend program plan executable
+      exact selectCoreBackend_success_backend program plan stagingFuel executable
         (by simpa [selectBackend] using selected)
-
-private theorem selectBackend_automatic_typed_source
-    (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
-    (stagingFuel : Nat)
-    (selected : selectBackend program plan stagingFuel .automatic =
-      .ok .typedSource) :
-    selectTypedSourceBackend program plan = .ok .typedSource := by
-  cases selectedCore : selectCoreBackend program plan stagingFuel with
-  | ok executable =>
-      have equal : executable = .typedSource := by
-        simpa [selectBackend, selectedCore] using selected
-      have backend := selectCoreBackend_success_backend program plan stagingFuel executable selectedCore
-      rw [equal] at backend
-      cases backend
-  | error error =>
-      cases error <;> simp [selectBackend, selectedCore] at selected
-      rename_i rejection
-      cases selectedTyped : selectTypedSourceBackend program plan with
-      | ok executable =>
-          simp only [selectedTyped] at selected
-          cases selected
-          rfl
-      | error error =>
-          rw [selectedTyped] at selected
-          cases error <;> try cases selected
-          rename_i rejection
-          cases rejection <;> cases selected
+  | typedSource =>
+      have same : backend = .typedSource := by simpa [BackendPreference.requested?] using requested.symm
+      subst backend
+      exact (selectTypedSourceBackend_success program plan stagingFuel executable
+        (by simpa [selectBackend] using selected)).1
 
 private theorem selectBackend_typed_plan
     (program : CheckedProgram) (plan : SourceSpecializationWorklist.Plan)
     (stagingFuel : Nat) (preference : BackendPreference)
-    (selected : selectBackend program plan stagingFuel preference =
-      .ok .typedSource) :
+    (cached : SourceCoreUnifiedCompilation.Compiled)
+    (selected : selectBackend program plan stagingFuel preference = .ok (.typedSource cached)) :
     SourceCompilationPlan.validateExecutablePlanEvidence program plan = .ok () := by
-  cases preference with
-  | core =>
-      have impossible := selectCoreBackend_success_backend program plan
-        stagingFuel .typedSource (by simpa [selectBackend] using selected)
-      cases impossible
-  | typedSource =>
-      exact selectTypedSourceBackend_success_validation program plan
-        .typedSource (by simpa [selectBackend] using selected)
-  | automatic =>
-      exact selectTypedSourceBackend_success_validation program plan
-        .typedSource
-        (selectBackend_automatic_typed_source program plan stagingFuel selected)
+  have owned := selectBackend_success_ownership program plan stagingFuel preference (.typedSource cached) selected
+  have valid := SourceCoreUnifiedPreparationCertificates.compiled_validation cached
+  simp only [Executable.OwnedBy] at owned
+  simpa only [owned.1, owned.2] using valid
 
 /-- Guard the public result signature against an inconsistent linker payload. -/
 private def validatePublicResultType
@@ -796,7 +885,7 @@ private def validatePublicResultType
         |>.mapError CompileError.publicGeneralResultProjection
       if projected = general.entry.resultType then pure ()
       else throw (.publicCoreResultMismatch projected general.entry.resultType)
-  | .typedSource => pure ()
+  | .typedSource _ => pure ()
 
 private theorem validatePublicResultType_correct
     (root : SourceSpecialization.SpecializedFunction)
@@ -837,7 +926,7 @@ private theorem validatePublicResultType_correct
           by_cases same : projected = general.entry.resultType
           · exact congrArg Except.ok same
           · simp [validatePublicResultType, projection, same, Except.mapError, bind, Except.bind] at accepted
-  | typedSource =>
+  | typedSource cached =>
       trivial
 
 /-- Compile one explicit root from an already checked program.  This is the
@@ -855,10 +944,13 @@ def compileChecked (program : CheckedProgram) (seed : Seed)
   SourceCoreDirectLinking.validatePlan program plan
     |>.mapError CompileError.invalidPlan
   let root ← exactRoot plan
-  let executable ← selectBackend program plan options.stagingFuel
-    options.backendPreference
-  validatePublicResultType root executable
-  pure ⟨program, plan, root, executable⟩
+  let executable ← match selected : selectBackend program plan options.stagingFuel options.backendPreference with
+    | .error error => throw error
+    | .ok executable => pure (⟨executable,
+        selectBackend_success_ownership program plan options.stagingFuel options.backendPreference executable selected⟩ :
+        {executable // executable.OwnedBy program plan})
+  validatePublicResultType root executable.val
+  pure ⟨program, plan, root, executable.val, executable.property⟩
 
 /-- Checked compilation retains the exact caller-supplied checked program.
 This is an identity fact, not a claim that the supplied record came from the
@@ -900,14 +992,11 @@ theorem compileChecked_program
                       cases compiledOk
                   | ok root =>
                       rw [selected] at compiledOk
-                      cases backend : selectBackend program plan
-                          options.stagingFuel options.backendPreference with
-                      | error error =>
-                          rw [backend] at compiledOk
+                      dsimp only [Except.mapError, bind, Except.bind] at compiledOk
+                      split at compiledOk
+                      next error backend =>
                           cases compiledOk
-                      | ok executable =>
-                          rw [backend] at compiledOk
-                          simp at compiledOk
+                      next executable backend =>
                           cases publicResult : validatePublicResultType root
                               executable with
                           | error error =>
@@ -959,18 +1048,15 @@ theorem compileChecked_backend_of_preference
                       cases compiledOk
                   | ok root =>
                       rw [selected] at compiledOk
-                      cases backendSelection : selectBackend program plan
-                          options.stagingFuel options.backendPreference with
-                      | error error =>
-                          rw [backendSelection] at compiledOk
+                      dsimp only [Except.mapError, bind, Except.bind] at compiledOk
+                      split at compiledOk
+                      next error backendSelection =>
                           cases compiledOk
-                      | ok executable =>
+                      next executable backendSelection =>
                           have exactBackend :=
                             selectBackend_backend_of_preference program plan
                               options.stagingFuel options.backendPreference
                               backend executable requested backendSelection
-                          rw [backendSelection] at compiledOk
-                          simp at compiledOk
                           cases publicResult : validatePublicResultType root
                               executable with
                           | error error =>
@@ -1021,14 +1107,11 @@ theorem compileChecked_hasCanonicalRoot
                       cases compiledOk
                   | ok root =>
                       rw [selected] at compiledOk
-                      cases backend : selectBackend program plan
-                          options.stagingFuel options.backendPreference with
-                      | error error =>
-                          rw [backend] at compiledOk
+                      dsimp only [Except.mapError, bind, Except.bind] at compiledOk
+                      split at compiledOk
+                      next error backend =>
                           cases compiledOk
-                      | ok executable =>
-                          rw [backend] at compiledOk
-                          simp at compiledOk
+                      next executable backend =>
                           cases publicResult : validatePublicResultType root
                               executable with
                           | error error =>
@@ -1079,14 +1162,11 @@ theorem compileChecked_hasValidatedTypedPlan
                       cases compiledOk
                   | ok root =>
                       rw [selected] at compiledOk
-                      cases backendSelected : selectBackend program plan
-                          options.stagingFuel options.backendPreference with
-                      | error error =>
-                          rw [backendSelected] at compiledOk
+                      dsimp only [Except.mapError, bind, Except.bind] at compiledOk
+                      split at compiledOk
+                      next error backendSelected =>
                           cases compiledOk
-                      | ok executable =>
-                          rw [backendSelected] at compiledOk
-                          simp at compiledOk
+                      next executable backendSelected =>
                           cases publicResult : validatePublicResultType root
                               executable with
                           | error error =>
@@ -1098,10 +1178,10 @@ theorem compileChecked_hasValidatedTypedPlan
                               cases executable with
                               | core entry | coreRuntime entry | coreGeneral entry =>
                                   simp [CompiledEntry.backend] at typedBackend
-                              | typedSource =>
+                              | typedSource cached =>
                                   exact selectBackend_typed_plan program plan
                                     options.stagingFuel options.backendPreference
-                                    backendSelected
+                                    cached backendSelected
 
 /-- The public result type is certified against the backend selected by every
 successful checked compilation, including every explicit backend preference. -/
@@ -1142,14 +1222,11 @@ theorem compileChecked_hasPublicResultProjection
                       cases compiledOk
                   | ok root =>
                       rw [selected] at compiledOk
-                      cases backend : selectBackend program plan
-                          options.stagingFuel options.backendPreference with
-                      | error error =>
-                          rw [backend] at compiledOk
+                      dsimp only [Except.mapError, bind, Except.bind] at compiledOk
+                      split at compiledOk
+                      next error backend =>
                           cases compiledOk
-                      | ok executable =>
-                          rw [backend] at compiledOk
-                          simp at compiledOk
+                      next executable backend =>
                           cases publicResult : validatePublicResultType root
                               executable with
                           | error error =>
@@ -1213,14 +1290,11 @@ theorem compileChecked_key_of_resolved (program : CheckedProgram) (seed : Seed)
                   have rootKey : root.key = specialized.key := by
                     simpa [rootSeeds] using seeds
                   rw [selected] at compiledOk
-                  cases executable : selectBackend program plan
-                      options.stagingFuel options.backendPreference with
-                  | error error =>
-                      rw [executable] at compiledOk
+                  dsimp only [Except.mapError, bind, Except.bind] at compiledOk
+                  split at compiledOk
+                  next error executable =>
                       cases compiledOk
-                  | ok backend =>
-                      rw [executable] at compiledOk
-                      simp at compiledOk
+                  next backend executable =>
                       cases publicResult : validatePublicResultType root
                           backend with
                       | error error =>
@@ -2078,7 +2152,7 @@ theorem CompiledEntry.run_core_done_preserves_type
       .ok (.core (.done value finalStore))) :
     compiled.SuccessfulResultHasNativeType (.core (.done value finalStore)) := by
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
@@ -2106,7 +2180,7 @@ theorem CompiledEntry.run_core_done_preserves_type
       cases result : general.entry.run arguments options.executionFuel store with
       | error error => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
       | ok result => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
-  | typedSource =>
+  | typedSource cached =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
 
 /-- Under the same deep invocation premise, the facade's direct-Core route
@@ -2120,7 +2194,7 @@ theorem CompiledEntry.run_core_never_faults
     compiled.run (.coreValues arguments store) options ≠
       .ok (.core (.fault error faultState)) := by
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
@@ -2150,43 +2224,62 @@ theorem CompiledEntry.run_core_never_faults
       cases result : general.entry.run arguments options.executionFuel store with
       | error error => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
       | ok result => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
-  | typedSource =>
+  | typedSource cached =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
 
-/-- A successful source-typed facade result has the inferred result type of
-the unique retained root specialization. -/
+/-- A source-value facade result retains the exact original request's deep
+boundary certificate from the cached Core observation. -/
+private theorem typedSource_done_certificate
+    (compiled : CompiledEntry) (arguments : List SourceTypedRuntime.Value)
+    (initial : SourceTypedRuntime.RuntimeState) (options : RunOptions)
+    {value : SourceTypedRuntime.Value} {finalState : SourceTypedRuntime.RuntimeState}
+    (precondition : compiled.PreservationPrecondition (.typedValues arguments initial))
+    (ran : compiled.run (.typedValues arguments initial) options =
+      .ok (.typedSource (.done value finalState))) :
+    compiled.TypedDeepExecution arguments initial value finalState := by
+  cases compiled
+  rename_i program plan root executable owned
+  cases executable with
+  | core entry | coreRuntime entry | coreGeneral entry =>
+      simp only [CompiledEntry.PreservationPrecondition] at precondition
+  | typedSource cached =>
+      simp only [CompiledEntry.PreservationPrecondition, CompiledEntry.HasCanonicalRoot] at precondition
+      simp only [Executable.OwnedBy] at owned
+      cases native : cached.run root.key arguments options.inputValidationFuel options.executionFuel initial with
+      | error error => simp [CompiledEntry.run, CompiledEntry.key, native, Except.mapError, Except.map] at ran
+      | ok result =>
+          have done : result.observation = .done value finalState := by
+            simpa [CompiledEntry.run, CompiledEntry.key, native, Except.mapError, Except.map] using ran
+          obtain ⟨specialized, selected, certificate⟩ :=
+            SourceCoreUnifiedPreparationCertificates.run_done_specialization native done
+          rw [owned.1, owned.2] at certificate
+          rw [owned.2] at selected
+          have rootSelected : SourceCompilationPlan.exactSpecialization plan root.key = .ok root := by
+            simp [SourceCompilationPlan.exactSpecialization, precondition]
+          have same : specialized = root := Except.ok.inj (selected.symm.trans rootSelected)
+          subst specialized
+          exact certificate
+
+/-- Successful source-value observations have the public result type, final
+heap and authentic closure/evidence boundary supplied by the cached Core run. -/
 theorem CompiledEntry.run_typedSource_done_preserves_type
     (compiled : CompiledEntry)
     (arguments : List SourceTypedRuntime.Value)
     (initial : SourceTypedRuntime.RuntimeState) (options : RunOptions)
     {value : SourceTypedRuntime.Value}
     {finalState : SourceTypedRuntime.RuntimeState}
-    (precondition : compiled.PreservationPrecondition
-      (.typedValues arguments initial))
+    (precondition : compiled.PreservationPrecondition (.typedValues arguments initial))
     (ran : compiled.run (.typedValues arguments initial) options =
       .ok (.typedSource (.done value finalState))) :
-    compiled.SuccessfulResultHasNativeType
-      (.typedSource (.done value finalState)) := by
+    compiled.SuccessfulResultHasNativeType (.typedSource (.done value finalState)) := by
+  have execution := typedSource_done_certificate compiled arguments initial options precondition ran
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry | coreRuntime entry | coreGeneral entry =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
-  | typedSource =>
-      simp only [CompiledEntry.PreservationPrecondition] at precondition
-      have completed : SourceTypedRuntime.runDeepCertifiedWithValidationFuel
-          program plan root.key arguments
-            options.inputValidationFuel options.executionFuel initial =
-          .done value finalState := by
-        simpa [CompiledEntry.run] using ran
-      simp only [CompiledEntry.SuccessfulResultHasNativeType]
-      have selected : SourceTypedRuntime.exactSpecialization plan root.key =
-          .ok root := by
-        unfold SourceTypedRuntime.exactSpecialization
-        rw [precondition]
-      exact SourceTypedRuntime.runDeepCertifiedWithValidationFuel_done
-        program plan root.key arguments options.inputValidationFuel
-        options.executionFuel initial finalState value root selected completed
+  | typedSource cached =>
+      exact ⟨execution.prepared, execution.final_state_safe, execution.value_safe⟩
 
 /-- On the typed backend, the common native-type conclusion is exactly the
 artifact's public source result type, not a separate runtime declaration. -/
@@ -2204,11 +2297,11 @@ theorem CompiledEntry.runTyped_done_has_public_resultType
   have native := compiled.run_typedSource_done_preserves_type arguments
     initial options precondition ran
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry | coreRuntime entry | coreGeneral entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
-  | typedSource =>
+  | typedSource cached =>
       simp only [CompiledEntry.SuccessfulResultHasNativeType] at native
       refine ⟨native.executablePlan, native.prepared, ?_⟩
       exact native.value_safe.typed.outer
@@ -2227,24 +2320,7 @@ theorem CompiledEntry.runTyped_done_has_public_deepExecution
     (ran : compiled.runTyped arguments options initial =
       .ok (.typedSource (.done value finalState))) :
     compiled.TypedDeepExecution arguments initial value finalState := by
-  cases compiled
-  rename_i program plan root executable
-  cases executable with
-  | core entry | coreRuntime entry | coreGeneral entry =>
-      simp [CompiledEntry.PreservationPrecondition] at precondition
-  | typedSource =>
-      simp only [CompiledEntry.PreservationPrecondition] at precondition
-      have completed : SourceTypedRuntime.runDeepCertifiedWithValidationFuel
-          program plan root.key arguments options.inputValidationFuel
-            options.executionFuel initial = .done value finalState := by
-        simpa [CompiledEntry.runTyped, CompiledEntry.run] using ran
-      have selected : SourceTypedRuntime.exactSpecialization plan root.key =
-          .ok root := by
-        unfold SourceTypedRuntime.exactSpecialization
-        rw [precondition]
-      exact SourceTypedRuntime.runDeepCertifiedWithValidationFuel_done_certificate
-        program plan root.key arguments options.inputValidationFuel
-          options.executionFuel initial finalState value root selected completed
+  exact typedSource_done_certificate compiled arguments initial options precondition ran
 
 /-- Canonical-root provenance is the only additional proof needed to use the
 typed deep boundary on an already compiled artifact. -/
@@ -2262,7 +2338,7 @@ theorem CompiledEntry.runTyped_done_has_public_deepExecution_of_canonical
   have precondition : compiled.PreservationPrecondition
       (.typedValues arguments initial) := by
     cases compiled
-    rename_i program plan root executable
+    rename_i program plan root executable owned
     cases executable <;>
       simp_all [CompiledEntry.backend, CompiledEntry.HasCanonicalRoot,
         CompiledEntry.PreservationPrecondition]
@@ -2285,11 +2361,11 @@ theorem CompiledEntry.runTyped_done_has_public_deepResult
   have native := compiled.run_typedSource_done_preserves_type arguments
     initial options precondition ran
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry | coreRuntime entry | coreGeneral entry =>
       simp [CompiledEntry.PreservationPrecondition] at precondition
-  | typedSource =>
+  | typedSource cached =>
       simpa [CompiledEntry.TypedDeepResult,
         CompiledEntry.SuccessfulResultHasNativeType] using native
 
@@ -2308,7 +2384,7 @@ theorem CompiledEntry.run_core_done_has_public_resultType
   have native := compiled.run_core_done_preserves_type arguments store
     options precondition ran
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry =>
       change SourceCoreElaboration.lowerType
@@ -2328,7 +2404,7 @@ theorem CompiledEntry.run_core_done_has_public_resultType
       cases result : general.entry.run arguments options.executionFuel store with
       | error error => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
       | ok result => simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
-  | typedSource =>
+  | typedSource cached =>
       simp only [CompiledEntry.PreservationPrecondition] at precondition
 
 /-- The optional-cell entry checks complete input values and supplies typed
@@ -2341,12 +2417,12 @@ theorem CompiledEntry.run_coreLanguageResult_hasType
       .ok (.coreLanguageResult observation)) :
     compiled.SuccessfulResultHasNativeType (.coreLanguageResult observation) := by
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry =>
       cases result : entry.run? arguments options.executionFuel store <;>
         simp [CompiledEntry.run, result] at ran
-  | typedSource => simp [CompiledEntry.run, Invocation.kind] at ran
+  | typedSource cached => simp [CompiledEntry.run, Invocation.kind] at ran
   | coreRuntime entry =>
       cases accepted : entry.run arguments options.executionFuel store with
       | error error => simp [CompiledEntry.run, accepted, Except.mapError, Except.map] at ran
@@ -2373,10 +2449,10 @@ theorem CompiledEntry.run_coreLanguageResult_has_public_resultType
     compiled.CoreLanguageResultHasPublicType observation := by
   have typed := compiled.run_coreLanguageResult_hasType arguments store options observation ran
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
-  | typedSource => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
+  | typedSource cached => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
   | coreRuntime entry => exact ⟨entry.resultType, projection, typed⟩
   | coreGeneral general => exact ⟨general.entry.resultType, projection, typed⟩
 
@@ -2392,16 +2468,16 @@ theorem CompiledEntry.run_coreLanguageResult_done_has_public_resultType
   have typed := compiled.run_coreLanguageResult_hasType arguments store options
     (.succeeded value finalStore) ran
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
   | core entry => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
-  | typedSource => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
+  | typedSource cached => simp [CompiledEntry.SuccessfulResultHasNativeType] at typed
   | coreRuntime entry =>
       exact ⟨entry.resultType, projection, typed⟩
   | coreGeneral general => exact ⟨general.entry.resultType, projection, typed⟩
 
 /-- Whole-compiler successful-result preservation. One theorem covers both
-selected runtimes without erasing their native value/store domains.
+invocation interfaces without erasing their value/store domains.
 The precondition is substantial only for direct Core (deep values/store) and
 for the typed backend's sealed canonical-root provenance. -/
 theorem CompiledEntry.run_preserves_successful_result_native_type
@@ -2420,9 +2496,13 @@ theorem CompiledEntry.run_preserves_successful_result_native_type
                 options precondition ran
           | typedValues arguments state =>
               cases compiled
-              rename_i program plan root executable
-              cases executable <;>
-                simp [CompiledEntry.run, Invocation.kind] at ran
+              rename_i program plan root executable owned
+              cases executable with
+              | core entry | coreRuntime entry | coreGeneral entry =>
+                  simp [CompiledEntry.run, Invocation.kind] at ran
+              | typedSource cached =>
+                  cases native : cached.run root.key arguments options.inputValidationFuel options.executionFuel state <;>
+                    simp [CompiledEntry.run, CompiledEntry.key, native, Except.mapError, Except.map] at ran
       | outOfFuel state =>
           simp [CompiledEntry.SuccessfulResultHasNativeType]
       | fault error state =>
@@ -2433,7 +2513,7 @@ theorem CompiledEntry.run_preserves_successful_result_native_type
           cases invocation with
           | coreValues arguments store =>
               cases compiled
-              rename_i program plan root executable
+              rename_i program plan root executable owned
               cases executable with
               | core entry =>
                   simp only [CompiledEntry.run] at ran
@@ -2444,7 +2524,7 @@ theorem CompiledEntry.run_preserves_successful_result_native_type
               | coreGeneral general =>
                   cases result : general.entry.run arguments options.executionFuel store <;>
                     simp [CompiledEntry.run, result, Except.mapError, Except.map] at ran
-              | typedSource =>
+              | typedSource cached =>
                   simp [CompiledEntry.run, Invocation.kind] at ran
           | typedValues arguments initial =>
               exact compiled.run_typedSource_done_preserves_type arguments
@@ -2459,11 +2539,15 @@ theorem CompiledEntry.run_preserves_successful_result_native_type
           exact compiled.run_coreLanguageResult_hasType arguments store options observation ran
       | typedValues arguments state =>
           cases compiled
-          rename_i program plan root executable
-          cases executable <;> simp [CompiledEntry.run, Invocation.kind] at ran
+          rename_i program plan root executable owned
+          cases executable with
+          | core entry | coreRuntime entry | coreGeneral entry => simp [CompiledEntry.run, Invocation.kind] at ran
+          | typedSource cached =>
+              cases native : cached.run root.key arguments options.inputValidationFuel options.executionFuel state <;>
+                simp [CompiledEntry.run, CompiledEntry.key, native, Except.mapError, Except.map] at ran
 
-/-- A typed-source artifact rejects Core-domain inputs before either runtime
-starts.  In particular, execution fuel cannot turn this boundary failure into
+/-- A source-value artifact rejects Core-domain inputs before Core execution
+starts. In particular, execution fuel cannot turn this boundary failure into
 a runtime result. -/
 theorem CompiledEntry.runCore_of_typedSource (compiled : CompiledEntry)
     (arguments : List Core.Value) (options : RunOptions) (store : Core.Store)
@@ -2471,7 +2555,7 @@ theorem CompiledEntry.runCore_of_typedSource (compiled : CompiledEntry)
     compiled.runCore arguments options store =
       .error (.invocationKindMismatch .typedSource .coreValues) := by
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable <;> simp_all [CompiledEntry.backend, CompiledEntry.runCore,
     CompiledEntry.run, Invocation.kind]
 
@@ -2483,23 +2567,46 @@ theorem CompiledEntry.runTyped_of_core (compiled : CompiledEntry)
     compiled.runTyped arguments options state =
       .error (.invocationKindMismatch .core .typedValues) := by
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable <;> simp_all [CompiledEntry.backend, CompiledEntry.runTyped,
     CompiledEntry.run, Invocation.kind]
 
-/-- Once a typed-source artifact receives typed inputs, validation failures,
-runtime faults, and either fuel exhaustion are retained inside its native
-result carrier rather than being relabeled as facade errors. -/
-theorem CompiledEntry.runTyped_ok_of_typedSource (compiled : CompiledEntry)
+/-- Source faults and exhaustion retain the historical result carrier.
+An internal adapter failure remains a distinct facade error. -/
+theorem CompiledEntry.runTyped_outcome_of_typedSource (compiled : CompiledEntry)
     (arguments : List SourceTypedRuntime.Value) (options : RunOptions)
     (state : SourceTypedRuntime.RuntimeState)
     (hbackend : compiled.backend = .typedSource) :
-    ∃ result, compiled.runTyped arguments options state =
-      .ok (.typedSource result) := by
+    (∃ result, compiled.runTyped arguments options state = .ok (.typedSource result)) ∨
+      (∃ error, compiled.runTyped arguments options state = .error (.typedSourceAdapter error)) := by
   cases compiled
-  rename_i program plan root executable
-  cases executable <;> simp_all [CompiledEntry.backend, CompiledEntry.runTyped,
-    CompiledEntry.run]
+  rename_i program plan root executable owned
+  cases executable with
+  | core entry | coreRuntime entry | coreGeneral entry =>
+      simp [CompiledEntry.backend] at hbackend
+  | typedSource cached =>
+      cases native : cached.run root.key arguments options.inputValidationFuel options.executionFuel state with
+      | error error => exact .inr ⟨error, by simp [CompiledEntry.runTyped, CompiledEntry.run,
+          CompiledEntry.key, native, Except.mapError, Except.map]⟩
+      | ok result => exact .inl ⟨result.observation, by simp [CompiledEntry.runTyped, CompiledEntry.run,
+          CompiledEntry.key, native, Except.mapError, Except.map]⟩
+
+/-- Successful checkpoint creation projects to the historical public result. -/
+theorem CompiledEntry.runTyped_ok_of_checkpoint (compiled : CompiledEntry)
+    (arguments : List SourceTypedRuntime.Value) (options : RunOptions)
+    (state : SourceTypedRuntime.RuntimeState) (checkpoint : CompiledEntry.TypedCheckpoint compiled)
+    (ran : compiled.runTypedWithCheckpoint arguments options state = .ok checkpoint) :
+    compiled.runTyped arguments options state = .ok (.typedSource checkpoint.observation) := by
+  unfold CompiledEntry.runTypedWithCheckpoint at ran
+  split at ran
+  next cached selected =>
+    split at ran
+    · cases ran
+    · next result native =>
+      cases ran
+      simp [CompiledEntry.runTyped, CompiledEntry.run, selected, CompiledEntry.TypedCheckpoint.observation,
+        native, Except.mapError, Except.map]
+  next => cases ran
 
 /-- Core-domain execution retains either its direct result, its decoded
 language result, or its explicit input-boundary rejection. -/
@@ -2511,9 +2618,9 @@ theorem CompiledEntry.runCore_outcome_of_core (compiled : CompiledEntry)
         .ok (.coreLanguageResult observation)) ∨
       (∃ error, compiled.runCore arguments options store = .error error) := by
   cases compiled
-  rename_i program plan root executable
+  rename_i program plan root executable owned
   cases executable with
-  | typedSource => simp [CompiledEntry.backend] at hbackend
+  | typedSource cached => simp [CompiledEntry.backend] at hbackend
   | core entry =>
       cases exactRun : entry.run? arguments options.executionFuel store with
       | none =>
@@ -2617,7 +2724,7 @@ theorem compileChecked_typed_preservation_precondition
   have canonical := compileChecked_hasCanonicalRoot program seed options
     compiled compiledOk
   cases compiled
-  rename_i checked plan root executable
+  rename_i checked plan root executable owned
   cases executable <;>
     simp_all [CompiledEntry.backend, CompiledEntry.PreservationPrecondition]
 
@@ -2633,7 +2740,7 @@ theorem compile_typed_preservation_precondition
     compiled.PreservationPrecondition (.typedValues arguments state) := by
   have canonical := compile_hasCanonicalRoot raw seed options compiled compiledOk
   cases compiled
-  rename_i checked plan root executable
+  rename_i checked plan root executable owned
   cases executable <;>
     simp_all [CompiledEntry.backend, CompiledEntry.PreservationPrecondition]
 
