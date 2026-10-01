@@ -89,6 +89,7 @@ import Solcore.Frontend.SourceCoreUnifiedRuntime
 import Solcore.Frontend.SourceCoreUnifiedRuntimeCertificates
 import Solcore.Frontend.SourceCoreUnifiedCompilation
 import Solcore.Frontend.SourceCoreUnifiedPreparationCertificates
+import Solcore.Frontend.SourceCoreCompiler
 import Solcore.Frontend.SourceCoreLambdaTemplates
 import Solcore.Frontend.SourceCoreCompatibleHeapOutputs
 import Solcore.Frontend.SourceCoreCompatibleDataPlaces
@@ -97,6 +98,10 @@ import Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites
 import Solcore.Frontend.SourceCorePlanCatalog
 import Solcore.Frontend.SourceCoreDataValues
 import Solcore.Frontend.SourceCoreSession
+import Solcore.Frontend.SourceCorePublicValues
+import Solcore.Frontend.SourceCoreIndexedSession
+import Solcore.Frontend.SourceCoreRootDiscovery
+import Solcore.Frontend.SourceCoreExecution
 import Solcore.Frontend.SourceCompilerSession
 import Solcore.Frontend.SourceCoreEvidence
 import Solcore.Frontend.SourceCoreLocalPolymorphism

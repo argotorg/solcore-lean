@@ -138,6 +138,13 @@ import Solcore.Test.SourceCoreCallableIndexedAmbient
 import Solcore.Test.SourceCoreCompatibleAmbientMappings
 import Solcore.Test.SourceCoreCompatibleAmbientPaths
 import Solcore.Test.SourceCoreCompatibleAmbientSnapshot
+import Solcore.Test.SourceCoreCompatibleAmbientPlaceEffects
+import Solcore.Test.SourceCoreCompatibleAmbientWriteback
+import Solcore.Test.SourceCoreCompatibleAmbientLowerReflection
+import Solcore.Test.SourceCoreCompatibleExpressionProducts
+import Solcore.Test.SourceCoreCompatibleAmbientBitNot
+import Solcore.Test.SourceCoreCompatibleExpressionPrimitives
+import Solcore.Test.SourceCoreCompatibleExpressionConditionals
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -1243,6 +1250,12 @@ import Solcore.Test.SourceCoreDataEqualityScalarProofs
 import Solcore.Test.SourceCoreDataEqualityCertificates
 import Solcore.Test.SourceCoreDataMatchCertificates
 import Solcore.Test.SourceCoreSession
+import Solcore.Test.SourceCoreCompiler
+import Solcore.Test.SourceCoreIndexedSession
+import Solcore.Test.SourceCoreIndexedSessionFactories
+import Solcore.Test.SourceCoreIndexedSessionInvocation
+import Solcore.Test.SourceCoreRootDiscovery
+import Solcore.Test.SourceCoreExecution
 import Solcore.Test.SourceCompilerCoreGeneral
 import Solcore.Test.SourceCompilerSession
 import Solcore.Test.SourceCoreEvidence
@@ -2437,6 +2450,11 @@ private def coreRuntimeUnificationTests : IO Unit := do
   Solcore.Test.SourceCoreCompatibleAmbientMappings.run
   SourceCoreCompatibleAmbientPaths.run
   SourceCoreCompatibleAmbientSnapshot.run
+  SourceCoreCompatibleAmbientPlaceEffects.run
+  SourceCoreCompatibleAmbientWriteback.run
+  SourceCoreCompatibleExpressionProducts.run
+  SourceCoreCompatibleExpressionPrimitives.run
+  SourceCoreCompatibleExpressionConditionals.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
@@ -2772,6 +2790,12 @@ def run : IO Unit := do
   SourceCoreForStatementReflection.run
   SourceCoreDataEqualityInitialization.run
   SourceCoreSession.run
+  SourceCoreCompiler.run
+  SourceCoreIndexedSession.run
+  SourceCoreIndexedSessionFactories.run
+  SourceCoreIndexedSessionInvocation.run
+  SourceCoreRootDiscovery.run
+  SourceCoreExecution.run
   SourceCompilerCoreGeneral.run
   SourceCompilerSession.run
   SourceCoreEvidence.run
