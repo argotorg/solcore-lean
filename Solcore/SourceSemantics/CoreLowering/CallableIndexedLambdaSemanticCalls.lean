@@ -1,14 +1,14 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaViewInvocation
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticCalls
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
 
 /-! Ordinary closure calls combine concrete lexical builtin bodies with the
 actual indexed frame and marked parameter prefix. The lambda's generation
 receipt and caller history remain semantic inputs. Completed native execution
 constructs the independent source call; no body execution is an input. -/
 set_option autoImplicit false
-namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaViewCalls
+namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticCalls
 open Core Frontend SourceInference GeneralHeap ReadOnly CoreProof CompatiblePayload
-open CallableIndexedHistory CallableIndexedLambdaValues CallableIndexedLambdaViewInvocation
+open CallableIndexedHistory CallableIndexedLambdaValues CallableIndexedLambdaSemanticInvocation
 open CallableIndexedParameterCertificates CallableIndexedParameterMeaning
 open SourceCoreCallableIndexedFrames
 
@@ -54,7 +54,26 @@ theorem Entry.preserves
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
-  exact CallableIndexedLambdaSemanticCalls.Entry.preserves captured code history body.semantic profile extension uninitialized missing entry allocated trace
+  obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
+  rw [← sameEnvironment, ← sameHeap] at trace
+  have registered := CallableIndexedAmbient.frame_registered prepared
+  obtain ⟨result, bodyStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    body.certificate.preserves (model prepared profile) extension rfl registered program body.valid body.unique uninitialized missing
+      (identity_faithful prepared) (observations prepared profile) (runtime_views prepared profile)
+      entry.entry.environments entry.entry.heaps entry.entry.locals entry.entry.lookups entry.entry.actualTyped
+      entry.entry.reference entry.entry.read entry.entry.unmapped trace
+  have maps := entry.entry.maps.trans maps
+  have worlds := entry.entry.worlds.trans worlds
+  have frame := entry.entry.frame.trans frame
+  have metadata := entry.entry.metadata.trans metadata
+  have bodyEval := entry.wrap evaluated
+  have callEval : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
+      store applyPayload result (bodyStore.set location (encode prepared.ancestry.layout.frame current)) :=
+    .apply (.second (.first (.var rfl))) (.var rfl) bodyEval
+  obtain ⟨restoredHeap, restoredFrame, restoredCaller⟩ := CallableIndexedBodyFrames.restore registered entry.unmapped entry.referenceTyped
+    (show CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost store from
+      ⟨entry.currentRead, entry.currentHistory⟩) finalHeaps worlds frame
+  exact ⟨result, _, finalMap, finalWorld, callEval, related, restoredHeap, maps, worlds, restoredFrame, metadata, restoredCaller⟩
 
 include extension uninitialized missing in
 theorem Entry.reflects
@@ -71,7 +90,37 @@ theorem Entry.reflects
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
-  exact CallableIndexedLambdaSemanticCalls.Entry.reflects captured code history body.semantic profile extension uninitialized missing entry evaluated
+  cases evaluated with
+  | apply callee argument applied =>
+    have expected : Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
+        store (.second (.first (.var 0)))
+        (.closure code.receipt.parameterCore (LanguageResult.resultType code.receipt.resultCore)
+          (code.body.rename captured.embedding.lift.lift) (encode prepared.ancestry.layout.frame history.native :: capturedActual)) store :=
+      .second (.first (.var rfl))
+    obtain ⟨sameClosure, sameStore⟩ := evaluation_deterministic callee expected
+    obtain ⟨rfl, rfl, rfl, rfl⟩ := Value.closure.inj sameClosure
+    rw [sameStore] at argument
+    obtain ⟨sameArgument, sameAfter⟩ := evaluation_deterministic argument
+      (show Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
+        store (.var 1) (DataPatternValues.packValues nativeArguments) store from .var rfl)
+    rw [sameArgument, sameAfter] at applied
+    obtain ⟨bodyStore, bodyEval, finalEq⟩ := entry.unwrap applied
+    have registered := CallableIndexedAmbient.frame_registered prepared
+    obtain ⟨outcome, after, finalMap, finalWorld, trace, related, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+      body.certificate.reflects (model prepared profile) extension rfl registered program body.valid body.unique uninitialized missing
+        (identity_faithful prepared) (observations prepared profile) (runtime_views prepared profile)
+        entry.entry.environments entry.entry.heaps entry.entry.locals entry.entry.lookups entry.entry.actualTyped
+        entry.entry.reference entry.entry.read entry.entry.unmapped bodyEval
+    have maps := entry.entry.maps.trans maps
+    have worlds := entry.entry.worlds.trans worlds
+    have frame := entry.entry.frame.trans frame
+    have metadata := entry.entry.metadata.trans metadata
+    obtain ⟨restoredHeap, restoredFrame, restoredCaller⟩ := CallableIndexedBodyFrames.restore registered entry.unmapped entry.referenceTyped
+      (show CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost store from
+        ⟨entry.currentRead, entry.currentHistory⟩) finalHeaps worlds frame
+    subst finalStore
+    exact ⟨entry.entry.environment, entry.entry.heap, outcome, after, finalMap, finalWorld, entry.entry.allocation, trace,
+      related, restoredHeap, maps, worlds, restoredFrame, metadata, restoredCaller⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
 theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
@@ -86,7 +135,10 @@ theorem reflects {callerContext : SourceSemantics.Context} {callerEvidence : Dyn
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
-  exact CallableIndexedLambdaSemanticCalls.reflects captured code history body.semantic profile extension represented heaps locals reference read currentCarried unmapped allowed uninitialized missing evaluated
+  obtain ⟨entry⟩ := entry_exists captured code history body profile represented heaps locals reference read currentCarried unmapped allowed
+  obtain ⟨environment, bound, outcome, after, finalMap, finalWorld, allocated, trace, rest⟩ :=
+    Entry.reflects captured code history body profile extension uninitialized missing entry evaluated
+  exact ⟨outcome, after, finalMap, finalWorld, trace.call body.frame body.extended allocated, rest⟩
 
 include body represented heaps locals reference read currentCarried unmapped allowed extension uninitialized missing in
 theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
@@ -101,6 +153,13 @@ theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dy
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
-  exact CallableIndexedLambdaSemanticCalls.preserves captured code history body.semantic profile extension represented heaps locals reference read currentCarried unmapped allowed uninitialized missing executed
+  have arity : function.parameters.length = arguments.length := by rw [parameters code]; simpa using represented.length.1
+  obtain ⟨types, context, environment, bound, extended, allocated, trace⟩ := FunctionCallBody.Outcome.trace arity executed
+  have sameTypes : types = body.types := extended.bodyTypes_eq.symm.trans body.extended.bodyTypes_eq
+  subst types
+  have sameContext := extended.functional body.extended
+  subst context
+  obtain ⟨entry⟩ := entry_exists captured code history body profile represented heaps locals reference read currentCarried unmapped allowed
+  exact Entry.preserves captured code history body profile extension uninitialized missing entry allocated trace
 
-end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaViewCalls
+end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticCalls
