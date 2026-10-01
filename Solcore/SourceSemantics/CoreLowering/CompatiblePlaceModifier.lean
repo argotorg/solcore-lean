@@ -11,7 +11,8 @@ open Core Frontend SourceInference GeneralHeap DataEquality CompatiblePayload Co
 open SourceCoreCompatibleDataPlaces
 
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+  {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
   {identities : Dynamic.Value → Word → Prop}
 
 theorem word_fields (observations : FunctionObservations checked.catalog functions identities)

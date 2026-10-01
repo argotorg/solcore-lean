@@ -16,7 +16,8 @@ structure Layout (compilation : SourceCoreCompatibleDataPlaces.Context) (source 
     (certificate : Certificate) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)
     (place : PlaceResolution) (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr)
     (sourceTypes : List TypeSystem.Ty) (leaf : TypeSystem.Ty) (administrativeContext : Core.Context)
-    (rhsType : Core.Ty := prepared.route.leafType) : Prop where
+    (rhsType : Core.Ty := prepared.route.leafType)
+    (definitions : DataEnvironment := compilation.checked.catalog.definitions) : Prop where
   path : PreparedPath compilation.checked source site prepared.route.rootSourceType place.projections
     0 prepared.steps prepared.keys leaf
   views : KeyViews path sourceTypes
@@ -29,12 +30,12 @@ structure Layout (compilation : SourceCoreCompatibleDataPlaces.Context) (source 
   getterTyped : HasType ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
       (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
     (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0)))
-    (LanguageResult.resultType prepared.optionalLeaf) compilation.checked.catalog.definitions
+    (LanguageResult.resultType prepared.optionalLeaf) definitions
   setterTyped : HasType
     (prepared.route.leafType :: rhsType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
       OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
     (.apply (setter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
-    (LanguageResult.resultType prepared.route.rootType) compilation.checked.catalog.definitions
+    (LanguageResult.resultType prepared.route.rootType) definitions
 
 private theorem resolved_nonempty {checked : Checked} {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
@@ -62,13 +63,14 @@ private theorem none_update {modify : Option Dynamic.Value → Dynamic.Value →
 Raw metadata and duplicate entries are retained by the full payload relation;
 the native store additionally contains tracked administrative helper cells. -/
 theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context}
-    (layout : Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (layout : Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
@@ -82,7 +84,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       SourceCoreRawMetadata.runtimeType leaf = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -149,7 +151,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
               (.inRight .unit resolution.snapshot) rightValue replacementValue coreEnvironment)
             (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
               OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
-            compilation.checked.catalog.definitions :=
+            ambient.definitions :=
           .cons replacementRep.runtime_hasType (.cons rightRep.runtime_hasType (.cons (.inRight snapshotRep.runtime_hasType)
             (.cons (CompatiblePlaceResolution.values_typed keyRep) (.cons (.cellRef reference.typed)
               ((environments.extend (resolution.maps.trans rhsResult.maps) (resolution.worlds.trans rhsResult.worlds)).runtime_hasTypes)))))

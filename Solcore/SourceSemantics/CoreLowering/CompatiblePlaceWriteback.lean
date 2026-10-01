@@ -11,7 +11,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute Co
 open SourceCoreCompatibleDataPlaces CompatibleMapping.MixedPaths
 
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+  {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
   {prepared : Prepared} {heap : Dynamic.Heap} {store : Store} {location : Dynamic.Location} {target : Location}
   {cell : Dynamic.Cell} {optional rootValue : Value} {sourceRoot : Dynamic.Value}
 
@@ -68,10 +69,10 @@ theorem preserves
     (observations : FunctionObservations checked.catalog functions identities) (keyLength : prepared.keyTypes.length = keys.length)
     {environment : Environment} {context : Core.Context} {keyType : Ty}
     {referenceExpression keyExpression replacementExpression : Expr}
-    (environmentTyped : RuntimeEnvironmentHasTypes world environment context checked.catalog.definitions)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
     (setterTyped : HasType context
       (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
-      (LanguageResult.resultType prepared.route.rootType) checked.catalog.definitions)
+      (LanguageResult.resultType prepared.route.rootType) ambient.definitions)
     (referenceSelected : Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (keysSelected : Selects environment keyExpression (packValues keys))
     (replacementSelected : Selects environment replacementExpression replacement) :
