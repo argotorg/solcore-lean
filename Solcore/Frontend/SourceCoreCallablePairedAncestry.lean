@@ -217,7 +217,7 @@ def prepare {checked : Checked} (base : Base checked) : Except Error (Prepared b
 
 private def fail (error : Error) : SourceCoreBasic.Error := .sourceAllocation (reprStr error)
 
-private def originId {checked : Checked} {base : Base checked} (_ : Prepared base)
+def originId {checked : Checked} {base : Base checked} (_ : Prepared base)
     (origin : SourceCoreStageCodebook.Origin) : Except SourceCoreBasic.Error Word := do
   let native ← match base.callableContext with
     | some native => pure native | none => throw (fail .missingCallableContext)
