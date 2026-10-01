@@ -24,6 +24,7 @@ import Solcore.Test.SourceCoreDataPlaceRhsReflection
 import Solcore.Test.SourceCoreDataPlaceSetterReflection
 import Solcore.Test.SourceCoreDataPlaceModifierReflection
 import Solcore.Test.SourceCoreDataPlaceCommitReflection
+import Solcore.Test.SourceCoreDataPlaceAssignmentReflection
 import Solcore.Test.SourceCoreDataPlaceCatalogBoundary
 import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCoreHeapMarkers
