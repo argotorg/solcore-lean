@@ -37,8 +37,8 @@ private theorem next_evaluates (layout : Layout) (index : Int) (environment : En
   exact CallableIndexedContextFrames.literal_evaluates _ _ _ _
 
 variable {checked : Checked} {base : Base checked}
-  {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-  {model : GenericHeap.PayloadModel catalog projects}
+  {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+  {model : GenericHeap.PayloadModel catalog projects nativeDefinitions}
   {program : Program} {sourceFunction : Dynamic.Closure} {certificate : FunctionCode.BodyCertificate}
   {faults : FunctionCalls.FaultRep}
 
@@ -59,8 +59,8 @@ theorem preserves (prepared : SourceCoreCallableIndexedAncestry.Prepared base)
     {before after : Dynamic.Heap} {store : Store} {location : Location}
     {current : NativeFrame} {currentGhost : GhostFrame} {outcome : Dynamic.ExpressionOutcome}
     {records : List CallableIndexedSnapshots.Record}
-    (registered : prepared.layout.frame.Registered catalog.definitions)
-    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical)
+    (registered : prepared.layout.frame.Registered nativeDefinitions)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical nativeDefinitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)
@@ -109,8 +109,8 @@ theorem reflects (prepared : SourceCoreCallableIndexedAncestry.Prepared base)
     {before : Dynamic.Heap} {store finalStore : Store} {location : Location}
     {current : NativeFrame} {currentGhost : GhostFrame} {value : Value}
     {records : List CallableIndexedSnapshots.Record}
-    (registered : prepared.layout.frame.Registered catalog.definitions)
-    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical)
+    (registered : prepared.layout.frame.Registered nativeDefinitions)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical nativeDefinitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)

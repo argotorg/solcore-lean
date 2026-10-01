@@ -16,13 +16,13 @@ private theorem insert_at_suffix (added tail : Environment) (value : Value) :
   | nil => simp [Environment.insertAt]
   | cons head rest ih => simpa [Environment.insertAt] using congrArg (head :: ·) ih
 
-private theorem insert_administrative {catalog : SourceCoreDataCatalog.Catalog}
+private theorem insert_administrative {catalog : SourceCoreDataCatalog.Catalog} {nativeDefinitions : DataEnvironment}
     {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
     {scope : Scope} {environment : Dynamic.Environment} {canonical : Environment}
-    (related : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical)
-    {value : Value} {type : Ty} (typed : RuntimeValueHasType world value type catalog.definitions) :
+    (related : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical nativeDefinitions)
+    {value : Value} {type : Ty} (typed : RuntimeValueHasType world value type nativeDefinitions) :
     DataHeap.EnvRepresents catalog mapping world (type :: administrative) scope environment
-      (Environment.insertAt canonical scope.length value) := by
+      (Environment.insertAt canonical scope.length value) nativeDefinitions := by
   induction related with
   | nil values => exact .nil (by simpa [Environment.insertAt] using RuntimeEnvironmentHasTypes.cons typed values)
   | cons reference _ ih => exact .cons reference ih
@@ -44,12 +44,12 @@ theorem inputKinds {source : TypedSource} {bindings : List Binding}
 
 /-- The retained bundle is typed directly from represented arguments, even
 when a payload is a closure that captures mutable cells. -/
-theorem Arguments.pack_typed {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {model : GenericHeap.PayloadModel catalog projects} {mapping : LocationMap} {world : StoreTyping}
+theorem Arguments.pack_typed {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects nativeDefinitions} {mapping : LocationMap} {world : StoreTyping}
     {bindings : List Binding} {sources : List Dynamic.Value} {values : List Value}
     (represented : Arguments model mapping world bindings sources values) :
     RuntimeValueHasType world (DataPatternValues.packValues values)
-      (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd)) catalog.definitions := by
+      (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd)) nativeDefinitions := by
   induction represented with
   | nil => exact .unit
   | @cons binder payload source value bindings sources values head rest ih =>
@@ -69,15 +69,15 @@ theorem named_prefix {layouts : SourceCoreAllocationLayouts.Prepared}
       (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError))
       source [] bindings output SourceCoreFunctions.argumentProjection body = .ok code)
     (inputs : source.inputs = bindings.map Prod.fst)
-    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {model : GenericHeap.PayloadModel catalog projects}
-    (definitions : layouts.definitions = catalog.definitions)
-    (registered : layout.Registered catalog.definitions)
+    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects nativeDefinitions}
+    (definitions : layouts.definitions = nativeDefinitions)
+    (registered : layout.Registered nativeDefinitions)
     {mapping : LocationMap} {world : StoreTyping} {sources : List Dynamic.Value} {values : List Value}
     (represented : Arguments model mapping world bindings sources values)
     {administrative : Core.Context} {canonical actual : Environment}
     {heap : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrative [] [] canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative [] [] canonical nativeDefinitions)
     (heaps : GenericHeap.HeapRepresents model mapping world heap store)
     (actualLayout : EnvironmentsAgree ξ (DataPatternValues.packValues values :: canonical) actual)
     (reference : canonical[globals]? = some (.cellRef layout.type contextLocation))
@@ -87,7 +87,7 @@ theorem named_prefix {layouts : SourceCoreAllocationLayouts.Prepared}
       Dynamic.BindersAllocate [] heap (bindings.map Prod.fst) sources finalEnvironment finalHeap ∧
       DataHeap.EnvRepresents catalog finalMap finalWorld
         (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) :: administrative)
-        (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) finalEnvironment finalCanonical ∧
+        (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) finalEnvironment finalCanonical nativeDefinitions ∧
       GenericHeap.HeapRepresents model finalMap finalWorld finalHeap finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧

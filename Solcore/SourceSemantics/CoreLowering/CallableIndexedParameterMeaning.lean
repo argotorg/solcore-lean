@@ -9,8 +9,8 @@ namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterMeaning
 open Core Frontend SourceInference GeneralHeap CoreProof ReadOnly DataEquality
 open CallableIndexedHistory CallableIndexedParameterCertificates CallableIndexedAllocationCompletion
 
-inductive Arguments {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    (model : GenericHeap.PayloadModel catalog projects) (mapping : LocationMap) (world : StoreTyping) :
+inductive Arguments {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+    (model : GenericHeap.PayloadModel catalog projects nativeDefinitions) (mapping : LocationMap) (world : StoreTyping) :
     List Binding → List Dynamic.Value → List Value → Prop where
   | nil : Arguments model mapping world [] [] []
   | cons {binder : TypedBinder} {payload : Ty} {source : Dynamic.Value} {value : Value}
@@ -19,8 +19,8 @@ inductive Arguments {catalog : SourceCoreDataCatalog.Catalog} {projects : Generi
       (tail : Arguments model mapping world bindings sources values) :
       Arguments model mapping world ((binder, payload) :: bindings) (source :: sources) (value :: values)
 
-theorem Arguments.length {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {model : GenericHeap.PayloadModel catalog projects} {mapping : LocationMap} {world : StoreTyping}
+theorem Arguments.length {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects nativeDefinitions} {mapping : LocationMap} {world : StoreTyping}
     {bindings : List Binding} {sources : List Dynamic.Value} {values : List Value}
     (represented : Arguments model mapping world bindings sources values) :
     bindings.length = sources.length ∧ bindings.length = values.length := by
@@ -28,8 +28,8 @@ theorem Arguments.length {catalog : SourceCoreDataCatalog.Catalog} {projects : G
   | nil => exact ⟨rfl, rfl⟩
   | cons _ _ ih => exact ⟨congrArg Nat.succ ih.1, congrArg Nat.succ ih.2⟩
 
-theorem Arguments.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {model : GenericHeap.PayloadModel catalog projects} {mapping futureMapping : LocationMap}
+theorem Arguments.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects nativeDefinitions} {mapping futureMapping : LocationMap}
     {world futureWorld : StoreTyping} {bindings : List Binding} {sources : List Dynamic.Value} {values : List Value}
     (represented : Arguments model mapping world bindings sources values)
     (maps : LocationMap.Extends mapping futureMapping) (worlds : WorldExtends world futureWorld) :
@@ -62,16 +62,16 @@ theorem Tree.prefix {layouts : SourceCoreAllocationLayouts.Prepared}
     {source : TypedSource} {total : Nat} {output : Ty} {body : Expr}
     {scope : Scope} {start : Nat} {bindings : List Binding} {code : Expr}
     (tree : Tree layouts owner active layout globals onError source total output body scope start bindings code)
-    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {model : GenericHeap.PayloadModel catalog projects}
-    (definitions : layouts.definitions = catalog.definitions)
-    (registered : layout.Registered catalog.definitions)
+    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects nativeDefinitions}
+    (definitions : layouts.definitions = nativeDefinitions)
+    (registered : layout.Registered nativeDefinitions)
     {mapping : LocationMap} {world : StoreTyping} {sources : List Dynamic.Value} {values : List Value}
     (represented : Arguments model mapping world bindings sources values)
     {administrative : Core.Context} {environment : Dynamic.Environment} {canonical logical actual : Environment}
     {heap : Dynamic.Heap} {store : Store} {ξ : Renaming}
     {allTypes : List Ty} {allValues : List Value} {named : Bool} {contextLocation : Location} {native : NativeFrame}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical nativeDefinitions)
     (heaps : GenericHeap.HeapRepresents model mapping world heap store)
     (sourceLayout : EnvironmentsAgree (Renaming.insertion start) canonical logical)
     (actualLayout : EnvironmentsAgree ξ logical actual)
@@ -87,7 +87,7 @@ theorem Tree.prefix {layouts : SourceCoreAllocationLayouts.Prepared}
       Dynamic.BindersAllocate environment heap (bindings.map Prod.fst) sources finalEnvironment finalHeap ∧
       DataHeap.EnvRepresents catalog finalMap finalWorld administrative
         (bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) scope)
-        finalEnvironment finalCanonical ∧
+        finalEnvironment finalCanonical nativeDefinitions ∧
       GenericHeap.HeapRepresents model finalMap finalWorld finalHeap finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧

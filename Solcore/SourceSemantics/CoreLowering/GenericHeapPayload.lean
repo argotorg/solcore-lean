@@ -21,13 +21,14 @@ abbrev strictProjection (catalog : SourceCoreDataCatalog.Catalog) : Projection :
   fun source payload => catalog.project source = .ok payload
 
 structure PayloadModel (catalog : SourceCoreDataCatalog.Catalog)
-    (projects : Projection := strictProjection catalog) where
+    (projects : Projection := strictProjection catalog)
+    (definitions : Core.DataEnvironment := catalog.definitions) where
   Represents : LocationMap → Core.StoreTyping → TypeSystem.Ty → Dynamic.Value → Core.Value → Core.Ty → Prop
   projection : ∀ {mapping world sourceType sourceValue value payload},
     Represents mapping world sourceType sourceValue value payload → projects sourceType payload
   runtime_hasType : ∀ {mapping world sourceType sourceValue value payload},
     Represents mapping world sourceType sourceValue value payload →
-      Core.RuntimeValueHasType world value payload catalog.definitions
+      Core.RuntimeValueHasType world value payload definitions
   extend : ∀ {mapping futureMapping world futureWorld sourceType sourceValue value payload},
     Represents mapping world sourceType sourceValue value payload →
     LocationMap.Extends mapping futureMapping → Core.WorldExtends world futureWorld →
@@ -36,7 +37,8 @@ structure PayloadModel (catalog : SourceCoreDataCatalog.Catalog)
 /-- Optional ordinary cells preserve the source declaration's type and reject
 retained generalized-cell metadata. Their payload representation is supplied
 by the model, not inferred from Core runtime typing. -/
-inductive CellRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} (model : PayloadModel catalog projects)
+inductive CellRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {definitions : Core.DataEnvironment}
+    (model : PayloadModel catalog projects definitions)
     (mapping : LocationMap) (world : Core.StoreTyping) : Dynamic.Cell → Core.Value → Core.Ty → Prop where
   | uninitialized {sourceType : TypeSystem.Ty} {payload : Core.Ty}
       (projection : projects sourceType payload) :
@@ -45,7 +47,8 @@ inductive CellRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : P
       (represented : model.Represents mapping world sourceType source value payload) :
       CellRepresents model mapping world ⟨sourceType, some source, none⟩ (.inRight .unit value) payload
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {model : PayloadModel catalog projects}
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {definitions : Core.DataEnvironment}
+  {model : PayloadModel catalog projects definitions}
 
 theorem CellRepresents.projection {mapping : LocationMap} {world : Core.StoreTyping}
     {cell : Dynamic.Cell} {value : Core.Value} {payload : Core.Ty}
@@ -62,7 +65,7 @@ theorem CellRepresents.ordinary {mapping : LocationMap} {world : Core.StoreTypin
 theorem CellRepresents.runtime_hasType {mapping : LocationMap} {world : Core.StoreTyping}
     {cell : Dynamic.Cell} {value : Core.Value} {payload : Core.Ty}
     (represented : CellRepresents model mapping world cell value payload) :
-    Core.RuntimeValueHasType world value (Core.OptionalCell.cellType payload) catalog.definitions := by
+    Core.RuntimeValueHasType world value (Core.OptionalCell.cellType payload) definitions := by
   cases represented with
   | uninitialized => exact .inLeft .unit
   | initialized related => exact .inRight (model.runtime_hasType related)

@@ -21,21 +21,22 @@ private theorem append_lookup {mapping : LocationMap} {fresh index target : Nat}
     subst index
     exact ⟨rfl, by simpa using found.symm⟩
 
-structure HeapRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} (model : PayloadModel catalog projects) (mapping : LocationMap) (world : Core.StoreTyping)
+structure HeapRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {definitions : Core.DataEnvironment} (model : PayloadModel catalog projects definitions) (mapping : LocationMap) (world : Core.StoreTyping)
     (heap : Dynamic.Heap) (store : Core.Store) : Prop where
   length_eq : mapping.length = heap.cells.length
   injective : LocationMap.Injective mapping
-  runtime_hasTypes : Core.RuntimeStoreHasTypes world store catalog.definitions
+  runtime_hasTypes : Core.RuntimeStoreHasTypes world store definitions
   cells : ∀ {source target : Nat}, mapping[source]? = some target →
     ∃ cell value payload,
       Dynamic.Heap.Reads heap ⟨source⟩ cell ∧
       world[target]? = some (Core.OptionalCell.cellType payload) ∧
       store.read? target = some value ∧ CellRepresents model mapping world cell value payload
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {model : PayloadModel catalog projects}
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {definitions : Core.DataEnvironment}
+  {model : PayloadModel catalog projects definitions}
 
 theorem HeapRepresents.empty : HeapRepresents model [] [] ⟨[]⟩ [] := by
-  refine ⟨rfl, ?_, Core.RuntimeStoreHasTypes.nil catalog.definitions, ?_⟩
+  refine ⟨rfl, ?_, Core.RuntimeStoreHasTypes.nil definitions, ?_⟩
   · intro left right target impossible; simp at impossible
   · intro source target impossible; simp at impossible
 
@@ -64,7 +65,7 @@ not required or derived. -/
 theorem HeapRepresents.allocate_administrative
     {mapping : LocationMap} {world : Core.StoreTyping} {heap : Dynamic.Heap} {store : Core.Store}
     (related : HeapRepresents model mapping world heap store) {value : Core.Value} {type : Core.Ty}
-    (typed : Core.RuntimeValueHasType world value type catalog.definitions) :
+    (typed : Core.RuntimeValueHasType world value type definitions) :
     HeapRepresents model mapping (world ++ [type]) heap (store.allocate value).1 := by
   refine ⟨related.length_eq, related.injective, related.runtime_hasTypes.allocate typed, ?_⟩
   intro source target mapped
@@ -119,7 +120,7 @@ theorem HeapRepresents.write_administrative
     {store updated : Core.Store} {location : Core.Location} {type : Core.Ty} {value : Core.Value}
     (related : HeapRepresents model mapping world heap store)
     (absent : ∀ {source : Nat}, mapping[source]? ≠ some location)
-    (found : world[location]? = some type) (typed : Core.RuntimeValueHasType world value type catalog.definitions)
+    (found : world[location]? = some type) (typed : Core.RuntimeValueHasType world value type definitions)
     (written : store.write? location value = some updated) :
     HeapRepresents model mapping world heap updated := by
   refine ⟨related.length_eq, related.injective, related.runtime_hasTypes.write found typed written, ?_⟩
@@ -225,14 +226,16 @@ theorem HeapRepresents.fresh_unmapped {mapping : LocationMap} {world : Core.Stor
 /-- Environments need no additional payload model: their exact mapped
 references and internal lexical slots already support every catalog type. -/
 abbrev EnvRepresents (catalog : SourceCoreDataCatalog.Catalog) (mapping : LocationMap)
-    (world : Core.StoreTyping) (administrativeContext : Core.Context := []) :=
-  DataHeap.EnvRepresents catalog mapping world administrativeContext
+    (world : Core.StoreTyping) (administrativeContext : Core.Context := [])
+    (scope : SourceCoreLocalCell.Scope) (environment : Dynamic.Environment) (canonical : Core.Environment)
+    (definitions : Core.DataEnvironment := catalog.definitions) :=
+  DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions
 
 theorem lookup_visible {mapping : LocationMap} {world : Core.StoreTyping}
     {administrativeContext : Core.Context} {scope : SourceCoreLocalCell.Scope}
     {environment : Dynamic.Environment} {canonical : Core.Environment} {heap : Dynamic.Heap} {store : Core.Store}
     {id : Resolved.LocalId} {location : Dynamic.Location} {index : Nat} {payload : Core.Ty}
-    (environments : EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : HeapRepresents model mapping world heap store)
     (sourceLookup : Dynamic.Environment.LooksUp environment id location)
     (slot : SourceCoreLocalCell.lookup? scope id = some (index, payload)) :
@@ -254,13 +257,13 @@ theorem bind {mapping : LocationMap} {world : Core.StoreTyping}
     {heap after : Dynamic.Heap} {store : Core.Store} {id : Resolved.LocalId}
     {sourceType : Ty} {sourceValue : Option Dynamic.Value} {location : Dynamic.Location}
     {value : Core.Value} {payload : Core.Ty}
-    (environments : EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : HeapRepresents model mapping world heap store)
     (cell : CellRepresents model mapping world ⟨sourceType, sourceValue, none⟩ value payload)
     (allocated : Dynamic.Heap.Allocates heap sourceType sourceValue location after) :
     EnvRepresents catalog (mapping ++ [store.length]) (world ++ [Core.OptionalCell.cellType payload])
       administrativeContext ((id, payload) :: scope) ((id, location) :: environment)
-      (.cellRef (Core.OptionalCell.cellType payload) store.length :: canonical) ∧
+      (.cellRef (Core.OptionalCell.cellType payload) store.length :: canonical) definitions ∧
     HeapRepresents model (mapping ++ [store.length]) (world ++ [Core.OptionalCell.cellType payload])
       after (store.allocate value).1 := by
   obtain ⟨heapRelated, reference⟩ := heaps.allocate cell allocated
@@ -272,14 +275,14 @@ theorem bind_internal {mapping : LocationMap} {world : Core.StoreTyping}
     {heap after : Dynamic.Heap} {store : Core.Store} {id : Resolved.LocalId}
     {sourceType : Ty} {sourceValue : Option Dynamic.Value} {location : Dynamic.Location}
     {value : Core.Value} {payload : Core.Ty}
-    (environments : EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : HeapRepresents model mapping world heap store)
     (fresh : scope.any (fun entry => decide (entry.1 = id)) = false)
     (cell : CellRepresents model mapping world ⟨sourceType, sourceValue, none⟩ value payload)
     (allocated : Dynamic.Heap.Allocates heap sourceType sourceValue location after) :
     EnvRepresents catalog (mapping ++ [store.length]) (world ++ [Core.OptionalCell.cellType payload])
       administrativeContext ((id, payload) :: scope) environment
-      (.cellRef (Core.OptionalCell.cellType payload) store.length :: canonical) ∧
+      (.cellRef (Core.OptionalCell.cellType payload) store.length :: canonical) definitions ∧
     HeapRepresents model (mapping ++ [store.length]) (world ++ [Core.OptionalCell.cellType payload])
       after (store.allocate value).1 := by
   obtain ⟨heapRelated, reference⟩ := heaps.allocate cell allocated

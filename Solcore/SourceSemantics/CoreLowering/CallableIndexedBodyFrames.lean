@@ -11,8 +11,8 @@ namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedBodyFrames
 open Core Frontend GeneralHeap CallableAncestryPairedLookup CallableIndexedHistory
 open SourceCoreCallableIndexedFrames
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-  {model : GenericHeap.PayloadModel catalog projects}
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+  {model : GenericHeap.PayloadModel catalog projects nativeDefinitions}
 
 /-- Installing a related callable frame changes no represented source cell.
 The new native carrier is typed by its registered definition independently of
@@ -21,7 +21,7 @@ theorem install {checked : Checked} {base : Base checked} {inputs : Inputs base}
     {layout : Layout} {mapping : LocationMap} {world : StoreTyping}
     {heap : Dynamic.Heap} {store : Store} {location : Location}
     {current next : NativeFrame} {currentGhost nextGhost : GhostFrame}
-    (registered : layout.Registered catalog.definitions)
+    (registered : layout.Registered nativeDefinitions)
     (heaps : GenericHeap.HeapRepresents model mapping world heap store)
     (unmapped : location ∉ mapping) (typed : world[location]? = some layout.type)
     (caller : CellState inputs table layout location current currentGhost store)
@@ -52,7 +52,7 @@ theorem restore {checked : Checked} {base : Base checked} {inputs : Inputs base}
     {layout : Layout} {mapping finalMap : LocationMap} {world finalWorld : StoreTyping}
     {after : Dynamic.Heap} {before bodyStore : Store} {location : Location}
     {current next : NativeFrame} {currentGhost : GhostFrame}
-    (registered : layout.Registered catalog.definitions)
+    (registered : layout.Registered nativeDefinitions)
     (unmapped : location ∉ mapping) (typed : world[location]? = some layout.type)
     (caller : CellState inputs table layout location current currentGhost before)
     (heaps : GenericHeap.HeapRepresents model finalMap finalWorld after bodyStore)

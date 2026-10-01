@@ -12,10 +12,10 @@ namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOrdinaryAllocation
 open Core Frontend SourceInference GeneralHeap ReadOnly
 open CallableIndexedHistory CallableIndexedAllocationCompletion
 
-private theorem scope_reference {catalog : SourceCoreDataCatalog.Catalog} {mapping : LocationMap}
+private theorem scope_reference {catalog : SourceCoreDataCatalog.Catalog} {nativeDefinitions : DataEnvironment} {mapping : LocationMap}
     {world : StoreTyping} {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope}
     {source : Dynamic.Environment} {canonical : Environment}
-    (related : DataHeap.EnvRepresents catalog mapping world administrative scope source canonical)
+    (related : DataHeap.EnvRepresents catalog mapping world administrative scope source canonical nativeDefinitions)
     {index : Nat} {binding : Resolved.LocalId × Ty} (found : scope[index]? = some binding) :
     ∃ target, canonical[index]? = some (.cellRef (OptionalCell.cellType binding.2) target) ∧
       world[target]? = some (OptionalCell.cellType binding.2) := by
@@ -38,13 +38,13 @@ private theorem scope_reference {catalog : SourceCoreDataCatalog.Catalog} {mappi
 
 /-- Capture values and their types follow from the mapped lexical slots, not
 from a supplied capture evaluation or an inspection of referenced payloads. -/
-theorem captures_typed {catalog : SourceCoreDataCatalog.Catalog} {mapping : LocationMap}
+theorem captures_typed {catalog : SourceCoreDataCatalog.Catalog} {nativeDefinitions : DataEnvironment} {mapping : LocationMap}
     {world : StoreTyping} {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope}
     {source : Dynamic.Environment} {canonical actual : Environment} {references : Renaming}
-    (related : DataHeap.EnvRepresents catalog mapping world administrative scope source canonical)
+    (related : DataHeap.EnvRepresents catalog mapping world administrative scope source canonical nativeDefinitions)
     (agrees : EnvironmentsAgree references canonical actual) :
     ∃ captured, Captures actual references scope captured ∧
-      RuntimeValueHasType world captured (SourceCoreSourceCells.captureType scope) catalog.definitions := by
+      RuntimeValueHasType world captured (SourceCoreSourceCells.captureType scope) nativeDefinitions := by
   have slots : ∀ index binding, scope[index]? = some binding → ∃ target,
       actual[references index]? = some (.cellRef (OptionalCell.cellType binding.2) target) ∧
       world[target]? = some (OptionalCell.cellType binding.2) := by
@@ -65,8 +65,8 @@ theorem captures_typed {catalog : SourceCoreDataCatalog.Catalog} {mapping : Loca
         exact slots (index + 1) binding (by simpa using found))
       exact ⟨_, .cons selected selectedTail, .pair (.cellRef typed) typedTail⟩
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-  {model : GenericHeap.PayloadModel catalog projects}
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {nativeDefinitions : DataEnvironment}
+  {model : GenericHeap.PayloadModel catalog projects nativeDefinitions}
 
 /-- Two ordinary administrative allocations precede the independently
 specified source allocation. World/map extensions use exact actual indices. -/
@@ -75,8 +75,8 @@ theorem heap_allocate {mapping : LocationMap} {world : StoreTyping}
     {sourceValue : Option Dynamic.Value} {sourceLocation : Dynamic.Location}
     {snapshot marker payload : Value} {snapshotType markerType payloadType : Ty}
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
-    (snapshotTyped : RuntimeValueHasType world snapshot snapshotType catalog.definitions)
-    (markerTyped : RuntimeValueHasType world marker markerType catalog.definitions)
+    (snapshotTyped : RuntimeValueHasType world snapshot snapshotType nativeDefinitions)
+    (markerTyped : RuntimeValueHasType world marker markerType nativeDefinitions)
     (cell : GenericHeap.CellRepresents model mapping world
       ⟨sourceType, sourceValue, none⟩ payload payloadType)
     (allocated : Dynamic.Heap.Allocates before sourceType sourceValue sourceLocation after) :
@@ -102,13 +102,13 @@ theorem preserves {layouts : SourceCoreAllocationLayouts.Prepared}
     (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active request)
     (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated layout globals allocate request)
     (same : annotation.original = allocation.expression)
-    (definitions : layouts.definitions = catalog.definitions)
-    (frameRegistered : layout.Registered catalog.definitions)
+    (definitions : layouts.definitions = nativeDefinitions)
+    (frameRegistered : layout.Registered nativeDefinitions)
     {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment}
     {before after : Dynamic.Heap} {store : Store} {contextLocation : Location} {native : NativeFrame}
     {payload : Option Value} {sourceValue : Option Dynamic.Value} {sourceLocation : Dynamic.Location}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrative request.scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative request.scope environment canonical nativeDefinitions)
     (agrees : EnvironmentsAgree request.references canonical actual)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (reference : actual[SourceCoreCallableIndexedAllocationFrames.referenceIndex globals request]? =
@@ -138,9 +138,9 @@ theorem preserves {layouts : SourceCoreAllocationLayouts.Prepared}
     change SourceCoreSourceCells.captureType allocation.entry.key.scope = SourceCoreSourceCells.captureType request.scope
     rw [allocation.keyExact]
     rfl
-  have markerRegistered : allocation.entry.layout.Registered catalog.definitions := definitions ▸ allocation.registered
+  have markerRegistered : allocation.entry.layout.Registered nativeDefinitions := definitions ▸ allocation.registered
   have markerTyped : RuntimeValueHasType world (SourceCoreHeapMarkers.markerValue allocation.entry.layout captured)
-      allocation.entry.layout.type catalog.definitions :=
+      allocation.entry.layout.type nativeDefinitions :=
     .constructed markerRegistered.payloadLookup (captureType.symm ▸ typed)
   obtain ⟨afterHeaps, afterReference⟩ := heap_allocate heaps
     (SourceCoreCallableIndexedFrames.encode_runtime_typed world frameRegistered native) markerTyped cell allocated
@@ -154,14 +154,14 @@ theorem bind_environment {mapping : LocationMap} {world : StoreTyping}
     {environment : Dynamic.Environment} {canonical : Environment} {store : Store}
     {sourceLocation : Dynamic.Location} {id : Resolved.LocalId}
     {snapshotType markerType payloadType : Ty}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical nativeDefinitions)
     (reference : ReferenceRepresents (mapping ++ [store.length + 2])
       (world ++ [snapshotType, markerType, OptionalCell.cellType payloadType])
       sourceLocation (store.length + 2) payloadType) :
     DataHeap.EnvRepresents catalog (mapping ++ [store.length + 2])
       (world ++ [snapshotType, markerType, OptionalCell.cellType payloadType]) administrative
       ((id, payloadType) :: scope) ((id, sourceLocation) :: environment)
-      (.cellRef (OptionalCell.cellType payloadType) (store.length + 2) :: canonical) :=
+      (.cellRef (OptionalCell.cellType payloadType) (store.length + 2) :: canonical) nativeDefinitions :=
   .cons reference (environments.extend ⟨_, rfl⟩ ⟨_, rfl⟩)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOrdinaryAllocation

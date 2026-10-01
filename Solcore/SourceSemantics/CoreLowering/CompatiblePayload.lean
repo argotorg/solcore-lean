@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.AmbientDefinitions
 import Solcore.Frontend.SourceCoreCompatibleCatalog
 import Solcore.SourceSemantics.CoreLowering.GeneralHeap
 import Solcore.SourceSemantics.CoreLowering.DataPatternValues
@@ -26,12 +27,13 @@ inductive IsFunction : Dynamic.Value → Prop where
   | global (function : Dynamic.GlobalFunction) : IsFunction (.global function)
   | builtin (function : Dynamic.BuiltinFunction) : IsFunction (.builtin function)
 
-structure FunctionModel (catalog : SourceCoreCompatibleCatalog.Catalog) where
+structure FunctionModel (catalog : SourceCoreCompatibleCatalog.Catalog)
+    (ambient : AmbientDefinitions catalog.definitions := .original catalog.definitions) where
   Represents : SourceCoreRawMetadata.Registry → LocationMap → StoreTyping → TypeSystem.Ty → Dynamic.Value → Value → Ty → Prop
   projection : ∀ {registry mapping world sourceType source value type},
     Represents registry mapping world sourceType source value type → catalog.project sourceType = .ok type
   runtime_hasType : ∀ {registry mapping world sourceType source value type},
-    Represents registry mapping world sourceType source value type → RuntimeValueHasType world value type catalog.definitions
+    Represents registry mapping world sourceType source value type → RuntimeValueHasType world value type ambient.definitions
   source_function : ∀ {registry mapping world sourceType source value type},
     Represents registry mapping world sourceType source value type → IsFunction source
   extend : ∀ {registry futureRegistry mapping futureMapping world futureWorld sourceType source value type},
@@ -70,7 +72,8 @@ theorem MetadataRep.word_equality_iff {registry : SourceCoreRawMetadata.Registry
 
 mutual
   inductive ValueRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
-      (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping) :
+      {ambient : AmbientDefinitions checked.catalog.definitions}
+      (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping) :
       TypeSystem.Ty → Dynamic.Value → Value → Ty → Prop where
     | unit : ValueRep checked registry functions mapping world .unit .unit .unit .unit
     | bool (value : Bool) : ValueRep checked registry functions mapping world .bool (.bool value) (.bool value) .bool
@@ -118,7 +121,8 @@ mutual
         (related : ValueRep checked registry functions mapping world actual source value type) :
         ValueRep checked registry functions mapping world expected source value type
   inductive ValuesRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
-      (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping) :
+      {ambient : AmbientDefinitions checked.catalog.definitions}
+      (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping) :
       List TypeSystem.Ty → List Dynamic.Value → List Value → List Ty → Prop where
     | nil : ValuesRep checked registry functions mapping world [] [] [] []
     | cons {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
@@ -127,7 +131,8 @@ mutual
         (tail : ValuesRep checked registry functions mapping world sourceTypes sources values types) :
         ValuesRep checked registry functions mapping world (sourceType :: sourceTypes) (source :: sources) (value :: values) (type :: types)
   inductive EntriesRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
-      (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping) :
+      {ambient : AmbientDefinitions checked.catalog.definitions}
+      (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping) :
       TypeSystem.Ty → TypeSystem.Ty → List (Dynamic.Value × Dynamic.Value) → OrderedMapping.Entries → Ty → Ty → Prop where
     | empty (keyType valueType : TypeSystem.Ty) (key value : Ty) :
         EntriesRep checked registry functions mapping world keyType valueType [] [] key value
@@ -138,7 +143,8 @@ mutual
         (tail : EntriesRep checked registry functions mapping world keyType valueType sources entries aType bType) :
         EntriesRep checked registry functions mapping world keyType valueType ((key, value) :: sources) ((a, b) :: entries) aType bType
   inductive DefaultRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
-      (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping) :
+      {ambient : AmbientDefinitions checked.catalog.definitions}
+      (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping) :
       TypeSystem.Ty → Option Value → Ty → Prop where
     | absent {sourceType : TypeSystem.Ty} {type : Ty}
         (missing : ¬ Dynamic.Defaultable sourceType)
@@ -152,7 +158,7 @@ mutual
 
 end
 
-variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel checked.catalog}
+variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
   {mapping : LocationMap} {world : StoreTyping}
 
 theorem ValueRep.projection {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
@@ -183,23 +189,23 @@ private theorem pack_typed {definitions : DataEnvironment} {types : List Ty} {va
 
 theorem ValueRep.runtime_hasType {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
     (related : ValueRep checked registry functions mapping world sourceType source value type) :
-    RuntimeValueHasType world value type checked.catalog.definitions := by
+    RuntimeValueHasType world value type ambient.definitions := by
   induction related using ValueRep.rec
-    (motive_2 := fun _ _ values types _ => ListRel (fun value type => RuntimeValueHasType world value type checked.catalog.definitions) values types)
+    (motive_2 := fun _ _ values types _ => ListRel (fun value type => RuntimeValueHasType world value type ambient.definitions) values types)
     (motive_3 := fun _ _ _ entries aType bType _ => ∀ a b, (a, b) ∈ entries →
-      RuntimeValueHasType world a aType checked.catalog.definitions ∧ RuntimeValueHasType world b bType checked.catalog.definitions)
-    (motive_4 := fun _ fallback type _ => RuntimeValueHasType world (OrderedMapping.optionValue type fallback) (.sum .unit type) checked.catalog.definitions) with
+      RuntimeValueHasType world a aType ambient.definitions ∧ RuntimeValueHasType world b bType ambient.definitions)
+    (motive_4 := fun _ fallback type _ => RuntimeValueHasType world (OrderedMapping.optionValue type fallback) (.sum .unit type) ambient.definitions) with
   | unit => exact .unit
   | bool => exact .bool
   | word => exact .word
   | integer => exact .integer
   | product _ _ first second => exact .pair first second
   | function related => exact functions.runtime_hasType related
-  | proxy _ _ registered => exact .constructed registered .word
-  | constructed _ _ _ _ registered _ ih => exact .constructed registered (.pair .word (pack_typed ih))
+  | proxy _ _ registered => exact .constructed (ambient.basePrefix.constructor_lookup registered) .word
+  | constructed _ _ _ _ registered _ ih => exact .constructed (ambient.basePrefix.constructor_lookup registered) (.pair .word (pack_typed ih))
   | compatible _ _ ih => exact ih
   | mappingValue _ _ _ _ registered _ _ entries fallback =>
-    exact .pair .word (.pair fallback (OrderedMapping.encode_hasType registered _ entries))
+    exact .pair .word (.pair fallback (OrderedMapping.encode_hasType (registered.extend_definitions ambient.basePrefix) _ entries))
   | nil => exact .nil
   | cons _ _ head tail => exact .cons head tail
   | empty => simp_all

@@ -15,7 +15,7 @@ open FunctionArguments FunctionCallBody
 abbrev FaultRep := Dynamic.SemanticFault → Word → Prop
 
 inductive ResultRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    (model : GenericHeap.PayloadModel catalog projects)
+    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (mapping : LocationMap) (world : StoreTyping) (sourceType : TypeSystem.Ty) (type : Ty) (faults : FaultRep) :
     Dynamic.ExpressionOutcome → Value → Prop where
   | value {source value} (represented : model.Represents mapping world sourceType source value type) :
@@ -26,14 +26,14 @@ inductive ResultRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects :
 /-- A universal semantic IH for an independently certified body. It is not a
 field of the static function code certificate. Source traces supply finiteness. -/
 def BodyPreserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    (model : GenericHeap.PayloadModel catalog projects)
+    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (program : Program) (function : Dynamic.Closure) (certificate : FunctionCode.BodyCertificate)
     (faults : FaultRep) : Prop :=
   ∀ {scope type body}, certificate function.source scope function.body type body →
   ∀ {context staticFinal facts}, StatementsHaveType function.source
     {returnType := function.resultType, loopDepth := 0} context function.body staticFinal facts →
   ∀ {mapping world administrativeContext environment canonical actual before store ξ outcome after},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical →
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
     GenericHeap.HeapRepresents model mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree ξ canonical actual →
@@ -48,14 +48,14 @@ def BodyPreserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericH
 /-- The source body trace is constructed from Core execution. No finite source
 trace is a premise of this universal reflection obligation. -/
 def BodyReflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    (model : GenericHeap.PayloadModel catalog projects)
+    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (program : Program) (function : Dynamic.Closure) (certificate : FunctionCode.BodyCertificate)
     (faults : FaultRep) : Prop :=
   ∀ {scope type body}, certificate function.source scope function.body type body →
   ∀ {context staticFinal facts}, StatementsHaveType function.source
     {returnType := function.resultType, loopDepth := 0} context function.body staticFinal facts →
   ∀ {mapping world administrativeContext environment canonical actual before store ξ value finalStore},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical →
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
     GenericHeap.HeapRepresents model mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree ξ canonical actual →

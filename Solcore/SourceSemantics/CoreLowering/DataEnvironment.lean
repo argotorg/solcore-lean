@@ -11,18 +11,18 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.DataHeap
 open Frontend Frontend.SourceInference GeneralHeap
 
-inductive EnvRepresents (catalog : SourceCoreDataCatalog.Catalog) (mapping : LocationMap)
+inductive EnvRepresentsIn (catalog : SourceCoreDataCatalog.Catalog) (definitions : Core.DataEnvironment) (mapping : LocationMap)
     (world : Core.StoreTyping) (administrativeContext : Core.Context := []) :
     SourceCoreLocalCell.Scope → Dynamic.Environment → Core.Environment → Prop where
   | nil {administrative : Core.Environment}
-      (typed : Core.RuntimeEnvironmentHasTypes world administrative administrativeContext catalog.definitions) :
-      EnvRepresents catalog mapping world administrativeContext [] [] administrative
+      (typed : Core.RuntimeEnvironmentHasTypes world administrative administrativeContext definitions) :
+      EnvRepresentsIn catalog definitions mapping world administrativeContext [] [] administrative
   | cons {scope : SourceCoreLocalCell.Scope} {environment : Dynamic.Environment}
       {coreEnvironment : Core.Environment} {id : Resolved.LocalId}
       {source : Dynamic.Location} {target : Core.Location} {payload : Core.Ty}
       (reference : ReferenceRepresents mapping world source target payload)
-      (tail : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment) :
-      EnvRepresents catalog mapping world administrativeContext ((id, payload) :: scope)
+      (tail : EnvRepresentsIn catalog definitions mapping world administrativeContext scope environment coreEnvironment) :
+      EnvRepresentsIn catalog definitions mapping world administrativeContext ((id, payload) :: scope)
         ((id, source) :: environment)
         (.cellRef (Core.OptionalCell.cellType payload) target :: coreEnvironment)
   | internal {scope : SourceCoreLocalCell.Scope} {environment : Dynamic.Environment}
@@ -30,20 +30,33 @@ inductive EnvRepresents (catalog : SourceCoreDataCatalog.Catalog) (mapping : Loc
       {source : Dynamic.Location} {target : Core.Location} {payload : Core.Ty}
       (reference : ReferenceRepresents mapping world source target payload)
       (absent : ∀ location, ¬ Dynamic.Environment.LooksUp environment id location)
-      (tail : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment) :
-      EnvRepresents catalog mapping world administrativeContext ((id, payload) :: scope) environment
+      (tail : EnvRepresentsIn catalog definitions mapping world administrativeContext scope environment coreEnvironment) :
+      EnvRepresentsIn catalog definitions mapping world administrativeContext ((id, payload) :: scope) environment
         (.cellRef (Core.OptionalCell.cellType payload) target :: coreEnvironment)
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
+/-- Source metadata stays with its catalog, while administrative values use
+an independently named full Core definition environment. Legacy callers default
+to the catalog's definitions. -/
+abbrev EnvRepresents (catalog : SourceCoreDataCatalog.Catalog) (mapping : LocationMap)
+    (world : Core.StoreTyping) (administrativeContext : Core.Context := [])
+    (scope : SourceCoreLocalCell.Scope) (environment : Dynamic.Environment) (coreEnvironment : Core.Environment)
+    (definitions : Core.DataEnvironment := catalog.definitions) : Prop :=
+  EnvRepresentsIn catalog definitions mapping world administrativeContext scope environment coreEnvironment
+
+namespace EnvRepresents
+export EnvRepresentsIn (nil cons internal)
+end EnvRepresents
+
+variable {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures} {definitions : Core.DataEnvironment}
 
 /-- World and location-map extension leave every captured source location and
 Core reference unchanged. -/
 theorem EnvRepresents.extend {mapping futureMapping : LocationMap} {world futureWorld : Core.StoreTyping}
     {administrativeContext : Core.Context} {scope : SourceCoreLocalCell.Scope}
     {environment : Dynamic.Environment} {coreEnvironment : Core.Environment}
-    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment)
+    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment definitions)
     (maps : LocationMap.Extends mapping futureMapping) (worlds : Core.WorldExtends world futureWorld) :
-    EnvRepresents catalog futureMapping futureWorld administrativeContext scope environment coreEnvironment := by
+    EnvRepresents catalog futureMapping futureWorld administrativeContext scope environment coreEnvironment definitions := by
   induction related with
   | nil typed => exact .nil (typed.weaken worlds)
   | cons reference _ ih => exact .cons (reference.extend maps worlds) ih
@@ -52,9 +65,9 @@ theorem EnvRepresents.extend {mapping futureMapping : LocationMap} {world future
 theorem EnvRepresents.runtime_hasTypes {mapping : LocationMap} {world : Core.StoreTyping}
     {administrativeContext : Core.Context} {scope : SourceCoreLocalCell.Scope}
     {environment : Dynamic.Environment} {coreEnvironment : Core.Environment}
-    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment) :
+    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment definitions) :
     Core.RuntimeEnvironmentHasTypes world coreEnvironment
-      (SourceCoreLocalCell.coreContext scope ++ administrativeContext) catalog.definitions := by
+      (SourceCoreLocalCell.coreContext scope ++ administrativeContext) definitions := by
   induction related with
   | nil typed => exact typed
   | cons reference _ ih => exact .cons (.cellRef reference.typed) ih
@@ -66,7 +79,7 @@ theorem EnvRepresents.lookup_source {mapping : LocationMap} {world : Core.StoreT
     {administrativeContext : Core.Context} {scope : SourceCoreLocalCell.Scope}
     {environment : Dynamic.Environment} {coreEnvironment : Core.Environment}
     {id : Resolved.LocalId} {location : Dynamic.Location}
-    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment)
+    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment definitions)
     (sourceLookup : Dynamic.Environment.LooksUp environment id location) :
     ∃ index payload target,
       SourceCoreLocalCell.lookup? scope id = some (index, payload) ∧
@@ -91,7 +104,7 @@ theorem EnvRepresents.lookup_visible {mapping : LocationMap} {world : Core.Store
     {administrativeContext : Core.Context} {scope : SourceCoreLocalCell.Scope}
     {environment : Dynamic.Environment} {coreEnvironment : Core.Environment}
     {id : Resolved.LocalId} {location : Dynamic.Location} {index : Nat} {payload : Core.Ty}
-    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment)
+    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment definitions)
     (sourceLookup : Dynamic.Environment.LooksUp environment id location)
     (slot : SourceCoreLocalCell.lookup? scope id = some (index, payload)) :
     ∃ target, coreEnvironment[index]? = some (.cellRef (Core.OptionalCell.cellType payload) target) ∧
@@ -122,7 +135,7 @@ the independently represented source environment. -/
 theorem EnvRepresents.fresh_absent {mapping : LocationMap} {world : Core.StoreTyping}
     {administrativeContext : Core.Context} {scope : SourceCoreLocalCell.Scope}
     {environment : Dynamic.Environment} {coreEnvironment : Core.Environment} {id : Resolved.LocalId}
-    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment)
+    (related : EnvRepresents catalog mapping world administrativeContext scope environment coreEnvironment definitions)
     (fresh : scope.any (fun entry => decide (entry.1 = id)) = false) :
     ∀ location, ¬ Dynamic.Environment.LooksUp environment id location := by
   intro location lookup
@@ -170,5 +183,13 @@ theorem EnvRepresents.bind_internal {mapping : LocationMap} {world : Core.StoreT
   obtain ⟨heapRelated, reference⟩ := heaps.allocate cell allocated
   exact ⟨.internal reference (environments.fresh_absent fresh)
     (environments.extend ⟨_, rfl⟩ ⟨_, rfl⟩), heapRelated⟩
+
+namespace EnvRepresentsIn
+abbrev extend := @EnvRepresents.extend
+abbrev runtime_hasTypes := @EnvRepresents.runtime_hasTypes
+abbrev lookup_source := @EnvRepresents.lookup_source
+abbrev lookup_visible := @EnvRepresents.lookup_visible
+abbrev fresh_absent := @EnvRepresents.fresh_absent
+end EnvRepresentsIn
 
 end Solcore.SourceSemantics.CoreLowering.DataHeap
