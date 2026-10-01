@@ -227,7 +227,7 @@ open GeneralHeap GenericExpressionMeaning
 
 /-- Index effects are evaluated exactly once in source projection order. The
 generated values remain fully represented after later index effects. -/
-theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
+theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {certificate : GenericExpressionMeaning.Certificate} {faults : FaultRep}
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
@@ -236,7 +236,7 @@ theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericH
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {evaluated : List Dynamic.EvaluatedProjection}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : ReadOnly.EnvironmentsAgree ξ canonical actual)
@@ -255,7 +255,7 @@ theorem preserves {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericH
   exact ⟨sources, values, finalStore, finalMap, finalWorld, shaped, evaluated, represented,
     finalHeaps, maps, worlds, frame, metadata⟩
 
-theorem preserves_fault {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
+theorem preserves_fault {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {certificate : GenericExpressionMeaning.Certificate} {faults : FaultRep}
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
@@ -264,7 +264,7 @@ theorem preserves_fault {catalog : SourceCoreDataCatalog.Catalog} {projects : Ge
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {reason : Dynamic.SemanticFault}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : ReadOnly.EnvironmentsAgree ξ canonical actual)
@@ -287,7 +287,7 @@ inductive OutcomeTrace (program : Program) (context : SourceSemantics.Context)
       (trace : Dynamic.SourceProjectionsFault program context evidence source environment before projections reason after) :
       OutcomeTrace program context evidence source environment before projections (.error reason) after
 
-theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
+theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {certificate : GenericExpressionMeaning.Certificate} {faults : FaultRep}
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
@@ -296,7 +296,7 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : ReadOnly.EnvironmentsAgree ξ canonical actual)

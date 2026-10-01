@@ -63,7 +63,7 @@ theorem Tree.of_mapM {α error : Type} {source : TypedSource} {certificate : Cer
         subst codes
         exact .cons (extract input code head) (ih tail)
 
-inductive Values {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} (model : GenericHeap.PayloadModel catalog projects)
+inductive Values {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (mapping : LocationMap) (world : StoreTyping) :
     List TypeSystem.Ty → List Ty → List Dynamic.Value → List Value → Prop where
   | nil : Values model mapping world [] [] [] []
@@ -72,7 +72,7 @@ inductive Values {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
       (tail : Values model mapping world sourceTypes types sources values) :
       Values model mapping world (sourceType :: sourceTypes) (type :: types) (source :: sources) (value :: values)
 
-theorem Values.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
+theorem Values.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
     {mapping futureMapping : LocationMap} {world futureWorld : StoreTyping}
     {sourceTypes : List TypeSystem.Ty} {types : List Ty} {sources : List Dynamic.Value} {values : List Value}
     (represented : Values model mapping world sourceTypes types sources values)
@@ -82,7 +82,7 @@ theorem Values.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : Gene
   | nil => exact .nil
   | cons head _ ih => exact .cons (model.extend head maps worlds) ih
 
-theorem Values.length {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
+theorem Values.length {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
     {mapping : LocationMap} {world : StoreTyping}
     {sourceTypes : List TypeSystem.Ty} {types : List Ty} {sources : List Dynamic.Value} {values : List Value}
     (represented : Values model mapping world sourceTypes types sources values) :
@@ -108,7 +108,7 @@ inductive Trace (program : Program) (context : SourceSemantics.Context)
       (failed : Dynamic.ExpressionsFault program context evidence source environment before ids reason after) :
       Trace program context evidence source environment before ids (.error reason) after
 
-inductive Result {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} (model : GenericHeap.PayloadModel catalog projects)
+inductive Result {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (mapping : LocationMap) (world : StoreTyping) (types : List TypeSystem.Ty)
     (codes : List SourceCoreBasic.LoweredExpr) (faults : FaultRep) : Outcome → Value → Prop where
   | values {sources values}
@@ -118,7 +118,7 @@ inductive Result {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
       Result model mapping world types codes faults (.error reason)
         (.inLeft (SourceCoreCalls.packArguments codes).type (.word token))
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : GenericHeap.PayloadModel catalog projects}
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
   {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
   {source : TypedSource} {certificate : Certificate} {faults : FaultRep}
   {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {sourceTypes : List TypeSystem.Ty}
@@ -131,7 +131,7 @@ theorem Tree.preserves_values (tree : Tree source certificate scope ids sourceTy
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {sources : List Dynamic.Value}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
@@ -189,7 +189,7 @@ theorem Tree.preserves_fault (tree : Tree source certificate scope ids sourceTyp
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {reason : Dynamic.SemanticFault}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
@@ -245,7 +245,7 @@ theorem Tree.reflects (tree : Tree source certificate scope ids sourceTypes code
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
@@ -350,7 +350,7 @@ theorem Tree.preserves (tree : Tree source certificate scope ids sourceTypes cod
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Outcome}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
@@ -380,7 +380,7 @@ theorem Tree.preserves_sufficient_fuel (tree : Tree source certificate scope ids
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Outcome}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
@@ -402,7 +402,7 @@ theorem Tree.reflects_done (tree : Tree source certificate scope ids sourceTypes
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value} {fuel : Nat}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)

@@ -69,7 +69,8 @@ theorem prepared_compare_preserves {checked : Checked} (prepared : Prepared chec
 /-- Raw aliases may use different original source types while sharing one
 native type. Their actual metadata still determines source equality. -/
 theorem represented_compare_preserves {checked : Checked} (prepared : Prepared checked) {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities)
     {leftType rightType : TypeSystem.Ty} {sourceLeft sourceRight : Dynamic.Value} {leftValue rightValue : Value}
@@ -85,7 +86,8 @@ theorem represented_compare_preserves {checked : Checked} (prepared : Prepared c
     environment store leftExpression rightExpression leftSelected rightSelected
 
 theorem represented_compare_run {checked : Checked} (prepared : Prepared checked) {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities)
     {leftType rightType : TypeSystem.Ty} {sourceLeft sourceRight : Dynamic.Value} {leftValue rightValue : Value}

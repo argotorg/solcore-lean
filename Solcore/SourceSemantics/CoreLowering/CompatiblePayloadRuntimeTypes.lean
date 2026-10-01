@@ -16,7 +16,7 @@ theorem runtimeType_agrees_metadata (type : TypeSystem.Ty) :
     Dynamic.runtimeType type = SourceCoreRawMetadata.runtimeType type := by
   induction type <;> simp_all [Dynamic.runtimeType, SourceCoreRawMetadata.runtimeType]
 
-def FunctionRuntimeViews {catalog : SourceCoreCompatibleCatalog.Catalog} (functions : FunctionModel catalog) : Prop :=
+def FunctionRuntimeViews {catalog : SourceCoreCompatibleCatalog.Catalog} {ambient : AmbientDefinitions catalog.definitions} (functions : FunctionModel catalog ambient) : Prop :=
   ∀ {registry mapping world parameter result source value type},
     functions.Represents registry mapping world (.function parameter result) source value type →
       Dynamic.ValueRuntimeTypeMatches source (.function parameter result)
@@ -24,7 +24,8 @@ def FunctionRuntimeViews {catalog : SourceCoreCompatibleCatalog.Catalog} (functi
 /-- Exact metadata receipts and structural children determine runtime
 compatibility, including staged mapping keys and proxies nested in products. -/
 theorem ValueRep.source_runtimeView {checked : SourceCoreCompatibleCatalog.Checked}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient}
     {mapping : LocationMap} {world : StoreTyping} {sourceType : TypeSystem.Ty}
     {source : Dynamic.Value} {value : Value} {type : Ty}
     (functionTypes : FunctionRuntimeViews functions)

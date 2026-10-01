@@ -79,14 +79,15 @@ theorem named_project_not_mapping {catalog : Catalog} {source : TypeSystem.Ty} {
       all_goals cases projected
 
 /-- Static function leaf obligations, independent of runtime comparisons. -/
-def FunctionObservations (catalog : Catalog) (functions : FunctionModel catalog)
+def FunctionObservations (catalog : Catalog) {ambient : AmbientDefinitions catalog.definitions} (functions : FunctionModel catalog ambient)
     (identities : Dynamic.Value → Word → Prop) : Prop :=
   ∀ {registry mapping world sourceType source value type},
     functions.Represents registry mapping world sourceType source value type →
       Observation catalog registry identities type source value
 
 theorem ValueRep.observation {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (functionLeaves : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
     (related : ValueRep checked registry functions mapping world sourceType source value type) :

@@ -8,11 +8,11 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.DataMappingHeap
 open Core Frontend GeneralHeap GenericHeap
 
-theorem heap_append {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : PayloadModel catalog projects}
+theorem heap_append {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : PayloadModel catalog projects definitions}
     {mapping : LocationMap} {world futureWorld : StoreTyping} {heap : Dynamic.Heap} {store suffix : Store}
     (related : HeapRepresents model mapping world heap store)
     (extension : WorldExtends world futureWorld)
-    (typed : RuntimeStoreHasTypes futureWorld (store ++ suffix) catalog.definitions) :
+    (typed : RuntimeStoreHasTypes futureWorld (store ++ suffix) definitions) :
     HeapRepresents model mapping futureWorld heap (store ++ suffix) := by
   refine ⟨related.length_eq, related.injective, typed, ?_⟩
   intro source target mapped
@@ -28,16 +28,16 @@ theorem administrative_append (mapping : LocationMap) (store suffix : Store) :
 
 /-- Combine a proved finite helper evaluation and its exact store suffix with
 the actual Core typing proof. The source heap and map remain unchanged. -/
-theorem evaluation_preserves_frame {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {model : PayloadModel catalog projects}
+theorem evaluation_preserves_frame {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : PayloadModel catalog projects definitions}
     {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store finalStore : Store}
     (related : HeapRepresents model mapping world heap store)
     {environment : Environment} {context : Core.Context} {expression : Expr} {value : Value} {type : Ty}
-    (environmentTyped : RuntimeEnvironmentHasTypes world environment context catalog.definitions)
-    (expressionTyped : HasType context expression type catalog.definitions)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context definitions)
+    (expressionTyped : HasType context expression type definitions)
     (evaluated : Evaluates environment store expression value finalStore)
     {suffix : Store} (extended : finalStore = store ++ suffix) :
     ∃ futureWorld, WorldExtends world futureWorld ∧ HeapRepresents model mapping futureWorld heap finalStore ∧
-      RuntimeValueHasType futureWorld value type catalog.definitions ∧
+      RuntimeValueHasType futureWorld value type definitions ∧
       AdministrativePreserved mapping store mapping finalStore := by
   subst finalStore
   obtain ⟨futureWorld, extension, storeTyped, valueTyped⟩ :=
