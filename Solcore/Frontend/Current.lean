@@ -61,6 +61,10 @@ import Solcore.Frontend.SourceCoreCallableContextFrameCodec
 import Solcore.Frontend.SourceCoreCallableAncestry
 import Solcore.Frontend.SourceCoreCallableAncestryPrograms
 import Solcore.Frontend.SourceCoreCallableAncestryLedger
+import Solcore.Frontend.SourceCoreAncestryAllocationFrames
+import Solcore.Frontend.SourceCoreCallableAncestryTemplates
+import Solcore.Frontend.SourceCoreCallableAncestryCaptures
+import Solcore.Frontend.SourceCoreCallableAncestryCache
 import Solcore.Frontend.SourceCoreLambdaTemplates
 import Solcore.Frontend.SourceCoreCompatibleHeapOutputs
 import Solcore.Frontend.SourceCoreCompatibleDataPlaces

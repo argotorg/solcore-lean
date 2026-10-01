@@ -70,6 +70,14 @@ import Solcore.Test.SourceCoreCallableAncestry
 import Solcore.Test.SourceCoreCallableAncestryPrograms
 import Solcore.Test.SourceCoreCallableAncestryOutputs
 import Solcore.Test.SourceCoreCallableAncestryMetadata
+import Solcore.Test.SourceCoreCallableAncestryTemplates
+import Solcore.Test.SourceCoreAncestryAllocationFrames
+import Solcore.Test.SourceCoreCallableAncestryProfiles
+import Solcore.Test.SourceCoreCallableAncestryComposition
+import Solcore.Test.SourceCoreCompatibleOutputLeaves
+import Solcore.Test.SourceCoreCallableAncestryCaptures
+import Solcore.Test.SourceCoreCallableAncestryCache
+import Solcore.Test.SourceCoreCompatibleMixedPaths
 import Solcore.Test.SourceCoreLambdaTemplates
 import Solcore.Test.SourceCoreCompatibleHeapOutputs
 import Solcore.Test.SourceCoreNativeEntry
@@ -2316,6 +2324,13 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallableAncestryPrograms.run
   SourceCoreCallableAncestryOutputs.run
   SourceCoreCallableAncestryMetadata.run
+  SourceCoreCallableAncestryTemplates.run
+  SourceCoreAncestryAllocationFrames.run
+  SourceCoreCallableAncestryProfiles.run
+  SourceCoreCompatibleOutputLeaves.run
+  SourceCoreCallableAncestryCaptures.run
+  SourceCoreCallableAncestryCache.run
+  SourceCoreCompatibleMixedPaths.run
   SourceCoreLambdaTemplates.run
   SourceCoreCompatibleHeapOutputs.run
 
