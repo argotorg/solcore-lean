@@ -102,11 +102,17 @@ import Solcore.Test.SourceCoreCallablePairedProtocol
 import Solcore.Test.SourceCoreCallableIndexedFrames
 import Solcore.Test.SourceCoreCallableIndexedHistory
 import Solcore.Test.SourceCoreCallableIndexedFormation
+import Solcore.Test.SourceCoreCallableIndexedSnapshots
+import Solcore.Test.SourceCoreCallableIndexedBodyMeaning
 import Solcore.Test.SourceCoreCallableIndexedPrograms
+import Solcore.Test.SourceCoreCallableIndexedReadViews
+import Solcore.Test.SourceCoreCallableIndexedOutputs
 import Solcore.Test.SourceCoreCompatibleAssignment
 import Solcore.Test.SourceCoreCompatibleStructuralFault
 import Solcore.Test.SourceCoreCompatibleTargetFaults
 import Solcore.Test.SourceCoreRuntimeKeyGuards
+import Solcore.Test.SourceCoreCompatibleGetterReflection
+import Solcore.Test.SourceCoreCompatibleAssignmentReflection
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
 import Solcore.Test.SourceCoreCompatibleMixedPaths
@@ -2378,10 +2384,14 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallablePairedOutputs.run
   SourceCoreCallableIndexedFrames.run
   SourceCoreCallableIndexedPrograms.run
+  SourceCoreCallableIndexedReadViews.run
+  SourceCoreCallableIndexedOutputs.run
   SourceCoreCompatibleAssignment.run
   SourceCoreCompatibleStructuralFault.run
   SourceCoreCompatibleTargetFaults.run
   SourceCoreRuntimeKeyGuards.run
+  SourceCoreCompatibleGetterReflection.run
+  SourceCoreCompatibleAssignmentReflection.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
   SourceCoreCompatibleMixedPaths.run
