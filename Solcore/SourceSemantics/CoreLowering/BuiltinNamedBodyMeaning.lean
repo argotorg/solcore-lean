@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.BuiltinNamedBodyCertificates
+import Solcore.SourceSemantics.CoreLowering.BuiltinBodySemanticReceipt
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalNamedBodyMeaning
 
 /-! The concrete recursive builtin statement tree supplies the named body
@@ -87,9 +87,9 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionLeaves : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
   (functionTypes : FunctionRuntimeViews functions)
 include definitions registered extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.preserves
-    (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
-      function.resultType type policy fuel fellThrough escaped code)
+theorem SemanticReceipt.preserves
+    (certificate : SemanticReceipt layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
+      function.resultType type fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -126,9 +126,9 @@ theorem Certificate.preserves
     finalHeaps, maps, worlds, frame, metadata, ⟨resultContext, control, sourceTrace, exit, lexical⟩⟩
 
 include definitions registered extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.reflects
-    (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
-      function.resultType type policy fuel fellThrough escaped code)
+theorem SemanticReceipt.reflects
+    (certificate : SemanticReceipt layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
+      function.resultType type fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -184,5 +184,67 @@ theorem Certificate.reflects
   exact ⟨outcome, after, finalMap, finalWorld, bodyTrace, result, finalHeaps, maps, worlds, frame, metadata,
     ⟨resultContext, control, trace, exit, lexical⟩⟩
 
+
+/- The accepted compiler certificate keeps the original public interface. -/
+include definitions registered extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
+theorem Certificate.preserves
+    (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
+      function.resultType type policy fuel fellThrough escaped code)
+    {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping)
+    (trace : FunctionCallBody.Trace program function context environment before outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome := by
+  exact certificate.semantic.preserves functions extension definitions registered program contextValid unique
+    uninitialized missing faithful functionLeaves functionTypes environments heaps locals agrees actualTyped reference read unmapped trace
+
+/- The accepted compiler certificate keeps the original completed reflection interface. -/
+include definitions registered extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
+theorem Certificate.reflects
+    (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt scope function.body
+      function.resultType type policy fuel fellThrough escaped code)
+    {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      FunctionCallBody.Trace program function context environment before outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome := by
+  exact certificate.semantic.reflects functions extension definitions registered program contextValid unique
+    uninitialized missing faithful functionLeaves functionTypes environments heaps locals agrees actualTyped reference read unmapped evaluated
 
 end Solcore.SourceSemantics.CoreLowering.BuiltinNamedBody
