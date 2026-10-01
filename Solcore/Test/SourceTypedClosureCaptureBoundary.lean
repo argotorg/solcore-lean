@@ -1,5 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.LegacyClosureBoundary
-import Solcore.Frontend.SourceTypedRuntimeDeepSafety
+import Solcore.Test.SourceCoreUnifiedCorpusSupport
+
+#check_failure Solcore.Frontend.SourceTypedRuntime.runDeepCertifiedWithValidationFuel
 
 /-! Checked-source examples of the legacy capture boundary.  The code and
 evidence stay authentic; only caller-supplied capture lists change.  This is
@@ -62,8 +64,9 @@ rejects all raw closure arguments, including genuine returned ones.  Unused
 initial-heap closures are admitted but do not become callable inputs. -/
 def run : IO Unit := do
   let (program, plan, make, invoke, constant) ← prepared
-  let (closure, state) ← match runDeepCertifiedWithValidationFuel program plan make
-      [.word (Core.Word.ofNatModulo 37)] 100 1000 with
+  let cached ← SourceCoreUnifiedCorpusSupport.preparePlan "capture boundary" program plan make
+  let (closure, state) ← match ← SourceCoreUnifiedCorpusSupport.observe cached make
+      [.word (Core.Word.ofNatModulo 37)] 300000 {} 100 with
     | .done value state => pure (value, state)
     | result => throw (IO.userError s!"checked make failed: {reprStr result}")
   let captures ← match closure with
@@ -80,11 +83,11 @@ def run : IO Unit := do
       "audit state must satisfy the deep validator"
     assertTrue (value.isDeeplySafe 100 program.signatures executablePlan initial expectedType)
       "audit closure must satisfy the deep validator"
-    match runDeepCertifiedWithValidationFuel program plan invoke [value] 100 1000 initial with
+    match ← SourceCoreUnifiedCorpusSupport.observe cached invoke [value] 300000 initial 100 with
     | .fault (.typeMismatch expected (some actual)) finalState =>
         assertTrue (expected == expectedType && actual == expectedType)
           "raw closure boundary diagnostic changed"
-        assertTrue (decide (finalState.heap.length = initial.heap.length))
+        assertTrue (reprStr finalState == reprStr initial)
           "raw closure boundary executed before rejecting"
     | result => throw (IO.userError s!"raw closure input was admitted: {reprStr result}")
   rejected closure state
@@ -104,7 +107,12 @@ def run : IO Unit := do
   let (_, unusedWrong) := unusedMissing.allocate expectedType (some wrong)
   assertTrue (unusedWrong.isDeeplySafe 100 program.signatures executablePlan)
     "unused malformed capture lists stopped satisfying current deep safety"
-  expectWord 13 (runDeepCertifiedWithValidationFuel program plan invoke
-    [.global constant []] 100 1000 unusedWrong)
+  let final ← SourceCoreUnifiedCorpusSupport.observe cached invoke [.global constant []] 300000 unusedWrong 100
+  expectWord 13 final
+  match final with
+  | .done _ state =>
+      assertTrue (reprStr (state.heap.take unusedWrong.heap.length) == reprStr unusedWrong.heap)
+        "Core execution changed the inert source heap prefix"
+  | _ => pure ()
 
 end Tests.SourceTypedClosureCaptureBoundary
