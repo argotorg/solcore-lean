@@ -207,7 +207,7 @@ private def reuse {definitions : Core.DataEnvironment} {world : Core.StoreTyping
       assertTrue (first == w 4 && second == w 6) "authenticated snapshots split the shared mutable source capture"
       assertTrue (final[shared]? == some (.inRight .unit (.word (w 6)))) "capture location changed on reentry"
       assertTrue (final[0]? == some (SourceCoreCallableContextFrames.encode frame .empty)) "reentry did not restore callable context"
-      assertTrue (final.length == store.length + 4) "snapshot wrapper added a source allocation beyond marked parameters"
+      assertTrue (final.length == store.length + 6) "snapshot wrapper changed the parameter allocation and ancestry metadata suffix"
     | observation => throw (IO.userError s!"authenticated lambda reuse failed: {reprStr observation}")
 
 private def escaped {checked : Checked} (prepared : Prepared checked) (cache : Cache prepared) (owner : Key) : IO Unit := do

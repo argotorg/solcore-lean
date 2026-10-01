@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceCoreCallableAncestry
+import Solcore.Frontend.SourceCoreAncestryAllocationFrames
 import Solcore.Frontend.SourceCoreCompatibleMarkedFunctions
 
 /-! Own one administrative callable frame alongside source-allocation markers.
@@ -33,11 +34,13 @@ inductive Error where
 def discoveryRepresentation {checked : Checked} {base : Base checked}
     (ancestry : SourceCoreCallableAncestry.Prepared base) (fuel : Nat)
     (discovery : SourceCoreAllocationDiscovery.Prepared) : Representation :=
-  SourceCoreCallableAncestry.representation ancestry (SourceCoreCompatibleMarkedFunctions.discoveryRepresentation base fuel discovery)
+  SourceCoreAncestryAllocationFrames.representation ancestry
+    (SourceCoreCallableAncestry.representation ancestry (SourceCoreCompatibleMarkedFunctions.discoveryRepresentation base fuel discovery))
 
 def markedRepresentation {checked : Checked} {base : Base checked}
     (ancestry : SourceCoreCallableAncestry.Prepared base) (fuel : Nat) (layouts : Layouts) : Representation :=
-  SourceCoreCallableAncestry.representation ancestry (SourceCoreCompatibleMarkedFunctions.markedRepresentation checked fuel layouts)
+  SourceCoreAncestryAllocationFrames.representation ancestry
+    (SourceCoreCallableAncestry.representation ancestry (SourceCoreCompatibleMarkedFunctions.markedRepresentation checked fuel layouts))
 
 def assembleCall {checked : Checked} {base : Base checked}
     (ancestry : SourceCoreCallableAncestry.Prepared base) (closures : List Core.Expr)
