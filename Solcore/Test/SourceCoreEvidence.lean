@@ -1,12 +1,11 @@
-import Solcore.Frontend.SourceCompilerSession
-import Solcore.Frontend.SourceCompiler
+import Solcore.Test.SourceCompilerFeatureSupport
 
 /-! Closed evidence and retained coercions run through ordinary cached Core
 functions. The checker keeps its existing admission rules. -/
 set_option autoImplicit false
 
 namespace Tests.SourceCoreEvidence
-open Solcore Solcore.Frontend SourceCompiler
+open Solcore Solcore.Frontend SourceCoreExecution
 
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
@@ -39,78 +38,49 @@ private def workspace : Workspace.RawWorkspace := {
   ]}]
 }
 
-private def compile (program : CheckedProgram) (name : String) (preference : BackendPreference) : IO CompiledEntry := do
-  let signature ← match program.signatures.functions.filter (·.name == name) with
-    | [signature] => pure signature
-    | _ => throw (IO.userError s!"evidence signature missing: {name}")
-  let options : CompileOptions := {backendPreference := preference, stagingFuel := 256, specializationBudget := 256}
-  match compileChecked program (.declaration signature.id) options with
-  | .ok compiled => pure compiled
-  | .error error =>
-      let plan ← match SourceSpecializationWorklist.run program [{declaration := signature.id, parameterSubstitution := []}] 256 with
-        | .ok (.complete plan) => pure plan
-        | result => throw (IO.userError s!"evidence plan failed: {reprStr result}")
-      throw (IO.userError s!"evidence compilation failed: {name}: {reprStr error}, general: {reprStr (SourceCoreSession.Recipe.prepareAutomatic program plan 256)}")
+private def compile (program : CheckedProgram) (name : String) : IO SourceCompilerFeatureSupport.Entry :=
+  SourceCompilerFeatureSupport.compileNamed program name []
+    {specializationBudget := 256, compilationFuel := 1000}
 
-private def testWord (program : CheckedProgram) (name : String) (arguments : List Core.Value)
-    (legacyArguments : List SourceTypedRuntime.Value) (expected : Nat) : IO Unit := do
-  for preference in [BackendPreference.core, .automatic] do
-    let compiled ← compile program name preference
-    assertTrue (compiled.backend == .core) s!"{name} did not select Core"
-    for _ in [0, 1] do
-      match compiled.runCore arguments {executionFuel := 65536} with
-      | .ok (.coreLanguageResult (.succeeded (.word actual) _)) =>
-          assertTrue (actual == w expected) s!"{name} Core evidence result changed"
-      | result => throw (IO.userError s!"{name} Core evidence run failed: {reprStr result}")
-    match compiled.runCore arguments {executionFuel := 0} with
-    | .ok (.coreLanguageResult (.outOfFuel state)) =>
-        match Core.LanguageResult.observeResult (Core.runStateful 65536 state) with
-        | .succeeded (.word actual) _ => assertTrue (actual == w expected) s!"{name} evidence resume changed"
-        | result => throw (IO.userError s!"{name} evidence resume failed: {reprStr result}")
-    | result => throw (IO.userError s!"{name} evidence checkpoint failed: {reprStr result}")
-  match (← compile program name .typedSource).runTyped legacyArguments {executionFuel := 65536} with
-  | .ok (.typedSource (.done (.word actual) _)) => assertTrue (actual == w expected) s!"{name} legacy result differs"
-  | result => throw (IO.userError s!"{name} legacy evidence failed: {reprStr result}")
+private def testWord (program : CheckedProgram) (name : String) (arguments : List Value)
+    (expected : Nat) : IO Unit := do
+  let compiled ← compile program name
+  for _ in [0, 1] do
+    assertTrue ((← compiled.run arguments) == .word (w expected)) s!"{name} Core evidence result changed"
+  compiled.checkResume arguments (.word (w expected)) 0
 
 def run : IO Unit := do
   let program ← match checkProgram workspace 4096 with
     | .ok program => pure program
     | .error error => throw (IO.userError s!"evidence source rejected: {reprStr error}")
-  testWord program "constrained" [.word (w 7)] [.word (w 7)] 7
+  testWord program "constrained" [.word (w 7)] 7
   for (flag, expected) in [(true, 42), (false, 8)] do
-    testWord program "converted" [.bool flag] [.bool flag] expected
-    testWord program "indirect" [.bool flag] [.bool flag] (expected + 5)
-  testWord program "operatorEffects" [] [] 12
+    testWord program "converted" [.bool flag] expected
+    testWord program "indirect" [.bool flag] (expected + 5)
+  testWord program "operatorEffects" [] 12
   let token ← match program.signatures.dataTypes.filter (·.name == "Token") with
     | [token] => pure token
     | _ => throw (IO.userError "Token missing")
   let tokenType := TypeSystem.Ty.nominal token.id []
-  let expected := SourceCoreDataValues.Value.constructed ⟨⟨token.id, 2⟩, [], [], tokenType⟩ []
-  let compiled ← compile program "operatorResult" .core
-  let context ← match compiled.coreDataContext? with
-    | some context => pure context
-    | none => throw (IO.userError "operator Core catalog missing")
-  match compiled.runCore [] {executionFuel := 65536} with
-  | .ok (.coreLanguageResult (.succeeded value _)) =>
-      assertTrue (match SourceCoreDataValues.decode 256 context tokenType value with
-        | .ok actual => decide (actual = expected)
-        | .error _ => false) "evidence-selected nominal operators changed"
-  | result => throw (IO.userError s!"nominal operator run failed: {reprStr result}")
+  let expected : Value := .constructed ⟨⟨token.id, 2⟩, [], [], tokenType⟩ []
+  let compiled ← compile program "operatorResult"
+  assertTrue ((← compiled.run []) == expected) "evidence-selected nominal operators changed"
+  compiled.checkResume [] expected 0
   let seeds ← ["convertedFunction", "useFunction"].mapM fun name => do
     match program.signatures.functions.filter (·.name == name) with
-    | [signature] => pure (Seed.declaration signature.id)
+    | [signature] => pure (SourceCoreCompiler.Seed.declaration signature.id)
     | _ => throw (IO.userError "function coercion root missing")
-  let shared ← match SourceCompilerSession.compileChecked program seeds {compilationFuel := 256, specializationBudget := 256} with
+  let shared ← match SourceCoreExecution.compileChecked program seeds {compilationFuel := 256, specializationBudget := 256} with
     | .ok shared => pure shared
     | .error error => throw (IO.userError s!"function coercion session failed: {reprStr error}")
   let artifact ← shared.open
-  let session ← artifact.newSession
+  let session ← SourceCompilerFeatureSupport.boot artifact
   let producer ← match shared.keys[0]? with | some key => pure key | none => throw (IO.userError "producer missing")
   let consumer ← match shared.keys[1]? with | some key => pure key | none => throw (IO.userError "consumer missing")
-  let made ← session.run producer [.word (w 1)] 65536 256
+  let made ← session.run producer [.word (w 1)] {executionFuel := 300000}
   match made with
   | .ok (.succeeded completion) =>
-      match ← completion.session.run consumer [completion.value, .word (w 9)] 65536 256 with
+      match ← completion.session.run consumer [completion.value, .word (w 9)] {executionFuel := 300000} with
       | .ok (.succeeded applied) => match applied.value with
           | .word actual => assertTrue (actual == w 9) "coerced function lost original global"
           | _ => throw (IO.userError "coerced function returned the wrong value")

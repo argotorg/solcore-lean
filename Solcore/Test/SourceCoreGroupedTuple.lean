@@ -1,9 +1,9 @@
-import Solcore.Frontend.SourceCompiler
+import Solcore.Test.SourceCompilerFeatureSupport
 import Solcore.Frontend.SourceCorePlanCatalog
 
 /-! Grouped tuple regressions cross the parser, checker and specialization
-boundary. Core executes the prepared body; the temporary legacy route agrees
-until its remaining features have migrated. -/
+boundary. Both the public session and the internal prepared body execute Core and
+preserve transparent tuple groups, pattern binding and evaluation order. -/
 
 set_option autoImplicit false
 
@@ -45,7 +45,7 @@ private def coreEntry (program : CheckedProgram) (name : String) : IO SourceCore
   | .error error => throw (IO.userError s!"grouped tuple Core compilation failed: {reprStr error}")
 
 private def test (program : CheckedProgram) (name : String) (inputs : List Core.Value)
-    (sourceInputs : List SourceTypedRuntime.Value) (expected : Nat) : IO Unit := do
+    (sourceInputs : List SourceCoreExecution.Value) (expected : Nat) : IO Unit := do
   let prepared ← coreEntry program name
   let entry ← match prepared.program.entries with
     | [entry] => pure entry
@@ -56,14 +56,9 @@ private def test (program : CheckedProgram) (name : String) (inputs : List Core.
         | .succeeded (.word actual) _ => assertTrue (actual == w expected) s!"{name} Core tuple result changed"
         | result => throw (IO.userError s!"{name} Core tuple run failed: {reprStr result}")
     | .error error => throw (IO.userError s!"{name} Core tuple input failed: {reprStr error}")
-  let compiled ← match SourceCompiler.compileChecked program
-      (.declaration entry.key.declaration) {backendPreference := .typedSource} with
-    | .ok compiled => pure compiled
-    | .error error => throw (IO.userError s!"{name} legacy tuple compilation failed: {reprStr error}")
-  match compiled.runTyped sourceInputs {executionFuel := 32768} with
-  | .ok (.typedSource (.done (.word actual) _)) =>
-      assertTrue (actual == w expected) s!"{name} legacy tuple grouping differs from Core: {reprStr actual}, expected {expected}"
-  | result => throw (IO.userError s!"{name} legacy tuple run failed: {reprStr result}")
+  let compiled ← SourceCompilerFeatureSupport.compileNamed program name
+  assertTrue ((← compiled.run sourceInputs) == .word (w expected)) s!"{name} public tuple grouping changed"
+  compiled.checkResume sourceInputs (.word (w expected)) 0
   match entry.run inputs 0 with
   | .ok result => match result.checkpoint? with
       | some checkpoint => match (checkpoint.resume 32768).observation with

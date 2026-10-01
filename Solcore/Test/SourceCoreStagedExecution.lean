@@ -1,9 +1,9 @@
-import Solcore.Frontend.SourceCompiler
+import Solcore.Test.SourceCompilerFeatureSupport
 import Solcore.Frontend.SourceCoreSession
 
-/-! Actual compiled callable contracts preserve the old invocation observations.
-The legacy evaluator is used only by this regression oracle. Native invocation
-uses the cached Core body and the descriptor held inside owned handles. -/
+/-! Actual compiled callable contracts preserve the source invocation observations.
+The public session, internal source observation adapter and ordinary prepared
+body all execute Core. Owned handles retain the actual native descriptor. -/
 
 set_option autoImplicit false
 namespace Tests.SourceCoreStagedExecution
@@ -54,7 +54,7 @@ private def prepare (program : CheckedProgram) (keys : List SourceCoreGeneralFun
   | .ok recipe => pure recipe
   | .error error => throw (IO.userError s!"staged execution compile failed: {reprStr error}")
 
-private def legacyArgument : Core.Value → Option SourceTypedRuntime.Value
+private def publicArgument : Core.Value → Option SourceCoreExecution.Value
   | .bool value => some (.bool value)
   | .word value => some (.word value)
   | .integer value => some (.integer value)
@@ -68,18 +68,6 @@ private def legacyNative : SourceTypedRuntime.Value → Option Core.Value
   | .product left right => do pure (.pair (← legacyNative left) (← legacyNative right))
   | _ => none
 
-private def legacy (program : CheckedProgram) (key : SourceCoreGeneralFunctions.Key) (arguments : List Core.Value) :
-    IO SourceTypedRuntime.RunResult := do
-  let values ← match arguments.mapM legacyArgument with
-    | some values => pure values
-    | none => throw (IO.userError "staged legacy fixture has unsupported argument")
-  let compiled ← match SourceCompiler.compileChecked program (.declaration key.declaration)
-      { backendPreference := .typedSource, specializationBudget := 128, stagingFuel := 256 } with
-    | .ok compiled => pure compiled
-    | .error error => throw (IO.userError s!"staged legacy compile failed: {reprStr error}")
-  match compiled.runTyped values {executionFuel := 65536} with
-  | .ok (.typedSource result) => pure result
-  | result => throw (IO.userError s!"staged legacy run failed: {reprStr result}")
 
 private def check (program : CheckedProgram) (name : String) (arguments : List Core.Value)
     (expected : Option Core.Value) (trace : Option Core.Word := none) : IO Unit := do
@@ -88,7 +76,12 @@ private def check (program : CheckedProgram) (name : String) (arguments : List C
   let entry ← match recipe.program.findEntry? key with
     | some entry => pure entry
     | none => throw (IO.userError "staged cached entry missing")
-  let old ← legacy program key arguments
+  let compiled ← SourceCompilerFeatureSupport.compileNamed program name []
+    {specializationBudget := 128, compilationFuel := 1000}
+  let publicInputs ← match arguments.mapM publicArgument with
+    | some values => pure values
+    | none => throw (IO.userError "staged fixture has unsupported public input")
+  let old := (← compiled.audit publicInputs).observation
   let verify := fun observation diagnosticAt => do
     match observation, old, expected with
     | .succeeded value _, .done oldValue _, some expected =>
@@ -111,15 +104,40 @@ private def check (program : CheckedProgram) (name : String) (arguments : List C
   match entry.run arguments 0 with
   | .ok {observation := .outOfFuel state, ..} => verify (Core.LanguageResult.observeResult (Core.runStateful 65536 state)) entry.faultSites.diagnostic?
   | _ => throw (IO.userError s!"{name} staged entry did not suspend")
-  for backend in [SourceCompiler.BackendPreference.core, .automatic] do
-    let compiled ← match SourceCompiler.compileChecked program (.declaration key.declaration)
-        {backendPreference := backend, specializationBudget := 128, stagingFuel := 256} with
-      | .ok compiled => pure compiled
-      | .error error => throw (IO.userError s!"{name} public staged Core compile failed: {reprStr error}")
-    unless compiled.backend == .core do throw (IO.userError s!"{name} public staged execution selected legacy")
-    match compiled.runCore arguments {executionFuel := 65536} with
-    | .ok (.coreLanguageResult observation) => verify observation compiled.coreFailureDiagnostic?
-    | result => throw (IO.userError s!"{name} public staged Core run failed: {reprStr result}")
+  for _ in [0, 1] do
+    let invoked ← compiled.invoke publicInputs
+    match invoked.outcome, old with
+    | .succeeded completion, .done value _ =>
+        let observed ← SourceCompilerFeatureSupport.get "public staged value"
+          (SourceCompilerFeatureSupport.rawData 128 completion.value)
+        unless reprStr observed == reprStr value do
+          throw (IO.userError s!"{name} public staged value changed")
+    | .failed reason _, .fault error _ =>
+        match ← invoked.diagnostic reason with
+        | some diagnostic => unless diagnostic.error == error do
+            throw (IO.userError s!"{name} public staged diagnostic changed")
+        | none => throw (IO.userError s!"{name} public staged diagnostic missing")
+    | _, _ => throw (IO.userError s!"{name} public staged classification changed")
+  let artifact ← compiled.execution.open
+  let session ← SourceCompilerFeatureSupport.boot artifact
+  let checkpoint ← SourceCompilerFeatureSupport.get "public staged checkpoint" (session.start compiled.key publicInputs)
+  let pending ← match ← checkpoint.resume 0 with
+    | .outOfFuel pending => pure pending
+    | _ => throw (IO.userError "public staged zero fuel did not suspend")
+  match ← pending.resume 300000 with
+  | .succeeded completion =>
+      match old with
+      | .done value _ =>
+          let observed ← SourceCompilerFeatureSupport.get "public staged resumed value"
+            (SourceCompilerFeatureSupport.rawData 128 completion.value)
+          unless reprStr observed == reprStr value do throw (IO.userError "public staged resume changed result")
+      | _ => throw (IO.userError "public staged resume changed fault into success")
+  | .failed reason session =>
+      match old, ← SourceCompilerFeatureSupport.get "public resumed diagnostic" (session.diagnostic compiled.key reason) with
+      | .fault error _, some diagnostic =>
+          unless diagnostic.error == error do throw (IO.userError "public staged resume changed diagnosis")
+      | _, _ => throw (IO.userError "public staged resume changed fault")
+  | _ => throw (IO.userError "public staged resume did not complete")
 
 def run : IO Unit := do
   let program ← match checkProgram workspace 4096 with

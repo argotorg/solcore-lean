@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreUnifiedCorpusSupport
-import Solcore.Frontend.SourceCompiler
+import Solcore.Test.SourceCompilerFeatureSupport
 
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 #check_failure Solcore.Frontend.SourceTypedRuntime.runWithValidationFuel
@@ -18,7 +18,6 @@ set_option autoImplicit false
 namespace Tests.SourceTypedRuntimeOperators
 
 open Solcore Solcore.Frontend Solcore.TypeSystem
-open Solcore.Frontend.SourceCompiler
 
 namespace Runtime
 
@@ -379,28 +378,15 @@ private def testOperatorResultCoercion (program : CheckedProgram) : IO Unit := d
     prepared.plan (← runPrepared prepared)
 
 private def testPublicCompiler (program : CheckedProgram) : IO Unit := do
-  let moduleId ← mainModule
-  let compileOptions : CompileOptions := {
-    specializationBudget := 64
-    stagingFuel := 256
-  }
-  let compiled ← match compileChecked program
-      (Seed.named moduleId "binaryEntry") compileOptions with
-    | .ok compiled => pure compiled
-    | .error error => throw (IO.userError
-        s!"public operator compilation failed: {reprStr error}")
-  assertTrue (decide (compiled.backend = .core))
-    "stateful selected operator did not choose the Core backend"
-  let runOptions : RunOptions := {
-    inputValidationFuel := 64
-    executionFuel := 8192
-  }
-  match compiled.runCore [] runOptions with
-  | .ok (.coreLanguageResult (.succeeded (.word actual) store)) => do
-      assertTrue (actual == word 31 && !store.isEmpty)
+  let compiled ← SourceCompilerFeatureSupport.compileNamed program "binaryEntry" []
+    {specializationBudget := 64, compilationFuel := 1000}
+  let invoked ← compiled.invoke [] {inputValidationFuel := 64, executionFuel := 300000}
+  match invoked.outcome with
+  | .succeeded completion =>
+      assertTrue (completion.value == .word (word 31) && completion.session.heapSize > invoked.initial.heapSize)
         "public stateful operator execution lost its result or heap effects"
-  | result => throw (IO.userError
-      s!"public stateful operator execution returned {reprStr result}")
+  | _ => throw (IO.userError "public stateful operator execution did not succeed")
+  compiled.checkResume [] (.word (word 31)) 0
 
 private def testOperatorPreflight (program : CheckedProgram) : IO Unit := do
   let fixture ← addAssumptionFixture program
