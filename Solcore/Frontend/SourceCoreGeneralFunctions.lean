@@ -176,7 +176,7 @@ private def contextualBinder (representation : Representation) (locals : SourceC
     | .metadata error => error
     | _ => .polymorphicBinding binder.id
 
-private def contextualSource (program : CheckedProgram) (plan : Plan)
+def contextualSource (program : CheckedProgram) (plan : Plan)
     (locals : SourceCoreLocalPolymorphism.Catalog) (owner : Key)
     (parent : Option SourceCoreLocalEvidence.Prepared) (source : TypedSource) (id : ExpressionId) :
     Except SourceCoreBasic.Error TypedSource := do
@@ -237,7 +237,7 @@ def callablePolicy (native : Option CallableContext) (active : TypeSystem.Substi
 /-- Contextual local instances re-enter the shared expression traversal with
 concrete metadata. Every closure captures the same lexical references; the
 bundle is constructed before the generalized binding's cell is allocated. -/
-private def lowerContextualExpression (program : CheckedProgram) (representation : Representation)
+def lowerContextualExpression (program : CheckedProgram) (representation : Representation)
     (signatures : ProgramSignatures) (locals : SourceCoreLocalPolymorphism.Catalog)
     (candidateParents : List SourceCoreLocalEvidence.Prepared)
     (assignments : SourceCoreAssignmentFaultSites.Table)
