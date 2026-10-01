@@ -10,7 +10,7 @@ namespace Solcore.SourceSemantics.CoreLowering.TypedScopedStatements
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 
 
-private theorem not_tail {mode : Bool} {node : StatementNode} {id : ExpressionId} {semi : Bool} {rest : List StatementId}
+theorem not_tail {mode : Bool} {node : StatementNode} {id : ExpressionId} {semi : Bool} {rest : List StatementId}
     (form : node.form = .expression id semi) (guard : (!semi && mode && rest.isEmpty) = false) :
     mode = true → rest = [] → ∀ expression, node.form ≠ .expression expression false := by
   intro active empty expression impossible
@@ -29,7 +29,7 @@ private theorem nil_executes (mode : Bool) (program : Program) (context : Source
     Executes mode program context evidence source environment heap [] context (.fallthrough environment) heap := by
   cases mode <;> exact .control .nil
 
-private theorem head_fault
+theorem head_fault
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {id : StatementId}
     {reason : Dynamic.SemanticFault} (mode : Bool) (rest : List StatementId)
@@ -41,7 +41,7 @@ private theorem head_fault
     | nil => exact .fault (.singleton fault)
     | cons => exact .fault (.head fault)
 
-private theorem terminal_intro
+theorem terminal_intro
     {program : Program} {context finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {id : StatementId} {node : StatementNode} {outcome : Dynamic.ControlOutcome}
@@ -56,7 +56,7 @@ private theorem terminal_intro
     | nil => exact .control (.singleton contains notTail head)
     | cons => exact .control (.terminal head terminal)
 
-private theorem prepend
+theorem prepend
     {program : Program} {context middleContext finalContext : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource}
     {environment nextEnvironment : Dynamic.Environment} {before middle after : Dynamic.Heap}
@@ -82,7 +82,7 @@ private theorem prepend
       | control execute => exact .control (.cons head execute)
       | fault fault => exact .fault (.tail head fault)
 
-private inductive SourceView (mode : Bool) (program : Program) (context : SourceSemantics.Context)
+inductive SourceView (mode : Bool) (program : Program) (context : SourceSemantics.Context)
     (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (environment : Dynamic.Environment)
     (before : Dynamic.Heap) (statements : List StatementId) (finalContext : SourceSemantics.Context)
     (after : Dynamic.Heap) : Dynamic.ControlOutcome → Prop where
@@ -93,7 +93,7 @@ private inductive SourceView (mode : Bool) (program : Program) (context : Source
       environment before statements finalContext reason after) : SourceView mode program context evidence source
       environment before statements finalContext after (.fault reason)
 
-private theorem source_view {statements : List StatementId}
+theorem source_view {statements : List StatementId}
     (trace : Executes mode program context evidence source environment before statements finalContext outcome after) :
     SourceView mode program context evidence source environment before statements finalContext after outcome := by
   cases mode <;> cases trace with
@@ -164,7 +164,7 @@ private theorem tail_view {expression : ExpressionId}
     | singleton head =>
       exact ⟨rfl, _, .fault (ScalarStatementViews.expression_fault unique contains form head), rfl⟩
 
-private theorem discard_view {expression : ExpressionId} {semi : Bool}
+theorem discard_view {expression : ExpressionId} {semi : Bool}
     (unique : NodeOccurrencesUnique source) (contains : ContainsStatement source id node)
     (form : node.form = .expression expression semi) (guard : (!semi && mode && rest.isEmpty) = false)
     (trace : Executes mode program context evidence source environment before (id :: rest) finalContext outcome after) :
