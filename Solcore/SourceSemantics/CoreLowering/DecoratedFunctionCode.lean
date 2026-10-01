@@ -47,6 +47,7 @@ theorem lambda_of_accepted
     (ordinary : SpecialPasses policy lowerBody fuel context source scope id reasonAt)
     (ordinaryCells : policy.sourceCells = none)
     (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
+    (ordinaryExpression : policy.rawLambdaExpression = SourceCoreFunctions.unchangedLambdaExpression)
     (found : source.lookupExpression? id = some node)
     (read : policy.readExpression source id = .ok (node, reportedType))
     (form : node.form = .lambda parameters resultType statements)
@@ -100,7 +101,7 @@ theorem lambda_of_accepted
                       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (min budget fuel) context
                         childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
                           reasonAt context.internalReason context.internalReason = _ at compiledBody
-                    simp only [compiledBody, ordinaryCells, ordinaryBody, SourceCoreFunctions.unchangedLambdaBody,
+                    simp only [compiledBody, ordinaryCells, ordinaryBody, SourceCoreFunctions.unchangedLambdaBody, ordinaryExpression, SourceCoreFunctions.unchangedLambdaExpression,
                       pure, Except.pure] at accepted
                     cases checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
                         (policy.callables.functionType parameterCore resultCore) with
@@ -142,6 +143,7 @@ theorem lambda_of_accepted_metadata
     (ordinary : SpecialPasses policy lowerBody fuel context source scope id reasonAt)
     (ordinaryCells : policy.sourceCells = none)
     (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
+    (ordinaryExpression : policy.rawLambdaExpression = SourceCoreFunctions.unchangedLambdaExpression)
     (found : source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters resultType statements)
     (readSound : ∀ selected type, policy.readExpression source id = .ok (selected, type) →
@@ -171,6 +173,6 @@ theorem lambda_of_accepted_metadata
     obtain ⟨selected, type⟩ := pair
     have same := Option.some.inj ((readSound selected type read).symm.trans found)
     subst selected
-    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody found read form extractBody accepted⟩
+    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody ordinaryExpression found read form extractBody accepted⟩
 
 end Solcore.SourceSemantics.CoreLowering.DecoratedFunctionCode

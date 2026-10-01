@@ -46,6 +46,12 @@ abbrev RawLambdaBodyHook := Context → TypedSource → Scope → ExpressionNode
 
 def unchangedLambdaBody : RawLambdaBodyHook := fun _ _ _ _ _ _ body => pure body
 
+/-- After binding the raw body, a profile may capture an administrative
+lexical value around the raw lambda. Callable decoration still owns the tags. -/
+abbrev RawLambdaExpressionHook := RawLambdaBodyHook
+
+def unchangedLambdaExpression : RawLambdaExpressionHook := fun _ _ _ _ _ _ expression => pure expression
+
 /-- Shared expression/evidence traversal uses one callable representation.
 Decoration receives a language result containing the raw tagged function;
 the call hook owns the guard protocol before arguments and application.
@@ -66,6 +72,7 @@ The leaf callback receives the same recursive expression compiler, so nominal
 payloads can contain calls and closures without a second evaluator. -/
 structure Policy where
   rawLambdaBody : RawLambdaBodyHook := unchangedLambdaBody
+  rawLambdaExpression : RawLambdaExpressionHook := unchangedLambdaExpression
   callables : CallablePolicy := {}
   sourceCells : Option SourceCoreSourceCells.Allocator := none
   projectType : SourceCoreElaboration.ErrorSite → TypeSystem.Ty → Except Error Core.Ty :=
@@ -287,9 +294,10 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                       argumentProjection (body.weakenAt parameters.length)
               let rawBody ← policy.rawLambdaBody context source scope node parameterCore resultCore rawBody
               SourceCoreBasic.ensureType site type (policy.callables.functionType parameterCore resultCore)
+              let rawLambda ← policy.rawLambdaExpression context source scope node parameterCore resultCore
+                (.lambda parameterCore (Core.LanguageResult.resultType resultCore) rawBody)
               let expression ← policy.callables.decorateCallable context source node (.lambda id) parameterCore resultCore
-                (Core.LanguageResult.success (Core.TaggedFunction.anonymous
-                  (.lambda parameterCore (Core.LanguageResult.resultType resultCore) rawBody)))
+                (Core.LanguageResult.success (Core.TaggedFunction.anonymous rawLambda))
               pure ⟨type, expression⟩
           | .unary operator operand =>
               let operand ← lowerExpressionWithPolicy policy lowerBody fuel context source scope operand reasonAt

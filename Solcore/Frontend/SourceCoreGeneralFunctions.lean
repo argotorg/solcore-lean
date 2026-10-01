@@ -59,6 +59,12 @@ structure Representation where
     SourceCoreLoops.Policy
   rawLambdaBodyAt : Key → TypeSystem.Substitution → SourceCoreFunctions.RawLambdaBodyHook :=
     fun _ _ => expressions.rawLambdaBody
+  rawLambdaExpressionAt : Key → TypeSystem.Substitution → SourceCoreFunctions.RawLambdaExpressionHook :=
+    fun _ _ => expressions.rawLambdaExpression
+  /-- The assembled checker validates this hook after all named parameter
+  cells have been bound. Its body still has the original raw argument slot. -/
+  rawNamedBody : Function → Core.Expr → Except SourceCoreBasic.Error Core.Expr :=
+    fun _ body => pure body
   /-- Preserve per-occurrence metadata after selecting a generalized local
   bundle. This does not change its representation type or select evidence. -/
   localReadView : Key → TypeSystem.Substitution → TypedSource → SourceCoreBasic.Scope →
@@ -76,7 +82,8 @@ def Representation.atContext (representation : Representation) (owner : Key)
     (active : TypeSystem.Substitution) : Representation :=
   {representation with expressions := {representation.expressions with
     sourceCells := representation.allocatorAt owner active
-    rawLambdaBody := representation.rawLambdaBodyAt owner active}}
+    rawLambdaBody := representation.rawLambdaBodyAt owner active
+    rawLambdaExpression := representation.rawLambdaExpressionAt owner active}}
 
 private def prepareInputs (representation : Representation) (source : TypedSource) :
     SourceCoreBasic.Scope → List TypedBinder → Except Error (List (TypedBinder × Core.Ty))
@@ -319,6 +326,7 @@ def compileClosureWithRepresentation (program : CheckedProgram) (representation 
     | none => pure (SourceCoreFunctions.bindParameters function.inputs function.signature.resultType body)
     | some allocate => (SourceCoreSourceCells.bindParameters allocate source [] function.inputs
         function.signature.resultType SourceCoreFunctions.argumentProjection body).mapError Error.lowering
+  let body ← (representation.rawNamedBody function body).mapError Error.lowering
   pure (.lambda function.signature.parameterType (Core.LanguageResult.resultType function.signature.resultType) body)
 
 def assembleCall (globals : List Signature) (functions : List Function) (closures : List Core.Expr)

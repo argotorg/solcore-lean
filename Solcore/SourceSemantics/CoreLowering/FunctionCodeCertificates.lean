@@ -107,6 +107,7 @@ theorem lambda_of_accepted
     (ordinary : policy.lowerSpecial? = none)
     (ordinaryCells : policy.sourceCells = none)
     (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
+    (ordinaryExpression : policy.rawLambdaExpression = SourceCoreFunctions.unchangedLambdaExpression)
     (defaultCallables : policy.callables = {})
     (found : source.lookupExpression? id = some node)
     (read : policy.readExpression source id = .ok (node, reportedType))
@@ -156,7 +157,7 @@ theorem lambda_of_accepted
                         childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
                           reasonAt context.internalReason context.internalReason = _ at compiledBody
                     simp only [compiledBody, pure, Except.pure, defaultCallables, ordinaryBody,
-                      SourceCoreFunctions.unchangedLambdaBody] at accepted
+                      SourceCoreFunctions.unchangedLambdaBody, ordinaryExpression, SourceCoreFunctions.unchangedLambdaExpression] at accepted
                     cases checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
                         (Core.TaggedFunction.functionType parameterCore resultCore) with
                     | error error => simp [checked] at accepted
@@ -185,6 +186,7 @@ theorem lambda_of_accepted_metadata
     (ordinary : policy.lowerSpecial? = none)
     (ordinaryCells : policy.sourceCells = none)
     (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
+    (ordinaryExpression : policy.rawLambdaExpression = SourceCoreFunctions.unchangedLambdaExpression)
     (defaultCallables : policy.callables = {})
     (found : source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters resultType statements)
@@ -209,7 +211,7 @@ theorem lambda_of_accepted_metadata
     obtain ⟨selected, type⟩ := pair
     have same := Option.some.inj ((readSound selected type read).symm.trans found)
     subst selected
-    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody defaultCallables found read form extractBody accepted⟩
+    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody ordinaryExpression defaultCallables found read form extractBody accepted⟩
 
 def LambdaCertificate.rawBody
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy} {source : TypedSource}
