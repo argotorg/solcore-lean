@@ -1,5 +1,6 @@
 import Solcore.Core.Data
 import Solcore.Core.Safety
+import Solcore.Core.DefinitionExtension
 import Solcore.Core.RuntimeStoreSafety
 import Solcore.Core.BoundedSafety
 import Solcore.Core.LanguageResult

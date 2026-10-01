@@ -86,6 +86,9 @@ import Solcore.Frontend.SourceCoreCallableIndexedReadViews
 import Solcore.Frontend.SourceCoreCallableIndexedRestoration
 import Solcore.Frontend.SourceCoreCallableIndexedOutputs
 import Solcore.Frontend.SourceCoreCallableIndexedHeapOutputs
+import Solcore.Frontend.SourceCoreUnifiedRuntime
+import Solcore.Frontend.SourceCoreUnifiedRuntimeCertificates
+import Solcore.Frontend.SourceCoreUnifiedCompilation
 import Solcore.Frontend.SourceCoreLambdaTemplates
 import Solcore.Frontend.SourceCoreCompatibleHeapOutputs
 import Solcore.Frontend.SourceCoreCompatibleDataPlaces
