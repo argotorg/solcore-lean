@@ -43,10 +43,12 @@ import Solcore.Frontend.SourceCoreGeneralFunctions
 import Solcore.Frontend.SourceCoreAllocationCodebook
 import Solcore.Frontend.SourceCoreAllocationDiscovery
 import Solcore.Frontend.SourceCoreAllocationContexts
+import Solcore.Frontend.SourceCoreAllocationLayouts
 import Solcore.Frontend.SourceCoreCompatibleDataEquality
 import Solcore.Frontend.SourceCoreCompatibleDataExpressions
 import Solcore.Frontend.SourceCoreCompatibleFunctions
 import Solcore.Frontend.SourceCoreCompatibleInputs
+import Solcore.Frontend.SourceCoreCompatibleOutputs
 import Solcore.Frontend.SourceCoreCompatibleDataPlaces
 import Solcore.Frontend.SourceCoreCompatibleDataMatches
 import Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites

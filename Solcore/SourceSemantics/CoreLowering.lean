@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePayload
+import Solcore.SourceSemantics.CoreLowering.CompatibleMappings
 import Solcore.SourceSemantics.CoreLowering.DataPlaceFaultTree
 import Solcore.SourceSemantics.CoreLowering.DataPlaceWriteBack
 import Solcore.SourceSemantics.CoreLowering.FunctionValues

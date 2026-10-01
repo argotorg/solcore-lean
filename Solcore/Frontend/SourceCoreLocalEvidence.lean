@@ -95,6 +95,9 @@ structure Prepared where private mk ::
 def Prepared.substitution (prepared : Prepared) : Substitution := prepared.origin.origin.substitution
 def Prepared.source (prepared : Prepared) : TypedSource := prepared.caller.function.typedBody
 
+/-- Retain the exact authenticated lambda instance for later metadata exports. -/
+def Prepared.instance (prepared : Prepared) : Instance := prepared.origin
+
 structure Reference where private mk ::
   id : ExpressionId
   cumulative : Substitution

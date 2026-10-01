@@ -47,6 +47,7 @@ inductive Error where
   | missingBinding (id : Resolved.LocalId)
   | nonTailExpression (id : StatementId)
   | missingReturn (resultType : Core.Ty)
+  | sourceAllocation (details : String)
   deriving Repr, DecidableEq
 
 def ensureType (site : SourceCoreElaboration.ErrorSite) (expected actual : Core.Ty) :

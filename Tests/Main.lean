@@ -1,4 +1,5 @@
 import Solcore.Test.SourceCoreCompatiblePayload
+import Solcore.Test.SourceCoreCompatibleMappings
 import Solcore.Test.SourceCoreDataPlacePathFaults
 import Solcore.Test.SourceCoreDataPlaceWriteBack
 import Solcore.Test.SourceCoreStageContracts
@@ -33,6 +34,7 @@ import Solcore.Test.SourceCoreSourceCells
 import Solcore.Test.SourceCoreAllocationCodebook
 import Solcore.Test.SourceCoreAllocationDiscovery
 import Solcore.Test.SourceCoreAllocationContexts
+import Solcore.Test.SourceCoreAllocationLayouts
 import Solcore.Test.SourceRuntimeValidationBoundary
 import Solcore.Test.SourceRuntimeDeepValidationBoundary
 import Solcore.Test.SourceCallableLedger
@@ -50,6 +52,7 @@ import Solcore.Test.SourceCoreCompatibleDataControl
 import Solcore.Test.SourceCoreCompatibleFunctions
 import Solcore.Test.SourceCoreCompatiblePreparedFunctions
 import Solcore.Test.SourceCoreCompatibleInputs
+import Solcore.Test.SourceCoreCompatibleOutputs
 import Solcore.Test.SourceCoreNativeEntry
 import Solcore.Test.SourceCoreRepresentationProjection
 import Solcore.Test.SourceCompilerSourceBoundaryObservations
@@ -2569,14 +2572,17 @@ def run : IO Unit := do
   SourceCoreAllocationCodebook.run
   SourceCoreAllocationDiscovery.run
   SourceCoreAllocationContexts.run
+  SourceCoreAllocationLayouts.run
   SourceCoreRawMetadata.run
   SourceCoreCompatibleValues.run
   SourceCoreCompatiblePayload.run
+  SourceCoreCompatibleMappings.run
   SourceCoreCompatibleDataExpressions.run
   SourceCoreCompatibleDataControl.run
   SourceCoreCompatibleFunctions.run
   SourceCoreCompatiblePreparedFunctions.run
   SourceCoreCompatibleInputs.run
+  SourceCoreCompatibleOutputs.run
   SourceCoreNativeEntry.run
   SourceCoreRepresentationProjection.run
   SourceCompilerSourceBoundaryObservations.run
