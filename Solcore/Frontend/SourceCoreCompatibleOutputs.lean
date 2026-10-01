@@ -290,10 +290,19 @@ private def callable {checked : Checked} {definitions : Core.DataEnvironment} (r
       | _ => throw ⟨[], .callablePayloadMismatch⟩
   | .lambda .. => throw ⟨[], .lambdaExportRequiresLedger entry.origin⟩
 
+/-- A function leaf decoder owns its separate code, metadata and capture
+receipts. Structural traversal does not certify those leaves by itself. -/
+abbrev LeafDecoder := Ty → Core.Value → Except Error SourceValue
+
+/-- The existing exact named/builtin decoder, for delegation from a richer
+lambda decoder. Its recipe still authenticates the installed global slots. -/
+def decodeCallable {checked : Checked} {definitions : Core.DataEnvironment}
+    (recipe : Recipe checked definitions) : LeafDecoder := callable recipe
+
 mutual
-  private def decodeRaw {checked : Checked} {definitions : Core.DataEnvironment} : Nat → Recipe checked definitions → Values → Ty → Core.Value → Except Error SourceValue
-    | 0, _, _, _, _ => throw ⟨[], .exhausted⟩
-    | fuel + 1, recipe, context, expected, value => do
+  private def decodeWithRaw {checked : Checked} {definitions : Core.DataEnvironment} : Nat → LeafDecoder → Recipe checked definitions → Values → Ty → Core.Value → Except Error SourceValue
+    | 0, _, _, _, _, _ => throw ⟨[], .exhausted⟩
+    | fuel + 1, leaf, recipe, context, expected, value => do
         if dataOnly value then
           let data ← (SourceCoreCompatibleValues.decode (fuel + 1) context expected value).mapError fromCodec
           match sourceFromData data with
@@ -301,17 +310,17 @@ mutual
           | none => throw ⟨[], .callablePayloadMismatch⟩
         else
           match SourceCoreRawMetadata.runtimeType expected, value with
-          | .function .., value => callable recipe expected value
+          | .function .., value => leaf expected value
           | .product leftType rightType, .pair left right =>
-              let left ← (decodeRaw fuel recipe context leftType left).mapError (Error.at .productLeft)
-              let right ← (decodeRaw fuel recipe context rightType right).mapError (Error.at .productRight)
+              let left ← (decodeWithRaw fuel leaf recipe context leftType left).mapError (Error.at .productLeft)
+              let right ← (decodeWithRaw fuel leaf recipe context rightType right).mapError (Error.at .productRight)
               pure (.product left right)
           | .mapping _ _, .pair (.word id) (.pair fallback stored) =>
               let (keyType, valueType) ← match ← metadata context expected id with
                 | .mapping key value => pure (key, value)
                 | _ => throw ⟨[], .codec (.metadataKindMismatch id)⟩
               let layout ← (context.checked.catalog.mappingLayout keyType valueType).mapError (fun error => ⟨[], .catalog error⟩)
-              let entries ← decodeEntries fuel recipe context keyType valueType layout stored 0
+              let entries ← decodeWithEntries fuel leaf recipe context keyType valueType layout stored 0
               let actual ← (SourceCoreCompatibleValues.decodeDefaultRaw fuel context valueType layout.valueType fallback).mapError fromCodec
               unless actual = SourceCoreCompatibleValues.defaultValue? (valueType.size + 1) valueType do
                 throw ⟨[], .codec .transportedDefaultMismatch⟩
@@ -322,41 +331,46 @@ mutual
                 | _ => throw ⟨[], .codec (.metadataKindMismatch id)⟩
               let authentic ← (context.checked.resolveConstructor instantiation).mapError (fun error => ⟨[], .catalog error⟩)
               unless constructor = authentic do throw ⟨[], .codec (.constructorMismatch constructor)⟩
-              let payloads ← decodePayloads fuel recipe context instantiation.payloadTypes payload 0
+              let payloads ← decodeWithPayloads fuel leaf recipe context instantiation.payloadTypes payload 0
               pure (.constructed instantiation payloads)
           | _, .cellRef .. => throw ⟨[], .externalReferenceUnsupported⟩
           | _, .hostFunction .. => throw ⟨[], .externalHostUnsupported⟩
           | _, _ => throw ⟨[], .callablePayloadMismatch⟩
 
-  private def decodePayloads {checked : Checked} {definitions : Core.DataEnvironment} : Nat → Recipe checked definitions → Values → List Ty → Core.Value → Nat → Except Error (List SourceValue)
-    | _, _, _, [], .unit, _ => pure []
-    | 0, _, _, _, _, _ => throw ⟨[], .exhausted⟩
-    | fuel + 1, recipe, context, [type], value, index =>
-        return [← (decodeRaw fuel recipe context type value).mapError (Error.at (.constructorPayload index))]
-    | fuel + 1, recipe, context, type :: types, .pair value rest, index => do
-        let value ← (decodeRaw fuel recipe context type value).mapError (Error.at (.constructorPayload index))
-        let rest ← decodePayloads fuel recipe context types rest (index + 1)
+  private def decodeWithPayloads {checked : Checked} {definitions : Core.DataEnvironment} : Nat → LeafDecoder → Recipe checked definitions → Values → List Ty → Core.Value → Nat → Except Error (List SourceValue)
+    | _, _, _, _, [], .unit, _ => pure []
+    | 0, _, _, _, _, _, _ => throw ⟨[], .exhausted⟩
+    | fuel + 1, leaf, recipe, context, [type], value, index =>
+        return [← (decodeWithRaw fuel leaf recipe context type value).mapError (Error.at (.constructorPayload index))]
+    | fuel + 1, leaf, recipe, context, type :: types, .pair value rest, index => do
+        let value ← (decodeWithRaw fuel leaf recipe context type value).mapError (Error.at (.constructorPayload index))
+        let rest ← decodeWithPayloads fuel leaf recipe context types rest (index + 1)
         pure (value :: rest)
-    | _, _, _, _, _, _ => throw ⟨[], .codec .malformedPayload⟩
+    | _, _, _, _, _, _, _ => throw ⟨[], .codec .malformedPayload⟩
 
-  private def decodeEntries {checked : Checked} {definitions : Core.DataEnvironment} : Nat → Recipe checked definitions → Values → Ty → Ty →
+  private def decodeWithEntries {checked : Checked} {definitions : Core.DataEnvironment} : Nat → LeafDecoder → Recipe checked definitions → Values → Ty → Ty →
       Core.OrderedMapping.Layout → Core.Value → Nat → Except Error (List (SourceValue × SourceValue))
-    | 0, _, _, _, _, _, _, _ => throw ⟨[], .exhausted⟩
-    | fuel + 1, recipe, context, keyType, valueType, layout, stored, index => do
+    | 0, _, _, _, _, _, _, _, _ => throw ⟨[], .exhausted⟩
+    | fuel + 1, leaf, recipe, context, keyType, valueType, layout, stored, index => do
         match stored with
         | .constructed constructor .unit =>
             unless constructor = layout.nilConstructor do throw ⟨[], .codec (.constructorMismatch constructor)⟩
             pure []
         | .constructed constructor (.pair (.pair key value) rest) =>
             unless constructor = layout.consConstructor do throw ⟨[], .codec (.constructorMismatch constructor)⟩
-            let key ← (decodeRaw fuel recipe context keyType key).mapError (Error.at (.mappingKey index))
-            let value ← (decodeRaw fuel recipe context valueType value).mapError (Error.at (.mappingValue index))
-            let rest ← decodeEntries fuel recipe context keyType valueType layout rest (index + 1)
+            let key ← (decodeWithRaw fuel leaf recipe context keyType key).mapError (Error.at (.mappingKey index))
+            let value ← (decodeWithRaw fuel leaf recipe context valueType value).mapError (Error.at (.mappingValue index))
+            let rest ← decodeWithEntries fuel leaf recipe context keyType valueType layout rest (index + 1)
             pure ((key, value) :: rest)
         | .cellRef .. => throw ⟨[], .externalReferenceUnsupported⟩
         | .hostFunction .. => throw ⟨[], .externalHostUnsupported⟩
         | _ => throw ⟨[], .codec .malformedPayload⟩
 end
+
+private def decodeRaw {checked : Checked} {definitions : Core.DataEnvironment}
+    (fuel : Nat) (recipe : Recipe checked definitions) (context : Values)
+    (expected : Ty) (value : Core.Value) : Except Error SourceValue :=
+  decodeWithRaw fuel (decodeCallable recipe) recipe context expected value
 
 structure Decoded {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (snapshot : Snapshot recipe)
     (context : Values) (expected : Ty) (core : Core.Value) where private mk ::
@@ -378,6 +392,38 @@ def decode {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Re
   match reversed : decodeRaw fuel recipe context expected core with
   | .error error => throw error
   | .ok source => pure (.mk source type projected typed ⟨fuel, reversed⟩)
+
+/-- Actual structural decoding with an explicit function-leaf policy. The
+policy's code and capture receipts must be retained by its caller. Native
+typing and this receipt alone do not establish source execution meaning. -/
+structure LeafDecoded {checked : Checked} {definitions : Core.DataEnvironment}
+    (leaf : LeafDecoder) (recipe : Recipe checked definitions) (snapshot : Snapshot recipe)
+    (context : Values) (expected : Ty) (core : Core.Value) where private mk ::
+  source : SourceValue
+  type : Core.Ty
+  projected : checked.catalog.project expected = .ok type
+  typed : Core.RuntimeValueHasType (snapshot.store.map Core.Value.type) core type definitions
+  private reversed : ∃ fuel, decodeWithRaw fuel leaf recipe context expected core = .ok source
+
+def decodeWithLeaves {checked : Checked} {definitions : Core.DataEnvironment}
+    (leaf : LeafDecoder) (recipe : Recipe checked definitions) (snapshot : Snapshot recipe)
+    (context : Values) (owner : context.checked = checked) (expected : Ty) (core : Core.Value)
+    (type : Core.Ty) (projected : checked.catalog.project expected = .ok type)
+    (typed : Core.RuntimeValueHasType (snapshot.store.map Core.Value.type) core type definitions)
+    (fuel : Nat := 1024) : Except Error (LeafDecoded leaf recipe snapshot context expected core) := do
+  let _ := owner
+  match reversed : decodeWithRaw fuel leaf recipe context expected core with
+  | .error error => throw error
+  | .ok source => pure ⟨source, type, projected, typed, ⟨fuel, reversed⟩⟩
+
+/-- Delegating all callable leaves to the original policy retains exactly the
+existing decoder's certificate. No new function origin is admitted. -/
+def LeafDecoded.default {checked : Checked} {definitions : Core.DataEnvironment}
+    {recipe : Recipe checked definitions} {snapshot : Snapshot recipe} {context : Values}
+    {expected : Ty} {core : Core.Value}
+    (decoded : LeafDecoded (decodeCallable recipe) recipe snapshot context expected core) :
+    Decoded recipe snapshot context expected core :=
+  ⟨decoded.source, decoded.type, decoded.projected, decoded.typed, decoded.reversed⟩
 
 structure Completion {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (context : Values) (expected : Ty) where private mk ::
   snapshot : Snapshot recipe
