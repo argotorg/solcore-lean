@@ -698,6 +698,8 @@ def Session.start {artifact : Artifact} (session : Session artifact) (key : Key)
   let root ← match artifact.recipe.roots.find? (fun root => decide (root.key = key)) with
     | some root => pure root | none => throw ⟨[], .missingEntry key⟩
   discard <| checkGlobals artifact session.store
+  unless root.inputs.length = arguments.length do
+    throw ⟨[], .argumentCountMismatch root.inputs.length arguments.length⟩
   let encoded ← encodeArguments session.authority session.registry fuel session.values session.owner root.inputs root.types arguments
   let native := encoded.native.reverse ++ environment artifact
   have reversed : Core.RuntimeEnvironmentHasTypes session.world encoded.native.reverse root.types.reverse artifact.program.layouts.definitions :=
