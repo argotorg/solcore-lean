@@ -29,6 +29,8 @@ import Solcore.Test.SourceCoreMappingWithDefault
 import Solcore.Test.SourceCoreHeapMarkers
 import Solcore.Test.SourceCoreSourceCells
 import Solcore.Test.SourceCoreAllocationCodebook
+import Solcore.Test.SourceCoreAllocationDiscovery
+import Solcore.Test.SourceCoreAllocationContexts
 import Solcore.Test.SourceRuntimeValidationBoundary
 import Solcore.Test.SourceRuntimeDeepValidationBoundary
 import Solcore.Test.SourceCallableLedger
@@ -2561,6 +2563,8 @@ def run : IO Unit := do
   SourceCoreHeapMarkers.run
   SourceCoreSourceCells.run
   SourceCoreAllocationCodebook.run
+  SourceCoreAllocationDiscovery.run
+  SourceCoreAllocationContexts.run
   SourceCoreRawMetadata.run
   SourceCoreCompatibleValues.run
   SourceCoreCompatibleDataExpressions.run
