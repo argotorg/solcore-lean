@@ -1,6 +1,7 @@
 import Solcore.Frontend.SourceCoreCompatibleFunctions
 import Solcore.Frontend.SourceCoreAllocationContexts
 import Solcore.Frontend.SourceCoreAllocationLayouts
+import Solcore.Frontend.SourceCoreCallableViewLowering
 
 /-! Compile source allocation metadata through the common compiler twice.
 The discovery pass retains its actual compiler equation. Its reached requests
@@ -20,6 +21,11 @@ abbrev Key := SourceSpecialization.SpecializationKey
 abbrev Layouts := SourceCoreAllocationLayouts.Prepared
 abbrev Representation := SourceCoreGeneralFunctions.Representation
 
+structure ViewTable where
+  program : CheckedProgram
+  plan : SourceSpecializationWorklist.Plan
+  table : SourceCoreCallableViews.Table program plan
+
 inductive Error where
   | contexts (error : SourceCoreAllocationContexts.Error)
   | discovery (error : SourceCoreAllocationDiscovery.Error)
@@ -29,6 +35,7 @@ inductive Error where
   | native (error : SourceCoreGeneralEntry.NativeCompileError)
   | diagnosticsUnavailable
   | missingRoot (key : Key)
+  | views (error : SourceCoreCallableViews.Error)
   deriving Repr
 
 def packClosures : List Core.Expr → Core.Expr
@@ -53,16 +60,28 @@ mutual
     | expression :: rest => 1 + scanBudget expression + scanBranchesBudget rest
 end
 
-def discoveryRepresentation {checked : Checked} (_base : Base checked) (fuel : Nat)
-    (discovery : SourceCoreAllocationDiscovery.Prepared) : Representation :=
+def discoveryRepresentation {checked : Checked} (base : Base checked) (fuel : Nat)
+    (discovery : SourceCoreAllocationDiscovery.Prepared)
+    (views : Option (SourceCoreCallableViews.Table base.sourceProgram base.plan) := none) : Representation :=
   {SourceCoreCompatibleFunctions.representation (.initial checked) fuel with
     allocatorAt := fun owner active => some (discovery.allocatorAt owner active
-      (fun error => .sourceAllocation (reprStr error)))}
+      (fun error => .sourceAllocation (reprStr error)))
+    localReadView := fun owner active source _ read lowered =>
+      match views with
+      | none => pure lowered
+      | some views => (SourceCoreCallableViewLowering.lower views owner active source read lowered)
+          |>.mapError (fun error => .callableMetadata (reprStr error))}
 
-def markedRepresentation (checked : Checked) (fuel : Nat) (layouts : Layouts) : Representation :=
+def markedRepresentation (checked : Checked) (fuel : Nat) (layouts : Layouts)
+    (views : Option ViewTable := none) : Representation :=
   {SourceCoreCompatibleFunctions.representation (.initial checked) fuel with
     allocatorAt := fun owner active => some (layouts.allocatorAt owner active
-      (fun error => .sourceAllocation (reprStr error)))}
+      (fun error => .sourceAllocation (reprStr error)))
+    localReadView := fun owner active source _ read lowered =>
+      match views with
+      | none => pure lowered
+      | some views => (SourceCoreCallableViewLowering.lower views.table owner active source read lowered)
+          |>.mapError (fun error => .callableMetadata (reprStr error))}
 
 /-- This is the actual shared contextual function compiler, with its retained
 diagnostic and local-evidence inventories. -/
@@ -115,22 +134,28 @@ private def prepareInputs (checked : Checked) (base : Base checked) (layouts : L
 structure Prepared (checked : Checked) where private mk ::
   base : Base checked
   fuel : Nat
+  views : SourceCoreCallableViews.Table base.sourceProgram base.plan
+  viewsPrepared : SourceCoreCallableViews.prepare base = .ok views
   contexts : SourceCoreAllocationContexts.Inventory base.plan base.contexts
   contextsPrepared : SourceCoreAllocationContexts.fromPrepared base.plan base.contexts = .ok contexts
   discovery : SourceCoreAllocationDiscovery.Prepared
   discoveryPrepared : SourceCoreAllocationDiscovery.prepare checked.catalog.definitions contexts.contexts = .ok discovery
-  firstPass : Compilation base (discoveryRepresentation base fuel discovery) fuel
+  firstPass : Compilation base (discoveryRepresentation base fuel discovery (some views)) fuel
   discovered : SourceCoreAllocationDiscovery.Discovered discovery (scanBudget (packClosures firstPass.closures))
     (packClosures firstPass.closures)
   scanned : SourceCoreAllocationDiscovery.discover discovery (scanBudget (packClosures firstPass.closures))
     (packClosures firstPass.closures) = .ok discovered
   layouts : Layouts
   layoutsPrepared : SourceCoreAllocationLayouts.prepare discovered = .ok layouts
-  secondPass : Compilation base (markedRepresentation checked fuel layouts) fuel
+  secondPass : Compilation base (markedRepresentation checked fuel layouts
+    (some ⟨base.sourceProgram, base.plan, views⟩)) fuel
   sourceInputs : SourceInputs checked layouts
   entries : List (Entry layouts)
 
 def prepare {checked : Checked} (base : Base checked) (fuel : Nat) : Except Error (Prepared checked) := do
+  let views ← match accepted : SourceCoreCallableViews.prepare base with
+    | .error error => throw (.views error)
+    | .ok views => pure (⟨views, accepted⟩ : {views // SourceCoreCallableViews.prepare base = .ok views})
   let contexts ← match accepted : SourceCoreAllocationContexts.fromPrepared base.plan base.contexts with
     | .error error => throw (.contexts error)
     | .ok inventory => pure (⟨inventory, accepted⟩ : {inventory //
@@ -139,7 +164,7 @@ def prepare {checked : Checked} (base : Base checked) (fuel : Nat) : Except Erro
     | .error error => throw (.discovery error)
     | .ok discovery => pure (⟨discovery, accepted⟩ : {discovery //
         SourceCoreAllocationDiscovery.prepare checked.catalog.definitions contexts.val.contexts = .ok discovery})
-  let firstPass ← compileWithReceipt base (discoveryRepresentation base fuel discovery.val) fuel
+  let firstPass ← compileWithReceipt base (discoveryRepresentation base fuel discovery.val (some views.val)) fuel
   let discovered ← match accepted : SourceCoreAllocationDiscovery.discover discovery.val
       (scanBudget (packClosures firstPass.closures)) (packClosures firstPass.closures) with
     | .error error => throw (.discovery error)
@@ -150,7 +175,8 @@ def prepare {checked : Checked} (base : Base checked) (fuel : Nat) : Except Erro
     | .error error => throw (.layouts error)
     | .ok layouts => pure (⟨layouts, accepted⟩ : {layouts //
         SourceCoreAllocationLayouts.prepare discovered.val = .ok layouts})
-  let secondPass ← compileWithReceipt base (markedRepresentation checked fuel layouts.val) fuel
+  let secondPass ← compileWithReceipt base (markedRepresentation checked fuel layouts.val
+    (some ⟨base.sourceProgram, base.plan, views.val⟩)) fuel
   let sourceInputs ← prepareInputs checked base layouts.val
   let entries ← base.plan.seedKeys.mapM fun key => do
     let function ← match base.functions.find? (fun function => decide (function.signature.key = key)) with
@@ -163,7 +189,7 @@ def prepare {checked : Checked} (base : Base checked) (fuel : Nat) : Except Erro
     let native ← (SourceCoreGeneralEntry.NativeEntry.compile layouts.val.definitions (function.inputs.map Prod.snd)
       function.signature.resultType body).mapError Error.native
     pure (Entry.mk key (function.inputs.map Prod.fst) function.specialized.function.inferredBodyType native)
-  pure ⟨base, fuel, contexts.val, contexts.property, discovery.val, discovery.property,
+  pure ⟨base, fuel, views.val, views.property, contexts.val, contexts.property, discovery.val, discovery.property,
     firstPass, discovered.val, discovered.property, layouts.val, layouts.property, secondPass, sourceInputs, entries⟩
 
 def Prepared.find? {checked : Checked} (prepared : Prepared checked) (key : Key) : Option (Entry prepared.layouts) :=

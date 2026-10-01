@@ -48,6 +48,7 @@ inductive Error where
   | nonTailExpression (id : StatementId)
   | missingReturn (resultType : Core.Ty)
   | sourceAllocation (details : String)
+  | callableMetadata (details : String)
   deriving Repr, DecidableEq
 
 def ensureType (site : SourceCoreElaboration.ErrorSite) (expected actual : Core.Ty) :

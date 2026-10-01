@@ -59,6 +59,11 @@ structure Representation where
     SourceCoreLoops.Policy
   rawLambdaBodyAt : Key → TypeSystem.Substitution → SourceCoreFunctions.RawLambdaBodyHook :=
     fun _ _ => expressions.rawLambdaBody
+  /-- Preserve per-occurrence metadata after selecting a generalized local
+  bundle. This does not change its representation type or select evidence. -/
+  localReadView : Key → TypeSystem.Substitution → TypedSource → SourceCoreBasic.Scope →
+    ExpressionId → SourceCoreBasic.LoweredExpr → Except SourceCoreBasic.Error SourceCoreBasic.LoweredExpr :=
+    fun _ _ _ _ _ lowered => pure lowered
   allocatorAt : Key → TypeSystem.Substitution → Option SourceCoreSourceCells.Allocator :=
     fun _ _ => expressions.sourceCells
   loopsWithSourceCells : Option SourceCoreSourceCells.Allocator →
@@ -278,7 +283,9 @@ private def lowerContextualExpression (program : CheckedProgram) (representation
               if locals.bindings.any (fun binding => decide (binding.caller = current.owner ∧ binding.binder.id = binder)) then
                 let lowered ← (SourceCoreLocalPolymorphism.lowerRead locals current.owner active source scope id (reasonAt id))
                   |>.mapError (localError id node)
-                return some lowered
+                let viewed ← representation.localReadView current.owner active source scope id lowered
+                SourceCoreBasic.ensureType (.occurrence id.occurrence) lowered.type viewed.type
+                return some viewed
               else return none
           | _ => return none }
       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1) context source scope id reasonAt
