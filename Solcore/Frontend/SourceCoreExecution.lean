@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceCoreCompiler
 import Solcore.Frontend.SourceCoreIndexedSession
+import Solcore.Frontend.SourceCoreRootDiscovery
 
 /-! A single source-facing compilation, value and session boundary. The
 indexed recipe is prepared once from the cached compiler artifact. Opening
@@ -24,6 +25,7 @@ structure RunOptions where
 inductive CompileError where
   | compilation (error : SourceCoreCompiler.Error)
   | preparation (error : SourceCoreIndexedSession.Error)
+  | discovery (error : SourceCoreRootDiscovery.StaticWordRootError)
   deriving Repr
 
 structure Compiled where private mk ::
@@ -94,6 +96,83 @@ theorem compile_checked_source {raw : Workspace.RawWorkspace} {seeds : List Seed
       simp only [selected, Except.mapError, bind, Except.bind] at accepted
       rw [prepare_program accepted]
       exact SourceCoreCompiler.compile_checked_source selected
+
+def compileEntryChecked (program : CheckedProgram) (moduleId : Workspace.ModuleId) (options : Options := {}) :
+    Except CompileError Compiled :=
+  compileChecked program [SourceCoreCompiler.Seed.named moduleId "main"] options
+
+def compileEntry (raw : Workspace.RawWorkspace) (options : Options := {}) : Except CompileError Compiled := do
+  let entry ← (SourceCoreRootDiscovery.checkEntry raw options.checkingFuel).mapError
+    (fun errors => CompileError.compilation (.checking errors))
+  compileChecked entry.program [entry.seed] options
+
+theorem compileEntry_checked_source {raw : Workspace.RawWorkspace} {options : Options}
+    {compiled : Compiled} (accepted : compileEntry raw options = .ok compiled) :
+    checkProgram raw options.checkingFuel = .ok compiled.program := by
+  unfold compileEntry at accepted
+  cases selected : SourceCoreRootDiscovery.checkEntry raw options.checkingFuel with
+  | error error => simp [selected, Except.mapError, bind, Except.bind] at accepted
+  | ok entry =>
+      simp only [selected, Except.mapError, bind, Except.bind] at accepted
+      rw [compileChecked_program accepted]
+      exact entry.source_checked
+
+structure StaticWordRoot (compiled : Compiled) where private mk ::
+  metadata : Abi.V1.MethodMetadata
+  root : SourceCoreCompiler.Root compiled.plan
+
+structure StaticWordProgram where private mk ::
+  compiled : Compiled
+  roots : List (StaticWordRoot compiled)
+
+def StaticWordProgram.count (program : StaticWordProgram) : Nat := program.roots.length
+def StaticWordProgram.rootForSelector? (program : StaticWordProgram) (selector : Abi.V1.Selector) :
+    Option (StaticWordRoot program.compiled) := program.roots.find? (fun root => root.metadata.selector == selector)
+
+def compileStaticWordChecked (program : CheckedProgram) (moduleId : Workspace.ModuleId)
+    (options : Options := {}) : Except CompileError StaticWordProgram := do
+  let requested ← (SourceCoreRootDiscovery.discoverStaticWordRoots program moduleId).mapError CompileError.discovery
+  let compiled ← compileChecked program (requested.map (·.seed)) options
+  if compiled.roots.map (·.seed) = requested.map (·.seed) then
+    let roots := (requested.zip compiled.roots).map fun (request, root) =>
+      (⟨request.metadata, root⟩ : StaticWordRoot compiled)
+    pure ⟨compiled, roots⟩
+  else throw (.compilation .rootOrderMismatch)
+
+def compileStaticWord (raw : Workspace.RawWorkspace) (options : Options := {}) :
+    Except CompileError StaticWordProgram := do
+  let entry ← (SourceCoreRootDiscovery.checkEntry raw options.checkingFuel).mapError
+    (fun errors => CompileError.compilation (.checking errors))
+  compileStaticWordChecked entry.program entry.moduleId options
+
+private theorem bind_ok {α β ε : Type} {action : Except ε α} {next : α → Except ε β} {output : β}
+    (accepted : (action >>= next) = .ok output) :
+    ∃ value, action = .ok value ∧ next value = .ok output := by
+  cases action with
+  | error error => cases accepted
+  | ok value => exact ⟨value, rfl, accepted⟩
+
+theorem compileStaticWordChecked_program {program : CheckedProgram} {moduleId : Workspace.ModuleId} {options : Options}
+    {compiled : StaticWordProgram} (accepted : compileStaticWordChecked program moduleId options = .ok compiled) :
+    compiled.compiled.program = program := by
+  unfold compileStaticWordChecked at accepted
+  obtain ⟨requested, _, accepted⟩ := bind_ok accepted
+  obtain ⟨source, selected, accepted⟩ := bind_ok accepted
+  split at accepted
+  · cases accepted
+    exact compileChecked_program selected
+  · cases accepted
+
+theorem compileStaticWord_checked_source {raw : Workspace.RawWorkspace} {options : Options}
+    {compiled : StaticWordProgram} (accepted : compileStaticWord raw options = .ok compiled) :
+    checkProgram raw options.checkingFuel = .ok compiled.compiled.program := by
+  unfold compileStaticWord at accepted
+  cases selected : SourceCoreRootDiscovery.checkEntry raw options.checkingFuel with
+  | error error => simp [selected, Except.mapError, bind, Except.bind] at accepted
+  | ok entry =>
+      simp only [selected, Except.mapError, bind, Except.bind] at accepted
+      rw [compileStaticWordChecked_program accepted]
+      exact entry.source_checked
 
 private inductive Opened (compiled : Compiled) where
   | empty (selected : compiled.recipe = none)
@@ -180,6 +259,34 @@ def Session.Authenticates {artifact : Artifact} (session : Session artifact)
   | ⟨_, .empty _⟩, ⟨_⟩ => False
   | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.Authenticates fuel expected value
 
+structure Authentication {artifact : Artifact} (session : Session artifact)
+    (fuel : Nat) (expected : TypeSystem.Ty) (value : Value) : Type where private mk ::
+  typed : session.Authenticates fuel expected value
+
+def Session.authenticate {artifact : Artifact} (session : Session artifact)
+    (fuel : Nat) (expected : TypeSystem.Ty) (value : Value) :
+    Except SourceCoreIndexedSession.Error (Authentication session fuel expected value) := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact .error ⟨[], .unknownHandle⟩
+  | indexed recipe selected native =>
+      rcases session with ⟨session⟩
+      exact do
+        let checked ← session.authenticate fuel expected value
+        pure ⟨checked.typed⟩
+
+def Session.diagnostic {artifact : Artifact} (session : Session artifact) (key : Key)
+    (reason : Core.Word) : Except SourceCoreIndexedSession.Error (Option SourceCoreFaultSites.Diagnostic) :=
+  match artifact, session with
+  | ⟨_, .empty _⟩, ⟨_⟩ => .error ⟨[], .missingEntry key⟩
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.diagnostic key reason
+
+def Checkpoint.diagnostic {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (reason : Core.Word) : Except SourceCoreIndexedSession.Error (Option SourceCoreFaultSites.Diagnostic) :=
+  match artifact, checkpoint with
+  | ⟨_, .empty _⟩, ⟨impossible⟩ => nomatch impossible
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.diagnostic reason
+
 structure Completion (artifact : Artifact) where private mk ::
   value : Value
   sourceType : TypeSystem.Ty
@@ -192,6 +299,32 @@ inductive Outcome (artifact : Artifact) where
   | failed (reason : Core.Word) (session : Session artifact)
   | outOfFuel (checkpoint : Checkpoint artifact)
   | exportError (error : SourceCoreIndexedSession.Error) (session : Session artifact)
+
+def Session.named {artifact : Artifact} (session : Session artifact) (key : Key)
+    (boundaryFuel : Nat := 1024) : IO (Except SourceCoreIndexedSession.Error (Completion artifact)) := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact pure (.error ⟨[], .missingEntry key⟩)
+  | indexed recipe selected native =>
+      rcases session with ⟨session⟩
+      exact do
+        match ← session.named key boundaryFuel with
+        | .error error => pure (.error error)
+        | .ok completion => pure (.ok ⟨completion.value, completion.sourceType,
+            ⟨completion.session⟩, completion.boundaryFuel, completion.authenticated⟩)
+
+def Session.builtin {artifact : Artifact} (session : Session artifact) (function : BuiltinFunctionId)
+    (boundaryFuel : Nat := 1024) : IO (Except SourceCoreIndexedSession.Error (Completion artifact)) := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact pure (.error ⟨[], .missingBuiltin function⟩)
+  | indexed recipe selected native =>
+      rcases session with ⟨session⟩
+      exact do
+        match ← session.builtin function boundaryFuel with
+        | .error error => pure (.error error)
+        | .ok completion => pure (.ok ⟨completion.value, completion.sourceType,
+            ⟨completion.session⟩, completion.boundaryFuel, completion.authenticated⟩)
 
 def Checkpoint.resume {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat)
     (boundaryFuel : Nat := 1024) : IO (Outcome artifact) := by
