@@ -1,5 +1,6 @@
 import Solcore.Test.SourceCoreCompatiblePayload
 import Solcore.Test.SourceCoreCompatibleMappings
+import Solcore.Test.SourceCoreCompatibleEncoding
 import Solcore.Test.SourceCoreDataPlacePathFaults
 import Solcore.Test.SourceCoreDataPlaceWriteBack
 import Solcore.Test.SourceCoreStageContracts
@@ -35,6 +36,7 @@ import Solcore.Test.SourceCoreAllocationCodebook
 import Solcore.Test.SourceCoreAllocationDiscovery
 import Solcore.Test.SourceCoreAllocationContexts
 import Solcore.Test.SourceCoreAllocationLayouts
+import Solcore.Test.SourceCoreAllocationLedger
 import Solcore.Test.SourceRuntimeValidationBoundary
 import Solcore.Test.SourceRuntimeDeepValidationBoundary
 import Solcore.Test.SourceCallableLedger
@@ -53,6 +55,10 @@ import Solcore.Test.SourceCoreCompatibleFunctions
 import Solcore.Test.SourceCoreCompatiblePreparedFunctions
 import Solcore.Test.SourceCoreCompatibleInputs
 import Solcore.Test.SourceCoreCompatibleOutputs
+import Solcore.Test.SourceCoreCompatibleMarkedFunctions
+import Solcore.Test.SourceCoreCompatibleMarkedLedger
+import Solcore.Test.SourceCoreCallableViews
+import Solcore.Test.SourceCoreCallableViewWrappers
 import Solcore.Test.SourceCoreNativeEntry
 import Solcore.Test.SourceCoreRepresentationProjection
 import Solcore.Test.SourceCompilerSourceBoundaryObservations
@@ -2573,16 +2579,22 @@ def run : IO Unit := do
   SourceCoreAllocationDiscovery.run
   SourceCoreAllocationContexts.run
   SourceCoreAllocationLayouts.run
+  SourceCoreAllocationLedger.run
   SourceCoreRawMetadata.run
   SourceCoreCompatibleValues.run
   SourceCoreCompatiblePayload.run
   SourceCoreCompatibleMappings.run
+  SourceCoreCompatibleEncoding.run
   SourceCoreCompatibleDataExpressions.run
   SourceCoreCompatibleDataControl.run
   SourceCoreCompatibleFunctions.run
   SourceCoreCompatiblePreparedFunctions.run
   SourceCoreCompatibleInputs.run
   SourceCoreCompatibleOutputs.run
+  SourceCoreCompatibleMarkedFunctions.run
+  SourceCoreCompatibleMarkedLedger.run
+  SourceCoreCallableViews.run
+  SourceCoreCallableViewWrappers.run
   SourceCoreNativeEntry.run
   SourceCoreRepresentationProjection.run
   SourceCompilerSourceBoundaryObservations.run
