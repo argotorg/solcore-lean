@@ -1,6 +1,7 @@
 import Solcore.Frontend.SourceCorePublicValues
 import Solcore.Frontend.SourceCoreUnifiedCompilation
 import Solcore.Frontend.SourceCoreCallableIndexedTemplates
+import Solcore.Frontend.SourceCoreHeapSnapshot
 
 /-! Persistent typed Core sessions for the source-compatible indexed program.
 Bootstrap installs the owned context cell and global closures once. Subsequent
@@ -41,6 +42,9 @@ inductive ErrorCode where
   | stagedInvocationRequired (origin : SourceCoreStageCodebook.Origin)
   | diagnostics (error : SourceCoreCompatibleDataPlaceFaultSites.Error)
   | invalidBootstrap
+  | heap (error : SourceCoreAllocationLedger.Error)
+  | cellHeader (error : SourceCoreCallableIndexedCellHeaders.Error)
+  | principal (error : SourceCoreCallableIndexedPrincipalAllocations.Error)
   deriving Repr
 structure Error where
   path : List PathStep := []
@@ -926,5 +930,259 @@ theorem Completion.world_extension {artifact : Artifact} (completion : Completio
 theorem Checkpoint.native_safe {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat) :
     (Core.runStateful fuel checkpoint.state).HasType (Core.LanguageResult.resultType checkpoint.request.type) artifact.program.layouts.definitions :=
   Core.well_typed_runStateful_has_type checkpoint.typed fuel
+
+private abbrev HeapRow (artifact : Artifact) (store : Core.Store) :=
+  SourceCoreAllocationLedger.Row artifact.program.layouts store
+
+private inductive HeapCellRelated {artifact : Artifact} {world : Core.StoreTyping}
+    {store : Core.Store} (values : Values) (authority : SessionAuthority)
+    (row : HeapRow artifact store) : SourceCoreHeapSnapshot.Cell → Prop where
+  | absent (selected : SourceCoreCallableIndexedCellHeaders.Selected
+      artifact.recipe.compiled.runtime.output.headers row)
+      (monomorphic : selected.header.raw.binder.scheme.quantified = [])
+      (absent : row.payload = none) :
+      HeapCellRelated values authority row
+        ⟨row.sourceLocation.index, selected.header.raw.binder.scheme.body, none⟩
+  | present (selected : SourceCoreCallableIndexedCellHeaders.Selected
+      artifact.recipe.compiled.runtime.output.headers row)
+      (monomorphic : selected.header.raw.binder.scheme.quantified = [])
+      {native : Core.Value} (present : row.payload = some native)
+      (projected : artifact.recipe.compiled.compatible.checked.catalog.project
+        selected.header.raw.binder.scheme.body = .ok row.entry.key.payloadType)
+      {fuel : Nat} (exported : Exported (artifact := artifact) world authority fuel values
+        selected.header.raw.binder.scheme.body native) :
+      HeapCellRelated values authority row
+        ⟨row.sourceLocation.index, selected.header.raw.binder.scheme.body, some (.data exported.value)⟩
+  | principal (selected : SourceCoreCallableIndexedCellHeaders.Selected
+      artifact.recipe.compiled.runtime.output.headers row)
+      (generic : selected.header.raw.binder.scheme.quantified ≠ [])
+      (restored : SourceCoreCallableIndexedPrincipalAllocations.Restored
+        artifact.recipe.compiled.runtime.output.output.headers row)
+      (rawType : restored.cell.type = selected.header.raw.binder.scheme.body) :
+      HeapCellRelated values authority row
+        ⟨row.sourceLocation.index, selected.header.raw.binder.scheme.body,
+          some (.principal (SourceCoreHeapSnapshot.Principal.ofRestored restored))⟩
+
+private structure HeapCellExport {artifact : Artifact} {world : Core.StoreTyping} {store : Core.Store}
+    (values : Values) (authority : SessionAuthority) (row : HeapRow artifact store) where
+  cell : SourceCoreHeapSnapshot.Cell
+  slots : Registry artifact world
+  related : HeapCellRelated (world := world) values authority row cell
+
+private def observeRow {artifact : Artifact} {world : Core.StoreTyping} {store : Core.Store}
+    (values : Values) (authority : SessionAuthority) (generation : ExportGeneration)
+    (slots : Registry artifact world) (row : HeapRow artifact store) (fuel : Nat) :
+    Except Error (HeapCellExport (world := world) values authority row) := do
+  let selected ← (SourceCoreCallableIndexedCellHeaders.select
+    artifact.recipe.compiled.runtime.output.headers row).mapError fun error => ⟨[], .cellHeader error⟩
+  if monomorphic : selected.header.raw.binder.scheme.quantified = [] then
+    match present : row.payload with
+    | none => pure ⟨⟨row.sourceLocation.index, selected.header.raw.binder.scheme.body, none⟩,
+        slots, .absent selected monomorphic present⟩
+    | some native =>
+      match projected : artifact.recipe.compiled.compatible.checked.catalog.project selected.header.raw.binder.scheme.body with
+      | .error error => throw (fromCatalog error)
+      | .ok type =>
+        if same : type = row.entry.key.payloadType then
+          let exported ← exportValue authority generation fuel values slots selected.header.raw.binder.scheme.body native
+          pure ⟨⟨row.sourceLocation.index, selected.header.raw.binder.scheme.body, some (.data exported.value)⟩,
+            exported.slots, .present selected monomorphic present (by simpa only [same] using projected) exported⟩
+        else throw ⟨[], .invalidNativeValue row.entry.key.payloadType type⟩
+  else
+    let restored ← (SourceCoreCallableIndexedPrincipalAllocations.restore
+      artifact.recipe.compiled.runtime.output.output.headers row).mapError fun error => ⟨[], .principal error⟩
+    if rawType : restored.cell.type = selected.header.raw.binder.scheme.body then
+      pure ⟨⟨row.sourceLocation.index, selected.header.raw.binder.scheme.body,
+          some (.principal (SourceCoreHeapSnapshot.Principal.ofRestored restored))⟩,
+        slots, .principal selected monomorphic restored rawType⟩
+    else throw ⟨[], .handleTypeMismatch selected.header.raw.binder.scheme.body restored.cell.type⟩
+
+private inductive HeapCellsRelated {artifact : Artifact} {world : Core.StoreTyping} {store : Core.Store}
+    (values : Values) (authority : SessionAuthority) : List (HeapRow artifact store) → List SourceCoreHeapSnapshot.Cell → Prop where
+  | nil : HeapCellsRelated values authority [] []
+  | cons {row rows cell cells} (head : HeapCellRelated (world := world) values authority row cell)
+      (tail : HeapCellsRelated (world := world) values authority rows cells) : HeapCellsRelated (world := world) values authority (row :: rows) (cell :: cells)
+
+private theorem HeapCellsRelated.length {artifact : Artifact} {world : Core.StoreTyping} {store : Core.Store}
+    {values : Values} {authority : SessionAuthority} {rows : List (HeapRow artifact store)}
+    {cells : List SourceCoreHeapSnapshot.Cell}
+    (related : HeapCellsRelated (world := world) values authority rows cells) : cells.length = rows.length := by
+  induction related with
+  | nil => rfl
+  | cons _ _ ih => simpa only [List.length_cons] using congrArg Nat.succ ih
+
+private theorem HeapCellsRelated.locations {artifact : Artifact} {world : Core.StoreTyping} {store : Core.Store}
+    {values : Values} {authority : SessionAuthority} {rows : List (HeapRow artifact store)}
+    {cells : List SourceCoreHeapSnapshot.Cell}
+    (related : HeapCellsRelated (world := world) values authority rows cells) :
+    cells.map SourceCoreHeapSnapshot.Cell.location = rows.map (fun row => row.sourceLocation.index) := by
+  induction related with
+  | nil => rfl
+  | cons head _ ih => cases head <;> simp only [List.map_cons, ih]
+
+private structure HeapCellsExport {artifact : Artifact} {world : Core.StoreTyping} {store : Core.Store}
+    (values : Values) (authority : SessionAuthority) (rows : List (HeapRow artifact store)) where
+  cells : List SourceCoreHeapSnapshot.Cell
+  slots : Registry artifact world
+  related : HeapCellsRelated (world := world) values authority rows cells
+
+private def observeRows {artifact : Artifact} {world : Core.StoreTyping} {store : Core.Store}
+    (values : Values) (authority : SessionAuthority) (generation : ExportGeneration) (fuel : Nat) :
+    (slots : Registry artifact world) → (rows : List (HeapRow artifact store)) →
+    Except Error (HeapCellsExport (world := world) values authority rows)
+  | slots, [] => pure ⟨[], slots, .nil⟩
+  | slots, row :: rows => do
+    let head ← observeRow values authority generation slots row fuel
+    let tail ← observeRows values authority generation fuel head.slots rows
+    pure ⟨head.cell :: tail.cells, tail.slots, .cons head.related tail.related⟩
+
+private structure HeapObservation {artifact : Artifact} (session : Session artifact) where
+  ledger : SourceCoreAllocationLedger.TypedLedger artifact.program.layouts session.sourcePrefix.state.heap session.world session.store
+  native : HeapCellsExport (world := session.world) session.values session.authority ledger.ledger.rows
+  prefixCells : List SourceCoreHeapSnapshot.Cell
+  prefixExact : prefixCells = SourceCoreHeapSnapshot.Legacy.observeAccepted artifact.program.base.sourceProgram.signatures
+    artifact.program.base.plan session.sourcePrefix.state session.sourcePrefix.validationFuel session.sourcePrefix.accepted
+
+private def observeHeap {artifact : Artifact} (session : Session artifact) (generation : ExportGeneration)
+    (fuel : Nat) : Except Error (HeapObservation session) := do
+  let ledger ← (SourceCoreAllocationLedger.scanTyped artifact.program.layouts session.sourcePrefix.state.heap
+    session.world session.store session.stored).mapError fun error => ⟨[], .heap error⟩
+  let native ← observeRows session.values session.authority generation fuel session.registry ledger.ledger.rows
+  pure ⟨ledger, native, SourceCoreHeapSnapshot.Legacy.observeAccepted artifact.program.base.sourceProgram.signatures
+    artifact.program.base.plan session.sourcePrefix.state session.sourcePrefix.validationFuel session.sourcePrefix.accepted, rfl⟩
+
+private inductive Saved (artifact : Artifact) where
+  | ready (session : Session artifact)
+  | suspended (checkpoint : Checkpoint artifact)
+
+private def Saved.session {artifact : Artifact} : Saved artifact → Session artifact
+  | .ready session => session
+  | .suspended checkpoint => ⟨checkpoint.origin.authority, checkpoint.world, checkpoint.state.store,
+      checkpoint.stored, checkpoint.origin.environmentTyped.weaken checkpoint.extension,
+      checkpoint.registry, checkpoint.values, checkpoint.owner, checkpoint.origin.sourcePrefix⟩
+
+/-- An accepted inert source prefix. Source callable code and source locations
+remain private sidecar data; they are never imported into the native world. -/
+structure PrefixSnapshot (artifact : Artifact) where private mk ::
+  private sourcePrefix : InertPrefix artifact
+
+def PrefixSnapshot.cells {artifact : Artifact} (snapshot : PrefixSnapshot artifact) : List SourceCoreHeapSnapshot.Cell :=
+  SourceCoreHeapSnapshot.Legacy.observeAccepted artifact.program.base.sourceProgram.signatures
+    artifact.program.base.plan snapshot.sourcePrefix.state snapshot.sourcePrefix.validationFuel snapshot.sourcePrefix.accepted
+def PrefixSnapshot.heapSize {artifact : Artifact} (snapshot : PrefixSnapshot artifact) : Nat := snapshot.cells.length
+
+/-- Start a new owned native world at frame zero while keeping the accepted
+source prefix opaque and unchanged. No old closure becomes a native input. -/
+def Artifact.bootstrapFromPrefix (artifact : Artifact) (snapshot : PrefixSnapshot artifact) : IO (Bootstrap artifact) :=
+  artifact.bootstrap snapshot.sourcePrefix
+
+namespace Legacy
+/-- Explicit migration adapter for the historical raw-state input API. The
+predicate and admission budget are exactly those of `InertPrefix.prepare`. -/
+def preparePrefix (artifact : Artifact) (state : SourceTypedRuntime.RuntimeState)
+    (validationFuel : Nat) : Option (PrefixSnapshot artifact) :=
+  (InertPrefix.prepare artifact state validationFuel).map fun sourcePrefix => ⟨sourcePrefix⟩
+end Legacy
+
+theorem PrefixSnapshot.source_length {artifact : Artifact} (snapshot : PrefixSnapshot artifact) :
+    snapshot.heapSize = snapshot.sourcePrefix.state.heap.length :=
+  SourceCoreHeapSnapshot.Legacy.observeAccepted_length snapshot.sourcePrefix.accepted
+
+theorem Legacy.preparePrefix_admission (artifact : Artifact) (state : SourceTypedRuntime.RuntimeState)
+    (validationFuel : Nat) :
+    (preparePrefix artifact state validationFuel).isSome =
+      state.isDeeplySafe validationFuel artifact.program.base.sourceProgram.signatures artifact.program.base.plan := by
+  simp only [preparePrefix, Option.isSome_map, InertPrefix.prepare]
+  split <;> simp_all
+
+/-- A snapshot privately retains the exact typed native store, registry, raw
+metadata and optional continuation. Its source heap view omits administrative
+cells. Neither raw source callable code nor native references are exposed. -/
+structure Snapshot (artifact : Artifact) where private mk ::
+  private saved : Saved artifact
+  private observed : HeapObservation saved.session
+
+def Snapshot.cells {artifact : Artifact} (snapshot : Snapshot artifact) : List SourceCoreHeapSnapshot.Cell :=
+  snapshot.observed.prefixCells ++ snapshot.observed.native.cells
+def Snapshot.prefix {artifact : Artifact} (snapshot : Snapshot artifact) : PrefixSnapshot artifact :=
+  ⟨snapshot.saved.session.sourcePrefix⟩
+def Snapshot.prefixSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.observed.prefixCells.length
+def Snapshot.heapSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.cells.length
+def Snapshot.nativeHeapSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.saved.session.heapSize
+def Snapshot.pendingAllocation {artifact : Artifact} (snapshot : Snapshot artifact) : Bool := snapshot.observed.ledger.ledger.pending.isSome
+def Snapshot.cellAt? {artifact : Artifact} (snapshot : Snapshot artifact) (sourceLocation : Nat) : Option SourceCoreHeapSnapshot.Cell :=
+  snapshot.cells[sourceLocation]?
+
+inductive RestoredSnapshot (artifact : Artifact) where
+  | ready (session : Session artifact)
+  | suspended (checkpoint : Checkpoint artifact)
+
+def Snapshot.restore {artifact : Artifact} (snapshot : Snapshot artifact) : RestoredSnapshot artifact := by
+  rcases snapshot with ⟨saved, observed⟩
+  cases saved with
+  | ready session => exact .ready {session with registry := observed.native.slots}
+  | suspended checkpoint => exact .suspended {checkpoint with registry := observed.native.slots}
+
+/-- Restoring into a foreign session cannot transfer registry ownership. -/
+def Session.restoreSnapshot {artifact : Artifact} (session : Session artifact) (snapshot : Snapshot artifact) :
+    Except Error (RestoredSnapshot artifact) :=
+  if session.authority = snapshot.saved.session.authority then .ok snapshot.restore
+  else .error ⟨[], .foreignSession⟩
+
+def Session.snapshot {artifact : Artifact} (session : Session artifact) (boundaryFuel : Nat := 1024) :
+    IO (Except Error (Snapshot artifact)) := do
+  let generation ← SourceCorePublicValues.ExportGeneration.mint
+  pure <| (observeHeap session generation boundaryFuel).map fun observed => ⟨.ready session, observed⟩
+
+def Checkpoint.snapshot {artifact : Artifact} (checkpoint : Checkpoint artifact) (boundaryFuel : Nat := 1024) :
+    IO (Except Error (Snapshot artifact)) := do
+  let generation ← SourceCorePublicValues.ExportGeneration.mint
+  pure <| (observeHeap (Saved.session (.suspended checkpoint)) generation boundaryFuel).map
+    fun observed => ⟨.suspended checkpoint, observed⟩
+
+theorem Snapshot.prefix_length {artifact : Artifact} (snapshot : Snapshot artifact) :
+    snapshot.prefixSize = snapshot.saved.session.sourcePrefix.state.heap.length := by
+  rw [Snapshot.prefixSize, snapshot.observed.prefixExact]
+  exact SourceCoreHeapSnapshot.Legacy.observeAccepted_length _
+
+theorem Snapshot.source_length {artifact : Artifact} (snapshot : Snapshot artifact) :
+    snapshot.heapSize = snapshot.prefixSize + snapshot.observed.ledger.ledger.rows.length := by
+  simp only [Snapshot.heapSize, Snapshot.cells, List.length_append, Snapshot.prefixSize]
+  rw [snapshot.observed.native.related.length]
+
+theorem Snapshot.restore_native_size {artifact : Artifact} (snapshot : Snapshot artifact) :
+    match snapshot.restore with
+    | .ready session => session.heapSize = snapshot.nativeHeapSize
+    | .suspended checkpoint => checkpoint.heapSize = snapshot.nativeHeapSize := by
+  rcases snapshot with ⟨saved, observed⟩
+  cases saved <;> rfl
+
+theorem Snapshot.restore_world {artifact : Artifact} (snapshot : Snapshot artifact) :
+    match snapshot.restore with
+    | .ready session => session.world = snapshot.saved.session.world
+    | .suspended checkpoint => checkpoint.world = snapshot.saved.session.world := by
+  rcases snapshot with ⟨saved, observed⟩
+  cases saved <;> rfl
+
+theorem Snapshot.restore_authority {artifact : Artifact} (snapshot : Snapshot artifact) :
+    match snapshot.restore with
+    | .ready session => session.authority = snapshot.saved.session.authority
+    | .suspended checkpoint => checkpoint.origin.authority = snapshot.saved.session.authority := by
+  rcases snapshot with ⟨saved, observed⟩
+  cases saved <;> rfl
+
+theorem Snapshot.restore_typed {artifact : Artifact} (snapshot : Snapshot artifact) :
+    match snapshot.restore with
+    | .ready session => Core.RuntimeStoreHasTypes snapshot.saved.session.world session.store artifact.program.layouts.definitions
+    | .suspended checkpoint => Core.RuntimeStoreHasTypes snapshot.saved.session.world checkpoint.state.store artifact.program.layouts.definitions := by
+  rcases snapshot with ⟨saved, observed⟩
+  cases saved with
+  | ready session => exact session.stored
+  | suspended checkpoint => exact checkpoint.stored
+
+theorem Session.restoreSnapshot_self {artifact : Artifact} (session : Session artifact)
+    {snapshot : Snapshot artifact} (same : snapshot.saved.session.authority = session.authority) :
+    session.restoreSnapshot snapshot = .ok snapshot.restore := by
+  simp only [Session.restoreSnapshot, same, ↓reduceIte]
 
 end Solcore.Frontend.SourceCoreIndexedSession
