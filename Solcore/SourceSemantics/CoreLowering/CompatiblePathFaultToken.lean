@@ -68,7 +68,8 @@ inductive FaultToken (checked : Checked) (registry : SourceCoreRawMetadata.Regis
       exact ⟨token, congrArg (fun n => _ + n) count⟩
 
  theorem EntriesRep.lookup_payload {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {rawKey rawValue : TypeSystem.Ty} {lookup selected : Dynamic.Value}
     {sources : List (Dynamic.Value × Dynamic.Value)} {entries : OrderedMapping.Entries} {keyType valueType : Ty}
     (related : CompatiblePayload.EntriesRep checked registry functions mapping world rawKey rawValue sources entries keyType valueType)
@@ -79,7 +80,8 @@ inductive FaultToken (checked : Checked) (registry : SourceCoreRawMetadata.Regis
   | tail _ found ih => cases related with | entry key value rest => exact ih rest
 
  theorem Selected.represented {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {rawKey rawValue : TypeSystem.Ty} {lookup selected : Dynamic.Value}
     {sources : List (Dynamic.Value × Dynamic.Value)} {header : Word} {layout : OrderedMapping.Layout}
     {entries : OrderedMapping.Entries} {fallback : Option Value}

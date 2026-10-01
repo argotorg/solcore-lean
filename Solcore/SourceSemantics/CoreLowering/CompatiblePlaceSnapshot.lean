@@ -30,7 +30,8 @@ theorem evaluation_frame {definitions : DataEnvironment} {mapping : LocationMap}
   exact ⟨absent, by simp [Store.read?, List.getElem?_append_left bound]⟩
 
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
   {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {prepared : Prepared}
   {heap : Dynamic.Heap} {store : Store} {location : Dynamic.Location} {target : Location}
   {cell : Dynamic.Cell} {optional rootValue : Value} {sourceRoot : Dynamic.Value}
@@ -49,10 +50,10 @@ theorem read_at
     {selected : Dynamic.Value} (read : Dynamic.ProjectionsRead (some sourceRoot) resolved (some selected))
     (nonempty : prepared.steps ≠ []) (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities) (keyLength : prepared.keyTypes.length = keys.length)
-    (storeTyped : RuntimeStoreHasTypes world store checked.catalog.definitions)
-    (environmentTyped : RuntimeEnvironmentHasTypes world environment context checked.catalog.definitions)
+    (storeTyped : RuntimeStoreHasTypes world store ambient.definitions)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
     (helperTyped : HasType context (.apply (getter prepared keyType) (.pair (.loadCell referenceExpression) keyExpression))
-      (LanguageResult.resultType prepared.optionalLeaf) checked.catalog.definitions)
+      (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions)
     (referenceSelected : Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (keysSelected : Selects environment keyExpression (packValues keys)) :
     ∃ native after administrative futureWorld,
@@ -60,9 +61,9 @@ theorem read_at
       ValueRep checked registry functions mapping futureWorld leaf selected native prepared.route.leafType ∧
       FiniteRun environment store (.apply (getter prepared keyType) (.pair (.loadCell referenceExpression) keyExpression))
         (.inRight .word (.inRight .unit native)) after ∧
-      WorldExtends world futureWorld ∧ RuntimeStoreHasTypes futureWorld after checked.catalog.definitions ∧
+      WorldExtends world futureWorld ∧ RuntimeStoreHasTypes futureWorld after ambient.definitions ∧
       RuntimeValueHasType futureWorld (.inRight .word (.inRight .unit native))
-        (LanguageResult.resultType prepared.optionalLeaf) checked.catalog.definitions ∧
+        (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions ∧
       RootRead checked registry functions mapping futureWorld prepared heap after location target cell optional sourceRoot rootValue ∧
       AdministrativePreserved mapping store mapping after ∧
       after = store ++ administrative ∧ administrative.length = readCost checked prepared.steps := by
@@ -85,10 +86,10 @@ theorem fault_at
     {reason : Dynamic.SemanticFault} (fault : Dynamic.ProjectionsFaults (some sourceRoot) resolved reason)
     (nonempty : prepared.steps ≠ []) (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities) (keyLength : prepared.keyTypes.length = keys.length)
-    (storeTyped : RuntimeStoreHasTypes world store checked.catalog.definitions)
-    (environmentTyped : RuntimeEnvironmentHasTypes world environment context checked.catalog.definitions)
+    (storeTyped : RuntimeStoreHasTypes world store ambient.definitions)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
     (helperTyped : HasType context (.apply (getter prepared keyType) (.pair (.loadCell referenceExpression) keyExpression))
-      (LanguageResult.resultType prepared.optionalLeaf) checked.catalog.definitions)
+      (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions)
     (referenceSelected : Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (keysSelected : Selects environment keyExpression (packValues keys)) :
     ∃ token count after administrative futureWorld,
@@ -96,9 +97,9 @@ theorem fault_at
       FaultToken checked registry sourceRoot prepared.steps resolved reason token count ∧
       FiniteRun environment store (.apply (getter prepared keyType) (.pair (.loadCell referenceExpression) keyExpression))
         (.inLeft prepared.optionalLeaf (.word token)) after ∧
-      WorldExtends world futureWorld ∧ RuntimeStoreHasTypes futureWorld after checked.catalog.definitions ∧
+      WorldExtends world futureWorld ∧ RuntimeStoreHasTypes futureWorld after ambient.definitions ∧
       RuntimeValueHasType futureWorld (.inLeft prepared.optionalLeaf (.word token))
-        (LanguageResult.resultType prepared.optionalLeaf) checked.catalog.definitions ∧
+        (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions ∧
       RootRead checked registry functions mapping futureWorld prepared heap after location target cell optional sourceRoot rootValue ∧
       AdministrativePreserved mapping store mapping after ∧ after = store ++ administrative ∧ administrative.length = count := by
   obtain ⟨token, count, receipt, tree⟩ := arguments.faultTree root.payload fault prepared

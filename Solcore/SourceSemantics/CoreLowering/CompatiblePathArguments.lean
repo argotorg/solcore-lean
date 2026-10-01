@@ -9,7 +9,8 @@ namespace Solcore.SourceSemantics.CoreLowering.CompatibleMixedRoute
 open Core Frontend SourceInference SourceCoreCompatibleDataPlaces CompatiblePayload
 
 inductive Arguments (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (source : TypedSource) (site : SourceCoreElaboration.ErrorSite) (values : List Value) :
     {root : TypeSystem.Ty} → {projections : List PlaceProjection} → {position : Nat} →
     {steps : List PreparedStep} → {keys : List (ExpressionId × Ty)} → {leaf : TypeSystem.Ty} →
@@ -63,7 +64,8 @@ theorem IndexSite.projection {checked : Checked} {source : TypedSource} {root ke
   exact CompatibleEncoding.mapping_project identity certificate.keyProjection certificate.valueProjection
 
 theorem IndexSite.mappingFields {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {source : TypedSource} {root keySource valueSource : TypeSystem.Ty}
     {key : ExpressionId} {layout : OrderedMapping.Layout}
     (certificate : IndexSite checked source root keySource valueSource key layout)

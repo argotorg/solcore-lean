@@ -15,7 +15,8 @@ private theorem replaced_eq_set {values output : List Dynamic.Value} {index : Na
   | @tail previous rest index replacement updated replaced ih => exact congrArg (List.cons previous) ih
 
  theorem Arguments.updateTree {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {keys : List Value}
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
     {steps : List PreparedStep} {keySites : List (ExpressionId × Ty)}

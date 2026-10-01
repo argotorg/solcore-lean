@@ -11,7 +11,8 @@ open Core Frontend SourceInference GeneralHeap CompatiblePayload CompatibleEqual
 open SourceCoreCompatibleDataPlaces CompatibleMapping CompatibleMapping.MixedPaths CompatibleMixedRoute
 
 structure RootRead (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping)
     (prepared : Prepared) (heap : Dynamic.Heap) (store : Store) (location : Dynamic.Location) (target : Location)
     (cell : Dynamic.Cell) (optional : Value) (source : Dynamic.Value) (value : Value) : Prop where
   sourceRead : Dynamic.Heap.Reads heap location cell
@@ -21,7 +22,8 @@ structure RootRead (checked : Checked) (registry : SourceCoreRawMetadata.Registr
   payload : ValueRep checked registry functions mapping world cell.type source value prepared.route.rootType
 
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
   {prepared : Prepared} {heap : Dynamic.Heap} {store : Store} {location : Dynamic.Location} {target : Location}
 
 theorem RootRead.initialized {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value}
@@ -36,7 +38,8 @@ theorem RootRead.initialized {sourceType : TypeSystem.Ty} {source : Dynamic.Valu
 /-- Actual describe's encoded literal supplies the virtual value and its full
 raw-header/default representation; the source and native cells stay absent. -/
 theorem RootRead.virtual {context : SourceCoreCompatibleDataPlaces.Context}
-    {functions : FunctionModel context.checked.catalog} {key valueType : TypeSystem.Ty}
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    {functions : FunctionModel context.checked.catalog ambient} {key valueType : TypeSystem.Ty}
     (generated : VirtualRoot.Generated context prepared.route key valueType)
     (extension : SourceCoreRawMetadata.Extends context.registry registry)
     (projected : context.checked.catalog.project (.mapping key valueType) = .ok prepared.route.rootType)

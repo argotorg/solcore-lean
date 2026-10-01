@@ -9,7 +9,8 @@ open Core Frontend SourceInference SourceCoreCompatibleDataPlaces CompatiblePayl
 open CompatibleMapping CompatibleMapping.MixedPaths
 
  theorem Arguments.faultTree {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {keys : List Value}
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
     {steps : List PreparedStep} {keySites : List (ExpressionId × Ty)}

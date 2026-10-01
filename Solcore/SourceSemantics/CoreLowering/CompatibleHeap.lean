@@ -16,19 +16,22 @@ abbrev projects (catalog : SourceCoreCompatibleCatalog.Catalog) : GenericHeap.Pr
   fun source payload => catalog.project source = .ok payload
 
 def payloadModel (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) :
-    GenericHeap.PayloadModel (storageCatalog checked.catalog) (projects checked.catalog) where
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) :
+    GenericHeap.PayloadModel (storageCatalog checked.catalog) (projects checked.catalog) ambient.definitions where
   Represents := ValueRep checked registry functions
   projection := ValueRep.projection
   runtime_hasType := ValueRep.runtime_hasType
   extend := fun related maps worlds => related.extend (.refl _) maps worlds
 
 abbrev HeapRepresents (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) :=
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) :=
   GenericHeap.HeapRepresents (payloadModel checked registry functions)
 
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
   {heap : Dynamic.Heap} {store : Store}
 
 theorem cell_extend_registry {future : SourceCoreRawMetadata.Registry} {cell : Dynamic.Cell} {value : Value} {type : Ty}
@@ -80,7 +83,8 @@ theorem HeapRepresents.initialized_root {prepared : Prepared} {sourceType : Type
 /-- The declared mapping remains absent on both heaps while the actual
 compiler's encoded empty/default value is supplied to the structural getter. -/
 theorem HeapRepresents.virtual_root {context : SourceCoreCompatibleDataPlaces.Context}
-    {functions : FunctionModel context.checked.catalog} {prepared : Prepared}
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    {functions : FunctionModel context.checked.catalog ambient} {prepared : Prepared}
     {key valueType : TypeSystem.Ty} {location : Dynamic.Location} {target : Location}
     (heaps : HeapRepresents context.checked registry functions mapping world heap store)
     (reference : ReferenceRepresents mapping world location target prepared.route.rootType)
@@ -98,7 +102,7 @@ source location or source heap update is introduced by a virtual read. -/
 theorem HeapRepresents.after_snapshot {futureWorld : StoreTyping} {after suffix : Store}
     (heaps : HeapRepresents checked registry functions mapping world heap store)
     (extension : WorldExtends world futureWorld)
-    (typed : RuntimeStoreHasTypes futureWorld after checked.catalog.definitions)
+    (typed : RuntimeStoreHasTypes futureWorld after ambient.definitions)
     (appended : after = store ++ suffix) :
     HeapRepresents checked registry functions mapping futureWorld heap after := by
   subst after

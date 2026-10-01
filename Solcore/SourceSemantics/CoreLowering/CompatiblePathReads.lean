@@ -15,7 +15,8 @@ theorem valueAt_unique {values : List Dynamic.Value} {index : Nat} {a b : Dynami
   | tail _ ih => cases second with | tail rest => exact ih rest
 
  theorem Arguments.readTree {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {keys : List Value}
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
     {steps : List PreparedStep} {keySites : List (ExpressionId × Ty)}

@@ -211,7 +211,8 @@ theorem Certificate.select {checked : Checked} {site : SourceCoreElaboration.Err
     (nominal : SourceCoreDataCatalog.nominalParts (SourceCoreRawMetadata.runtimeType root) = some (signature.id, arguments))
     (signatureSelected : checked.signatures.dataTypes.filter (fun data => decide (data.id = signature.id)) = [signature])
     (certificate : Certificate checked site (SourceCoreRawMetadata.runtimeType root) field signature arguments index identity branches fieldType)
-    {registry : SourceCoreRawMetadata.Registry} {functions : CompatiblePayload.FunctionModel checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : CompatiblePayload.FunctionModel checked.catalog ambient}
     {mapping : GeneralHeap.LocationMap} {world : StoreTyping} {metadata : DataConstructorInstantiation}
     {tag : ConstructorId} {id : Word} {sources : List Dynamic.Value} {values : List Value} {types : List Ty}
     (fields : CompatiblePayload.ConstructorFields checked registry functions mapping world root metadata tag id sources values types) :
