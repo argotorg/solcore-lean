@@ -28,6 +28,8 @@ import Solcore.Test.SourceRuntimeDeepValidationBoundary
 import Solcore.Test.SourceCallableLedger
 import Solcore.Test.SourceLambdaSourceAlignment
 import Solcore.Test.SourceRecursiveStageTrace
+import Solcore.Test.SourceRecursiveStageErasure
+import Solcore.Test.SourceRecursiveStageArguments
 import Solcore.Test.SourceCallStageGuards
 import Solcore.Test.SourceCallStageBoundary
 import Solcore.Test.SourceCoreRawMetadata

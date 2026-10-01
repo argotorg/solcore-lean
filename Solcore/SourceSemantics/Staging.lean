@@ -6,6 +6,7 @@ import Solcore.SourceSemantics.Staging.Program
 import Solcore.SourceSemantics.Staging.RecursiveScope
 import Solcore.SourceSemantics.Staging.RecursiveTrace
 import Solcore.SourceSemantics.Staging.RecursiveTraceProperties
+import Solcore.SourceSemantics.Staging.RecursiveErasure
 
 /-!
 # Declarative source staging

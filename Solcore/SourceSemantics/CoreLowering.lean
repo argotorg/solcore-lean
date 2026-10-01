@@ -50,6 +50,8 @@ import Solcore.SourceSemantics.CoreLowering.AuthenticatedCallableLedger
 import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageCalls
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageRegistry
+import Solcore.SourceSemantics.CoreLowering.RecursiveStageProjection
+import Solcore.SourceSemantics.CoreLowering.RecursiveStageArguments
 import Solcore.SourceSemantics.CoreLowering.BasicStatements
 import Solcore.SourceSemantics.CoreLowering.BasicExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.BasicStatementCertificates
