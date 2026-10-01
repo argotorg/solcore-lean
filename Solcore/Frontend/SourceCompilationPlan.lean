@@ -34,13 +34,15 @@ def exactSpecialization (plan : Plan) (key : Key) :
   | [specialized] => .ok specialized
   | candidates => .error (.duplicateSpecialization key candidates.length)
 
-private def exactParameterBinding? (substitution : ParameterSubstitution)
+/-- Exposed for static compiler receipt proofs; the selection behavior is unchanged. -/
+def exactParameterBinding? (substitution : ParameterSubstitution)
     (parameter : TypeParameterId) : Option Ty :=
   match substitution.filter fun entry => entry.1 == parameter with
   | [entry] => some entry.2
   | _ => none
 
-private def parameterSubstitutionsEquivalent
+/-- Exposed for static compiler receipt proofs; the selection behavior is unchanged. -/
+def parameterSubstitutionsEquivalent
     (left right : ParameterSubstitution) : Bool :=
   left.length == right.length &&
     left.all (fun entry =>
@@ -48,13 +50,15 @@ private def parameterSubstitutionsEquivalent
     right.all fun entry =>
       exactParameterBinding? left entry.1 == some entry.2
 
-private def specializationOwnershipCoherent
+/-- Exposed for static compiler receipt proofs; the selection behavior is unchanged. -/
+def specializationOwnershipCoherent
     (specialized : SourceSpecialization.SpecializedFunction) : Bool :=
   decide (specialized.key.declaration = specialized.declaration ∧
     specialized.function.declaration = specialized.declaration ∧
     specialized.function.typedBody.owner = specialized.declaration)
 
-private def specializationMatchesInstantiation
+/-- Exposed for static compiler receipt proofs; the selection behavior is unchanged. -/
+def specializationMatchesInstantiation
     (specialized : SourceSpecialization.SpecializedFunction)
     (instantiation : DeclarationInstantiation) : Bool :=
   specializationOwnershipCoherent specialized &&
@@ -406,7 +410,8 @@ def validateRuntimeEvidence (key : Key)
     throw (.runtimeEvidenceCountMismatch key predicates.length
       environment.length)
 
-private def validateRuntimeEvidenceSelection (signatures : ProgramSignatures)
+/-- Exposed for static compiler receipt proofs; the selection behavior is unchanged. -/
+def validateRuntimeEvidenceSelection (signatures : ProgramSignatures)
     (key : Key) : Nat → List ProgramPredicate → RuntimeEvidenceEnvironment →
       Except RuntimeError Unit
   | _, [], [] => pure ()
