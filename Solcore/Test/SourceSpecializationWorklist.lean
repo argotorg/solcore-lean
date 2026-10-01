@@ -1,5 +1,7 @@
 import Solcore.Frontend.SourceCoreDirectLinking
-import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Test.SourceCoreUnifiedCorpusSupport
+
+#check_failure Solcore.Frontend.SourceTypedRuntime.run
 
 /-! End-to-end regressions for finite whole-program specialization discovery. -/
 
@@ -739,15 +741,16 @@ private def testGroundInnerUnderPolymorphicOuter
       match SourceCoreDirectLinking.validatePlan program plan with
       | .error error => throw (IO.userError
           s!"ground-inner plan failed replay validation: {reprStr error}")
-      | .ok () =>
-          match SourceTypedRuntime.run program plan entryKey
-              [.bool true] 4096 with
+      | .ok () => do
+          let compiled ← SourceCoreUnifiedCorpusSupport.preparePlan
+            "ground inner under polymorphic outer" program plan entryKey
+          match ← SourceCoreUnifiedCorpusSupport.observe compiled entryKey [.bool true] with
           | .done (.product (.word left) (.word right)) _ =>
               let expected := Core.Word.ofNatModulo 1
               assertTrue (left == expected && right == expected)
-                "ground-inner runtime returned the wrong Word pair"
+                "ground-inner cached Core returned the wrong Word pair"
           | result => throw (IO.userError
-              s!"ground-inner runtime returned {reprStr result}")
+              s!"ground-inner cached Core returned {reprStr result}")
   | outcome => throw (IO.userError
       s!"ground-inner worklist expected a complete plan, found {reprStr outcome}")
 

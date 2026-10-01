@@ -1,9 +1,12 @@
-import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Test.SourceCoreUnifiedCorpusSupport
 import Solcore.Frontend.SourceCompiler
+
+#check_failure Solcore.Frontend.SourceTypedRuntime.run
+#check_failure Solcore.Frontend.SourceTypedRuntime.runWithValidationFuel
 
 /-!
 Focused end-to-end regressions for evidence-selected unary and binary methods
-in the typed-source runtime.
+in cached source-compatible Core code.
 
 The fixtures cross raw workspace checking and finite specialization before
 execution.  They also exercise method-local mutation, helper closure, caller-
@@ -55,10 +58,13 @@ private def signatureNamed (program : CheckedProgram) (name : String) :
   | signatures => throw (IO.userError
       s!"expected one signature named `{name}`, found {signatures.length}")
 
-private structure Prepared where
+private structure ValidationFixture where
   program : CheckedProgram
   plan : SourceSpecializationWorklist.Plan
   key : SourceSpecialization.SpecializationKey
+
+private structure Prepared extends ValidationFixture where
+  compiled : SourceCoreUnifiedCompilation.Compiled
 
 private def prepareNamed (program : CheckedProgram) (name : String) :
     IO Prepared := do
@@ -70,7 +76,9 @@ private def prepareNamed (program : CheckedProgram) (name : String) :
   match SourceSpecializationWorklist.run program [request] 64 with
   | .ok (.complete plan) =>
       match plan.seedKeys with
-      | [key] => pure { program, plan, key }
+      | [key] => do
+          let compiled ← SourceCoreUnifiedCorpusSupport.preparePlan name program plan key
+          pure { program, plan, key, compiled }
       | keys => throw (IO.userError
           s!"`{name}` retained {keys.length} seed keys")
   | .ok outcome => throw (IO.userError
@@ -78,8 +86,8 @@ private def prepareNamed (program : CheckedProgram) (name : String) :
   | .error error => throw (IO.userError
       s!"`{name}` specialization failed: {reprStr error}")
 
-private def runPrepared (prepared : Prepared) : RunResult :=
-  SourceTypedRuntime.run prepared.program prepared.plan prepared.key [] 8192
+private def runPrepared (prepared : Prepared) : IO RunResult :=
+  SourceCoreUnifiedCorpusSupport.observe prepared.compiled prepared.key
 
 private def expectWordAndShallowHeap (label : String) (expected : Nat)
     (plan : SourceSpecializationWorklist.Plan) : RunResult → IO Unit
@@ -301,19 +309,20 @@ private def addAssumptionFixture (program : CheckedProgram) :
 private def rewriteSpecializationFunction (prepared : Prepared)
     (key : SourceSpecialization.SpecializationKey)
     (rewrite : SourceInference.CheckedFunction → SourceInference.CheckedFunction) :
-    Prepared :=
+    ValidationFixture :=
   let specializations := prepared.plan.specializations.map fun specialized =>
     if specialized.key = key then
       { specialized with function := rewrite specialized.function }
     else
       specialized
-  { prepared with plan := { prepared.plan with specializations } }
+  { program := prepared.program, key := prepared.key,
+    plan := { prepared.plan with specializations } }
 
 private def rewriteSpecializationExpression (prepared : Prepared)
     (key : SourceSpecialization.SpecializationKey)
     (target : SourceInference.ExpressionId)
     (rewrite : SourceInference.ExpressionNode →
-      SourceInference.ExpressionNode) : Prepared :=
+      SourceInference.ExpressionNode) : ValidationFixture :=
   rewriteSpecializationFunction prepared key fun function => {
     function with
     typedBody := {
@@ -328,41 +337,46 @@ private def rewriteSpecializationExpression (prepared : Prepared)
   }
 
 private def expectSentinelFault (label : String)
-    (accept : RuntimeError → Bool) : RunResult → IO Unit
-  | .fault error { heap := [{ type := actualType, value := none }] } => do
+    (accept : RuntimeError → Bool) :
+    Except RuntimeError Unit × RuntimeState → IO Unit
+  | (.error error, { heap := [{ type := actualType, value := none }] }) => do
       assertTrue (accept error) s!"{label} reported {reprStr error}"
       assertTrue (actualType == Ty.word)
         s!"{label} changed the sentinel type to {reprStr actualType}"
-  | .fault error state => throw (IO.userError
+  | (.error error, state) => throw (IO.userError
       s!"{label} changed the initial state: {reprStr error}, {reprStr state}")
-  | result => throw (IO.userError
-      s!"{label} did not reject before execution: {reprStr result}")
+  | (.ok (), _) => throw (IO.userError
+      s!"{label} did not reject during pure plan validation")
 
-private def runTampered (prepared : Prepared) : RunResult :=
+/-- The validator returns an actual rejection; the caller's sentinel remains
+inert data. No executable artifact or source execution is produced for the
+rewritten plan. -/
+private def validateTampered (prepared : ValidationFixture) :
+    Except RuntimeError Unit × RuntimeState :=
   let initialState : RuntimeState := {
     heap := [{ type := .word, value := none }]
   }
-  SourceTypedRuntime.runWithValidationFuel prepared.program prepared.plan
-    prepared.key [] 4096 8192 initialState
+  (SourceCompilationPlan.validateExecutablePlanEvidence prepared.program prepared.plan,
+    initialState)
 
 private def testSelectedOperatorMethods (program : CheckedProgram) : IO Unit := do
   let binary ← prepareNamed program "binaryEntry"
   expectWordAndShallowHeap "selected binary operator method" 31 binary.plan
-    (runPrepared binary)
+    (← runPrepared binary)
   let unary ← prepareNamed program "unaryEntry"
   expectWordAndShallowHeap "selected unary operator method" 41 unary.plan
-    (runPrepared unary)
+    (← runPrepared unary)
   let equality ← prepareNamed program "equalityEntry"
   expectBoolAndShallowHeap "selected Bool-result operator method" true
-    equality.plan (runPrepared equality)
+    equality.plan (← runPrepared equality)
   let wordEquality ← prepareNamed program "wordEqualityEntry"
   expectBoolAndShallowHeap "selected Word equality override" false
-    wordEquality.plan (runPrepared wordEquality)
+    wordEquality.plan (← runPrepared wordEquality)
 
 private def testOperatorResultCoercion (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "coercedOperatorEntry"
   expectWordAndShallowHeap "operator raw result followed by Coerce" 59
-    prepared.plan (runPrepared prepared)
+    prepared.plan (← runPrepared prepared)
 
 private def testPublicCompiler (program : CheckedProgram) : IO Unit := do
   let moduleId ← mainModule
@@ -399,7 +413,7 @@ private def testOperatorPreflight (program : CheckedProgram) : IO Unit := do
           decide (caller = fixture.specialized.key ∧
             occurrence = fixture.node.id)
       | _ => false)
-    (runTampered missingMethodRequirement)
+    (validateTampered missingMethodRequirement)
 
   let mismatchedEvidence := rewriteSpecializationFunction fixture.prepared
     fixture.specialized.key fun function => {
@@ -420,7 +434,7 @@ private def testOperatorPreflight (program : CheckedProgram) : IO Unit := do
             expected = fixture.methodSolved.predicate ∧
             actual = fixture.primarySolved.predicate)
       | _ => false)
-    (runTampered mismatchedEvidence)
+    (validateTampered mismatchedEvidence)
 
   let equalityPrepared ← prepareNamed program "equalityEntry"
   let equalitySpecialized ← specializationNamed equalityPrepared "viaEq"
@@ -442,7 +456,7 @@ private def testOperatorPreflight (program : CheckedProgram) : IO Unit := do
             expected = [Ty.word, Ty.word] ∧
             actual = [equalitySubject, equalitySubject])
       | _ => false)
-    (runTampered strippedEquality)
+    (validateTampered strippedEquality)
 
   let wordEqualityPrepared ← prepareNamed program "wordEqualityEntry"
   let wordEqualitySpecialized ← specializationNamed wordEqualityPrepared "viaEq"
@@ -461,7 +475,7 @@ private def testOperatorPreflight (program : CheckedProgram) : IO Unit := do
     (fun error => match error with
       | .nonCanonicalInputPlan => true
       | _ => false)
-    (runTampered strippedWordEquality)
+    (validateTampered strippedWordEquality)
 
 private def testAll : IO Unit := do
   let program ← checkedProgram source
@@ -469,7 +483,7 @@ private def testAll : IO Unit := do
   testOperatorPreflight program
   testOperatorResultCoercion program
   testPublicCompiler program
-  IO.println "typed-source runtime operators GREEN"
+  IO.println "cached Core operators and pure metadata preflight GREEN"
 
 end Runtime
 
