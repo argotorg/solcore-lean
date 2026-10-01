@@ -8,7 +8,8 @@ namespace Solcore.SourceSemantics.CoreLowering.CompatibleMapping
 open Core Frontend CompatiblePayload CompatibleEquality
 
 structure Fields (checked : SourceCoreCompatibleCatalog.Checked) (registry : Registry)
-    (functions : FunctionModel checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (sourceKey sourceValue : TypeSystem.Ty) (sources : List (Dynamic.Value × Dynamic.Value))
     (header : Word) (layout : Core.OrderedMapping.Layout) (entries : Core.OrderedMapping.Entries) (fallback : Option Value) : Prop where
   metadata : MetadataRep registry (.mapping sourceKey sourceValue) header
@@ -20,7 +21,8 @@ structure Fields (checked : SourceCoreCompatibleCatalog.Checked) (registry : Reg
   default : DefaultRep checked registry functions mapping world sourceValue fallback layout.valueType
 
  theorem Fields.represents {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {sourceKey sourceValue : TypeSystem.Ty} {sources : List (Dynamic.Value × Dynamic.Value)}
     {header : Word} {layout : Core.OrderedMapping.Layout} {entries : Core.OrderedMapping.Entries} {fallback : Option Value}
     (fields : Fields checked registry functions mapping world sourceKey sourceValue sources header layout entries fallback) :
@@ -29,7 +31,8 @@ structure Fields (checked : SourceCoreCompatibleCatalog.Checked) (registry : Reg
   .mappingValue fields.metadata fields.identity fields.keyProjection fields.valueProjection fields.registered fields.stored fields.default
 
  theorem mapping_fields {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {expected : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
     (related : ValueRep checked registry functions mapping world expected source value type) :
     ∀ {sourceKey sourceValue sources}, source = .mapping sourceKey sourceValue sources →

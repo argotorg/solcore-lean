@@ -8,7 +8,8 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatiblePayload
 open Core Frontend SourceInference GeneralHeap DataPatternValues
 variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
 
 theorem ValuesRep.at {types : List TypeSystem.Ty} {sources : List Dynamic.Value} {values : List Value} {coreTypes : List Ty}
     (represented : ValuesRep checked registry functions mapping world types sources values coreTypes)
@@ -47,7 +48,8 @@ theorem ValuesRep.projection {types : List TypeSystem.Ty} {sources : List Dynami
     | cons first rest => simp [List.mapM_cons, first.projection, ih rest, bind, Except.bind]
 
 structure ConstructorFields (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping)
     (expected : TypeSystem.Ty) (metadata : DataConstructorInstantiation) (tag : ConstructorId) (id : Word)
     (sources : List Dynamic.Value) (values : List Value) (types : List Ty) : Prop where
   metadataRep : MetadataRep registry (.constructor metadata) id

@@ -11,7 +11,8 @@ open SourceCoreCompatibleDataPlaces
 /-- The standalone helper does not check the raw source key type. With that
 independent receipt, its missing-default outcome is exactly the source fault. -/
 theorem UpdateResult.failure {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {sourceKey sourceValue : TypeSystem.Ty} {key replacement : Dynamic.Value}
     {sources : List (Dynamic.Value × Dynamic.Value)} {header missing token : Word}
     {layout : Core.OrderedMapping.Layout} {fallback : Option Value} {count : Nat}
@@ -26,7 +27,8 @@ theorem UpdateResult.failure {checked : SourceCoreCompatibleCatalog.Checked} {re
 
  theorem getter_initialized_run {checked : SourceCoreCompatibleCatalog.Checked} {index : PreparedIndex}
     (certificate : Index checked index) (prepared : Prepared) (steps : prepared.steps = [.index index])
-    {registry : Registry} {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {registry : Registry} {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities)
     {sourceKey sourceValue : TypeSystem.Ty} {sources : List (Dynamic.Value × Dynamic.Value)}
@@ -55,7 +57,8 @@ theorem UpdateResult.failure {checked : SourceCoreCompatibleCatalog.Checked} {re
  theorem setter_initialized_run {checked : SourceCoreCompatibleCatalog.Checked} {index : PreparedIndex}
     (certificate : Index checked index) (prepared : Prepared) (steps : prepared.steps = [.index index])
     (rootType : prepared.route.rootType = SourceCoreMappingWithDefault.type index.layout)
-    {registry : Registry} {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {registry : Registry} {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities)
     {sourceKey sourceValue : TypeSystem.Ty} {sources : List (Dynamic.Value × Dynamic.Value)}

@@ -11,7 +11,8 @@ namespace Solcore.SourceSemantics.CoreLowering.CompatibleMapping
 open Core Frontend CompatiblePayload CompatibleEquality DataEquality
 
 inductive ReadResult (checked : SourceCoreCompatibleCatalog.Checked) (registry : Registry)
-    (functions : FunctionModel checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (sourceValue : TypeSystem.Ty) (key : Dynamic.Value) (sources : List (Dynamic.Value × Dynamic.Value))
     (valueType : Ty) (missingBase header : Word) : Value → Prop where
   | found {source value}
@@ -27,7 +28,8 @@ inductive ReadResult (checked : SourceCoreCompatibleCatalog.Checked) (registry :
         (.inLeft valueType (.word (missingBase.add header)))
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-  {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
   {sourceKey sourceValue : TypeSystem.Ty} {sources : List (Dynamic.Value × Dynamic.Value)}
   {header : Word} {layout : Core.OrderedMapping.Layout} {entries : Core.OrderedMapping.Entries} {fallback : Option Value}
 

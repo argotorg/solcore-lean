@@ -22,7 +22,8 @@ def liftedRead (resultType : Ty) (result : Value) : Value :=
 
  theorem selectedIndex_meaning {checked : SourceCoreCompatibleCatalog.Checked} {index : PreparedIndex}
     (certificate : Index checked index) (prepared : Prepared)
-    {registry : Registry} {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {registry : Registry} {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities)
     {sourceKey sourceValue : TypeSystem.Ty} {sources : List (Dynamic.Value × Dynamic.Value)}
@@ -42,7 +43,8 @@ def liftedRead (resultType : Ty) (result : Value) : Value :=
 
  theorem selectOne_meaning {checked : SourceCoreCompatibleCatalog.Checked} {index : PreparedIndex}
     (certificate : Index checked index) (prepared : Prepared)
-    {registry : Registry} {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {registry : Registry} {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities)
     {sourceKey sourceValue : TypeSystem.Ty} {sources : List (Dynamic.Value × Dynamic.Value)}
@@ -73,7 +75,8 @@ def liftedRead (resultType : Ty) (result : Value) : Value :=
 
  theorem getter_initialized {checked : SourceCoreCompatibleCatalog.Checked} {index : PreparedIndex}
     (certificate : Index checked index) (prepared : Prepared) (steps : prepared.steps = [.index index])
-    {registry : Registry} {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {registry : Registry} {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
     (functionLeaves : FunctionObservations checked.catalog functions identities)
     {sourceKey sourceValue : TypeSystem.Ty} {sources : List (Dynamic.Value × Dynamic.Value)}

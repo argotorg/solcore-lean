@@ -7,7 +7,8 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatiblePayload
 open Core Frontend GeneralHeap
 variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
 
 theorem DefaultRep.projection {sourceType : TypeSystem.Ty} {fallback : Option Value} {type : Ty}
     (related : DefaultRep checked registry functions mapping world sourceType fallback type) :
@@ -18,7 +19,7 @@ theorem DefaultRep.projection {sourceType : TypeSystem.Ty} {fallback : Option Va
 
 theorem DefaultRep.runtime_hasType {sourceType : TypeSystem.Ty} {fallback : Option Value} {type : Ty}
     (related : DefaultRep checked registry functions mapping world sourceType fallback type) :
-    RuntimeValueHasType world (OrderedMapping.optionValue type fallback) (.sum .unit type) checked.catalog.definitions := by
+    RuntimeValueHasType world (OrderedMapping.optionValue type fallback) (.sum .unit type) ambient.definitions := by
   cases related with
   | absent => exact .inLeft .unit
   | present _ related => exact .inRight related.runtime_hasType
@@ -66,8 +67,12 @@ theorem EntriesRep.runtime_hasType {keyType valueType : TypeSystem.Ty} {sources 
     {entries : OrderedMapping.Entries} {layout : OrderedMapping.Layout}
     (related : EntriesRep checked registry functions mapping world keyType valueType sources entries layout.keyType layout.valueType)
     (registered : layout.Registered checked.catalog.definitions) :
-    RuntimeValueHasType world (OrderedMapping.encode layout entries) layout.type checked.catalog.definitions := by
-  apply OrderedMapping.encode_hasType registered
+    RuntimeValueHasType world (OrderedMapping.encode layout entries) layout.type ambient.definitions := by
+  have nativeRegistered : layout.Registered ambient.definitions :=
+    ⟨registered.keyWellFormed.extend_definitions ambient.basePrefix,
+      registered.valueWellFormed.extend_definitions ambient.basePrefix,
+      ambient.basePrefix.lookup registered.lookup⟩
+  apply OrderedMapping.encode_hasType nativeRegistered
   induction sources generalizing entries with
   | nil => cases related; simp
   | cons source sources ih =>

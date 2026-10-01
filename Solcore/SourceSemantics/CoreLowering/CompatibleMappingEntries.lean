@@ -8,12 +8,14 @@ namespace Solcore.SourceSemantics.CoreLowering.CompatibleMapping
 open Core Frontend CompatiblePayload CompatibleEquality
 
 abbrev Payload {checked : SourceCoreCompatibleCatalog.Checked} (registry : Registry)
-    (functions : FunctionModel checked.catalog) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : GeneralHeap.LocationMap) (world : StoreTyping)
     (sourceType : TypeSystem.Ty) (type : Ty) : OrderedMapping.Relation :=
   fun source value => ValueRep checked registry functions mapping world sourceType source value type
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
-  {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
   {sourceKey sourceValue : TypeSystem.Ty} {keyType valueType : Ty}
 
  theorem entries_related {sources : List (Dynamic.Value × Dynamic.Value)} {entries : Core.OrderedMapping.Entries}
