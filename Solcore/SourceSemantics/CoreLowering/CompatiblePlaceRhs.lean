@@ -12,7 +12,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
   {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
   {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
   {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
@@ -22,7 +23,8 @@ variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
 /-- The original reference is read against the actual post-RHS store.
 The source cell's raw declared type survives; its value may have changed. -/
 structure Latest (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping)
     (prepared : Prepared) (sourceTarget : Dynamic.ResolvedPlace) (target : Location)
     (heap : Dynamic.Heap) (store : Store) where
   cell : Dynamic.Cell
@@ -71,7 +73,7 @@ The returned live-root receipt is derived from the IH's new heap. -/
 theorem preserves
     (meaning : Preserves (payloadModel checked registry functions) program context evidence source certificate faults)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) initialMap initialWorld administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) initialMap initialWorld administrativeContext scope environment coreEnvironment)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment targetHeap id outcome after) :
@@ -94,7 +96,7 @@ at one preselected runtime environment. -/
 theorem reflects
     (meaning : Reflects (payloadModel checked registry functions) program context evidence source certificate faults)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) initialMap initialWorld administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) initialMap initialWorld administrativeContext scope environment coreEnvironment)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     {value : Value} {store : Store}
     (evaluated : Evaluates

@@ -42,7 +42,8 @@ inductive KeyViews {checked : Checked} {source : TypedSource} {site : SourceCore
 /-- The ordered semantic values returned by the real argument packing theorem
 supply every mapping key, including aliases retaining distinct raw metadata. -/
 theorem KeyViews.arguments {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
     {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
     {steps : List PreparedStep} {keySites : List (ExpressionId × Ty)}
@@ -73,7 +74,8 @@ theorem KeyViews.arguments {checked : Checked} {registry : SourceCoreRawMetadata
 /-- Universal expression preservation constructs the key executions and their
 intervening live heaps. This theorem adds path Arguments to the shared result. -/
 theorem preserves {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
     {certificate : GenericExpressionMeaning.Certificate} {faults : GenericExpressionMeaning.FaultRep}
     {site : SourceCoreElaboration.ErrorSite} {root leaf : TypeSystem.Ty} {projections : List PlaceProjection}
@@ -86,7 +88,7 @@ theorem preserves {checked : Checked} {registry : SourceCoreRawMetadata.Registry
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {resolved : List Dynamic.EvaluatedProjection}
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : ReadOnly.EnvironmentsAgree ξ canonical actual)
@@ -106,7 +108,8 @@ theorem preserves {checked : Checked} {registry : SourceCoreRawMetadata.Registry
 /-- Every completed packed-key computation reconstructs either the ordered
 source key trace and authenticated path arguments, or its exact source fault. -/
 theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
     {certificate : GenericExpressionMeaning.Certificate} {faults : GenericExpressionMeaning.FaultRep}
     {site : SourceCoreElaboration.ErrorSite} {root leaf : TypeSystem.Ty} {projections : List PlaceProjection}
@@ -119,7 +122,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store after : Store} {ξ : Renaming} {value : Value}
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : ReadOnly.EnvironmentsAgree ξ canonical actual)

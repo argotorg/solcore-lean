@@ -12,7 +12,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute Co
 open CompatibleMapping CompatibleMapping.MixedPaths SourceCoreCompatibleDataPlaces
 
 inductive ResultRep (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping)
     (prepared : Prepared) (cell : Dynamic.Cell) (resolved : List Dynamic.EvaluatedProjection)
     (leaf : TypeSystem.Ty) : Value → Prop where
   | read {sourceRoot selected : Dynamic.Value} {native : Value}
@@ -32,7 +33,8 @@ inductive ResultRep (checked : Checked) (registry : SourceCoreRawMetadata.Regist
       ResultRep checked registry functions mapping world prepared cell resolved leaf (.inLeft prepared.optionalLeaf (.word prepared.invalidProjection))
 
 variable {compilation : SourceCoreCompatibleDataPlaces.Context}
-  {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+  {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
   {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
   {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {prepared : Prepared}
   {location : Dynamic.Location} {target : Location} {cell : Dynamic.Cell}
@@ -51,9 +53,9 @@ private theorem present_evaluates
     (faithful : DataEquality.IdentityFaithful identities) (observations : FunctionObservations compilation.checked.catalog functions identities)
     (keyLength : prepared.keyTypes.length = keys.length)
     (heaps : HeapRepresents compilation.checked registry functions mapping world heap store)
-    (environmentTyped : RuntimeEnvironmentHasTypes world environment context compilation.checked.catalog.definitions)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
     (helperTyped : HasType context (.apply (getter prepared keyType) (.pair (.loadCell referenceExpression) keyExpression))
-      (LanguageResult.resultType prepared.optionalLeaf) compilation.checked.catalog.definitions)
+      (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions)
     (referenceSelected : DataEquality.Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (keysSelected : DataEquality.Selects environment keyExpression (packValues keys)) :
     ∃ result after futureWorld administrative,
@@ -108,9 +110,9 @@ theorem evaluates
     (heaps : HeapRepresents compilation.checked registry functions mapping world heap store)
     (reference : ReferenceRepresents mapping world location target prepared.route.rootType)
     (read : Dynamic.Heap.Reads heap location cell)
-    (environmentTyped : RuntimeEnvironmentHasTypes world environment context compilation.checked.catalog.definitions)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
     (helperTyped : HasType context (.apply (getter prepared keyType) (.pair (.loadCell referenceExpression) keyExpression))
-      (LanguageResult.resultType prepared.optionalLeaf) compilation.checked.catalog.definitions)
+      (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions)
     (referenceSelected : DataEquality.Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (keysSelected : DataEquality.Selects environment keyExpression (packValues keys)) :
     ∃ result after futureWorld administrative,
@@ -155,9 +157,9 @@ theorem reflects
     (heaps : HeapRepresents compilation.checked registry functions mapping world heap store)
     (reference : ReferenceRepresents mapping world location target prepared.route.rootType)
     (read : Dynamic.Heap.Reads heap location cell)
-    (environmentTyped : RuntimeEnvironmentHasTypes world environment context compilation.checked.catalog.definitions)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
     (helperTyped : HasType context (.apply (getter prepared keyType) (.pair (.loadCell referenceExpression) keyExpression))
-      (LanguageResult.resultType prepared.optionalLeaf) compilation.checked.catalog.definitions)
+      (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions)
     (referenceSelected : DataEquality.Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (keysSelected : DataEquality.Selects environment keyExpression (packValues keys))
     {result : Value} {after : Store}

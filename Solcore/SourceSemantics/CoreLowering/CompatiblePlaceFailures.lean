@@ -11,7 +11,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 theorem keys {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
@@ -20,7 +21,7 @@ theorem keys {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {coreEnvironment : Environment} {before after : Dynamic.Heap} {store : Store}
     {sourceLocation : Dynamic.Location} {cell : Dynamic.Cell} {index : Nat} {reason : Dynamic.SemanticFault}
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -54,7 +55,8 @@ theorem keys {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
 CompatiblePlaceResolution.preserves, and the independent RHS fault. It derives
 the actual RHS run and suppresses modifier, setter, write and continuation. -/
 theorem rhs {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
@@ -67,7 +69,7 @@ theorem rhs {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {id : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     (coreType : lowered.type = prepared.route.leafType)
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) initialMap initialWorld administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) initialMap initialWorld administrativeContext scope environment coreEnvironment)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (resolved : Dynamic.SourcePlaceResolves program context evidence source environment before place sourceTarget targetHeap)
     {index : Nat} (reference : coreEnvironment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target))

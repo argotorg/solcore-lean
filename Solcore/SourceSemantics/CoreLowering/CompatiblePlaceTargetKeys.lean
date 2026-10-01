@@ -9,7 +9,8 @@ open Core Frontend SourceInference GeneralHeap DataPatternValues GenericExpressi
 open CompatiblePayload CompatibleEquality CompatibleHeap SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (prepared : Prepared) (place : PlaceResolution)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (prepared : Prepared) (place : PlaceResolution)
     (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (location : Dynamic.Location) (resolved : List Dynamic.EvaluatedProjection)
     (coreEnvironment : Environment) (before after : Dynamic.Heap) (store : Store)
@@ -38,7 +39,8 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
 /-- Successful key expressions supply the current root after all their effects.
 Exact declared source type comes from WritableLocal and environment agreement. -/
 theorem preserves {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
     {certificate : Certificate} {faults : FaultRep} {prepared : Prepared} {place : PlaceResolution}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
@@ -47,7 +49,7 @@ theorem preserves {checked : Checked} {registry : SourceCoreRawMetadata.Registry
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {coreEnvironment : Environment} {before after : Dynamic.Heap} {store : Store}
     {location : Dynamic.Location} {initialCell : Dynamic.Cell} {resolved : List Dynamic.EvaluatedProjection} {index : Nat}
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))

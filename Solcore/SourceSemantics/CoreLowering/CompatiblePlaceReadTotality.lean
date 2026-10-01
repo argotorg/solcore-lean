@@ -12,7 +12,8 @@ open Core Frontend SourceInference GeneralHeap DataPatternValues
 open CompatiblePayload CompatibleEquality CompatibleMixedRoute CompatibleMapping CompatibleMapping.MixedPaths SourceCoreCompatibleDataPlaces
 
 private theorem source_mapping {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
     (related : ValueRep checked registry functions mapping world sourceType source value type) :
     ∀ {key result}, SourceCoreRawMetadata.runtimeType sourceType = .mapping key result →
@@ -33,7 +34,8 @@ private theorem source_mapping {checked : Checked} {registry : SourceCoreRawMeta
   | nil | cons | empty | entry | absent | present => trivial
 
 private theorem source_constructor {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
     (related : ValueRep checked registry functions mapping world sourceType source value type) :
     ∀ {owner arguments}, SourceCoreDataCatalog.nominalParts (SourceCoreRawMetadata.runtimeType sourceType) = some (owner, arguments) →
@@ -49,7 +51,8 @@ private theorem source_constructor {checked : Checked} {registry : SourceCoreRaw
 produces an independent missing-default fault. Function leaves require only
 the explicit shallow metadata law, not any function-body evaluation. -/
 theorem read_or_fault {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
     {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {keys : List Value}
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
     {steps : List PreparedStep} {keySites : List (ExpressionId × Ty)}

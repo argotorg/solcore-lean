@@ -28,7 +28,8 @@ theorem execute_eq (prepared : Prepared) (reference : Expr) (keys : SourceCoreBa
         (remainder prepared keys.type rhs next outputType operator bitNot invalid)) := rfl
 
 inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (program : Program) (context : SourceSemantics.Context)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (program : Program) (context : SourceSemantics.Context)
     (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (faults : FaultRep)
     (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (place : PlaceResolution) (environment : Dynamic.Environment) (coreEnvironment : Environment)
@@ -57,7 +58,8 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
 /-- Completed emitted code supplies the key runs to the universal reflection
 IH. No source projection trace or child runtime execution is an input. -/
 theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
@@ -66,7 +68,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {coreEnvironment : Environment} {before : Dynamic.Heap} {store finalStore : Store}
     {location : Dynamic.Location} {initialCell : Dynamic.Cell} {index : Nat}
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))

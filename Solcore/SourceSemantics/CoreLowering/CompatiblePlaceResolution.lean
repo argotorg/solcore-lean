@@ -20,11 +20,11 @@ private theorem packed_type (codes : List SourceCoreBasic.LoweredExpr) :
     | cons => exact congrArg (Ty.product code.type) ih
 
 theorem values_typed {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {model : GenericHeap.PayloadModel catalog projects} {mapping : LocationMap} {world : StoreTyping}
+    {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions} {mapping : LocationMap} {world : StoreTyping}
     {sourceTypes : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
     {sources : List Dynamic.Value} {values : List Value}
     (represented : DataExpressionSequence.Values model mapping world sourceTypes (codes.map (·.type)) sources values) :
-    RuntimeValueHasType world (packValues values) (SourceCoreCalls.packArguments codes).type catalog.definitions := by
+    RuntimeValueHasType world (packValues values) (SourceCoreCalls.packArguments codes).type definitions := by
   rw [← packed_type]
   generalize typesEq : codes.map (·.type) = types at represented ⊢
   clear typesEq codes
@@ -60,7 +60,8 @@ private theorem read_present {root : Dynamic.Value} {projections : List Dynamic.
 /-- The source selected value and exact key/snapshot native runs are outputs
 of resolution. The source heap is unchanged by snapshot helper allocation. -/
 structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (prepared : Prepared)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (prepared : Prepared)
     (codes : List SourceCoreBasic.LoweredExpr) (sourceTypes : List TypeSystem.Ty)
     (place : PlaceResolution) (leaf : TypeSystem.Ty) (sourceTarget : Dynamic.ResolvedPlace)
     (environment : Environment) (initialStore : Store) (initialMap : LocationMap)
@@ -99,7 +100,8 @@ The universal child theorem covers every intermediate key heap and hidden
 reference slot. Independent writable-local typing and environment agreement
 recover the exact raw root declaration type. -/
 theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
@@ -118,13 +120,13 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (getterTyped : HasType ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
         (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
       (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0)))
-      (LanguageResult.resultType prepared.optionalLeaf) compilation.checked.catalog.definitions)
+      (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {sourceTarget : Dynamic.ResolvedPlace} {index : Nat}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -163,7 +165,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     have typedEnvironment : RuntimeEnvironmentHasTypes keyWorld
         (keysEnvironment prepared.route.rootType target (packValues values) coreEnvironment)
         ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
-          (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) compilation.checked.catalog.definitions :=
+          (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) ambient.definitions :=
       .cons (values_typed keysRelated)
         (.cons (.cellRef currentReference.typed) ((environments.extend keyMaps keyWorlds).runtime_hasTypes))
     have resolvedNonempty : projections ≠ [] := by
