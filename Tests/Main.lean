@@ -195,6 +195,10 @@ import Solcore.Test.SourceCoreCallableIndexedLambdaValues
 import Solcore.Test.SourceCoreTypedImperativeFor
 import Solcore.Test.SourceCoreCompatibleRenamedBareBitNot
 import Solcore.Test.SourceCoreBuiltinNamedCalls
+import Solcore.Test.SourceCoreCompatiblePatternProofs
+import Solcore.Test.SourceCoreTypedImperativeForUnary
+import Solcore.Test.SourceCoreCallableIndexedLambdaCalls
+import Solcore.Test.SourceCoreRecursiveNamedExpressions
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -2560,6 +2564,10 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreTypedImperativeFor.run
   SourceCoreCompatibleRenamedBareBitNot.run
   SourceCoreBuiltinNamedCalls.run
+  SourceCoreCompatiblePatternProofs.run
+  SourceCoreTypedImperativeForUnary.run
+  SourceCoreCallableIndexedLambdaCalls.run
+  SourceCoreRecursiveNamedExpressions.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
