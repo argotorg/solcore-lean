@@ -51,14 +51,14 @@ theorem getter_of_infer {definitions : DataEnvironment} {context : Core.Context}
 
 /-- The retained child typing fixes the otherwise unused RHS slot. This is a
 static compiler obligation and does not assume any child evaluation. -/
-theorem setter_of_execute {definitions : DataEnvironment} {context : Core.Context}
+theorem setter_of_execute_rhs {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
-    {outputType resultType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    {outputType resultType rhsType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
     (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
       resultType definitions)
     (rhsTyped : HasType (prepared.optionalLeaf :: keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
-      (shift 3 rhs) (LanguageResult.resultType prepared.route.leafType) definitions) :
-    HasType (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: keys.type ::
+      (shift 3 rhs) (LanguageResult.resultType rhsType) definitions) :
+    HasType (prepared.route.leafType :: rhsType :: prepared.optionalLeaf :: keys.type ::
         OptionalCell.referenceType prepared.route.rootType :: context)
       (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
       (LanguageResult.resultType prepared.route.rootType) definitions := by
@@ -105,15 +105,34 @@ theorem setter_of_execute {definitions : DataEnvironment} {context : Core.Contex
                                     subst_vars
                                     exact .apply (.lambda parameterTyped resultTyped body) (.pair referenceArgument (.pair keys (.var rfl)))
 
+theorem setter_of_execute {definitions : DataEnvironment} {context : Core.Context}
+    {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
+    {outputType resultType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word}
+    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
+      resultType definitions)
+    (rhsTyped : HasType (prepared.optionalLeaf :: keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
+      (shift 3 rhs) (LanguageResult.resultType prepared.route.leafType) definitions) :
+    HasType (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: keys.type ::
+        OptionalCell.referenceType prepared.route.rootType :: context)
+      (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
+      (LanguageResult.resultType prepared.route.rootType) definitions :=
+  setter_of_execute_rhs typed rhsTyped
+
 /-- Ordinary child typing yields the exact three administrative slots used by
 execute. This is syntactic weakening only; store values are never compared. -/
+theorem rhs_shift_typed_rhs {definitions : DataEnvironment} {context : Core.Context}
+    {prepared : Prepared} {rhsType : Ty} {keys : SourceCoreBasic.LoweredExpr} {rhs : Expr}
+    (typed : HasType context rhs (LanguageResult.resultType rhsType) definitions) :
+    HasType (prepared.optionalLeaf :: keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
+      (shift 3 rhs) (LanguageResult.resultType rhsType) definitions := by
+  simpa only [shift, List.range, List.range.loop, List.foldl, Core.Context.insertAt] using
+    (((typed.weakenAt (inserted := OptionalCell.referenceType prepared.route.rootType) 0).weakenAt (inserted := keys.type) 0).weakenAt
+      (inserted := prepared.optionalLeaf) 0)
 theorem rhs_shift_typed {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {keys : SourceCoreBasic.LoweredExpr} {rhs : Expr}
     (typed : HasType context rhs (LanguageResult.resultType prepared.route.leafType) definitions) :
     HasType (prepared.optionalLeaf :: keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
-      (shift 3 rhs) (LanguageResult.resultType prepared.route.leafType) definitions := by
-  simpa only [shift, List.range, List.range.loop, List.foldl, Core.Context.insertAt] using
-    (((typed.weakenAt (inserted := OptionalCell.referenceType prepared.route.rootType) 0).weakenAt (inserted := keys.type) 0).weakenAt
-      (inserted := prepared.optionalLeaf) 0)
+      (shift 3 rhs) (LanguageResult.resultType prepared.route.leafType) definitions :=
+  rhs_shift_typed_rhs typed
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceHelperTyping

@@ -57,8 +57,8 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
-    {administrativeContext : Core.Context}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    {administrativeContext : Core.Context} {rhsType : Core.Ty}
+    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext rhsType)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : Reflects (payloadModel compilation.checked registry functions) program context evidence source certificate faults)

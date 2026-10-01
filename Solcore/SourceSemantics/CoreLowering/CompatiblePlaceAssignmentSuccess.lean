@@ -15,7 +15,8 @@ open SourceCoreCompatibleDataPlaces DataPlaceExecution
 structure Layout (compilation : SourceCoreCompatibleDataPlaces.Context) (source : TypedSource)
     (certificate : Certificate) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)
     (place : PlaceResolution) (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr)
-    (sourceTypes : List TypeSystem.Ty) (leaf : TypeSystem.Ty) (administrativeContext : Core.Context) : Prop where
+    (sourceTypes : List TypeSystem.Ty) (leaf : TypeSystem.Ty) (administrativeContext : Core.Context)
+    (rhsType : Core.Ty := prepared.route.leafType) : Prop where
   path : PreparedPath compilation.checked source site prepared.route.rootSourceType place.projections
     0 prepared.steps prepared.keys leaf
   views : KeyViews path sourceTypes
@@ -30,7 +31,7 @@ structure Layout (compilation : SourceCoreCompatibleDataPlaces.Context) (source 
     (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0)))
     (LanguageResult.resultType prepared.optionalLeaf) compilation.checked.catalog.definitions
   setterTyped : HasType
-    (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
+    (prepared.route.leafType :: rhsType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
       OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
     (.apply (setter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
     (LanguageResult.resultType prepared.route.rootType) compilation.checked.catalog.definitions
