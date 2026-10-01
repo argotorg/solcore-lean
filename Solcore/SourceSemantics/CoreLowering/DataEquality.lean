@@ -49,7 +49,7 @@ structure IdentityFaithful (identities : Dynamic.Value → Word → Prop) : Prop
   equal : ∀ {left right leftId rightId}, identities left leftId → identities right rightId →
     (leftId = rightId ↔ left = right)
 
-private theorem product_equivalent {a b c d : Dynamic.Value} :
+theorem product_equivalent {a b c d : Dynamic.Value} :
     Dynamic.ValueEquivalent (.product a b) (.product c d) ↔
       Dynamic.ValueEquivalent a c ∧ Dynamic.ValueEquivalent b d := by
   constructor
@@ -60,7 +60,7 @@ private theorem product_equivalent {a b c d : Dynamic.Value} :
   · rintro ⟨⟨rfl, left⟩, ⟨rfl, right⟩⟩
     exact ⟨rfl, .product left right⟩
 
-private theorem pack_comparable {values : List Dynamic.Value} {packed : Dynamic.Value}
+theorem pack_comparable {values : List Dynamic.Value} {packed : Dynamic.Value}
     (packing : Dynamic.ValuesPack values packed) :
     Dynamic.ValueComparable packed ↔ ∀ value, value ∈ values → Dynamic.ValueComparable value := by
   induction packing with
@@ -80,7 +80,7 @@ private theorem pack_comparable {values : List Dynamic.Value} {packed : Dynamic.
         intro value member
         exact all value (List.mem_cons_of_mem first member)))
 
-private theorem pack_equivalent {left right : List Dynamic.Value} {leftPacked rightPacked : Dynamic.Value}
+theorem pack_equivalent {left right : List Dynamic.Value} {leftPacked rightPacked : Dynamic.Value}
     (leftPack : Dynamic.ValuesPack left leftPacked) (rightPack : Dynamic.ValuesPack right rightPacked)
     (arity : left.length = right.length) :
     Dynamic.ValueEquivalent leftPacked rightPacked ↔ Dynamic.ValuesEquivalent left right := by

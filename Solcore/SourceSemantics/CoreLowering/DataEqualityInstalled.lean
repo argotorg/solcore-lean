@@ -130,7 +130,7 @@ def allocatedReferences (types : List Ty) (base : Nat) : Environment :=
 def allocatedEnvironment (catalog : Catalog) (base : Nat) (environment : Environment) : Environment :=
   (allocatedReferences (catalogTypes catalog) base).reverse ++ environment
 
-private theorem allocate_types_evaluates (types : List Ty) (next : Expr)
+theorem allocate_types_evaluates (types : List Ty) (next : Expr)
     (environment : Environment) (store : Store) {value : Value} {finalStore : Store}
     (nextEvaluated : Evaluates ((allocatedReferences types store.length).reverse ++ environment)
       (store ++ emptyCells types) next value finalStore) :
@@ -143,15 +143,15 @@ private theorem allocate_types_evaluates (types : List Ty) (next : Expr)
     apply ih
     simpa [allocatedReferences, emptyCells, List.zipIdx_cons, List.reverse_cons, List.append_assoc] using nextEvaluated
 
-private theorem allocate_eq_types (catalog : Catalog) (next : Expr) :
+theorem allocate_eq_types (catalog : Catalog) (next : Expr) :
     allocate catalog next =
       (catalogTypes catalog).foldr (fun type body => .letE (OptionalCell.allocate type) body) next := by
   simp [allocate, catalogTypes, List.foldr_map]
 
-private theorem catalogTypes_length (catalog : Catalog) : (catalogTypes catalog).length = catalog.entries.length := by
+theorem catalogTypes_length (catalog : Catalog) : (catalogTypes catalog).length = catalog.entries.length := by
   simp [catalogTypes]
 
-private theorem allocated_references (catalog : Catalog) (base : Nat) (environment : Environment) :
+theorem allocated_references (catalog : Catalog) (base : Nat) (environment : Environment) :
     References catalog base (allocatedEnvironment catalog base environment) := by
   intro index bound
   have typesLength := catalogTypes_length catalog
@@ -218,7 +218,7 @@ def Installed (catalog : Catalog) (bodies : List Expr) (base : Nat)
     store.read? (base + index) =
       some (.inRight .unit (helper (allocatedEnvironment catalog base environment) body index))
 
-private theorem cells_lookup {environment : Environment} {bodies : List Expr} {index : Nat} {body : Expr}
+theorem cells_lookup {environment : Environment} {bodies : List Expr} {index : Nat} {body : Expr}
     (found : bodies[index]? = some body) :
     (cells environment bodies)[index]? = some (.inRight .unit (helper environment body index)) := by
   simp [cells, List.getElem?_zipIdx, found]
