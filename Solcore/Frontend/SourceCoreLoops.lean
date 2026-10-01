@@ -49,7 +49,8 @@ structure Policy where
   lowerMatch : Option (ExpressionLowerer → FlowLowerer → Nat → TypedSource → Scope → StatementId →
     MatchResolution → Core.Ty → (ExpressionId → Core.Word) → Core.Word → Except Error Core.Expr) := none
 
-private def assignValue (policy : Policy) (fuel : Nat) (source : TypedSource) (scope : Scope)
+/-- Actual assignment callback selection, exposed for compiler certificates. -/
+def assignValue (policy : Policy) (fuel : Nat) (source : TypedSource) (scope : Scope)
     (site : SourceCoreElaboration.ErrorSite) (assignment : AssignmentResolution)
     (operator : Syntax.ValueAssignOp) (rhs : ExpressionId) (outputType : Core.Ty)
     (next : Core.Expr) (reasonAt : ExpressionId → Core.Word) : Except Error Core.Expr := do
