@@ -182,6 +182,15 @@ import Solcore.Test.SourceCoreTypedBuiltinCalls
 import Solcore.Test.SourceCoreTypedLexicalWhileNative
 import Solcore.Test.SourceCoreCompatibleAssignmentStatements
 import Solcore.Test.SourceCoreNamedCalls
+import Solcore.Test.SourceCoreRecursiveBuiltinExpressions
+import Solcore.Test.SourceCoreCallableIndexedBuiltinValues
+import Solcore.Test.SourceCoreTypedImperative
+import Solcore.Test.SourceCoreNamedArguments
+import Solcore.Test.SourceCoreCallableIndexedNamedValues
+import Solcore.Test.SourceCoreCallableNamedCanonicalOrder
+import Solcore.Test.SourceCoreTypedForHeader
+import Solcore.Test.SourceCoreCallableIndexedRetainedNamedValues
+import Solcore.Test.SourceCoreBuiltinLexicalStatements
 import Solcore.Test.SourceSemanticsIntegerBitNot
 import Solcore.Test.SourceCoreCompatiblePlaceKeyTyping
 import Solcore.Test.SourceCoreCompatiblePlaceOrder
@@ -1509,6 +1518,7 @@ import Solcore.Test.ImportedResolutionConsumers
 import Solcore.Test.ProgramLoading
 import Solcore.Test.TraitResolution
 import Solcore.Test.TypedTraitResolution
+import Solcore.Test.TraitResolutionEvidenceEquality
 import Solcore.Test.ProgramIdentity
 import Solcore.Test.ProgramSignatures
 import Solcore.Test.ExecutableImplMethods
@@ -2361,6 +2371,7 @@ def staticSemanticsSpineTests : IO Unit := do
   Tests.ImportedResolutionConsumers.testImportedResolutionConsumers
   testProgramLoading
   TypedTraitResolution.testTypedTraitResolution
+  TraitResolutionEvidenceEquality.run
   ProgramIdentity.testProgramIdentity
   testProgramSignatures
   ExecutableImplMethods.testExecutableImplMethods
@@ -2532,6 +2543,15 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreTypedLexicalWhileNative.run
   SourceCoreCompatibleAssignmentStatements.run
   SourceCoreNamedCalls.run
+  SourceCoreRecursiveBuiltinExpressions.run
+  SourceCoreCallableIndexedBuiltinValues.run
+  SourceCoreTypedImperative.run
+  SourceCoreNamedArguments.run
+  SourceCoreCallableIndexedNamedValues.run
+  SourceCoreCallableNamedCanonicalOrder.run
+  SourceCoreTypedForHeader.run
+  SourceCoreCallableIndexedRetainedNamedValues.run
+  SourceCoreBuiltinLexicalStatements.run
   SourceSemanticsIntegerBitNot.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
