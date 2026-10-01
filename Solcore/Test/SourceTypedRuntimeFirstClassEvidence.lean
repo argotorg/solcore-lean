@@ -1,6 +1,9 @@
-import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Test.SourceCoreUnifiedCorpusSupport
 
-/-! Focused execution tests for evidence-bearing first-class functions. -/
+#check_failure Solcore.Frontend.SourceTypedRuntime.run
+
+/-! Checked-source regressions for evidence-bearing first-class functions,
+executed through a cached source-compatible Core artifact. -/
 
 set_option autoImplicit false
 
@@ -87,6 +90,7 @@ private structure Prepared where
   program : CheckedProgram
   plan : SourceSpecializationWorklist.Plan
   key : SourceSpecialization.SpecializationKey
+  compiled : SourceCoreUnifiedCompilation.Compiled
 
 private def prepareNamed (program : CheckedProgram) (name : String) :
     IO Prepared := do
@@ -98,7 +102,9 @@ private def prepareNamed (program : CheckedProgram) (name : String) :
   match SourceSpecializationWorklist.run program [request] 32 with
   | .ok (.complete plan) =>
       match plan.seedKeys with
-      | [key] => pure { program, plan, key }
+      | [key] => do
+          let compiled ← SourceCoreUnifiedCorpusSupport.preparePlan name program plan key
+          pure { program, plan, key, compiled }
       | keys => throw (IO.userError
           s!"`{name}` retained {keys.length} seed keys")
   | .ok outcome => throw (IO.userError
@@ -107,9 +113,8 @@ private def prepareNamed (program : CheckedProgram) (name : String) :
       s!"`{name}` specialization failed: {reprStr error}")
 
 private def runPrepared (prepared : Prepared)
-    (arguments : List Value := []) : RunResult :=
-  SourceTypedRuntime.run prepared.program prepared.plan prepared.key arguments
-    8192
+    (arguments : List Value := []) : IO RunResult :=
+  SourceCoreUnifiedCorpusSupport.observe prepared.compiled prepared.key arguments
 
 private def expectWord (label : String) (expected : Nat) : RunResult → IO Unit
   | .done (.word actual) _ =>
@@ -129,7 +134,7 @@ private def testConstrainedGlobalValue (program : CheckedProgram) : IO Unit := d
   let valueFactory ← prepareNamed program "globalValue"
   assertTrue (valueFactory.plan.referenceEdges.length == 1)
     "constrained declaration value lost its reference edge"
-  let (key, evidence) ← match runPrepared valueFactory with
+  let (key, evidence) ← match ← runPrepared valueFactory with
     | .done (.global key evidence) _ => pure (key, evidence)
     | result => throw (IO.userError
         s!"globalValue returned {reprStr result}")
@@ -144,12 +149,12 @@ private def testConstrainedGlobalValue (program : CheckedProgram) : IO Unit := d
 
   let aliasCall ← prepareNamed program "globalAliasCall"
   expectWord "constrained global alias" 41
-    (runPrepared aliasCall [.word (word 41)])
+    (← runPrepared aliasCall [.word (word 41)])
 
   let applyStored ← prepareNamed program "applyStored"
   expectWord "evidence-bearing global input" 49
-    (runPrepared applyStored [.global key evidence, .word (word 49)])
-  match runPrepared applyStored [.global key [], .word (word 49)] with
+    (← runPrepared applyStored [.global key evidence, .word (word 49)])
+  match ← runPrepared applyStored [.global key [], .word (word 49)] with
   | .fault (.typeMismatch _ _) _ => pure ()
   | result => throw (IO.userError
       s!"global input with missing evidence was accepted: {reprStr result}")
@@ -163,7 +168,7 @@ private def testPredicateReordering (program : CheckedProgram) : IO Unit := do
       decide (factory.assumptions.reverse = target.assumptions))
     "predicate-reordering fixture lost its opposite declaration orders"
   expectWord "predicate-reordered declaration value" 43
-    (runPrepared prepared [.word (word 43)])
+    (← runPrepared prepared [.word (word 43)])
 
 private def testQualifiedLocalAliasEscape
     (program : CheckedProgram) : IO Unit := do
@@ -175,7 +180,7 @@ private def testQualifiedLocalAliasEscape
       forwarded.length == 1)
     "qualified local escape lost its caller assumption or forwarded call"
   expectWord "qualified local alias escape" 45
-    (runPrepared prepared [.word (word 45)])
+    (← runPrepared prepared [.word (word 45)])
 
 private def testGenericRecursiveClosure
     (program : CheckedProgram) : IO Unit := do
@@ -186,7 +191,7 @@ private def testGenericRecursiveClosure
   assertTrue (recursive.assumptions.length == 1 && selfEdges.length == 1)
     "escaped generic closure lost recursive evidence forwarding"
   expectWord "generic recursive closure" 47
-    (runPrepared prepared [.word (word 47)])
+    (← runPrepared prepared [.word (word 47)])
 
 def testSourceTypedRuntimeFirstClassEvidence : IO Unit := do
   let program ← checkedProgram

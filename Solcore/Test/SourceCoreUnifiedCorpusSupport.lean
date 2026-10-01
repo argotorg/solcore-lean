@@ -27,6 +27,29 @@ def key (program : CheckedProgram) (name : String) : IO Key :=
   | [signature] => pure ⟨signature.id, []⟩
   | _ => throw (IO.userError s!"corpus function missing {name}")
 
+/-- Cache the actual Core compilation of an existing checked canonical plan.
+The original plan remains available to callers for specialization assertions. -/
+def preparePlan (label : String) (program : CheckedProgram)
+    (plan : SourceSpecializationWorklist.Plan) (root : Key)
+    (compilationFuel : Nat := 1000) : IO Compiled := do
+  let compiled ← get s!"{label} cached Core artifact"
+    (SourceCoreUnifiedCompilation.prepare program plan compilationFuel)
+  assertTrue (compiled.keys.contains root) s!"{label} root is absent from the cached artifact"
+  pure compiled
+
+/-- Invoke cached Core code and retain its native checkpoint. Adapter failures
+remain test failures, distinct from source language faults in the observation. -/
+def executeKey (compiled : Compiled) (owner : Key) (arguments : List Value := [])
+    (fuel : Nat := 300000) (initial : State := {}) (validationFuel : Nat := 500) :
+    IO (SourceCoreUnifiedCompilation.Result compiled) :=
+  get s!"{reprStr owner} Core execution/export"
+    (compiled.run owner arguments validationFuel fuel initial)
+
+def observe (compiled : Compiled) (owner : Key) (arguments : List Value := [])
+    (fuel : Nat := 300000) (initial : State := {}) (validationFuel : Nat := 500) :
+    IO SourceTypedRuntime.RunResult := do
+  pure (← executeKey compiled owner arguments fuel initial validationFuel).observation
+
 def prepare (label content : String) (names : List String) : IO Compiled := do
   let program ← get s!"{label} checked source" (checkProgram {
     entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] })
@@ -41,7 +64,7 @@ def prepare (label content : String) (names : List String) : IO Compiled := do
 def execute (compiled : Compiled) (name : String) (arguments : List Value := [])
     (fuel : Nat := 300000) (initial : State := {}) : IO (SourceCoreUnifiedCompilation.Result compiled) := do
   let owner ← key compiled.sourceProgram name
-  get s!"{name} Core execution/export" (compiled.run owner arguments 500 fuel initial)
+  executeKey compiled owner arguments fuel initial
 
 def completed (compiled : Compiled) (name : String) (arguments : List Value := [])
     (spent : Nat := 300000) : IO (Value × State) := do

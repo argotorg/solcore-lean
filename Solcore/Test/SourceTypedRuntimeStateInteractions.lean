@@ -1,4 +1,6 @@
-import Solcore.Frontend.SourceTypedRuntime
+import Solcore.Test.SourceCoreUnifiedCorpusSupport
+
+#check_failure Solcore.Frontend.SourceTypedRuntime.run
 
 /-!
 End-to-end regressions for interactions between typed source execution,
@@ -6,8 +8,8 @@ polymorphism, trait evidence, coercions, closures, mutable cells, mappings,
 and proxies.
 
 Each case enters through the raw-workspace checker, builds the finite
-specialization plan, and executes that checked plan.  The fixtures use only
-source forms supported by the upstream Solcore frontend; in particular,
+specialization plan, and caches its Core artifact before execution. The fixtures
+use only source forms supported by the upstream Solcore frontend; in particular,
 proxy values are used as mapping keys rather than treating enum payloads as
 named fields.
 -/
@@ -52,6 +54,7 @@ private structure Prepared where
   program : CheckedProgram
   plan : SourceSpecializationWorklist.Plan
   key : SourceSpecialization.SpecializationKey
+  compiled : SourceCoreUnifiedCompilation.Compiled
 
 private def prepareNamed (program : CheckedProgram) (name : String)
     (budget : Nat := 64) : IO Prepared := do
@@ -63,7 +66,9 @@ private def prepareNamed (program : CheckedProgram) (name : String)
   match SourceSpecializationWorklist.run program [request] budget with
   | .ok (.complete plan) =>
       match plan.seedKeys with
-      | [key] => pure { program, plan, key }
+      | [key] => do
+          let compiled ← SourceCoreUnifiedCorpusSupport.preparePlan name program plan key
+          pure { program, plan, key, compiled }
       | keys => throw (IO.userError
           s!"`{name}` retained {keys.length} seed keys")
   | .ok outcome => throw (IO.userError
@@ -72,9 +77,8 @@ private def prepareNamed (program : CheckedProgram) (name : String)
       s!"`{name}` specialization failed: {reprStr error}")
 
 private def runPrepared (prepared : Prepared)
-    (arguments : List Value := []) (fuel : Nat := 8192) : RunResult :=
-  SourceTypedRuntime.run prepared.program prepared.plan prepared.key
-    arguments fuel
+    (arguments : List Value := []) (fuel : Nat := 300000) : IO RunResult :=
+  SourceCoreUnifiedCorpusSupport.observe prepared.compiled prepared.key arguments fuel
 
 private def expectWordAndShallowHeap (label : String) (expected : Nat)
     (plan : SourceSpecializationWorklist.Plan) : RunResult → IO Unit
@@ -169,39 +173,39 @@ private def testGenericConstrainedCapturedState
     (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "capturedStateEntry"
   expectWordAndShallowHeap "generic constrained captured mutation" 9
-    prepared.plan (runPrepared prepared [.word (word 19)])
+    prepared.plan (← runPrepared prepared [.word (word 19)])
 
 private def testStatefulCoercionMethod
     (program : CheckedProgram) : IO Unit := do
   let mapping ← prepareNamed program "coercionMapping"
   expectWordAndShallowHeap "stateful coercion in mapping assignment (true)" 42
-    mapping.plan (runPrepared mapping [.bool true])
+    mapping.plan (← runPrepared mapping [.bool true])
   expectWordAndShallowHeap "stateful coercion in mapping assignment (false)" 8
-    mapping.plan (runPrepared mapping [.bool false])
+    mapping.plan (← runPrepared mapping [.bool false])
 
   let result ← prepareNamed program "coercionResult"
   expectWordAndShallowHeap "stateful coercion in function result (true)" 42
-    result.plan (runPrepared result [.bool true])
+    result.plan (← runPrepared result [.bool true])
   expectWordAndShallowHeap "stateful coercion in function result (false)" 8
-    result.plan (runPrepared result [.bool false])
+    result.plan (← runPrepared result [.bool false])
 
   let captured ← prepareNamed program "coercionCapturedState"
   expectWordAndShallowHeap "coercion closure preserves method state (true)" 86
-    captured.plan (runPrepared captured [.bool true])
+    captured.plan (← runPrepared captured [.bool true])
   expectWordAndShallowHeap "coercion closure preserves method state (false)" 18
-    captured.plan (runPrepared captured [.bool false])
+    captured.plan (← runPrepared captured [.bool false])
 
 private def testGenericProxyMappingKey
     (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "proxyKeyEntry"
   expectWordAndShallowHeap "generic proxy mapping key" 73
-    prepared.plan (runPrepared prepared [.word (word 5)])
+    prepared.plan (← runPrepared prepared [.word (word 5)])
 
 private def testRecursiveClosureSelfCellAndEvidence
     (program : CheckedProgram) : IO Unit := do
   let prepared ← prepareNamed program "recursiveClosureEntry"
   expectWordAndShallowHeap "recursive closure self-cell and evidence" 67
-    prepared.plan (runPrepared prepared [.word (word 67)])
+    prepared.plan (← runPrepared prepared [.word (word 67)])
 
 private def testAll : IO Unit := do
   let program ← checkedProgram source
@@ -209,11 +213,11 @@ private def testAll : IO Unit := do
   testStatefulCoercionMethod program
   testGenericProxyMappingKey program
   testRecursiveClosureSelfCellAndEvidence program
-  IO.println "typed-source runtime state interactions GREEN"
+  IO.println "cached Core source state interactions GREEN"
 
 end Runtime
 
-/-- Exercise stateful interactions through the checked typed-source runtime. -/
+/-- Exercise stateful interactions through checked source-compatible Core code. -/
 def testSourceTypedRuntimeStateInteractions : IO Unit :=
   Runtime.testAll
 
