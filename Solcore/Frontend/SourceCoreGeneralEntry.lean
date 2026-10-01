@@ -274,15 +274,21 @@ private def InputFrame.push {definitions : Core.DataEnvironment} {context : Core
       (frame.environmentTyped.weaken extension)
   }
 
-private def prepareArguments {checked : Checked} {context : Core.Context} (index : Nat)
-    (frame : InputFrame (definitions checked) context) : (inputs : List (Input checked)) → List Core.Value →
-      Except RunError (InputFrame (definitions checked) (inputContext inputs ++ context))
-  | [], [] => pure (by simpa [inputContext] using frame)
-  | input :: inputs, argument :: arguments => do
-    let value ← (validateValue (definitions checked) argument input.type).mapError (RunError.input index)
-    let prepared ← prepareArguments (index + 1) (frame.push input.type argument value) inputs arguments
-    pure (by simpa [inputContext, List.reverse_cons, List.append_assoc] using prepared)
-  | inputs, arguments => throw (.argumentCountMismatch (index + inputs.length) (index + arguments.length))
+/-- Input preparation depends on the actual Core types and definitions. Both
+strict and source-compatible artifacts share this checked native boundary. -/
+def nativeInputContext (types : List Core.Ty) : Core.Context :=
+  (types.map Core.OptionalCell.referenceType).reverse
+
+def prepareNativeArguments {definitions : Core.DataEnvironment} {context : Core.Context} (index : Nat)
+    (frame : InputFrame definitions context) : (types : List Core.Ty) → List Core.Value →
+      Except RunError (InputFrame definitions (nativeInputContext types ++ context))
+  | [], [] => pure (by simpa [nativeInputContext] using frame)
+  | type :: types, argument :: arguments => do
+    let value ← (validateValue definitions argument type).mapError (RunError.input index)
+    let prepared ← prepareNativeArguments (index + 1) (frame.push type argument value) types arguments
+    pure (by simpa [nativeInputContext, List.reverse_cons, List.append_assoc] using prepared)
+  | types, arguments => throw (.argumentCountMismatch (index + types.length) (index + arguments.length))
+
 
 structure Checkpoint (definitions : Core.DataEnvironment) (resultType : Core.Ty) where
   state : Core.State
@@ -294,22 +300,57 @@ structure Result (definitions : Core.DataEnvironment) (resultType : Core.Ty) whe
   typed : observation.HasType resultType definitions
   deriving Repr
 
-/-- Fresh input locations follow source parameter order; references in the
-lexical environment are newest first. Existing public stores are rejected. -/
-def Entry.start {checked : Checked} (entry : Entry checked) (arguments : List Core.Value)
-    (initialStore : Core.Store := []) : Except RunError (Checkpoint (definitions checked) entry.resultType) := do
+/-- A native body is checked against its actual definitions independently of
+which source representation supplied the input/result projections. -/
+structure NativeEntry (definitions : Core.DataEnvironment) where
+  inputTypes : List Core.Ty
+  resultType : Core.Ty
+  body : Core.Expr
+  bodyTyped : Core.HasType (nativeInputContext inputTypes) body
+    (Core.LanguageResult.resultType resultType) definitions
+  deriving Repr
+
+inductive NativeCompileError where
+  | coreCheckFailed (expected : Core.Ty) (actual : Option Core.Ty)
+  deriving Repr, DecidableEq
+
+def NativeEntry.compile (definitions : Core.DataEnvironment) (inputTypes : List Core.Ty)
+    (resultType : Core.Ty) (body : Core.Expr) : Except NativeCompileError (NativeEntry definitions) :=
+  if accepted : Core.infer? (nativeInputContext inputTypes) body definitions =
+      some (Core.LanguageResult.resultType resultType) then
+    .ok ⟨inputTypes, resultType, body, Core.infer_sound accepted⟩
+  else .error (.coreCheckFailed (Core.LanguageResult.resultType resultType)
+    (Core.infer? (nativeInputContext inputTypes) body definitions))
+
+/-- Fresh native inputs are administrative cells in source argument order.
+Existing public Core stores retain their historical rejection behavior. -/
+def NativeEntry.start {definitions : Core.DataEnvironment} (entry : NativeEntry definitions)
+    (arguments : List Core.Value) (initialStore : Core.Store := []) :
+    Except RunError (Checkpoint definitions entry.resultType) := do
   match initialStore with
   | _ :: _ => throw (.initialStoreUnsupported initialStore.length)
   | [] =>
-    if entry.inputs.length ≠ arguments.length then
-      throw (.argumentCountMismatch entry.inputs.length arguments.length)
-    let frame ← prepareArguments 0 (InputFrame.empty (definitions checked)) entry.inputs arguments
+    if entry.inputTypes.length ≠ arguments.length then
+      throw (.argumentCountMismatch entry.inputTypes.length arguments.length)
+    let frame ← prepareNativeArguments 0 (InputFrame.empty definitions) entry.inputTypes arguments
     let environmentTyped : Core.RuntimeEnvironmentHasTypes frame.world frame.environment
-        (inputContext entry.inputs) (definitions checked) := by simpa using frame.environmentTyped
+        (nativeInputContext entry.inputTypes) definitions := by simpa using frame.environmentTyped
     pure {
       state := .initial entry.body frame.environment frame.store
       typed := .eval frame.storeTyped environmentTyped entry.bodyTyped .nil
     }
+
+def Entry.native {checked : Checked} (entry : Entry checked) : NativeEntry (definitions checked) := {
+  inputTypes := entry.inputs.map (·.type)
+  resultType := entry.resultType
+  body := entry.body
+  bodyTyped := by
+    simpa [nativeInputContext, inputContext, Entry.resultType, List.map_map, Function.comp_def] using entry.bodyTyped
+}
+
+def Entry.start {checked : Checked} (entry : Entry checked) (arguments : List Core.Value)
+    (initialStore : Core.Store := []) : Except RunError (Checkpoint (definitions checked) entry.resultType) :=
+  entry.native.start arguments initialStore
 
 def Checkpoint.resume {definitions : Core.DataEnvironment} {type : Core.Ty}
     (checkpoint : Checkpoint definitions type) (fuel : Nat) : Result definitions type := {
@@ -332,6 +373,12 @@ def Result.checkpoint? {definitions : Core.DataEnvironment} {type : Core.Ty}
     rw [observation] at typed
     exact typed⟩
   | _ => none
+
+def NativeEntry.run {definitions : Core.DataEnvironment} (entry : NativeEntry definitions)
+    (arguments : List Core.Value) (executionFuel : Nat) (initialStore : Core.Store := []) :
+    Except RunError (Result definitions entry.resultType) := do
+  let checkpoint ← entry.start arguments initialStore
+  pure (checkpoint.resume executionFuel)
 
 def Entry.run {checked : Checked} (entry : Entry checked) (arguments : List Core.Value) (executionFuel : Nat)
     (initialStore : Core.Store := []) : Except RunError (Result (definitions checked) entry.resultType) := do

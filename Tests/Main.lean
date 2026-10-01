@@ -34,6 +34,7 @@ import Solcore.Test.SourceCoreRawMetadata
 import Solcore.Test.SourceCoreCompatibleValues
 import Solcore.Test.SourceCoreCompatibleDataExpressions
 import Solcore.Test.SourceCoreCompatibleFunctions
+import Solcore.Test.SourceCoreNativeEntry
 import Solcore.Test.SourceCoreRepresentationProjection
 import Solcore.Test.SourceCompilerSourceBoundaryObservations
 import Solcore.Test.SourceCoreDataPayload
@@ -2553,6 +2554,7 @@ def run : IO Unit := do
   SourceCoreCompatibleValues.run
   SourceCoreCompatibleDataExpressions.run
   SourceCoreCompatibleFunctions.run
+  SourceCoreNativeEntry.run
   SourceCoreRepresentationProjection.run
   SourceCompilerSourceBoundaryObservations.run
   SourceCoreGeneralEntry.run

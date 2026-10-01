@@ -43,10 +43,10 @@ private def fresh (index : Nat) : Except Error Core.Word :=
   | none => .error .reasonSpaceExhausted
 
 def prepare (plan : SourceCoreStageCodebook.Plan) (contracts : Table)
-    (base : SourceCoreFaultSites.Table) : Except Error Program := do
+    (base : SourceCoreFaultSites.Table) (minimumReason : Nat := 0) : Except Error Program := do
   let used := base.reads.map (·.reason.val) ++ base.additional.map (·.1.val) ++
     [base.escapedReason.val]
-  let start := used.foldl max 0 + 1
+  let start := max (used.foldl max 0 + 1) minimumReason
   let unknown ← fresh start
   let mut sites : List Site := []
   for row in contracts.decisions do
