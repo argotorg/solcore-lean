@@ -40,6 +40,7 @@ import Solcore.Frontend.SourceCoreScalar
 import Solcore.Frontend.SourceCoreInteger
 import Solcore.Frontend.SourceCoreGeneralEntry
 import Solcore.Frontend.SourceCoreGeneralFunctions
+import Solcore.Frontend.SourceCoreAllocationCodebook
 import Solcore.Frontend.SourceCoreCompatibleDataEquality
 import Solcore.Frontend.SourceCoreCompatibleDataExpressions
 import Solcore.Frontend.SourceCoreCompatibleDataPlaces
