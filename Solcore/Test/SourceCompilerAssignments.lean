@@ -1,56 +1,26 @@
-import Solcore.Frontend.SourceCompiler
+import Solcore.Test.SourceCompilerFeatureSupport
 import Solcore.Test.SourceCoreAssignmentEntries
 
-/-! Automatic and explicit Core compilation execute the assignment profiles.
-Snapshot and RHS failure tests need function values, so they also verify the
-FunctionEntry fallback reaches public compilation with source diagnostics. -/
-
+/-! Assignment regressions use public values and opaque checkpoints; the same
+cached artifact supplies source-cell and complete-native-store effect audits. -/
 set_option autoImplicit false
-
 namespace Tests.SourceCompilerAssignments
-
 open Solcore Solcore.Frontend Solcore.Frontend.SourceInference
-open SourceCompiler
+open Tests.SourceCompilerFeatureSupport
 
-private def assertTrue (condition : Bool) (message : String) : IO Unit := do
-  unless condition do throw (IO.userError message)
-
-private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
-private def scalar (value : Nat) : Core.Value := .word (word value)
-private def present (value : Core.Value) : Core.Value := .inRight .unit value
-private def execution : RunOptions := { executionFuel := 30000 }
-
-private def compileNamed (program : CheckedProgram) (name : String)
-    (preference : BackendPreference) : IO CompiledEntry := do
-  let signature ← match program.signatures.functions.filter (·.name == name) with
-    | [signature] => pure signature
-    | _ => throw (IO.userError s!"public assignment fixture missing: {name}")
-  match compileChecked program (.declaration signature.id []) {
-      specializationBudget := 100, stagingFuel := 128, backendPreference := preference } with
-  | .ok compiled =>
-      assertTrue (compiled.backend == .core) "supported assignments did not select Core"
-      pure compiled
-  | .error error => throw (IO.userError s!"public assignment compilation rejected: {reprStr error}")
-
-private def observation (result : Except RunError ExecutionResult) : IO Core.LanguageResult.Observation := do
-  match result with
-  | .ok (.coreLanguageResult result) => pure result
-  | result => throw (IO.userError s!"public assignment lost its Core language result: {reprStr result}")
-
-private def success (compiled : CompiledEntry) (arguments : List Core.Value)
-    (expected : Core.Value) : IO Core.Store := do
-  let completed ← observation (compiled.runCore arguments execution)
-  let store ← match completed with
-    | .succeeded value store =>
-        assertTrue (value == expected) "public assignment changed its result"
-        pure store
-    | result => throw (IO.userError s!"public assignment failed: {reprStr result}")
-  match ← observation (compiled.runCore arguments { execution with executionFuel := 10 }) with
-  | .outOfFuel state =>
-      assertTrue (Core.LanguageResult.observeResult (Core.runStateful 29990 state) == completed)
-        "public assignment resume changed its snapshot or shared heap"
-  | result => throw (IO.userError s!"public assignment lost its checkpoint: {reprStr result}")
-  pure store
+private def success (entry : Entry) (arguments : List Value)
+    (expected : Value) : IO (List SourceTypedRuntime.Cell) := do
+  require ((← entry.run arguments) == expected) "public assignment changed its result"
+  entry.checkResume arguments expected
+  let complete ← entry.audit arguments
+  let pending ← entry.audit arguments 10
+  match ← nativeObservation pending with
+  | .outOfFuel _ => pure ()
+  | _ => throw (IO.userError "native assignment did not suspend")
+  let resumed ← get "native assignment resume" (pending.resume 300000)
+  require ((← nativeObservation resumed) == (← nativeObservation complete))
+    "assignment resume changed its snapshot or complete shared native store"
+  pure (sourceState complete).heap
 
 private def expectedDiagnostic (program : CheckedProgram) (name : String)
     (error : SourceTypedRuntime.RuntimeError) : IO SourceCoreFaultSites.Diagnostic := do
@@ -69,20 +39,31 @@ private def expectedDiagnostic (program : CheckedProgram) (name : String)
   | some (.statement node) => pure { error, site := .occurrence node.id.occurrence, span := some node.span }
   | _ => throw (IO.userError "public assignment diagnostic occurrence missing")
 
-private def failure (compiled : CompiledEntry) (arguments : List Core.Value)
-    (diagnostic : SourceCoreFaultSites.Diagnostic) : IO (Core.Word × Core.Store) := do
-  match ← observation (compiled.runCore arguments execution) with
-  | .failed reason store =>
-      assertTrue (reason != Core.Word.zero && decide (compiled.coreFailureDiagnostic? reason = some diagnostic))
-        "public assignment failure lost its exact source error, occurrence or span"
-      pure (reason, store)
-  | result => throw (IO.userError s!"public assignment lost its failure: {reprStr result}")
+private def failure (entry : Entry) (arguments : List Value)
+    (diagnostic : SourceCoreFaultSites.Diagnostic) : IO (Core.Word × List SourceTypedRuntime.Cell) := do
+  let invocation ← entry.invoke arguments
+  match invocation.outcome with
+  | .failed reason _ =>
+      require (reason != Core.Word.zero && decide ((← invocation.diagnostic reason) = some diagnostic))
+        "assignment failure lost its exact source error, occurrence or span"
+      let audit ← entry.audit arguments
+      match audit.observation with
+      | .fault error state =>
+          require (decide (error = diagnostic.error)) "source observation changed failure priority"
+          pure (reason, state.heap)
+      | _ => throw (IO.userError "source observation lost the assignment failure")
+  | _ => throw (IO.userError "public assignment did not fail")
 
-private def testProfile (program : CheckedProgram) (preference : BackendPreference) : IO Unit := do
-  let operators ← compileNamed program "operators" preference
+private def hasWordCell (heap : List SourceTypedRuntime.Cell) (index : Nat) (expected : Core.Word) : Bool :=
+  match heap[index]? with
+  | some ⟨.word, some (.word actual)⟩ => actual == expected
+  | _ => false
+
+private def testProfile (program : CheckedProgram) : IO Unit := do
+  let operators ← compileNamed program "operators"
   discard <| success operators [scalar 2] (.word (word 8).bitNot)
   discard <| success operators [scalar 5] (.word (word 14).bitNot)
-  discard <| success (← compileNamed program "forOrder" preference) [scalar 3] (.pair (scalar 23) (scalar 3))
+  discard <| success (← compileNamed program "forOrder") [scalar 3] (.product (scalar 23) (scalar 3))
   for (name, error) in ([
       ("absent", .invalidAssignmentOperands .add none (some .word)),
       ("unaryAbsent", .invalidUnaryOperand .bitNot none),
@@ -90,25 +71,25 @@ private def testProfile (program : CheckedProgram) (preference : BackendPreferen
       ("postAbsent", .invalidAssignmentOperands .add none (some .word)),
       ("unaryPostAbsent", .invalidUnaryOperand .bitNot none)] :
       List (String × SourceTypedRuntime.RuntimeError)) do
-    let compiled ← compileNamed program name preference
+    let compiled ← compileNamed program name
     discard <| failure compiled [] (← expectedDiagnostic program name error)
-  let choose ← compileNamed program "choose" preference
+  let choose ← compileNamed program "choose"
   let mut tokens : List Core.Word := []
   for (flag, name, operator) in [(true, "failLeft", Syntax.ValueAssignOp.add), (false, "failRight", .subtract)] do
     let (reason, _) ← failure choose [.bool flag] (← expectedDiagnostic program name
       (.invalidAssignmentOperands operator none (some .word)))
     tokens := reason :: tokens
-  assertTrue (tokens[0]? != tokens[1]?) "public callee assignment failures reused a token"
-  let snapshot ← compileNamed program "snapshot" preference
+  require (tokens[0]? != tokens[1]?) "public callee assignment failures reused a token"
+  let snapshot ← compileNamed program "snapshot"
   let store ← success snapshot [scalar 2] (scalar 5)
-  assertTrue (store[snapshot.inputTypes.length + snapshot.specializationCount]? == some (present (scalar 5)))
+  require (hasWordCell store 0 (word 5))
     "public compound assignment used the latest captured-cell value"
-  let absent ← compileNamed program "snapshotAbsent" preference
+  let absent ← compileNamed program "snapshotAbsent"
   let (_, store) ← failure absent [] (← expectedDiagnostic program "snapshotAbsent"
     (.invalidAssignmentOperands .add none (some .word)))
-  assertTrue (store[absent.specializationCount]? == some (present (scalar 100)))
+  require (hasWordCell store 0 (word 100))
     "public absent-operand failure discarded RHS mutation"
-  let priority ← compileNamed program "failurePriority" preference
+  let priority ← compileNamed program "failurePriority"
   let function ← match program.functions.find? (·.declaration == priority.key.declaration) with
     | some function => pure function
     | none => throw (IO.userError "public RHS failure owner missing")
@@ -121,16 +102,12 @@ private def testProfile (program : CheckedProgram) (preference : BackendPreferen
     | _ => throw (IO.userError "public RHS failure occurrence missing")
   let (_, store) ← failure priority [] {
     error := .uninitializedLocal binder, site := .occurrence node.id.occurrence, span := some node.span }
-  assertTrue (store[priority.specializationCount]? == some (present (scalar 100)))
+  require (hasWordCell store 0 (word 100))
     "public RHS failure lost its preceding mutation"
-  discard <| success (← compileNamed program "captured" preference) [scalar 4] (.pair (scalar 6) (scalar 9))
-  discard <| success (← compileNamed program "functionEqual" preference) [] (scalar 2)
+  discard <| success (← compileNamed program "captured") [scalar 4] (.product (scalar 6) (scalar 9))
+  discard <| success (← compileNamed program "functionEqual") [] (scalar 2)
 
 def run : IO Unit := do
-  let program ← match checkProgram Tests.SourceCoreAssignmentEntries.fixtures with
-    | .ok program => pure program
-    | .error errors => throw (IO.userError s!"public assignment fixtures failed checking: {reprStr errors}")
-  for preference in [BackendPreference.automatic, .core] do
-    testProfile program preference
-
+  let program ← get "assignment fixtures" (checkProgram Tests.SourceCoreAssignmentEntries.fixtures)
+  testProfile program
 end Tests.SourceCompilerAssignments

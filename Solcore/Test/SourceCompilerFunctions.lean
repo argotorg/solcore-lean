@@ -1,13 +1,8 @@
-import Solcore.Frontend.SourceCompiler
+import Solcore.Test.SourceCompilerFeatureSupport
 
 set_option autoImplicit false
-
 namespace Tests.SourceCompilerFunctions
-
-open Solcore Solcore.Frontend SourceCompiler
-
-private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
-private def scalar (value : Nat) : Core.Value := .word (word value)
+open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
@@ -29,63 +24,35 @@ private def workspace : Workspace.RawWorkspace := {
   ] }]
 }
 
-private def assertTrue (condition : Bool) (message : String) : IO Unit := do
-  unless condition do throw (IO.userError message)
-
-private def compileNamed (program : CheckedProgram) (name : String) (preference : BackendPreference) : IO CompiledEntry := do
-  let signature ← match program.signatures.functions.filter (·.name == name) with
-    | [signature] => pure signature
-    | _ => throw (IO.userError s!"{name}: function fixture missing")
-  match compileChecked program (.declaration signature.id [])
-      { backendPreference := preference, specializationBudget := 100, stagingFuel := 200 } with
-  | .ok compiled => pure compiled
-  | .error error => throw (IO.userError s!"{name}: compilation failed: {reprStr error}")
-
-private def execution : RunOptions := { inputValidationFuel := 100, executionFuel := 30000 }
-
 private def testValues (program : CheckedProgram) : IO Unit := do
-  let pair := Core.Value.pair (scalar 4) (scalar 7)
-  for preference in [BackendPreference.automatic, .core] do
-    for (name, expected) in [("named", scalar 3), ("returned", pair), ("shared", pair), ("selfCell", scalar 2)] do
-      let compiled ← compileNamed program name preference
-      assertTrue (compiled.backend == .core) s!"{name}: function program did not select Core"
-      for _ in [0, 1] do
-        match compiled.runCore [scalar 2] execution with
-        | .ok (.coreLanguageResult (.succeeded value _)) =>
-            assertTrue (value == expected) s!"{name}: capture, indirect call or entry reuse changed the value"
-        | result => throw (IO.userError s!"{name}: Core function run failed: {reprStr result}")
-  for name in ["returned", "shared"] do
-    let compiled ← compileNamed program name .typedSource
-    match compiled.runTyped [.word (word 2)] execution with
-    | .ok (.typedSource (.done (.product (.word left) (.word right)) _)) =>
-        assertTrue (left == word 4 && right == word 7) s!"{name}: Core and source capture results differ"
-    | result => throw (IO.userError s!"{name}: source comparison failed: {reprStr result}")
+  let pair : Value := .product (scalar 4) (scalar 7)
+  for (name, expected) in [("named", scalar 3), ("returned", pair), ("shared", pair), ("selfCell", scalar 2)] do
+    let compiled ← compileNamed program name
+    for _ in [0, 1] do
+      require ((← compiled.run [scalar 2]) == expected)
+        s!"{name}: capture, indirect call or cached entry reuse changed"
+    compiled.checkResume [scalar 2] expected
 
 private def testFailure (program : CheckedProgram) : IO Unit := do
-  let compiled ← compileNamed program "failure" .core
+  let compiled ← compileNamed program "failure"
   let function ← match program.functions.find? (·.declaration == compiled.key.declaration) with
-    | some function => pure function
-    | none => throw (IO.userError "failure: source function missing")
+    | some function => pure function | none => throw (IO.userError "failure source function missing")
   let reads := function.typedBody.nodes.filterMap fun
     | .expression node => match node.form with
-        | .reference "f" (.local binder) => some (node, binder)
-        | _ => none
+      | .reference "f" (.local binder) => some (node, binder) | _ => none
     | _ => none
   let (node, binder) ← match reads with
-    | [read] => pure read
-    | _ => throw (IO.userError "failure: function read occurrence missing")
-  match compiled.runCore [] execution with
-  | .ok (.coreLanguageResult (.failed reason _)) =>
-      assertTrue (decide (compiled.coreFailureDiagnostic? reason = some {
+    | [read] => pure read | _ => throw (IO.userError "failure occurrence missing")
+  let invocation ← compiled.invoke []
+  match invocation.outcome with
+  | .failed reason _ =>
+      require (decide ((← invocation.diagnostic reason) = some {
         error := .uninitializedLocal binder, site := .occurrence node.id.occurrence, span := some node.span }))
         "failed indirect callee lost its source occurrence"
-  | result => throw (IO.userError s!"failure: indirect callee did not fail: {reprStr result}")
+  | _ => throw (IO.userError "uninitialized indirect callee did not fail")
 
 def run : IO Unit := do
-  let program ← match checkProgram workspace with
-    | .ok program => pure program
-    | .error errors => throw (IO.userError s!"function fixture failed checking: {reprStr errors}")
+  let program ← get "function checking" (checkProgram workspace)
   testValues program
   testFailure program
-
 end Tests.SourceCompilerFunctions
