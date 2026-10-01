@@ -1,12 +1,33 @@
-import Solcore
-/-! End-to-end regressions for the public source compiler boundary. -/
+import Solcore.Frontend.SourceCoreExecution
+import Solcore.Frontend.SourceCoreRootDiscovery
+import Solcore.Test.SourceCompilerRetainedBoundary
+
+#check_failure Solcore.Frontend.SourceCoreExecution.Options.backendPreference
+#check_failure Solcore.Frontend.SourceCoreExecution.Backend
+#check_failure Solcore.Frontend.SourceCoreExecution.Invocation
+#check_failure Solcore.Frontend.SourceCoreExecution.Compiled.backend
+#check_failure Solcore.Frontend.SourceCoreExecution.Session.runCore
+#check_failure Solcore.Frontend.SourceCoreExecution.Session.runTyped
+#check_failure Solcore.Frontend.SourceCoreExecution.Value.closure
+#check_failure Solcore.Frontend.SourceCoreExecution.Value.cellRef
+#check_failure Solcore.Frontend.SourceCoreExecution.Session.state
+#check_failure Solcore.Frontend.SourceCoreExecution.Session.store
+#check_failure Solcore.Frontend.SourceCoreExecution.Checkpoint.state
+#check_failure Solcore.Frontend.SourceTypedRuntime.run
+
+/-! The public source compiler has one Core/value/session boundary. Root
+metadata, source behavior, ABI discovery and validation are preserved; there is
+no backend choice or native/source invocation mismatch in this API. -/
 set_option autoImplicit false
 namespace Tests.SourceCompiler
-open Solcore Solcore.Frontend Solcore.TypeSystem
-open Solcore.Frontend.SourceCompiler
+open Solcore Solcore.Frontend Solcore.TypeSystem SourceCoreExecution
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
+private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO α
+  | .ok value => pure value
+  | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
+private def scalar (value : Nat) : Value := .word (word value)
 private def moduleId (path : String) : IO Workspace.ModuleId := do
   match Workspace.CanonicalSourcePath.parse path with
   | none => throw (IO.userError s!"invalid test module path `{path}`")
@@ -155,7 +176,7 @@ private def workspace : Workspace.RawWorkspace := {
 }
 
 /-- A compact raw-workspace fixture for automatic entry discovery, exported
-ABI discovery, re-export aliases, and mixed-backend multi-root compilation. -/
+ABI discovery, re-export aliases, and shared-graph multi-root compilation. -/
 private def orchestrationWorkspace : Workspace.RawWorkspace := {
   entry := "api.solc"
   mainSources := [
@@ -183,359 +204,235 @@ private def orchestrationWorkspace : Workspace.RawWorkspace := {
   ]
   externalLibraries := []
 }
-private def compilerOptions : CompileOptions :=
-  { specializationBudget := 32, stagingFuel := 128 }
+private def compilerOptions : Options :=
+  { specializationBudget := 128, compilationFuel := 1000 }
 private def runtimeOptions : RunOptions :=
-  { inputValidationFuel := 64, executionFuel := 150000 }
-private def checkedWorkspace : IO CheckedProgram := do
-  match checkProgram workspace with
-  | .ok checked => pure checked
-  | .error errors => throw (IO.userError
-      s!"compiler fixture failed checking: {reprStr errors}")
-private def compileNamed (checked : CheckedProgram) (path name : String) :
-    IO CompiledEntry := do
+  { inputValidationFuel := 128, executionFuel := 300000, outputValidationFuel := 128 }
+private def boot (artifact : Artifact) : IO (Session artifact) := do
+  let bootstrap ← artifact.bootstrap
+  match bootstrap.resume 300000 with
+  | .ready session => pure session
+  | .error error => throw (IO.userError s!"compiler bootstrap rejected: {reprStr error}")
+  | .outOfFuel _ => throw (IO.userError "compiler bootstrap exhausted")
+private def execute {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value) :
+    IO (Completion artifact) := do
+  match ← session.run key arguments runtimeOptions with
+  | .ok (.succeeded completion) => pure completion
+  | .error error => throw (IO.userError s!"public inputs rejected: {reprStr error}")
+  | .ok (.exportError error _) => throw (IO.userError s!"public output rejected: {reprStr error}")
+  | .ok (.failed token _) => throw (IO.userError s!"unexpected language failure: {reprStr token}")
+  | .ok (.outOfFuel _) => throw (IO.userError "public execution exhausted")
+private structure Entry where
+  compiled : Compiled
+  root : SourceCoreCompiler.Root compiled.plan
+private def Entry.key (entry : Entry) : Key := entry.root.key
+private def Entry.inputTypes (entry : Entry) : List Ty := entry.root.inputTypes
+private def Entry.resultType (entry : Entry) : Ty := entry.root.resultType
+private def entry (compiled : Compiled) (index : Nat := 0) : IO Entry :=
+  match compiled.root? index with
+  | some root => pure ⟨compiled, root⟩
+  | none => throw (IO.userError s!"compiled root missing at {index}")
+private def compileNamed (program : CheckedProgram) (path name : String) : IO Entry := do
   let selectedModule ← moduleId path
-  match compileChecked checked (Seed.named selectedModule name) compilerOptions with
-  | .ok compiled => pure compiled
-  | .error error => throw (IO.userError
-      s!"`{path}.{name}` failed compilation: {reprStr error}")
-private def compileNamedWithBackend (checked : CheckedProgram)
-    (path name : String) (preference : BackendPreference) :
-    IO CompiledEntry := do
-  let selectedModule ← moduleId path
-  let options := { compilerOptions with backendPreference := preference }
-  match compileChecked checked (Seed.named selectedModule name) options with
-  | .ok compiled => pure compiled
-  | .error error => throw (IO.userError
-      (s!"`{path}.{name}` failed compilation for {reprStr preference}: " ++
-        reprStr error))
-private def expectCoreWord (label : String) (expected : Nat) :
-    Except RunError ExecutionResult → IO Unit
-  | .ok (.core (.done (.word actual) [])) =>
-      assertTrue (actual == word expected) s!"{label} returned the wrong Word"
-  | result => throw (IO.userError s!"{label} returned {reprStr result}")
-private def expectTypedWord (label : String) (expected : Nat) :
-    Except RunError ExecutionResult → IO Unit
-  | .ok (.typedSource (.done (.word actual) _)) =>
-      assertTrue (actual == word expected) s!"{label} returned the wrong Word"
-  | result => throw (IO.userError s!"{label} returned {reprStr result}")
-private def expectCoreLanguageWord (label : String) (expected : Nat) :
-    Except RunError ExecutionResult → IO Unit
-  | .ok (.coreLanguageResult (.succeeded (.word actual) _)) =>
-      assertTrue (actual == word expected) s!"{label} returned the wrong Word"
-  | result => throw (IO.userError s!"{label} returned {reprStr result}")
-private def expectCoreInteger (label : String) (expected : Int) :
-    Except RunError ExecutionResult → IO Unit
-  | .ok (.coreLanguageResult (.succeeded (.integer actual) _)) =>
-      assertTrue (actual == expected) s!"{label} returned the wrong integer"
-  | result => throw (IO.userError s!"{label} returned {reprStr result}")
-private def expectTypedGlobal (label : String) :
-    Except RunError ExecutionResult → IO Unit
-  | .ok (.typedSource (.done (.global _ _) _)) => pure ()
-  | result => throw (IO.userError s!"{label} returned {reprStr result}")
-private def expectCoreDeepStage (label : String)
-    (expectedLeft expectedMiddle expectedRight : Nat) :
-    Except RunError ExecutionResult → IO Unit
-  | .ok (.coreLanguageResult (.succeeded
-      (.pair (.word actualLeft)
-        (.pair (.word actualMiddle) (.word actualRight))) _)) =>
-      assertTrue (actualLeft == word expectedLeft &&
-          actualMiddle == word expectedMiddle &&
-          actualRight == word expectedRight)
-        s!"{label} returned the wrong nested staged product"
-  | result => throw (IO.userError s!"{label} returned {reprStr result}")
+  entry (← get s!"compile {path}.{name}" (compileChecked program [SourceCoreCompiler.Seed.named selectedModule name] compilerOptions))
+private def Entry.run (entry : Entry) (arguments : List Value) : IO Value := do
+  let artifact ← entry.compiled.open
+  let session ← boot artifact
+  pure (← execute session entry.key arguments).value
+private def expectWord (label : String) (expected : Nat) (actual : IO Value) : IO Unit := do
+  assertTrue ((← actual) == scalar expected) s!"{label} returned the wrong Word"
 
 private structure PreparedSet where
   checked : CheckedProgram
-  direct : CompiledEntry
-  recursive : CompiledEntry
-  typed : CompiledEntry
+  direct : Entry
+  recursive : Entry
+  pair : Entry
 
-private def testCheckedReuseAndPrecedence : IO PreparedSet := do
-  let checked ← checkedWorkspace
+private def testCheckedReuse : IO PreparedSet := do
+  let checked ← get "compiler checking" (checkProgram workspace)
   let direct ← compileNamed checked "main.solc" "direct"
   let recursive ← compileNamed checked "main.solc" "recurse"
-  let general ← compileNamed checked "main.solc" "visibleAlias"
-  let typed ← compileNamedWithBackend checked "main.solc" "visibleAlias" .typedSource
-  let corePolymorphicLocal ← compileNamed checked "main.solc" "polymorphicLocal"
-  let polymorphicLocal ← compileNamedWithBackend checked "main.solc" "polymorphicLocal" .typedSource
-  let coreNestedPolymorphicLocal ← compileNamed checked "main.solc" "nestedPolymorphicLocal"
-  let nestedPolymorphicLocal ←
-    compileNamedWithBackend checked "main.solc" "nestedPolymorphicLocal" .typedSource
-  let coreRecursiveContextPolymorphicLocal ← compileNamed checked "main.solc" "recursiveContextPolymorphicLocal"
-  let recursiveContextPolymorphicLocal ←
-    compileNamedWithBackend checked "main.solc" "recursiveContextPolymorphicLocal" .typedSource
-  let coreLocalProof ← compileNamed checked "main.solc" "localProof"
-  let localProof ← compileNamedWithBackend checked "main.solc" "localProof" .typedSource
-  let coreEvidence ← compileNamed checked "main.solc" "typedEvidence"
-  let typedEvidence ← compileNamedWithBackend checked "main.solc" "typedEvidence" .typedSource
-  let coreCoercion ← compileNamed checked "main.solc" "typedCoercion"
-  let typedCoercion ← compileNamedWithBackend checked "main.solc" "typedCoercion" .typedSource
-  let coreFunctionFromCoercion ← compileNamed checked "main.solc" "functionFromCoercion"
-  let functionFromCoercion ←
-    compileNamedWithBackend checked "main.solc" "functionFromCoercion" .typedSource
+  let pair ← compileNamed checked "main.solc" "visibleAlias"
   let main ← moduleId "main.solc"
-  assertTrue (decide (
-      direct.backend = .core ∧
-      recursive.backend = .core ∧
-      general.backend = .core ∧
-      typed.backend = .typedSource ∧
-      corePolymorphicLocal.backend = .core ∧
-      coreNestedPolymorphicLocal.backend = .core ∧
-      coreRecursiveContextPolymorphicLocal.backend = .core ∧
-      polymorphicLocal.backend = .typedSource ∧
-      nestedPolymorphicLocal.backend = .typedSource ∧
-      recursiveContextPolymorphicLocal.backend = .typedSource ∧
-      coreLocalProof.backend = .core ∧
-      localProof.backend = .typedSource ∧
-      coreEvidence.backend = .core ∧
-      coreCoercion.backend = .core ∧
-      coreFunctionFromCoercion.backend = .core ∧
-      typedEvidence.backend = .typedSource ∧
-      typedCoercion.backend = .typedSource ∧
-      functionFromCoercion.backend = .typedSource))
-    s!"automatic backend precedence changed: {reprStr [direct.backend, recursive.backend, general.backend, typed.backend, corePolymorphicLocal.backend, coreNestedPolymorphicLocal.backend, coreRecursiveContextPolymorphicLocal.backend, localProof.backend, coreEvidence.backend, coreCoercion.backend, coreFunctionFromCoercion.backend]}"
-  assertTrue (decide (
-      direct.key.declaration.moduleId = main ∧
-      recursive.key.declaration.moduleId = main ∧
-      typed.key.declaration.moduleId = main ∧
-      direct.key.arguments = [] ∧ recursive.key.arguments = [] ∧
-      typed.key.arguments = []))
-    "compiled roots lost their canonical module or ground arguments"
-  assertTrue (decide (
-      direct.inputTypes = [.word] ∧ direct.resultType = .word ∧
+  assertTrue (decide (direct.key.declaration.moduleId = main ∧ recursive.key.declaration.moduleId = main ∧
+      pair.key.declaration.moduleId = main ∧ direct.key.arguments = [] ∧ recursive.key.arguments = [] ∧ pair.key.arguments = []))
+    "compiled roots lost canonical module or ground arguments"
+  assertTrue (decide (direct.inputTypes = [.word] ∧ direct.resultType = .word ∧
       recursive.inputTypes = [.word] ∧ recursive.resultType = .word ∧
-      typed.inputTypes = [.product .word .word] ∧ typed.resultType = .word))
-    "backend-independent source signature metadata changed"
-  assertTrue (direct.specializationCount == 1 &&
-      recursive.specializationCount == 1 && typed.specializationCount == 1)
-    "a single-function fixture retained an unexpected specialization plan"
-  assertTrue (polymorphicLocal.specializationCount == 3)
-    "local polymorphism did not retain its root and two generic helper instances"
-  assertTrue (nestedPolymorphicLocal.specializationCount == 3)
-    "depth-2 local polymorphism did not retain its root and two generic helper instances"
-  assertTrue (recursiveContextPolymorphicLocal.specializationCount == 3)
-    "recursive local contexts did not retain their root and two generic helper instances"
-  assertTrue (localProof.specializationCount == 3)
-    "local proof calls did not retain their root and two constrained helper instances"
-  assertTrue (typedEvidence.specializationCount == 3)
-    "typed evidence forwarding did not retain root, relay, and callee"
-  let polymorphicRequest ←
-    match SourceProgramExecution.resolveSeed checked
-        (Seed.named main "polymorphicLocal") with
-    | .ok request => pure request
-    | .error error => throw (IO.userError
-        s!"polymorphic-local seed resolution failed: {reprStr error}")
-  match SourceSpecializationWorklist.run checked [polymorphicRequest]
-      compilerOptions.specializationBudget with
-  | .ok (.complete plan) =>
-      assertTrue (plan.specializations.length == 3 && plan.callEdges.length == 2)
-        "local polymorphism did not discover both contextual generic calls"
-  | result => throw (IO.userError
-      s!"polymorphic-local plan reconstruction failed: {reprStr result}")
-  let nestedPolymorphicRequest ←
-    match SourceProgramExecution.resolveSeed checked
-        (Seed.named main "nestedPolymorphicLocal") with
-    | .ok request => pure request
-    | .error error => throw (IO.userError
-        s!"depth-2 polymorphic-local seed resolution failed: {reprStr error}")
-  match SourceSpecializationWorklist.run checked [nestedPolymorphicRequest]
-      compilerOptions.specializationBudget with
-  | .ok (.complete plan) =>
-      let edges := plan.callEdges.filter fun edge =>
-        decide (edge.caller = nestedPolymorphicLocal.key)
-      assertTrue (decide (
-          plan.specializations.length = 3 ∧
-          plan.callEdges.length = 2 ∧
-          edges.length = 2 ∧
-          (edges.map (·.occurrence)).eraseDups.length = 1 ∧
-          (edges.map (·.callee.arguments)).contains [.word] ∧
-          (edges.map (·.callee.arguments)).contains [.bool]))
-        "depth-2 local polymorphism did not discover two contextual generic calls"
-  | result => throw (IO.userError
-      s!"depth-2 polymorphic-local plan reconstruction failed: {reprStr result}")
-  let recursiveContextRequest ←
-    match SourceProgramExecution.resolveSeed checked
-        (Seed.named main "recursiveContextPolymorphicLocal") with
-    | .ok request => pure request
-    | .error error => throw (IO.userError
-        s!"recursive-context seed resolution failed: {reprStr error}")
-  match SourceSpecializationWorklist.run checked [recursiveContextRequest]
-      compilerOptions.specializationBudget with
-  | .ok (.complete plan) =>
-      let edges := plan.callEdges.filter fun edge =>
-        decide (edge.caller = recursiveContextPolymorphicLocal.key)
-      assertTrue (decide (
-          plan.specializations.length = 3 ∧
-          plan.callEdges.length = 2 ∧
-          edges.length = 2 ∧
-          (edges.map (·.occurrence)).eraseDups.length = 1 ∧
-          (edges.map (·.callee.arguments)).contains [.word] ∧
-          (edges.map (·.callee.arguments)).contains [.bool]))
-        "recursive local contexts did not discover two contextual generic calls"
-  | result => throw (IO.userError
-      s!"recursive-context plan reconstruction failed: {reprStr result}")
-  expectCoreLanguageWord "automatic nominal Core root" 12 <|
-    general.runCore [.pair (.word (word 4)) (.word (word 5))] runtimeOptions
-  expectCoreWord "direct Core root" 14 <|
-    direct.runCore [.word (word 7)] runtimeOptions
-  expectCoreWord "reused direct Core root" 18 <|
-    direct.runCore [.word (word 9)] runtimeOptions
-  match direct.runCore [.word (word 4)] runtimeOptions [.bool true] with
-  | .ok (.core (.done (.word actual) [.bool retained])) =>
-      assertTrue (actual == word 8 && retained)
-        "direct Core execution did not retain its supplied store"
-  | result => throw (IO.userError
-      s!"direct Core execution changed its exact state: {reprStr result}")
-  expectCoreLanguageWord "automatic recursive Core root" 31 <|
-    recursive.runCore [.word (word 3)] runtimeOptions
-  let explicitTypedRecursive ← compileNamedWithBackend checked "main.solc" "recurse" .typedSource
-  expectTypedWord "explicit recursive typed root" 31 <|
-    explicitTypedRecursive.runTyped [.word (word 3)] runtimeOptions
-  expectTypedWord "imported alias typed root" 12 <|
-    typed.runTyped [.product (.word (word 7)) (.word (word 8))] runtimeOptions
-  match polymorphicLocal.runTyped [.bool true] runtimeOptions with
-  | .ok (.typedSource (.done
-      (.product (.word actualWord) (.bool actualBool)) _)) =>
-      assertTrue (actualWord == word 11 && actualBool)
-        "runtime let-polymorphism did not independently instantiate Word and Bool"
-  | result => throw (IO.userError
-      s!"runtime let-polymorphism returned {reprStr result}")
-  match nestedPolymorphicLocal.runTyped [.bool true] runtimeOptions with
-  | .ok (.typedSource (.done
-      (.product (.word actualWord) (.bool actualBool)) _)) =>
-      assertTrue (actualWord == word 13 && actualBool)
-        "runtime depth-2 let-polymorphism did not independently instantiate Word and Bool"
-  | result => throw (IO.userError
-      s!"runtime depth-2 let-polymorphism returned {reprStr result}")
-  match recursiveContextPolymorphicLocal.runTyped [.bool true] runtimeOptions with
-  | .ok (.typedSource (.done
-      (.product (.word actualWord) (.bool actualBool)) _)) =>
-      assertTrue (actualWord == word 15 && actualBool)
-        "runtime recursive local contexts did not instantiate Word and Bool"
-  | result => throw (IO.userError
-      s!"runtime recursive local contexts returned {reprStr result}")
-  match localProof.runTyped [.bool true] runtimeOptions with
-  | .ok (.typedSource (.done
-      (.product (.word actualWord) (.bool actualBool)) _)) =>
-      assertTrue (actualWord == word 2 && actualBool)
-        "runtime local proof calls did not retain Word/Bool results"
-  | result => throw (IO.userError
-      s!"runtime local proof calls returned {reprStr result}")
-  expectTypedWord "public typed evidence forwarding" 73 <|
-    typedEvidence.runTyped [.word (word 73)] runtimeOptions
-  expectTypedWord "public stateful coercion (true)" 42 <|
-    typedCoercion.runTyped [.bool true] runtimeOptions
-  expectTypedWord "public stateful coercion (false)" 8 <|
-    typedCoercion.runTyped [.bool false] runtimeOptions
-  expectTypedGlobal "public method-discovered function result" <|
-    functionFromCoercion.runTyped [.word (word 1)] runtimeOptions
-  pure { checked, direct, recursive, typed }
+      pair.inputTypes = [.product .word .word] ∧ pair.resultType = .word))
+    "compiled roots lost source signature metadata"
+  assertTrue (direct.compiled.plan.specializations.length == 1 && recursive.compiled.plan.specializations.length == 1 &&
+    pair.compiled.plan.specializations.length == 1) "single-function plan gained specializations"
+  let artifact ← direct.compiled.open
+  let session ← boot artifact
+  let first ← execute session direct.key [scalar 7]
+  let second ← execute first.session direct.key [scalar 9]
+  assertTrue (first.value == scalar 14 && second.value == scalar 18)
+    "reusing one cached artifact/session changed direct results"
+  expectWord "recursive source root" 31 (recursive.run [scalar 3])
+  expectWord "imported nominal alias" 12 (pair.run [.product (scalar 7) (scalar 8)])
+  for (name, expected) in [("polymorphicLocal", 11), ("nestedPolymorphicLocal", 13), ("recursiveContextPolymorphicLocal", 15)] do
+    let compiled ← compileNamed checked "main.solc" name
+    assertTrue (compiled.compiled.plan.specializations.length == 3) s!"{name}: local generic instances changed"
+    let edges := compiled.compiled.plan.callEdges.filter (fun edge => decide (edge.caller = compiled.key))
+    assertTrue (compiled.compiled.plan.callEdges.length == 2 && edges.length == 2 &&
+      (edges.map (·.occurrence)).eraseDups.length == 1 &&
+      (edges.map (·.callee.arguments)).contains [.word] && (edges.map (·.callee.arguments)).contains [.bool])
+      s!"{name}: contextual Word/Bool calls disappeared"
+    assertTrue ((← compiled.run [.bool true]) == .product (scalar expected) (.bool true))
+      s!"{name}: local instantiation result changed"
+  let proof ← compileNamed checked "main.solc" "localProof"
+  assertTrue (proof.compiled.plan.specializations.length == 3 &&
+    (← proof.run [.bool true]) == .product (scalar 2) (.bool true)) "local evidence specialization changed"
+  let evidence ← compileNamed checked "main.solc" "typedEvidence"
+  assertTrue (evidence.compiled.plan.specializations.length == 3) "evidence frontier lost root/relay/callee"
+  expectWord "evidence forwarding" 73 (evidence.run [scalar 73])
+  let coercion ← compileNamed checked "main.solc" "typedCoercion"
+  expectWord "stateful coercion true" 42 (coercion.run [.bool true])
+  expectWord "stateful coercion false" 8 (coercion.run [.bool false])
+  let returned ← compileNamed checked "main.solc" "functionFromCoercion"
+  match ← returned.run [scalar 1] with
+  | .function handle => assertTrue (handle.sourceType == .function .word .word) "coercion lost returned function type"
+  | _ => throw (IO.userError "method-discovered function was not exported as an owned handle")
+  pure ⟨checked, direct, recursive, pair⟩
 
-/-- An explicit preference selects exactly the requested runtime, while all
-public backends agree on the same closed source computation. -/
-private def testExplicitBackendAgreement (checked : CheckedProgram) : IO Unit := do
-  let core ← compileNamedWithBackend checked "main.solc" "direct" .core
-  let typed ← compileNamedWithBackend checked "main.solc" "direct" .typedSource
-  assertTrue (decide (core.backend = .core ∧ typed.backend = .typedSource))
-    "an explicit backend preference selected a different runtime"
-  expectCoreWord "explicit direct-Core agreement" 14 <|
-    core.runCore [.word (word 7)] runtimeOptions
-  expectTypedWord "explicit typed-source agreement" 14 <|
-    typed.runTyped [.word (word 7)] runtimeOptions
+private def testInputBoundary (prepared : PreparedSet) : IO Unit := do
+  let artifact ← prepared.pair.compiled.open
+  let session ← boot artifact
+  match session.start prepared.pair.key [.bool true] 128 with
+  | .error {code := .compatible {code := .sourceTypeMismatch (.product .word .word) .bool, ..}, ..} => pure ()
+  | _ => throw (IO.userError "public value mismatch lost exact expected/actual types")
+  let pair : Value := .product (scalar 7) (scalar 8)
+  for fuel in [0, 1] do
+    match session.start prepared.pair.key [pair] fuel with
+    | .error {code := .compatible {code := .exhausted, ..}, ..} => pure ()
+    | _ => throw (IO.userError "public deep input validation ignored its budget")
+  match session.start prepared.pair.key [] 128 with
+  | .error {code := .argumentCountMismatch 1 0, ..} => pure ()
+  | _ => throw (IO.userError "public input arity mismatch was accepted")
+  let checkpoint ← get "public typed checkpoint" (session.start prepared.pair.key [pair] 128)
+  let paused ← match ← checkpoint.resume 0 128 with
+    | .outOfFuel paused => pure paused | _ => throw (IO.userError "execution fuel was not independent of validation")
+  match ← paused.resume 300000 128 with
+  | .succeeded completion => assertTrue (completion.value == scalar 12) "resume changed nominal source result"
+  | _ => throw (IO.userError "validated public checkpoint failed to resume")
+  -- Rejection never changes the caller's persistent session.
+  assertTrue ((← execute session prepared.pair.key [pair]).value == scalar 12)
+    "input rejection changed reusable session state"
 
-private def abiRootNamed (compiled : CompiledStaticWordProgram)
-    (name : String) : IO CompiledStaticWordRoot :=
-  match compiled.roots.find? fun root => root.metadata.name.text == name with
+private def testCapabilities (checked : CheckedProgram) : IO Unit := do
+  let cases : List (String × List Ty × Ty × List Value × Value) := [
+      ("constrained", [.word], .word, [scalar 19], scalar 19),
+      ("staged", [.word], .word, [scalar 23], scalar 23),
+      ("stagedType", [.comptime .word], .word, [scalar 29], scalar 1),
+      ("integerResult", [], .integer, [], .integer 1),
+      ("nestedStaged", [.product .word (.comptime .word)], .word, [.product (scalar 2) (scalar 3)], scalar 1),
+      ("nestedComptime", [.product (.comptime .word) (.product .word (.comptime .word))],
+        .product (.comptime .word) (.product .word (.comptime .word)),
+        [.product (scalar 4) (.product (scalar 5) (scalar 6))], .product (scalar 4) (.product (scalar 5) (scalar 6))),
+      ("integerBitAnd", [], .integer, [], .integer 1),
+      ("integerBitXor", [], .integer, [], .integer 6),
+      ("integerBitOr", [], .integer, [], .integer 7),
+      ("integerBitNot", [], .integer, [], .integer (-6)),
+      ("markedEffects", [.word], .word, [scalar 9], scalar 12),
+      ("markedEffectsEntry", [], .word, [], scalar 12)]
+  for (name, inputTypes, resultType, arguments, expected) in cases do
+    let compiled ← compileNamed checked "blocked.solc" name
+    assertTrue (compiled.inputTypes == inputTypes && compiled.resultType == resultType)
+      s!"{name}: raw public source signature metadata changed"
+    assertTrue ((← compiled.run arguments) == expected) s!"{name}: staged/evidence/Integer behavior changed"
+
+private def testCompilationErrors (checked : CheckedProgram) : IO Unit := do
+  let main ← moduleId "main.solc"
+  let missing := SourceCoreCompiler.Seed.named main "missing"
+  match compileChecked checked [missing] compilerOptions with
+  | .error (.compilation (.seed 0 actual (.unknownName owner "missing"))) =>
+      assertTrue (decide (actual = missing ∧ owner = main)) "seed rejection lost its original request"
+  | _ => throw (IO.userError "unknown public root did not report its seed error")
+  match compileChecked checked [SourceCoreCompiler.Seed.named main "direct"]
+      {compilerOptions with specializationBudget := 0} with
+  | .error (.compilation (.specializationBudgetExhausted next pending)) =>
+      assertTrue (next.declaration.moduleId == main && pending > 0) "shared specialization budget lost its frontier"
+  | _ => throw (IO.userError "zero shared specialization budget was accepted")
+  let blocked ← moduleId "blocked.solc"
+  match compileChecked checked [SourceCoreCompiler.Seed.named blocked "blocked"] compilerOptions with
+  | .error (.compilation (.planEvidence (.executableCoercionMethod _ _ _ (.missingTraitMethod _ "coerce")))) => pure ()
+  | _ => throw (IO.userError "unavailable coercion method escaped the one compiler's plan validation")
+  match compileChecked checked [SourceCoreCompiler.Seed.named blocked "dependent"] compilerOptions with
+  | .error (.compilation (.planEvidence (.stagedExpressionType _ .integer))) => pure ()
+  | _ => throw (IO.userError "dependent staged Integer escaped plan validation")
+  let invalid : Workspace.RawWorkspace := {
+    entry := "broken.solc", externalLibraries := [],
+    mainSources := [{path := "broken.solc", content := "function broken(value: Word returns (Word) { return value; }"}] }
+  match compile invalid [SourceCoreCompiler.Seed.named (← moduleId "broken.solc") "broken"] compilerOptions with
+  | .error (.compilation (.checking (_ :: _))) => pure ()
+  | _ => throw (IO.userError "malformed source escaped checking precedence")
+  match compile invalid [] compilerOptions with
+  | .error (.compilation (.checking (_ :: _))) => pure ()
+  | _ => throw (IO.userError "empty roots bypassed raw source checking")
+
+private def abiRootNamed (abi : StaticWordProgram) (name : String) : IO (StaticWordRoot abi.compiled) :=
+  match abi.roots.find? (fun root => root.metadata.name.text == name) with
   | some root => pure root
-  | none => throw (IO.userError s!"missing compiled ABI root `{name}`")
+  | none => throw (IO.userError s!"missing compiled ABI root {name}")
 
-/-- Exercise raw entry discovery, ordered/duplicate multi-root artifacts,
-mixed automatic backend selection, exported ABI aliases, and selector lookup. -/
+/-- Roots share one graph budget; public order and duplicates remain observable.
+ABI discovery still uses exported source names and canonical declarations. -/
 private def testProgramOrchestration : IO Unit := do
   let api ← moduleId "api.solc"
   let provider ← moduleId "provider.solc"
-  let entry ← match compileEntry orchestrationWorkspace with
-    | .ok entry => pure entry
-    | .error error => throw (IO.userError
-        s!"automatic main compilation failed: {reprStr error}")
-  assertTrue (entry.backend == .core && entry.inputTypes.isEmpty &&
-      entry.resultType == .word && entry.key.declaration.moduleId == api)
-    "automatic main discovery lost its entry module, signature, or backend"
-  expectCoreWord "automatic workspace main" 17 <|
-    entry.runCore [] runtimeOptions
-
-  let checked ← match checkProgram orchestrationWorkspace with
-    | .ok checked => pure checked
-    | .error errors => throw (IO.userError
-        s!"orchestration fixture failed checking: {reprStr errors}")
-  let requested := [
-    Seed.named provider "twice",
-    Seed.named provider "recursive",
-    Seed.named provider "twice"
-  ]
-  let many ← match compileManyChecked checked requested compilerOptions with
-    | .ok compiled => pure compiled
-    | .error error => throw (IO.userError
-        s!"checked multi-root compilation failed: {reprStr error}")
-  match many.entries with
+  let main ← entry (← get "conventional main" (compileEntry orchestrationWorkspace compilerOptions))
+  assertTrue (main.inputTypes.isEmpty && main.resultType == .word && main.key.declaration.moduleId == api)
+    "main discovery lost its entry module or signature"
+  expectWord "conventional workspace main" 17 (main.run [])
+  let checked ← get "orchestration checking" (checkProgram orchestrationWorkspace)
+  let requested := [SourceCoreCompiler.Seed.named provider "twice", .named provider "recursive", .named provider "twice"]
+  let many ← get "checked shared roots" (compileChecked checked requested compilerOptions)
+  match many.roots with
   | [first, second, third] =>
-      assertTrue (decide (many.count = 3 ∧
-          many.backends = [.core, .core, .core] ∧
-          many.usesMixedBackends = false ∧
-          first.key = third.key ∧ first.key ≠ second.key))
-        "multi-root order, duplicates, or Core backend selection changed"
-  | entries => throw (IO.userError
-      s!"multi-root compilation returned {entries.length} entries")
-  match compileManyChecked checked
-      [Seed.named provider "twice", Seed.named provider "missing"]
-      compilerOptions with
-  | .error failure =>
-      assertTrue (decide (failure.index = 1 ∧
-          failure.seed = Seed.named provider "missing"))
-        "multi-root failure lost its exact request position or seed"
-  | .ok _ => throw (IO.userError "missing second root compiled successfully")
+      assertTrue (many.rootCount == 3 && first.key == third.key && first.key != second.key &&
+        decide (many.roots.map (·.seed) = requested)) "root order or duplicate requests changed"
+  | _ => throw (IO.userError "shared compilation changed root count")
+  match compileChecked checked [SourceCoreCompiler.Seed.named provider "twice", .named provider "missing"] compilerOptions with
+  | .error (.compilation (.seed 1 actual (.unknownName owner "missing"))) =>
+      assertTrue (decide (actual = SourceCoreCompiler.Seed.named provider "missing" ∧ owner = provider))
+        "missing second root lost request position or metadata"
+  | _ => throw (IO.userError "missing second root changed its seed diagnostic")
+  let rawMany ← get "raw shared roots" (compile orchestrationWorkspace requested compilerOptions)
+  assertTrue (rawMany.keys == many.keys) "raw compilation changed ordered canonical roots"
+  let one : Options := {compilerOptions with specializationBudget := 1}
+  match compileChecked checked [SourceCoreCompiler.Seed.named provider "twice", .named api "local"] one with
+  | .error (.compilation (.specializationBudgetExhausted _ pending)) =>
+      assertTrue (pending > 0) "shared budget failure lost the unfinished frontier"
+  | _ => throw (IO.userError "two distinct roots incorrectly received independent graph budgets")
+  let duplicate ← get "duplicate root shared budget" (compileChecked checked
+    [SourceCoreCompiler.Seed.named provider "twice", .named provider "twice"] one)
+  assertTrue (duplicate.rootCount == 2 && duplicate.plan.specializations.length == 1)
+    "duplicate requests consumed separate specialization budgets"
 
-  let rawMany ← match compileMany orchestrationWorkspace requested with
-    | .ok compiled => pure compiled
-    | .error error => throw (IO.userError
-        s!"raw multi-root compilation failed: {reprStr error}")
-  assertTrue (rawMany.backends == [.core, .core, .core] &&
-      !rawMany.usesMixedBackends)
-    "raw compile-many did not preserve Core per-root selection"
-
-  let abi ← match compileStaticWord orchestrationWorkspace with
-    | .ok compiled => pure compiled
-    | .error error => throw (IO.userError
-        s!"Static Word root compilation failed: {reprStr error}")
-  assertTrue (abi.count == 3 && !abi.usesMixedBackends)
-    "Static Word discovery lost an exported root or Core backend"
+  let abi ← get "Static Word roots" (compileStaticWord orchestrationWorkspace compilerOptions)
+  assertTrue (abi.count == 3) "ABI discovery lost an exported root"
   let doubled ← abiRootNamed abi "doubled"
   let localRoot ← abiRootNamed abi "local"
   let recursive ← abiRootNamed abi "recursive"
-  assertTrue (decide (
-      doubled.entry.key.declaration.moduleId = provider ∧
-      localRoot.entry.key.declaration.moduleId = api ∧
-      recursive.entry.key.declaration.moduleId = provider ∧
-      doubled.entry.backend = .core ∧ localRoot.entry.backend = .core ∧
-      recursive.entry.backend = .core ∧
-      (abi.roots.find? fun root =>
-        root.metadata.name.text == "hidden").isNone ∧
-      (abi.roots.find? fun root =>
-        root.metadata.name.text == "providerOnly").isNone))
-    "ABI export/alias/module filtering or backend selection changed"
+  assertTrue (doubled.root.key.declaration.moduleId == provider &&
+    localRoot.root.key.declaration.moduleId == api && recursive.root.key.declaration.moduleId == provider &&
+    (abi.roots.find? (fun root => root.metadata.name.text == "hidden")).isNone &&
+    (abi.roots.find? (fun root => root.metadata.name.text == "providerOnly")).isNone)
+    "ABI alias/module/export filtering changed"
+  let discovered ← get "independent ABI discovery" (SourceCoreRootDiscovery.discoverStaticWordRoots checked api)
+  assertTrue (abi.roots.map (·.metadata.name.text) == discovered.map (·.metadata.name.text))
+    "compilation reordered discovered ABI roots"
   match abi.rootForSelector? doubled.metadata.selector with
-  | some selected =>
-      assertTrue (selected.metadata.name.text == "doubled")
-        "selector lookup returned a different ABI root"
-  | none => throw (IO.userError "selector lookup lost an admitted ABI root")
-  expectCoreWord "exported ABI alias" 14 <|
-    doubled.entry.runCore [.word (word 7)] runtimeOptions
-  expectCoreWord "exported local ABI root" 8 <|
-    localRoot.entry.runCore [.word (word 7)] runtimeOptions
-  expectCoreLanguageWord "exported recursive ABI root" 31 <|
-    recursive.entry.runCore [.word (word 3)] runtimeOptions
-
+  | some selected => assertTrue (selected.metadata.name.text == "doubled") "selector lookup chose another root"
+  | none => throw (IO.userError "selector lookup lost an admitted root")
+  let artifact ← abi.compiled.open
+  let session ← boot artifact
+  let first ← execute session doubled.root.key [scalar 7]
+  let second ← execute first.session localRoot.root.key [scalar 7]
+  let third ← execute second.session recursive.root.key [scalar 3]
+  assertTrue (first.value == scalar 14 && second.value == scalar 8 && third.value == scalar 31)
+    "ABI alias/local/recursive results changed in the shared session"
   let missingMain : Workspace.RawWorkspace := {
     entry := "missing.solc"
     mainSources := [{
@@ -546,7 +443,7 @@ private def testProgramOrchestration : IO Unit := do
   }
   let missingModule ← moduleId "missing.solc"
   match compileEntry missingMain with
-  | .error (.seed (.unknownName actual "main")) =>
+  | .error (.compilation (.seed 0 _ (.unknownName actual "main"))) =>
       assertTrue (actual == missingModule)
         "automatic entry failure lost its canonical module"
   | .error error => throw (IO.userError
@@ -614,312 +511,42 @@ private def testProgramOrchestration : IO Unit := do
   | .ok _ => throw (IO.userError
       "colliding ABI selectors were silently accepted")
 
-private def testTypedBoundary (prepared : PreparedSet) : IO Unit := do
-  let pair : SourceTypedRuntime.Value :=
-    .product (.word (word 7)) (.word (word 8))
-  match prepared.typed.runTyped [.bool true] runtimeOptions with
-  | .ok (.typedSource (.fault (.typeMismatch expected actual) state)) =>
-      assertTrue (decide (
-          expected = Ty.product .word .word ∧ actual = some Ty.bool) &&
-          state.heap.isEmpty)
-        "typed input rejection changed its type or mutated the heap"
-  | result => throw (IO.userError
-      s!"ill-typed public source input was accepted: {reprStr result}")
-  let shallowValidation : RunOptions :=
-    { inputValidationFuel := 1, executionFuel := 4096 }
-  match prepared.typed.runTyped [pair] shallowValidation with
-  | .ok (.typedSource (.fault
-      (.inputValidationFuelExhausted expected 1) state)) =>
-      assertTrue (decide (expected = Ty.product .word .word) &&
-          state.heap.isEmpty)
-        "typed validation exhaustion lost its expected type or initial heap"
-  | result => throw (IO.userError
-      s!"typed input validation exhaustion was misclassified: {reprStr result}")
-  let malformedInitial : SourceTypedRuntime.RuntimeState := {
-    heap := [{ type := .word, value := some (.bool true) }]
-  }
-  match prepared.typed.runTyped [pair] runtimeOptions malformedInitial with
-  | .ok (.typedSource (.fault
-      .deepSafetyInitialStateRejected finalState)) =>
-      match finalState.heap with
-      | [{ type := .word, value := some (.bool retained) }] =>
-          assertTrue retained
-            "deep initial-state rejection changed the supplied heap"
-      | heap => throw (IO.userError
-          s!"deep initial-state rejection mutated the supplied heap: {reprStr heap}")
-  | result => throw (IO.userError
-      s!"malformed initial heap crossed the deep boundary: {reprStr result}")
-  let shallowExecution : RunOptions :=
-    { inputValidationFuel := 64, executionFuel := 1 }
-  match prepared.typed.runTyped [pair] shallowExecution with
-  | .ok (.typedSource (.outOfFuel state)) =>
-      assertTrue state.heap.isEmpty
-        "Core suspension before parameter allocation leaked an administrative cell"
-  | result => throw (IO.userError
-      s!"typed execution fuel was not independent: {reprStr result}")
-  match prepared.typed.runCore [.word (word 7)] runtimeOptions with
-  | .error (.invocationKindMismatch .typedSource .coreValues) => pure ()
-  | result => throw (IO.userError
-      s!"a Core-domain invocation crossed the typed backend: {reprStr result}")
-  match prepared.direct.runTyped [] runtimeOptions with
-  | .error (.invocationKindMismatch .core .typedValues) => pure ()
-  | result => throw (IO.userError
-      s!"a typed invocation crossed the direct Core backend: {reprStr result}")
-  match prepared.direct.runCore [.bool true] runtimeOptions with
-  | .error (.coreInputTypesMismatch [.word] [.bool]) => pure ()
-  | result => throw (IO.userError
-      s!"direct Core input mismatch lost its public category: {reprStr result}")
-  let retainedState : SourceTypedRuntime.RuntimeState := {
-    heap := [{ type := .word, value := some (.word (word 99)) }]
-  }
-  match prepared.typed.runTyped [pair] runtimeOptions retainedState with
-  | .ok (.typedSource (.done (.word actual) finalState)) =>
-      match finalState.heap with
-      | { type := .word, value := some (.word retained) } :: _ =>
-          assertTrue (actual == word 12 && retained == word 99)
-            "deep execution changed a pre-existing cell or the source result"
-      | heap => throw (IO.userError
-          s!"deep execution did not preserve the initial type layout: {reprStr heap}")
-  | result => throw (IO.userError
-      s!"valid nonempty initial heap failed the deep boundary: {reprStr result}")
-  let zeroValidation : RunOptions := {
-    inputValidationFuel := 0
-    executionFuel := 4096
-  }
-  match prepared.typed.runTyped [pair] zeroValidation retainedState with
-  | .ok (.typedSource (.fault
-      (.inputValidationFuelExhausted expected 0) finalState)) =>
-      match finalState.heap with
-      | [{ type := .word, value := some (.word retained) }] =>
-          assertTrue (decide (expected = Ty.product .word .word) &&
-              retained == word 99)
-            "zero validation fuel changed the expected type or initial heap"
-      | heap => throw (IO.userError
-          s!"validation rejection mutated the supplied heap: {reprStr heap}")
-  | result => throw (IO.userError
-      s!"zero validation fuel changed public behavior: {reprStr result}")
-
+/-- Checking, graph preparation, bootstrap, input validation and execution use
+separate budgets. Suspension retains an opaque, reusable checkpoint. -/
 private def testOneShotLimits : IO Unit := do
   let main ← moduleId "main.solc"
-  let limits : Limits := {
-    backendPreference := .typedSource
-    checkingFuel := 1024
-    specializationBudget := 32
-    stagingFuel := 128
-    inputValidationFuel := 64
-    executionFuel := 1
-  }
-  match SourceCompiler.run workspace (Seed.named main "visibleAlias")
-      (Invocation.typedFresh [
-        .product (.word (word 7)) (.word (word 8))]) limits with
-  | .ok (.typedSource (.outOfFuel state)) =>
-      assertTrue state.heap.isEmpty
-        "one-shot Core suspension leaked an administrative cell"
-  | result => throw (IO.userError
-      s!"one-shot compiler boundary returned {reprStr result}")
+  let compiled ← get "limited raw preparation" (compile workspace [SourceCoreCompiler.Seed.named main "visibleAlias"]
+    {checkingFuel := 1024, specializationBudget := 32, compilationFuel := 128})
+  let root ← entry compiled
+  let artifact ← compiled.open
+  let bootstrap ← artifact.bootstrap
+  let bootstrap ← match bootstrap.resume 0 with
+    | .outOfFuel checkpoint => pure checkpoint
+    | _ => throw (IO.userError "zero bootstrap budget failed to suspend")
+  let session ← match bootstrap.resume 300000 with
+    | .ready session => pure session
+    | _ => throw (IO.userError "bootstrap did not resume")
+  match ← session.run root.key [.product (scalar 7) (scalar 8)]
+      {inputValidationFuel := 64, executionFuel := 1, outputValidationFuel := 128} with
+  | .ok (.outOfFuel checkpoint) =>
+      match ← checkpoint.resume 300000 128 with
+      | .succeeded done => assertTrue (done.value == scalar 12) "limited invocation changed resumed result"
+      | _ => throw (IO.userError "limited invocation did not resume")
+  | _ => throw (IO.userError "execution budget was conflated with validation or preparation")
 
-private def testBackendDiagnostics (checked : CheckedProgram) : IO Unit := do
-  let blocked ← moduleId "blocked.solc"
-  let main ← moduleId "main.solc"
-  let coreOptions := {
-    compilerOptions with backendPreference := .core
-  }
-  let recursive ← compileNamedWithBackend checked "main.solc" "recurse" .core
-  expectCoreLanguageWord "forced recursive Core root" 31 <|
-    recursive.runCore [.word (word 3)] runtimeOptions
-  match compileChecked checked (Seed.named main "visibleAlias") coreOptions with
-  | .ok compiled =>
-      assertTrue (compiled.backend == .core) "forced nominal Core root changed its backend"
-      expectCoreLanguageWord "forced nominal Core root" 12 <|
-        compiled.runCore [.pair (.word (word 7)) (.word (word 8))] runtimeOptions
-  | .error error => throw (IO.userError
-      s!"forced nominal Core compilation failed: {reprStr error}")
-  match compileChecked checked (Seed.named main "polymorphicLocal") coreOptions with
-  | .error error => throw (IO.userError s!"forced polymorphic Core failed: {reprStr error}")
-  | .ok compiled =>
-      assertTrue (compiled.backend == .core) "local polymorphism did not select Core"
-      match compiled.runCore [.bool true] runtimeOptions with
-      | .ok (.coreLanguageResult (.succeeded (.pair (.word value) (.bool flag)) _)) =>
-          assertTrue (value == word 11 && flag) "forced polymorphic Core result changed"
-      | result => throw (IO.userError s!"forced polymorphic Core run failed: {reprStr result}")
-  match compileChecked checked (Seed.named blocked "blocked") compilerOptions with
-  | .error (.noBackend [
-      .core directError,
-      .typedSource typedSourceError
-    ]) =>
-      match directError with
-      | .sourceCore _ => pure ()
-      | error => throw (IO.userError
-          s!"direct rejection lost its source-Core category: {reprStr error}")
-      match typedSourceError with
-      | .executableCoercionMethod _ _ _
-          (.missingTraitMethod _ "coerce") => pure ()
-      | error => throw (IO.userError
-          s!"typed rejection lost its evidence diagnostic: {reprStr error}")
-  | .error error => throw (IO.userError
-      s!"automatic backend rejection changed category: {reprStr error}")
-  | .ok compiled => throw (IO.userError
-      s!"an unsupported root selected {reprStr compiled.backend}")
-private def typedRejection (checked : CheckedProgram) (name : String) :
-    IO SourceTypedRuntime.RuntimeError := do
-  let blocked ← moduleId "blocked.solc"
-  let typedOptions := {
-    compilerOptions with backendPreference := .typedSource
-  }
-  match compileChecked checked (Seed.named blocked name) typedOptions with
-  | .error (.backendRejected (.typedSource error)) => pure error
-  | .error error => throw (IO.userError
-      s!"`{name}` changed rejection stage: {reprStr error}")
-  | .ok compiled => throw (IO.userError
-      s!"`{name}` bypassed staging through {reprStr compiled.backend}")
-
-private def testTypedCapabilityBoundary (checked : CheckedProgram) : IO Unit := do
-  let coreConstrained ← compileNamed checked "blocked.solc" "constrained"
-  let constrained ← compileNamedWithBackend checked "blocked.solc" "constrained" .typedSource
-  let staged ← compileNamed checked "blocked.solc" "staged"
-  let stagedTyped ← compileNamedWithBackend checked "blocked.solc" "staged" .typedSource
-  let stagedType ← compileNamed checked "blocked.solc" "stagedType"
-  let integerResult ← compileNamed checked "blocked.solc" "integerResult"
-  let nestedStaged ← compileNamed checked "blocked.solc" "nestedStaged"
-  let nestedComptime ←
-    compileNamed checked "blocked.solc" "nestedComptime"
-  let integerBitAnd ← compileNamed checked "blocked.solc" "integerBitAnd"
-  let integerBitXor ← compileNamed checked "blocked.solc" "integerBitXor"
-  let integerBitOr ← compileNamed checked "blocked.solc" "integerBitOr"
-  let integerBitNot ← compileNamed checked "blocked.solc" "integerBitNot"
-  let markedEffects ←
-    compileNamed checked "blocked.solc" "markedEffects"
-  let markedEffectsEntry ←
-    compileNamed checked "blocked.solc" "markedEffectsEntry"
-  assertTrue (decide (
-      coreConstrained.backend = .core ∧
-      constrained.backend = .typedSource ∧
-      staged.backend = .core ∧
-      stagedTyped.backend = .typedSource ∧
-      stagedType.backend = .core ∧
-      integerResult.backend = .core ∧
-      nestedStaged.backend = .core ∧
-      nestedComptime.backend = .core ∧
-      integerBitAnd.backend = .core ∧
-      integerBitXor.backend = .core ∧
-      integerBitOr.backend = .core ∧
-      integerBitNot.backend = .core ∧
-      markedEffects.backend = .core ∧
-      markedEffectsEntry.backend = .core))
-    "staged capability cases selected an unexpected backend"
-  assertTrue (decide (
-      constrained.inputTypes = [.word] ∧ constrained.resultType = .word ∧
-      staged.inputTypes = [.word] ∧ staged.resultType = .word ∧
-      stagedType.inputTypes = [.comptime .word] ∧
-      stagedType.resultType = .word ∧
-      integerResult.inputTypes = [] ∧
-      integerResult.resultType = .integer ∧
-      nestedStaged.inputTypes = [.product .word (.comptime .word)] ∧
-      nestedStaged.resultType = .word ∧
-      nestedComptime.inputTypes = [
-        .product (.comptime .word)
-          (.product .word (.comptime .word))] ∧
-      nestedComptime.resultType =
-        .product (.comptime .word)
-          (.product .word (.comptime .word)) ∧
-      integerBitAnd.inputTypes = [] ∧ integerBitAnd.resultType = .integer ∧
-      integerBitXor.inputTypes = [] ∧ integerBitXor.resultType = .integer ∧
-      integerBitOr.inputTypes = [] ∧ integerBitOr.resultType = .integer ∧
-      integerBitNot.inputTypes = [] ∧ integerBitNot.resultType = .integer ∧
-      markedEffects.inputTypes = [.word] ∧
-      markedEffects.resultType = .word ∧
-      markedEffectsEntry.inputTypes = [] ∧
-      markedEffectsEntry.resultType = .word))
-    "staged capability cases lost their source signature metadata"
-  expectTypedWord "ground constrained public root" 19 <|
-    constrained.runTyped [.word (word 19)] runtimeOptions
-  match staged.runCore [.word (word 23)] runtimeOptions with
-  | .ok (.coreLanguageResult (.succeeded (.word actual) [.inRight .unit (.word stored)])) =>
-      assertTrue (actual == word 23 && stored == word 23)
-        "marked public Core input lost its exact value or input cell"
-  | result => throw (IO.userError s!"marked public input did not use prepared Core: {reprStr result}")
-  expectTypedWord "explicit typed-source marked public input" 23 <|
-    stagedTyped.runTyped [.word (word 23)] runtimeOptions
-  expectCoreLanguageWord "structural comptime input" 1 <|
-    stagedType.runCore [.word (word 29)] runtimeOptions
-  expectCoreInteger "integer result" 1 <|
-    integerResult.runCore [] runtimeOptions
-  expectCoreLanguageWord "nested comptime input" 1 <|
-    nestedStaged.runCore
-      [.pair (.word (word 2)) (.word (word 3))] runtimeOptions
-  match ← typedRejection checked "dependent" with
-  | .stagedExpressionType _ type =>
-      assertTrue (decide (type = Ty.integer))
-        "runtime-dependent staged expression lost its Integer type"
-  | error => throw (IO.userError
-      s!"runtime-dependent staged expression changed rejection: {reprStr error}")
-  expectCoreDeepStage "recursively erased comptime product" 4 5 6 <|
-    nestedComptime.runCore [
-      .pair (.word (word 4))
-        (.pair (.word (word 5)) (.word (word 6)))] runtimeOptions
-  expectCoreInteger "integer bitwise and" 1 <|
-    integerBitAnd.runCore [] runtimeOptions
-  expectCoreInteger "integer bitwise xor" 6 <|
-    integerBitXor.runCore [] runtimeOptions
-  expectCoreInteger "integer bitwise or" 7 <|
-    integerBitOr.runCore [] runtimeOptions
-  expectCoreInteger "integer bitwise not" (-6) <|
-    integerBitNot.runCore [] runtimeOptions
-  expectCoreLanguageWord "marked closure/mutation/mapping" 12 <|
-    markedEffects.runCore [.word (word 9)] runtimeOptions
-  expectCoreLanguageWord "effectful staged call" 12 <|
-    markedEffectsEntry.runCore [] runtimeOptions
-
-private def testPublicCompilationErrors (checked : CheckedProgram) : IO Unit := do
-  let main ← moduleId "main.solc"
-  match compileChecked checked (Seed.named main "missing") compilerOptions with
-  | .error (.seed (.unknownName actual "missing")) =>
-      assertTrue (decide (actual = main))
-        "unknown-name compilation error lost its module"
-  | .error error => throw (IO.userError
-      s!"unknown public root changed error category: {reprStr error}")
-  | .ok compiled => throw (IO.userError
-      s!"unknown public root selected {reprStr compiled.backend}")
-  let noSpecializations : CompileOptions :=
-    { specializationBudget := 0, stagingFuel := 128 }
-  match compileChecked checked (Seed.named main "direct") noSpecializations with
-  | .error (.specializationBudgetExhausted next pendingCount) =>
-      assertTrue (decide (next.declaration.moduleId = main) && pendingCount > 0)
-        "specialization exhaustion lost its frontier"
-  | .error error => throw (IO.userError
-      s!"specialization budget changed error category: {reprStr error}")
-  | .ok compiled => throw (IO.userError
-      s!"zero specialization budget selected {reprStr compiled.backend}")
-
-private def testCheckingFailurePrecedence : IO Unit := do
-  let invalid : Workspace.RawWorkspace := {
-    entry := "broken.solc"
-    mainSources := [{
-      path := "broken.solc"
-      content := "function broken(value: Word returns (Word) { return value; }"
-    }]
-    externalLibraries := []
-  }
-  let brokenModule ← moduleId "broken.solc"
-  match compile invalid (Seed.named brokenModule "broken") with
-  | .error (.checking (_ :: _)) => pure ()
-  | .error error => throw (IO.userError
-      s!"malformed source escaped the checking phase: {reprStr error}")
-  | .ok compiled => throw (IO.userError
-      s!"malformed source selected {reprStr compiled.backend}")
-
-/-- Exercise compile-once reuse, exact backend selection, whole-program root
-discovery, exact results, staged execution, and public-boundary hardening. -/
+/-- Durable runtime, root, ABI, evidence, staging and boundary regressions use
+one compiler and one owned-value session API. -/
 def testSourceCompiler : IO Unit := do
-  let prepared ← testCheckedReuseAndPrecedence
-  testExplicitBackendAgreement prepared.checked
+  let prepared ← testCheckedReuse
   testProgramOrchestration
-  testTypedBoundary prepared
+  testInputBoundary prepared
   testOneShotLimits
-  testBackendDiagnostics prepared.checked
-  testTypedCapabilityBoundary prepared.checked
-  testPublicCompilationErrors prepared.checked
-  testCheckingFailurePrecedence
+  testCapabilities prepared.checked
+  testCompilationErrors prepared.checked
+  let main ← moduleId "main.solc"
+  let blocked ← moduleId "blocked.solc"
+  SourceCompilerRetainedBoundary.run prepared.checked
+    (SourceCoreCompiler.Seed.named main "visibleAlias") (SourceCoreCompiler.Seed.named main "direct")
+    (SourceCoreCompiler.Seed.named blocked "blocked") (SourceCoreCompiler.Seed.named blocked "dependent")
   IO.println "public source compiler integration GREEN"
-
 end Tests.SourceCompiler
