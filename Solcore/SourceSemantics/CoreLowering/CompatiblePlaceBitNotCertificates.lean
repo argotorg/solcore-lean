@@ -7,7 +7,7 @@ namespace Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCertificates
 open Core Frontend SourceInference SourceCoreCompatibleDataPlaces DataPatternValues
 open DataPlaceCertificates CompatibleMixedRoute CompatiblePlaceCompilerCertificates
 
-theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Context}
+theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Context} {definitions : DataEnvironment}
     {source : TypedSource} {context : SourceSemantics.Context} {site : SourceCoreElaboration.ErrorSite}
     {assignment : AssignmentResolution} {route : Route} {prepared : Prepared}
     {fuel : Nat} {invalid : Word} {missing : TypeSystem.Ty → Word}
@@ -26,14 +26,14 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext)
       (execute prepared reference (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalidOperand)
-      resultType compilation.checked.catalog.definitions)
+      resultType definitions)
     (rhsTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) rhs
-      (LanguageResult.resultType .unit) compilation.checked.catalog.definitions) :
+      (LanguageResult.resultType .unit) definitions) :
     ∃ binder leaf sourceTypes,
       rootBinder source assignment.target.root = .ok binder ∧
       prepared.route.rootSourceType = binder.scheme.body ∧
       SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type ∧
-      CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext .unit ∧
+      CompatiblePlaceAssignmentSuccess.Layout (definitions := definitions) compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext .unit ∧
       ((∀ k v, prepared.route.rootSourceType ≠ .mapping k v) → prepared.route.rootMapping = none) := by
   obtain ⟨binder, leaf, description⟩ := CompatiblePlaceDescription.of_describe described
   obtain ⟨routeEq, _, path⟩ := description.prepared preparedBy
@@ -62,7 +62,7 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
 
 /-- Actual `rhs := none` compilation fixes the Unit RHS, with no source
 expression invented for that administrative value. -/
-theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
+theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definitions : DataEnvironment}
     {source : TypedSource} {context : SourceSemantics.Context} {site : SourceCoreElaboration.ErrorSite}
     {assignment : AssignmentResolution} {fuel : Nat} {expression : ExpressionLowerer} {scope : Scope}
     {reasonAt : ExpressionId → Word} {operator : Syntax.ValueAssignOp}
@@ -76,7 +76,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none outputType
       next reasonAt invalid invalidOperand missing = .ok lowered)
-    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType compilation.checked.catalog.definitions) :
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType definitions) :
     ∃ binder leaf prepared codes sourceTypes index,
       (∃ route, describe compilation compilation.checked.signatures source site assignment = .ok route ∧
         prepare compilation fuel route invalid missing = .ok prepared) ∧
@@ -84,7 +84,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       prepared.route.rootSourceType = binder.scheme.body ∧
       SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type ∧
       SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, prepared.route.rootType) ∧
-      CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext .unit ∧
+      CompatiblePlaceAssignmentSuccess.Layout (definitions := definitions) compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext .unit ∧
       ((∀ k v, prepared.route.rootSourceType ≠ .mapping k v) → prepared.route.rootMapping = none) ∧
       (prepared.route.leafType = .word ∨ prepared.route.leafType = .integer) ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) (LanguageResult.success .unit) next outputType

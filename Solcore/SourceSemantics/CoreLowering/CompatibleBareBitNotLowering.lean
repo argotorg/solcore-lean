@@ -10,7 +10,8 @@ open Core Frontend SourceInference GeneralHeap GenericExpressionMeaning
 open CompatiblePayload CompatibleEquality CompatibleHeap SourceCoreCompatibleDataPlaces
 
 variable {compilation : SourceCoreCompatibleDataPlaces.Context}
-  {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+  {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
   {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
   {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
   {faults : FaultRep} {assignment : AssignmentResolution} {administrativeContext : Core.Context}
@@ -26,7 +27,7 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context}
     SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
   {identities : Dynamic.Value → Word → Prop}
   (observations : FunctionObservations compilation.checked.catalog functions identities)
-  (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+  (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
   (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
 

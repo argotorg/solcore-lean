@@ -11,7 +11,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap DataEquality
 open SourceCoreCompatibleDataPlaces DataPlaceExecution CompatibleBareBitNotCertificates
 
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {prepared : Prepared} {mapping : LocationMap} {world : StoreTyping}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {prepared : Prepared} {mapping : LocationMap} {world : StoreTyping}
   {heap : Dynamic.Heap} {store : Store} {location : Dynamic.Location} {target : Location}
 
 private theorem nonmapping {type : TypeSystem.Ty}
@@ -76,7 +77,8 @@ theorem initialized_commit (layout : Layout prepared)
 /-- Every live bare numeric root has exactly one generated phase: an absent
 operand failure, or a source snapshot update with a real native commit. -/
 theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {functions : FunctionModel compilation.checked.catalog}
+    {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {administrativeContext : Core.Context}
     {place : PlaceResolution} {environment : Dynamic.Environment} {coreEnvironment : Environment}
@@ -86,7 +88,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world heap store)
     (locals : Dynamic.EnvironmentAgrees heap context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))

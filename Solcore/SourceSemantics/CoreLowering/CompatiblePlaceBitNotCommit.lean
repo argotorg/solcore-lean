@@ -11,7 +11,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute Co
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
-    (functions : FunctionModel checked.catalog) (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr)
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    (functions : FunctionModel checked.catalog ambient) (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr)
     (environment : Environment) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (target : Location) (keys : List Value) (snapshot : Value) (before after : Dynamic.Heap)
     (updated : Dynamic.Value) (operator : Option BinaryOp) (invalid : Word) where
@@ -59,19 +60,20 @@ private theorem resolved_nonempty {checked : Checked} {source : TypedSource} {si
 /-- Consume an independent snapshot write and derive its actual native
 modifier, latest-root reconstruction and single mapped store update. -/
 theorem of_write_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before selectedHeap after : Dynamic.Heap} {store : Store} {target : Dynamic.ResolvedPlace} {updated : Dynamic.Value}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared codes sourceTypes place leaf target
       coreEnvironment store mapping world before selectedHeap)
     (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)
@@ -117,7 +119,7 @@ theorem of_write_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
           (.inRight .unit resolution.snapshot) .unit replacementValue coreEnvironment)
         (prepared.route.leafType :: .unit :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
           OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
-        compilation.checked.catalog.definitions :=
+        ambient.definitions :=
       .cons replacementRep.runtime_hasType (.cons .unit (.cons (.inRight snapshotRep.runtime_hasType)
         (.cons (CompatiblePlaceResolution.values_typed keyRep) (.cons (.cellRef reference.typed)
           ((environments.extend resolution.maps resolution.worlds).runtime_hasTypes)))))
@@ -135,19 +137,20 @@ theorem of_write_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
 
 /-- Word-only compatibility API. -/
 theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
     {administrativeContext : Core.Context}
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (profile : SourceCoreRawMetadata.runtimeType leaf = .word)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before selectedHeap after : Dynamic.Heap} {store : Store} {target : Dynamic.ResolvedPlace} {updated : Dynamic.Value}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared codes sourceTypes place leaf target
       coreEnvironment store mapping world before selectedHeap)
     (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)

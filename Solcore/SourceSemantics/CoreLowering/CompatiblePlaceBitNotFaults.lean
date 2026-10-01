@@ -13,7 +13,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute Co
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 variable {compilation : SourceCoreCompatibleDataPlaces.Context}
-  {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+  {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
   {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
   {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
   {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
@@ -25,7 +26,8 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context}
   {resolved : List Dynamic.EvaluatedProjection}
 
 theorem keys {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {program : Program} {context : SourceSemantics.Context}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
@@ -34,7 +36,7 @@ theorem keys {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {coreEnvironment : Environment} {before after : Dynamic.Heap} {store : Store}
     {sourceLocation : Dynamic.Location} {cell : Dynamic.Cell} {index : Nat} {reason : Dynamic.SemanticFault}
-    (environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -67,9 +69,9 @@ theorem keys {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
 /-- Independent structural failure determines the actual whole emitted
 assignment's failure before its RHS, modifier, setter or continuation starts. -/
 theorem projection
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -130,7 +132,7 @@ theorem projection
   have typedEnvironment : RuntimeEnvironmentHasTypes keys.keyWorld
       (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
       ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
-        (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) compilation.checked.catalog.definitions :=
+        (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) ambient.definitions :=
     .cons (CompatiblePlaceResolution.values_typed keys.related)
       (.cons (.cellRef keys.reference.typed) ((environments.extend keys.maps keys.worlds).runtime_hasTypes))
   obtain ⟨finalWorld, extension, typedStore, _, frame⟩ :=
@@ -145,9 +147,9 @@ theorem projection
 /-- Actual describe supplies `ordinary`. It is a static route fact, not a
 claim that native type equality recovers the source declaration. -/
 theorem uninitialized
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -200,7 +202,7 @@ theorem uninitialized
 administrative RHS. Typed live locals exclude dangling/unbound roots; an
 accepted successful projected read supplies an initialized numeric snapshot. -/
 theorem preserves_numeric
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
@@ -210,7 +212,7 @@ theorem preserves_numeric
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     (profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
@@ -270,7 +272,7 @@ theorem preserves_numeric
 
 /-- Word-only compatibility API. -/
 theorem preserves
-    (layout : CompatiblePlaceAssignmentSuccess.Layout compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext .unit)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
@@ -280,7 +282,7 @@ theorem preserves
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     (profile : SourceCoreRawMetadata.runtimeType leaf = .word)
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))

@@ -39,7 +39,8 @@ theorem native_reflects (value : Int) {environment : Environment} {snapshot rhs 
   exact ⟨(evaluation_deterministic completed evaluated).1, (evaluation_deterministic completed evaluated).2, applies⟩
 
 theorem compatible_success {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop}
     (observations : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {type : Ty} {source : Dynamic.Value} {value : Value}

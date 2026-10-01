@@ -8,7 +8,8 @@ namespace Solcore.SourceSemantics.CoreLowering.CompatiblePlaceNumericBitNotModif
 open Core Frontend GeneralHeap CompatiblePayload CompatibleEquality SourceCoreCompatibleDataPlaces
 
 theorem success {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-    {functions : FunctionModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
     {identities : Dynamic.Value → Word → Prop}
     (observations : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {type : Ty} {source : Dynamic.Value} {value : Value}

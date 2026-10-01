@@ -33,7 +33,8 @@ private theorem excludes_target_fault {program : Program} {context : SourceSeman
     exact nonempty rfl
 
 theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {administrativeContext : Core.Context}
     {place : PlaceResolution} {prepared : Prepared} {mapping : LocationMap} {world : StoreTyping}
@@ -44,7 +45,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))

@@ -11,7 +11,8 @@ open CompatiblePayload CompatibleEquality CompatibleHeap CompatibleMixedRoute
 open SourceCoreCompatibleDataPlaces
 
 theorem reflects_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {assignment : AssignmentResolution}
@@ -28,7 +29,7 @@ theorem reflects_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none outputType
       next reasonAt invalid invalidOperand missing = .ok lowered)
-    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType compilation.checked.catalog.definitions)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType ambient.definitions)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : Reflects (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
     (functionTypes : FunctionRuntimeViews functions)
@@ -43,7 +44,7 @@ theorem reflects_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {result : Value}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (completed : Evaluates coreEnvironment store lowered result finalStore) :
@@ -63,7 +64,8 @@ theorem reflects_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
 
 /-- Word-only compatibility API. -/
 theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel compilation.checked.catalog}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {assignment : AssignmentResolution}
@@ -80,7 +82,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none outputType
       next reasonAt invalid invalidOperand missing = .ok lowered)
-    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType compilation.checked.catalog.definitions)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType ambient.definitions)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : Reflects (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
     (functionTypes : FunctionRuntimeViews functions)
@@ -94,7 +96,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (operatorProfile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {result : Value}
-    (environments : DataHeap.EnvRepresents (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (completed : Evaluates coreEnvironment store lowered result finalStore) :

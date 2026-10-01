@@ -9,7 +9,8 @@ open Core Frontend SourceInference GeneralHeap DataPatternValues CompatiblePaylo
 open SourceCoreCompatibleDataPlaces DataPlaceExecution
 
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
-  {functions : FunctionModel checked.catalog} {prepared : Prepared} {codes : List SourceCoreBasic.LoweredExpr}
+  {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {prepared : Prepared} {codes : List SourceCoreBasic.LoweredExpr}
   {environment : Environment} {store : Store} {mapping : LocationMap} {world : StoreTyping}
   {target : Location} {keys : List Value} {snapshot : Value} {before after : Dynamic.Heap}
   {updated : Dynamic.Value} {operator : Option BinaryOp} {invalid : Word}

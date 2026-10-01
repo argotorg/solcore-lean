@@ -132,7 +132,8 @@ theorem actual_lower_reflects {code : Expr}
   have binding : ∀ actual, rootBinder source assignment.target.root = .ok actual → actual = binder := by
     intro actual found
     exact Except.ok.inj (found.symm.trans (show rootBinder source assignment.target.root = .ok binder by cbv))
-  have reflected := CompatiblePlaceBitNotLowerReflection.reflects_numeric (certificate := Child)
+  have reflected := CompatiblePlaceBitNotLowerReflection.reflects_numeric (compilation := compilation)
+    (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
     unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _))
     (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment])
     (fun id code accepted => let ⟨node, found, child, _⟩ := childReceipt id code accepted; ⟨node, found, child⟩) accepted typed
