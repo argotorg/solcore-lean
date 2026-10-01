@@ -232,6 +232,12 @@ theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
     exact assignment_preserves functions extension program evidence uninitialized missing faithful observations
       found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped trace
 
+  | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
+    intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
+      environments heaps locals agrees actualTyped reference read unmapped trace
+    exact CompatibleBitNotStatements.assignment_preserves functions program evidence observations
+      found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialIH restIH =>
     intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped trace
@@ -254,6 +260,10 @@ theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
   | @initializerAssign context scope assignment operator rhs rest body condition post statements expected type head remaining remainingErrors headErrors ih =>
     obtain ⟨header, errors⟩ := ih
     exact ⟨.assign head header, .assign (head := head) errors headErrors⟩
+
+  | @initializerBitNot context scope assignment rest body condition post statements expected type head remaining remainingErrors headErrors ih =>
+    obtain ⟨header, errors⟩ := ih
+    exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
 include definitions registered extension uninitialized missing faithful observations in
 theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
@@ -410,6 +420,12 @@ theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique
     exact assignment_reflects functions extension program evidence uninitialized missing faithful observations functionTypes
       found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
 
+  | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
+    intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+      environments heaps locals agrees actualTyped reference read unmapped evaluated
+    exact CompatibleBitNotStatements.assignment_reflects functions program evidence observations
+      found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialIH restIH =>
     intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
       environments heaps locals agrees actualTyped reference read unmapped evaluated
@@ -432,6 +448,10 @@ theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique
   | @initializerAssign context scope assignment operator rhs rest body condition post statements expected type head remaining remainingErrors headErrors ih =>
     obtain ⟨header, errors⟩ := ih
     exact ⟨.assign head header, .assign (head := head) errors headErrors⟩
+
+  | @initializerBitNot context scope assignment rest body condition post statements expected type head remaining remainingErrors headErrors ih =>
+    obtain ⟨header, errors⟩ := ih
+    exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
 include definitions registered extension uninitialized missing faithful observations in
 theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}

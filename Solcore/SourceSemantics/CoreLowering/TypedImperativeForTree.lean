@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
 import Solcore.SourceSemantics.CoreLowering.TypedForHeaderPost
 import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.LoopExecution
@@ -242,6 +243,15 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
         context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type))
 
 
+  | bitNot {context scope mode id node assignment rest expected type body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
+      (head : CompatibleBitNotStatements.Head context scope assignment)
+      (remaining : Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative
+        context scope (.statements mode rest) expected type body) :
+      Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative
+        context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type))
+
+
   | forLoop {context scope mode id node initializer condition post statements rest expected type initialCode body}
       (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initializer condition post statements)
       (initial : Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative context scope (.initializers initializer condition post statements) expected type initialCode)
@@ -299,6 +309,13 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
         context scope (.initializers rest condition post statements) expected type body) :
       Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative
         context scope (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type))
+
+  | initializerBitNot {context scope assignment rest body condition post statements expected type}
+      (head : CompatibleBitNotStatements.Head context scope assignment)
+      (remaining : Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative
+        context scope (.initializers rest condition post statements) expected type body) :
+      Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative
+        context scope (.initializers (.assignBitNot assignment :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type))
 
 namespace Tree
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
@@ -411,6 +428,16 @@ inductive Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionC
       (headErrors : head.Errors registry faults)
       : Errors registry faults (.assign found form head remaining)
 
+  | bitNot {context scope mode id node assignment rest expected type body}
+      {found : source.lookupStatement? id = some node}
+      {form : node.form = .assignBitNot assignment}
+      {head : CompatibleBitNotStatements.Head context scope assignment}
+      {remaining : Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative
+        context scope (.statements mode rest) expected type body}
+      (remainingErrors : Errors registry faults remaining)
+      (headErrors : head.Errors faults)
+      : Errors registry faults (.bitNot found form head remaining)
+
   | forLoop {context scope mode id node initializer condition post statements rest expected type initialCode body}
       {found : source.lookupStatement? id = some node} {form : node.form = .forLoop initializer condition post statements}
       {initial : Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative context scope (.initializers initializer condition post statements) expected type initialCode}
@@ -470,5 +497,12 @@ inductive Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionC
       (remainingErrors : Errors registry faults remaining)
       (headErrors : head.Errors registry faults)
       : Errors registry faults (.initializerAssign head remaining)
+  | initializerBitNot {context scope assignment rest body condition post statements expected type}
+      {head : CompatibleBitNotStatements.Head context scope assignment}
+      {remaining : Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative
+        context scope (.initializers rest condition post statements) expected type body}
+      (remainingErrors : Errors registry faults remaining)
+      (headErrors : head.Errors faults)
+      : Errors registry faults (.initializerBitNot head remaining)
 end Tree
 end Solcore.SourceSemantics.CoreLowering.TypedImperativeFor

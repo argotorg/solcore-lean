@@ -180,4 +180,17 @@ theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval)
       exact reflected.prepend (.assignValue trace) maps worlds preservation metadata
 
+  | @bitNot context scope assignment rest body head remaining remainingErrors headErrors ih =>
+    rcases head.reflects functions program evidence observations
+      environments heaps locals agrees actualTyped headErrors evaluated with
+      ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata⟩ |
+      ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, remainingEval⟩
+    · exact .fault (.head (.assignBitNot trace)) rfl matched finalHeaps maps worlds preservation metadata
+    · have reflected := ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+        (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+        ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+        (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+        (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval)
+      exact reflected.prepend (.assignBitNot trace) maps worlds preservation metadata
+
 end Solcore.SourceSemantics.CoreLowering.TypedForHeader

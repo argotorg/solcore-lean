@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeMeaning
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeCertificates
 
@@ -98,6 +99,13 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
       Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative type continuation
         context scope (.assignValue assignment operator rhs :: rest) (head.emit body (LocalLoop.controlType type))
 
+  | bitNot {context scope assignment rest body}
+      (head : CompatibleBitNotStatements.Head context scope assignment)
+      (remaining : Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative type continuation
+        context scope rest body) :
+      Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative type continuation
+        context scope (.assignBitNot assignment :: rest) (head.emit body (LocalLoop.controlType type))
+
 namespace Tree
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
@@ -155,5 +163,12 @@ inductive Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionC
       (remainingErrors : Errors registry faults remaining)
       (headErrors : head.Errors registry faults)
       : Errors registry faults (.assign head remaining)
+  | bitNot {context scope assignment rest body}
+      {head : CompatibleBitNotStatements.Head context scope assignment}
+      {remaining : Tree layouts owner active frame globals onError readFuel values source solved reasonAt definitions administrative type continuation
+        context scope rest body}
+      (remainingErrors : Errors registry faults remaining)
+      (headErrors : head.Errors faults)
+      : Errors registry faults (.bitNot head remaining)
 end Tree
 end Solcore.SourceSemantics.CoreLowering.TypedForHeader

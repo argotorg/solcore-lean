@@ -126,6 +126,14 @@ theorem Tree.control_shapeAt {context : SourceSemantics.Context} {scope : Scope}
     · exact ih tail
     · obtain ⟨_, rfl, _⟩ := ScalarStatementViews.assignValue unique contains form first
       cases terminal
+  | @bitNot context scope mode id node assignment rest expected type body found form head remaining ih =>
+    intro program actualContext finalContext evidence environment before after outcome executed
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, _, tail⟩ | ⟨first, terminal⟩
+    · exact ih tail
+    · obtain ⟨_, rfl, _⟩ := CompatibleBitNotStatements.bitNot_view unique contains form first
+      cases terminal
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialIH restIH =>
     intro program actualContext finalContext evidence environment before after outcome executed
     have contains := lookupStatement?_sound found
@@ -136,7 +144,7 @@ theorem Tree.control_shapeAt {context : SourceSemantics.Context} {scope : Scope}
       rcases for_control_shape loop with ⟨next, rfl⟩ | ⟨value, rfl⟩
       · exact .fallthrough environment
       · exact .returned value
-  | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign => trivial
+  | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot => trivial
 
 theorem Tree.control_shape {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}

@@ -163,6 +163,21 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
         exact (prefixAgreement body (LocalLoop.controlType type)).trans (by
           simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using agreement)
 
+  | @bitNot context scope assignment rest body head remaining ih =>
+    cases trace with | cons first rest =>
+      cases first with | assignBitNot assigned =>
+        obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
+          head.preserves_prefix functions program evidence observations
+            environments heaps locals agrees actualTyped assigned
+        obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, agreement⟩ :=
+          ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+            (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 rest
+        refine ⟨tail, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata, ?_⟩
+        exact (prefixAgreement body (LocalLoop.controlType type)).trans (by
+          simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using agreement)
+
 include definitions registered extension uninitialized missing faithful observations in
 theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
@@ -275,6 +290,26 @@ theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {s
       cases first with | assignValue assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions extension program evidence valid unique uninitialized missing faithful observations
+            environments heaps locals agrees actualTyped assigned
+        obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata⟩ :=
+          ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+            (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 rest
+        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata⟩
+        exact (prefixAgreement body (LocalLoop.controlType type)).wrap (by
+          simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using completed)
+
+  | @bitNot context scope assignment rest body head remaining remainingErrors headErrors ih =>
+    cases trace with
+    | head failed =>
+      cases failed with | assignBitNot failed =>
+        exact head.preserves_fault functions program evidence observations
+          environments heaps locals agrees headErrors failed body (LocalLoop.controlType type)
+    | tail first rest =>
+      cases first with | assignBitNot assigned =>
+        obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
+          head.preserves_prefix functions program evidence observations
             environments heaps locals agrees actualTyped assigned
         obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata⟩ :=
           ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
