@@ -192,6 +192,7 @@ import Solcore.Test.SourceCoreTypedForHeader
 import Solcore.Test.SourceCoreCallableIndexedRetainedNamedValues
 import Solcore.Test.SourceCoreBuiltinLexicalStatements
 import Solcore.Test.SourceCoreBuiltinAssignmentStatements
+import Solcore.Test.SourceCoreBuiltinForHeader
 import Solcore.Test.SourceCoreCallableIndexedLambdaValues
 import Solcore.Test.SourceCoreTypedImperativeFor
 import Solcore.Test.SourceCoreCompatibleRenamedBareBitNot
@@ -199,10 +200,13 @@ import Solcore.Test.SourceCoreBuiltinNamedCalls
 import Solcore.Test.SourceCoreCompatiblePatternProofs
 import Solcore.Test.SourceCoreCompatibleCompositePatterns
 import Solcore.Test.SourceCoreCompatibleMatchArmAllocations
+import Solcore.Test.SourceCoreCompatibleMatchPrefixes
 import Solcore.Test.SourceCoreTypedImperativeForUnary
 import Solcore.Test.SourceCoreCallableIndexedLambdaCalls
 import Solcore.Test.SourceCoreCallableIndexedLambdaViewCalls
 import Solcore.Test.SourceCoreCallableLambdaViewEdits
+import Solcore.Test.SourceCoreCallableLambdaViewBodyTree
+import Solcore.Test.SourceCoreProtectedNamedAssignments
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
 import Solcore.Test.SourceCoreProtectedNamedPlaces
 import Solcore.Test.SourceSemanticsIntegerBitNot
@@ -2567,6 +2571,7 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallableIndexedRetainedNamedValues.run
   SourceCoreBuiltinLexicalStatements.run
   SourceCoreBuiltinAssignmentStatements.run
+  SourceCoreBuiltinForHeader.run
   SourceCoreCallableIndexedLambdaValues.run
   SourceCoreTypedImperativeFor.run
   SourceCoreCompatibleRenamedBareBitNot.run
@@ -2574,10 +2579,13 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCompatiblePatternProofs.run
   SourceCoreCompatibleCompositePatterns.run
   SourceCoreCompatibleMatchArmAllocations.run
+  SourceCoreCompatibleMatchPrefixes.run
   SourceCoreTypedImperativeForUnary.run
   SourceCoreCallableIndexedLambdaCalls.run
   SourceCoreCallableIndexedLambdaViewCalls.run
   SourceCoreCallableLambdaViewEdits.run
+  SourceCoreCallableLambdaViewBodyTree.run
+  SourceCoreProtectedNamedAssignments.run
   SourceCoreRecursiveNamedExpressions.run
   SourceCoreProtectedNamedPlaces.run
   SourceSemanticsIntegerBitNot.run
