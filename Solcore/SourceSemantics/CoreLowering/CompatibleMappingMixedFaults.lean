@@ -16,7 +16,7 @@ inductive FaultTree (checked : SourceCoreCompatibleCatalog.Checked) (registry : 
       (certificate : Index checked index)
       (fields : Fields checked registry functions mapping world sourceKey sourceValue sources header index.layout entries fallback)
       (keyRep : Payload registry functions mapping world sourceKey index.layout.keyType lookup key)
-      (keyTyped : Dynamic.ValueRuntimeType lookup sourceKey) (keyAt : keys[index.keyPosition]? = some key)
+      (keyTyped : Dynamic.ValueRuntimeTypeMatches lookup sourceKey) (keyAt : keys[index.keyPosition]? = some key)
       (absent : Dynamic.MappingAbsent lookup sources) (unavailable : ¬ Dynamic.Defaultable sourceValue) :
       FaultTree checked registry functions mapping world prepared keys
         (.mapping sourceKey sourceValue sources) (Transport.carrier header fallback index.layout entries) (SourceCoreMappingWithDefault.type index.layout)
@@ -37,7 +37,7 @@ inductive FaultTree (checked : SourceCoreCompatibleCatalog.Checked) (registry : 
       (certificate : Index checked index)
       (fields : Fields checked registry functions mapping world sourceKey sourceValue sources header index.layout entries fallback)
       (keyRep : Payload registry functions mapping world sourceKey index.layout.keyType lookup key)
-      (keyTyped : Dynamic.ValueRuntimeType lookup sourceKey) (keyAt : keys[index.keyPosition]? = some key)
+      (keyTyped : Dynamic.ValueRuntimeTypeMatches lookup sourceKey) (keyAt : keys[index.keyPosition]? = some key)
       (selected : Selected lookup sources sourceValue child)
       (tail : ∀ value, Payload registry functions mapping world sourceValue index.layout.valueType child value →
         FaultTree checked registry functions mapping world prepared keys child value index.layout.valueType steps projections reason token count) :

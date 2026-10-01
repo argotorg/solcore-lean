@@ -17,7 +17,7 @@ theorem UpdateResult.failure {checked : SourceCoreCompatibleCatalog.Checked} {re
     {layout : Core.OrderedMapping.Layout} {fallback : Option Value} {count : Nat}
     (result : UpdateResult checked registry functions mapping world sourceKey sourceValue key replacement sources
       header layout fallback missing (.inLeft (SourceCoreMappingWithDefault.type layout) (.word token)) count)
-    (keyTyped : Dynamic.ValueRuntimeType key sourceKey) :
+    (keyTyped : Dynamic.ValueRuntimeTypeMatches key sourceKey) :
     token = missing.add header ∧ count = checked.catalog.entries.length + 1 ∧
       Dynamic.ProjectionsFaults (some (.mapping sourceKey sourceValue sources)) [.index key]
         (.missingMappingDefault sourceValue) := by

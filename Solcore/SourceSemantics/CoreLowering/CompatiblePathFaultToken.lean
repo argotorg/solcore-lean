@@ -12,7 +12,7 @@ inductive FaultToken (checked : Checked) (registry : SourceCoreRawMetadata.Regis
     Dynamic.Value → List PreparedStep → List Dynamic.EvaluatedProjection → Dynamic.SemanticFault → Word → Nat → Prop where
   | missing {rawKey rawValue lookup entries index steps projections header}
       (metadata : MetadataRep registry (.mapping rawKey rawValue) header)
-      (typed : Dynamic.ValueRuntimeType lookup rawKey)
+      (typed : Dynamic.ValueRuntimeTypeMatches lookup rawKey)
       (absent : Dynamic.MappingAbsent lookup entries) (unavailable : ¬ Dynamic.Defaultable rawValue) :
       FaultToken checked registry (.mapping rawKey rawValue entries) (.index index :: steps) (.index lookup :: projections)
         (.missingMappingDefault rawValue) (index.missing.add header) (checked.catalog.entries.length + 1)
@@ -22,13 +22,13 @@ inductive FaultToken (checked : Checked) (registry : SourceCoreRawMetadata.Regis
       FaultToken checked registry (.constructed metadata values) (.member dataType position branches fieldType :: steps)
         (.member name position :: projections) reason token count
   | found {rawKey rawValue lookup entries index steps projections child reason token count}
-      (typed : Dynamic.ValueRuntimeType lookup rawKey)
+      (typed : Dynamic.ValueRuntimeTypeMatches lookup rawKey)
       (found : Dynamic.MappingLookup lookup entries child)
       (tail : FaultToken checked registry child steps projections reason token count) :
       FaultToken checked registry (.mapping rawKey rawValue entries) (.index index :: steps) (.index lookup :: projections)
         reason token (checked.catalog.entries.length + 1 + count)
   | default {rawKey rawValue lookup entries index steps projections child reason token count}
-      (typed : Dynamic.ValueRuntimeType lookup rawKey)
+      (typed : Dynamic.ValueRuntimeTypeMatches lookup rawKey)
       (absent : Dynamic.MappingAbsent lookup entries) (defaulted : Dynamic.DefaultValue rawValue child)
       (tail : FaultToken checked registry child steps projections reason token count) :
       FaultToken checked registry (.mapping rawKey rawValue entries) (.index index :: steps) (.index lookup :: projections)

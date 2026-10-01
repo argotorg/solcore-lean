@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.Dynamic.Default
+import Solcore.SourceSemantics.Dynamic.RuntimeType
 import Solcore.SourceSemantics.Dynamic.Primitive
 import Solcore.SourceSemantics.Places
 
@@ -20,35 +21,6 @@ namespace Solcore.SourceSemantics.Dynamic
 open Frontend
 open Frontend.SourceInference
 open TypeSystem
-
-/-- Canonical shallow runtime type of every mathematical source value. -/
-inductive ValueRuntimeType : Value → Ty → Prop where
-  | unit : ValueRuntimeType .unit .unit
-  | bool (value : Bool) : ValueRuntimeType (.bool value) .bool
-  | word (value : Core.Word) : ValueRuntimeType (.word value) .word
-  | integer (value : Int) : ValueRuntimeType (.integer value) .integer
-  | product
-      {left right : Value} {leftType rightType : Ty}
-      (left_type : ValueRuntimeType left leftType)
-      (right_type : ValueRuntimeType right rightType) :
-      ValueRuntimeType (.product left right) (.product leftType rightType)
-  | proxy (inner : Ty) : ValueRuntimeType (.proxy inner) (.proxy inner)
-  | constructed
-      (instantiation : DataConstructorInstantiation) (arguments : List Value) :
-      ValueRuntimeType (.constructed instantiation arguments)
-        instantiation.resultType
-  | mapping (keyType valueType : Ty) (entries : List (Value × Value)) :
-      ValueRuntimeType (.mapping keyType valueType entries)
-        (.mapping keyType valueType)
-  | closure (function : Closure) :
-      ValueRuntimeType (.closure function)
-        (.function
-          (Ty.productMany (function.parameters.map fun binder => binder.scheme.body))
-          function.resultType)
-  | global (function : GlobalFunction) :
-      ValueRuntimeType (.global function) function.instantiation.type
-  | builtin (function : BuiltinFunction) :
-      ValueRuntimeType (.builtin function) function.id.type
 
 /-- A place projection after all index occurrences have been evaluated. -/
 inductive EvaluatedProjection where
@@ -279,21 +251,21 @@ inductive ProjectionsFaults :
     Option Value → List EvaluatedProjection → SemanticFault → Prop where
   | indexDefaultUnavailable
       {key keyType valueType entries projections}
-      (key_type : ValueRuntimeType key keyType)
+      (key_type : ValueRuntimeTypeMatches key keyType)
       (absent : MappingAbsent key entries)
       (not_defaultable : ¬ Defaultable valueType) :
       ProjectionsFaults (some (.mapping keyType valueType entries))
         (.index key :: projections) (.missingMappingDefault valueType)
   | indexFound
       {key keyType valueType entries selected projections reason}
-      (key_type : ValueRuntimeType key keyType)
+      (key_type : ValueRuntimeTypeMatches key keyType)
       (lookup : MappingLookup key entries selected)
       (tail : ProjectionsFaults (some selected) projections reason) :
       ProjectionsFaults (some (.mapping keyType valueType entries))
         (.index key :: projections) reason
   | indexDefault
       {key keyType valueType entries defaultValue projections reason}
-      (key_type : ValueRuntimeType key keyType)
+      (key_type : ValueRuntimeTypeMatches key keyType)
       (absent : MappingAbsent key entries)
       (defaulted : DefaultValue valueType defaultValue)
       (tail : ProjectionsFaults (some defaultValue) projections reason) :

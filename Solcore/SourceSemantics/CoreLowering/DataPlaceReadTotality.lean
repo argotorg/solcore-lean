@@ -84,7 +84,7 @@ theorem read_or_fault {checked : Checked} {signatures : ProgramSignatures} {sour
         | cons keyRelated keysRelated =>
           have keyRep : ValueRep checked.catalog signatures functions mapping world key _ _ _ := keyRelated
           have keyCanonical := (TypeSystem.Ty.mapping.inj erased).1
-          have keyRuntime := keyRep.source_runtimeType functionTypes keyCanonical
+          have keyRuntime := (keyRep.source_runtimeType functionTypes keyCanonical).matches
           obtain ⟨entries, coreEntries, sourceEq, coreEq, identity, registered, contents⟩ :=
             rootRelated.mapping_parts layout keyProjected valueProjected
           subst sourceRoot

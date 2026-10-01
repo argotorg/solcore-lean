@@ -134,7 +134,7 @@ theorem getter_missing {checked : SourceCoreDataCatalog.Checked} {sourceValue : 
     {sources : List (Dynamic.Value × Dynamic.Value)} {entries : Core.OrderedMapping.Entries}
     (input : RootInput index.layout sourceKeyType sourceValue (KeyRep certificate signatures identities) valueRel cell optional sources entries)
     (keyRep : KeyRep certificate signatures identities sourceKey key)
-    (keyTyped : Dynamic.ValueRuntimeType sourceKey sourceKeyType)
+    (keyTyped : Dynamic.ValueRuntimeTypeMatches sourceKey sourceKeyType)
     (absent : Dynamic.MappingAbsent sourceKey sources) (missing : ¬ Dynamic.Defaultable sourceValue)
     (environment : Environment) (store : Store) (keyType : Ty) (keys : List Value) (argument : Expr)
     (keysLength : prepared.keyTypes.length = keys.length) (keyAt : keys[index.keyPosition]? = some key)
@@ -171,7 +171,7 @@ theorem setter_missing {checked : SourceCoreDataCatalog.Checked} {sourceValue : 
     {sources : List (Dynamic.Value × Dynamic.Value)} {entries : Core.OrderedMapping.Entries}
     (input : RootInput index.layout sourceKeyType sourceValue (KeyRep certificate signatures identities) valueRel cell optional sources entries)
     (keyRep : KeyRep certificate signatures identities sourceKey key)
-    (keyTyped : Dynamic.ValueRuntimeType sourceKey sourceKeyType)
+    (keyTyped : Dynamic.ValueRuntimeTypeMatches sourceKey sourceKeyType)
     (absent : Dynamic.MappingAbsent sourceKey sources) (missing : ¬ Dynamic.Defaultable sourceValue)
     (environment : Environment) (store : Store) (keyType : Ty) (keys : List Value) (argument : Expr)
     (keysLength : prepared.keyTypes.length = keys.length) (keyAt : keys[index.keyPosition]? = some key)

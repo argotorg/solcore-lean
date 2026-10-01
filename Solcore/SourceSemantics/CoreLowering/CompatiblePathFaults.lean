@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePathFaultToken
 
 /-! Independent source structural faults determine the exact emitted token
-and automatically construct the actual selector/updater fault trees. Raw key
+and automatically construct the actual selector/updater fault trees. Normalized key
 guards come from the source fault trace; helper execution is never assumed. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatibleMixedRoute
@@ -38,7 +38,7 @@ open CompatibleMapping CompatibleMapping.MixedPaths
   | @index root keySource valueSource leaf key layout projections steps position keySites comparison missing certificate generated tail lookup keyValue resolved keyAt keyRelated arguments ih =>
     have finish {rawKey rawValue : TypeSystem.Ty} {entries : List (Dynamic.Value × Dynamic.Value)} {child : Dynamic.Value}
         (represented : ValueRep checked registry functions mapping world root (.mapping rawKey rawValue entries) value type)
-        (typed : Dynamic.ValueRuntimeType lookup rawKey)
+        (typed : Dynamic.ValueRuntimeTypeMatches lookup rawKey)
         (selectedAt : Selected lookup entries rawValue child)
         (tailFault : Dynamic.ProjectionsFaults (some child) resolved reason) :
         ∃ token count,

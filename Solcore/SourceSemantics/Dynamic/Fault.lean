@@ -1412,10 +1412,10 @@ mutual
         (index_evaluates : ExpressionEvaluates program context evidence source
           environment middle index key after)
         (actual_type : ValueRuntimeType key actual)
-        (mismatch : actual ≠ keyType) :
+        (mismatch : runtimeType actual ≠ runtimeType keyType) :
         ExpressionFormFaults program context evidence source environment before
           (.index base index) requirements coercions
-          (.typeMismatch keyType actual) after
+          (.typeMismatch keyType (runtimeType actual)) after
     | indexDefaultUnavailable
         {context evidence source environment before middle after base index
           requirements coercions keyType valueType entries key}
@@ -1424,7 +1424,7 @@ mutual
           environment before base (.mapping keyType valueType entries) middle)
         (index_evaluates : ExpressionEvaluates program context evidence source
           environment middle index key after)
-        (key_type : ValueRuntimeType key keyType)
+        (key_type : ValueRuntimeTypeMatches key keyType)
         (absent : MappingAbsent key entries)
         (not_defaultable : ¬ Defaultable valueType) :
         ExpressionFormFaults program context evidence source environment before

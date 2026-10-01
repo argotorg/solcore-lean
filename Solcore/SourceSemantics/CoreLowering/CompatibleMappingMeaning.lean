@@ -39,11 +39,11 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : Registry}
   | found found represented => exact ⟨_, .indexFound found .nil, represented⟩
   | default absent defaulted represented => exact ⟨_, .indexDefault absent defaulted .nil, represented⟩
 
-/-- Exact source fault typing is supplied separately. Native projection alone
-cannot establish this raw key-type guard for runtime-compatible aliases. -/
+/-- Source runtime compatibility is supplied separately. Native projection alone
+cannot establish the metadata-derived key guard for runtime-compatible aliases. -/
  theorem ReadResult.failure {key : Dynamic.Value} {valueType : Ty} {missingBase header token : Word}
     (result : ReadResult checked registry functions mapping world sourceValue key sources valueType missingBase header (.inLeft valueType (.word token)))
-    (keyTyped : Dynamic.ValueRuntimeType key sourceKey) :
+    (keyTyped : Dynamic.ValueRuntimeTypeMatches key sourceKey) :
     token = missingBase.add header ∧ Dynamic.ProjectionsFaults (some (.mapping sourceKey sourceValue sources))
       [.index key] (.missingMappingDefault sourceValue) := by
   cases result with

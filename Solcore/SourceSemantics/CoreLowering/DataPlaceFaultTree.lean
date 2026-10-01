@@ -17,7 +17,7 @@ inductive Tree (checked : SourceCoreDataCatalog.Checked) (signatures : ProgramSi
       {sources : List (Dynamic.Value × Dynamic.Value)} {entries : Core.OrderedMapping.Entries}
       {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection}
       (keyRep : KeyRep certificate signatures identities sourceKey key)
-      (keyType : Dynamic.ValueRuntimeType sourceKey sourceKeyType) (keyAt : keys[index.keyPosition]? = some key)
+      (keyType : Dynamic.ValueRuntimeTypeMatches sourceKey sourceKeyType) (keyAt : keys[index.keyPosition]? = some key)
       (entriesRep : OrderedMapping.EntriesRel (KeyRep certificate signatures identities) valueRelation sources entries)
       (absent : Dynamic.MappingAbsent sourceKey sources) (unavailable : ¬ Dynamic.Defaultable sourceValueType) :
       Tree checked signatures identities prepared keys
@@ -45,7 +45,7 @@ inductive Tree (checked : SourceCoreDataCatalog.Checked) (signatures : ProgramSi
       {steps : List PreparedStep} {projections : List Dynamic.EvaluatedProjection}
       {reason : Dynamic.SemanticFault} {token : Word} {count : Nat}
       (keyRep : KeyRep certificate signatures identities sourceKey key)
-      (keyType : Dynamic.ValueRuntimeType sourceKey sourceKeyType) (keyAt : keys[index.keyPosition]? = some key)
+      (keyType : Dynamic.ValueRuntimeTypeMatches sourceKey sourceKeyType) (keyAt : keys[index.keyPosition]? = some key)
       (entriesRep : OrderedMapping.EntriesRel (KeyRep certificate signatures identities) valueRelation sources entries)
       (selected : Reads sourceKey sources sourceValueType sourceChild)
       (tail : ∀ value, (valueRelation sourceChild value ∨
