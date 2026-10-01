@@ -1,9 +1,15 @@
 import Solcore.SourceSemantics.Dynamic.Fault
-import Solcore.Frontend.SourceTypedRuntime
+import Solcore.SourceSemantics.CoreLowering.CompatiblePathFaults
+import Solcore.Frontend.SourceRuntimeValues
+
+#check_failure Solcore.Frontend.SourceTypedRuntime.run
+#check_failure Solcore.Frontend.SourceTypedRuntime.updateResolvedValue
+#check_failure Solcore.Frontend.SourceTypedRuntime.writeResolvedPlace
 
 /-! An absent mapping entry whose value type has no default is a source fault.
-The existing typed-source runtime represents this reason by a type mismatch
-with no actual value type; that observation is preserved here. -/
+Independent source faults determine the actual Core selector/updater token.
+Their administrative allocations preserve the initial store prefix, and failure
+suppresses replacement and commit continuations. -/
 
 set_option autoImplicit false
 
@@ -50,18 +56,6 @@ example (value : Value) : ¬ DefaultValue functionType value :=
 /-- The runtime's existing default calculation reports the same absence. -/
 example : SourceTypedRuntime.defaultValue? (functionType.size + 1) functionType =
     none := by
-  rfl
-
-/-- Explicit runtime observation: `missingMappingDefault functionType` is
-reported as `typeMismatch functionType none`. This also confirms the same
-missing-default behavior on the runtime's projected-update path, before its
-modifier can be invoked. -/
-example (plan : SourceSpecializationWorklist.Plan) (key : Core.Word)
-    (modify : Option SourceTypedRuntime.Value →
-      Except SourceTypedRuntime.RuntimeError SourceTypedRuntime.Value) :
-    SourceTypedRuntime.updateResolvedValue plan functionType modify
-      (some (.mapping .word functionType [])) [.index (.word key)] =
-      .error (.typeMismatch functionType none) := by
   rfl
 
 /-- Missing-default failure propagates through a successfully defaulted mapping
@@ -191,46 +185,47 @@ example (program : Program) (context : SourceSemantics.Context)
     ¬ ProjectionsFaults initial target.projections reason :=
   resolved.excludes_projection_fault current_read initial_value
 
-/-- The same defaulted-prefix behavior holds in the actual runtime. -/
-example (plan : SourceSpecializationWorklist.Plan) (outerKey innerKey : Core.Word)
-    (modify : Option SourceTypedRuntime.Value →
-      Except SourceTypedRuntime.RuntimeError SourceTypedRuntime.Value) :
-    SourceTypedRuntime.updateResolvedValue plan functionType modify
-      (some (.mapping .word (.mapping .word functionType) []))
-      [.index (.word outerKey), .index (.word innerKey)] =
-      .error (.typeMismatch functionType none) := by
-  rfl
+namespace CoreBridge
+open Core SourceSemantics.CoreLowering SourceCoreCompatibleDataPlaces
+open CompatiblePayload CompatibleMixedRoute CompatibleMapping.MixedPaths
 
-/-- `selected` may be a valid old snapshot. The write still reads the current
-root, and failure returns exactly that post-RHS state without invoking modify. -/
-example (plan : SourceSpecializationWorklist.Plan) (key : Core.Word)
-    (selected : Option SourceTypedRuntime.Value)
-    (modify : Option SourceTypedRuntime.Value →
-      Except SourceTypedRuntime.RuntimeError SourceTypedRuntime.Value) :
-    let state : SourceTypedRuntime.RuntimeState := {
-      heap := [{
-        type := .mapping .word functionType
-        value := some (.mapping .word functionType [])
-      }]
-    }
-    let target : SourceTypedRuntime.ResolvedPlace := {
-      location := ⟨0⟩
-      rootType := .mapping .word functionType
-      valueType := functionType
-      projections := [.index (.word key)]
-      selected := selected
-    }
-    SourceTypedRuntime.writeResolvedPlace plan state target modify =
-      .fault (.typeMismatch functionType none) state := by
-  rfl
+/-- An independently derived missing default, including a defaulted or member
+prefix, constructs the actual Core getter and updater failures. The updater's
+replacement and commit continuation can be any expressions: neither is evaluated.
+The old snapshot does not participate in this traversal of the current root. -/
+theorem current_root_missing_default
+    {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
+    {functions : FunctionModel checked.catalog} {mapping : GeneralHeap.LocationMap} {world : Core.StoreTyping}
+    {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
+    {root leaf : TypeSystem.Ty} {sourceProjections : List PlaceProjection} {position : Nat}
+    {steps : List PreparedStep} {keySites : List (ExpressionId × Core.Ty)}
+    {path : PreparedPath checked source site root sourceProjections position steps keySites leaf}
+    {prepared : Prepared} {keys : List Core.Value} {projections : List Dynamic.EvaluatedProjection}
+    (arguments : Arguments checked registry functions mapping world source site keys path projections)
+    {current : Dynamic.Value} {value : Core.Value} {type : Core.Ty}
+    (represented : ValueRep checked registry functions mapping world root current value type)
+    (fault : Dynamic.ProjectionsFaults (some current) projections (.missingMappingDefault functionType))
+    {identities : Dynamic.Value → Core.Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : CompatibleEquality.FunctionObservations checked.catalog functions identities)
+    (keyLength : prepared.keyTypes.length = keys.length)
+    (environment : Core.Environment) (store : Core.Store) (currentExpression keyExpression replacement next : Core.Expr)
+    (selected : DataEquality.Selects environment currentExpression value)
+    (keysSelected : DataEquality.Selects environment keyExpression (DataPatternValues.packValues keys))
+    (output : Core.Ty) :
+    ∃ token count finalStore administrative,
+      FaultToken checked registry current steps projections (.missingMappingDefault functionType) token count ∧
+      Core.Evaluates environment store (select prepared steps currentExpression keyExpression)
+        (.inLeft prepared.optionalLeaf (.word token)) finalStore ∧
+      Core.Evaluates environment store
+        (Core.LanguageResult.bind output (update prepared steps type currentExpression keyExpression replacement) next)
+        (.inLeft output (.word token)) finalStore ∧
+      finalStore = store ++ administrative ∧ administrative.length = count := by
+  obtain ⟨token, count, receipt, tree⟩ := arguments.faultTree represented fault prepared
+  obtain ⟨finalStore, administrative, _, read, updated, appended, counted⟩ :=
+    tree.preserves faithful observations keyLength environment store currentExpression keyExpression replacement selected keysSelected
+  exact ⟨token, count, finalStore, administrative, receipt, read,
+    Core.LanguageResult.bind_failure output updated, appended, counted⟩
 
-/-- An explicitly failing modifier is not run when the structural path
-already lacks a default. This checks the runtime's actual reason precedence. -/
-example (plan : SourceSpecializationWorklist.Plan) (key : Core.Word) :
-    SourceTypedRuntime.updateResolvedValue plan functionType
-      (fun _ => .error (.invalidAssignmentOperands .add (some .bool) (some .word)))
-      (some (.mapping .word functionType [])) [.index (.word key)] =
-      .error (.typeMismatch functionType none) := by
-  rfl
+end CoreBridge
 
 end Solcore.Test.SourceMappingDefaultFault
