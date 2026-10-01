@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedForGenericEndpoint
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForReflection
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForEndpoint
 
@@ -32,6 +33,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
+
 include extension meaning unique definitions registered faithful observations in
 theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
@@ -50,42 +52,23 @@ theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNod
       (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome
     environments heaps locals agrees actualTyped reference read unmapped trace
-  obtain ⟨state, installedProgress⟩ := initial_state functions environments heaps locals agrees actualTyped read unmapped typed
-  have postCorrect : PostPreserves functions program evidence (source := source) (context := context) (scope := scope) (registry := registry)
-      (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
-      (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
-      (contextLocation := contextLocation) (location := store.length) (type := type)
-      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) post postCode := by
-    intro mapping world before after store finalContext finalEnvironment state continued trace
-    exact post_preserves functions definitions registered extension program evidence meaning faithful observations postTree
-      valid unique agrees reference state continued trace
-  have postFailed : PostFaults functions program evidence (source := source) (context := context) (scope := scope) (registry := registry)
-      (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
-      (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
-      (contextLocation := contextLocation) (location := store.length) (type := type)
-      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) (faults := faults) post postCode := by
-    intro mapping world before after store finalContext reason state continued trace
-    exact post_fault functions definitions registered extension program evidence meaning faithful observations postTree postErrors
-      valid unique agrees reference state continued trace
-  cases trace with
-  | control sourceTrace =>
-    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
-      iterations_success sourceTrace (meaning context valid) conditionTree conditionFound valid unique agrees reference correct postCorrect state
-    exact ⟨value, finalStore, finalMap, finalWorld,
-      by
-        rw [LoopRenaming.iterate]
-        apply LocalLoop.iterate_evaluates
-        exact LocalLoop.invoke_success _ _ (.var rfl) state.selfRead nativeTrace,
-      represented, installedProgress.trans progress⟩
-  | fault failed =>
-    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
-      iterations_fault failed (meaning context valid) conditionTree conditionFound valid unique agrees reference correct postCorrect postFailed state
-    exact ⟨value, finalStore, finalMap, finalWorld,
-      by
-        rw [LoopRenaming.iterate]
-        apply LocalLoop.iterate_evaluates
-        exact LocalLoop.invoke_success _ _ (.var rfl) state.selfRead nativeTrace,
-      represented, installedProgress.trans progress⟩
+  have entryResult := ProtectedFor.Body.loop_preserves functions program evidence ProtectedFor.Body.trivialTransport
+      (ProtectedExpressionMeaning.preserves_of_typed ProtectedFor.Body.trivialEntry (meaning context valid))
+      conditionFound conditionTree typed unique
+      (ProtectedFor.Body.preserves_of_unprotected functions program evidence correct)
+      (by
+        intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
+          mapping world before after store finalContext finalEnvironment guarded continued execution
+        exact post_preserves functions definitions registered extension program evidence meaning faithful observations postTree
+          actualValid unique actualAgrees actualReference guarded.1 continued execution)
+      (by
+        intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
+          mapping world before after store finalContext reason guarded continued execution
+        exact post_fault functions definitions registered extension program evidence meaning faithful observations postTree postErrors
+          actualValid unique actualAgrees actualReference guarded.1 continued execution)
+  obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, heaps, maps, worlds, frame, metadata, _⟩ :=
+    entryResult valid environments heaps locals agrees actualTyped reference read unmapped trivial trace
+  exact ⟨value, finalStore, finalMap, finalWorld, completed, represented, heaps, maps, worlds, frame, metadata⟩
 
 include extension meaning reflection unique definitions registered faithful observations in
 theorem loop_reflects (functionTypes : FunctionRuntimeViews functions)
@@ -108,21 +91,18 @@ theorem loop_reflects (functionTypes : FunctionRuntimeViews functions)
       (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped evaluated
-  obtain ⟨state, installedProgress⟩ := initial_state functions environments heaps locals agrees actualTyped read unmapped typed
-  have postCorrect : PostReflects functions program evidence (source := source) (context := context) (scope := scope) (registry := registry)
-      (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
-      (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
-      (contextLocation := contextLocation) (location := store.length) (type := type)
-      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) faults post postCode := by
-    intro mapping world before store finalStore value state continued trace
-    exact post_reflects functions definitions registered extension program evidence meaning reflection faithful observations functionTypes postTree postErrors
-      valid unique agrees reference state continued trace
-  rw [LoopRenaming.iterate] at evaluated
-  obtain ⟨size, sized⟩ := evaluation_has_size evaluated
-  obtain ⟨entrySize, _, entry⟩ := sized.iterate_entry
-  obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, progress⟩ :=
-    iterations_reflect functions program evidence (reflection context valid) conditionTree conditionFound valid agrees reference correct
-      postCorrect bodyCannotFault entrySize state entry
-  exact ⟨outcome, after, finalMap, finalWorld, trace, represented, installedProgress.trans progress⟩
+  have entryResult := ProtectedFor.Body.loop_reflects functions program evidence ProtectedFor.Body.trivialTransport
+      (ProtectedExpressionMeaning.reflects_of_typed ProtectedFor.Body.trivialEntry (reflection context valid))
+      conditionFound conditionTree typed
+      (ProtectedFor.Body.reflects_of_unprotected functions program evidence correct)
+      bodyCannotFault
+      (by
+        intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
+          mapping world before store finalStore value guarded continued execution
+        exact post_reflects functions definitions registered extension program evidence meaning reflection faithful observations functionTypes postTree postErrors
+          actualValid unique actualAgrees actualReference guarded.1 continued execution)
+  obtain ⟨outcome, after, finalMap, finalWorld, sourceTrace, represented, heaps, maps, worlds, frame, metadata, _⟩ :=
+    entryResult valid environments heaps locals agrees actualTyped reference read unmapped trivial evaluated
+  exact ⟨outcome, after, finalMap, finalWorld, sourceTrace, represented, heaps, maps, worlds, frame, metadata⟩
 
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeFor
