@@ -1,6 +1,7 @@
 import Solcore.Frontend.SourceCoreCompatibleCatalog
 import Solcore.SourceSemantics.CoreLowering.GeneralHeap
 import Solcore.SourceSemantics.CoreLowering.DataPatternValues
+import Solcore.SourceSemantics.Dynamic.Default
 
 /-! Independent data representation for the source-compatible native profile.
 Raw proxy and constructor metadata is retained through authenticated registry
@@ -11,7 +12,9 @@ Function leaves have the same projection, finite-world typing and extension
 obligations as GenericHeap.PayloadModel, with an additional registry index.
 The compatible catalog has a different projection, so this module does not
 reinterpret it as a strict catalog or introduce another heap relation.
-Ordered mappings and transported raw defaults are a separate next layer. -/
+Ordered mappings preserve every entry in source order, including duplicates.
+Their transported optional default is justified by the original raw source
+type and the independent DefaultValue relation. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatiblePayload
 open Core Frontend Frontend.SourceInference GeneralHeap DataPatternValues
@@ -98,6 +101,18 @@ mutual
         (payloads : ValuesRep checked registry functions mapping world metadata.payloadTypes sources values types) :
         ValueRep checked registry functions mapping world metadata.resultType (.constructed metadata sources)
           (.constructed tag (.pair (.word id) (packValues values))) (.namedData tag.owner)
+    | mappingValue {keyType valueType : TypeSystem.Ty} {id : Word} {layout : OrderedMapping.Layout}
+        {sources : List (Dynamic.Value × Dynamic.Value)} {entries : OrderedMapping.Entries} {fallback : Option Value}
+        (metadata : MetadataRep registry (.mapping keyType valueType) id)
+        (identity : checked.catalog.identity? (.mapping keyType valueType) = some layout.dataType)
+        (keyProjection : checked.catalog.project keyType = .ok layout.keyType)
+        (valueProjection : checked.catalog.project valueType = .ok layout.valueType)
+        (registered : layout.Registered checked.catalog.definitions)
+        (stored : EntriesRep checked registry functions mapping world keyType valueType sources entries layout.keyType layout.valueType)
+        (defaultValue : DefaultRep checked registry functions mapping world valueType fallback layout.valueType) :
+        ValueRep checked registry functions mapping world (.mapping keyType valueType)
+          (.mapping keyType valueType sources) (SourceCoreMappingWithDefault.value id fallback layout entries)
+          (SourceCoreMappingWithDefault.type layout)
     | compatible {expected actual : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
         (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType actual)
         (related : ValueRep checked registry functions mapping world actual source value type) :
@@ -111,6 +126,30 @@ mutual
         (head : ValueRep checked registry functions mapping world sourceType source value type)
         (tail : ValuesRep checked registry functions mapping world sourceTypes sources values types) :
         ValuesRep checked registry functions mapping world (sourceType :: sourceTypes) (source :: sources) (value :: values) (type :: types)
+  inductive EntriesRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
+      (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping) :
+      TypeSystem.Ty → TypeSystem.Ty → List (Dynamic.Value × Dynamic.Value) → OrderedMapping.Entries → Ty → Ty → Prop where
+    | empty (keyType valueType : TypeSystem.Ty) (key value : Ty) :
+        EntriesRep checked registry functions mapping world keyType valueType [] [] key value
+    | entry {keyType valueType : TypeSystem.Ty} {key value : Dynamic.Value} {a b : Value} {aType bType : Ty}
+        {sources : List (Dynamic.Value × Dynamic.Value)} {entries : OrderedMapping.Entries}
+        (keyRep : ValueRep checked registry functions mapping world keyType key a aType)
+        (valueRep : ValueRep checked registry functions mapping world valueType value b bType)
+        (tail : EntriesRep checked registry functions mapping world keyType valueType sources entries aType bType) :
+        EntriesRep checked registry functions mapping world keyType valueType ((key, value) :: sources) ((a, b) :: entries) aType bType
+  inductive DefaultRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
+      (functions : FunctionModel checked.catalog) (mapping : LocationMap) (world : StoreTyping) :
+      TypeSystem.Ty → Option Value → Ty → Prop where
+    | absent {sourceType : TypeSystem.Ty} {type : Ty}
+        (missing : ¬ Dynamic.Defaultable sourceType)
+        (projected : checked.catalog.project sourceType = .ok type)
+        (wellFormed : type.WellFormed checked.catalog.definitions) :
+        DefaultRep checked registry functions mapping world sourceType none type
+    | present {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
+        (meaning : Dynamic.DefaultValue sourceType source)
+        (related : ValueRep checked registry functions mapping world sourceType source value type) :
+        DefaultRep checked registry functions mapping world sourceType (some value) type
+
 end
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel checked.catalog}
@@ -119,7 +158,8 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreR
 theorem ValueRep.projection {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
     (related : ValueRep checked registry functions mapping world sourceType source value type) :
     checked.catalog.project sourceType = .ok type := by
-  induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True) with
+  induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
   | unit | bool | word | integer => rfl
   | product _ _ first second => simp [SourceCoreCompatibleCatalog.Catalog.project, first, second, bind, Except.bind, pure, Except.pure]
   | function related => exact functions.projection related
@@ -128,7 +168,9 @@ theorem ValueRep.projection {sourceType : TypeSystem.Ty} {source : Dynamic.Value
   | compatible same _ ih =>
     rw [← checked.catalog.project_runtimeType, same, checked.catalog.project_runtimeType]
     exact ih
-  | nil | cons => trivial
+  | mappingValue _ identity key value _ _ _ _ _ =>
+    simp [SourceCoreCompatibleCatalog.Catalog.project, identity, key, value, bind, Except.bind, pure, Except.pure]
+  | nil | cons | empty | entry | absent | present => trivial
 
 private theorem pack_typed {definitions : DataEnvironment} {types : List Ty} {values : List Value}
     (typed : ListRel (fun value type => RuntimeValueHasType world value type definitions) values types) :
@@ -143,7 +185,10 @@ theorem ValueRep.runtime_hasType {sourceType : TypeSystem.Ty} {source : Dynamic.
     (related : ValueRep checked registry functions mapping world sourceType source value type) :
     RuntimeValueHasType world value type checked.catalog.definitions := by
   induction related using ValueRep.rec
-    (motive_2 := fun _ _ values types _ => ListRel (fun value type => RuntimeValueHasType world value type checked.catalog.definitions) values types) with
+    (motive_2 := fun _ _ values types _ => ListRel (fun value type => RuntimeValueHasType world value type checked.catalog.definitions) values types)
+    (motive_3 := fun _ _ _ entries aType bType _ => ∀ a b, (a, b) ∈ entries →
+      RuntimeValueHasType world a aType checked.catalog.definitions ∧ RuntimeValueHasType world b bType checked.catalog.definitions)
+    (motive_4 := fun _ fallback type _ => RuntimeValueHasType world (OrderedMapping.optionValue type fallback) (.sum .unit type) checked.catalog.definitions) with
   | unit => exact .unit
   | bool => exact .bool
   | word => exact .word
@@ -153,8 +198,18 @@ theorem ValueRep.runtime_hasType {sourceType : TypeSystem.Ty} {source : Dynamic.
   | proxy _ _ registered => exact .constructed registered .word
   | constructed _ _ _ _ registered _ ih => exact .constructed registered (.pair .word (pack_typed ih))
   | compatible _ _ ih => exact ih
+  | mappingValue _ _ _ _ registered _ _ entries fallback =>
+    exact .pair .word (.pair fallback (OrderedMapping.encode_hasType registered _ entries))
   | nil => exact .nil
   | cons _ _ head tail => exact .cons head tail
+  | empty => simp_all
+  | entry _ _ _ key value tail =>
+    rename_i a b member
+    rcases List.mem_cons.mp member with head | rest
+    · cases head; exact ⟨key, value⟩
+    · exact tail a b rest
+  | absent => exact .inLeft .unit
+  | present _ _ typed => exact .inRight typed
 
 /-- Static IDs and all raw metadata survive input-registry extension. The
 finite location map/world extension is delegated only at function leaves. -/
@@ -165,7 +220,9 @@ theorem ValueRep.extend {futureRegistry : SourceCoreRawMetadata.Registry} {futur
     (worlds : WorldExtends world futureWorld) :
     ValueRep checked futureRegistry functions futureMapping futureWorld sourceType source value type := by
   induction related using ValueRep.rec
-    (motive_2 := fun types sources values coreTypes _ => ValuesRep checked futureRegistry functions futureMapping futureWorld types sources values coreTypes) with
+    (motive_2 := fun types sources values coreTypes _ => ValuesRep checked futureRegistry functions futureMapping futureWorld types sources values coreTypes)
+    (motive_3 := fun key value sources entries aType bType _ => EntriesRep checked futureRegistry functions futureMapping futureWorld key value sources entries aType bType)
+    (motive_4 := fun type fallback coreType _ => DefaultRep checked futureRegistry functions futureMapping futureWorld type fallback coreType) with
   | unit => exact .unit
   | bool => exact .bool _
   | word => exact .word _
@@ -176,8 +233,14 @@ theorem ValueRep.extend {futureRegistry : SourceCoreRawMetadata.Registry} {futur
   | constructed header owner selected projected registered _ ih =>
     exact .constructed (header.extend metadata) (metadata.signatures.trans owner) selected projected registered ih
   | compatible same _ ih => exact .compatible same ih
+  | mappingValue header identity key value registered _ _ entries fallback =>
+    exact .mappingValue (header.extend metadata) identity key value registered entries fallback
   | nil => exact .nil
   | cons _ _ head tail => exact .cons head tail
+  | empty => exact .empty _ _ _ _
+  | entry _ _ _ key value tail => exact .entry key value tail
+  | absent missing projected wf => exact .absent missing projected wf
+  | present meaning _ ih => exact .present meaning ih
 
 theorem ValuesRep.length {types : List TypeSystem.Ty} {sources : List Dynamic.Value} {values : List Value} {coreTypes : List Ty}
     (related : ValuesRep checked registry functions mapping world types sources values coreTypes) :
