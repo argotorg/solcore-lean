@@ -76,6 +76,21 @@ private def check {checked : Checked} (prepared : Prepared checked) (recipe : Re
     assertTrue (reprStr exported.decoded.source == reprStr expected)
       s!"compatible output source identity/metadata/order changed: {reprStr exported.decoded.source}"
 
+private def checkMarked {checked : Checked} (prepared : SourceCoreCompatibleMarkedFunctions.Prepared checked)
+    (recipe : Solcore.Frontend.SourceCoreCompatibleOutputs.Recipe checked prepared.layouts.definitions)
+    (owner : Key) (arguments : List SourceValue) (expected : SourceValue) : IO Unit := do
+  for fuel in [0, 7, 37, 150000] do
+    let completion ← match prepared.runSource owner arguments fuel with
+      | .ok completion => pure (completion.resume 150000)
+      | .error error => throw (IO.userError s!"marked output source run failed: {reprStr error}")
+    let projection ← project checked completion.entry.sourceResultType completion.entry.native.resultType
+    let exported ← match SourceCoreCompatibleOutputs.decodeSuccess recipe completion.result.context
+        completion.result.contextOwner completion.entry.sourceResultType projection.eq completion.result.native with
+      | .ok exported => pure exported
+      | .error error => throw (IO.userError s!"marked output reverse failed: {reprStr error}")
+    assertTrue (reprStr exported.decoded.source == reprStr expected)
+      s!"marked output source metadata/order changed: {reprStr exported.decoded.source}"
+
 private def mutate {checked : Checked} (prepared : Prepared checked) (recipe : Recipe checked)
     (owner : Key) (transform : Core.Expr → Core.Expr)
     (rejected : SourceCoreCompatibleOutputs.Error → Bool) : IO Unit := do
@@ -132,13 +147,19 @@ def run : IO Unit := do
   let prepared := automatic.prepared
   let recipe ← match SourceCoreCompatibleOutputs.prepare prepared with
     | .ok recipe => pure recipe | .error error => throw (IO.userError s!"compatible output recipe failed: {reprStr error}")
+  let marked ← match SourceCoreCompatibleMarkedFunctions.prepare prepared 500 with
+    | .ok marked => pure marked | .error error => throw (IO.userError s!"marked output factory failed: {reprStr error}")
+  let markedRecipe ← match SourceCoreCompatibleOutputs.prepareMarked marked with
+    | .ok recipe => pure recipe | .error error => throw (IO.userError s!"marked output recipe failed: {reprStr error}")
   let inc ← key program "inc"
   let dec ← key program "dec"
   let named : SourceValue := .global inc []
   let getNamed ← key program "getNamed"
   let getBuiltin ← key program "getBuiltin"
   check prepared recipe getNamed [] named
+  checkMarked marked markedRecipe getNamed [] named
   check prepared recipe getBuiltin [] (.builtin .wordToInteger)
+  checkMarked marked markedRecipe getBuiltin [] (.builtin .wordToInteger)
   let qualified ← match prepared.functions.filter (fun function => function.specialized.assumptions != []) with
     | [function] => pure function
     | _ => throw (IO.userError "compatible qualified output specialization absent")
@@ -147,6 +168,7 @@ def run : IO Unit := do
     | .ok evidence => pure evidence | .error error => throw (IO.userError s!"compatible expected qualified evidence failed: {reprStr error}")
   assertTrue (!evidence.isEmpty) "compatible qualified output test lacked evidence"
   check prepared recipe (← key program "getQualified") [] (.global qualified.signature.key evidence)
+  checkMarked marked markedRecipe (← key program "getQualified") [] (.global qualified.signature.key evidence)
   let holder ← match program.signatures.dataTypes.find? (·.name == "Holder") with
     | some holder => pure holder | none => throw (IO.userError "compatible output Holder absent")
   let constructor ← match holder.constructors[0]? with
@@ -154,13 +176,17 @@ def run : IO Unit := do
   let functionType := TypeSystem.Ty.function .word .word
   let instantiation : DataConstructorInstantiation := ⟨constructor.id, [], [functionType], .nominal holder.id []⟩
   check prepared recipe (← key program "getNominal") [] (.constructed instantiation [named])
+  checkMarked marked markedRecipe (← key program "getNominal") [] (.constructed instantiation [named])
   check prepared recipe (← key program "getTuple") [] (.product named (.builtin .wordToInteger))
+  checkMarked marked markedRecipe (← key program "getTuple") [] (.product named (.builtin .wordToInteger))
   let mapping : SourceValue := .mapping (.comptime functionType) functionType
     [(named, named), (named, .global dec [])]
   check prepared recipe (← key program "mappingReturn") [mapping] mapping
+  checkMarked marked markedRecipe (← key program "mappingReturn") [mapping] mapping
   let alias : SourceValue := .mapping (.proxy (.comptime .word)) (.comptime functionType)
     [(.proxy (.comptime .word), named), (.proxy .word, .global dec [])]
   check prepared recipe (← key program "alias") [alias] alias
+  checkMarked marked markedRecipe (← key program "alias") [alias] alias
   let table ← match prepared.callableContext with
     | some native => pure native.table | none => throw (IO.userError "compatible output codebook missing")
   let decDescriptor ← match table.idAt? (.named dec) with

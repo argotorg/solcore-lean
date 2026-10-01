@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceCoreCompatibleFunctions
 import Solcore.Frontend.SourceCoreCompatibleInputs
+import Solcore.Frontend.SourceCoreCompatibleMarkedFunctions
 
 /-! Reverse source values from a cached compatible artifact. Named outputs
 must match both the installed global slot and its prepared code/capture
@@ -67,8 +68,29 @@ private structure Builtin where
   output : Core.Ty
   body : Core.Expr
 
-structure Recipe (checked : Checked) where private mk ::
-  private prepared : Prepared checked
+inductive ArtifactOrigin (checked : Checked) where
+  | ordinary (prepared : Prepared checked)
+  | marked (prepared : SourceCoreCompatibleMarkedFunctions.Prepared checked)
+
+def ArtifactOrigin.base {checked : Checked} : ArtifactOrigin checked → Prepared checked
+  | .ordinary prepared => prepared
+  | .marked prepared => prepared.base
+
+def ArtifactOrigin.definitions {checked : Checked} : ArtifactOrigin checked → Core.DataEnvironment
+  | .ordinary _ => checked.catalog.definitions
+  | .marked prepared => prepared.layouts.definitions
+
+def ArtifactOrigin.closures {checked : Checked} : ArtifactOrigin checked → List Core.Expr
+  | .ordinary prepared => prepared.closures
+  | .marked prepared => prepared.secondPass.closures
+
+def ArtifactOrigin.inputContext? {checked : Checked} : ArtifactOrigin checked → Option SourceCoreCompatibleInputs.Context
+  | .ordinary prepared => prepared.sourceInputs.map (·.context)
+  | .marked prepared => some prepared.sourceInputs.context
+
+structure Recipe (checked : Checked) (definitions : Core.DataEnvironment := checked.catalog.definitions) where private mk ::
+  private origin : ArtifactOrigin checked
+  private definitionsExact : origin.definitions = definitions
   private named : List Named
   private builtins : List Builtin
 
@@ -95,18 +117,20 @@ def freshGlobals (globals : List SourceCoreCalls.Signature) : Core.Environment :
 
 /-- Consume the compiler-owned cache, never caller-selected closure templates.
 Evidence selection and source signature checks happen only during preparation. -/
-def prepare {checked : Checked} (prepared : Prepared checked) :
-    Except Error (Recipe checked) := do
+private def prepareOrigin {checked : Checked} (origin : ArtifactOrigin checked) :
+    Except Error (Recipe checked origin.definitions) := do
+  let prepared := origin.base
+  let closures := origin.closures
   let program := prepared.sourceProgram
-  let inputContext ← match prepared.sourceInputs with
-    | some ready => pure ready.context
+  let inputContext ← match origin.inputContext? with
+    | some ready => pure ready
     | none => throw ⟨[], .sourceInputsUnavailable⟩
   unless checked.catalog.callableContracts do throw ⟨[], .unsupportedCallableProfile⟩
   let table ← match prepared.callableContext with
     | some native => pure native.table | none => throw ⟨[], .missingCodebook⟩
-  unless prepared.globals.length = prepared.closures.length do throw ⟨[], .malformedTemplate 0⟩
+  unless prepared.globals.length = closures.length do throw ⟨[], .malformedTemplate 0⟩
   let mut named := []
-  for ((signature, expression), index) in (prepared.globals.zip prepared.closures).zipIdx do
+  for ((signature, expression), index) in (prepared.globals.zip closures).zipIdx do
     let specialized ← (SourceCompilationPlan.exactSpecialization prepared.plan signature.key).mapError (fun error => ⟨[], .source error⟩)
     let evidence ← (SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program signature.key specialized.assumptions)
       |>.mapError (fun error => ⟨[], .source error⟩)
@@ -118,7 +142,7 @@ def prepare {checked : Checked} (prepared : Prepared checked) :
       | _ => throw ⟨[], .malformedTemplate index⟩
     unless input = signature.parameterType && output = Core.LanguageResult.resultType signature.resultType do
       throw ⟨[], .templateTypeMismatch index⟩
-    unless Core.infer? ((List.replicate index .unit) ++ inputContext.coreContext) template checked.catalog.definitions =
+    unless Core.infer? ((List.replicate index .unit) ++ inputContext.coreContext) template origin.definitions =
         some signature.functionType do throw ⟨[], .templateTypeMismatch index⟩
     named := named ++ [⟨signature.key, specialized.function.type, evidence, ← identified index,
       ← descriptor table (.named signature.key), prepared.globals.length - 1 - index,
@@ -129,14 +153,20 @@ def prepare {checked : Checked} (prepared : Prepared checked) :
       | _ => throw ⟨[], .malformedTemplate index⟩
     pure (⟨function, ← identified (prepared.globals.length + index),
       ← descriptor table (.builtin function), input, output, body⟩ : Builtin)
-  pure (.mk prepared named builtins)
+  pure (.mk origin rfl named builtins)
 
-structure Snapshot {checked : Checked} (recipe : Recipe checked) where private mk ::
+def prepare {checked : Checked} (prepared : Prepared checked) : Except Error (Recipe checked) :=
+  prepareOrigin (.ordinary prepared)
+
+def prepareMarked {checked : Checked} (prepared : SourceCoreCompatibleMarkedFunctions.Prepared checked) :
+    Except Error (Recipe checked prepared.layouts.definitions) := prepareOrigin (.marked prepared)
+
+structure Snapshot {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) where private mk ::
   store : Core.Store
-  stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store checked.catalog.definitions
+  stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store definitions
   private slots : ∀ row ∈ recipe.named, store[row.location]? = some (.inRight .unit row.closure)
 
-private def slotError {checked : Checked} (recipe : Recipe checked) (store : Core.Store) : Error :=
+private def slotError {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (store : Core.Store) : Error :=
   match recipe.named.find? (fun row => store[row.location]? != some (.inRight .unit row.closure)) with
   | some row => match store[row.location]? with
     | none => ⟨[], .missingGlobalSlot row.location⟩
@@ -146,15 +176,15 @@ private def slotError {checked : Checked} (recipe : Recipe checked) (store : Cor
 /-- A typed native completion supplies the store proof. Every named slot must
 still equal the cache's exact fresh installation, including administrative
 captures. This rejects foreign, missing and edited callable stores. -/
-def snapshot {checked : Checked} (recipe : Recipe checked) (store : Core.Store)
-    (stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store checked.catalog.definitions) :
+def snapshot {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (store : Core.Store)
+    (stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store definitions) :
     Except Error (Snapshot recipe) := do
   if slots : ∀ row ∈ recipe.named, store[row.location]? = some (.inRight .unit row.closure) then
     pure (.mk store stored slots)
   else throw (slotError recipe store)
 
-theorem snapshot_store {checked : Checked} {recipe : Recipe checked} {store : Core.Store}
-    {stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store checked.catalog.definitions}
+theorem snapshot_store {checked : Checked} {definitions : Core.DataEnvironment} {recipe : Recipe checked definitions} {store : Core.Store}
+    {stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store definitions}
     {result : Snapshot recipe} (accepted : snapshot recipe store stored = .ok result) : result.store = store := by
   unfold snapshot at accepted
   split at accepted
@@ -195,11 +225,11 @@ private def metadata (context : Values) (expected : Ty) (id : Core.Word) : Excep
   discard <| compatible expected value.type
   pure value
 
-private def callable {checked : Checked} (recipe : Recipe checked) (expected : Ty) (value : Core.Value) : Except Error SourceValue := do
+private def callable {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (expected : Ty) (value : Core.Value) : Except Error SourceValue := do
   let (identity, closure, id) ← match value with
     | .pair (.pair (.inRight .unit (.word identity)) closure) (.word id) => pure (identity, closure, id)
     | .pair (.pair (.inLeft .word .unit) _) (.word id) =>
-        let table ← match recipe.prepared.callableContext with
+        let table ← match recipe.origin.base.callableContext with
           | some native => pure native.table | none => throw ⟨[], .missingCodebook⟩
         let row ← match table.entryAt? id with
           | some row => pure row | none => throw ⟨[], .unknownDescriptor id⟩
@@ -209,7 +239,7 @@ private def callable {checked : Checked} (recipe : Recipe checked) (expected : T
     | .hostFunction .. => throw ⟨[], .externalHostUnsupported⟩
     | .cellRef .. => throw ⟨[], .externalReferenceUnsupported⟩
     | _ => throw ⟨[], .callablePayloadMismatch⟩
-  let table ← match recipe.prepared.callableContext with
+  let table ← match recipe.origin.base.callableContext with
     | some native => pure native.table | none => throw ⟨[], .missingCodebook⟩
   let entry ← match table.entryAt? id with
     | some entry => pure entry | none => throw ⟨[], .unknownDescriptor id⟩
@@ -236,7 +266,7 @@ private def callable {checked : Checked} (recipe : Recipe checked) (expected : T
   | .lambda .. => throw ⟨[], .lambdaExportRequiresLedger entry.origin⟩
 
 mutual
-  private def decodeRaw {checked : Checked} : Nat → Recipe checked → Values → Ty → Core.Value → Except Error SourceValue
+  private def decodeRaw {checked : Checked} {definitions : Core.DataEnvironment} : Nat → Recipe checked definitions → Values → Ty → Core.Value → Except Error SourceValue
     | 0, _, _, _, _ => throw ⟨[], .exhausted⟩
     | fuel + 1, recipe, context, expected, value => do
         if dataOnly value then
@@ -273,7 +303,7 @@ mutual
           | _, .hostFunction .. => throw ⟨[], .externalHostUnsupported⟩
           | _, _ => throw ⟨[], .callablePayloadMismatch⟩
 
-  private def decodePayloads {checked : Checked} : Nat → Recipe checked → Values → List Ty → Core.Value → Nat → Except Error (List SourceValue)
+  private def decodePayloads {checked : Checked} {definitions : Core.DataEnvironment} : Nat → Recipe checked definitions → Values → List Ty → Core.Value → Nat → Except Error (List SourceValue)
     | _, _, _, [], .unit, _ => pure []
     | 0, _, _, _, _, _ => throw ⟨[], .exhausted⟩
     | fuel + 1, recipe, context, [type], value, index =>
@@ -284,7 +314,7 @@ mutual
         pure (value :: rest)
     | _, _, _, _, _, _ => throw ⟨[], .codec .malformedPayload⟩
 
-  private def decodeEntries {checked : Checked} : Nat → Recipe checked → Values → Ty → Ty →
+  private def decodeEntries {checked : Checked} {definitions : Core.DataEnvironment} : Nat → Recipe checked definitions → Values → Ty → Ty →
       Core.OrderedMapping.Layout → Core.Value → Nat → Except Error (List (SourceValue × SourceValue))
     | 0, _, _, _, _, _, _, _ => throw ⟨[], .exhausted⟩
     | fuel + 1, recipe, context, keyType, valueType, layout, stored, index => do
@@ -303,28 +333,28 @@ mutual
         | _ => throw ⟨[], .codec .malformedPayload⟩
 end
 
-structure Decoded {checked : Checked} (recipe : Recipe checked) (snapshot : Snapshot recipe)
+structure Decoded {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (snapshot : Snapshot recipe)
     (context : Values) (expected : Ty) (core : Core.Value) where private mk ::
   source : SourceValue
   type : Core.Ty
   projected : checked.catalog.project expected = .ok type
-  typed : Core.RuntimeValueHasType (snapshot.store.map Core.Value.type) core type checked.catalog.definitions
+  typed : Core.RuntimeValueHasType (snapshot.store.map Core.Value.type) core type definitions
   private reversed : ∃ fuel, decodeRaw fuel recipe context expected core = .ok source
 
 /-- Typed Core success supplies the world proof, while the sealed recipe and
 snapshot authenticate executable leaves. Raw external capabilities never
 become source data. The context ownership proof retains the native profile. -/
-def decode {checked : Checked} (recipe : Recipe checked) (snapshot : Snapshot recipe)
+def decode {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (snapshot : Snapshot recipe)
     (context : Values) (owner : context.checked = checked) (expected : Ty) (core : Core.Value)
     (type : Core.Ty) (projected : checked.catalog.project expected = .ok type)
-    (typed : Core.RuntimeValueHasType (snapshot.store.map Core.Value.type) core type checked.catalog.definitions)
+    (typed : Core.RuntimeValueHasType (snapshot.store.map Core.Value.type) core type definitions)
     (fuel : Nat := 1024) : Except Error (Decoded recipe snapshot context expected core) := do
   let _ := owner
   match reversed : decodeRaw fuel recipe context expected core with
   | .error error => throw error
   | .ok source => pure (.mk source type projected typed ⟨fuel, reversed⟩)
 
-structure Completion {checked : Checked} (recipe : Recipe checked) (context : Values) (expected : Ty) where private mk ::
+structure Completion {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (context : Values) (expected : Ty) where private mk ::
   snapshot : Snapshot recipe
   core : Core.Value
   decoded : Decoded recipe snapshot context expected core
@@ -332,23 +362,23 @@ structure Completion {checked : Checked} (recipe : Recipe checked) (context : Va
 /-- Extract the actual finite world from the typed native observation; this
 uses store annotations and the proved uniqueness of a store's typing world.
 It does not run or inspect any source evaluator. -/
-def decodeSuccess {checked : Checked} (recipe : Recipe checked) (context : Values)
+def decodeSuccess {checked : Checked} {definitions : Core.DataEnvironment} (recipe : Recipe checked definitions) (context : Values)
     (owner : context.checked = checked) (expected : Ty) {type : Core.Ty}
     (projected : checked.catalog.project expected = .ok type)
-    (result : SourceCoreGeneralEntry.Result checked.catalog.definitions type)
+    (result : SourceCoreGeneralEntry.Result definitions type)
     (fuel : Nat := 1024) : Except Error (Completion recipe context expected) := do
   match observed : result.observation with
   | .succeeded value store =>
-      let stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store checked.catalog.definitions := by
+      let stored : Core.RuntimeStoreHasTypes (store.map Core.Value.type) store definitions := by
         obtain ⟨_, stored, _⟩ := result.success_typed observed
         simpa only [stored.world_eq] using stored
-      let typed : Core.RuntimeValueHasType (store.map Core.Value.type) value type checked.catalog.definitions := by
+      let typed : Core.RuntimeValueHasType (store.map Core.Value.type) value type definitions := by
         obtain ⟨_, stored, typed⟩ := result.success_typed observed
         simpa only [stored.world_eq] using typed
       match accepted : snapshot recipe store stored with
       | .error error => throw error
       | .ok snapshot =>
-          have typed : Core.RuntimeValueHasType (snapshot.store.map Core.Value.type) value type checked.catalog.definitions := by
+          have typed : Core.RuntimeValueHasType (snapshot.store.map Core.Value.type) value type definitions := by
             rw [snapshot_store accepted]
             exact typed
           let decoded ← decode recipe snapshot context owner expected value type projected typed fuel
