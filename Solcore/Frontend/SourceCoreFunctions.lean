@@ -38,6 +38,14 @@ inductive CallableOrigin where
   | builtin (function : BuiltinFunctionId)
   deriving Repr
 
+/-- A profile may add a typed, pure manifest after parameter binding and
+before callable decoration. The enclosing assembled Core checker validates
+its result under the same packed-argument/captured-environment convention. -/
+abbrev RawLambdaBodyHook := Context → TypedSource → Scope → ExpressionNode →
+  Core.Ty → Core.Ty → Core.Expr → Except Error Core.Expr
+
+def unchangedLambdaBody : RawLambdaBodyHook := fun _ _ _ _ _ _ body => pure body
+
 /-- Shared expression/evidence traversal uses one callable representation.
 Decoration receives a language result containing the raw tagged function;
 the call hook owns the guard protocol before arguments and application.
@@ -57,6 +65,7 @@ additional data leaves. The recursive traversal and call order remain shared.
 The leaf callback receives the same recursive expression compiler, so nominal
 payloads can contain calls and closures without a second evaluator. -/
 structure Policy where
+  rawLambdaBody : RawLambdaBodyHook := unchangedLambdaBody
   callables : CallablePolicy := {}
   sourceCells : Option SourceCoreSourceCells.Allocator := none
   projectType : SourceCoreElaboration.ErrorSite → TypeSystem.Ty → Except Error Core.Ty :=
@@ -276,6 +285,7 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                 | some allocate =>
                     SourceCoreSourceCells.bindParameters allocate source scope parameters resultCore
                       argumentProjection (body.weakenAt parameters.length)
+              let rawBody ← policy.rawLambdaBody context source scope node parameterCore resultCore rawBody
               SourceCoreBasic.ensureType site type (policy.callables.functionType parameterCore resultCore)
               let expression ← policy.callables.decorateCallable context source node (.lambda id) parameterCore resultCore
                 (Core.LanguageResult.success (Core.TaggedFunction.anonymous

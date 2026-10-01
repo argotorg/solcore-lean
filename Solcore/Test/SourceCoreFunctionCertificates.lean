@@ -47,7 +47,7 @@ private def emitted : SourceCoreBasic.LoweredExpr := ⟨functionType,
 
 private theorem artifact_exists : Nonempty
     (LambdaCertificate bodyCertificate policy source scope id node [] .unit [] functionType emitted) := by
-  apply lambda_of_accepted (ordinaryCells := rfl) (lowerBody := lowerBody) (fuel := 1) (context := compilation)
+  apply lambda_of_accepted (ordinaryCells := rfl) (ordinaryBody := rfl) (lowerBody := lowerBody) (fuel := 1) (context := compilation)
     (reasonAt := fun _ => Core.Word.zero) rfl rfl rfl rfl rfl
   · intro budget bodyScope type code accepted
     simp only [lowerBody, SourceCoreBasic.lowerStatements] at accepted

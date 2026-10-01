@@ -55,7 +55,7 @@ variable {table : SourceCoreStageCodebook.Table}
 private theorem artifact_exists : Nonempty
     (DecoratedFunctionCode.LambdaCertificate bodyCertificate (policy descriptor) compilation source [] id node
       [] .unit [] functionType (emitted descriptor)) := by
-  apply DecoratedFunctionCode.lambda_of_accepted (ordinaryCells := rfl) (lowerBody := lowerBody) (fuel := 0)
+  apply DecoratedFunctionCode.lambda_of_accepted (ordinaryCells := rfl) (ordinaryBody := rfl) (lowerBody := lowerBody) (fuel := 0)
     (policy := policy descriptor) (context := compilation) (source := source) (scope := []) (id := id) (node := node)
     (reasonAt := fun _ => Core.Word.zero) rfl rfl rfl rfl
   · intro budget bodyScope type code accepted

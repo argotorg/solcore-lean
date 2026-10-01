@@ -57,6 +57,8 @@ structure Representation where
   loops : List SolvedRequirement → SourceCoreAssignmentFaultSites.Table →
     SourceCoreDataPlaceFaultSites.Program → Key → SourceCoreFunctions.ExpressionLowerer →
     SourceCoreLoops.Policy
+  rawLambdaBodyAt : Key → TypeSystem.Substitution → SourceCoreFunctions.RawLambdaBodyHook :=
+    fun _ _ => expressions.rawLambdaBody
   allocatorAt : Key → TypeSystem.Substitution → Option SourceCoreSourceCells.Allocator :=
     fun _ _ => expressions.sourceCells
   loopsWithSourceCells : Option SourceCoreSourceCells.Allocator →
@@ -68,7 +70,8 @@ structure Representation where
 def Representation.atContext (representation : Representation) (owner : Key)
     (active : TypeSystem.Substitution) : Representation :=
   {representation with expressions := {representation.expressions with
-    sourceCells := representation.allocatorAt owner active}}
+    sourceCells := representation.allocatorAt owner active
+    rawLambdaBody := representation.rawLambdaBodyAt owner active}}
 
 private def prepareInputs (representation : Representation) (source : TypedSource) :
     SourceCoreBasic.Scope → List TypedBinder → Except Error (List (TypedBinder × Core.Ty))

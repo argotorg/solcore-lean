@@ -2,7 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.FunctionCodeCertificates
 
 /-! Actual lambda compilation with a callable representation hook. The raw
 lambda code certificate is retained beneath the hook's exact accepted result.
-The parameter wrapper uses ordinary source-cell allocation. The hook is not
+The parameter wrapper uses ordinary source-cell allocation and the unchanged
+raw lambda-body hook. The hook is not
 assumed to preserve meaning: the concrete representation layer
 must authenticate its decoration separately. Special-expression handling must
 fall through at this occurrence; a successful special hook is another branch. -/
@@ -45,6 +46,7 @@ theorem lambda_of_accepted
     {reportedType : Core.Ty} {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
     (ordinary : SpecialPasses policy lowerBody fuel context source scope id reasonAt)
     (ordinaryCells : policy.sourceCells = none)
+    (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
     (found : source.lookupExpression? id = some node)
     (read : policy.readExpression source id = .ok (node, reportedType))
     (form : node.form = .lambda parameters resultType statements)
@@ -98,7 +100,8 @@ theorem lambda_of_accepted
                       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (min budget fuel) context
                         childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
                           reasonAt context.internalReason context.internalReason = _ at compiledBody
-                    simp only [compiledBody, ordinaryCells] at accepted
+                    simp only [compiledBody, ordinaryCells, ordinaryBody, SourceCoreFunctions.unchangedLambdaBody,
+                      pure, Except.pure] at accepted
                     cases checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
                         (policy.callables.functionType parameterCore resultCore) with
                     | error error => simp [checked] at accepted
@@ -138,6 +141,7 @@ theorem lambda_of_accepted_metadata
     {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
     (ordinary : SpecialPasses policy lowerBody fuel context source scope id reasonAt)
     (ordinaryCells : policy.sourceCells = none)
+    (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
     (found : source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters resultType statements)
     (readSound : ∀ selected type, policy.readExpression source id = .ok (selected, type) →
@@ -167,6 +171,6 @@ theorem lambda_of_accepted_metadata
     obtain ⟨selected, type⟩ := pair
     have same := Option.some.inj ((readSound selected type read).symm.trans found)
     subst selected
-    exact ⟨type, lambda_of_accepted ordinary ordinaryCells found read form extractBody accepted⟩
+    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody found read form extractBody accepted⟩
 
 end Solcore.SourceSemantics.CoreLowering.DecoratedFunctionCode

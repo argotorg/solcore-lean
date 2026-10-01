@@ -95,7 +95,8 @@ structure LambdaCertificate (bodyCertificate : BodyCertificate)
 /-- Static extraction is relative to the chosen metadata policy and body
 compiler.  Their certificates are kept explicit, and no child evaluation is
 assumed. This certificate uses the default tagged callable representation,
-ordinary source-cell allocation and an absent special-expression hook. -/
+ordinary source-cell allocation, the unchanged lambda-body hook and an absent
+special-expression hook. -/
 theorem lambda_of_accepted
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy}
     {lowerBody : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -105,6 +106,7 @@ theorem lambda_of_accepted
     {reportedType : Core.Ty} {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
     (ordinary : policy.lowerSpecial? = none)
     (ordinaryCells : policy.sourceCells = none)
+    (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
     (defaultCallables : policy.callables = {})
     (found : source.lookupExpression? id = some node)
     (read : policy.readExpression source id = .ok (node, reportedType))
@@ -153,7 +155,8 @@ theorem lambda_of_accepted
                       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (min budget fuel) context
                         childSource childScope childId childReasonAt) fuel source bodyScope statements resultCore
                           reasonAt context.internalReason context.internalReason = _ at compiledBody
-                    simp only [compiledBody, pure, Except.pure, defaultCallables] at accepted
+                    simp only [compiledBody, pure, Except.pure, defaultCallables, ordinaryBody,
+                      SourceCoreFunctions.unchangedLambdaBody] at accepted
                     cases checked : SourceCoreBasic.ensureType (.occurrence id.occurrence) reportedType
                         (Core.TaggedFunction.functionType parameterCore resultCore) with
                     | error error => simp [checked] at accepted
@@ -181,6 +184,7 @@ theorem lambda_of_accepted_metadata
     {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
     (ordinary : policy.lowerSpecial? = none)
     (ordinaryCells : policy.sourceCells = none)
+    (ordinaryBody : policy.rawLambdaBody = SourceCoreFunctions.unchangedLambdaBody)
     (defaultCallables : policy.callables = {})
     (found : source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters resultType statements)
@@ -205,7 +209,7 @@ theorem lambda_of_accepted_metadata
     obtain ⟨selected, type⟩ := pair
     have same := Option.some.inj ((readSound selected type read).symm.trans found)
     subst selected
-    exact ⟨type, lambda_of_accepted ordinary ordinaryCells defaultCallables found read form extractBody accepted⟩
+    exact ⟨type, lambda_of_accepted ordinary ordinaryCells ordinaryBody defaultCallables found read form extractBody accepted⟩
 
 def LambdaCertificate.rawBody
     {bodyCertificate : BodyCertificate} {policy : SourceCoreFunctions.Policy} {source : TypedSource}
