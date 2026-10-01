@@ -253,6 +253,16 @@ def Session.start {artifact : Artifact} (session : Session artifact) (key : Key)
       let checkpoint ← native.start key arguments fuel
       pure ⟨checkpoint⟩
 
+/-- Start the owned callable with its source parameters packed into one value.
+The native descriptor retains arity and the existing staging guards. -/
+def Session.startHandlePacked {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (argument : Value) (fuel : Nat := 1024) : Except SourceCoreIndexedSession.Error (Checkpoint artifact) :=
+  match artifact, session with
+  | ⟨_, .empty _⟩, ⟨_⟩ => .error ⟨[], .unknownHandle⟩
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => do
+      let checkpoint ← native.startHandlePacked handle argument fuel
+      pure ⟨checkpoint⟩
+
 def Session.Authenticates {artifact : Artifact} (session : Session artifact)
     (fuel : Nat) (expected : TypeSystem.Ty) (value : Value) : Prop :=
   match artifact, session with
@@ -286,6 +296,12 @@ def Checkpoint.diagnostic {artifact : Artifact} (checkpoint : Checkpoint artifac
   match artifact, checkpoint with
   | ⟨_, .empty _⟩, ⟨impossible⟩ => nomatch impossible
   | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.diagnostic reason
+
+def Session.handleDiagnostic {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (reason : Core.Word) : Except SourceCoreIndexedSession.Error (Option SourceCoreFaultSites.Diagnostic) :=
+  match artifact, session with
+  | ⟨_, .empty _⟩, ⟨_⟩ => .error ⟨[], .unknownHandle⟩
+  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.handleDiagnostic handle reason
 
 structure Completion (artifact : Artifact) where private mk ::
   value : Value
@@ -344,6 +360,12 @@ def Checkpoint.resume {artifact : Artifact} (checkpoint : Checkpoint artifact) (
 def Session.run {artifact : Artifact} (session : Session artifact) (key : Key)
     (arguments : List Value) (options : RunOptions := {}) : IO (Except SourceCoreIndexedSession.Error (Outcome artifact)) := do
   match session.start key arguments options.inputValidationFuel with
+  | .error error => pure (.error error)
+  | .ok checkpoint => pure (.ok (← checkpoint.resume options.executionFuel options.outputValidationFuel))
+
+def Session.invokePacked {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (argument : Value) (options : RunOptions := {}) : IO (Except SourceCoreIndexedSession.Error (Outcome artifact)) := do
+  match session.startHandlePacked handle argument options.inputValidationFuel with
   | .error error => pure (.error error)
   | .ok checkpoint => pure (.ok (← checkpoint.resume options.executionFuel options.outputValidationFuel))
 

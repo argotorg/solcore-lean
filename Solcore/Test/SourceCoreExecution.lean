@@ -22,6 +22,9 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def word (n : Nat) : Value := .word (Core.Word.ofNatModulo n)
+private def handle : Value → IO Handle
+  | .function handle => pure handle
+  | _ => throw (IO.userError "public function did not export an owned handle")
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
     "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(step: Word) { seed += step; return seed; }; }",
@@ -32,6 +35,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function spin() returns (Word) { while (true) {} return 0; }",
     "function main() returns (Word) { return 55; }",
     "function uninitialized() returns (Word) { let absent: Word; return absent; }",
+    "function marked(comptime value: Word) returns (Word) { return value; }",
     "export {recurse};"
   ]}] }
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -69,10 +73,10 @@ example {raw : Workspace.RawWorkspace} {options : Options} {compiled : StaticWor
 
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
-  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized"].mapM (seed program)
+  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked"].mapM (seed program)
   let options : Options := {specializationBudget := 256, compilationFuel := 1000}
   let compiled ← get "public single compilation" (compile workspace seeds options)
-  require (compiled.rootCount == 8 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
+  require (compiled.rootCount == 9 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
   let key (index : Nat) : IO Key := match compiled.keys[index]? with
     | some key => pure key | none => throw (IO.userError "public root missing")
   let artifact ← compiled.open
@@ -81,7 +85,7 @@ def run : IO Unit := do
     | .outOfFuel pending => pure pending | _ => throw (IO.userError "public bootstrap did not suspend")
   let initial ← match pending.resume 300000 with
     | .ready session => pure session | _ => throw (IO.userError "public bootstrap resume failed")
-  require (artifact.rootCount == 8 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
+  require (artifact.rootCount == 9 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
   let made ← execute initial (← key 0) [word 10]
   let first ← execute made.session (← key 1) [made.value, word 2]
   let second ← execute first.session (← key 1) [made.value, word 3]
@@ -117,6 +121,34 @@ def run : IO Unit := do
   match ← foreign.run (← key 1) [made.value, word 1] {executionFuel := 300000} with
   | .error {code := .foreignArtifact, ..} => pure ()
   | _ => throw (IO.userError "public boundary accepted foreign handle")
+  let directStart ← get "public direct handle start"
+    (afterFault.startHandlePacked (← handle made.value) (word 4))
+  let directPending ← match ← directStart.resume 0 with
+    | .outOfFuel pending => pure pending
+    | _ => throw (IO.userError "public direct call did not suspend at zero fuel")
+  let direct ← match ← directPending.resume 300000 with
+    | .succeeded completion => pure completion
+    | _ => throw (IO.userError "public direct call did not resume")
+  require (direct.value == word 23) "public direct invocation lost shared capture"
+  let integer ← match ← direct.session.invokePacked (← handle builtin.value) (word 8) {executionFuel := 300000} with
+    | .ok (.succeeded completion) => pure completion
+    | _ => throw (IO.userError "public direct builtin invocation failed")
+  require (integer.value == .integer 8) "public direct builtin changed result"
+  let absent ← get "public direct failing handle" (← integer.session.named (← key 7))
+  let absentHandle ← handle absent.value
+  let afterDirectFault ← match ← absent.session.invokePacked absentHandle .unit {executionFuel := 300000} with
+    | .ok (.failed reason session) =>
+        match ← get "public direct diagnostic" (session.handleDiagnostic absentHandle reason) with
+        | some {error := .uninitializedLocal _, span := some _, ..} => pure session
+        | _ => throw (IO.userError "public direct fault lost source diagnosis")
+    | _ => throw (IO.userError "public direct fault changed outcome")
+  let marked ← get "public marked handle" (← afterDirectFault.named (← key 8))
+  match marked.session.startHandlePacked (← handle marked.value) (.bool true) 0 with
+  | .error {code := .stagedInvocationRequired _, ..} => pure ()
+  | _ => throw (IO.userError "public direct invocation bypassed source staging guard")
+  match foreign.startHandlePacked (← handle made.value) (word 1) with
+  | .error {code := .foreignArtifact, ..} => pure ()
+  | _ => throw (IO.userError "public direct invocation accepted a foreign artifact handle")
   let spinning ← get "public spin start" (afterFault.start (← key 5) [])
   let spinning ← match ← spinning.resume 200 with
     | .outOfFuel next => pure next | _ => throw (IO.userError "public spin completed")
@@ -129,6 +161,9 @@ def run : IO Unit := do
   match ← emptySession.run (← key 0) [] with
   | .error {code := .missingEntry _, ..} => pure ()
   | _ => throw (IO.userError "empty public session accepted a call")
+  match emptySession.startHandlePacked (← handle made.value) (word 1) with
+  | .error {code := .unknownHandle, ..} => pure ()
+  | _ => throw (IO.userError "empty public session accepted a callable handle")
   let mainCompiled ← get "public conventional main" (compileEntry workspace options)
   require (mainCompiled.rootCount == 1) "public main gained another root"
   let mainArtifact ← mainCompiled.open
