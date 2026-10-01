@@ -168,7 +168,9 @@ private def localError (id : ExpressionId) (node : ExpressionNode)
   | .metadata error => error
   | _ => .unsupportedExpression id node.form
 
-private def contextualBinder (representation : Representation) (locals : SourceCoreLocalPolymorphism.Catalog)
+/-- The production binder policy, retained in static receipts connecting an
+accepted function body to its exact contextual statement traversal. -/
+def contextualBinder (representation : Representation) (locals : SourceCoreLocalPolymorphism.Catalog)
     (owner : Key) (active : TypeSystem.Substitution) (source : TypedSource)
     (scope : SourceCoreBasic.Scope) (binder : TypedBinder) : Except SourceCoreBasic.Error Core.Ty :=
   if binder.scheme.quantified.isEmpty then representation.expressions.lowerBinder source scope binder
