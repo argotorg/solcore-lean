@@ -36,6 +36,9 @@ inductive ErrorCode where
   | missingBuiltin (function : BuiltinFunctionId)
   | missingContract (origin : SourceCoreStageCodebook.Origin)
   | identitySpaceExhausted
+  | notFunction (type : Ty)
+  | malformedCallable
+  | stagedInvocationRequired (origin : SourceCoreStageCodebook.Origin)
   | diagnostics (error : SourceCoreCompatibleDataPlaceFaultSites.Error)
   | invalidBootstrap
   deriving Repr
@@ -593,17 +596,99 @@ private def encodeArguments {artifact : Artifact} {world : Core.StoreTyping} (au
       pure ⟨tail.values, tail.owner, encoded.value :: tail.native, .cons validated.typed tail.typed⟩
   | sourceTypes, _, args => throw ⟨[], .argumentCountMismatch sourceTypes.length args.length⟩
 
+private structure Request (compiled : SourceCoreUnifiedCompilation.Compiled) where
+  result : Ty
+  type : Core.Ty
+  generated : compiled.compatible.checked.catalog.project result = .ok type
+  diagnosticKey : Option Key
+
+private def Root.request {compiled : SourceCoreUnifiedCompilation.Compiled} (root : Root compiled) : Request compiled :=
+  ⟨root.result, root.type, root.generated, some root.key⟩
+
 structure Checkpoint (artifact : Artifact) where private mk ::
   private origin : Session artifact
-  private root : Root artifact.recipe.compiled
+  private request : Request artifact.recipe.compiled
   private world : Core.StoreTyping
   private state : Core.State
   private stored : Core.RuntimeStoreHasTypes world state.store artifact.program.layouts.definitions
-  private typed : Core.StateHasType state (Core.LanguageResult.resultType root.type) artifact.program.layouts.definitions
+  private typed : Core.StateHasType state (Core.LanguageResult.resultType request.type) artifact.program.layouts.definitions
   private extension : Core.WorldExtends origin.world world
   private registry : Registry artifact world
   private values : Values
   private owner : values.checked = artifact.recipe.compiled.compatible.checked
+
+private def functionParts : Ty → Option (Ty × Ty)
+  | .function parameter result => some (parameter, result)
+  | .comptime type => functionParts type
+  | _ => none
+
+private structure CallableSelection (artifact : Artifact) (world : Core.StoreTyping) where
+  parameter : Ty
+  nativeParameter : Core.Ty
+  request : Request artifact.recipe.compiled
+  value : Core.Value
+  typed : Core.RuntimeValueHasType world value
+    (Core.CallableContract.functionType nativeParameter request.type) artifact.program.layouts.definitions
+
+/-- Resolve the actual retained callable before validating its packed input.
+The host boundary has runtime availability; it supplies no staged caller
+receipt. Existing compiled source calls keep their own exact stage guards. -/
+private def selectCallable {artifact : Artifact} (session : Session artifact) (handle : Handle) :
+    Except Error (CallableSelection artifact session.world) := do
+  let value ← resolve session.authority session.registry handle.sourceType handle
+  let .pair (.pair _ _) (.word descriptor) := value | throw ⟨[], .malformedCallable⟩
+  let table ← match artifact.program.base.callableContext with
+    | some native => pure native.table
+    | none => throw ⟨[], .malformedCallable⟩
+  let entry ← match table.entryAt? descriptor with
+    | some entry => pure entry
+    | none => throw ⟨[], .malformedCallable⟩
+  match entry.contract with
+  | none => pure ()
+  | some contract =>
+      if contract.stagedResult || contract.parameterStages.any id then
+        throw ⟨[], .stagedInvocationRequired entry.origin⟩
+  let (parameter, result) ← match functionParts handle.sourceType with
+    | some signature => pure signature
+    | none => throw ⟨[], .notFunction handle.sourceType⟩
+  let nativeParameter ← (artifact.recipe.compiled.compatible.checked.catalog.project parameter).mapError fromCatalog
+  match generated : artifact.recipe.compiled.compatible.checked.catalog.project result with
+  | .error error => throw (fromCatalog error)
+  | .ok nativeResult =>
+      let validated ← validateAt artifact.program.layouts.definitions session.world value
+        (Core.CallableContract.functionType nativeParameter nativeResult)
+      let key := match entry.origin with
+        | .named key | .lambda key .. => some key
+        | .builtin _ => none
+      pure ⟨parameter, nativeParameter, ⟨result, nativeResult, generated, key⟩, value, validated.typed⟩
+
+private def packedInvocation : Core.Expr :=
+  .apply (.second (.first (.var 0))) (.var 1)
+
+private theorem packedInvocation_typed {definitions : Core.DataEnvironment} {context : Core.Context}
+    (parameter result : Core.Ty) : Core.HasType
+      (Core.CallableContract.functionType parameter result :: parameter :: context)
+      packedInvocation (Core.LanguageResult.resultType result) definitions :=
+  .apply (.second (.first (.var rfl))) (.var rfl)
+
+/-- Invoke one packed source parameter value: Unit for zero parameters, the
+value itself for one, and a right-associated product for multiple parameters.
+The actual descriptor owns source arity; tuple grouping is never inferred from
+a host list. Contracts needing staged availability are rejected before input
+encoding. Only an owned registry handle supplies native code. -/
+def Session.startHandlePacked {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (argument : Value) (fuel : Nat := 1024) : Except Error (Checkpoint artifact) := do
+  let selected ← selectCallable session handle
+  discard <| checkGlobals artifact session.store
+  let encoded ← encodeArguments session.authority session.registry fuel session.values session.owner
+    [selected.parameter] [selected.nativeParameter] [argument]
+  let native := selected.value :: encoded.native ++ environment artifact
+  have inputs : Core.RuntimeEnvironmentHasTypes session.world native
+      (Core.CallableContract.functionType selected.nativeParameter selected.request.type :: selected.nativeParameter :: context artifact)
+      artifact.program.layouts.definitions :=
+    .cons selected.typed (environment_append encoded.typed session.environmentTyped)
+  pure ⟨session, selected.request, session.world, .initial packedInvocation native session.store, session.stored,
+    .eval session.stored inputs (packedInvocation_typed _ _) .nil, .refl _, session.registry, encoded.values, encoded.owner⟩
 
 /-- Start only a cached root body. Arguments enter the native environment as
 proved values; source parameter allocations still occur in the compiled body.
@@ -619,17 +704,19 @@ def Session.start {artifact : Artifact} (session : Session artifact) (key : Key)
     environment_reverse encoded.typed
   have inputs : Core.RuntimeEnvironmentHasTypes session.world native (root.types.reverse ++ context artifact) artifact.program.layouts.definitions :=
     environment_append reversed session.environmentTyped
-  pure ⟨session, root, session.world, .initial root.body native session.store, session.stored,
+  pure ⟨session, root.request, session.world, .initial root.body native session.store, session.stored,
     .eval session.stored inputs root.typed .nil, .refl _, session.registry, encoded.values, encoded.owner⟩
 
-private def diagnosticTable (artifact : Artifact) (root : Root artifact.recipe.compiled)
+private def diagnosticTable (artifact : Artifact) (request : Request artifact.recipe.compiled)
     (values : Values) (owner : values.checked = artifact.recipe.compiled.compatible.checked) :
     Except Error SourceCoreFaultSites.Table := do
   have extension : SourceCoreRawMetadata.Extends artifact.recipe.compiled.compatible.checked.staticRegistry values.registry := by
     simpa only [owner] using values.extension
   let table ← match artifact.program.base.diagnostics with
     | some diagnostics => (diagnostics.tableForRegistry values.registry extension).mapError (fun error => ⟨[], .diagnostics error⟩)
-    | none => pure { owner := root.key.declaration, resultType := root.result, reads := [], escapedReason := Core.Word.zero }
+    | none => match request.diagnosticKey with
+      | some key => pure { owner := key.declaration, resultType := request.result, reads := [], escapedReason := Core.Word.zero }
+      | none => throw ⟨[], .invalidBootstrap⟩
   pure <| match artifact.program.base.callableDiagnostics with
     | none => table
     | some diagnostics => {table with additional := table.additional ++
@@ -641,14 +728,22 @@ def Session.diagnostic {artifact : Artifact} (session : Session artifact) (key :
     (reason : Core.Word) : Except Error (Option SourceCoreFaultSites.Diagnostic) := do
   let root ← match artifact.recipe.roots.find? (fun root => decide (root.key = key)) with
     | some root => pure root | none => throw ⟨[], .missingEntry key⟩
-  let table ← diagnosticTable artifact root session.values session.owner
+  let table ← diagnosticTable artifact root.request session.values session.owner
+  pure (table.diagnostic? reason)
+
+/-- A failed direct handle call retains its owned callable origin and raw
+metadata registry, including writes made before the language failure. -/
+def Session.handleDiagnostic {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (reason : Core.Word) : Except Error (Option SourceCoreFaultSites.Diagnostic) := do
+  let selected ← selectCallable session handle
+  let table ← diagnosticTable artifact selected.request session.values session.owner
   pure (table.diagnostic? reason)
 
 /-- A pending request retains newly interned input metadata even before it
 finishes; diagnostic lookup uses that registry rather than its origin's. -/
 def Checkpoint.diagnostic {artifact : Artifact} (checkpoint : Checkpoint artifact)
     (reason : Core.Word) : Except Error (Option SourceCoreFaultSites.Diagnostic) := do
-  let table ← diagnosticTable artifact checkpoint.root checkpoint.values checkpoint.owner
+  let table ← diagnosticTable artifact checkpoint.request checkpoint.values checkpoint.owner
   pure (table.diagnostic? reason)
 
 private structure Exported {artifact : Artifact} (world : Core.StoreTyping)
@@ -749,7 +844,7 @@ private def complete {artifact : Artifact} (checkpoint : Checkpoint artifact) (g
     obtain ⟨_, _, path⟩ := Core.runStateful_sound finished
     obtain ⟨future, extension, typed⟩ := path.preserve_store_world checkpoint.typed checkpoint.stored
     simpa only [typed.world_eq, Core.State.final, Core.State.store] using extension
-  have typed : Core.RuntimeValueHasType world value (Core.LanguageResult.resultType checkpoint.root.type)
+  have typed : Core.RuntimeValueHasType world value (Core.LanguageResult.resultType checkpoint.request.type)
       artifact.program.layouts.definitions := by
     obtain ⟨future, typedStore, typedValue⟩ := Core.well_typed_runStateful_preserves_result_type checkpoint.typed finished
     simpa only [typedStore.world_eq] using typedValue
@@ -763,7 +858,7 @@ private def complete {artifact : Artifact} (checkpoint : Checkpoint artifact) (g
       rw [decoded] at found
       cases found)
   | some outcome =>
-      have related : outcome.RuntimeHasType world checkpoint.root.type artifact.program.layouts.definitions := by
+      have related : outcome.RuntimeHasType world checkpoint.request.type artifact.program.layouts.definitions := by
         obtain ⟨actual, found, related⟩ := Core.LanguageResult.decode?_runtime_typed typed
         rw [decoded] at found
         cases found
@@ -771,13 +866,13 @@ private def complete {artifact : Artifact} (checkpoint : Checkpoint artifact) (g
       match outcome with
       | .failed reason => .failed reason session
       | .succeeded payload =>
-          match exportValue checkpoint.origin.authority generation boundaryFuel checkpoint.values registry checkpoint.root.result payload with
+          match exportValue checkpoint.origin.authority generation boundaryFuel checkpoint.values registry checkpoint.request.result payload with
           | .error error => .exportError error session
           | .ok exported => by
               let session : Session artifact := {session with registry := exported.slots}
-              exact .succeeded ⟨exported.value, checkpoint.root.result, session, boundaryFuel,
-                ⟨exported.encoded, checkpoint.root.type, exported.reencoded, checkpoint.root.generated, by
-                  change Core.RuntimeValueHasType world exported.encoded.value checkpoint.root.type artifact.program.layouts.definitions
+              exact .succeeded ⟨exported.value, checkpoint.request.result, session, boundaryFuel,
+                ⟨exported.encoded, checkpoint.request.type, exported.reencoded, checkpoint.request.generated, by
+                  change Core.RuntimeValueHasType world exported.encoded.value checkpoint.request.type artifact.program.layouts.definitions
                   rw [exported.recovered]
                   exact related⟩,
                 checkpoint.origin, checkpoint.extension.trans extension⟩
@@ -791,7 +886,7 @@ private def suspend {artifact : Artifact} (checkpoint : Checkpoint artifact) (fu
   have stored : Core.RuntimeStoreHasTypes world state.store artifact.program.layouts.definitions := by
     obtain ⟨future, _, stored⟩ := Core.well_typed_runStateful_preserves_checkpoint_world checkpoint.typed checkpoint.stored exhausted
     simpa only [stored.world_eq] using stored
-  exact ⟨checkpoint.origin, checkpoint.root, world, state, stored,
+  exact ⟨checkpoint.origin, checkpoint.request, world, state, stored,
     Core.well_typed_runStateful_preserves_checkpoint_type checkpoint.typed exhausted,
     checkpoint.extension.trans extension, checkpoint.registry.weaken extension, checkpoint.values, checkpoint.owner⟩
 
@@ -808,6 +903,15 @@ def Session.run {artifact : Artifact} (session : Session artifact) (key : Key) (
   | .error error => pure (.error error)
   | .ok checkpoint => pure (.ok (← checkpoint.resume fuel boundaryFuel))
 
+/-- Direct host runtime invocation of the retained callable. It shares the
+same typed completion, language-failure, mutable heap and resume machinery as
+cached source roots. Staged source invocations remain compiled-root operations. -/
+def Session.invokePacked {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (argument : Value) (fuel : Nat) (boundaryFuel : Nat := 1024) : IO (Except Error (Outcome artifact)) := do
+  match session.startHandlePacked handle argument boundaryFuel with
+  | .error error => pure (.error error)
+  | .ok checkpoint => pure (.ok (← checkpoint.resume fuel boundaryFuel))
+
 theorem Completion.typed {artifact : Artifact} (completion : Completion artifact) :
     completion.session.Authenticates completion.boundaryFuel completion.sourceType completion.value := completion.authenticated
 
@@ -815,7 +919,7 @@ theorem Completion.world_extension {artifact : Artifact} (completion : Completio
     Core.WorldExtends completion.origin.world completion.session.world := completion.extension
 
 theorem Checkpoint.native_safe {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat) :
-    (Core.runStateful fuel checkpoint.state).HasType (Core.LanguageResult.resultType checkpoint.root.type) artifact.program.layouts.definitions :=
+    (Core.runStateful fuel checkpoint.state).HasType (Core.LanguageResult.resultType checkpoint.request.type) artifact.program.layouts.definitions :=
   Core.well_typed_runStateful_has_type checkpoint.typed fuel
 
 end Solcore.Frontend.SourceCoreIndexedSession
