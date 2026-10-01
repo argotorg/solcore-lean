@@ -1128,3 +1128,13 @@ def applySubstitution (substitution : Substitution)
 end TypedSource
 
 end Solcore.Frontend.SourceInference
+
+namespace Solcore.Frontend.SourceInference.DeclarationInstantiation
+open TypeSystem
+/-- Solving flexible types preserves the order of retained rigid keys. -/
+@[simp] theorem applySubstitution_parameterDomain (substitution : Substitution)
+    (instantiation : DeclarationInstantiation) :
+    (instantiation.applySubstitution substitution).parameterSubstitution.map Prod.fst =
+      instantiation.parameterSubstitution.map Prod.fst := by
+  simp [applySubstitution, applyFinalToParameters, List.map_map, Function.comp_def]
+end Solcore.Frontend.SourceInference.DeclarationInstantiation

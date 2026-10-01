@@ -3838,3 +3838,42 @@ theorem buildProgramSignatures_success_trait_structure_state
   · simp at success
 
 end Solcore.Frontend
+
+namespace Solcore.Frontend.ConstrainedDeclarationScheme
+private theorem freshParameterSubstitution_domain_reverse
+    (parameters : List TypeSystem.TypeParameterId) (next : Nat)
+    (substitution : TypeSystem.ParameterSubstitution)
+    (unique : parameters.Nodup)
+    (disjoint : ∀ parameter, parameter ∈ parameters → parameter ∉ substitution.map Prod.fst) :
+    (freshParameterSubstitution parameters next substitution).1.map Prod.fst =
+      parameters.reverse ++ substitution.map Prod.fst := by
+  induction parameters generalizing next substitution with
+  | nil => simp [freshParameterSubstitution]
+  | cons parameter parameters ih =>
+    obtain ⟨absent, unique⟩ := List.nodup_cons.mp unique
+    have missing : substitution.lookup? parameter = none := by
+      cases found : substitution.lookup? parameter with
+      | none => rfl
+      | some value =>
+        exact False.elim (disjoint parameter (by simp)
+          (List.mem_map.mpr ⟨(parameter, value), TypeSystem.ParameterSubstitution.lookup?_eq_some_mem found, rfl⟩))
+    simp only [freshParameterSubstitution, missing]
+    have remaining : ∀ candidate, candidate ∈ parameters →
+        candidate ∉ (((parameter, TypeSystem.Ty.variable ⟨next⟩) :: substitution).map Prod.fst) := by
+      intro candidate member known
+      simp only [List.map_cons, List.mem_cons] at known
+      rcases known with same | old
+      · exact absent (same.symm ▸ member)
+      · exact disjoint candidate (List.mem_cons_of_mem _ member) old
+    rw [ih (next + 1) ((parameter, TypeSystem.Ty.variable ⟨next⟩) :: substitution) unique remaining]
+    simp [List.reverse_cons, List.append_assoc]
+
+/-- The checker prepends freshly allocated substitutions, so retained declaration
+metadata follows reverse declaration order. Final type solving preserves it. -/
+theorem instantiate_parameterSubstitution_domain_reverse
+    (scheme : ConstrainedDeclarationScheme) (next : Nat)
+    (unique : scheme.parameters.Nodup) :
+    (scheme.instantiate next).parameterSubstitution.map Prod.fst = scheme.parameters.reverse := by
+  simpa only [instantiate, List.map_nil, List.append_nil] using
+    freshParameterSubstitution_domain_reverse scheme.parameters next [] unique (by simp)
+end Solcore.Frontend.ConstrainedDeclarationScheme

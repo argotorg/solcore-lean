@@ -1242,3 +1242,87 @@ theorem applySolvedRequirement_goal_alignment
   simp [applyCheckedFunction]
 
 end Solcore.Frontend.SourceSpecialization
+
+namespace Solcore.Frontend.SourceSpecialization
+open SourceInference TypeSystem
+private theorem canonicalSubstitution_parameterDomain
+    {declared : List TypeParameterId} {supplied canonical : ParameterSubstitution}
+    (accepted : canonicalSubstitution declared supplied = .ok canonical) :
+    canonical.map Prod.fst = declared := by
+  induction declared generalizing canonical with
+  | nil => cases accepted; rfl
+  | cons parameter rest ih =>
+    simp only [canonicalSubstitution] at accepted
+    split at accepted
+    · cases accepted
+    · split at accepted
+      · cases accepted
+      · cases remaining : canonicalSubstitution rest supplied with
+        | error error => simp [remaining, bind, Except.bind] at accepted
+        | ok tail =>
+          simp only [remaining, bind, Except.bind, pure, Except.pure, Except.ok.injEq] at accepted
+          subst canonical
+          simp only [List.map_cons, ih remaining]
+
+private theorem bind_ok {α β : Type} {computation : Except Error α} {next : α → Except Error β} {result : β}
+    (accepted : computation.bind next = .ok result) :
+    ∃ value, computation = .ok value ∧ next value = .ok result := by
+  cases computed : computation with
+  | error error => simp [computed, Except.bind] at accepted
+  | ok value => exact ⟨value, rfl, by simpa only [computed, Except.bind] using accepted⟩
+
+/-- Successful specialization records declaration-order substitutions, even
+when its request originally supplied the same bindings in a different order. -/
+theorem specializeFunction_parameterDomain {signature : ProgramFunctionSignature}
+    {function : CheckedFunction} {supplied : ParameterSubstitution} {specialized : SpecializedFunction}
+    (accepted : specializeFunction signature function supplied = .ok specialized) :
+    specialized.parameterSubstitution.map Prod.fst = signature.scheme.parameters := by
+  unfold specializeFunction at accepted
+  by_cases guard0 : (signature.id != function.declaration) = true
+  · simp only [guard0] at accepted
+    cases accepted
+  · simp only [guard0] at accepted
+    by_cases guard1 : (function.typedBody.owner != function.declaration) = true
+    · simp only [guard1] at accepted
+      cases accepted
+    · simp only [guard1] at accepted
+      by_cases guard2 : (signature.scheme.body != function.type) = true
+      · simp only [guard2] at accepted
+        cases accepted
+      · simp only [guard2] at accepted
+        by_cases guard3 : (signature.parameterComptime != function.typedBody.inputs.map (·.comptime)) = true
+        · simp only [guard3] at accepted
+          cases accepted
+        · simp only [guard3] at accepted
+          by_cases guard4 : (signature.returnComptime != function.returnComptime) = true
+          · simp only [guard4] at accepted
+            cases accepted
+          · simp only [guard4] at accepted
+            obtain ⟨check0, _, accepted⟩ := bind_ok accepted
+            cases check0
+            obtain ⟨check1, _, accepted⟩ := bind_ok accepted
+            cases check1
+            obtain ⟨check2, _, accepted⟩ := bind_ok accepted
+            cases check2
+            obtain ⟨check3, _, accepted⟩ := bind_ok accepted
+            cases check3
+            obtain ⟨canonical, selected, accepted⟩ := bind_ok accepted
+            obtain ⟨after0, _, accepted⟩ := bind_ok accepted
+            obtain ⟨after1, _, accepted⟩ := bind_ok accepted
+            obtain ⟨after2, _, accepted⟩ := bind_ok accepted
+            obtain ⟨after3, _, accepted⟩ := bind_ok accepted
+            cases analysis : SourceStageAnalysis.analyzeFunction (applyCheckedFunction canonical function) with
+            | error error => simp only [analysis] at accepted; cases accepted
+            | ok stages =>
+              simp only [analysis, pure, Except.pure, bind, Except.bind, Except.ok.injEq] at accepted
+              subst specialized
+              exact canonicalSubstitution_parameterDomain selected
+
+/-- Rigid caller specialization changes replacement types and retains the
+ordered keys recorded by expression inference. -/
+@[simp] theorem applyInstantiation_parameterDomain (substitution : ParameterSubstitution)
+    (instantiation : DeclarationInstantiation) :
+    (applyInstantiation substitution instantiation).parameterSubstitution.map Prod.fst =
+      instantiation.parameterSubstitution.map Prod.fst := by
+  simp [applyInstantiation, List.map_map, Function.comp_def]
+end Solcore.Frontend.SourceSpecialization
