@@ -1,6 +1,7 @@
 import Solcore.Test.SourceCoreCompatiblePayload
 import Solcore.Test.SourceCoreCompatibleMappings
 import Solcore.Test.SourceCoreCompatibleEncoding
+import Solcore.Test.SourceCoreCompatibleEqualityProofs
 import Solcore.Test.SourceCoreDataPlacePathFaults
 import Solcore.Test.SourceCoreDataPlaceWriteBack
 import Solcore.Test.SourceCoreStageContracts
@@ -59,6 +60,11 @@ import Solcore.Test.SourceCoreCompatibleMarkedFunctions
 import Solcore.Test.SourceCoreCompatibleMarkedLedger
 import Solcore.Test.SourceCoreCallableViews
 import Solcore.Test.SourceCoreCallableViewWrappers
+import Solcore.Test.SourceCoreCallablePrincipals
+import Solcore.Test.SourceCoreCallableContextFrames
+import Solcore.Test.SourceCoreCallableContextFrameProofs
+import Solcore.Test.SourceCoreLambdaTemplates
+import Solcore.Test.SourceCoreCompatibleHeapOutputs
 import Solcore.Test.SourceCoreNativeEntry
 import Solcore.Test.SourceCoreRepresentationProjection
 import Solcore.Test.SourceCompilerSourceBoundaryObservations
@@ -2585,6 +2591,7 @@ def run : IO Unit := do
   SourceCoreCompatiblePayload.run
   SourceCoreCompatibleMappings.run
   SourceCoreCompatibleEncoding.run
+  SourceCoreCompatibleEqualityProofs.run
   SourceCoreCompatibleDataExpressions.run
   SourceCoreCompatibleDataControl.run
   SourceCoreCompatibleFunctions.run
@@ -2595,6 +2602,11 @@ def run : IO Unit := do
   SourceCoreCompatibleMarkedLedger.run
   SourceCoreCallableViews.run
   SourceCoreCallableViewWrappers.run
+  SourceCoreCallablePrincipals.run
+  SourceCoreCallableContextFrames.run
+  SourceCoreCallableContextFrameProofs.run
+  SourceCoreLambdaTemplates.run
+  SourceCoreCompatibleHeapOutputs.run
   SourceCoreNativeEntry.run
   SourceCoreRepresentationProjection.run
   SourceCompilerSourceBoundaryObservations.run

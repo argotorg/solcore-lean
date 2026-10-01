@@ -54,6 +54,11 @@ import Solcore.Frontend.SourceCoreCompatibleMarkedFunctions
 import Solcore.Frontend.SourceCoreCompatibleMarkedLedger
 import Solcore.Frontend.SourceCoreCallableViews
 import Solcore.Frontend.SourceCoreCallableViewWrappers
+import Solcore.Frontend.SourceCoreCallableViewLowering
+import Solcore.Frontend.SourceCoreCallablePrincipals
+import Solcore.Frontend.SourceCoreCallableContextFrames
+import Solcore.Frontend.SourceCoreLambdaTemplates
+import Solcore.Frontend.SourceCoreCompatibleHeapOutputs
 import Solcore.Frontend.SourceCoreCompatibleDataPlaces
 import Solcore.Frontend.SourceCoreCompatibleDataMatches
 import Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites

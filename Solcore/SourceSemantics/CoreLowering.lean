@@ -1,7 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePayload
 import Solcore.SourceSemantics.CoreLowering.CompatibleMappings
 import Solcore.SourceSemantics.CoreLowering.CompatibleEncoding
+import Solcore.SourceSemantics.CoreLowering.CompatibleEqualityEncoding
 import Solcore.SourceSemantics.CoreLowering.CallableViewWrappers
+import Solcore.SourceSemantics.CoreLowering.CallableContextFrames
 import Solcore.SourceSemantics.CoreLowering.DataPlaceFaultTree
 import Solcore.SourceSemantics.CoreLowering.DataPlaceWriteBack
 import Solcore.SourceSemantics.CoreLowering.FunctionValues
