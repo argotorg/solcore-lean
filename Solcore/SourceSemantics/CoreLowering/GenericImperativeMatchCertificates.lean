@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeForCertificates
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeReceipts
 
 /-! Real native typing is inverted along emitted lexical/assignment/loop
 wrappers. Generic expression extraction consumes retained source syntax and
@@ -17,9 +18,9 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {reasonAt : ExpressionId → Word}
   {definitions : DataEnvironment} {administrative : Core.Context}
 
-/-- Source scope agreement and the real native typing of emitted match
-children are explicit static profile receipts. They are not child execution
-or a source meaning inferred from native type equality. -/
+/-- Source scope agreement remains an independent static profile receipt.
+Native typing of actual child callbacks is derived from the whole emitted
+match, without a separate child typing or execution premise. -/
 def MatchChildStatic (compilation : SourceCoreCompatibleDataMatches.Context)
     (source : TypedSource) (certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate)
     (definitions : DataEnvironment) (administrative : Core.Context) : Prop :=
@@ -31,9 +32,7 @@ def MatchChildStatic (compilation : SourceCoreCompatibleDataMatches.Context)
     HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions →
     ∀ request, request ∈ requests → ∀ childContext,
       GenericMatchChildren.ContextFor source context scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
-      CompatibleExpressionReads.ScopeDeclarations source request.scope childContext ∧
-      ∃ childNativeType, HasType (SourceCoreLocalCell.coreContext request.scope ++ administrative)
-        request.code childNativeType definitions
+      CompatibleExpressionReads.ScopeDeclarations source request.scope childContext
 
 variable {matchCompilation : SourceCoreCompatibleDataMatches.Context}
 
@@ -484,16 +483,16 @@ theorem tree_of_typed_position
       obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
       cases accepted
       obtain ⟨⟨matchedType, matchedTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
-      obtain ⟨requests, receipt, _, generatedChildren⟩ := GenericMatchChildren.finite_of_lower
-        (expressionCertificate := certificates context)
+      obtain ⟨requests, receipt, _, generatedChildren⟩ := CompatibleMatchNativeReceipts.finite_typed_of_lower
+        onError matchAllocator matchDefinitions (expressionCertificate := certificates context)
         (fun childFuel lowered generated => expressions context closed residual sourceSignatures declarations
-          scrutineeSyntax scrutineeFound scrutineeTyped generated) generatedMatch
+          scrutineeSyntax scrutineeFound scrutineeTyped generated) generatedMatch matchedTyped
       apply Tree.matchWith found form scrutineeFound scrutineeTyped casesTyped defaultTyped matchCompilation
         matchValues matchDefinitions matchAllocator requests receipt
         (CompatibleMatchSelectionPrefix.ordinary_of_source_ids receipt hiddenOrdinary armsOrdinary)
       · intro request member childContext selectedContext
-        obtain ⟨childFuel, generated⟩ := generatedChildren request member
-        obtain ⟨childDeclarations, childNativeType, childTyped⟩ :=
+        obtain ⟨⟨childFuel, generated⟩, childTyped⟩ := generatedChildren request member
+        have childDeclarations :=
           matchChildStatic scrutineeFound declarations receipt matchedTyped request member childContext selectedContext
         obtain ⟨sameSignatures, sameVariables, sameResidual⟩ := GenericMatchChildren.ContextFor.closed_fields selectedContext
         exact childIH request childContext selectedContext (sameVariables.trans closed) (sameResidual.trans residual)
