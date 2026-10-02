@@ -95,6 +95,48 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionLeaves : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
   (functionTypes : FunctionRuntimeViews functions)
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
+theorem Certificate.preserves_reachable
+    (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
+      function.resultType type policy fuel fellThrough escaped code)
+    (errors : GenericImperativeMatch.Tree.ReachableReady registry faults certificate.tree)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping)
+    (trace : FunctionCallBody.Trace program function context environment before outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome := by
+  obtain ⟨resultContext, control, sourceTrace, exit⟩ := trace_control trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
+    certificate.tree.preserves_reachable functions definitions registered catalogValid extension program function.evidence uninitialized missing
+      faithful functionLeaves functionTypes errors contextValid unique environments heaps locals agrees actualTyped reference read unmapped sourceTrace
+  obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
+    cases same
+    exact certificate.tree.true_fallthrough_unit unique sourceTrace)
+    certificate.projection fellThrough escaped escapedFault represented evaluated
+  have evaluated : Evaluates actual store (code.rename ξ) result finalStore := by
+    rw [certificate.emitted, ImperativeFunctionFinish.rename]
+    exact completed
+  exact ⟨result, finalStore, finalMap, finalWorld, evaluated, ImperativeFunctionFinish.result related exit,
+    finalHeaps, maps, worlds, frame, metadata, ⟨resultContext, control, sourceTrace, exit, lexical⟩⟩
+
+include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
 theorem Certificate.preserves
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
@@ -122,25 +164,14 @@ theorem Certificate.preserves
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
         context scope environment before after outcome := by
-  obtain ⟨resultContext, control, sourceTrace, exit⟩ := trace_control trace
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
-    certificate.tree.preserves functions definitions registered catalogValid extension program function.evidence uninitialized missing
-      faithful functionLeaves functionTypes errors contextValid unique environments heaps locals agrees actualTyped reference read unmapped sourceTrace
-  obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
-    cases same
-    exact certificate.tree.true_fallthrough_unit unique sourceTrace)
-    certificate.projection fellThrough escaped escapedFault represented evaluated
-  have evaluated : Evaluates actual store (code.rename ξ) result finalStore := by
-    rw [certificate.emitted, ImperativeFunctionFinish.rename]
-    exact completed
-  exact ⟨result, finalStore, finalMap, finalWorld, evaluated, ImperativeFunctionFinish.result related exit,
-    finalHeaps, maps, worlds, frame, metadata, ⟨resultContext, control, sourceTrace, exit, lexical⟩⟩
+  apply Certificate.preserves_reachable (functions := functions) (certificate := certificate) (errors := errors.reachable)
+  all_goals assumption
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
-theorem Certificate.reflects
+theorem Certificate.reflects_reachable
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
-    (errors : GenericImperativeMatch.Tree.Ready registry faults certificate.tree)
+    (errors : GenericImperativeMatch.Tree.ReachableReady registry faults certificate.tree)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -167,7 +198,7 @@ theorem Certificate.reflects
   rw [certificate.emitted, ImperativeFunctionFinish.rename] at evaluated
   obtain ⟨flowValue, middleStore, flowEval⟩ := ImperativeFunctionFinish.input evaluated
   obtain ⟨resultContext, control, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
-    certificate.tree.reflects functions definitions registered catalogValid extension program function.evidence uninitialized missing
+    certificate.tree.reflects_reachable functions definitions registered catalogValid extension program function.evidence uninitialized missing
       faithful functionLeaves functionTypes errors contextValid unique environments heaps locals agrees actualTyped reference read unmapped flowEval
   obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
     cases same
@@ -206,11 +237,82 @@ theorem Certificate.reflects
   exact ⟨outcome, after, finalMap, finalWorld, bodyTrace, result, finalHeaps, maps, worlds, frame, metadata,
     ⟨resultContext, control, trace, exit, lexical⟩⟩
 
+include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
+theorem Certificate.reflects
+    (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
+      function.resultType type policy fuel fellThrough escaped code)
+    (errors : GenericImperativeMatch.Tree.Ready registry faults certificate.tree)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      FunctionCallBody.Trace program function context environment before outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome := by
+  apply Certificate.reflects_reachable (functions := functions) (certificate := certificate) (errors := errors.reachable)
+  all_goals assumption
 
 include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
 /-- Finite source call completion and completed Core execution are equivalent.
 Suspension is outside both sides; no common fuel bound or termination premise
 is required. The stronger preceding theorems retain result and heap relations. -/
+theorem Certificate.finite_iff_reachable
+    (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
+      function.resultType type policy fuel fellThrough escaped code)
+    (errors : GenericImperativeMatch.Tree.ReachableReady registry faults certificate.tree)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store : Store} {ξ : Renaming}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping)
+:
+    (∃ runtimeFuel value finalStore,
+      Core.runStateful runtimeFuel (.initial (code.rename ξ) actual store) =
+        .done value finalStore) ↔
+    (∃ outcome after,
+      FunctionCallBody.Trace program function context environment before outcome after) := by
+  constructor
+  · rintro ⟨runtimeFuel, value, finalStore, completed⟩
+    obtain ⟨outcome, after, _, _, trace, _⟩ :=
+      certificate.reflects_reachable functions extension definitions registered catalogValid program
+        contextValid unique escapedFault uninitialized missing faithful functionLeaves functionTypes
+        errors environments heaps locals agrees actualTyped reference read unmapped
+        (Core.runStateful_evaluation_sound completed)
+    exact ⟨outcome, after, trace⟩
+  · rintro ⟨outcome, after, trace⟩
+    obtain ⟨value, finalStore, _, _, evaluated, _⟩ :=
+      certificate.preserves_reachable functions extension definitions registered catalogValid program
+        contextValid unique escapedFault uninitialized missing faithful functionLeaves functionTypes
+        errors environments heaps locals agrees actualTyped reference read unmapped trace
+    obtain ⟨runtimeFuel, completed⟩ :=
+      Core.evaluation_runStateful_complete_with_sufficient_fuel evaluated
+    exact ⟨runtimeFuel, value, finalStore, completed runtimeFuel (Nat.le_refl _)⟩
+
+include definitions registered catalogValid escapedFault extension faithful functionLeaves functionTypes contextValid unique uninitialized missing in
 theorem Certificate.finite_iff
     (certificate : Certificate layouts owner active frameLayout globals onError readFuel values function.source context solved reasonAt ambient.definitions administrative scope function.body
       function.resultType type policy fuel fellThrough escaped code)
@@ -234,21 +336,7 @@ theorem Certificate.finite_iff
         .done value finalStore) ↔
     (∃ outcome after,
       FunctionCallBody.Trace program function context environment before outcome after) := by
-  constructor
-  · rintro ⟨runtimeFuel, value, finalStore, completed⟩
-    obtain ⟨outcome, after, _, _, trace, _⟩ :=
-      certificate.reflects functions extension definitions registered catalogValid program
-        contextValid unique escapedFault uninitialized missing faithful functionLeaves functionTypes
-        errors environments heaps locals agrees actualTyped reference read unmapped
-        (Core.runStateful_evaluation_sound completed)
-    exact ⟨outcome, after, trace⟩
-  · rintro ⟨outcome, after, trace⟩
-    obtain ⟨value, finalStore, _, _, evaluated, _⟩ :=
-      certificate.preserves functions extension definitions registered catalogValid program
-        contextValid unique escapedFault uninitialized missing faithful functionLeaves functionTypes
-        errors environments heaps locals agrees actualTyped reference read unmapped trace
-    obtain ⟨runtimeFuel, completed⟩ :=
-      Core.evaluation_runStateful_complete_with_sufficient_fuel evaluated
-    exact ⟨runtimeFuel, value, finalStore, completed runtimeFuel (Nat.le_refl _)⟩
+  apply Certificate.finite_iff_reachable (functions := functions) (certificate := certificate) (errors := errors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchBody

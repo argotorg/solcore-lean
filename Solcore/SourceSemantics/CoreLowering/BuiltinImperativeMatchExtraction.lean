@@ -19,6 +19,18 @@ abbrev Extraction (layouts : SourceCoreAllocationLayouts.Prepared)
     (fun context => CompatibleExpressionBuiltins.Tree readFuel values source context solved reasonAt)
     definitions administrative solved
 
+abbrev ExtractionFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (layouts : SourceCoreAllocationLayouts.Prepared)
+    (owner : SourceSpecialization.SpecializationKey) (active : TypeSystem.Substitution)
+    (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    (readFuel : Nat) (values : ValuesContext) (source : TypedSource)
+    (solved : List SolvedRequirement) (reasonAt : ExpressionId → Word)
+    (definitions : DataEnvironment) (administrative : Core.Context) :=
+  GenericImperativeMatch.ExtractionFor diagnosticPolicy layouts owner active frame globals onError values source
+    (CompatibleExpressionBuiltins.Syntax source)
+    (fun context => CompatibleExpressionBuiltins.Tree readFuel values source context solved reasonAt)
+    definitions administrative solved
+
 /- Both ledgers come from explicit compiler contexts. Emitted code and value
 catalog equality are not used to infer their equality. -/
 section Certificates
@@ -41,6 +53,70 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {native : SourceCoreGeneralFunctions.CallableContext} {parent : Option SourceCoreLocalEvidence.Prepared}
   {skipInitializer : Option ExpressionId}
 
+theorem extraction_of_contextual_body_for (diagnosticPolicy : AssignmentDiagnosticPolicy)
+    {matchCompilation : SourceCoreCompatibleDataMatches.Context}
+    (matchPolicy : policy.lowerMatch = some (SourceCoreCompatibleDataMatches.lowerWithReasons matchCompilation))
+    (matchValues : matchCompilation.values = values) (matchDefinitions : matchCompilation.definitions = definitions)
+    (matchLedger : matchCompilation.solvedRequirements = compilation.solvedRequirements)
+    (matchAllocator : matchCompilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (matchChildStatic : GenericImperativeMatch.MatchChildStatic matchCompilation source
+      (fun context => CompatibleExpressionBuiltins.Tree readFuel values source context compilation.solvedRequirements reasonAt)
+      definitions administrative)
+    (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
+    (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (assignments : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missingDefault)
+    (unique : NodeOccurrencesUnique source)
+    (ordinary : CompatibleExpressionBuiltins.Ordinary source locals compilation.owner)
+    (expressionPolicy : policy.lowerExpression = SourceCoreGeneralFunctions.lowerContextualExpression
+      program representation signatures locals parents assignmentsTable diagnostics compilation (some native) parent skipInitializer)
+    (expressionRead : representation.expressions.readExpression = SourceCoreCompatibleDataExpressions.readExpression values.checked)
+    (lowerRead : representation.expressions.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values)
+    (leafPolicy : representation.expressions.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (nativeTyping : ∀ sourceContext scope fuel id lowered,
+      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = false →
+      sourceContext.signatures = values.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations source scope sourceContext →
+      CompatibleExpressionBuiltins.Syntax source id → ∀ node,
+      source.lookupExpression? id = some node → ExpressionHasType source sourceContext id node.type →
+      policy.lowerExpression fuel source scope id reasonAt = .ok lowered →
+      HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+        (LanguageResult.resultType lowered.type) definitions)
+    {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (syntaxTree : Syntax source context (.statements true statements) expected)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (sourceSignatures : context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {fuel : Nat} {type nativeType : Ty} {code : Expr} {fellThrough escaped : Word}
+    (projection : values.checked.catalog.project expected = .ok type)
+    (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel source scope statements type reasonAt fellThrough escaped = .ok code)
+    (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
+    ∃ flow,
+      SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope statements type reasonAt true escaped = .ok flow ∧
+      ∃ _extracted : ExtractionFor diagnosticPolicy layouts owner active frame globals onError readFuel values source compilation.solvedRequirements reasonAt definitions administrative
+        context scope (.statements true statements) expected type flow,
+      code = LocalControl.finish type (LocalLoop.toControl type flow escaped)
+        (if type = .unit then LanguageResult.success .unit else LanguageResult.failure type (.word fellThrough)) := by
+  obtain ⟨flow, generated, extracted, same⟩ := GenericImperativeMatch.extraction_of_typed_body_for diagnosticPolicy
+    (certificates := fun context => CompatibleExpressionBuiltins.Tree readFuel values source context compilation.solvedRequirements reasonAt)
+    matchPolicy matchValues matchDefinitions matchAllocator matchChildStatic readPolicy binderPolicy allocationPolicy
+    (fun sourceContext closed residual signatures scope fuel id node lowered declarations syntaxTree found typed generated =>
+      CompatibleExpressionBuiltins.tree_of_contextual ordinary unique closed residual declarations signatures
+        syntaxTree found typed expressionRead lowerRead leafPolicy (expressionPolicy ▸ generated))
+    assignments unaryPolicy unique
+    (fun sourceContext scope fuel id lowered closed residual signatures declarations syntaxTree node found typed generated =>
+      ⟨CompatibleExpressionBuiltins.tree_of_contextual ordinary unique closed residual declarations signatures
+        syntaxTree found typed expressionRead lowerRead leafPolicy (expressionPolicy ▸ generated),
+        nativeTyping sourceContext scope fuel id lowered closed residual signatures declarations syntaxTree node found typed generated⟩)
+    syntaxTree closed residual sourceSignatures declarations projection accepted nativeTyped
+  exact ⟨flow, generated, matchLedger ▸ extracted, same⟩
+
+/-- The production loop policy fixes the match ledger and allocator directly.
+Only source-hidden freshness, source typing and native typing remain here. -/
 theorem extraction_of_contextual_body
     {matchCompilation : SourceCoreCompatibleDataMatches.Context}
     (matchPolicy : policy.lowerMatch = some (SourceCoreCompatibleDataMatches.lowerWithReasons matchCompilation))
@@ -89,22 +165,65 @@ theorem extraction_of_contextual_body
         context scope (.statements true statements) expected type flow,
       code = LocalControl.finish type (LocalLoop.toControl type flow escaped)
         (if type = .unit then LanguageResult.success .unit else LanguageResult.failure type (.word fellThrough)) := by
-  obtain ⟨flow, generated, extracted, same⟩ := GenericImperativeMatch.extraction_of_typed_body
-    (certificates := fun context => CompatibleExpressionBuiltins.Tree readFuel values source context compilation.solvedRequirements reasonAt)
-    matchPolicy matchValues matchDefinitions matchAllocator matchChildStatic readPolicy binderPolicy allocationPolicy
-    (fun sourceContext closed residual signatures scope fuel id node lowered declarations syntaxTree found typed generated =>
-      CompatibleExpressionBuiltins.tree_of_contextual ordinary unique closed residual declarations signatures
-        syntaxTree found typed expressionRead lowerRead leafPolicy (expressionPolicy ▸ generated))
-    assignments unaryPolicy unique
-    (fun sourceContext scope fuel id lowered closed residual signatures declarations syntaxTree node found typed generated =>
-      ⟨CompatibleExpressionBuiltins.tree_of_contextual ordinary unique closed residual declarations signatures
-        syntaxTree found typed expressionRead lowerRead leafPolicy (expressionPolicy ▸ generated),
-        nativeTyping sourceContext scope fuel id lowered closed residual signatures declarations syntaxTree node found typed generated⟩)
-    syntaxTree closed residual sourceSignatures declarations projection accepted nativeTyped
-  exact ⟨flow, generated, matchLedger ▸ extracted, same⟩
+  obtain ⟨flow, generated, extracted, same⟩ := extraction_of_contextual_body_for .unconditional (matchCompilation := matchCompilation) (matchPolicy := matchPolicy) (matchValues := matchValues) (matchDefinitions := matchDefinitions) (matchLedger := matchLedger) (matchAllocator := matchAllocator) (matchChildStatic := matchChildStatic) (readPolicy := readPolicy) (binderPolicy := binderPolicy) (allocationPolicy := allocationPolicy) (assignments := assignments) (unaryPolicy := unaryPolicy) (unique := unique) (ordinary := ordinary) (expressionPolicy := expressionPolicy) (expressionRead := expressionRead) (lowerRead := lowerRead) (leafPolicy := leafPolicy) (nativeTyping := nativeTyping) (context := context) (scope := scope) (statements := statements) (expected := expected) (syntaxTree := syntaxTree) (closed := closed) (residual := residual) (sourceSignatures := sourceSignatures) (declarations := declarations) (fuel := fuel) (type := type) (nativeType := nativeType) (code := code) (fellThrough := fellThrough) (escaped := escaped) (projection := projection) (accepted := accepted) (nativeTyped := nativeTyped)
+  exact ⟨flow, generated, extracted.to_strict, same⟩
 
-/-- The production loop policy fixes the match ledger and allocator directly.
-Only source-hidden freshness, source typing and native typing remain here. -/
+theorem extraction_of_fixed_contextual_body_for (diagnosticPolicy : AssignmentDiagnosticPolicy)
+    (fixedPolicy : policy = SourceCoreCompatibleDataMatches.loopPolicy values compilation.solvedRequirements
+      assignmentsTable diagnostics compilation.owner policy.lowerExpression
+      (some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals (layouts.allocatorAt owner active onError)))
+      (some definitions))
+    (hidden : GenericImperativeMatch.MatchHiddenFresh source)
+    (assignments : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missingDefault)
+    (unique : NodeOccurrencesUnique source)
+    (ordinary : CompatibleExpressionBuiltins.Ordinary source locals compilation.owner)
+    (expressionPolicy : policy.lowerExpression = SourceCoreGeneralFunctions.lowerContextualExpression
+      program representation signatures locals parents assignmentsTable diagnostics compilation (some native) parent skipInitializer)
+    (expressionRead : representation.expressions.readExpression = SourceCoreCompatibleDataExpressions.readExpression values.checked)
+    (lowerRead : representation.expressions.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values)
+    (leafPolicy : representation.expressions.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (nativeTyping : ∀ sourceContext scope fuel id lowered,
+      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = false →
+      sourceContext.signatures = values.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations source scope sourceContext →
+      CompatibleExpressionBuiltins.Syntax source id → ∀ node,
+      source.lookupExpression? id = some node → ExpressionHasType source sourceContext id node.type →
+      policy.lowerExpression fuel source scope id reasonAt = .ok lowered →
+      HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+        (LanguageResult.resultType lowered.type) definitions)
+    {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (syntaxTree : Syntax source context (.statements true statements) expected)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (sourceSignatures : context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {fuel : Nat} {type nativeType : Ty} {code : Expr} {fellThrough escaped : Word}
+    (projection : values.checked.catalog.project expected = .ok type)
+    (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel source scope statements type reasonAt fellThrough escaped = .ok code)
+    (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
+    ∃ flow,
+      SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope statements type reasonAt true escaped = .ok flow ∧
+      ∃ _extracted : ExtractionFor diagnosticPolicy layouts owner active frame globals onError readFuel values source compilation.solvedRequirements reasonAt definitions administrative
+        context scope (.statements true statements) expected type flow,
+      code = LocalControl.finish type (LocalLoop.toControl type flow escaped)
+        (if type = .unit then LanguageResult.success .unit else LanguageResult.failure type (.word fellThrough)) := by
+  exact extraction_of_contextual_body_for diagnosticPolicy
+    (matchCompilation := ⟨values, compilation.solvedRequirements,
+      some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals (layouts.allocatorAt owner active onError)),
+      some definitions⟩)
+    (by rw [fixedPolicy]; rfl) rfl rfl rfl rfl
+    (GenericImperativeMatch.MatchChildStatic.of_hidden
+      (matchCompilation := ⟨values, compilation.solvedRequirements,
+        some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals (layouts.allocatorAt owner active onError)),
+        some definitions⟩)
+      (certificates := fun context => CompatibleExpressionBuiltins.Tree readFuel values source context compilation.solvedRequirements reasonAt)
+      (definitions := definitions) (administrative := administrative) hidden)
+    (by rw [fixedPolicy]; rfl)
+    (by intro scope binder _; rw [fixedPolicy]; rfl)
+    (by rw [fixedPolicy]; rfl)
+    assignments unaryPolicy unique ordinary expressionPolicy expressionRead lowerRead leafPolicy nativeTyping
+    syntaxTree closed residual sourceSignatures declarations projection accepted nativeTyped
+
 theorem extraction_of_fixed_contextual_body
     (fixedPolicy : policy = SourceCoreCompatibleDataMatches.loopPolicy values compilation.solvedRequirements
       assignmentsTable diagnostics compilation.owner policy.lowerExpression
@@ -144,22 +263,8 @@ theorem extraction_of_fixed_contextual_body
         context scope (.statements true statements) expected type flow,
       code = LocalControl.finish type (LocalLoop.toControl type flow escaped)
         (if type = .unit then LanguageResult.success .unit else LanguageResult.failure type (.word fellThrough)) := by
-  exact extraction_of_contextual_body
-    (matchCompilation := ⟨values, compilation.solvedRequirements,
-      some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals (layouts.allocatorAt owner active onError)),
-      some definitions⟩)
-    (by rw [fixedPolicy]; rfl) rfl rfl rfl rfl
-    (GenericImperativeMatch.MatchChildStatic.of_hidden
-      (matchCompilation := ⟨values, compilation.solvedRequirements,
-        some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals (layouts.allocatorAt owner active onError)),
-        some definitions⟩)
-      (certificates := fun context => CompatibleExpressionBuiltins.Tree readFuel values source context compilation.solvedRequirements reasonAt)
-      (definitions := definitions) (administrative := administrative) hidden)
-    (by rw [fixedPolicy]; rfl)
-    (by intro scope binder _; rw [fixedPolicy]; rfl)
-    (by rw [fixedPolicy]; rfl)
-    assignments unaryPolicy unique ordinary expressionPolicy expressionRead lowerRead leafPolicy nativeTyping
-    syntaxTree closed residual sourceSignatures declarations projection accepted nativeTyped
+  obtain ⟨flow, generated, extracted, same⟩ := extraction_of_fixed_contextual_body_for .unconditional (fixedPolicy := fixedPolicy) (hidden := hidden) (assignments := assignments) (unaryPolicy := unaryPolicy) (unique := unique) (ordinary := ordinary) (expressionPolicy := expressionPolicy) (expressionRead := expressionRead) (lowerRead := lowerRead) (leafPolicy := leafPolicy) (nativeTyping := nativeTyping) (context := context) (scope := scope) (statements := statements) (expected := expected) (syntaxTree := syntaxTree) (closed := closed) (residual := residual) (sourceSignatures := sourceSignatures) (declarations := declarations) (fuel := fuel) (type := type) (nativeType := nativeType) (code := code) (fellThrough := fellThrough) (escaped := escaped) (projection := projection) (accepted := accepted) (nativeTyped := nativeTyped)
+  exact ⟨flow, generated, extracted.to_strict, same⟩
 
 end Certificates
 end Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatch
