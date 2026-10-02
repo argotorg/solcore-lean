@@ -424,6 +424,10 @@ import Solcore.SourceSemantics.CoreLowering.NamedLoopFunctionFallthrough
 import Solcore.SourceSemantics.CoreLowering.NamedLoopFunctionBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.ProtectedForGenericEndpoint
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchExtraction
+import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderPost
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionScalarNativeTyping
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
